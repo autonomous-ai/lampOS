@@ -1,3 +1,19 @@
+## 2026-10-27 13:00 UTC — Common 314 native gates pass on the observed merge
+
+Ready for lamp-voice: no
+
+[Native receipt](verification/common-314-native-20261027/receipt.json): ARM64
+40504365418 and Linux Clippy 40504365398 pass on actual merge `4339358153` /
+tree `fd5a343984`, parents `241f5150` + published `314a0f6b`. ARM records
+11,905 unique passes / zero failures, leaks or timeouts; 106 summary skips.
+All 112 / current 525 pass once, with 25 overlaps not added; the separate Linux
+repair also passes once. Separate docs 4/0 across 47 targets, relay aggregate OK,
+process 13/0, and export 48 binaries + two examples remain separate.
+The 118 MB artifact ZIP digest matches API/upload evidence; its contents were
+not downloaded or independently rehashed. Prior local proof and failed ARM
+outcomes remain unchanged. Current-base/readers/privacy/pins/lamp holds remain;
+no current worktree, later carry or Ready qualification is implied.
+
 ## 2026-10-27 12:31 UTC — Common 8d93 local gate and metadata fold complete
 
 Ready for lamp-voice: no

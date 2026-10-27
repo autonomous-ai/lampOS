@@ -1,0 +1,4202 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::original_admission_distinguishes_room_from_narrowed_private_and_revocation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8261,
+    "retained_log_line": 9149
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::cache_uses_latest_face_never_sticky_session_owner_and_expires",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8251,
+    "retained_log_line": 9139
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::refreshed_observation_is_hashed_off_path_and_uses_its_original_expiry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8265,
+    "retained_log_line": 9153
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::contention_is_unknown_instead_of_waiting_or_reusing_an_old_person",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8254,
+    "retained_log_line": 9142
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::invalidation_never_waits_for_a_refresh_lock_and_retires_inflight_reads",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8257,
+    "retained_log_line": 9145
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_narrowed_lease_reads_the_room_at_every_later_boundary",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8248,
+    "retained_log_line": 9136
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::owner_drop_revokes_every_task_lease_without_revoking_a_new_request",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8262,
+    "retained_log_line": 9150
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::revocation_after_borrow_requires_a_fresh_boundary_check",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8266,
+    "retained_log_line": 9154
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::looking_later_keeps_one_recorder_and_never_upgrades_room_disclosure",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8260,
+    "retained_log_line": 9148
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_recorder_is_issued_once_and_seals_only_its_request",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8271,
+    "retained_log_line": 9159
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_proof_rejects_wrong_worker_session_and_request_without_transfer",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8269,
+    "retained_log_line": 9157
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_proof_requires_exactly_one_well_formed_boot_qualified_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8270,
+    "retained_log_line": 9158
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::room_speaker_proof_keeps_old_and_new_boots_distinct_for_pending_photos",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8267,
+    "retained_log_line": 9155
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_expiry_stays_anchored_to_audio_end_and_has_strict_bounds",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8268,
+    "retained_log_line": 9156
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::held_narrowed_and_revoked_requests_never_expose_speaker_proof",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8256,
+    "retained_log_line": 9144
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::dropping_the_request_owner_revokes_unsealed_and_sealed_speaker_proofs",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8255,
+    "retained_log_line": 9143
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_known_face_lost_with_no_face_in_view_keeps_its_scope_through_the_gap",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8245,
+    "retained_log_line": 9133
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::lamp_c0a4s_timeline_a_line_decided_4_to_6_s_after_the_answer_is_held",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8259,
+    "retained_log_line": 9147
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::lamp_c0a4s_question_9_s_after_the_answer_is_held_past_a_sound_of_no_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8258,
+    "retained_log_line": 9146
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_face_in_view_or_no_look_or_the_switch_off_holds_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8241,
+    "retained_log_line": 9129
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_gap_is_held_only_for_someone_the_lamp_was_just_talking_with",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8242,
+    "retained_log_line": 9130
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::an_unproved_private_read_check_does_not_poison_a_later_actual_proof",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8250,
+    "retained_log_line": 9138
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::private_read_loss_is_shared_by_clones_and_cannot_be_reproved",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8264,
+    "retained_log_line": 9152
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_new_request_has_fresh_private_read_state_after_the_previous_lost_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8249,
+    "retained_log_line": 9137
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::private_read_loss_does_not_revoke_narrow_or_destroy_the_original_speaker",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8263,
+    "retained_log_line": 9151
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::concurrent_true_and_false_after_private_proof_always_finish_lost",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8253,
+    "retained_log_line": 9141
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::checking_can_only_pause_a_pinned_grant_and_never_wins_over_loss",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8252,
+    "retained_log_line": 9140
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8243,
+    "retained_log_line": 9131
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_face_first_named_after_the_lines_end_and_the_wait_is_not_the_keeper",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8244,
+    "retained_log_line": 9132
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8278,
+    "retained_log_line": 9166
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_late_look_is_armed_only_while_the_cache_is_cold",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8246,
+    "retained_log_line": 9134
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_cache_gone_cold_during_the_line_arms_its_late_look_at_the_end",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8279,
+    "retained_log_line": 9167
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_line_begun_cold_keeps_only_for_a_face_seen_or_named_at_its_start",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8326,
+    "retained_log_line": 9214
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_change_in_the_eyes_known_file_makes_the_cache_cold",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 8239,
+    "retained_log_line": 9127
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::reviewer_second_owner_name_does_not_follow_sticky_person_to_unknown_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10445,
+    "retained_log_line": 11333
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_empty_rooms_turn_then_an_unknown_faces_carry_no_typed_name",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10418,
+    "retained_log_line": 11306
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_skills_look_needs_the_switch_on_and_a_full_look",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10401,
+    "retained_log_line": 11289
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_airs_note_is_given_once_when_due",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10452,
+    "retained_log_line": 11340
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_heard_as_nothing_the_conversation_means_is_held_as_unclear",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10375,
+    "retained_log_line": 11263
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_routes_lines_are_one_sessions_and_eight_held_renew_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10482,
+    "retained_log_line": 11370
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10344,
+    "retained_log_line": 11232
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_room_never_holds_a_line_that_calls_the_lamp",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10345,
+    "retained_log_line": 11233
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_rooms_fifteen_seconds_count_from_the_end_of_the_lamps_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10347,
+    "retained_log_line": 11235
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_just_after_a_long_answer_is_in_a_conversation_going_on",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10378,
+    "retained_log_line": 11266
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_rooms_conversation_goes_on_fifteen_seconds",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10346,
+    "retained_log_line": 11234
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_journal_names_the_sign_that_let_a_line_out",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10464,
+    "retained_log_line": 11352
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_face_alone_lets_no_line_out_in_a_busy_room_on_this_route",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10510,
+    "retained_log_line": 11398
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10515,
+    "retained_log_line": 11403
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_begun_while_the_answer_plays_goes_on",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10511,
+    "retained_log_line": 11399
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_another_voice_makes_the_room_busy_before_its_own_verdict",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10513,
+    "retained_log_line": 11401
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_colleague_off_camera_is_answered_while_the_person_faces_the_lamp",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10509,
+    "retained_log_line": 11397
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_two_faces_in_view_make_the_room_busy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10514,
+    "retained_log_line": 11402
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_two_faces_must_stay",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10528,
+    "retained_log_line": 11416
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10527,
+    "retained_log_line": 11415
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10820,
+    "retained_log_line": 11708
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10512,
+    "retained_log_line": 11400
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::another_voice_going_on_is_held_and_the_conversations_own_goes_on",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10421,
+    "retained_log_line": 11309
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10372,
+    "retained_log_line": 11260
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10366,
+    "retained_log_line": 11254
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10459,
+    "retained_log_line": 11347
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10362,
+    "retained_log_line": 11250
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10358,
+    "retained_log_line": 11246
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_window_keeps_the_same_voice_sign_for_going_on_same_one",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10371,
+    "retained_log_line": 11259
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10368,
+    "retained_log_line": 11256
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_same_speaker_goes_on_five_turns_in_a_busy_room_only_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10485,
+    "retained_log_line": 11373
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleagues_line_is_held_and_two_in_a_row_end_the_carry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10361,
+    "retained_log_line": 11249
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owners_five_turns_go_on_past_one_colleague_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10475,
+    "retained_log_line": 11363
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_sure_other_voice_is_one_colleague_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10369,
+    "retained_log_line": 11257
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_a_held_colleague_the_owners_voice_alone_must_be_nearer_theirs",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10414,
+    "retained_log_line": 11302
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::two_held_colleagues_keep_the_older_voice_constraint",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10499,
+    "retained_log_line": 11387
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::held_voice_constraints_close_with_the_carry_and_reject_old_callbacks",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10434,
+    "retained_log_line": 11322
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_full_held_voice_bound_keeps_the_owner_by_face_until_a_fresh_call",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10364,
+    "retained_log_line": 11252
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10394,
+    "retained_log_line": 11282
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_fresh_call_clears_the_previous_callers_held_voice_constraints",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10363,
+    "retained_log_line": 11251
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_calling_the_lamp_becomes_the_caller",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10357,
+    "retained_log_line": 11245
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_with_no_sure_sign_is_held_and_ends_no_carry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10382,
+    "retained_log_line": 11270
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owner_turned_to_a_colleague_is_held_and_ends_the_carry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10474,
+    "retained_log_line": 11362
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleagues_face_is_held_in_a_room_not_busy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10360,
+    "retained_log_line": 11248
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_carry_ends_twenty_seconds_after_the_lamps_words_by_the_lines_start",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10458,
+    "retained_log_line": 11346
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_stop_a_privacy_change_or_a_forgetting_ends_the_carry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10404,
+    "retained_log_line": 11292
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_unsure_print_of_a_carried_line_ends_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10370,
+    "retained_log_line": 11258
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owners_line_seven_seconds_after_an_answer_with_a_short_print_is_carried",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10476,
+    "retained_log_line": 11364
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_within_the_eight_seconds_is_held_and_two_end_the_carry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10359,
+    "retained_log_line": 11247
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_unsure_print_with_no_face_decides_nothing_whenever_it_comes",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10420,
+    "retained_log_line": 11308
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_unknown_voice_let_out_in_the_eight_seconds_is_no_identity_past_them",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10419,
+    "retained_log_line": 11307
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_sure_other_voice_within_the_eight_seconds_is_held",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10405,
+    "retained_log_line": 11293
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_low_print_without_spoken_to_keeps_the_conversation_going",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10383,
+    "retained_log_line": 11271
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_trusted_session_does_not_carry_to_another_voice",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10407,
+    "retained_log_line": 11295
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_holds_only_for_the_one_the_lamp_answered",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10431,
+    "retained_log_line": 11319
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::same_voice_starts_for_the_rules_that_read_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10447,
+    "retained_log_line": 11335
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_same_one_holds_without_spoken_to",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10432,
+    "retained_log_line": 11320
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_same_one_plays_the_conversations_voice_and_holds_another",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10433,
+    "retained_log_line": 11321
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_caller_let_in_by_a_turned_face_takes_the_conversations_voice",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10352,
+    "retained_log_line": 11240
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_unanswered_carries_the_next_lines_for_fifteen_seconds",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10351,
+    "retained_log_line": 11239
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10469,
+    "retained_log_line": 11357
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::someone_else_by_voice_only_under_0_30",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10448,
+    "retained_log_line": 11336
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_let_out_carries_the_next_line_though_the_lamp_said_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10349,
+    "retained_log_line": 11237
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamp_just_asked_only_with_its_question_in_a_conversation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10465,
+    "retained_log_line": 11353
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_facts_are_the_live_routes_own",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10460,
+    "retained_log_line": 11348
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_holds_nothing_without_a_sign_of_someone_else",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10438,
+    "retained_log_line": 11326
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_holds_the_talk_without_spoken_to",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10439,
+    "retained_log_line": 11327
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_plays_the_callers_speaking_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10440,
+    "retained_log_line": 11328
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_takes_a_face_turned_to_the_lamp_for_the_callers",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10442,
+    "retained_log_line": 11330
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_callers_face_goes_with_privacy_the_window_and_the_eyes_boot",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10457,
+    "retained_log_line": 11345
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_without_voice_or_face_plays_one_persons_follow_ups",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10443,
+    "retained_log_line": 11331
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_plays_the_callers_voice",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10441,
+    "retained_log_line": 11329
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_request_going_on_keeps_only_the_one_just_before_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10398,
+    "retained_log_line": 11286
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_carried_over_call_keeps_the_space_between_its_halves",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10354,
+    "retained_log_line": 11242
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_rule_holds_office_talk_and_lets_a_call_or_a_follow_up_through",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10483,
+    "retained_log_line": 11371
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_answer_ends_when_its_sound_has_all_been_played",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10417,
+    "retained_log_line": 11305
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_spoken_turn_is_given_its_few_functions_and_the_rest_behind_one",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10402,
+    "retained_log_line": 11290
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_call_for_the_rest_is_answered_by_the_route",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10456,
+    "retained_log_line": 11344
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_production_audio_runner_keeps_skills_identity_and_private_offers",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10479,
+    "retained_log_line": 11367
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_audio_runner_keeps_more_and_the_requests_early_search",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10453,
+    "retained_log_line": 11341
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_audio_runner_refuses_a_changed_or_retired_capability_before_dispatch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10454,
+    "retained_log_line": 11342
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10451,
+    "retained_log_line": 11339
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::stop_during_music_rpc_and_warm_stt_opening_finishes_without_waiting",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10450,
+    "retained_log_line": 11338
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::authority_that_lapsed_in_the_queue_during_a_stall_is_skipped",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10429,
+    "retained_log_line": 11317
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_camera_close_and_a_mute_are_told_as_a_privacy_change",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10353,
+    "retained_log_line": 11241
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10444,
+    "retained_log_line": 11332
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_new_owner_retires_the_old_turn_and_its_late_input",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10389,
+    "retained_log_line": 11277
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turns_end_holds_its_hand_on_to_memory_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10411,
+    "retained_log_line": 11299
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_sends_a_sign_ins_words_as_one_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10488,
+    "retained_log_line": 11376
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_written_request_goes_to_the_chat_as_a_note_and_silence_as_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10413,
+    "retained_log_line": 11301
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_quoted_line_is_never_kept_for_a_later_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10393,
+    "retained_log_line": 11281
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_reads_who_work_can_go_to_as_live_does",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10487,
+    "retained_log_line": 11375
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_takes_the_task_switches_as_live_does",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10490,
+    "retained_log_line": 11378
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_memory_days_the_note_is_asked_once_a_session_and_kept_for_its_turns",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10508,
+    "retained_log_line": 11396
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_note_asked_as_the_turn_is_told_is_waited_for_longer_than_one_asked_ahead",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10390,
+    "retained_log_line": 11278
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10416,
+    "retained_log_line": 11304
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10427,
+    "retained_log_line": 11315
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_attention_near_the_rooms_rise_on_the_bus_makes_a_line_near",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10519,
+    "retained_log_line": 11407
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10543,
+    "retained_log_line": 11431
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_the_name_signal_a_spoken_turn_is_offered_heard_my_name_and_its_call_does_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10520,
+    "retained_log_line": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_health_fact_is_empty_with_the_switch_off_and_when_nothing_is_known",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10461,
+    "retained_log_line": 11349
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_takes_the_live_workers_flags_but_keep_link",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10489,
+    "retained_log_line": 11377
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turn_of_the_known_persons_own_is_told_their_name",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10409,
+    "retained_log_line": 11297
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turn_is_kept_and_told_to_the_next",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10408,
+    "retained_log_line": 11296
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_narrowed_lines_exchange_is_the_rooms_not_the_known_persons",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10387,
+    "retained_log_line": 11275
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_sentence_is_kept_nowhere_and_the_next_line_carries_none_of_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10491,
+    "retained_log_line": 11379
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_texts_system_message_never_has_the_rooms_spoken_conversation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10406,
+    "retained_log_line": 11294
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_worker_answers_a_text_without_the_rooms_spoken_conversation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10497,
+    "retained_log_line": 11385
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_known_person_long_after_another_has_their_own_turns_at_once",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10367,
+    "retained_log_line": 11255
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_persons_first_turn_is_matched_against_their_own_kept_things",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10391,
+    "retained_log_line": 11279
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_is_the_callers_alone_only_with_their_one_face_speaking",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10376,
+    "retained_log_line": 11264
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turns_hits_are_asked_in_its_leases_scope",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10412,
+    "retained_log_line": 11300
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_rule_judges_in_the_room_the_route_keeps",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10428,
+    "retained_log_line": 11316
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_day_and_the_night_bars_are_read_as_on_live",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10425,
+    "retained_log_line": 11313
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_heard_only_in_the_rooms_sound_opens_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10500,
+    "retained_log_line": 11388
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_heard_in_the_rooms_sound_counts_with_one",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10501,
+    "retained_log_line": 11389
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_the_second_sign_drops_earns_no_name_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10386,
+    "retained_log_line": 11274
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_heard_in_the_line_before_does_not_play_the_next",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10384,
+    "retained_log_line": 11272
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_hearing_come_two_lines_late_stays_with_its_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10365,
+    "retained_log_line": 11253
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_at_a_lines_start_goes_on_and_a_kept_hearing_is_used_up",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10348,
+    "retained_log_line": 11236
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_the_name_at_a_lines_start_counts",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10503,
+    "retained_log_line": 11391
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_the_lamp_named_in_passing_stays_dropped",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10502,
+    "retained_log_line": 11390
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_said_late_is_dated_from_when_it_began",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10504,
+    "retained_log_line": 11392
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_a_line_begun_with_the_name_to_a_face_is_answered_in_a_busy_room",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10516,
+    "retained_log_line": 11404
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_office_talk_that_opens_like_the_name_is_not_named",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10518,
+    "retained_log_line": 11406
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_an_unclear_line_named_to_a_face_stays_held",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10517,
+    "retained_log_line": 11405
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_busy_called_strict_office_lines_are_no_call_in_a_busy_room",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10507,
+    "retained_log_line": 11395
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_busy_called_strict_a_call_set_off_or_backed_still_counts",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10506,
+    "retained_log_line": 11394
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_rule_s_switches_each_turn_on_only_their_own_part",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10484,
+    "retained_log_line": 11372
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_speaking_a_silent_face_turned_to_the_lamp_is_nobody_turned_to_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10525,
+    "retained_log_line": 11413
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10521,
+    "retained_log_line": 11409
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_desk_talk_past_a_still_face_is_held_and_makes_the_room_busy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10522,
+    "retained_log_line": 11410
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_the_conversations_voice_still_counts_with_a_still_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10523,
+    "retained_log_line": 11411
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_the_same_speaker_still_goes_on_five_turns",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10524,
+    "retained_log_line": 11412
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::one_person_said_both_lines_by_voice_or_by_one_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10436,
+    "retained_log_line": 11324
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10659,
+    "retained_log_line": 11547
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_chain_with_two_faces_seen_speaking_in_it_breaks_before_the_second",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10355,
+    "retained_log_line": 11243
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turned_face_counts_for_a_first_word_only_when_it_speaks_the_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10410,
+    "retained_log_line": 11298
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_near_check_reads_the_eyes_through_addressed_when_it_runs",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10473,
+    "retained_log_line": 11361
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_close_face_turned_over_the_line_counts_for_a_first_word_through_the_eyes",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10505,
+    "retained_log_line": 11393
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_near_hearing_counts_only_around_the_lines_start",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10388,
+    "retained_log_line": 11276
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10526,
+    "retained_log_line": 11414
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_kept_unjudged_is_read_for_one_speaker_as_a_judged_one",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10379,
+    "retained_log_line": 11267
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_request_with_a_pause_and_one_face_in_view_is_asked_whole",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10496,
+    "retained_log_line": 11384
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_begins_with_the_name_only_when_it_is_set_off_as_a_call",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10373,
+    "retained_log_line": 11261
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_name_heard_as_a_line_began_earns_the_live_routes_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10472,
+    "retained_log_line": 11360
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_the_live_route_would_hold_is_said_as_run_for_the_battery",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10350,
+    "retained_log_line": 11238
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_actions_and_a_line_going_on_read_one_reader_of_the_policy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10466,
+    "retained_log_line": 11354
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_policy_holds_this_routes_actions_only_with_the_bus_and_the_rule",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10477,
+    "retained_log_line": 11365
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10478,
+    "retained_log_line": 11366
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_a_remark_to_the_room_is_held_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10422,
+    "retained_log_line": 11310
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_lines_said_over_the_lamp_are_not_talk_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10424,
+    "retained_log_line": 11312
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_an_answer_ends_a_busy_room_a_minute_later_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10423,
+    "retained_log_line": 11311
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_days_bars_hold_a_name_heard_close_by_day",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10426,
+    "retained_log_line": 11314
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::in_a_busy_room_a_line_going_on_waits_for_the_policy_and_goes_as_it_says",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10435,
+    "retained_log_line": 11323
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_judged_in_a_busy_room_is_known_as_judged_busy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10377,
+    "retained_log_line": 11265
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_a_tool_turn_or_the_lamps_news_a_line_105_s_later_is_judged_as_live_judges_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10415,
+    "retained_log_line": 11303
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_let_out_only_as_the_conversation_going_on_earns_the_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10380,
+    "retained_log_line": 11268
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_begun_over_the_lamps_answer_is_not_told_it_may_be_peoples_talk",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10374,
+    "retained_log_line": 11262
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_reply_to_nothing_the_lamp_asked_said_over_its_answer_is_someone_elses",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10397,
+    "retained_log_line": 11285
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_hearing_hook_is_installed_with_the_switch_alone",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10462,
+    "retained_log_line": 11350
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::spoken_turns_are_told_to_answer_the_likeliest_meaning",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10449,
+    "retained_log_line": 11337
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_plain_ask_for_something_new_is_searched_from_its_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10392,
+    "retained_log_line": 11280
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_search_begun_early_is_taken_once_by_its_request",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10486,
+    "retained_log_line": 11374
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_models_query_adding_a_place_is_not_answered_by_the_early_search",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10471,
+    "retained_log_line": 11359
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_requests_first_search_takes_the_one_begun_early",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10400,
+    "retained_log_line": 11288
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_routes_bound_is_past_lives_and_within_the_chat_models_own",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10481,
+    "retained_log_line": 11369
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_spoken_turns_look_is_never_the_one_the_bound_cuts",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10403,
+    "retained_log_line": 11291
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_name_heard_as_lynn_is_its_call_not_someone_elses",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10468,
+    "retained_log_line": 11356
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_said_by_name_is_told_to_answer_and_a_face_only_line_may_decline",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10381,
+    "retained_log_line": 11269
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_hearing_counts_from_its_time_and_score",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10385,
+    "retained_log_line": 11273
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_is_fetched_only_when_a_call_asks",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10494,
+    "retained_log_line": 11382
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_switch_off_declares_and_fetches_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10495,
+    "retained_log_line": 11383
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_is_cut_after_the_skills_and_before_the_search",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10493,
+    "retained_log_line": 11381
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_place_follows_its_time",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10470,
+    "retained_log_line": 11358
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_room_the_route_keeps_is_told_on_the_bus",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10480,
+    "retained_log_line": 11368
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::gemini_is_called_with_the_units_key_or_the_live_routes_google_key_never_a_relays",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10430,
+    "retained_log_line": 11318
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_hosted_chats_and_searches_take_the_units_credentials",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10463,
+    "retained_log_line": 11351
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::through_the_relay_deepseek_takes_the_relay_key_and_needs_no_deepseek_key",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10498,
+    "retained_log_line": 11386
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_refused_own_key_sends_that_request_through_the_relay",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10395,
+    "retained_log_line": 11283
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_removed_own_key_leaves_voice_keys_reporting",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10399,
+    "retained_log_line": 11287
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::own_keys_turned_off_or_the_worker_dropped_says_voice_keys_is_stopping",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10437,
+    "retained_log_line": 11325
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_bound_cuts_the_fetch_then_the_time_and_never_a_core_skill",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10455,
+    "retained_log_line": 11343
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_time_is_given_only_for_another_places_time",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10492,
+    "retained_log_line": 11380
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_switches::with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10336,
+    "retained_log_line": 11224
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10333,
+    "retained_log_line": 11221
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_named_ask_makes_the_first_round_call_start_agent_task_and_nothing_else_changes",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10331,
+    "retained_log_line": 11219
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::an_ask_to_remember_a_face_with_a_name_makes_the_first_round_call_remember_my_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10334,
+    "retained_log_line": 11222
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::the_first_force_that_names_a_function_is_the_one_kept",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10335,
+    "retained_log_line": 11223
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_named_ask_tells_the_forced_round_only_the_agent_its_words_name",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10332,
+    "retained_log_line": 11220
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_slow_second_speech_piece_keeps_order_until_release_or_retirement",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9996,
+    "retained_log_line": 10884
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_spoken_turn_is_heard_then_said_sentence_by_sentence_in_order",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9999,
+    "retained_log_line": 10887
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_written_turn_is_answered_without_listening",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10011,
+    "retained_log_line": 10899
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_tool_call_is_run_and_its_result_answered",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10004,
+    "retained_log_line": 10892
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_forget_nobody_asked_for_is_not_run",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9923,
+    "retained_log_line": 10811
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_yes_alone_forgets_nothing_and_one_that_says_it_does",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10014,
+    "retained_log_line": 10902
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_words_that_ask_to_forget_let_a_forget_run",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10113,
+    "retained_log_line": 11001
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9926,
+    "retained_log_line": 10814
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10097,
+    "retained_log_line": 10985
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::news_asked_by_voice_through_this_route_is_put_on_the_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10100,
+    "retained_log_line": 10988
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_said_before_a_call_are_told_to_the_next_round_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10238,
+    "retained_log_line": 11126
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::not_for_me_ends_the_turn_in_silence",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10101,
+    "retained_log_line": 10989
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_decline_of_a_line_named_to_a_face_is_not_taken_once",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9922,
+    "retained_log_line": 10810
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_holding_only_answer_is_told_so_the_route_is_asked_to_go_on",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9938,
+    "retained_log_line": 10826
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_lost_on_the_network_is_asked_once_more_when_the_link_is_back",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9956,
+    "retained_log_line": 10844
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_is_not_asked_again_after_words_a_call_a_refusal_or_a_newer_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9954,
+    "retained_log_line": 10842
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_the_heed_holds_end_the_turn_unanswered",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10239,
+    "retained_log_line": 11127
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_the_heed_holds_is_told_held_back",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10006,
+    "retained_log_line": 10894
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_the_model_declines_is_told_held_back",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9961,
+    "retained_log_line": 10849
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_declined_after_a_tool_ran_is_not_told_held_back",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9947,
+    "retained_log_line": 10835
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_verdict_is_told_before_its_words_are_taken",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9932,
+    "retained_log_line": 10820
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_the_heed_lets_out_is_told_answered_and_one_not_judged_is_not_told",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10007,
+    "retained_log_line": 10895
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_held_as_unclear_is_told_and_a_misheard_cut_in_is_noted_next",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9951,
+    "retained_log_line": 10839
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_decline_keeps_an_executed_scoped_requested_audio_call",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9939,
+    "retained_log_line": 10827
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::an_unacted_mixed_requested_audio_and_decline_is_held_back",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10018,
+    "retained_log_line": 10906
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9914,
+    "retained_log_line": 10802
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::lines_the_route_gave_up_are_no_talk_past_the_lamp",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10061,
+    "retained_log_line": 10949
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10212,
+    "retained_log_line": 11100
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_begun_on_the_early_words_is_kept_when_they_are_the_lines",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9915,
+    "retained_log_line": 10803
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turns_tools_are_journalled_by_name_and_count_never_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10008,
+    "retained_log_line": 10896
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_resumed_turn_drops_the_chat_begun_on_its_early_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9986,
+    "retained_log_line": 10874
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::memory_told_on_the_early_words_keeps_the_prepared_round",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10063,
+    "retained_log_line": 10951
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_piece_waits_for_four_words_with_the_configured_voice",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10199,
+    "retained_log_line": 11087
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::early_words_stand_only_for_the_same_line_asked_the_same_way",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10030,
+    "retained_log_line": 10918
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_round_after_a_tool_ran_is_not_given_up",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9987,
+    "retained_log_line": 10875
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_pause_asks_the_lines_listener_for_its_words_so_far",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9974,
+    "retained_log_line": 10862
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_slow_first_round_makes_one_soft_sound_and_waits_longer",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9995,
+    "retained_log_line": 10883
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9944,
+    "retained_log_line": 10832
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_request_sends_its_times_before_its_end",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10028,
+    "retained_log_line": 10916
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sound_comes_when_it_is_told",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10217,
+    "retained_log_line": 11105
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_wait_sound_preserves_the_answer_window",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9942,
+    "retained_log_line": 10830
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_wait_sound_does_not_delay_cancellation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9941,
+    "retained_log_line": 10829
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sounds_time_is_milliseconds_in_its_bounds",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10219,
+    "retained_log_line": 11107
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sounds_take_turns",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10218,
+    "retained_log_line": 11106
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::not_for_me_written_as_words_ends_the_turn_in_silence",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10107,
+    "retained_log_line": 10995
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_without_a_picture_tells_the_model_it_saw_nothing",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9968,
+    "retained_log_line": 10856
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_sends_the_eyes_picture_or_says_there_is_none",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9966,
+    "retained_log_line": 10854
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_s_picture_goes_once_and_never_otherwise",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9965,
+    "retained_log_line": 10853
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::nothing_heard_is_a_quiet_complete_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10108,
+    "retained_log_line": 10996
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_announcement_is_said_once_per_quiet_spell",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10192,
+    "retained_log_line": 11080
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_words_end_with_a_finished_piece_as_the_live_routes_do",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10204,
+    "retained_log_line": 11092
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_only_voice_never_says_it_sounds_different",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10209,
+    "retained_log_line": 11097
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::bedtime_words_use_the_second_routes_written_path_independently_of_reminders",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10020,
+    "retained_log_line": 10908
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_spoken_over_stops_its_chat_and_speech_and_sends_nothing_more",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10005,
+    "retained_log_line": 10893
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_failing_service_fails_the_turn_at_its_stage",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10027,
+    "retained_log_line": 10915
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_speech_to_text_stream_lost_mid_line_fails_that_turn_and_the_next_is_answered",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9997,
+    "retained_log_line": 10885
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_reminder_is_deferred_as_the_fixture_does",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9980,
+    "retained_log_line": 10868
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::every_turn_begun_settles_the_routes_once",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10032,
+    "retained_log_line": 10920
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_only_voice_says_a_due_reminder_with_the_live_routes_note_and_no_tools",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10211,
+    "retained_log_line": 11099
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_chat_is_given_the_exchanges_it_is_told_between_the_system_and_the_question",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10193,
+    "retained_log_line": 11081
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::what_changes_is_told_after_the_exchanges_and_before_the_notes_and_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10232,
+    "retained_log_line": 11120
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_tool_call_is_heard_only_in_a_spoken_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10003,
+    "retained_log_line": 10891
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9990,
+    "retained_log_line": 10878
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9918,
+    "retained_log_line": 10806
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::with_its_switch_a_written_turn_waits_seven_seconds_to_begin",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10233,
+    "retained_log_line": 11121
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_waits_five_seconds_and_then_says_it_could_not_look",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9967,
+    "retained_log_line": 10855
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_full_look_without_its_still_still_says_it_could_not_look",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9924,
+    "retained_log_line": 10812
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_sentence_is_heard_for_its_count_and_never_asked_of_the_model",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10213,
+    "retained_log_line": 11101
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_sentences_sound_is_not_carried_into_the_next_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10214,
+    "retained_log_line": 11102
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_from_one_given_up_begins_with_its_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9982,
+    "retained_log_line": 10870
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_takes_only_the_words_of_the_one_just_before_it_in_its_session",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9984,
+    "retained_log_line": 10872
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_request_after_a_stop_is_told_of_it_beside_its_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10200,
+    "retained_log_line": 11088
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_whose_request_is_never_asked_is_told_with_the_next_one",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10002,
+    "retained_log_line": 10890
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_goes_with_a_request_going_on_and_never_past_two_minutes",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10001,
+    "retained_log_line": 10889
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9917,
+    "retained_log_line": 10805
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9916,
+    "retained_log_line": 10804
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_turn_after_a_start_says_the_down_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10201,
+    "retained_log_line": 11089
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_names_the_one_begun_before_it_in_its_session",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9983,
+    "retained_log_line": 10871
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::lines_left_unanswered_make_the_routes_room_busy_and_an_answer_is_speaking",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10060,
+    "retained_log_line": 10948
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_the_name_began_is_asked_with_the_name_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9962,
+    "retained_log_line": 10850
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_yes_after_a_hand_over_on_this_route_starts_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10013,
+    "retained_log_line": 10901
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_spoken_request_is_told_the_air_and_a_written_turn_is_not",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9998,
+    "retained_log_line": 10886
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9940,
+    "retained_log_line": 10828
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_work_and_its_own_turns_are_told_to_the_rule",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10205,
+    "retained_log_line": 11093
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_stop_tells_the_rule_of_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10198,
+    "retained_log_line": 11086
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_end_of_the_lamps_words_is_told_as_they_are_sent",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10194,
+    "retained_log_line": 11082
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_let_out_only_as_the_conversation_is_asked_with_its_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9955,
+    "retained_log_line": 10843
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_voice_makes_ready_as_a_line_begins",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10215,
+    "retained_log_line": 11103
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_call_is_not_run_and_the_model_is_told_so",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9927,
+    "retained_log_line": 10815
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_words_are_said_before_the_first_sentence_ends",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10202,
+    "retained_log_line": 11090
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_words_heard_are_told_before_the_chat_begins",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10222,
+    "retained_log_line": 11110
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_asked_by_its_call_goes_to_the_coordinator_and_ends_the_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9964,
+    "retained_log_line": 10852
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skill_answer_with_a_look_asks_the_coordinator_for_the_turns_look",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9991,
+    "retained_log_line": 10879
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_note_for_its_picture_goes_once_with_its_look_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9993,
+    "retained_log_line": 10881
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_note_for_its_picture_is_read_from_its_answer",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9994,
+    "retained_log_line": 10882
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_look_dropped_in_a_written_turn_goes_on_to_the_next_round",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9992,
+    "retained_log_line": 10880
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_a_turn_the_lamp_answered_aloud_marks_whom_it_was_talking_with",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10109,
+    "retained_log_line": 10997
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_of_no_words_neither_starts_nor_uses_up_a_held_gap",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9985,
+    "retained_log_line": 10873
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9952,
+    "retained_log_line": 10840
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_dated_follow_up_s_line_goes_last_in_its_turn_s_notes",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9921,
+    "retained_log_line": 10809
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_cold_first_greeting_gets_the_dated_follow_up_s_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9919,
+    "retained_log_line": 10807
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_cold_first_request_tells_the_model_nothing_of_the_event",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9920,
+    "retained_log_line": 10808
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_one_word_first_request_then_a_greeting_tells_nothing_of_the_event",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9973,
+    "retained_log_line": 10861
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_dated_follow_up_s_line_comes_after_the_note_read_at_the_turn_or_ahead",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9928,
+    "retained_log_line": 10816
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_note_read_ahead_withholds_its_dated_follow_up_after_a_first_request",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9975,
+    "retained_log_line": 10863
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9930,
+    "retained_log_line": 10818
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_memory_call_on_a_gap_held_line_runs_for_no_one",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9970,
+    "retained_log_line": 10858
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_call",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9934,
+    "retained_log_line": 10822
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9910,
+    "retained_log_line": 10798
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10031,
+    "retained_log_line": 10919
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::memory_scope_is_bound_before_answer_and_revoked_with_the_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10062,
+    "retained_log_line": 10950
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::dropping_engine_revokes_memory_scope_even_when_task_holds_a_lease",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10025,
+    "retained_log_line": 10913
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::revoked_tool_result_is_not_sent_to_another_chat_round",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10182,
+    "retained_log_line": 11070
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_cut_short_by_a_held_line_are_answered_in_its_place",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10236,
+    "retained_log_line": 11124
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_cut_short_by_a_line_let_out_are_let_go",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10237,
+    "retained_log_line": 11125
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_broken_into_four_pieces_is_asked_as_one_line",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9981,
+    "retained_log_line": 10869
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_cut_before_it_was_asked_stays_in_the_chain",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9976,
+    "retained_log_line": 10864
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_already_answered_is_never_chained_into_the_next",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9943,
+    "retained_log_line": 10831
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_cut_while_its_verdict_waits_is_chained_only_in_a_room_not_busy",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9977,
+    "retained_log_line": 10865
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_cut_while_its_verdict_waits_clears_the_chain_in_any_room",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10000,
+    "retained_log_line": 10888
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_folded_into_the_next_by_its_sound_keeps_the_chain",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10052,
+    "retained_log_line": 10940
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::stopped_words_are_never_joined_nor_answered_in_a_later_lines_place",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10196,
+    "retained_log_line": 11084
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9946,
+    "retained_log_line": 10834
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_let_out_with_no_sign_of_a_second_person_is_asked_with_the_words_it_cut_short",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9978,
+    "retained_log_line": 10866
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_second_half_of_the_same_persons_request_is_answered_with_the_first",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9933,
+    "retained_log_line": 10821
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_carried_through_a_held_line_are_never_joined",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10235,
+    "retained_log_line": 11123
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_print_still_to_come_is_waited_for_before_the_lines_are_joined",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10034,
+    "retained_log_line": 10922
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_while_a_join_waits_for_a_print_still_carries_the_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9972,
+    "retained_log_line": 10860
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_going_on_from_one_unanswered_hears_its_sound_first",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9950,
+    "retained_log_line": 10838
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_spoken_line_is_asked_with_its_call_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10029,
+    "retained_log_line": 10917
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_a_wordless_piece_carries_and_only_its_last_moments",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10110,
+    "retained_log_line": 10998
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_name_cut_off_by_a_pause_begins_the_next_line_with_the_listener_kept_ready",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10207,
+    "retained_log_line": 11095
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10010,
+    "retained_log_line": 10898
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10183,
+    "retained_log_line": 11071
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_over_the_lamps_answer_is_told_it_cut_in",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9945,
+    "retained_log_line": 10833
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_soon_after_the_lamp_spoke_is_told_it_may_follow_on",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9957,
+    "retained_log_line": 10845
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10111,
+    "retained_log_line": 10999
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_called_line_with_more_words_than_the_name_is_not_told_it_was_only_the_name",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9912,
+    "retained_log_line": 10800
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_begun_on_a_cut_ins_early_words_carries_its_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9913,
+    "retained_log_line": 10801
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::b_first_line_after_a_reaches_the_memory_as_bs",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10019,
+    "retained_log_line": 10907
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9953,
+    "retained_log_line": 10841
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::without_the_switch_a_line_another_face_spoke_stays_the_known_persons",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10234,
+    "retained_log_line": 11122
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::seeing_who_speaks_needs_the_scoped_context",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10184,
+    "retained_log_line": 11072
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_waits_for_the_policy_goes_as_it_decides",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9960,
+    "retained_log_line": 10848
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_next_lines_listener_is_kept_ready_and_one_closed_since_is_not_used",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10210,
+    "retained_log_line": 11098
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_kept_listener_goes_after_its_time_or_when_listening_stops",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9937,
+    "retained_log_line": 10825
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_start_goes_to_a_socket_opened_before_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10197,
+    "retained_log_line": 11085
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::no_listener_is_opened_before_a_line_outside_a_runtime",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10099,
+    "retained_log_line": 10987
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_ending_before_its_name_waits_for_it",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9948,
+    "retained_log_line": 10836
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_lines_words_are_counted_against_the_line_before_and_the_lamps_answer",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9963,
+    "retained_log_line": 10851
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_whose_words_line_says_its_counts_in_its_own_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10220,
+    "retained_log_line": 11108
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_latest_answers_words_are_kept_for_the_count",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10206,
+    "retained_log_line": 11094
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_cuts_the_story_is_asked_with_the_story_as_heard",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9959,
+    "retained_log_line": 10847
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_call_written_in_the_answer_is_left_out_of_what_was_heard",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9911,
+    "retained_log_line": 10799
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_answer_asks_for_its_speech_socket_as_it_begins",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10026,
+    "retained_log_line": 10914
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_written_turn_waits_longer_only_with_its_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10012,
+    "retained_log_line": 10900
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_named_asks_call_goes_to_the_agent_its_words_name",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9971,
+    "retained_log_line": 10859
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_named_asks_journal_line_says_what_became_of_it_and_no_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10208,
+    "retained_log_line": 11096
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_asks_two_of_the_staff_gives_each_task_to_its_own",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9958,
+    "retained_log_line": 10846
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_lines_named_ask_is_said_in_the_journal",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9929,
+    "retained_log_line": 10817
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_searchs_own_written_turn_takes_the_skills_next_look",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9988,
+    "retained_log_line": 10876
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_push_mid_search_holds_its_looks_until_the_person_asks_again",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9979,
+    "retained_log_line": 10867
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_walked_search_past_two_minutes_since_its_own_look_still_takes_a_push",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10009,
+    "retained_log_line": 10897
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_looks_answer_with_no_call_is_told_to_the_coordinator",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9969,
+    "retained_log_line": 10857
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::an_add_ons_quoted_line_is_asked_with_no_functions_and_runs_no_call",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10015,
+    "retained_log_line": 10903
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::called_fallback_does_not_supply_words_for_a_music_identity",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10021,
+    "retained_log_line": 10909
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::requested_music_through_the_installed_runner_keeps_its_offer_private",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10181,
+    "retained_log_line": 11069
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10179,
+    "retained_log_line": 11067
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::prepared_music_calls_wait_for_final_admission_and_survive_only_matching_words",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10132,
+    "retained_log_line": 11020
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_words_answered_for_a_held_request_have_no_new_music_identity",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10024,
+    "retained_log_line": 10912
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_sound_alone_does_not_authorize_music_for_the_successor",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10023,
+    "retained_log_line": 10911
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::more_then_decline_remains_unanswered_with_requested_audio_off_or_on",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10065,
+    "retained_log_line": 10953
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::skipped_music_confirmation_has_no_audio_but_a_later_sentence_can_still_speak",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10190,
+    "retained_log_line": 11078
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::warm_listeners_keep_exact_words_and_distinct_music_request_identities",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10230,
+    "retained_log_line": 11118
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::replaced_warm_listeners_hear_current_words_and_current_music_identity",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10178,
+    "retained_log_line": 11066
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::written_and_say_turns_neither_open_nor_consume_a_warm_music_listener",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10240,
+    "retained_log_line": 11128
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::warm_prepared_music_waits_for_final_raw_words_and_admission",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10231,
+    "retained_log_line": 11119
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::prepared_music_held_as_unclear_cannot_offer_and_written_sorry_has_no_grant",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10133,
+    "retained_log_line": 11021
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::misheard_hum_note_replaces_same_words_prepared_music_with_fresh_context",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10064,
+    "retained_log_line": 10952
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_music_after_unclear_handoff_cancels_pending_call_without_another_unclear",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10022,
+    "retained_log_line": 10910
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::speech_tags_reach_only_the_voice_and_only_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10191,
+    "retained_log_line": 11079
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10203,
+    "retained_log_line": 11091
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_words_so_far_are_told_only_with_the_switch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10221,
+    "retained_log_line": 11109
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_ending_on_a_filler_is_told_and_the_filler_never_reaches_the_model",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 9949,
+    "retained_log_line": 10837
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10195,
+    "retained_log_line": 11083
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10137,
+    "retained_log_line": 11025
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::expired_private_system_never_calls_chat_or_speech",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10145,
+    "retained_log_line": 11033
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_hits_are_guarded_even_with_neutral_system",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10156,
+    "retained_log_line": 11044
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_held_forget_policy_expiry_sends_no_chat_or_tool",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10154,
+    "retained_log_line": 11042
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_tool_completion_expiry_cannot_start_another_round",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10162,
+    "retained_log_line": 11050
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::expired_prepared_private_events_never_reach_speech",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10143,
+    "retained_log_line": 11031
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::positive_private_and_public_room_contexts_still_dispatch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10152,
+    "retained_log_line": 11040
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::empty_packets_preserve_legacy_current_and_carried_read_bounds",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10141,
+    "retained_log_line": 11029
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::authority_lost_while_chat_waits_sends_no_private_speech",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10134,
+    "retained_log_line": 11022
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_authority_loss_completes_the_live_engine_turn_once",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10153,
+    "retained_log_line": 11041
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_complete_a_revoked_or_different_request",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10149,
+    "retained_log_line": 11037
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::cached_private_hit_cannot_be_downgraded_by_neutral_final_system",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10136,
+    "retained_log_line": 11024
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_output_rechecks_authority_after_queue_backpressure",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10157,
+    "retained_log_line": 11045
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_held_forget_tool_completion_expiry_sends_no_first_chat",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10155,
+    "retained_log_line": 11043
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_resume_on_a_later_positive_read",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10150,
+    "retained_log_line": 11038
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::buffered_private_output_expires_at_both_receiver_boundaries_without_blocking_public_output",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10135,
+    "retained_log_line": 11023
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_words_waiting_for_announcement_capacity_are_never_retained_or_sent_to_tts",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10164,
+    "retained_log_line": 11052
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_rechecks_before_first_poll_with_positive_room_and_public_controls",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10167,
+    "retained_log_line": 11055
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_packet_returning_after_expiry_is_not_enqueued",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10159,
+    "retained_log_line": 11047
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_piece_initialisation_preserves_queue_call_order",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10160,
+    "retained_log_line": 11048
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_words_expiring_between_announcement_check_and_retained_words_lock_are_not_kept",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10163,
+    "retained_log_line": 11051
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::event_note_private_provenance_survives_neutral_told_and_async_expiry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10144,
+    "retained_log_line": 11032
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::queued_private_event_callback_rechecks_proof_before_read",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10165,
+    "retained_log_line": 11053
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_request_before_told_keeps_public_completion_without_private_services",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10151,
+    "retained_log_line": 11039
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::short_done_after_a_private_tool_keeps_fresh_speaker_permission",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10169,
+    "retained_log_line": 11057
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_waits_without_rereading_then_resumes_or_ends",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10168,
+    "retained_log_line": 11056
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::days_event_lock_pending_is_retried_without_replaying_its_decision",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10142,
+    "retained_log_line": 11030
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_pending_obeys_the_original_response_ceiling",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10166,
+    "retained_log_line": 11054
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10158,
+    "retained_log_line": 11046
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::carried_speaker::carried_old_speech_requires_positive_evidence_on_the_actual_current_piece",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10139,
+    "retained_log_line": 11027
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10140,
+    "retained_log_line": 11028
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10172,
+    "retained_log_line": 11060
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10146,
+    "retained_log_line": 11034
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10148,
+    "retained_log_line": 11036
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10147,
+    "retained_log_line": 11035
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10272,
+    "retained_log_line": 11160
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::short_line::a_short_current_piece_requires_two_unambiguous_positive_frames",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10175,
+    "retained_log_line": 11063
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_note_ahead_abandoned_refresh_keeps_the_confirmed_fact",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10283,
+    "retained_log_line": 11171
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_refresh_read_on_past_its_cancelled_line_is_the_next_lines",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10261,
+    "retained_log_line": 11149
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_refresh_let_go_untold_gives_the_keep_back",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10258,
+    "retained_log_line": 11146
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_keep_survives_privacy_void_while_the_refresh_is_reading",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10282,
+    "retained_log_line": 11170
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_an_invalid_resume_read_never_returns_the_forgotten_cached_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10280,
+    "retained_log_line": 11168
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10257,
+    "retained_log_line": 11145
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_room_keep_reaches_the_next_context_without_a_person_change",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10259,
+    "retained_log_line": 11147
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::legacy_keeps_update_the_callback_without_a_days_marker",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10262,
+    "retained_log_line": 11150
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_start_waits_for_sealed_proof_and_room_is_distinct_from_held",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10279,
+    "retained_log_line": 11167
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_queued_reader_checks_real_permission_before_any_socket",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10276,
+    "retained_log_line": 11164
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_slow_real_read_cannot_spend_offer_or_disclose_after_proof_loss",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10281,
+    "retained_log_line": 11169
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_blocking_follow_up_rechecks_after_queue_and_consumes_once",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10273,
+    "retained_log_line": 11161
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_session_lock_wait_rechecks_proof_before_read_entry",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10278,
+    "retained_log_line": 11166
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::staged_private_note_cannot_cross_person_or_reused_face_from_another_boot",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10284,
+    "retained_log_line": 11172
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_same_request_cannot_revive_after_ready_observed_proof_loss",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10274,
+    "retained_log_line": 11162
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::lost_private_read_permission_does_not_revoke_an_ordinary_remember_write",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10264,
+    "retained_log_line": 11152
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::completed_private_read_needs_new_request_proof_after_ready_observed_loss",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10260,
+    "retained_log_line": 11148
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::new_request_already_waiting_retries_after_the_old_reader_actually_denies",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10263,
+    "retained_log_line": 11151
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::prepared_private_context_is_neutral_and_final_proof_discloses_both_layouts",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10270,
+    "retained_log_line": 11158
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::unproved_mismatched_expired_and_legacy_private_requests_never_read_memory_or_history",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10271,
+    "retained_log_line": 11159
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::genuine_room_context_keeps_room_notes_and_history_without_speaker_proof",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10265,
+    "retained_log_line": 11153
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::slow_note_read_rechecks_revocation_expiry_and_fresh_known_identity",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10277,
+    "retained_log_line": 11165
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::actual_hits_rpc_requires_positive_current_matching_proof_and_rechecks_its_reply",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10266,
+    "retained_log_line": 11154
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::identity_changed_during_history_composition_discards_the_private_told",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10269,
+    "retained_log_line": 11157
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::by_presence_context_never_adopts_a_different_sticky_person",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10267,
+    "retained_log_line": 11155
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::typed_setup_name_uses_final_speaker_proof_and_marks_disclosure",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10275,
+    "retained_log_line": 11163
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::missing_private_source_is_reported_once_without_granting_context",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10268,
+    "retained_log_line": 11156
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10290,
+    "retained_log_line": 11178
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_never_heals_loss_or_downgrades_errors_and_legacy_sources",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10297,
+    "retained_log_line": 11185
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::repeated_explicit_absence_does_not_extend_the_original_audio_deadline",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10301,
+    "retained_log_line": 11189
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::actual_engine_sealed_microphone_request_finishes_through_explicit_lookaway",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10285,
+    "retained_log_line": 11173
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::actual_http_fallback_retains_only_explicit_same_epoch_lookaway",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10288,
+    "retained_log_line": 11176
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_lookaway_retains_credited_output_only_for_same_request_epoch",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10291,
+    "retained_log_line": 11179
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_source_envelopes_reject_malformed_or_mixed_continuation_tokens",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10293,
+    "retained_log_line": 11181
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10299,
+    "retained_log_line": 11187
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_same_name_never_erases_changed_stable_identity",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10303,
+    "retained_log_line": 11191
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10302,
+    "retained_log_line": 11190
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_credited_ipc",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10300,
+    "retained_log_line": 11188
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_unbound_and_legacy_requests_still_need_the_original_audio_face",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10304,
+    "retained_log_line": 11192
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10298,
+    "retained_log_line": 11186
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_never_extends_original_audio_deadline",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10316,
+    "retained_log_line": 11204
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10286,
+    "retained_log_line": 11174
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_never_hides_terminal_source_or_identity_loss",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10292,
+    "retained_log_line": 11180
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_ends_at_the_original_audio_deadline",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10312,
+    "retained_log_line": 11200
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_holds_real_credited_ipc_until_completed_recognition",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10287,
+    "retained_log_line": 11175
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::event_selection_keeps_checking_distinct_from_room_and_lost",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10289,
+    "retained_log_line": 11177
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_expiry_blocks_first_private_grant_at_the_final_boundary",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10295,
+    "retained_log_line": 11183
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_reader_checks_completion_and_all_nonterminal_states",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10294,
+    "retained_log_line": 11182
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::renewed_permission_cannot_refresh_an_old_absent_or_checking_observation",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10296,
+    "retained_log_line": 11184
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_timeout",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10327,
+    "retained_log_line": 11215
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_refusal",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10326,
+    "retained_log_line": 11214
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_an_invalid_snapshot",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10328,
+    "retained_log_line": 11216
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_missing_own_snapshot",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10325,
+    "retained_log_line": 11213
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_busy_client",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10324,
+    "retained_log_line": 11212
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_no_client",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10329,
+    "retained_log_line": 11217
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_incomplete_note_retries_on_the_next_turn_and_then_stays_cached",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10318,
+    "retained_log_line": 11206
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::repeated_failures_after_the_next_turn_get_one_attempt_per_interval",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10323,
+    "retained_log_line": 11211
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_valid_empty_note_is_cached_without_retries",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10314,
+    "retained_log_line": 11202
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_explicit_refresh_does_not_wait_for_failed_read_backoff",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10317,
+    "retained_log_line": 11205
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_person_change_cannot_leave_the_previous_persons_note_cached",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10307,
+    "retained_log_line": 11195
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10320,
+    "retained_log_line": 11208
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::unchanged_authority_keeps_the_note_and_unleased_behavior",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10330,
+    "retained_log_line": 11218
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_is_checked_after_waiting_for_an_older_context",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10319,
+    "retained_log_line": 11207
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_kept_name_recovers_after_a_failed_refresh_without_another_keep",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10308,
+    "retained_log_line": 11196
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_timed_out_note_retries_and_recovers_without_a_keep",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10315,
+    "retained_log_line": 11203
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_non_held_person_change_bypasses_the_failed_persons_backoff",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10310,
+    "retained_log_line": 11198
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_eligible_retry_shares_one_budget_between_room_and_person",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10321,
+    "retained_log_line": 11209
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_note_asked_as_the_line_begins_is_in_by_its_end_and_the_loop_never_waits",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10311,
+    "retained_log_line": 11199
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::lines_never_answered_open_and_close_no_session_and_spend_no_follow_up",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10338,
+    "retained_log_line": 11226
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_follow_up_is_read_only_once_its_turn_is_answered",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10309,
+    "retained_log_line": 11197
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_late_note_is_the_next_turns_and_a_failed_one_is_asked_again_on_the_next_turn",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10396,
+    "retained_log_line": 11284
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_person_change_during_the_line_asks_again_for_whoever_it_is_at_its_end",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10313,
+    "retained_log_line": 11201
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10356,
+    "retained_log_line": 11244
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_line_and_a_revoked_scope_never_get_another_scopes_note",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10306,
+    "retained_log_line": 11194
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::pending_note_adoption_preserves_the_completed_read_and_original_ask",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10322,
+    "retained_log_line": 11210
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_completed_old_note_reads_its_follow_up_once_after_recognition_is_ready",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10305,
+    "retained_log_line": 11193
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::pending_composition_rebuilds_cached_note_history_and_name_before_one_final_chat",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10337,
+    "retained_log_line": 11225
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::pending_prepared_composition_never_freezes_reduced_messages",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10340,
+    "retained_log_line": 11228
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::permission_expiry_after_composition_sends_no_private_chat",
+    "status": "PASS",
+    "observed_outer_terminal_count": 1,
+    "outer_terminal_ordinal": 10339,
+    "retained_log_line": 11227
+  }
+]

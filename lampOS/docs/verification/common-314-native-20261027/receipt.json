@@ -1,0 +1,139 @@
+{
+  "ready_for_lamp_voice": false,
+  "qualification": "Completed CI on the exact merge preview below; no current-worktree or later-tree qualification",
+  "published_source": {
+    "head": "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd",
+    "authored_base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "full_tree": "8d93ad178efd868fbf728d4d49bd81b48c28e2ed"
+  },
+  "actual_ci_source": {
+    "checkout": "433935815339d6d773d44e2107635db7d73b7a0c",
+    "tree": "fd5a3439849af70dd65fc06927163cc6cbb23d78",
+    "parents": [
+      "241f51500f258ea06594f9edf3928a702d6a2038",
+      "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd"
+    ],
+    "checkout_logs_and_commit_api_agree": true,
+    "earlier_private_preview_tree_not_used": "98255fc67fd2f0b44930b3868f8c8feaa278f1be"
+  },
+  "runs": {
+    "arm64": {
+      "id": 40504365418,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40504365418",
+      "status": "completed",
+      "conclusion": "success",
+      "supported_watcher_exit": 0
+    },
+    "linux_clippy": {
+      "id": 40504365398,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40504365398",
+      "status": "completed",
+      "conclusion": "success",
+      "supported_watcher_exit": 0,
+      "scope": "strict workspace all-target Clippy and workflow checks"
+    }
+  },
+  "runtime": {
+    "unique_outer_passed": 11905,
+    "failed": 0,
+    "leaky": 0,
+    "timed_out": 0,
+    "duplicate_pairs": 0,
+    "summary_skipped": 106,
+    "skip_identities_not_exported": true,
+    "raw_nextest_json_and_discovery_not_exported": true,
+    "count_boundary": "One terminal per binary/test before the first nextest Summary; repeated final output and nested libtest summaries are not extra cases. Original GitHub step log independently matches the complete identity set."
+  },
+  "coverage": {
+    "required112": {
+      "requested": 112,
+      "observed_once_passed": 112,
+      "ledger": "required112-terminal-ledger.json",
+      "mapping_sha256": "e28f2ea13d43a9b573fa671783201c62234313f6afffd9aff90e67c6cc86801f"
+    },
+    "current525": {
+      "requested": 525,
+      "observed_once_passed": 525,
+      "ledger": "current525-terminal-ledger.json",
+      "mapping_sha256": "e4cd1cf7a0d9bdbac11cb2e740e0a2678f7ac0e09c8884b0a29d7f18093f1711"
+    },
+    "overlap": 25,
+    "unique_mapped_union": 612,
+    "supplemental_linux_repair": "supplemental-linux-repair.json",
+    "historical_source_results_not_transferred": true
+  },
+  "separate_results": {
+    "workspace_doctests": {
+      "targets": 47,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "relay_signals": {
+      "aggregate_ok": 1,
+      "internal_case_count_not_inferred": true
+    },
+    "turn_end_process": {
+      "passed": 13,
+      "failed": 0
+    },
+    "not_added_to_nextest_count": true
+  },
+  "artifact": {
+    "id": 12736055317,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40504365418/artifacts/12736055317",
+    "export_log_binaries": 48,
+    "export_log_examples": 2,
+    "complete_SHA256SUMS_reported_by_exporter": true,
+    "size_bytes": 118176415,
+    "api_and_upload_zip_sha256": "3e56be88bcd28f06b4f60422dbe6d5cf051d4de5dc3521f2102fd488d566a6e8",
+    "api_and_upload_digest_match": true,
+    "archive_download_limit_bytes": 33554432,
+    "archive_downloaded": false,
+    "individual_exported_binary_hashes_independently_verified": false,
+    "no_per_binary_manifest_claim": "The log does not contain all 50 distinct exported hashes; no digest manifest is fabricated."
+  },
+  "evidence": {
+    "private_receipt_sha256": "7ca60aacf90f677000bedbfc72c20e0fd2e9a03fc02e7dd22682dc651966aed7",
+    "retained_raw_evidence_sha256": {
+      "40504365418-raw.log": "c493c7a43fdb5938a3e7b0691415b8be384b4b9a660603068800e5c5132d6aaf",
+      "40504365398-raw.log": "6822fa66fb3eda443dd267d0bb0ab933c696398ca62c9c3a9cb3c11f0016db91",
+      "40504365418-original-logs.zip": "d1db3652dbb187631968c27b668ea34cfad445ffadfd4a86d3f340971d072bb1",
+      "40504365398-original-logs.zip": "9b1376a8b272fe62c90c576d9a9a0c73cd66199644084db580f67b115854e37f",
+      "arm-artifacts-final.json": "6b128ee9e6a77507533112d28f67ff57a65725e27b477b04c08e85071ee62c0c",
+      "clippy-checkout-commit.json": "edba1c8b63642c23dd881b3e33143229d22fa2b041a5b6c43dafb3c95c8f3b50",
+      "published-head-commit.json": "654899b382fca3ed35003952a87f26f648938a5dc01bf845e40b06b745bacd3c",
+      "checkout-arm64-workflow.yml": "43a7eef7907d272904f975d7ee65b456ec3bc4eba63505bee596d1bf196a6e74",
+      "checkout-clippy-workflow.yml": "f979a9e8d87e8f9db255c4a9e81a51ecf7164b6b48118627578ce83722a3db92",
+      "checkout-nextest.toml": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+    },
+    "original_text_log_archive_bytes": {
+      "arm64": 910641,
+      "linux_clippy": 26863
+    },
+    "text_log_download_limit_bytes": 33554432,
+    "text_log_expansion_limit_bytes": 67108864,
+    "raw_logs_binaries_and_personal_content_not_published": true
+  },
+  "related_evidence": {
+    "local_proof_commit": "e253b5887189f7e363f4bacc72569eb4835b345f",
+    "local_proof": "../common-8d93-qualified-local-20261027/README.md",
+    "old_native_failure_commit": "0a5c4adb1ad1d26be51142ea81656473331ee7a6",
+    "old_native_failure": "../common-3e9-native-failure-20261027/README.md",
+    "old_arm64_run": 40492822862,
+    "old_outcome": "FAILED: 2780 passed, 1 failed, 8961 selected unrun; preserved, not relabeled"
+  },
+  "holds": [
+    "Current-base qualification",
+    "Required current-head readers",
+    "Privacy acceptance",
+    "Matching deployment pins",
+    "Assigned lamp/device/physical acceptance"
+  ],
+  "limits": [
+    "No Ready transition.",
+    "No valid V3 grant, acoustic latency or physical behavior claim from the Linux fixture.",
+    "The active future carry is outside this source qualification.",
+    "Local runtime5590 and metadata outcomes remain separate from CI counts."
+  ]
+}

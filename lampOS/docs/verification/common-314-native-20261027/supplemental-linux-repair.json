@@ -1,0 +1,14 @@
+{
+  "binary": "lamp-eyes::bin/lamp-eyes",
+  "test": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+  "status": "PASS",
+  "observed_outer_terminal_count": 1,
+  "outer_terminal_ordinal": 2832,
+  "retained_log_line": 3720,
+  "reported_test_duration_seconds": 0.005,
+  "duration_is_not_acoustic_or_physical_latency": true,
+  "separate_from_required112_and_current525": true,
+  "original_assertions_preserved": 8,
+  "new_negative_ticket_assertions": 1,
+  "scope": "Ticketless publication is refused; an explicitly invalid stale-source fixture is removed while the enrollment guard remains valid. This is not valid V3 authority or live-grant revocation coverage."
+}
