@@ -402,6 +402,31 @@ pub enum RecoveryInputs<'a> {
     },
 }
 
+/// A successfully acquired lease owned by one process and controller.
+/// An inherited child's drop closes its descriptor without unlocking the
+/// parent's lease; the whole Session still cannot transfer across fork.
+struct OwnedLockGuard {
+    file: File,
+    owner_pid: u32,
+}
+
+impl Drop for OwnedLockGuard {
+    fn drop(&mut self) {
+        // Release this owner's lease before File closes. Closing alone would
+        // leave the lock held while a dup/fork reference remains open.
+        if std::process::id() == self.owner_pid {
+            let _ = rustix::fs::flock(&self.file, rustix::fs::FlockOperation::Unlock);
+        }
+    }
+}
+
+#[cfg(test)]
+impl OwnedLockGuard {
+    fn try_clone(&self) -> io::Result<File> {
+        self.file.try_clone()
+    }
+}
+
 /// An already existing private folder. No default system path is provided.
 pub struct Store {
     folder: PathBuf,
@@ -422,7 +447,7 @@ impl Store {
         })
     }
 
-    fn lock(&self) -> io::Result<File> {
+    fn lock(&self) -> io::Result<OwnedLockGuard> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -439,7 +464,10 @@ impl Store {
         }
         rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive)
             .map_err(io::Error::from)?;
-        Ok(file)
+        Ok(OwnedLockGuard {
+            file,
+            owner_pid: std::process::id(),
+        })
     }
 
     fn read(&self, expected: &Binding) -> io::Result<Journal> {
@@ -556,10 +584,13 @@ fn resting_admission(journal: &Journal) -> Admission {
 }
 
 /// The guard lock stays held for this live controller. No product lock is
-/// acquired or inherited here. Dropping it leaves durable recovery required.
+/// acquired or inherited here. Dropping it releases this owner's lease and
+/// leaves durable recovery required. The lease cannot transfer to a forked
+/// child: an inherited child's drop cannot unlock the parent's lease, but a
+/// child must not use the Session as an independent journal or grant owner.
 pub struct Session<'a> {
     store: &'a Store,
-    _lock: File,
+    _lock: OwnedLockGuard,
     journal: Journal,
     recovery: bool,
     poisoned: bool,
