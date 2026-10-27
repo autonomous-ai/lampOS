@@ -680,3 +680,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 00:19: quiet tick; nothing new on my PRs. Nine has not yet answered the #3901 SDK pre-check P3.
 - 00:25: #3869 merged (train 253, 5741bf29b) and #3875 merged (3aa752f73). Devin build: harness-reviewer uses the Python SDK directly; on 75c9 only say and events are real (no ring, no arm). Posted the move-under-lease snippet for Nine's feelings moves (wait returns at to:body; sleep the move's length; lease state; rates).
 - 00:29: quiet tick for my PRs; no SDK questions from harness-reviewer.
+- 00:34: quiet tick for my PRs. The 75c9 lamp-control install waits ~20 min for a build (lamp-voice ARM64 red on the N13 flake; Friday's #3891 fixes it).
