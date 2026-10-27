@@ -568,25 +568,33 @@ fn product(name: &str) -> serde_json::Value {
 #[test]
 fn the_products_files_one_release_ahead_are_read_and_their_new_fields_named() {
     let root = Root::new();
+    // The path may contain the values whose omission the diagnostic checks.
+    let directory = root.0.join("diagnostic-high-900");
+    fs::create_dir(&directory).unwrap();
     let mut pins = product("controls-pins.json");
     let ours: TouchPinsConfig = serde_json::from_value(pins.clone()).unwrap();
     pins["head_hold_ms"] = json!(900);
     pins["head_pads"][1]["sensitivity"] = json!("high");
-    let path = root.0.join("controls-pins.json");
+    let path = directory.join("controls-pins.json");
     fs::write(&path, serde_json::to_vec_pretty(&pins).unwrap()).unwrap();
     let (read, line) = TouchPinsConfig::read(&path).unwrap();
     assert_eq!(read, ours);
-    let line = line.unwrap();
-    for named in ["head_hold_ms", "head_pads[1].sensitivity"] {
-        assert!(line.contains(named), "{line}");
-    }
-    assert!(!line.contains("high") && !line.contains("900"), "{line}");
+    assert_eq!(
+        line.as_deref(),
+        Some(
+            format!(
+                "{}: fields this build does not read, ignored: head_hold_ms, head_pads[1].sensitivity",
+                path.display()
+            )
+            .as_str()
+        )
+    );
     assert_eq!(TouchPinsConfig::load(&path).unwrap(), ours);
 
     let mut controls = product("controls.json");
     let ours: Config = serde_json::from_value(controls.clone()).unwrap();
     controls["hold_tiers_ms"] = json!([2000, 5000]);
-    let path = root.0.join("controls.json");
+    let path = directory.join("controls.json");
     let bytes = serde_json::to_vec_pretty(&controls).unwrap();
     let (read, line) = lamp_controls::forward::read::<Config>(&path, &bytes).unwrap();
     assert_eq!(read, ours);
