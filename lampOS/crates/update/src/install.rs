@@ -450,6 +450,11 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          32 without `LAMP_USE_SKILL=on`",
     ),
     (
+        "meal-check",
+        "an installable skill, not yet tried on a lamp (#3504): V1's meal reminder, which its \
+         owner chooses; a played check on a lamp comes first",
+    ),
+    (
         "who-was-here",
         "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
          eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \

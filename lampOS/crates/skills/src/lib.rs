@@ -7683,6 +7683,9 @@ pub fn replay(dir: &Path, recording: &Path) -> Result<Vec<Made>, String> {
     replay_with(dir, recording, &[], None)
 }
 
+/// The day a case's `clock` is on: midnight UTC, 1 January 2026.
+const REPLAY_DAY_MS: u64 = 1_767_225_600_000;
+
 /// The same, with the model calling the skill's tool at the times of
 /// `tools`: each after the messages recorded at or before it. A call is
 /// made as the program would make it, its arguments and its conditions
@@ -7716,8 +7719,14 @@ pub fn replay_with(
     let mut engine = Engine::new(vec![skill], true);
     let messages = read_recordings(recording)?;
     let first_us = messages.first().map_or(0, |message| message.header.at_us);
-    if let Some(clock) = clock {
-        engine.clock(0, first_us, u64::from(minute_of_day(clock)?) * 60_000);
+    // On a real date (1 January 2026, UTC), since a trigger's `during`
+    // needs a wall clock that was set; quiet hours and `[active]` read only
+    // the minute of the day, and `most_a_day` only where a day turns.
+    let clock_ms = clock
+        .map(|clock| minute_of_day(clock).map(|minute| REPLAY_DAY_MS + u64::from(minute) * 60_000))
+        .transpose()?;
+    if let Some(clock_ms) = clock_ms {
+        engine.clock(0, first_us, clock_ms);
     }
     let mut calls: Vec<(u64, &str, Value)> = tools
         .iter()
@@ -7756,6 +7765,12 @@ pub fn replay_with(
     };
     for message in messages {
         let at_us = message.header.at_us;
+        // The clock told again at every message, as a live host tells it
+        // (`clock_in_with_trust`), so a trigger's `during` window, which
+        // needs a local time told within 2 minutes, is replayed over hours.
+        if let Some(clock_ms) = clock_ms {
+            engine.clock(0, at_us, clock_ms + (at_us - first_us) / 1_000);
+        }
         call_tools(&mut engine, &mut made, Some(at_us - first_us));
         // Time passes as the messages come: a held run whose trigger topic
         // went silent ends at the first message of any topic after.

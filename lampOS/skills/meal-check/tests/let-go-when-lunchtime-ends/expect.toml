@@ -1,0 +1,6 @@
+# 11:00, away an hour, then at the desk from 12:00 (minute 60): due at 13:15 (minute 135),
+# with a second face in view from minute 130 to 158, so it is held. Lunchtime ends at 13:30
+# (minute 150) while the 30-minute wait still runs (to 13:45), and the second face leaves
+# at 13:38 (minute 158): the window's end, not the wait, lets it go. Nothing.
+clock = "11:00"
+none = true

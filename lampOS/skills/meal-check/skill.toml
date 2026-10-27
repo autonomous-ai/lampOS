@@ -1,0 +1,105 @@
+# A meal check: someone at the desk through most of lunchtime or dinnertime
+# is asked once, the way a friend would, whether they've eaten. V1's meal
+# reminder, which the owner asked to bring back (#3504, the lead's list,
+# 27 Oct), shaped like the wellbeing nudges (#1685) and A comfort break. One
+# open, caring question, never a menu or a food; it reads only the faces and
+# the voice's state, never a picture, and it waits while anyone else is in
+# view. Written to lamp-skills' schema (docs/skills.md, "The schema, as
+# lamp-skills reads it").
+needs = ["eyes", "body", "voice"]
+# Installable: its owner chooses it (`lamp-skills install`), and it is not in
+# the product's install (`install::NOT_PRODUCT_SKILLS`) until tried on a lamp.
+kind = "installable"
+version = "1.0.0"
+# Once at lunch and once at dinner, counted from the local midnight.
+most_a_day = 2
+
+# What it may read and use, and nothing more: the faces, the voice's state,
+# the eyes' head-down reading, and a turn toward the face. One short
+# question, worded by the voice.
+[permissions]
+speak = true
+topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+body = true
+
+# Lunchtime, 11:30 to 13:30: held only inside it, so its 75 minutes are
+# minutes of lunchtime at the desk, and the question comes from 12:45 on.
+[[trigger]]
+name = "lunch"
+topic = "humans/faces/tracked"
+present = true
+near = 0.14               # at the desk, not across the room (Stretch break's line)
+for = "75m"               # through most of the two hours, not out to eat
+gap = "2m"                # looking away or leaning out of view does not end it
+rearm = "leaves"
+cooldown = "120m"         # once a window, even if they leave and come back in it
+wait = "30m"              # someone else in view, or a talk: once they go, while lunchtime lasts
+during = { from = "11:30", to = "13:30" }
+
+# Dinnertime, 18:30 to 20:30, the same way.
+[[trigger]]
+name = "dinner"
+topic = "humans/faces/tracked"
+present = true
+near = 0.14
+for = "75m"
+gap = "2m"
+rearm = "leaves"
+cooldown = "120m"
+wait = "30m"
+during = { from = "18:30", to = "20:30" }
+
+[[while]]                 # nobody else in view: never asked in front of others, held
+topic = "humans/faces/tracked"  # until they have been gone a minute (the trigger's wait keeps it)
+faces_at_most = 1
+for = "1m"
+
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]                 # never in the middle of a conversation
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
+
+[[while]]                 # not while they read or write, head down (#1678), as Stretch break:
+topic = "room/activity"   # it waits for them to look up. Without the eyes' room/activity
+field = "state"           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
+not_equals = "head_down"
+unknown = "holds"
+
+[quiet]                   # never at night
+from = "22:00"
+to = "08:00"
+
+# One nudge an hour between the wellbeing skills.
+[budget]
+group = "wellbeing"
+per_hour = 1
+
+# Two questions nobody noticed in a row, and it rests until tomorrow morning.
+[rest]
+after_ignored = 2
+
+# The wellbeing skills' one function (#1685): it stops the one that came
+# last, or with all, every one.
+[stop]
+tool = "wellbeing_nudges"
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word that it's a good moment for a short break, a question at lunch or dinner time whether they've eaten, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+on = "lunch"
+body = { look_at = "face" }
+say = "They have been at the desk through most of lunchtime. Ask them once, warmly and in a few words, the way a friend would, whether they've had lunch yet. One open question: suggest no food, no menu and no place, and say nothing about health."
+
+[[do]]
+on = "dinner"
+body = { look_at = "face" }
+say = "They have been at the desk through most of dinnertime. Ask them once, warmly and in a few words, the way a friend would, whether they've had dinner yet. One open question: suggest no food, no menu and no place, and say nothing about health."
