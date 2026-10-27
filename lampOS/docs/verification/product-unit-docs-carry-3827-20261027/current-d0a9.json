@@ -1,0 +1,45 @@
+{
+  "head": "d0a9f70cc4344c74554df7ad47a5c7a4368d0090",
+  "base": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+  "previous": "eaa5febb540e3989994ee77a156d43369a924ecb",
+  "range_diff": "1:  eaa5febb5 = 1:  d0a9f70cc lampOS: updates.md says a round carries the product's own units since #3466, and keeps 7071's note to that release",
+  "all_five_reviewed_updater_source_blobs_unchanged": true,
+  "only_document_patch_unchanged": true,
+  "author_and_message_exact": true,
+  "diff_check": 0,
+  "prior_source_receipt": {
+    "head": "eaa5febb540e3989994ee77a156d43369a924ecb",
+    "base": "3f4b87969113a89795c814051501c4ba581418e9",
+    "original": "4a6c8cf8e584dbc123bf28d0cb987638d95cac51",
+    "range_diff": "1:  4a6c8cf8e = 1:  eaa5febb5 lampOS: updates.md says a round carries the product's own units since #3466, and keeps 7071's note to that release",
+    "one_original_commit_author_and_message_preserved": true,
+    "raw_author_header_sha256": "eb499082538a4af973cfcd2ac131cadc11aeefda226d6b5e5e42d42b63fd3b1c",
+    "changed_files": [
+      "lampOS/docs/updates.md"
+    ],
+    "diff_check": 0,
+    "source_checks": [
+      "settings_switches: explicit on works independently of managed default; absent choice alone can inherit",
+      "product_settings_of: managed/self_switch,level6/product manifest and regular managed updater unit",
+      "product_skills: installed part, future-or-installed unit product folder, signed bounded checked bundle independent of apply switch",
+      "publish make+is_unit_name: ordinary service/by-build parser; own updater and fixed helpers excluded",
+      "carried_units: only installed parts; product current links; lamp-specific override wins; no add/enable",
+      "7071 observation explicitly pre3466"
+    ],
+    "source_sha256": {
+      "crates/update/src/main.rs": "fb00394e145afbcc795a0230aad8956308a7cef05445e72e444c813fffce4217",
+      "crates/update/src/round.rs": "f7f02ae54d2c7b700f165645a0382cd6195c3d6fa02b8b7fbe8938f842520610",
+      "crates/update/src/publish.rs": "47463e08347785e57751db6d0955633131072ac599636b1459645d8e53d14507",
+      "crates/update/src/manifest.rs": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c",
+      "crates/update/src/unit.rs": "02521360f0d1495ba9839a029287043f0798deb5cc82324fd441e8f2bbc11aa3"
+    },
+    "limits": [
+      "Docs-only source qualification, no Cargo/native/device/privileged install execution",
+      "Initial exploratory guessed file/glob searches returned missing paths; correct module locations read before qualification",
+      "No full runtime result transferred from old3753 or currentMain"
+    ]
+  },
+  "limits": [
+    "No new Cargo/native/device execution; immutable current-source/doc gate only"
+  ]
+}
