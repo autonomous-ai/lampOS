@@ -1,0 +1,80 @@
+{
+  "head": "f3056f50e46ea6a27bca261f3d9395443215eca3",
+  "gated_head": "b18a97d59aa0bca357ccc4885925877e0ff84175",
+  "gated_receipt_sha256": "e8a7e04b4ad612e2c7a4d5d2c22f58d7962524d584965c5e279fbbca63ae3dd5",
+  "only_difference": [
+    "D\tlampOS/docs/vi/skill-format_vi.md"
+  ],
+  "every_other_git_blob_and_mode_unchanged": true,
+  "decision": "READ-OK currentf305; Third documentation-scope HOLD closed",
+  "gated_proof": {
+    "all_current_handles_terminal0_reaped_group_absent": true,
+    "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "clean_worktree": true,
+    "coverage": "3format tests:32committedpackage schemas;1actual-loader valid fixture and13singlemutated invalid fixtures;colors/coregrants/addonvocab/kinds/gesture inventories.",
+    "file_hashes": {
+      "format-controls.log": "ade2d2772d50358362e321df1624c165e431b5d91be99bcf24b3b74de54c0573",
+      "pr-current.json": "f0c89b665bd7a830cbe63b93f3da8ba4fdc106bd66c90fe05dd9b27e2af4a584",
+      "scope.json": "bf8e584b02dcd0f7a55703b5b84455061d085fdd79d5e7844f6458fab97b912d",
+      "source-before.json": "aa095b2f25bca0038f44e60570e5f13babeb89942e6e4866af3846131e09b948",
+      "source-review.json": "2a367b168fa1db2150b610796e47e8e119cb4b0a355f10e12cf52556282cc5ee"
+    },
+    "handles": {
+      "fmt": 95044,
+      "format-controls": 57850,
+      "skills-clippy": 20478
+    },
+    "head": "b18a97d59aa0bca357ccc4885925877e0ff84175",
+    "limits": [
+      "No full556Skills run, nativeLinux/device/install/realTTS/model or Memoryimplementation reads.",
+      "Schema shape validation is not authorization; actual loader/call boundaries remain authoritative.",
+      "Bounded custom validator is not generalJSONSchema conformance; current24keywords staticallyrecognised.",
+      "Old780fmt/Clippy/3format separate. Three oldprivateprobe failures preserved with no causalgrantA/B runtimecredit; no privateprobe on currenthead."
+    ],
+    "prior_head_evidence": "../old-780-summary.json",
+    "prior_private_probe_credit": "No causalgrantA/B proof. Two harness setup compilefailures and1invalidpositivefixture fail preserved; no currentprivateprobe.",
+    "result": "Scoped READ-OK, no new P1/P2; previous Lead P2 corrections source verified. P3 notes remain in source-review.json. Nine/First owns permission wording and English-only policy decision.",
+    "source_hashes_unchanged": 7363,
+    "stages": {
+      "fmt": {
+        "cleanup": [],
+        "controller_error": null,
+        "elapsed_seconds": 12.986184489,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "source_unchanged": true,
+        "timed_out": false
+      },
+      "format-controls": {
+        "cleanup": [],
+        "controller_error": null,
+        "elapsed_seconds": 10.473264335,
+        "log_sha256": "ade2d2772d50358362e321df1624c165e431b5d91be99bcf24b3b74de54c0573",
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "source_unchanged": true,
+        "timed_out": false
+      },
+      "skills-clippy": {
+        "cleanup": [],
+        "controller_error": null,
+        "elapsed_seconds": 4.832180516999999,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "source_unchanged": true,
+        "timed_out": false
+      }
+    },
+    "target_free": "third-reminder-carry-target"
+  },
+  "limits": [
+    "No new Cargo execution onf305; exact unchanged code/schema/manifest/lock/English-doc binding to completed b18 checks",
+    "No full Skills/native/install/device qualification",
+    "Old780 private setup/invalid-fixture failures are not proof of grant causality"
+  ]
+}
