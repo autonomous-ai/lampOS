@@ -1,0 +1,34 @@
+{
+  "head": "e74e8c02cf82c6bcdd87d78eba617968796754fc",
+  "tree": "33f103b46744000779eccb769a6f74115510f22e",
+  "scope": "actual clean e74/410 foundation carry; Skills dependency changed, full Update requalification",
+  "owned": {
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "573bd7b2cd44230661a5284cd8c9c68fb8500642dc53c73eae2d3eecae2f0e1d",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_refresh.rs": {
+      "sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "c8ce7d16bac0fe8deb66bec9a8bc22c58e18df3dcfee262152989fbbbccc880b",
+      "mode": 420
+    },
+    "lampOS/docs/settings-writer-refresh.md": {
+      "sha256": "acb1a1d15ba09af36eaaf5200cf06ee271bcadfeac2766d9642a90e50b7ff767",
+      "mode": 420
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "4e84757d34b0d96a44ce8ec5b2d77238f4933d8d797d975b8892150d8b6e9a2d",
+      "mode": 420
+    }
+  },
+  "status": "",
+  "controller_sha256": "41590c2122424d71eeba0ebd29fb126f1cec63cec706883daaea109d7c2e201f",
+  "target": "<target>"
+}

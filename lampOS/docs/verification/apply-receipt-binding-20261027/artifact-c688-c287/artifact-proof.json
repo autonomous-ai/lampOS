@@ -1,0 +1,320 @@
+{
+  "pr": 3808,
+  "run_id": 40488040984,
+  "run_attempt": 1,
+  "artifact_id": 12728036087,
+  "artifact_name": "lampos-arm64-c688ec71a95bf128409265e3deadcb1873a9791b",
+  "head": "c688ec71a95bf128409265e3deadcb1873a9791b",
+  "archive_bytes": 117983866,
+  "archive_sha256": "3ad9d599106145712e35a24e25a8bff7ec7257676df873b30d6be283fa66d2f1",
+  "api_digest_equal": true,
+  "members": [
+    {
+      "name": "lamp-actions",
+      "sha256": "7406ed89b63941f4186c3b0f88c361993be99118f38dcb9bb2212484b37e46fe",
+      "bytes": 4510440,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-addons",
+      "sha256": "8012ae17c166fab778b04f5d9ea45d84111b89309b52d5211a4a6960d9150bb7",
+      "bytes": 1154744,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-air",
+      "sha256": "8c79e2e83b73f19dd818d1eb507c951781aa9a316707e96223d4dbbcf3264855",
+      "bytes": 896264,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-audio",
+      "sha256": "2a47f6a8b753ea38ababf08732b205114e696386878ed2dda0879c4154d3620c",
+      "bytes": 2121152,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body",
+      "sha256": "5f4d07c2eedb0a8342343a7518a49f59932f4fc92038caa8e9fd5b734df35b7c",
+      "bytes": 1995112,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-inspect",
+      "sha256": "be28b09afeec6bd4ae0dec0a17858d9c97eb3ecf6974296609ca2abc0d9c57d7",
+      "bytes": 703568,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-measure",
+      "sha256": "19b508f886a381f56a7b708e6612c13c2f84c5dee149c1541f5ebda47f2f6c28",
+      "bytes": 1367416,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-mood",
+      "sha256": "bb7d3ec66f7c8957033d59290ff3cd3e3048d0d4a06cebe6faf37578446c315f",
+      "bytes": 477072,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-worker",
+      "sha256": "54b06b8025ccb4774882ad21ae8ec01b5f1b1859f4d255b68e1e86fa2167e1ed",
+      "bytes": 1179624,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-bus",
+      "sha256": "bca4b1dc589c3522daeb6b5ff42d124fc6878f82cd8c9fb1436d1b1f0deab5a7",
+      "bytes": 1106576,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-cloud",
+      "sha256": "d180a2180e67d6de3f994dcb3dcdcd78e8ab2a968f7a0df794edc09d9d2e24a4",
+      "bytes": 10787096,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-control",
+      "sha256": "9a334bafbfebde607d11a5f32039c8d8921fd48d4808590bc70e723142295b57",
+      "bytes": 3999920,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-controls",
+      "sha256": "97a84704a20ccd8edfaebee7e06b2f2865b74315091adaf4a93452b1d812ed2f",
+      "bytes": 2469128,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-ears",
+      "sha256": "9fd4159987a2d3028ffc7fbd90f302d85d675f6eaec72a8abff99fd85b6b19c0",
+      "bytes": 24861664,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-expression",
+      "sha256": "27977e60e5ba24044d1203e116250040ed0cdcf066e7d71eb642cf2b94f6406d",
+      "bytes": 4204368,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-eyes",
+      "sha256": "730ccee71af9f7da1e9d714e60bd5a8c4c8265428d8b4949863beb08b06cf6e1",
+      "bytes": 26399024,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-health",
+      "sha256": "5054f799b77cd82a601cde22d15afea624ede58e97324f3686a1e9d9fd19c806",
+      "bytes": 1315144,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-ipc-probe",
+      "sha256": "80a3898dde91c6109dbf55f0cc6d1fd49e491be7bb6ef941df914e02411296cb",
+      "bytes": 667592,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-keeper",
+      "sha256": "7bd98033aa1296036c0aa9bd408f0266386446626635a4b1d3e2a3ffd1749032",
+      "bytes": 3248920,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-memory",
+      "sha256": "a3a4ae34ca1273017656a102e613da8028a979dfb4697625f023a78a1f6ea7d9",
+      "bytes": 4848464,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-memory-eval",
+      "sha256": "7c63d7a812641ba74190de4805aaa31a311e19c57767da8db606c5a1e03c80f6",
+      "bytes": 3051720,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-memory-fixture",
+      "sha256": "ba6cea50c29980fdc5b8bfa1e6bafe10eb1317e7718700ed4fed0b484d764fd8",
+      "bytes": 5006888,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-mood",
+      "sha256": "a4f4cff9078b3635331df183894121f94bc7491bb8dce39c7011f8db1b95fe6f",
+      "bytes": 1985048,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-name",
+      "sha256": "203e7fe88974a38b9ef414bc7d5a6239ff62fc3f52fc885fa441b6b0d6b4072a",
+      "bytes": 24279688,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-observer",
+      "sha256": "24d48e53babb9efc35b430d93579830ab0854f42011654c0f39ba019944fd670",
+      "bytes": 884120,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-peek",
+      "sha256": "232b6021357a95db43ec5c9fa12ce89a9ec6098b8a5884b15f71bfc8596c8a5a",
+      "bytes": 2719208,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy",
+      "sha256": "95192befbb32995e4c3032826b10e3f22e44b783be2b5980320437c598d097f3",
+      "bytes": 5028856,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy-fit",
+      "sha256": "a992290e3bf742d726555b6656323b10a2dea1fe914f276b2dc05a7776067461",
+      "bytes": 919256,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy-judges",
+      "sha256": "eed2e46796fefd2eaee6269926eddab571d886405d65f38a9579d0becb5deba7",
+      "bytes": 4541768,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy-replay",
+      "sha256": "f10e7f0fa90c145f30b63a608c6ee051c9686614d6452441bde78045ec5f06ec",
+      "bytes": 2959984,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-records",
+      "sha256": "4498c93f38e503e419dd87adf8adca37520f9d7c92462e2d72b67ec09e8621c6",
+      "bytes": 1407008,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-records-fixture",
+      "sha256": "3f105a8ac131126682dabd60e9a9c48dd29d02071f31b739f473f760568069cb",
+      "bytes": 1450088,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-same-voice",
+      "sha256": "844334e28468176535e201ca66a42b152584a2cba023bc95462cc1e4c18e5297",
+      "bytes": 24217008,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-schedule",
+      "sha256": "4d9ce0154dbab3886084f34dc9d5b06b560b8e933539d81c74bdb95fe4a85b19",
+      "bytes": 4490336,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-seems-measure",
+      "sha256": "d4489ada7ab1cd9aed8e12b60e04c516ab70f1017d0c133cf092c7155e7532bf",
+      "bytes": 16740936,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-selftest",
+      "sha256": "7cb6f43b02b737897e6a7faa03d059d98695e66055848c861df7ba350460db69",
+      "bytes": 1560016,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-settings",
+      "sha256": "99b2d69311058cc28e3136cdc0651e2d473f081853483652ac6b461f7569e198",
+      "bytes": 1529744,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-setup",
+      "sha256": "3cb6b489a4c8a10519f7adf2b66033f50ce8f0fe53422d298b230aa5590ee52f",
+      "bytes": 7616264,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-skills",
+      "sha256": "f3a55ba6e8ebac796f4777fab48a956b3220eddbf8c4f33cbac626effd1766d9",
+      "bytes": 8787256,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-sound-fixtures",
+      "sha256": "404cd34297318d5cb82f1fff194a3955b61923c48d3fc1b0d4ca601876a3e28f",
+      "bytes": 1006096,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-station",
+      "sha256": "0b14570325a481d1b8aa2cb5be0e8d8c279ae246f905c18ce0cfc16438944795",
+      "bytes": 1816960,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-surround",
+      "sha256": "89a4b249c31d4d3a3ca1efaa6f2a77fd806f875119163bd94612a59ce1e2b13b",
+      "bytes": 13872184,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-tasks",
+      "sha256": "fcae18c40004b3d2c796d1f9a58a374156a03742587162951cefeb9748c9ca92",
+      "bytes": 4725928,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-tasks-harness-fixture",
+      "sha256": "4f891bc0d3866cc56b3b0fa44de4141575d3602ae008ca9e806756b66a6a81f9",
+      "bytes": 752840,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-turn-end",
+      "sha256": "f64143717c32e4d705e065a62e2b498837ace692e198fa8b69e32089eb4eb468",
+      "bytes": 24796992,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-update",
+      "sha256": "aba3e2095da789fefd1fa491fe2b121e32969274ecfe9452179ceedbea01140d",
+      "bytes": 4881384,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-voice",
+      "sha256": "416daf6b89811f57399e4e5262e0b1d435485b0b63dbabb15da048308d889b72",
+      "bytes": 28828152,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-voice-eval",
+      "sha256": "59b1dbaa0a1fbc1b106e868a6696e58f2e95e68cd2bcd6df27cdd5e8448a7d77",
+      "bytes": 13268120,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "replay_cost",
+      "sha256": "6fc4ec839fe3a802640d6cf9b643e12f8e0651ae081b0d53dc1cc4e471d9d391",
+      "bytes": 1572400,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "schedule_check",
+      "sha256": "d2c42b9a4980f8d5fefdfb33976b772bf9a15fb9e53799de5ceb2d95ea7bfddb",
+      "bytes": 4679632,
+      "format": "ELF64 little-endian AArch64"
+    }
+  ],
+  "checksums": {
+    "sha256": "7e03b43a594c1bdb972d1863ce32f05a8f5846c75ab607dc5ad81a9911026738",
+    "unique_executables": 50,
+    "all_match": true,
+    "exact_inventory": true
+  },
+  "limits": "Production release executables only. None executed by this audit. These are not nextest test executables or a device/signature/promotion result."
+}

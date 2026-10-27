@@ -1,0 +1,7 @@
+# Combined foundation: complete Update on current 410 Main
+
+Actual clean committed e74e8c02cf82c6bcdd87d78eba617968796754fc on 410faf6180d4dfeacb9021d1e272020c6037d18d. The upstream Skills production change is consumed by Update test helpers, so this is a fresh full Update execution, not an unconsumed-only carry.
+
+Formatting, strict Update all-target Clippy and full no-run compiler JSON pass, followed once by normal Cargo full Update at four test threads: **492 passed  / 0 failed  / 6 ignored**, all 18 writer controls once as a subset. Nine actual Running paths match produced compiler records. Every produced actual/preserved executable hash agrees before/after execution; all 7,362 tracked source/workflow hashes and modes, head/status and controller close unchanged. Previous observer c287 484 / 0 / 6 target witnesses were verified before controlled reuse; they remain their own execution.
+
+All three range-diff entries are equal. Five authored full blobs remain equal; reuse-decisions differs by the inherited new Main reminder appendix. This source proof is not substituted for runtime. Original native e74/410 checks follow this push; older 3c3/c287 native 7,684 / 0/53 remains separately bound, as do all prior failures and Mac scopes. No physical power cut, root helper execution, candidate apply/restore or 7071 acceptance ran. Raw logs, Cargo JSON and executable bytes remain private; only normalized text receipts appear here.

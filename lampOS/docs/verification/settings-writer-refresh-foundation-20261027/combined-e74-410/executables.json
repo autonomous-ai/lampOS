@@ -1,0 +1,312 @@
+[
+  {
+    "path": "<target>/debug/lamp-update",
+    "sha256": "40685b700324bb1993107580bad05e96f96b067f96db5fd0013cb59395b2d62f",
+    "size": 13715216,
+    "preserved": "<gate>/executables/0",
+    "preserved_sha256": "40685b700324bb1993107580bad05e96f96b067f96db5fd0013cb59395b2d62f",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "<checkout>/lampOS/crates/update/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "40685b700324bb1993107580bad05e96f96b067f96db5fd0013cb59395b2d62f"
+  },
+  {
+    "path": "<target>/debug/deps/self_cli_exec-25113342c679f525",
+    "sha256": "f582949e4f5be9057f1719cce421aeb080364c532ff27dbbc4d428271d07ac71",
+    "size": 565456,
+    "preserved": "<gate>/executables/1",
+    "preserved_sha256": "f582949e4f5be9057f1719cce421aeb080364c532ff27dbbc4d428271d07ac71",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-cli-exec",
+      "src_path": "<checkout>/lampOS/crates/update/tests/self_cli_exec.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "f582949e4f5be9057f1719cce421aeb080364c532ff27dbbc4d428271d07ac71"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_update-1c2005188bf8e5ab",
+    "sha256": "9639ec182c6d6189276286e1a9348a4b82810abab3415b046f93ca436bde7557",
+    "size": 1282720,
+    "preserved": "<gate>/executables/2",
+    "preserved_sha256": "9639ec182c6d6189276286e1a9348a4b82810abab3415b046f93ca436bde7557",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "<checkout>/lampOS/crates/update/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "9639ec182c6d6189276286e1a9348a4b82810abab3415b046f93ca436bde7557"
+  },
+  {
+    "path": "<target>/debug/deps/self_process_cuts-8ce1b6350e2ac329",
+    "sha256": "a18206eb54127c5df8ce6a9ef61517d9e7f8249d0cbf53feb73f4d6157779f8a",
+    "size": 566032,
+    "preserved": "<gate>/executables/3",
+    "preserved_sha256": "a18206eb54127c5df8ce6a9ef61517d9e7f8249d0cbf53feb73f4d6157779f8a",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-process-cuts",
+      "src_path": "<checkout>/lampOS/crates/update/tests/self_process_cuts.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "a18206eb54127c5df8ce6a9ef61517d9e7f8249d0cbf53feb73f4d6157779f8a"
+  },
+  {
+    "path": "<target>/debug/deps/release_pair-2447bcdc916504d4",
+    "sha256": "123fb8248d48178fbf9e505ec4f9b95c2084ecc850ef873b4253db09eb1ff97b",
+    "size": 3348944,
+    "preserved": "<gate>/executables/4",
+    "preserved_sha256": "123fb8248d48178fbf9e505ec4f9b95c2084ecc850ef873b4253db09eb1ff97b",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "<checkout>/lampOS/crates/update/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "123fb8248d48178fbf9e505ec4f9b95c2084ecc850ef873b4253db09eb1ff97b"
+  },
+  {
+    "path": "<target>/debug/deps/functions-9e56cee2cd1d1695",
+    "sha256": "f5589e53c4f7fd57cd18c0a08eef241e45322ec58598f1de8654eab6d18aabdb",
+    "size": 23096008,
+    "preserved": "<gate>/executables/5",
+    "preserved_sha256": "f5589e53c4f7fd57cd18c0a08eef241e45322ec58598f1de8654eab6d18aabdb",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "functions",
+      "src_path": "<checkout>/lampOS/crates/update/tests/functions.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "f5589e53c4f7fd57cd18c0a08eef241e45322ec58598f1de8654eab6d18aabdb"
+  },
+  {
+    "path": "<target>/debug/deps/it-ae5bcab57f15def3",
+    "sha256": "b4a6955d2321df95ce88c5264a82b52b7b41d50ebcc9979aa5c785a01b016a43",
+    "size": 2008432,
+    "preserved": "<gate>/executables/6",
+    "preserved_sha256": "b4a6955d2321df95ce88c5264a82b52b7b41d50ebcc9979aa5c785a01b016a43",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "<checkout>/lampOS/crates/update/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "b4a6955d2321df95ce88c5264a82b52b7b41d50ebcc9979aa5c785a01b016a43"
+  },
+  {
+    "path": "<target>/debug/deps/install-7739a60369055fbf",
+    "sha256": "9d48e371d52e5315771fbf9989f7992d4d948f4ae669df84188c15c9f410db86",
+    "size": 16790792,
+    "preserved": "<gate>/executables/7",
+    "preserved_sha256": "9d48e371d52e5315771fbf9989f7992d4d948f4ae669df84188c15c9f410db86",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "install",
+      "src_path": "<checkout>/lampOS/crates/update/tests/install.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "9d48e371d52e5315771fbf9989f7992d4d948f4ae669df84188c15c9f410db86"
+  },
+  {
+    "path": "<target>/debug/deps/round-f8d7f0920c4648fb",
+    "sha256": "e998642016b07c9a24bc99030b329b87071a3f1a5f0641a0d09b5e7a31a774fb",
+    "size": 20670424,
+    "preserved": "<gate>/executables/8",
+    "preserved_sha256": "e998642016b07c9a24bc99030b329b87071a3f1a5f0641a0d09b5e7a31a774fb",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "round",
+      "src_path": "<checkout>/lampOS/crates/update/tests/round.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "e998642016b07c9a24bc99030b329b87071a3f1a5f0641a0d09b5e7a31a774fb"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_update-2fc2e5180de6bc32",
+    "sha256": "35eb82a292c97f0a06f4e3599844529ed85e3578f7dfffdf1797525d6dbf3189",
+    "size": 15085648,
+    "preserved": "<gate>/executables/9",
+    "preserved_sha256": "35eb82a292c97f0a06f4e3599844529ed85e3578f7dfffdf1797525d6dbf3189",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "<checkout>/lampOS/crates/update/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "35eb82a292c97f0a06f4e3599844529ed85e3578f7dfffdf1797525d6dbf3189"
+  }
+]

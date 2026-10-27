@@ -1,0 +1,52 @@
+{
+  "before_head": "3c3ef1a2a97ca821b031b99245147254d7aaa47a",
+  "before_base": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "head": "e74e8c02cf82c6bcdd87d78eba617968796754fc",
+  "base": "410faf6180d4dfeacb9021d1e272020c6037d18d",
+  "range_diff": "1:  f4bbafdb01 = 1:  29dba6dee6 lampOS: plan independent recovery for settings writer refresh\n2:  3bf5318b6a = 2:  34d93f5d18 lampOS: record bounded writer refresh admission and recovery\n3:  3c3ef1a2a9 = 3:  e74e8c02cf lampOS: expose validated inputs for writer recovery",
+  "files": [
+    {
+      "path": "lampOS/crates/update/src/lib.rs",
+      "before_blob": "77d5807ac882409e634840bbfda142623797a31d",
+      "after_blob": "77d5807ac882409e634840bbfda142623797a31d",
+      "mode_unchanged": true,
+      "blob_unchanged": true
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "before_blob": "77ad2e38e7a3135fe56723cde18a822df5da8680",
+      "after_blob": "77ad2e38e7a3135fe56723cde18a822df5da8680",
+      "mode_unchanged": true,
+      "blob_unchanged": true
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "before_blob": "a9bb99c4ace0198232f37c658984f7d2a8ec79ae",
+      "after_blob": "a9bb99c4ace0198232f37c658984f7d2a8ec79ae",
+      "mode_unchanged": true,
+      "blob_unchanged": true
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "before_blob": "a1f6ed3dae788bdc4206d1e4027428aa1c20c06e",
+      "after_blob": "7ad8962418f1a2ba895dad8f8704ed257c8f0862",
+      "mode_unchanged": true,
+      "blob_unchanged": false
+    },
+    {
+      "path": "lampOS/docs/settings-writer-refresh.md",
+      "before_blob": "4d595ce730e3569b98f1ca8c3bad22833a91181e",
+      "after_blob": "4d595ce730e3569b98f1ca8c3bad22833a91181e",
+      "mode_unchanged": true,
+      "blob_unchanged": true
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "before_blob": "bc096ebcafb0c9d0e22f3e1606f3930b50f7ee08",
+      "after_blob": "bc096ebcafb0c9d0e22f3e1606f3930b50f7ee08",
+      "mode_unchanged": true,
+      "blob_unchanged": true
+    }
+  ],
+  "scope": "All three authored patches equivalent; five full blobs identical, inherited reuse-decisions Main appendix differs. Skills is consumed, so a fresh complete Update run was performed."
+}

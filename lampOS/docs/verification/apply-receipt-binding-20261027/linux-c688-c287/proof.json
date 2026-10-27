@@ -1,0 +1,61 @@
+{
+  "pr": 3808,
+  "head": "c688ec71a95bf128409265e3deadcb1873a9791b",
+  "base": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "actual_checkout": "f894ffba916c515fe8529d7f2ebc946d7abc4f38",
+  "ordered_parents": [
+    "c28789eeb03bf5d441927a7e991b949a2689b557",
+    "c688ec71a95bf128409265e3deadcb1873a9791b"
+  ],
+  "full_tree": "4e2cf8ab0a0290b1a82f9ca1247306494eb65aef",
+  "preview_full_tree_equals_authored": true,
+  "run": {
+    "id": 40488041318,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "head_sha": "c688ec71a95bf128409265e3deadcb1873a9791b",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "job": {
+    "id": 122134678616,
+    "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-27T10:23:16Z",
+    "completed_at": "2026-10-27T10:35:25Z"
+  },
+  "toolchain": "1.96.0-x86_64-unknown-linux-gnu",
+  "commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "required_stages": [
+    {
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "raw_log": {
+    "bytes": 42997,
+    "lines": 559,
+    "sha256": "450875abeaee71ec618097ef37c30d00bcf7450335dce7ebcbfdc3616e3b9a69"
+  },
+  "cache": "Restored cache and source-time reuse, 7282/7309 unchanged,27 changed/new; not a cache-free rebuild claim. Cache-save skipped by design.",
+  "warnings": "Certificate rehash warning and Node action deprecations retained in raw log; no Rust diagnostics.",
+  "exit_note": "Actual bash -e commands, Finished output and required-stage conclusions corroborate success; numeric command exit codes are not separately printed.",
+  "limits": "Linux fmt/strict Clippy only; no runtime, device or writer activation claim."
+}

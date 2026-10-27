@@ -1,0 +1,12 @@
+{
+  "command": [
+    "rg",
+    "-n",
+    "writer_refresh::|mod writer_refresh",
+    "lampOS/crates"
+  ],
+  "exit_code": 0,
+  "stdout": "lampOS/crates/update/src/lib.rs:34:pub mod writer_refresh;\n",
+  "stderr": "",
+  "scope": "only Update declaration/tests; no live CLI/round/service caller"
+}

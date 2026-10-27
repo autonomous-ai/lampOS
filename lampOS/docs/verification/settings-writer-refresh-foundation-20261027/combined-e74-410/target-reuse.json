@@ -1,0 +1,8 @@
+{
+  "actual_and_preserved_verified": true,
+  "executable_count": 10,
+  "previous_closed_boundaries": [
+    "c287 observer complete Update484/0/6"
+  ],
+  "no_active_handles": "Observer worker released slot after session9684 drained0; Root owns next full gate"
+}

@@ -1,0 +1,34 @@
+{
+  "head": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "tree": "032b3d74a8ee0852fe3902034873546a56061600",
+  "scope": "actual c287 plus six owned uncommitted observer paths; no writer_refresh foundation present",
+  "owned": {
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "d9a3cb6c5281691b8e7a568671c575abd2878c059157d4f395cdd1ce8db1c3a6",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "5b3d3d82054715a2850cb0934e7cfdfd1f43023ee88020de74cc760f3ff42b11",
+      "mode": 420
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "67d3d73b8e8024242d491f4c5ed4004ee4dcbeaebfcc2419a3ebe0f2c07181be",
+      "mode": 420
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684",
+      "mode": 420
+    }
+  },
+  "status": " M lampOS/crates/update/src/lib.rs\n M lampOS/docs/reuse-decisions.md\n M lampOS/docs/updates.md\n?? lampOS/crates/update/src/writer_files.rs\n?? lampOS/crates/update/src/writer_files/tests.rs\n?? lampOS/docs/writer-file-observation.md\n",
+  "controller_sha256": "d46693f2d8196bca4232366f14c5ede27706421861a64a241121e223a40d3e25",
+  "target": "<owned-target>"
+}

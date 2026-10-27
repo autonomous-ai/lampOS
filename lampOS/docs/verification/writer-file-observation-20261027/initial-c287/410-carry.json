@@ -1,0 +1,100 @@
+{
+  "before_head": "0b02e04794dcea7f69acb9d48186f6114b1c6d30",
+  "before_base": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "after_head": "5717ca78b40d6ad56d11657ec1c3f2e97c247eb5",
+  "after_base": "410faf6180d4dfeacb9021d1e272020c6037d18d",
+  "paths": {
+    "lampOS/crates/update/src/lib.rs": {
+      "before": {
+        "mode": "100644",
+        "blob": "3b8767bcdd6d1683638e77d1c4bedf9baed25538",
+        "sha256": "d9a3cb6c5281691b8e7a568671c575abd2878c059157d4f395cdd1ce8db1c3a6"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "3b8767bcdd6d1683638e77d1c4bedf9baed25538",
+        "sha256": "d9a3cb6c5281691b8e7a568671c575abd2878c059157d4f395cdd1ce8db1c3a6"
+      },
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "before": {
+        "mode": "100644",
+        "blob": "79b0f419624e2ed1f8416673844afd7e988531e7",
+        "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "79b0f419624e2ed1f8416673844afd7e988531e7",
+        "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c"
+      },
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "before": {
+        "mode": "100644",
+        "blob": "9dadf2e73c5db037d5126b95e78a7fcac768df1f",
+        "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "9dadf2e73c5db037d5126b95e78a7fcac768df1f",
+        "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95"
+      },
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "before": {
+        "mode": "100644",
+        "blob": "cdc8304e8fdade73e91c9ac8c2f041e28157f03e",
+        "sha256": "5b3d3d82054715a2850cb0934e7cfdfd1f43023ee88020de74cc760f3ff42b11"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "6d5b81efc81cc51e01ac04e46c7ce51cfbfbb21c",
+        "sha256": "914c8df197cc7461bac02f1843ac77cea58c02f80eabc09b1eac09667973fda8"
+      },
+      "full_blob_equal": false,
+      "mode_equal": true
+    },
+    "lampOS/docs/updates.md": {
+      "before": {
+        "mode": "100644",
+        "blob": "67b42a84c28be1ebad83ecd37491e435dc3a1ed0",
+        "sha256": "67d3d73b8e8024242d491f4c5ed4004ee4dcbeaebfcc2419a3ebe0f2c07181be"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "67b42a84c28be1ebad83ecd37491e435dc3a1ed0",
+        "sha256": "67d3d73b8e8024242d491f4c5ed4004ee4dcbeaebfcc2419a3ebe0f2c07181be"
+      },
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "before": {
+        "mode": "100644",
+        "blob": "5b310eaeca9bfcd1bf9e108d01e4dfe9b89d82f1",
+        "sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "5b310eaeca9bfcd1bf9e108d01e4dfe9b89d82f1",
+        "sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684"
+      },
+      "full_blob_equal": true,
+      "mode_equal": true
+    }
+  },
+  "all_full_blobs_equal": false,
+  "all_modes_equal": true,
+  "zero_context_authored_diff_equal": false,
+  "range_diff": "1:  0b02e04794 = 1:  5717ca78b4 lampOS: observe bounded setting files through directory descriptors\n",
+  "new_base_runtime_status": "UNRUN: c287 result retained, no Cargo during Root gate",
+  "authored_patch_body_equal_without_blob_index_and_hunk_offsets": true,
+  "reuse_doc_preserves_exact_own_prefix_and_exact_new_main_body": true,
+  "note": "Five full blobs unchanged; reuse-decisions carries exact incoming Main reminder-skills appendix. All six modes unchanged; range-diff =. Consumed Skills changed in Main; 410 runtime unrun."
+}

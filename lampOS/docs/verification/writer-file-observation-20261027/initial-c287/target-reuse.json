@@ -1,0 +1,9 @@
+{
+  "actual_and_preserved_verified": true,
+  "executable_count": 10,
+  "previous_closed_boundaries": [
+    "cb97/1fb full Update",
+    "later c287 lib/functions"
+  ],
+  "no_active_handles": "Root explicitly released single slot; prior sessions 59547/19512/73033 drained, worker has none"
+}

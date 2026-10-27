@@ -1,3 +1,13 @@
+## 27 October 2026, 17:53 +07 — consumed-dependency carry fully qualified
+
+#3775 now offers e74e8c02c on current Main 410faf618. All three carried patches match. Main changed Skills, an actual Update test dependency, so a fresh complete Update gate ran once: fmt and strict all-target Clippy pass; 492 passed / 0 failed / 6 ignored, all 18 writer controls once. All 7,362 source/mode guards and nine actual Running executables close. [Current local packet](verification/settings-writer-refresh-foundation-20261027/combined-e74-410/README.md) preserves the source and target-reuse boundary. Original new ARM/Linux checks are active; older 3c3 native evidence remains separate.
+
+#3808 original c688/c287 ARM is verified: 7,674 unique PASS / 0 bad or selected unrun / 53 skipped, all eight controls once; original Linux lint passes. [ARM](verification/apply-receipt-binding-20261027/native-c688-c287/README.md), [Linux](verification/apply-receipt-binding-20261027/linux-c688-c287/README.md) and artifact text packets retain exact preview/tree and all 50 AArch64 member bindings, without pretending production artifacts include test-executable hashes. Its clean e2d393ad3/410 carry is now in the sole local full gate.
+
+The separate observer first passed 484/0/6 on c287, all ten controls; [source-bound proof](verification/writer-file-observation-20261027/initial-c287/README.md) retains that scope and the unrun 410 carry. Root has combined it with the first raw ordinary-ownership capture consumer locally; an independent source read finds no P1/P2, runtime unrun. The raw output is neither authenticated nor projected nor executable.
+
+Reader disposition: #3775's two no-P1/P2 reads were on 3c3; the P3 stale fourteen-test prose is corrected locally to eighteen in both owned docs and will go in the next owned update. No code/runtime retest is requested for that prose. No lamp, root helper, candidate restoration or 7071 GOOD/BAD acceptance is claimed.
+
 ## 27 October 2026, 17:30 +07 — current combined foundation native gates close
 
 #3775 current3c3ef1a2a/c28789eeb original attempt1 ARM40485795636 passes7,684 unique tests, zero FAIL/LEAK/TIMEOUT/selected-unrun,53 skipped; all18 admission/accessor controls pass once. Actual selected scope is12packages/70binaries, not whole-workspace runtime. Separate process13/0,relay1,docs4 across47,Rusthelper25 and Python35/12/7 remain separate. Linux40485795797 actual workspace fmt/strict all-target Clippy passes.

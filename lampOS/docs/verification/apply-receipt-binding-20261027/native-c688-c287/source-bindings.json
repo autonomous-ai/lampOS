@@ -1,0 +1,62 @@
+{
+  ".github/workflows/lampos-arm64.yml": {
+    "bytes": 20675,
+    "mode": "100644",
+    "object": "70afefeaec5a28c8e5aff539dd1d8d537d098560",
+    "sha256": "43a7eef7907d272904f975d7ee65b456ec3bc4eba63505bee596d1bf196a6e74"
+  },
+  ".github/workflows/lampos-clippy.yml": {
+    "bytes": 4688,
+    "mode": "100644",
+    "object": "907ef8ccd6d32d96d60887d56ca0fac84a41d67a",
+    "sha256": "f979a9e8d87e8f9db255c4a9e81a51ecf7164b6b48118627578ce83722a3db92"
+  },
+  "lampOS/Cargo.lock": {
+    "bytes": 122873,
+    "mode": "100644",
+    "object": "5616633180e1b52671e5378d27632818c9f1a7f1",
+    "sha256": "8e325cf6a44cbba7aadb288cc8631cc91074a9dea83063f197f5590783404e1e"
+  },
+  "lampOS/Cargo.toml": {
+    "bytes": 1442,
+    "mode": "100644",
+    "object": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+    "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+  },
+  "lampOS/crates/update/Cargo.toml": {
+    "bytes": 2172,
+    "mode": "100644",
+    "object": "856efebb1928394acbf06fc05e2dfee1251671d4",
+    "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+  },
+  "lampOS/crates/update/src/apply.rs": {
+    "bytes": 69318,
+    "mode": "100644",
+    "object": "23233e73bed97907a4d3b9cf84d5a5a8616f6542",
+    "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+  },
+  "lampOS/crates/update/src/round.rs": {
+    "bytes": 127120,
+    "mode": "100644",
+    "object": "2ae7fa83504c7162c59b3fa279d517b35a579994",
+    "sha256": "7a712870ef8ef107f15810b526e2ce3ee02dc66a904c6c9914c5cedfa988b6aa"
+  },
+  "lampOS/crates/update/tests/round.rs": {
+    "bytes": 192235,
+    "mode": "100644",
+    "object": "2b9cf68c94a0cb30ba30f68002e2a37f541c832c",
+    "sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422"
+  },
+  "lampOS/docs/updates.md": {
+    "bytes": 169816,
+    "mode": "100644",
+    "object": "bbf199b2a6b970412908a42cf50159fef03e8c4a",
+    "sha256": "2d372c9158fa8eb1493be3818868db7d3dba38af6c7ff551c498b0624de222fb"
+  },
+  "lampOS/rust-toolchain.toml": {
+    "bytes": 86,
+    "mode": "100644",
+    "object": "e3b40113e65befef4d5d198284b99c78c27136f0",
+    "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+  }
+}

@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (<owned-target>/debug/deps/lamp_update-2fc2e5180de6bc32)
+     Running unittests src/main.rs (<owned-target>/debug/deps/lamp_update-1c2005188bf8e5ab)
+     Running tests/functions.rs (<owned-target>/debug/deps/functions-9e56cee2cd1d1695)
+     Running tests/install.rs (<owned-target>/debug/deps/install-7739a60369055fbf)
+     Running tests/it/main.rs (<owned-target>/debug/deps/it-ae5bcab57f15def3)
+     Running tests/release_pair.rs (<owned-target>/debug/deps/release_pair-2447bcdc916504d4)
+     Running tests/round.rs (<owned-target>/debug/deps/round-f8d7f0920c4648fb)
+     Running tests/self_cli_exec.rs (<owned-target>/debug/deps/self_cli_exec-25113342c679f525)
+     Running tests/self_process_cuts.rs (<owned-target>/debug/deps/self_process_cuts-8ce1b6350e2ac329)
+   Doc-tests lamp_update
