@@ -91,6 +91,10 @@ pub trait Host {
     fn joints(&mut self) -> Option<Vec<f64>>;
     /// Stop every part, and return once each reads stopped.
     fn stop(&mut self) -> io::Result<()>;
+    /// The lamp's units active now, read before a dry run's stop and after.
+    fn active(&mut self) -> Vec<String>;
+    /// Start `units` again, after a dry run.
+    fn start(&mut self, units: &[String]) -> io::Result<()>;
     /// The body's let-go: its one report line, or why it did not let go.
     fn let_go(&mut self) -> Result<String, String>;
     /// The ring's safe-to-unplug light, left on.
@@ -183,6 +187,10 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
             say,
         );
     }
+    // A dry run leaves the lamp as it found it: what its stop ends that
+    // is not part of `lampos.target` (`lamp-update.service`, the reset's
+    // writers and starters) is not brought back by restarting the target.
+    let before = if dry_run { host.active() } else { Vec::new() };
     let stopped = host.stop();
     match &stopped {
         Ok(()) => step(Step::Stopped, "every part is stopped".into(), say),
@@ -220,6 +228,20 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
     host.sync();
     step(Step::Synced, "synced".into(), say);
     if dry_run {
+        let now = host.active();
+        let again: Vec<String> = before
+            .into_iter()
+            .filter(|unit| !now.contains(unit))
+            .collect();
+        if !again.is_empty() {
+            match host.start(&again) {
+                Ok(()) => say(&format!("dry run: started again {}", again.join(" "))),
+                Err(why) => say(&format!(
+                    "dry run: not started again ({why}): {}",
+                    again.join(" ")
+                )),
+            }
+        }
         step(
             Step::WouldPowerOff,
             format!("dry run: would run {}", POWER_OFF.join(" ")),
@@ -378,6 +400,9 @@ mod tests {
         no_keeper: bool,
         /// The say service is not there: answered after the whole wait.
         say_fails: bool,
+        /// Each read of the active units in turn; none after.
+        active: Vec<Vec<&'static str>>,
+        started: Vec<String>,
         calls: Vec<(Duration, &'static str)>,
     }
 
@@ -419,6 +444,21 @@ mod tests {
             } else {
                 Ok(())
             }
+        }
+        fn active(&mut self) -> Vec<String> {
+            if self.active.is_empty() {
+                return Vec::new();
+            }
+            self.active
+                .remove(0)
+                .into_iter()
+                .map(str::to_owned)
+                .collect()
+        }
+        fn start(&mut self, units: &[String]) -> io::Result<()> {
+            self.calls.push((self.now, "start"));
+            self.started = units.to_vec();
+            Ok(())
         }
         fn let_go(&mut self) -> Result<String, String> {
             self.calls.push((self.now, "let go"));
@@ -591,6 +631,33 @@ mod tests {
         assert!(!names(&fake).contains(&"power off"));
         assert_eq!(names(&fake).last(), Some(&"sync"));
         assert_eq!(steps.last(), Some(&Step::WouldPowerOff));
+    }
+
+    #[test]
+    fn a_dry_run_starts_again_what_it_stopped() {
+        let mut fake = Fake {
+            joints: vec![Some(vec![0.0])],
+            active: vec![
+                vec!["lampos.target", "lamp-voice.service", "lamp-update.service"],
+                vec![],
+            ],
+            ..Fake::default()
+        };
+        run(&mut fake, true, &mut |_| {});
+        assert_eq!(
+            fake.started,
+            ["lampos.target", "lamp-voice.service", "lamp-update.service"]
+        );
+        assert_eq!(names(&fake).last(), Some(&"start"));
+        // A real power-off reads nothing and starts nothing.
+        let mut fake = Fake {
+            joints: vec![Some(vec![0.0])],
+            active: vec![vec!["lamp-update.service"], vec![]],
+            ..Fake::default()
+        };
+        run(&mut fake, false, &mut |_| {});
+        assert!(fake.started.is_empty());
+        assert_eq!(fake.active.len(), 2);
     }
 
     #[test]
