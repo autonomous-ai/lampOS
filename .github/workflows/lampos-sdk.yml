@@ -13,12 +13,14 @@ on:
     paths:
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
+      - 'lampOS/docs/skill-format*'
       - '.github/workflows/lampos-sdk.yml'
   push:
     branches: [lamp-voice]
     paths:
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
+      - 'lampOS/docs/skill-format*'
       - '.github/workflows/lampos-sdk.yml'
 
 permissions:
@@ -33,16 +35,30 @@ jobs:
       - name: Each SDK's copy is the doc's, byte for byte
         run: |
           status=0
-          for copy in lampOS/sdk/python/src/lampos/control.schema.json lampOS/sdk/js/src/control.schema.json; do
-            if ! cmp -s lampOS/docs/control.schema.json "$copy"; then
-              echo "::error file=$copy::differs from lampOS/docs/control.schema.json: cp lampOS/docs/control.schema.json $copy"
+          # A copy marked `required` must exist: a deleted or renamed one
+          # fails. The skill-format copy is `until-3840` until #3840 adds it.
+          while read -r doc copy need; do
+            if [ ! -e "$copy" ]; then
+              if [ "$need" = required ]; then
+                echo "::error file=$copy::missing: cp $doc $copy"
+                status=1
+              fi
+              continue
+            fi
+            if ! cmp -s "$doc" "$copy"; then
+              echo "::error file=$copy::differs from $doc: cp $doc $copy"
               status=1
             fi
-          done
+          done <<'COPIES'
+          lampOS/docs/control.schema.json lampOS/sdk/python/src/lampos/control.schema.json required
+          lampOS/docs/control.schema.json lampOS/sdk/js/src/control.schema.json required
+          lampOS/docs/skill-format.schema.json lampOS/sdk/python/src/lampos/skill-format.schema.json until-3840
+          COPIES
           exit $status
 
-  # Each SDK's floor (requires-python, engines) and a current one, so the
-  # floor the package promises stays tested (harness-reviewer's P3 on #3823).
+  # Each SDK's floor, exactly as promised (requires-python 3.10, engines
+  # 20.11), and a current one, so the floor stays tested (harness-reviewer's
+  # P3s on #3823 and #3830).
   python:
     name: lampOS SDK — Python ${{ matrix.python }} (pytest)
     runs-on: ubuntu-24.04
@@ -68,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '22']
+        node: ['20.11', '22']
     defaults:
       run:
         working-directory: lampOS/sdk/js
