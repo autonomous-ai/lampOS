@@ -1189,16 +1189,25 @@ order is kept. A written turn is the same from the chat on.
     quiet sits where its capture level puts it, and lamp-c0a4's quiet room
     read -45 dBFS on 27 Oct (7071), where a first fixed -46 dBFS held the
     join. And no line since the start was in another voice or seen spoken
-    by two faces (`Heeding::showing_the_first_seconds_quiet`). So the bare
+    by two faces, and the rule held no line since the start
+    (`Heeding::showing_the_first_seconds_quiet`): with no voice check
+    (`LAMP_SAME_VOICE_MODEL` unset), another person's line with no face
+    seen speaking it shows no second person, and held as said to nobody it
+    is no talk left alone for the room told (`RoomTold::held`), so the hold
+    itself keeps the join off (#3801's P3). A wait for the Policy is no
+    hold, and the bare name waiting for its request is never judged. So the bare
     name and its request, nobody in view, are joined and answered once. A
     rise like talk or a television between the lines, a loud room's quiet,
-    no fresh quiet or too few readings, talk left alone, another voice, or
-    two faces in view keep it held; the rule's verdicts and the room told
+    no fresh quiet or too few readings, talk left alone, a line held,
+    another voice, or two faces in view keep it held; the rule's verdicts and the room told
     are as before. The journal says `request N: the room is not known yet
     after the start, and the ears' stream stayed within R dB of its quiet
-    of F dBFS outside the lines, with no talk left alone and no other voice
-    since: kept as said in a quiet room for a join
-    (LAMP_FIRST_SECONDS_QUIET)`. With no rule (`Engine::telling_one_speaker`
+    of F dBFS outside the lines, with no talk left alone, no line held and
+    no other voice since: kept as said in a quiet room for a join
+    (LAMP_FIRST_SECONDS_QUIET)`. Its levels' thread is started after
+    `--addressed`'s looks, and reads them beside the levels whichever
+    started first (`Heeding::levels_looks`), so `--addressed` and
+    `LAMP_NAME_NEAR`'s face check keep their looks with it on. With no rule (`Engine::telling_one_speaker`
     unset), nothing carries. Carried, the line is never held as a short
     sound, and the rule is given its words with the name line's words before them when
     those begin with the name ("Lamp. So I have a meeting at three…"), or
