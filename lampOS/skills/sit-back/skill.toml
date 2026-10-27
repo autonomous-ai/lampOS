@@ -1,0 +1,95 @@
+# Sit back: someone who has leaned in toward the desk for a long while is
+# told once, kindly, that it's a good moment to sit back, and given a short
+# warm word when they do. V1's posture reminder, which the owner asked to
+# bring back (#3694, the first builder on #3504, 27 Oct), shaped like the
+# wellbeing nudges (#1685) and A comfort break. It reads only what the eyes
+# already say of the person at the desk (`room/activity`'s `leaning_in`: the
+# face bigger than it sat, against this sitting's own baseline, never a fixed
+# line and never a picture), and it never speaks of a body or looks. Written
+# to lamp-skills' schema (docs/skills.md, "The schema, as lamp-skills reads it").
+needs = ["eyes", "body", "voice"]
+# Installable: its owner chooses it (`lamp-skills install`), and it is not in
+# the product's install (`install::NOT_PRODUCT_SKILLS`) until tried on a lamp.
+kind = "installable"
+version = "1.0.0"
+# Three nudges a day at most, counted from the local midnight. The word after
+# one (`sat_well`) is that nudge's, not counted (`follows`).
+most_a_day = 3
+
+# What it may read and use, and nothing more: the eyes' reading of the person
+# at the desk, the faces, the voice's state, and a turn toward the face. One
+# short line, worded by the voice.
+[permissions]
+speak = true
+topics = ["room/activity", "humans/faces/tracked", "voice/state"]
+body = true
+
+# Leaned in for ten minutes: the eyes say `leaning_in` once it has held 10 s
+# (eyes/src/activity.rs, the face 1.25 times as big as it sat). A sit-up
+# shorter than 20 s does not end it; one longer does, so a person shifting
+# about near the line is not nudged.
+[[trigger]]
+name = "slouch"
+topic = "room/activity"
+field = "state"
+equals = "leaning_in"
+for = "10m"
+gap = "20s"
+rearm = "leaves"          # once each time they lean in; again only after they sat back
+cooldown = "60m"
+wait = "10m"              # someone else in view, or a talk: once they go, while still leaned in
+
+# Sat back a minute within a quarter of an hour of a nudge: one short warm word.
+[[trigger]]
+name = "sat_well"
+topic = "room/activity"
+field = "state"
+equals = "at_desk"
+for = "1m"
+gap = "10s"
+rearm = "leaves"
+follows = { trigger = "slouch", within = "15m" }
+
+[[while]]                 # nobody else in view: never said in front of others
+topic = "humans/faces/tracked"
+faces_at_most = 1
+for = "1m"
+
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]                 # never while they talk, or in the middle of a conversation
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
+
+[quiet]                   # never at night
+from = "22:00"
+to = "08:00"
+
+# One nudge an hour between the wellbeing skills.
+[budget]
+group = "wellbeing"
+per_hour = 1
+
+# The wellbeing skills' one function (#1685): it stops the one that came
+# last, or with all, every one.
+[stop]
+tool = "wellbeing_nudges"
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word that it's a good moment for a short break, a word to sit back after a long while leaned in, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+on = "slouch"
+body = { look_at = "face" }
+say = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health."
+
+[[do]]
+on = "sat_well"
+say = "They sat back after your word. Say a short, warm thanks or 'that's better' in two or three words. Nothing about their body or looks."

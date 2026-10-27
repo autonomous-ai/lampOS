@@ -1,0 +1,6 @@
+{"topic": "voice/state", "declaration": {"type": "lamp_msgs/VoiceState", "version": 1, "kind": "latest"}}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"6a7b8c9d0e1f2a3b","seq":1,"at_us":0,"at_unix_ms":1792368000000},"payload_b64":"eyJzdGF0ZSI6InJlc3RpbmcifQ=="}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"6a7b8c9d0e1f2a3b","seq":2,"at_us":720000000,"at_unix_ms":1792368720000},"payload_b64":"eyJzdGF0ZSI6Imxpc3RlbmluZyJ9"}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"6a7b8c9d0e1f2a3b","seq":3,"at_us":750000000,"at_unix_ms":1792368750000},"payload_b64":"eyJzdGF0ZSI6InNwZWFraW5nIn0="}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"6a7b8c9d0e1f2a3b","seq":4,"at_us":900000000,"at_unix_ms":1792368900000},"payload_b64":"eyJzdGF0ZSI6Imxpc3RlbmluZyJ9"}
+{"header":{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"lamp_bus_cli","boot":"6a7b8c9d0e1f2a3b","seq":5,"at_us":960000000,"at_unix_ms":1792368960000},"payload_b64":"eyJzdGF0ZSI6InJlc3RpbmcifQ=="}
