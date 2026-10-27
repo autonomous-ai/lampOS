@@ -2816,6 +2816,18 @@ pub fn serve(
         );
     }
     engine = engine.answering_short(short_done);
+    // A line said to the lamp by name never ends in silence from an empty
+    // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
+    let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if no_words_again {
+        eprintln!(
+            "lamp-voice second: a line begun with the lamp's name answered with no words and no call is asked once more, and said a short sorry if it has none again (LAMP_NO_WORDS_AGAIN)"
+        );
+    }
+    engine = engine.asking_again_for_no_words(no_words_again);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
