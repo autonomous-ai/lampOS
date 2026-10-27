@@ -1791,6 +1791,36 @@ The journal line says who asked, when the datagram said (`(asked by
 skill:stretch-break)`). Without the switch, a gesture asked while another
 plays is dropped whoever asks, as before.
 
+#### Who asks, from the kernel: `--caller-caps on` (#3504, phase 0)
+
+Any process in group `lampos` may write to the mood socket, and a datagram
+may say any `source` and `priority`. With `--caller-caps on` (off unless
+given) the body asks the kernel who sent each datagram (`SO_PASSCRED`,
+`lamp_ipc::caller`) and holds a gesture or a move to the most its systemd
+unit may ask at, whatever it says, if it runs as that unit's user
+(`lamp_msgs::MOST_BY_UNIT`):
+
+| Unit | Runs as | At most |
+|------|---------|---------|
+| `lamp-voice` | root | person |
+| `lamp-cloud`, `lamp-actions` | lampos | conversation |
+| `lamp-skills`, `lamp-control` | lampos | skill |
+| `lamp-addons`, `lamp-expression` | lampos | idle |
+| root's other helpers | root | what they ask |
+| anyone else, or a known unit run as another user | | idle |
+
+A unit is named only from `/system.slice/` or `/lampos.slice/`, so a login
+user's own `systemd-run --user --unit=lamp-voice` is nobody's. Its
+`source` becomes the unit's name before what it said
+(`lamp-skills/skill:dance`, `unknown`, `root`). A cut is said once a minute
+per unit: `lamp-body: lamp-skills asked at person, held to skill`. The cap
+holds whatever `--arbitration`, since a skill's gesture asked at
+`conversation` would otherwise outlast a conversation beginning. Moods are
+taken as before. The gaze socket takes a sight only from `lamp-eyes` or
+`lamp-skills` run as `lampos`, or from root, and drops any other, said once
+a minute. A datagram too long for the body's buffer is refused whole. No
+product unit passes it yet.
+
 ## Not tipping over (V1's anti-tip rule)
 
 The body keeps V1's anti-tip rule (#641, #642 in the first lamp software;
@@ -1890,6 +1920,7 @@ four rows, "Without it" is what `off` leaves.
 | `--look-at-name on` (default) | the lamp's name heard on the bus taken as being spoken to for two seconds, and with nobody in view one small glance once it stands (see "Turning to a call") | a call is not taken | on or off |
 | `--idle on` (default) | a standing lamp at rest shifts a little now and then | off | on or off |
 | `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped | on or off |
+| `--caller-caps on` | who asks is the kernel's word: a gesture or a move is held to its unit's most, and the gaze socket takes sights from the eyes, skills or root only (see "Who asks, from the kernel") | as before: any process in group `lampos` may ask at any priority and send a sight | on or off |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
 | `--pitch-window LOW,HIGH` | the window the head's pitch goal is kept in while the head is beside the base, this lamp's own; checked at start against the head pitch servo's own limits (registers 9 and 11), and the run refused with nothing written if it is not inside them | lamp-4ace's, 1,740 to 2,030, and the servo's limits are not read | LOW at least 1,670 (the head's floor) and under HIGH, and around `--home`'s pitch |

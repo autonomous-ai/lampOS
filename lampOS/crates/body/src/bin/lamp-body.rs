@@ -4,13 +4,13 @@
 use lamp_body::{calibration::UnitId, moves::Asker};
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off [--folded-arm SHOULDER,ELBOW]] [--refused-let-go on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off] [--hold-from ABSOLUTE_FILE]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet), --gaze-reach given or\nnot, runs with gaze off and says so once. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window (a let-go run, --let-go-at-stop on with no --home\nand no --torque on, found outside it with --folded-arm given alone and its shoulder and elbow\neach within 20 counts of those is let go at once, torque off only, no goal written; the folded\ncounts must come from a read the person confirmed was folded, never from this run's own read of\nwhere the arm is now); one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --refused-let-go\non (the default; off is the body as before), a lamp found folded whose start is refused only because\nthe head or the base is out of where it may start is let go instead (torque off on the three, and on\nthe shoulder and the elbow with --stand), says on the bus what it asks of a person (\"My head is tipped\ntoo far...\"), reads the joints ten times a second, and once they have been in range for a second takes\nhold where they are and starts as it would have; a head found tipped up out of range (pitch under\nits range, against its weight) keeps its torque so that it does not drop, and says so; after ten\nminutes nobody has set it straight it stops asking, stays let go and reads twice a second; a lamp\nfound up is refused as before. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
+const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off [--folded-arm SHOULDER,ELBOW]] [--refused-let-go on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off] [--caller-caps on|off] [--hold-from ABSOLUTE_FILE]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet), --gaze-reach given or\nnot, runs with gaze off and says so once. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window (a let-go run, --let-go-at-stop on with no --home\nand no --torque on, found outside it with --folded-arm given alone and its shoulder and elbow\neach within 20 counts of those is let go at once, torque off only, no goal written; the folded\ncounts must come from a read the person confirmed was folded, never from this run's own read of\nwhere the arm is now); one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --refused-let-go\non (the default; off is the body as before), a lamp found folded whose start is refused only because\nthe head or the base is out of where it may start is let go instead (torque off on the three, and on\nthe shoulder and the elbow with --stand), says on the bus what it asks of a person (\"My head is tipped\ntoo far...\"), reads the joints ten times a second, and once they have been in range for a second takes\nhold where they are and starts as it would have; a head found tipped up out of range (pitch under\nits range, against its weight) keeps its torque so that it does not drop, and says so; after ten\nminutes nobody has set it straight it stops asking, stays let go and reads twice a second; a lamp\nfound up is refused as before. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
 (--give-way off is the body as it was before them, and --limp off keeps giving way without the
 slump). With --give-way, a joint that pushes at its goal without moving for\n1.5 s is told to stop (its goal becomes where it is; torque is never written off); with\n--give-way stay, a head or base joint that gave way and is moved more than 15 counts by\na hand for over a second stays where it was put. With --limp on as well, as the old runtime
 did, a head or base joint that a hand stops and still pushes a second later makes the lamp
 slump (torque off on all five, held again 5 s later where it lies; after an overload, 120 s);
 a hand never ends the run, and a head roll or base found beyond 400 counts of home at start is
-taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does; a shoulder left\nup over an elbow that fell is first lowered folded, and otherwise the arm waits where it\nslumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding (one asked while a slumped lamp's shoulder is being lowered holds where it is instead, and the next start lowers it); with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and not weighed, so a caller may always say them. Either way, a\nskill's or idle gesture playing ends, eased out, when a conversation begins or a hand holds the head;\nwith LAMP_GESTURE_PAUSE=on, listening only pauses it: it ends when the lamp answers or after 3 s, and\ngoes on where it was if the lamp rests again sooner.\nWith LAMP_BODY_OWN_RANGES=on, each joint's own stored limits are read at start: a home, folded arm,\nstand or pitch window outside them does not start, and a head or base goal outside them (less 20)\nends the run; a joint storing 0..=4095 keeps its guard as before.\n--hold-from FILE is for tests on a lamp only: while FILE's first word is held, the head's pitch is\ntaken as held by a hand (its goal kept where it is, torque and giving way untouched), and the\njournal says the hand is from a test input; free, another word or no file is no hand. No product unit passes it.\nPrints one JSON report when it ends.\n";
+taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does; a shoulder left\nup over an elbow that fell is first lowered folded, and otherwise the arm waits where it\nslumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding (one asked while a slumped lamp's shoulder is being lowered holds where it is instead, and the next start lowers it); with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and not weighed, so a caller may always say them. Either way, a\nskill's or idle gesture playing ends, eased out, when a conversation begins or a hand holds the head;\nwith LAMP_GESTURE_PAUSE=on, listening only pauses it: it ends when the lamp answers or after 3 s, and\ngoes on where it was if the lamp rests again sooner.\nWith --caller-caps on (off unless given; phase 0 of the lamp programming protocol, #3504), the kernel names\nwho sent each datagram, never the datagram: a gesture or a move is held to the most its systemd unit\nmay ask at, run as that unit's user (lamp-voice person; lamp-cloud and lamp-actions conversation;\nlamp-skills and lamp-control skill; lamp-addons and lamp-expression idle; root's other helpers what they\nask; anyone else idle), its source is that unit's name before what it said, and a cut is said once a\nminute per unit; the gaze socket takes a sight only from lamp-eyes, lamp-skills or root, and drops\nany other, said once a minute.\nWith LAMP_BODY_OWN_RANGES=on, each joint's own stored limits are read at start: a home, folded arm,\nstand or pitch window outside them does not start, and a head or base goal outside them (less 20)\nends the run; a joint storing 0..=4095 keeps its guard as before.\n--hold-from FILE is for tests on a lamp only: while FILE's first word is held, the head's pitch is\ntaken as held by a hand (its goal kept where it is, torque and giving way untouched), and the\njournal says the hand is from a test input; free, another word or no file is no hand. No product unit passes it.\nPrints one JSON report when it ends.\n";
 
 #[derive(Debug)]
 struct Arguments {
@@ -46,6 +46,8 @@ struct Arguments {
     look_at_name: bool,
     moves: Option<PathBuf>,
     arbitration: bool,
+    /// `--caller-caps on` (#3504, phase 0): who asks is the kernel's word.
+    caller_caps: bool,
     /// `--hold-from FILE`: a hand on the head from a test input (#2668),
     /// for tests on a lamp only; no product unit passes it.
     hold_from: Option<PathBuf>,
@@ -60,10 +62,11 @@ struct Arguments {
 /// updated is the safe failure, not one that moves on bounds it knows to be
 /// incomplete (the first builder on #2071, 20 Oct 06:28; #1680's one
 /// exception, a safety rule).
-const OPTIONS: [&str; 34] = [
+const OPTIONS: [&str; 35] = [
     "--arbitration",
     "--arm-load",
     "--awake-seconds",
+    "--caller-caps",
     "--device",
     "--folded-arm",
     "--force-limit",
@@ -186,6 +189,7 @@ fn parse_with(
     let mut look_at_name = None;
     let mut moves = None;
     let mut arbitration = None;
+    let mut caller_caps = None;
     let mut hold_from = None;
     while let Some(key) = args.next() {
         if key == "--help" {
@@ -222,6 +226,7 @@ fn parse_with(
                 || look_at_name.is_some()
                 || moves.is_some()
                 || arbitration.is_some()
+                || caller_caps.is_some()
                 || hold_from.is_some()
                 || args.next().is_some()
             {
@@ -432,6 +437,13 @@ fn parse_with(
                     _ => return Err("--arbitration is on or off"),
                 });
             }
+            Some("--caller-caps") if caller_caps.is_none() => {
+                caller_caps = Some(match value.to_str() {
+                    Some("on") => true,
+                    Some("off") => false,
+                    _ => return Err("--caller-caps is on or off"),
+                });
+            }
             Some("--look-at-name") if look_at_name.is_none() => {
                 look_at_name = Some(match value.to_str() {
                     Some("on") => true,
@@ -592,6 +604,7 @@ fn parse_with(
         look_at_name: look_at_name.unwrap_or(true),
         moves,
         arbitration: arbitration.unwrap_or(false),
+        caller_caps: caller_caps.unwrap_or(false),
         hold_from,
     };
     if result.limp && result.give_way.is_none() {
@@ -761,6 +774,95 @@ fn intake_dropped(
         (held, asked)
     } else {
         (asked, held)
+    }
+}
+
+/// Under `--caller-caps on` (phase 0 of the lamp programming protocol,
+/// #3504): a gesture's or a move's asker held to the most its caller may
+/// ask at (`lamp_msgs::most_for`), whatever its datagram says, and named
+/// by its unit before what it said (`lamp-skills/skill:dance`): `root` for
+/// root with no unit, `unknown` for a caller the kernel did not name or not
+/// as a lamp part. Under `--arbitration off` a source is still not kept.
+/// The claim it cut, if it did: who, what it asked and what it is held to.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn held_to(
+    asker: Asker,
+    caller: Option<&lamp_ipc::caller::Caller>,
+    lampos: Option<u32>,
+    arbitration: bool,
+) -> (
+    Asker,
+    Option<(
+        String,
+        lamp_body::moves::Priority,
+        lamp_body::moves::Priority,
+    )>,
+) {
+    use lamp_msgs::{MOST_BY_UNIT, RunsAs};
+    let most = caller.map_or(Some(lamp_body::moves::Priority::Idle), |caller| {
+        lamp_msgs::most_for(caller.unit.as_deref(), caller.uid, lampos)
+    });
+    let part = |unit: &str| {
+        MOST_BY_UNIT.iter().any(|(name, runs_as, _)| {
+            *name == unit && *runs_as == RunsAs::Lampos && caller.map(|caller| caller.uid) == lampos
+        })
+    };
+    let who = match caller {
+        Some(caller) if caller.uid == 0 => caller.unit.as_deref().unwrap_or("root.service"),
+        Some(caller) => caller
+            .unit
+            .as_deref()
+            .filter(|unit| part(unit))
+            .unwrap_or("unknown.service"),
+        None => "unknown.service",
+    };
+    let who = who.strip_suffix(".service").unwrap_or(who).to_owned();
+    let asked = asker.priority();
+    let held = most.map_or(asked, |most| asked.min(most));
+    let source = (arbitration || asker.source.is_some()).then(|| match &asker.source {
+        Some(said) => format!("{who}/{said}"),
+        None => who.clone(),
+    });
+    let cut = (held < asked).then_some((who, asked, held));
+    (
+        Asker {
+            source,
+            priority: Some(held),
+        },
+        cut,
+    )
+}
+
+/// Under `--caller-caps on`: whether a sight on the gaze socket is taken.
+/// Only the eyes and a skill's run send one, as `lampos`; root may.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn sight_from(caller: Option<&lamp_ipc::caller::Caller>, lampos: Option<u32>) -> bool {
+    caller.is_some_and(|caller| {
+        caller.uid == 0
+            || (Some(caller.uid) == lampos
+                && matches!(
+                    caller.unit.as_deref(),
+                    Some("lamp-eyes.service" | "lamp-skills.service")
+                ))
+    })
+}
+
+/// Once a minute per unit: whether a line about `who` is due at `now`.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+#[derive(Default)]
+struct Minutely(std::collections::HashMap<String, std::time::Instant>);
+
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+impl Minutely {
+    fn due(&mut self, who: &str, now: std::time::Instant) -> bool {
+        const EVERY: std::time::Duration = std::time::Duration::from_secs(60);
+        self.0
+            .retain(|_, at| now.saturating_duration_since(*at) < EVERY);
+        if self.0.contains_key(who) {
+            return false;
+        }
+        self.0.insert(who.to_owned(), now);
+        true
     }
 }
 
@@ -1005,6 +1107,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         arguments.look_at_name,
         arguments.moves,
         arguments.arbitration,
+        arguments.caller_caps,
     );
     Err("the body requires Linux; no device was opened".into())
 }
@@ -1041,6 +1144,23 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     }
     let moods = UnixDatagram::bind(&arguments.mood_socket)?;
     moods.set_nonblocking(true)?;
+    // `--caller-caps on` (#3504, phase 0): each datagram comes with who sent
+    // it, from the kernel, and `lampos` is the user the parts run as.
+    let caller_caps = arguments.caller_caps;
+    let lampos = caller_caps
+        .then(|| lamp_ipc::caller::uid_named("lampos"))
+        .flatten();
+    if caller_caps {
+        lamp_ipc::caller::pass_credentials(&moods)?;
+        eprintln!(
+            "lamp-body: callers capped by their unit (--caller-caps on), lampos {}",
+            lampos.map_or(
+                "unknown: every lampos part asks at idle".into(),
+                |uid| format!("uid {uid}")
+            )
+        );
+    }
+    let cuts_said = std::cell::RefCell::new(Minutely::default());
     let moves = moves_of(arguments.moves.as_deref());
     // `--hold-from` (#2668): a hand on the head from a test input, for
     // tests on a lamp only; what it says this step, for the journal.
@@ -1100,11 +1220,32 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         // Everything waiting; which of it counts is `of_this_step`'s.
         let mut moods_heard = Vec::new();
         for _ in 0..32 {
-            match moods.recv(&mut datagram) {
-                Ok(length) => {
+            let received = if caller_caps {
+                lamp_ipc::caller::recv_with_caller(&moods, &mut datagram)
+            } else {
+                moods.recv(&mut datagram).map(|length| (length, None))
+            };
+            match received {
+                Ok((length, caller)) => {
                     let sent = &datagram[..length];
                     match heard_asked(sent, &moves, &mut moves_sent, arbitration) {
                         (Heard::Gesture(clip), asker) => {
+                            let asker = if caller_caps {
+                                let (asker, cut) =
+                                    held_to(asker, caller.as_ref(), lampos, arbitration);
+                                if let Some((who, asked, held)) = cut
+                                    && cuts_said.borrow_mut().due(&who, std::time::Instant::now())
+                                {
+                                    eprintln!(
+                                        "lamp-body: {who} asked at {}, held to {} (--caller-caps; said once a minute)",
+                                        format!("{asked:?}").to_lowercase(),
+                                        format!("{held:?}").to_lowercase()
+                                    );
+                                }
+                                asker
+                            } else {
+                                asker
+                            };
                             let asked = (clip, asker.priority());
                             let source = asker
                                 .source
@@ -1163,6 +1304,13 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                                 eprintln!("{line}");
                             }
                         }
+                    }
+                }
+                // Too long for the buffer: refused whole, and the rest read.
+                Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+                    let line = "lamp-body: dropped from the mood socket, a datagram longer than 16 KiB, not read".to_owned();
+                    if let Some(line) = unknown_said.due(line, std::time::Instant::now()) {
+                        eprintln!("{line}");
                     }
                 }
                 Err(_) => break,
@@ -1545,6 +1693,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             }
             let sights = UnixDatagram::bind(&choice.socket)?;
             sights.set_nonblocking(true)?;
+            if caller_caps {
+                lamp_ipc::caller::pass_credentials(&sights)?;
+            }
             (
                 Some(lamp_body::gaze::Looking::new(choice.turn, choice.reach)?),
                 Some(sights),
@@ -1552,18 +1703,40 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         }
         None => (None, None),
     };
+    let sights_said = std::cell::RefCell::new(Minutely::default());
     let eyes = || {
         // Everything waiting, and only the newest of it counts.
         let sights = sights.as_ref()?;
         let mut latest = None;
         let mut datagram = [0u8; 160];
         for _ in 0..32 {
-            match sights.recv(&mut datagram) {
-                Ok(length) => {
+            let received = if caller_caps {
+                lamp_ipc::caller::recv_with_caller(sights, &mut datagram)
+            } else {
+                sights.recv(&mut datagram).map(|length| (length, None))
+            };
+            match received {
+                Ok((length, caller)) => {
+                    if caller_caps && !sight_from(caller.as_ref(), lampos) {
+                        let who = caller
+                            .as_ref()
+                            .and_then(|caller| caller.unit.clone())
+                            .unwrap_or_else(|| "unknown".into());
+                        if sights_said
+                            .borrow_mut()
+                            .due(&who, std::time::Instant::now())
+                        {
+                            eprintln!(
+                                "lamp-body: a sight from {who} dropped: only the eyes, a skill or root may send one (--caller-caps; said once a minute)"
+                            );
+                        }
+                        continue;
+                    }
                     latest = serde_json::from_slice::<lamp_body::gaze::Seen>(&datagram[..length])
                         .ok()
                         .or(latest);
                 }
+                Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {}
                 Err(_) => break,
             }
         }
@@ -2420,6 +2593,172 @@ mod tests {
         ] {
             assert!(with(refused).is_err(), "{refused:?}");
         }
+    }
+
+    /// Caller caps (#3504, phase 0) are on or off, and off unless given.
+    #[test]
+    fn caller_caps_are_on_or_off_and_off_unless_given() {
+        let with = |more: &[&'static str]| parse(args(&[&FULL[..], more].concat()));
+        assert!(!with(&[]).unwrap().unwrap().caller_caps);
+        assert!(with(&["--caller-caps", "on"]).unwrap().unwrap().caller_caps);
+        assert!(
+            !with(&["--caller-caps", "off"])
+                .unwrap()
+                .unwrap()
+                .caller_caps
+        );
+        for refused in [
+            &["--caller-caps", "yes"][..],
+            &["--caller-caps"],
+            &["--caller-caps", "on", "--caller-caps", "on"],
+        ] {
+            assert!(with(refused).is_err(), "{refused:?}");
+        }
+    }
+
+    /// A gesture's asker is held to its unit's most, whatever it says, and
+    /// named by its unit; a cut says who, what was asked and what is kept.
+    #[test]
+    fn a_gesture_is_held_to_what_its_unit_may_ask() {
+        use lamp_body::moves::Priority::*;
+        use lamp_ipc::caller::Caller;
+        let lampos = Some(990);
+        let caller = |unit: &str, uid| Caller {
+            pid: 7,
+            uid,
+            unit: Some(unit.to_owned()),
+        };
+        let asker = |source: Option<&str>, priority| Asker {
+            source: source.map(str::to_owned),
+            priority,
+        };
+        let skills = caller("lamp-skills.service", 990);
+        // A skill claiming the person is held to skill, its own name kept.
+        let (held, cut) = held_to(
+            asker(Some("skill:dance"), Some(Person)),
+            Some(&skills),
+            lampos,
+            true,
+        );
+        assert_eq!(held, asker(Some("lamp-skills/skill:dance"), Some(Skill)));
+        assert_eq!(cut, Some(("lamp-skills".into(), Person, Skill)));
+        // At or under its own, nothing is cut.
+        let (held, cut) = held_to(asker(None, Some(Idle)), Some(&skills), lampos, true);
+        assert_eq!(held, asker(Some("lamp-skills"), Some(Idle)));
+        assert_eq!(cut, None);
+        // No priority said is conversation, as before, then held.
+        let (held, cut) = held_to(asker(None, None), Some(&skills), lampos, true);
+        assert_eq!(held.priority, Some(Skill));
+        assert_eq!(cut, Some(("lamp-skills".into(), Conversation, Skill)));
+        // The voice, as root, keeps the person.
+        let voice = caller("lamp-voice.service", 0);
+        let (held, cut) = held_to(asker(None, Some(Person)), Some(&voice), lampos, true);
+        assert_eq!(held, asker(Some("lamp-voice"), Some(Person)));
+        assert_eq!(cut, None);
+        // The voice's name as lampos, a login user's or no caller: unknown, idle.
+        for nobody in [
+            Some(caller("lamp-voice.service", 990)),
+            Some(Caller {
+                pid: 7,
+                uid: 1000,
+                unit: None,
+            }),
+            None,
+        ] {
+            let (held, cut) = held_to(asker(None, Some(Person)), nobody.as_ref(), lampos, true);
+            assert_eq!(held, asker(Some("unknown"), Some(Idle)), "{nobody:?}");
+            assert_eq!(cut, Some(("unknown".into(), Person, Idle)));
+        }
+        // Root's other helpers keep what they ask.
+        let root = Caller {
+            pid: 1,
+            uid: 0,
+            unit: None,
+        };
+        let (held, cut) = held_to(asker(None, Some(Safety)), Some(&root), lampos, true);
+        assert_eq!(held, asker(Some("root"), Some(Safety)));
+        assert_eq!(cut, None);
+        // Under --arbitration off no source is kept, and the cap still holds:
+        // a skill can't outlast a conversation by claiming one.
+        let (held, _) = held_to(
+            asker(None, Some(Conversation)),
+            Some(&skills),
+            lampos,
+            false,
+        );
+        assert_eq!(held, asker(None, Some(Skill)));
+    }
+
+    /// Only the eyes, a skill's run or root may say where a face is.
+    #[test]
+    fn a_sight_is_taken_from_the_eyes_a_skill_or_root_only() {
+        use lamp_ipc::caller::Caller;
+        let lampos = Some(990);
+        let from = |unit: Option<&str>, uid| {
+            sight_from(
+                Some(&Caller {
+                    pid: 7,
+                    uid,
+                    unit: unit.map(str::to_owned),
+                }),
+                lampos,
+            )
+        };
+        assert!(from(Some("lamp-eyes.service"), 990));
+        assert!(from(Some("lamp-skills.service"), 990));
+        assert!(from(None, 0));
+        assert!(!from(Some("lamp-eyes.service"), 1000));
+        assert!(!from(Some("lamp-addons.service"), 990));
+        assert!(!from(None, 990));
+        assert!(!sight_from(None, lampos));
+        assert!(!sight_from(
+            Some(&Caller {
+                pid: 7,
+                uid: 990,
+                unit: Some("lamp-eyes.service".into())
+            }),
+            None
+        ));
+    }
+
+    /// A cut is said once a minute per unit.
+    #[test]
+    fn a_cut_is_said_once_a_minute_per_unit() {
+        let mut said = Minutely::default();
+        let now = std::time::Instant::now();
+        assert!(said.due("lamp-skills", now));
+        assert!(!said.due("lamp-skills", now + std::time::Duration::from_secs(59)));
+        assert!(said.due("unknown", now + std::time::Duration::from_secs(1)));
+        assert!(said.due("lamp-skills", now + std::time::Duration::from_secs(60)));
+    }
+
+    /// From a real socket: a process that is not a lamp part claiming the
+    /// person on the mood socket is held to idle by what the kernel says.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_claim_on_a_real_socket_is_held_by_who_the_kernel_names() {
+        if rustix::process::geteuid().is_root() {
+            return; // root keeps what it asks: nothing to show.
+        }
+        let (one, other) = std::os::unix::net::UnixDatagram::pair().unwrap();
+        lamp_ipc::caller::pass_credentials(&other).unwrap();
+        one.send(br#"{"gesture":"nod","source":"voice","priority":"person"}"#)
+            .unwrap();
+        let mut buffer = [0u8; 256];
+        let (length, caller) = lamp_ipc::caller::recv_with_caller(&other, &mut buffer).unwrap();
+        let moves = lamp_body::moves::Loaded::default();
+        let (clip, asker) = gesture_asked(&buffer[..length], &moves).unwrap();
+        assert_eq!(clip.name, "nod");
+        assert_eq!(asker.priority, Some(lamp_body::moves::Priority::Person));
+        // This test runs as nobody's part (no lampos uid, or not its unit).
+        let (held, _) = held_to(asker, caller.as_ref(), None, true);
+        assert_eq!(held.priority, Some(lamp_body::moves::Priority::Idle));
+        assert_eq!(
+            held.source
+                .as_deref()
+                .map(|source| source.ends_with("/voice")),
+            Some(true)
+        );
     }
 
     /// Arbitration (#940) is on or off, and off unless given.
