@@ -2411,10 +2411,15 @@ same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 With `LAMP_EYES_MOUTH_FULL_LOOK=on` and `--full-look` (the product's 1280
 by 960) it is cut from the frame at its own size instead
-(`mesh::crop_full`). The switch is off in the product until a silent, still
-face at the desk is measured to read `no` on those crops at
-`MESH_SPEAKING_AT`, and someone off camera speaking is not given that face
-(a false `yes` would give a silent known person another's line, #3679): the detector's box and marks are
+(`mesh::crop_full`). The switch stays off in the product (#3764, closed):
+on lamp-52e6 (27 Oct) a real person sitting silent at the desk read 31
+`yes` of 372 looks, and one off-camera line was filed as theirs (a false
+`yes` gives a silent known person another's line, #3679). Lips against the
+room's level (`ears/level`) did not tell a face's own voice from another's
+either: a look with a moving mouth to mesh takes about 0.4 to 0.5 s there,
+so the eyes reach about 2 looks a second with a talking face (asked for 10,
+with the full frame or the 320 crop alike), too few for the lips' rhythm.
+Who a line belongs to rests on the voice's own evidence instead. The detector's box and marks are
 scaled back to the frame's pixels, as `LAMP_FACE_FULL_CROP=on` does for a
 print (`who::align_full`), and the frame is the one the look's picture was
 shrunk from, kept for the look, never a second decode. On lamp-52e6 a face
