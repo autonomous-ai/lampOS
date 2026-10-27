@@ -871,6 +871,33 @@ impl lamp_setup::shutdown::Host for Shutdown {
         }
         reset::stop_and_wait(&lamp_setup::shutdown::STOP.map(str::to_owned), &mut System)
     }
+    /// The active `lamp*` units. An accepted connection's instance (`@`)
+    /// is left out: its socket is what is started again.
+    fn active(&mut self) -> Vec<String> {
+        let argv = [
+            "/usr/bin/systemctl",
+            "list-units",
+            "--state=active",
+            "--plain",
+            "--no-legend",
+            "--full",
+            "lamp*",
+        ]
+        .map(str::to_owned);
+        System
+            .read(&argv)
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| line.split_whitespace().find(|word| *word != "\u{25cf}"))
+            .filter(|unit| !unit.contains('@'))
+            .map(str::to_owned)
+            .collect()
+    }
+    fn start(&mut self, units: &[String]) -> io::Result<()> {
+        let mut argv = vec!["/usr/bin/systemctl".to_owned(), "start".to_owned()];
+        argv.extend(units.iter().cloned());
+        System.run(&argv)
+    }
     /// `lamp-body-measure let-go` as the body's user, as the body runs
     /// (the servo port's owner refuses root), on the body's own device,
     /// lock and poses.
