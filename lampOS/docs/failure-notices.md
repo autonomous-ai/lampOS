@@ -237,7 +237,7 @@ the install change merges.
 | `provider_unavailable` | "Sorry, I can't reach the internet right now. I'll be back soon." | `provider-unavailable.en-US.wav` |
 | `back_online` | "I'm back online." | `back-online.en-US.wav` |
 | `voice_service_unreachable` | "Sorry, I'm having trouble thinking right now. Give me a moment." | `voice-service-unreachable.en-US.wav` |
-| `wifi_lost` | "I can't reach any Wi-Fi. Hold my button for five seconds to set me up again." | `wifi-lost.en-US.wav` |
+| `wifi_lost` | "I can't reach any Wi-Fi. If your Wi-Fi has changed, hold the reset button for five seconds. That erases me and starts setup again." | `wifi-lost.en-US.wav` |
 
 They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
 size and SHA-256 in `deploy/product/models.json`. `lamp-update install`
