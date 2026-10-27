@@ -1404,7 +1404,8 @@
                   "expired",
                   "taken_by_owner_app",
                   "revoked",
-                  "released"
+                  "released",
+                  "slumped"
                 ]
               }
             },
