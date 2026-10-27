@@ -2022,11 +2022,6 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// #1997 (Third's guard): a yes to being named reaches the eyes only
-    /// from the named person's own admitted scope; the room's, another
-    /// person's, one narrowed to the room (#2008) or none is refused with
-    /// nothing sent. A no is sent from any scope. Neither is run unheard, nor
-    /// with the switch off.
     /// A face the eyes saved tells the onboarding walk (#3740), through the
     /// mailbox `setup_step` writes; a refused one tells it nothing.
     #[test]
@@ -2066,7 +2061,10 @@ mod tests {
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
-        assert_eq!(lines, [json!({"step": "who_you_are", "outcome": "done"})]);
+        assert_eq!(
+            lines,
+            [json!({"step": "who_you_are", "outcome": "done", "by": "remember_my_face"})]
+        );
         // With no onboarding file, a save writes nothing anywhere.
         let none = Route::Faces(socket.clone(), Default::default(), None);
         let _ = run_call(&none, &remember("Sam"), 3, true);
@@ -2074,6 +2072,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// #1997 (Third's guard): a yes to being named reaches the eyes only
+    /// from the named person's own admitted scope; the room's, another
+    /// person's, one narrowed to the room (#2008) or none is refused with
+    /// nothing sent. A no is sent from any scope. Neither is run unheard, nor
+    /// with the switch off.
     #[test]
     fn a_yes_to_being_named_is_taken_only_from_the_named_persons_own_scope() {
         use crate::known_faces::{DONT_TELL, FaceSwitches, NOT_SURE_WHOSE_YES, TELL};
