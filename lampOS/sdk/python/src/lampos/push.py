@@ -19,8 +19,11 @@ import json
 import re
 import sys
 import tarfile
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+from typing import BinaryIO
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -240,6 +243,39 @@ def open_package(data: bytes) -> Opened:
     if read:
         raise _bad(f"{sorted(read)[0]} is in the package but not in {MANIFEST}")
     return Opened(name, version, author, files)
+
+
+class _HttpsOnly(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to another https URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urllib.parse.urlsplit(newurl).scheme != "https":
+            raise LampError(f"{newurl}: a redirect away from https is refused", code="bad_request")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def read_capped(stream: BinaryIO, cap: int = PACKAGE_MAX) -> bytes:
+    """At most `cap` bytes from `stream`, refused at the first byte past
+    it: reading stops there rather than after the whole download."""
+    data = stream.read(cap + 1)
+    if len(data) > cap:
+        raise LampError(f"more than {cap} bytes: a shared skill is 1 MiB at most", code="bad_request")
+    return data
+
+
+def fetch(url: str, *, timeout: float = 30.0) -> bytes:
+    """A shared package from an https URL, on this computer; the lamp never
+    goes to a URL for it. https only, no redirect to another scheme, and at
+    most 1 MiB read (Fourteen's point 4 on #3504). Nothing in it is run or
+    unpacked here: `open_package` checks it in memory."""
+    if urllib.parse.urlsplit(url).scheme != "https":
+        raise LampError(f"{url}: a shared skill is fetched over https only", code="bad_request")
+    opener = urllib.request.build_opener(_HttpsOnly)
+    try:
+        with opener.open(url, timeout=timeout) as response:
+            return read_capped(response)
+    except OSError as error:
+        raise LampError(f"{url}: {error}", code="bad_request") from error
 
 
 def pack(folder: str | Path, author: Ed25519PrivateKey | None = None) -> Package:

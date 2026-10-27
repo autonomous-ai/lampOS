@@ -821,6 +821,37 @@ def test_lamp_skill_keygen_pack_and_check_a_package(tmp_path):
     assert code == 1 and "does not match lamp-skill.json" in said
 
 
+def test_a_shared_package_is_fetched_over_https_only_and_capped():
+    # Fourteen's point 4 on #3504: https only, no redirect to another scheme,
+    # and reading stops at 1 MiB, not after the whole download.
+    import io
+    import urllib.request
+
+    from lampos.push import PACKAGE_MAX, _HttpsOnly, fetch, read_capped
+
+    for url in ("http://example.com/a.tar", "file:///etc/passwd", "ftp://example.com/a.tar"):
+        with pytest.raises(LampError) as raised:
+            fetch(url)
+        assert "https only" in raised.value.why
+    request = urllib.request.Request("https://example.com/a.tar")
+    with pytest.raises(LampError) as raised:
+        _HttpsOnly().redirect_request(request, None, 302, "Found", {}, "http://example.com/a.tar")
+    assert "away from https" in raised.value.why
+    assert _HttpsOnly().redirect_request(request, None, 302, "Found", {}, "https://mirror.example/a.tar") is not None
+
+    class Counted(io.BytesIO):
+        asked = 0
+
+        def read(self, size=-1):
+            Counted.asked = size
+            return super().read(size)
+
+    assert read_capped(io.BytesIO(b"x" * PACKAGE_MAX)) == b"x" * PACKAGE_MAX
+    with pytest.raises(LampError):
+        read_capped(Counted(b"x" * (PACKAGE_MAX * 4)))
+    assert Counted.asked == PACKAGE_MAX + 1
+
+
 def test_a_skill_is_packed_as_lamp_skills_packs_it(tmp_path):
     import io
     import tarfile
