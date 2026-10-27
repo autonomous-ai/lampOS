@@ -697,3 +697,5 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - the schema item's description is "8 letters at least, so no short word or pair.";
   - the tests use Fourteen's phrases from #3901;
   - Python 58 passed on 3.10 and 3.12, JS 34, and lamp-control passes. Asked for a reader on #3504.
+
+- **28 Oct 01:16.** #3915 (Nine's body-lease P3s) ends a lease as `lost`/`released`; both SDKs already take any `lost` as ended and keep its why, and `released` is in the schema's list, so nothing changes in the SDKs. #3914's SDK jobs are green. `blue/sdk-skill-push` now gives the JS CLI `lamp skill push|list|remove` with Python's output, and a test runs the real CLI process against the fake. JS 37 passed. The ask for Mobile to pin the `skills` pairing line waits for #3910, since the grant's words land with it.
