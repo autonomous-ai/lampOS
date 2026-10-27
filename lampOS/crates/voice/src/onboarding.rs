@@ -1600,11 +1600,14 @@ impl Onboarding {
             }
             Step::Preferences => {
                 let heard = &mut led.heard;
-                if words
-                    .iter()
-                    .any(|word| matches!(word.as_str(), "hello" | "hi" | "greet"))
-                    || (heard.quiet_hours && (agrees(&words) || refuses(&words)))
-                {
+                // A greeting alone ("Hello, Lamp.") is someone saying hello,
+                // not their answer on whether the lamp may: on lamp-52e6 on 27
+                // Oct it ended the step, and the lamp asked again.
+                let about_hello = !greets_only(&words)
+                    && words
+                        .iter()
+                        .any(|word| matches!(word.as_str(), "hello" | "hi" | "greet"));
+                if about_hello || (heard.quiet_hours && (agrees(&words) || refuses(&words))) {
                     heard.hello = true;
                 } else if quiet_hours(&words) {
                     heard.quiet_hours = true;
@@ -2293,6 +2296,22 @@ fn names_someone(text: &str, words: &[String]) -> bool {
                     .any(|word| not_a_name(word) || NOT_A_NAME_ALONE.contains(&word.as_str()))
         }
     }
+}
+
+/// A line that only greets: "Hello, Lamp.", "Hi there.", "Good morning."
+fn greets_only(words: &[String]) -> bool {
+    const GREETING: [&str; 9] = [
+        "hello",
+        "hi",
+        "hey",
+        "lamp",
+        "there",
+        "good",
+        "morning",
+        "afternoon",
+        "evening",
+    ];
+    !words.is_empty() && words.iter().all(|word| GREETING.contains(&word.as_str()))
 }
 
 /// An answer about the hours to keep quiet: a time, a part of the day, or none.
@@ -3586,6 +3605,12 @@ mod tests {
             .heard("Please stay quiet after ten at night.", room.at);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::Preferences), None);
+        // A greeting alone, as on lamp-52e6 on 27 Oct, answers nothing.
+        for greeting in ["Hello, Lamp.", "Hi there.", "Good morning, Lamp.", "Hey."] {
+            room.walk.heard(greeting, room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::Preferences), None, "{greeting}");
+        }
         room.walk
             .heard("Yes, you can say hello in the morning.", room.at);
         room.wait(S, Some(NEAR_MIDDLE));
