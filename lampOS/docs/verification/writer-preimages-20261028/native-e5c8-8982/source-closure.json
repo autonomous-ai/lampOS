@@ -1,0 +1,43 @@
+{
+  "authored_head": "e5c86db4d95e23b356fe40f4381abe0e4ff2b0ae",
+  "Main_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "actual_preview": "ebb2b81cd52379c989534caee87361a621491b82",
+  "ordered_parents": [
+    "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "e5c86db4d95e23b356fe40f4381abe0e4ff2b0ae"
+  ],
+  "whole_authored_tree": "681480adf880905c85c27b9372b6fd4ce77cc29f",
+  "whole_tree_equal_to_both_actual_checkouts": true,
+  "ARM_run": 40600791750,
+  "ARM_required_job": 122528095089,
+  "Linux_run": 40600791522,
+  "Linux_required_job": 122528094340,
+  "run_attempts": 1,
+  "both_actual_required_jobs_completed_success": true,
+  "all_observer_and_full_log_handles_drained_exit0": {
+    "ARM_observer": 5901,
+    "ARM_log_and_source": 52571,
+    "Linux_observer": 3482,
+    "Linux_log": 72449
+  },
+  "nextest_unique_pass": 7883,
+  "all_bad_and_selected_unrun": 0,
+  "reported_skips": 54,
+  "selected_binaries": 70,
+  "skipped_binaries": 120,
+  "identical_echoes_excluded": 34,
+  "all111_controls_once_PASS": true,
+  "all9_preimage_controls_once_PASS": true,
+  "direct_install_doc_reader_once_PASS": true,
+  "separate_docs_pass": 4,
+  "separate_own_process_pass": 13,
+  "separate_relay_pass": 1,
+  "separate_promotion_helper_pass": 25,
+  "optional_archive_requested_or_claimed": false,
+  "no_rerun_or_cancellation": true,
+  "raw_ARM_log_bytes": 1962377,
+  "raw_ARM_log_sha256": "3be218e4bf7c626ab37561f7c9dbb87851b83561149afd110d26d408ab424153",
+  "raw_Linux_log_bytes": 87955,
+  "raw_Linux_log_sha256": "5d5ae4a3fb6bf63e5e21c71550e0fab70841597abdb086cb6f720d7c457a6411",
+  "current_unpushed23c_c0ae_not_qualified_by_this_receipt": true
+}

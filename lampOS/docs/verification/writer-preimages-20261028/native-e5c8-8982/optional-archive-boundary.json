@@ -1,0 +1,7 @@
+{
+  "requested": false,
+  "artifact_payload_verified": false,
+  "production_inventory_verified": false,
+  "test_driver_artifact_equivalence_claimed": false,
+  "no_optional_download_or_payload_execution": true
+}

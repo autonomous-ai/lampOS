@@ -1,0 +1,228 @@
+{
+  "actual_nextest_version": "0.9.149",
+  "actual_preview": "e5a56cc7a18f9f6767efff89537d187d68655aff",
+  "actual_rust": "1.96.0-aarch64-unknown-linux-gnu",
+  "actual_tree": "a960785006fb44d7c22975d8f236b3e63c7317ea",
+  "authored_tree": "a960785006fb44d7c22975d8f236b3e63c7317ea",
+  "commands_observed": [
+    "cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics",
+    "cargo nextest run --locked --release --workspace",
+    "cargo test --locked --release --workspace --doc -- --test-threads=1"
+  ],
+  "complete_authored_actual_tree_equal": true,
+  "head": "a96e0adb27ff251167d3b9c89f64dd2ba92f6d12",
+  "job_stages": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication failure tests (offline, no signing secret)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion tests (offline, disposable test key)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "record fresh source times for a cold publication build",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run taiki-e/install-action@v2",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build (release, the lamps' binaries)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build the two selected artifact examples without filename collisions",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "which crates a pull request tests",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "export only current Cargo targets and their SHA-256",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/upload-artifact@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "discard the isolated example target before saving the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "status": "completed"
+    }
+  ],
+  "local_compiler_or_runtime_executed_by_audit": false,
+  "new_controls_subset": [
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::both_typed_absences_agree_at_each_first_missing_component",
+      "ordinal": 2493,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::common_leaf_fields_and_exact_binary_bytes_cannot_be_substituted",
+      "ordinal": 2494,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::decoded_regular_empty_and_unmatched_binary_preserve_artifacts_without_live_io",
+      "ordinal": 2495,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::directory_facts_check_types_membership_absence_and_extra_link_bypass",
+      "ordinal": 2496,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::every_raw_entry_checks_common_ancestors_even_without_a_matching_head_leaf",
+      "ordinal": 2497,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::exact_root_spelling_and_nonempty_raw_root_evidence_are_required",
+      "ordinal": 2498,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::negative_kind_suffix_and_no_link_chain_shape_match_the_requested_key",
+      "ordinal": 2499,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::signed_device_conversion_refuses_negative_instead_of_reinterpreting_bits",
+      "ordinal": 2500,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::unchanged_bytes_with_real_permission_changes_fail_without_snapshot_or_auth_claims",
+      "ordinal": 2501,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::coherence::tests::unrelated_head_links_and_null_masks_are_valid_but_raw_overlap_refuses",
+      "ordinal": 2502,
+      "status": "PASS",
+      "total": 7893
+    }
+  ],
+  "physical_raw_name_controls": [
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::tests::portable_raw_names_and_link_bytes_are_exact_without_a_physical_mac_claim",
+      "ordinal": 2518,
+      "status": "PASS",
+      "total": 7893
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "ordinal": 2544,
+      "status": "PASS",
+      "total": 7893
+    }
+  ],
+  "production_archive_audited": false,
+  "rerun_or_cancellation_requested": false,
+  "runtime_transferred_to_other_head_or_Main": false
+}

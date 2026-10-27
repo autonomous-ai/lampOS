@@ -1,3 +1,19 @@
+## 28 October 2026, 06:42 +07 — original native results and saved-plan preparation
+
+Ready for lamp-voice: no (#3960 is draft pending its original CI and independent reads; #3858, #3913, #3907 and #3949 have separate reader/dependency conditions).
+
+The delivered bounded-output [original 7e ARM/Linux packet](verification/head-plan-output-20261028/native-7e-fc9c/README.md) records **7,856 unique passes**, all 84 controls plus the install reader, zero bad or selected unrun and 54 skips. Its actual preview and authored tree d748 agree, and Main 2b73 delivers that tree. GitHub source delivery remains distinct from a merged=true PR flag.
+
+Coherence [a96](verification/head-preimage-coherence-20261028/native-a96-fc9c/README.md) and [a796](verification/head-preimage-coherence-20261028/native-a796-actual8982/README.md) each independently pass **7,893**, all 121 controls plus install reader, zero bad or selected unrun, 54 skips. a96's actual/authored tree a960 agrees; a796's actual 8982 preview tree 7a3b differs from its authored 2b73/a960 tree only in the four inherited played-tool paths. Current a796 is ready for review with Third's READ-OK and the Raw/preimage prerequisite holds retained. Mac 600 remains its first 4c6/c1fa execution; no runtime is transferred to another source label.
+
+Current [Raw 3f03](verification/writer-settings-capture-20261027/native-3f03-8982/README.md) independently passes **7,874/all 102 controls**, and [PID aaf7](verification/writer-refresh-drop-20261028/native-aaf7-8982/README.md) **7,858/all 86**, each plus the install reader, zero bad/unrun and 54 skips. Exact actual/authored preview trees agree, and their separate Linux proofs are green. [Preimages e5c8](verification/writer-preimages-20261028/native-e5c8-8982/README.md) passes **7,883/all 111**, plus install reader, zero bad/unrun and 54 skips; both required jobs and complete source identity checks close. It is ready with its Raw dependency explicit.
+
+#3960 c3b125455 publishes the pure signed ordinary preparation: the first full Mac gate on seven frozen files over 154621cf/8982 passed **614 unique tests**, all 135 required controls including 14 new, zero bad or selected unrun and 6 existing ignored. Exact commit binding is e135; c3's same seven blobs and four patches are carried onto c0ae's unconsumed SDK delta. Fresh metadata/fmt/strict Clippy and source guards pass without repeating runtime. Original ARM40603560943 and Linux40603560988 are independently observed; no outcome is claimed here. The complete Mac packet follows separately.
+
+First's Queue comment6456076191 ends base-only refresh churn: leave qualified PR bases in place; the train's ARM64 run on its merged tree supplies the latest-base check. The next bounded saved-plan container is being implemented separately. It retains exact inputs, every signed decision and projection order, and reopens against protected expectations; there is no runtime caller, live State reader, durability, grant, executor, restoration, signing/promotion or lamp claim.
+
+Eight immutable text packets, all 55 manifest members and 63 member files are checked in the index and committed tree before push. No binary or private path/account is published. Historical failures remain recorded and unwaived.
+
 ## 28 October 2026, 06:24 +07 — three delivered prerequisites and source-bound preparation
 
 Ready for lamp-voice: no (new writer-plan preparation runtime is in progress; remaining PRs retain their own current CI/read/dependency conditions).

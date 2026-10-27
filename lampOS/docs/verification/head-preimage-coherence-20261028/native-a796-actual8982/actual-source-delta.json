@@ -1,0 +1,66 @@
+{
+  "actual_leaf_count": 10934,
+  "actual_preview": "df3724d2dd30cc60cc23b4e0b51c2786fc77d9ca",
+  "actual_tree": "7a3b97897e4f6dee90fa36529ed306afc8461f16",
+  "all_other_leaves_equal": true,
+  "authored_head": "a7966359645966908b78220752fbeb7f01b6c457",
+  "authored_leaf_count": 10934,
+  "authored_tree": "a960785006fb44d7c22975d8f236b3e63c7317ea",
+  "both_recursive_responses_untruncated": true,
+  "complete_authored_actual_tree_equal": false,
+  "complete_mode_type_blob_delta": {
+    "lampOS/tools/played/README.md": {
+      "actual": {
+        "mode": "100644",
+        "sha": "f2a95316c5692a8edc3ba5fe11e265fe39ad6537",
+        "type": "blob"
+      },
+      "authored": {
+        "mode": "100644",
+        "sha": "ffb377e7e7edbbd837583a649a341779937e0e44",
+        "type": "blob"
+      }
+    },
+    "lampOS/tools/played/make-skill-test.sh": {
+      "actual": {
+        "mode": "100755",
+        "sha": "6cfeb807d832a326a0fc489352b28efe5a7387e5",
+        "type": "blob"
+      },
+      "authored": {
+        "mode": "100755",
+        "sha": "686fbee8767f68f0a6dff459e4978d7bd88b482a",
+        "type": "blob"
+      }
+    },
+    "lampOS/tools/played/make-skill.sh": {
+      "actual": {
+        "mode": "100755",
+        "sha": "09c9ea0cbeb588ed67d9c867e77615228a59abf1",
+        "type": "blob"
+      },
+      "authored": {
+        "mode": "100755",
+        "sha": "692358a94dbb4693a28aa8ad38aff98daaa205dc",
+        "type": "blob"
+      }
+    },
+    "lampOS/tools/played/stand-in.sh": {
+      "actual": {
+        "mode": "100755",
+        "sha": "a477ec490d3b57c710b061a084b33ee1801f7302",
+        "type": "blob"
+      },
+      "authored": {
+        "mode": "100755",
+        "sha": "10858d90625dd3d5662ca612c388c77d5f9f1ea7",
+        "type": "blob"
+      }
+    }
+  },
+  "no_runtime_transfer": true,
+  "ordered_actual_parents": [
+    "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "a7966359645966908b78220752fbeb7f01b6c457"
+  ]
+}

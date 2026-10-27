@@ -1,0 +1,200 @@
+{
+  "actual_nextest_version": "0.9.149",
+  "actual_preview": "61d5329e81fdd0c61f2888f8c2bac0c38d8a96eb",
+  "actual_rust": "1.96.0-aarch64-unknown-linux-gnu",
+  "actual_tree": "d748d5ce1d2dd3bc4da732cc494008271fef202a",
+  "authored_tree": "d748d5ce1d2dd3bc4da732cc494008271fef202a",
+  "commands_observed": [
+    "cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics",
+    "cargo nextest run --locked --release --workspace",
+    "cargo test --locked --release --workspace --doc -- --test-threads=1"
+  ],
+  "complete_authored_actual_tree_equal": true,
+  "head": "7e4af32d940e854f37b2c82157143199546b4175",
+  "job_stages": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication failure tests (offline, no signing secret)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion tests (offline, disposable test key)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "record fresh source times for a cold publication build",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run taiki-e/install-action@v2",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build (release, the lamps' binaries)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build the two selected artifact examples without filename collisions",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "which crates a pull request tests",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "export only current Cargo targets and their SHA-256",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/upload-artifact@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "discard the isolated example target before saving the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "status": "completed"
+    }
+  ],
+  "local_compiler_or_runtime_executed_by_audit": false,
+  "new_controls_subset": [
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::compact_input_that_expands_past_the_cap_refuses_only_the_new_plan_path",
+      "ordinal": 2544,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::keep_step_has_no_derived_output_and_moves_oversized_existing_text_without_copying",
+      "ordinal": 2545,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::late_provider_failure_returns_no_owned_partial_plan_or_private_diagnostic",
+      "ordinal": 2546,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::ordinary_policy_bytes_hashes_and_request_order_match_all_eight_closed_replays",
+      "ordinal": 2547,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::refusing_an_append_happens_before_buffer_growth_or_partial_write",
+      "ordinal": 2548,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::streaming_pretty_bytes_and_newline_obey_the_exact_utf8_byte_limit",
+      "ordinal": 2549,
+      "status": "PASS",
+      "total": 7856
+    }
+  ],
+  "physical_raw_name_controls": [
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::tests::portable_raw_names_and_link_bytes_are_exact_without_a_physical_mac_claim",
+      "ordinal": 2508,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "ordinal": 2534,
+      "status": "PASS",
+      "total": 7856
+    }
+  ],
+  "production_archive_audited": false,
+  "rerun_or_cancellation_requested": false,
+  "runtime_transferred_to_other_head_or_Main": false
+}

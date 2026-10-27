@@ -1,0 +1,53 @@
+{
+  "all6_full_blobs_modes_equal": true,
+  "complete_tree_equal": true,
+  "delivery_Main": "2b73dd03073947c62b3d10593f293aa9ab954410",
+  "delivery_Main_tree": "d748d5ce1d2dd3bc4da732cc494008271fef202a",
+  "files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "bytes": 22678,
+      "git_blob": "f85bd04a47173e02e491c40847941332eb780015",
+      "git_mode": "100644",
+      "sha256": "8046a94a819ab03f3d2c00499283f2894d8a1a3b530f81b3c37a065b2cdc740f"
+    },
+    "lampOS/crates/update/src/head_touch/plan_output.rs": {
+      "bytes": 3060,
+      "git_blob": "73ff1d98449036be0e7cb518e742e066b12e609b",
+      "git_mode": "100644",
+      "sha256": "ec79d76ae9f9dcadf3837ebe5470ad950b46d1b94e011d31c8953e3c00bbf5b2"
+    },
+    "lampOS/crates/update/src/head_touch/plan_output/tests.rs": {
+      "bytes": 10958,
+      "git_blob": "00a0acca0c909e32b24891474d3b46a6cc20d06b",
+      "git_mode": "100644",
+      "sha256": "e891b042bf6092ee1a4e18cf229a8bd0685cc263cc75a268cd9a77aca201a495"
+    },
+    "lampOS/docs/head-touch-plan-output.md": {
+      "bytes": 3163,
+      "git_blob": "eb6d9e9abed58e19a146d54dfa7d817ce20f9521",
+      "git_mode": "100644",
+      "sha256": "2f8b14f740d397ed4b5fcd5c6f8594ca453601040cdf33286c646054df0358ee"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "bytes": 152985,
+      "git_blob": "0e8ac9a4d30560523022ac050d64184bf1804634",
+      "git_mode": "100644",
+      "sha256": "a6a1ae1ab2d7054d49e7992878cac3b081016e8c0fe890ea2818e047afb45dcf"
+    },
+    "lampOS/docs/updates.md": {
+      "bytes": 176352,
+      "git_blob": "bc10513689c3c029589d029b226c00b6294bd108",
+      "git_mode": "100644",
+      "sha256": "6e4ad4ed08fb88162ad1003313397cf364c6fba3f32a2a68243cb7bd28ba7df3"
+    }
+  },
+  "github_PR_state": "closed",
+  "github_merged": false,
+  "no_reapply": true,
+  "no_runtime_count_transfer": true,
+  "offered_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "offered_head": "7e4af32d940e854f37b2c82157143199546b4175",
+  "offered_tree": "d748d5ce1d2dd3bc4da732cc494008271fef202a",
+  "pr": 3946,
+  "source_delivered": true
+}

@@ -1,0 +1,135 @@
+{
+  "actual_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "all_authored_change_modes_types_blobs_equal_actual": true,
+  "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "files": {
+    "lampOS/crates/update/src/apply.rs": {
+      "bytes": 69786,
+      "git_blob": "2e5e541d8eb974694cf451f27eac1a57897c1b69",
+      "git_mode": "100644",
+      "sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8"
+    },
+    "lampOS/crates/update/src/head_touch.rs": {
+      "bytes": 22678,
+      "git_blob": "f85bd04a47173e02e491c40847941332eb780015",
+      "git_mode": "100644",
+      "sha256": "8046a94a819ab03f3d2c00499283f2894d8a1a3b530f81b3c37a065b2cdc740f"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+      "bytes": 69758,
+      "git_blob": "665a7d9c74334b29d916db51fc88c0aa29ea7d5a",
+      "git_mode": "100644",
+      "sha256": "dbfafc272c0e158f97764a6a6ababf589c4e7a833d669b79d5843480c5e8b6e3"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence.rs": {
+      "bytes": 8471,
+      "git_blob": "3da2e142285c7a5db0aa6f48e304b64de11cf3b5",
+      "git_mode": "100644",
+      "sha256": "1d256ce1442eb85531c341246afae93bf855f8bc8b88be8c78304f7d5df50037"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs": {
+      "bytes": 17219,
+      "git_blob": "9781329d37fa3fbe78d9666e472d65d242e06543",
+      "git_mode": "100644",
+      "sha256": "9ecbf08d95d0ba71808b79131c06f8456a228f4eadd14a46edecb253a5c259ea"
+    },
+    "lampOS/crates/update/src/head_touch/plan_output.rs": {
+      "bytes": 3060,
+      "git_blob": "73ff1d98449036be0e7cb518e742e066b12e609b",
+      "git_mode": "100644",
+      "sha256": "ec79d76ae9f9dcadf3837ebe5470ad950b46d1b94e011d31c8953e3c00bbf5b2"
+    },
+    "lampOS/crates/update/src/head_touch/plan_output/tests.rs": {
+      "bytes": 10958,
+      "git_blob": "00a0acca0c909e32b24891474d3b46a6cc20d06b",
+      "git_mode": "100644",
+      "sha256": "e891b042bf6092ee1a4e18cf229a8bd0685cc263cc75a268cd9a77aca201a495"
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "bytes": 1334,
+      "git_blob": "81d50f1c786f8c60a0399a94ee44855bfdb339eb",
+      "git_mode": "100644",
+      "sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec"
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "bytes": 10530,
+      "git_blob": "79b0f419624e2ed1f8416673844afd7e988531e7",
+      "git_mode": "100644",
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c"
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "bytes": 11335,
+      "git_blob": "9dadf2e73c5db037d5126b95e78a7fcac768df1f",
+      "git_mode": "100644",
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95"
+    },
+    "lampOS/crates/update/src/writer_preimages.rs": {
+      "bytes": 27567,
+      "git_blob": "d1349892af75734dbb26940c671c3f0edb2bcdd6",
+      "git_mode": "100644",
+      "sha256": "ae77c27a17dca18c42b8da10e7a959f74a1fe19225fea148f3dbbadcf47b2242"
+    },
+    "lampOS/crates/update/src/writer_preimages/tests.rs": {
+      "bytes": 18273,
+      "git_blob": "d2f4499ce02ec8925d0daf36a4d9c67d1540ed0e",
+      "git_mode": "100644",
+      "sha256": "6d06b27283543a308d4d4b1ada60406235a10c2ccf28eadc05aa1ac82ea3270f"
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "bytes": 9350,
+      "git_blob": "7afb9d0ddf4c2372dc95ece82f9bfa1ba42fc8c6",
+      "git_mode": "100644",
+      "sha256": "53080a07a94e76ecc47f83bf0316a203be43abdfc6af6156e99f2bd9859d7248"
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "bytes": 14611,
+      "git_blob": "00aaca5cffce778e7787b98bb3a4c3f66d85baa3",
+      "git_mode": "100644",
+      "sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad"
+    },
+    "lampOS/docs/head-preimage-coherence.md": {
+      "bytes": 3364,
+      "git_blob": "29aea2efc311cc88aa7ff508bf64217f82f3691d",
+      "git_mode": "100644",
+      "sha256": "47299d4911fd639ec90e3cbbf979135b2918ee8ff4b6e72d4f96c0a0369b774c"
+    },
+    "lampOS/docs/head-touch-plan-output.md": {
+      "bytes": 3163,
+      "git_blob": "eb6d9e9abed58e19a146d54dfa7d817ce20f9521",
+      "git_mode": "100644",
+      "sha256": "2f8b14f740d397ed4b5fcd5c6f8594ca453601040cdf33286c646054df0358ee"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "bytes": 157014,
+      "git_blob": "fb174d9eb411ad0ee6f4713fb9eaf92f7769851f",
+      "git_mode": "100644",
+      "sha256": "fbc4a8c9294ceee0ec5a3141c2c6516f30e5b5de2ed0d9a853985afc78da8d41"
+    },
+    "lampOS/docs/updates.md": {
+      "bytes": 178351,
+      "git_blob": "d6744a40d984e033ade3227f76653d6609c34852",
+      "git_mode": "100644",
+      "sha256": "d377d590388451b3c35972b5af17c5fdd12b6fbf4ec058830aeee8a10c063046"
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "bytes": 4719,
+      "git_blob": "62a923dabe6c1dd267742ddd5275c6e25f3dcbdc",
+      "git_mode": "100644",
+      "sha256": "369d7ce1ac493f37ecc1a5cb414f3f5ba14b2796de33b89de7a2024725da109d"
+    },
+    "lampOS/docs/writer-preimages.md": {
+      "bytes": 5331,
+      "git_blob": "cf8983953621694a8b5c5e26cb62c9060cb2ad0b",
+      "git_mode": "100644",
+      "sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9"
+    },
+    "lampOS/docs/writer-settings-capture.md": {
+      "bytes": 6448,
+      "git_blob": "b9c8d7ba9bc37b7c26acc19d9723139a211b3f90",
+      "git_mode": "100644",
+      "sha256": "9766bdaed2e350b920f2ab09252e5f2435a11a1c8243feb8e25f5442af7ab149"
+    }
+  },
+  "head": "a96e0adb27ff251167d3b9c89f64dd2ba92f6d12",
+  "whole_authored_actual_tree_equal": true
+}
