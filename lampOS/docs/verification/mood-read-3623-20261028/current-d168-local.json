@@ -1,0 +1,359 @@
+{
+  "additional_limits": [
+    "No independent fmt/clippy/full341package or native audit in this narrow approved run",
+    "No release/currentMain readiness, device latency, or historical failure waiver",
+    "Authored parent3aa and metadata PRbase409/actualnativepreview remain separate; no latestbase carry claimed"
+  ],
+  "artifact": {
+    "emitted_path": "<worktrees>/third-store-target/debug/deps/runtime-f9b92bb4002b831f",
+    "features": [],
+    "fresh": false,
+    "retained_copy": "retained-current-expression-runtime",
+    "sha256": "371b881627f210299b66e725c845d97db92bb59ef573e9907994800c1ea87d06"
+  },
+  "bank_released": true,
+  "compiler_artifact": {
+    "executable": "<target>/debug/deps/runtime-f9b92bb4002b831f",
+    "features": [],
+    "filenames": [
+      "<target>/debug/deps/runtime-f9b92bb4002b831f"
+    ],
+    "fresh": false,
+    "manifest_path": "<worktree>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<worktree>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "runtime",
+      "src_path": "<worktree>/lampOS/crates/expression/tests/runtime.rs",
+      "test": true
+    }
+  },
+  "counts": {
+    "fail": 0,
+    "ignored": 0,
+    "pass": 12,
+    "retries": 0,
+    "selected": 12,
+    "unrun": 0
+  },
+  "disposition": "SCOPED_SOURCE_AND_12_CURRENT_LOCAL_READ_OK",
+  "environment_removed_only": [
+    "LAMP_EXPRESSION_SLEEP_NAME_JOURNAL_CHILD"
+  ],
+  "evidence_hashes": {
+    "current-artifact.json": "0a781e61a4e2d5c5e41305a7c26f4ed3f2e3c6fa310b0de18eb0e1b978dd73a5",
+    "current-compile.stderr": "7eaba07244f2e9fd52b9e4a1cff64144bbcbfaca688f71e2a985a9c46b74ef7b",
+    "current-compile.stdout": "d5140f18f274e3386a006b37a9b54f89f53eb0f81f75c1b1bc3631d13f816cdf",
+    "current-d168-proposal.json": "25c9fb0ad223b26659b9e269edecd7d71a5f61f5516fc220cc647b315b9149f8",
+    "current-discovery.stdout": "6249784e0118adda2c98a7330e7b66fa7778b521cbaea1398123bd967f45adb8",
+    "current-runtime-exact1.stdout": "c1415c75171342947efef1f5b13f812980793a313948954df8f7121455b07071",
+    "current-runtime-exact2.stdout": "164679361965c873c0622904704622e2a59e7160db9e4c185ee5bfcdac17110d",
+    "current-runtime-module10.stderr": "14726cf91a3881d45e29f1dce8d6724bd2a34f2a7c6960fa60acf283bd98ef34",
+    "current-runtime-module10.stdout": "8d0ace651e00fac235e410878b565893b58de5a1c795a74eafd1c8fce02538d4",
+    "qualified-current-local.json": "7fe7582bb2c91b845cd5951aa29bb858296d8b29c66f0f8062159760f93d0889",
+    "retained-current-expression-runtime": "371b881627f210299b66e725c845d97db92bb59ef573e9907994800c1ea87d06",
+    "source-review.json": "a0caf2403661e436d2628d43bd455b217155d00e71de210517c58e175a15a4b8"
+  },
+  "exact_env_overrides": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "<worktrees>/third-store-target",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_TEST_THREADS": "1"
+  },
+  "head": "d168fa939905531a3257f80a335a69dcfd528027",
+  "helper_sha256": {
+    "current-d168-proposal.json": "25c9fb0ad223b26659b9e269edecd7d71a5f61f5516fc220cc647b315b9149f8",
+    "root-approval.json": "30a994c40eac2e4fdb2ec1513f2c6701a663e0df8798acf1bb2333bf99bcd34e",
+    "run-current-gate.py": "fbb893b89a4c15eb81a782eddae7a7a82d7d50b40a2002669904adb7d024979b"
+  },
+  "journal_child": "Committed parent test passed; child current_exe is same qualified driver, child success checked and RAII wait present. Child inherits runtime module PGID, now absent; separate numeric child PID not exposed by fixture.",
+  "journal_child_count_limit": "12 unique selected parent case terminals; the committed Journal case internally self-executes its same test name in child mode. Not an additional unique selected case or a second independent replay. Its parent asserts successful child status and exact single journal line. Numeric child PID not emitted; inherited module process group checked absent.",
+  "limits": [
+    "No fmt/clippy or full341package proposal; author gates separate",
+    "No native/device/latency claim or historical failure waiver"
+  ],
+  "no_nextest": "Absent; current committed integration driver, sequential module10 and two exact once",
+  "parent": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "prior3913_retained_copy_sha256_unchanged": "2b4884821be4993c873a0a9c12dd1bcbb0ab7c71620e19e0d7147fa033387c87",
+  "source_before_after_manifest_sha256": {
+    "after": "a1af61a5d4b146ce43570c56dd26f1464687c5dc1c3a19dee72dfb32a8fc1094",
+    "before": "a1af61a5d4b146ce43570c56dd26f1464687c5dc1c3a19dee72dfb32a8fc1094"
+  },
+  "source_guard_count": 1906,
+  "source_guard_sha256": "a1af61a5d4b146ce43570c56dd26f1464687c5dc1c3a19dee72dfb32a8fc1094",
+  "source_helpers_tools_unchanged": true,
+  "source_review": {
+    "all30_comments_read": true,
+    "findings": [],
+    "head": "d168fa939905531a3257f80a335a69dcfd528027",
+    "last_own_comments": [
+      "6437067436",
+      "6437096573"
+    ],
+    "new_addressed_comment": "6450096371",
+    "owned_paths": {
+      "lampOS/crates/expression/tests/runtime.rs": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752",
+      "lampOS/docs/expression.md": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c"
+    },
+    "parent": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+    "relevant_limits": [
+      "Author341pass and original337/3 or338/2 failures are separate source-bound observations; no waiver/cause inference",
+      "Exact authored parent3aa separate from current PRbase409/currentpreview",
+      "No current native audit or local execution yet",
+      "Selected tests exercise real lamp bus/Service; std-only extraction would mirror or omit dependencies"
+    ],
+    "runtime_case_names": [
+      "sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms",
+      "sleep_name::activity_adaptation_keeps_the_source_clock_and_owner",
+      "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+      "sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease",
+      "sleep_name::the_switch_closed_mid_look_ends_it",
+      "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+      "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+      "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+      "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "slow_input_draining_does_not_make_old_joints_fresh",
+      "mood_in_reads_only_a_fresh_valid_state_from_mood"
+    ],
+    "source_read": "No P1/P2 found in exact two-path test/doc diff; production Expression sources unchanged. Mood is stamped after ordinary publication-span correction, first injected sample begins at that stamp, later samples include Mood publication time; ordinary transport/source ages preserved. Only heldMood selects250ms; default200ms unchanged. Journal RAII kills/reaps child on unwinding; 15s watchdog begins after spawn and exact single line plus25checks remain unchanged. Existing real transport limits still apply; host stalls can still refuse old typed input.",
+    "tree": "52534008058c1d95ed139b3257526f6252a77004",
+    "unchanged_blocks": {
+      "default200ms-step": {
+        "equal_parent": true,
+        "sha256": "724fd952d83654af4786ae9db4b232c2fea6041c8c488859fc09403f322850ed"
+      },
+      "journal-child-and-test": {
+        "equal_parent": true,
+        "sha256": "c5822e041631db03e2b9623618fe5464ba7473f3b12f712016b444b06f98db92"
+      }
+    },
+    "unchanged_production_expression": [
+      {
+        "path": "lampOS/crates/expression/src/alive.rs",
+        "sha256": "411bd581f5226289d41d43f152e811dd5fd3c75999d6e9c2c3d7d6258b70be84"
+      },
+      {
+        "path": "lampOS/crates/expression/src/catalogue.rs",
+        "sha256": "f3aab49e4090f43affef9f857646fcca1fa64edbb39c9538011f4471b93d42ab"
+      },
+      {
+        "path": "lampOS/crates/expression/src/engine.rs",
+        "sha256": "130290ecf60a64b30bc4bd5f190485debcf22b75228c785e4d2ecd0643e3f458"
+      },
+      {
+        "path": "lampOS/crates/expression/src/lib.rs",
+        "sha256": "863fbef6e93f0bceb5724f5f4d91a911589c2bf2e32c12a0872938a10988f614"
+      },
+      {
+        "path": "lampOS/crates/expression/src/local_time.rs",
+        "sha256": "7d24d58f2a61db0bcf8bffea09777d6a525c83fe9fc1d9efcc80426c45609663"
+      },
+      {
+        "path": "lampOS/crates/expression/src/main.rs",
+        "sha256": "c9795e4b997111045241366b8da0dcbe913b66f83e3801d41c0f4d8ad99e1537"
+      },
+      {
+        "path": "lampOS/crates/expression/src/replay.rs",
+        "sha256": "4b705a0ccc23a42be9e0714602c861d3c9fa5a9123a24ccceba3abbcd070646f"
+      },
+      {
+        "path": "lampOS/crates/expression/src/rest.rs",
+        "sha256": "c0db3b6c42b79d329aaf019d3a778ee43faf1359c038aa48b896e1033631c587"
+      },
+      {
+        "path": "lampOS/crates/expression/src/runtime.rs",
+        "sha256": "ecc10ed90806472967453dde30ebca572ecde0ac9dc54780dd18b0bc3e284a99"
+      },
+      {
+        "path": "lampOS/crates/expression/src/speaking.rs",
+        "sha256": "36f1a722c4a94dfa04359b4ab58313be24ef607b5eef85f5956321677b224938"
+      },
+      {
+        "path": "lampOS/crates/expression/src/startle.rs",
+        "sha256": "2a9b4d4a9ddf9ff06d9f95aa0f1e240588f5992869fe916a08f0b4c11f627b07"
+      },
+      {
+        "path": "lampOS/crates/expression/src/unplug.rs",
+        "sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-expression",
+        "--test",
+        "runtime",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 17.1514,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 19926,
+      "pid": 19926,
+      "stage": "current-compile",
+      "stderr_sha256": "7eaba07244f2e9fd52b9e4a1cff64144bbcbfaca688f71e2a985a9c46b74ef7b",
+      "stdout_sha256": "d5140f18f274e3386a006b37a9b54f89f53eb0f81f75c1b1bc3631d13f816cdf",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/runtime-f9b92bb4002b831f",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.7581,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 20277,
+      "pid": 20277,
+      "stage": "current-discovery",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "6249784e0118adda2c98a7330e7b66fa7778b521cbaea1398123bd967f45adb8",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/runtime-f9b92bb4002b831f",
+        "sleep_name::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 4.6246,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 20279,
+      "pid": 20279,
+      "stage": "current-runtime-module10",
+      "stderr_sha256": "14726cf91a3881d45e29f1dce8d6724bd2a34f2a7c6960fa60acf283bd98ef34",
+      "stdout_sha256": "8d0ace651e00fac235e410878b565893b58de5a1c795a74eafd1c8fce02538d4",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/runtime-f9b92bb4002b831f",
+        "--exact",
+        "slow_input_draining_does_not_make_old_joints_fresh",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0479,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 20652,
+      "pid": 20652,
+      "stage": "current-runtime-exact1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c1415c75171342947efef1f5b13f812980793a313948954df8f7121455b07071",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/runtime-f9b92bb4002b831f",
+        "--exact",
+        "mood_in_reads_only_a_fresh_valid_state_from_mood",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0217,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 20653,
+      "pid": 20653,
+      "stage": "current-runtime-exact2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "164679361965c873c0622904704622e2a59e7160db9e4c185ee5bfcdac17110d",
+      "timed_out": false
+    }
+  ],
+  "status": "PASS",
+  "target_release": "All five numeric child groups reaped/absent, exclusive flock released after guards; saved current executable retained before any later bank reuse",
+  "terminals": [
+    [
+      "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+      "ok"
+    ],
+    [
+      "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+      "ok"
+    ],
+    [
+      "sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease",
+      "ok"
+    ],
+    [
+      "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+      "ok"
+    ],
+    [
+      "sleep_name::activity_adaptation_keeps_the_source_clock_and_owner",
+      "ok"
+    ],
+    [
+      "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "ok"
+    ],
+    [
+      "sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms",
+      "ok"
+    ],
+    [
+      "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+      "ok"
+    ],
+    [
+      "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "ok"
+    ],
+    [
+      "sleep_name::the_switch_closed_mid_look_ends_it",
+      "ok"
+    ],
+    [
+      "slow_input_draining_does_not_make_old_joints_fresh",
+      "ok"
+    ],
+    [
+      "mood_in_reads_only_a_fresh_valid_state_from_mood",
+      "ok"
+    ]
+  ],
+  "tool_sha256": {
+    "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+    "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+  },
+  "tree": "52534008058c1d95ed139b3257526f6252a77004"
+}
