@@ -611,13 +611,17 @@ each under the quiet rule. A round
    for a while, and one round switches each its own way.
    lamp-update's own unit is never one. For each part whose binary the build
    carries:
-   - **its unit**: the build's copy from this lamp's own folder
-     (`deploy/<lamp>/<unit>`, the lamp being `--lamp`, or its host name) if
-     the build carries one, else the lamp's own. For a part that names its
-     build, the build's folder is written in everywhere the unit names its
-     folder (so the controls' `--config` follows too). A product part's unit
-     names no build and is left as it is, unless the build carries another;
-     what moves is its link.
+   - **its unit**: a pinned part uses the build's copy from this lamp's
+     own folder (`deploy/<lamp>/<unit>`, the lamp being `--lamp`, or its host
+     name), else the lamp's own. Its new build folder is written everywhere
+     that unit names the old folder (so the controls' `--config` follows too).
+     A linked part prefers a host template through `current`, otherwise the
+     product template. When a product candidate is carried, a legacy pinned
+     host template is skipped with a journal line naming only the unit, host
+     and installed `current` path. Without one, the existing host validation
+     still applies. The chosen linked unit must name the same part folder and
+     binary. What moves is its link, with any compatible unit change carried
+     by the build.
    - **its folder's files**: every file beside its binary now goes to the
      new folder: the build's version of any binary the build carries (the
      voice's `lamp-turn-end`), the old file otherwise (a model, a library,
@@ -950,17 +954,17 @@ an unmanaged install, they come only from `lamp-update install`. Product
 skills don't depend on the apply switch: a round places the build's
 `lamp-product-skills` bundle (above) whenever the installed `lamp-skills`
 part's unit uses the product folder `/var/lib/lampOS/skills/` and the signed
-build carries the bundle, within its size bound. A
-round by hand (`once`) takes the units the build carries for `--lamp`, the
-lamp's own name unless given: on a product-installed lamp that also has dev
-units of its own name in the build (lamp-4ace's and lamp-52e6's, with their
-hash-pinned paths), those are taken and refused ("the build's
-lamp-actions.service does not start /opt/lampOS/actions/ through its current
-link"), and `--lamp lamp-0000`, a name with no units of its own, keeps the
-installed product units (lamp-52e6 with 7071, the lead's agent, 26 Oct:
-before #3466, a round brought no new product unit text, which only `install`
-did). A customer lamp's
-name has none, so this is only a test lamp's. `check` never writes, whatever `--apply` says. `once` and `check` end with
+build carries the bundle, within its size bound.
+
+On a product-installed lamp, a legacy hash-pinned host template no longer
+blocks the linked product template (#3796). It is authenticated and skipped
+when a product candidate is carried, with a journal line naming only the unit,
+host and installed link path. A host template through `current` still wins,
+subject to the same folder/binary validation. Pinned installations retain
+their host-specific handling. A by-hand `once` uses the lamp's host name unless
+`--lamp` is given; no host-name override is needed to ignore legacy pinned
+entries on linked parts. `check` never writes, whatever `--apply` says. `once`
+and `check` end with
 0 (up to date, switched, or only saying), 1 (refused, put back, failed), 3
 (the channel cannot be reached), 4 (no quiet moment); a wrong option with 2.
 `serve` prints a round's outcome only when it differs from the last. The
@@ -1481,8 +1485,14 @@ their previous representation and behavior.
 
 A generic entry applies only to an already installed service started
 through its `current` link, with the same part folder and binary. An exact
-`deploy/<lamp>/` entry takes precedence regardless of manifest order.
-Pinned installations keep their lamp-specific unit handling. A product
+`deploy/<lamp>/` entry through `current` takes precedence regardless of manifest
+order. On a linked installation, a valid legacy hash-pinned host entry is skipped
+when a product candidate is carried, before that precedence is decided; the
+product entry can then apply. Without a product candidate, the previous host
+validation remains. The skip line contains the unit, host and installed link path, never unit text, arguments
+or environment values. Malformed or mismatched linked entries still reach the
+existing refusal checks. Pinned installations keep their lamp-specific unit
+handling. Without an eligible carried entry, the installed unit remains. A product
 entry of level 6 never adds or enables a missing part (level 8 does, below,
 "A part added over the air") and never rewrites local drop-ins. Unit text, binary links and settings use the existing quiet
 switch, journal, health check and fallback; a failure restores the exact
