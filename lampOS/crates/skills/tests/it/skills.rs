@@ -373,6 +373,7 @@ fn every_skill_folder_says_its_kind_and_version() {
     assert_eq!(
         named(SkillKind::Installable),
         [
+            "comfort-break",
             "desk-tutor",
             "desk-tutor-marks",
             "guard-mode",
@@ -2331,6 +2332,75 @@ fn an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing() {
 /// #1672: `through` goes with a field's `equals` and a `for`, `broken_by`
 /// with `through`, `through` never lists the value it equals, and
 /// `broken_by` names only words heard, the name heard, a push and a touch.
+/// #3504: a comfort break waits while anyone else is in view. A
+/// `[[while]]` on `humans/faces/tracked` with `faces_at_most`, 1 to 8,
+/// alone; anywhere else, or with a field or a presence test, refused.
+#[test]
+fn faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |test: &str| {
+        format!(
+            "[trigger]\ntopic = \"humans/faces/tracked\"\nfor = \"1m\"\n\
+             [[while]]\n{test}\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ dim = 1 }}\n\
+             [permissions]\ntopics = [\"humans/faces/tracked\", \"voice/state\"]\n\
+             light = true\n"
+        )
+    };
+    load(&skill_with(
+        dir.path(),
+        "fine",
+        &toml("topic = \"humans/faces/tracked\"\nfaces_at_most = 1\nfor = \"1m\"\n"),
+    ))
+    .unwrap();
+    for test in [
+        "topic = \"voice/state\"\nfaces_at_most = 1\n",
+        "topic = \"humans/faces/tracked\"\nfaces_at_most = 0\n",
+        "topic = \"humans/faces/tracked\"\nfaces_at_most = 9\n",
+        "topic = \"humans/faces/tracked\"\nfaces_at_most = 1\npresent = true\n",
+        "topic = \"humans/faces/tracked\"\nfaces_at_most = 1\nfield = \"faces\"\nequals = 1\n",
+    ] {
+        let error = load(&skill_with(dir.path(), "bad", &toml(test))).unwrap_err();
+        assert!(
+            error.contains("faces_at_most, 1 to 8, is known only on humans/faces/tracked, alone"),
+            "{test}: {error}"
+        );
+    }
+}
+
+/// #3504: what a comfort break says, what the model is told of it and the
+/// name its stop words carry never name a place or a need: only "a short
+/// break", whoever might be listening.
+#[test]
+fn a_comfort_break_never_names_the_bathroom() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/comfort-break");
+    let skill = load(&folder).unwrap();
+    let markdown = fs::read_to_string(folder.join("SKILL.md")).unwrap();
+    let toml: toml::Value =
+        toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
+    let mut told = vec![skill.name.clone(), markdown];
+    for step in toml["do"].as_array().unwrap() {
+        if let Some(say) = step.get("say").and_then(toml::Value::as_str) {
+            told.push(say.to_owned());
+        }
+    }
+    told.push(toml["stop"]["about"].as_str().unwrap().to_owned());
+    for text in &told {
+        let lower = text.to_lowercase();
+        for word in [
+            "bathroom", "toilet", "restroom", "washroom", "lavatory", "loo", "pee", "wc",
+        ] {
+            assert!(
+                !lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|token| token == word),
+                "{word} in {text:?}"
+            );
+        }
+    }
+    assert_eq!(skill.kind, SkillKind::Installable);
+}
+
 #[test]
 fn through_and_broken_by_are_refused_where_they_mean_nothing() {
     let dir = tempfile::tempdir().unwrap();

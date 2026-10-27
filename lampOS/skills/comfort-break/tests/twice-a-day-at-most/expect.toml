@@ -1,0 +1,27 @@
+# 09:00, three sittings of 130 minutes, 5 minutes away between: at 120 and 255 minutes, not at
+# 390 (most_a_day = 2).
+clock = "09:00"
+
+[[expect]]
+at = "120m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "120m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health." }
+
+[[expect]]
+at = "255m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "255m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health." }

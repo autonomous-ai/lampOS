@@ -401,6 +401,13 @@ pub const OFF_LINE: &str = off_line!();
 /// (`tests/functions.rs`): the two tools of Desk tutor and its marks would
 /// put the last of them past it, left out without a word.
 pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
+    // An installable skill (#3504): its owner chooses it; not in the
+    // product's install until it has been tried on a lamp.
+    (
+        "comfort-break",
+        "an installable skill, not yet tried on a lamp (#3504): V1's bathroom-break reminder, \
+         which its owner chooses; a played check on a lamp comes first",
+    ),
     (
         "desk-tutor",
         "with its marks its two functions would be 33 of a Live session's 32; the full look it \
