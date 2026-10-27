@@ -3182,10 +3182,13 @@ pub fn serve(
             .is_ok_and(|value| value == "on")
         {
             eprintln!(
-                "lamp-voice second: right after a start, a line in a room not yet known is kept as said in a quiet room for a join when the ears' quiet is a quiet room's and no talk was left alone and no other voice heard since (LAMP_FIRST_SECONDS_QUIET)"
+                "lamp-voice second: right after a start, a line in a room not yet known is kept as said in a quiet room for a join when the ears' stream stayed near its own quiet outside the lines and no talk was left alone and no other voice heard since (LAMP_FIRST_SECONDS_QUIET)"
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.showing_the_first_seconds_quiet();
+                if let Some(root) = files.bus_root.as_deref() {
+                    heeding.hear_levels(root, false);
+                }
             }
         }
         // The rule keeps the route's one reader of the Policy's decisions,
@@ -4398,6 +4401,9 @@ pub(crate) struct Heeding {
     /// since the start: never cleared, unlike [`Self::another_person`].
     first_seconds_quiet: bool,
     another_since_start: bool,
+    /// With it, each of the last lines kept and when it was said, so the
+    /// ears' stream is read outside them ([`Self::ears_show_quiet`]).
+    said: std::collections::VecDeque<(u64, (u64, u64))>,
 }
 
 /// How the room was as a line was judged, for a join on no sign of a
@@ -5006,13 +5012,24 @@ const LEVEL_EVERY: Duration = Duration::from_millis(100);
 /// A level older than this is let go: longer than a line replayed to this
 /// route takes to be heard.
 const LEVELS_KEPT_US: u64 = 30_000_000;
-/// The ears' quiet at or under which the room around the lamp is a quiet
-/// one, in dBFS (`LAMP_FIRST_SECONDS_QUIET`, [`Heeding::ears_show_quiet`]):
-/// about 5 dB over lamp-4ace's resting -51.5 at the pinned capture level
-/// (docs/ears.md). A quiet that sits higher has steady sound in it, talk
-/// or music; a lamp whose capture level isn't pinned reads it higher too
-/// (lamp-75c9's -37.6), and is left unknown. A first choice.
-const FIRST_SECONDS_QUIET_FLOOR_DB: f32 = -46.0;
+/// `LAMP_FIRST_SECONDS_QUIET` ([`Heeding::ears_show_quiet`]): the ears'
+/// quiet over which a room is a loud one, whatever its stream does, in
+/// dBFS. Each lamp's quiet sits where its capture level puts it (lamp-4ace
+/// -51.5, lamp-c0a4 -45 on 27 Oct, lamp-75c9 at an unpinned level -37.6), so
+/// only a quiet louder than any of them decides alone. A first choice.
+const LOUD_ROOM_FLOOR_DB: f32 = -30.0;
+/// The most the room microphone may rise over its own quiet outside the
+/// lines said for the room to be quiet, in dB: lamp-c0a4's quiet room read
+/// within 2 dB of it, colleagues talking across lamp-4ace's office rose 2
+/// to 8 dB (docs/ears.md). A first choice.
+const FIRST_SECONDS_RISE_DB: f32 = 6.0;
+/// At least this many of the ears' 100 ms readings outside the lines, a
+/// second's worth, before the stream shows anything.
+const FIRST_SECONDS_READINGS: usize = 10;
+/// A line's own sound, for the stream: from this long before its first
+/// sound to this long after its end.
+const SAID_BEFORE_US: u64 = 300_000;
+const SAID_AFTER_US: u64 = 700_000;
 
 impl Heeding {
     pub(crate) fn new(
@@ -5106,6 +5123,7 @@ impl Heeding {
             another_person: None,
             first_seconds_quiet: false,
             another_since_start: false,
+            said: std::collections::VecDeque::new(),
         }
     }
 
@@ -5122,7 +5140,7 @@ impl Heeding {
     /// ([`Self::keep_line_room`]) in a room the route keeps itself, unknown
     /// only for want of history right after a start
     /// ([`crate::room_told::RoomTold::unknown_for_want_of_history`]), is kept
-    /// as said in a quiet room when the ears show one
+    /// as said in a quiet room when the ears' own stream shows one
     /// ([`Self::ears_show_quiet`]) and no other person was heard or seen
     /// speaking in any line since the start. On lamp-4ace on 26 Oct, a bare
     /// "Lamp.", a pause, then the request, the first line after a start
@@ -5133,20 +5151,57 @@ impl Heeding {
         self.first_seconds_quiet = true;
     }
 
-    /// The ears' quiet (`ears/level`'s floor, fresh within a second), when
-    /// it is a quiet room's: at or under [`FIRST_SECONDS_QUIET_FLOOR_DB`].
-    /// None without the bus, a fresh level or a floor learned yet.
-    fn ears_show_quiet(&self) -> Option<f32> {
+    /// `request` was said over `window`, for the ears' stream
+    /// ([`Self::ears_show_quiet`]), with `LAMP_FIRST_SECONDS_QUIET`.
+    fn said_over(&mut self, request: u64, window: (u64, u64)) {
+        if !self.first_seconds_quiet {
+            return;
+        }
+        if self.said.len() == SPOKE_KEPT {
+            self.said.pop_front();
+        }
+        self.said.push_back((request, window));
+    }
+
+    /// Whether the ears show a quiet room up to `request`'s end, by their
+    /// own stream rather than one level for every lamp: the readings kept
+    /// ([`Self::hear_levels`], the last 30 s) outside the lines said, at
+    /// least [`FIRST_SECONDS_READINGS`] of them, all under
+    /// [`FIRST_SECONDS_RISE_DB`] over the room's own quiet, and that quiet
+    /// (`ears/level`'s, fresh within a second) under a loud room's
+    /// ([`LOUD_ROOM_FLOOR_DB`]). The quiet and the most it rose; none
+    /// without the bus, a fresh quiet, `request`'s window or enough
+    /// readings.
+    fn ears_show_quiet(&self, request: u64) -> Option<(f32, f32)> {
         let (bus, _) = self.bus.as_ref()?;
         let message = bus.latest(lamp_msgs::RoomSound::TOPIC).ok()??;
         if unix_ms(SystemTime::now()).saturating_sub(message.header.at_unix_ms) >= 1_000 {
             return None;
         }
-        message
+        let floor = message
             .parse::<lamp_msgs::RoomSound>()
             .ok()?
             .floor_db
-            .filter(|floor| *floor <= FIRST_SECONDS_QUIET_FLOOR_DB)
+            .filter(|floor| *floor <= LOUD_ROOM_FLOOR_DB)?;
+        let (_, (_, ended)) = self.said.iter().rev().find(|(of, _)| *of == request)?;
+        let until = ended.saturating_add(SAID_AFTER_US);
+        let levels = self.levels.as_ref()?.lock().ok()?;
+        let outside: Vec<f32> = levels
+            .iter()
+            .filter(|(at, _)| {
+                *at <= until
+                    && !self.said.iter().any(|(_, (began, ended))| {
+                        (began.saturating_sub(SAID_BEFORE_US)..=ended.saturating_add(SAID_AFTER_US))
+                            .contains(at)
+                    })
+            })
+            .map(|(_, rise)| *rise)
+            .collect();
+        if outside.len() < FIRST_SECONDS_READINGS {
+            return None;
+        }
+        let most = outside.into_iter().reduce(f32::max)?;
+        (most < FIRST_SECONDS_RISE_DB).then_some((floor, most))
     }
 
     /// A line that begins with the lamp's name, said to a face turned to the
@@ -5458,10 +5513,10 @@ impl Heeding {
             && crate::room_told::room()
                 .lock()
                 .is_ok_and(|mut told| told.unknown_for_want_of_history(monotonic_us()))
-            && let Some(floor) = self.ears_show_quiet()
+            && let Some((floor, most)) = self.ears_show_quiet(request)
         {
             eprintln!(
-                "lamp-voice second: request {request}: the room is not known yet after the start, and the ears' quiet is {floor:.1} dBFS with no talk left alone and no other voice since: kept as said in a quiet room for a join (LAMP_FIRST_SECONDS_QUIET)"
+                "lamp-voice second: request {request}: the room is not known yet after the start, and the ears' stream stayed within {most:.1} dB of its quiet of {floor:.1} dBFS outside the lines, with no talk left alone and no other voice since: kept as said in a quiet room for a join (LAMP_FIRST_SECONDS_QUIET)"
             );
             crate::room_told::Room::Quiet
         } else {
@@ -5519,6 +5574,7 @@ impl Heeding {
     /// for the line that is judged; and no conversation's end clears
     /// another person seen in it.
     pub(crate) fn keep_unjudged(&mut self, request: u64, (began_us, ended_us): (u64, u64)) {
+        self.said_over(request, (began_us, ended_us));
         let room = if self.keeps_room {
             crate::room_told::room()
                 .lock()
@@ -6851,6 +6907,7 @@ impl Heeding {
         heard: &str,
         mut signs: Signs,
     ) -> Option<&'static str> {
+        self.said_over(request, (began_us, ended_us));
         let attention = &mut self.attention;
         // What the engine gave: a request going on from one cut short has
         // that one's words in front of its own (#1168).
@@ -18535,12 +18592,15 @@ mod tests {
     /// `LAMP_FIRST_SECONDS_QUIET` (#3711): right after a start the room is
     /// unknown only for want of history, and on lamp-4ace on 26 Oct a bare
     /// "Lamp.", a pause, then the request, with nobody in view, was held and
-    /// had to be said twice. With the switch, the ears' quiet (a quiet
-    /// room's floor) and no talk left alone and no other voice since the
-    /// start show the room quiet for the join: the name carries to its
-    /// request. Another voice heard since the start, talk left alone, a
-    /// floor over a quiet room's or no fresh level, two faces in view, or
-    /// the switch off: held, as before.
+    /// had to be said twice. With the switch, the ears' own stream shows the
+    /// room quiet for the join: outside the lines said, the room microphone
+    /// stayed within a few dB of its own quiet, that quiet under a loud
+    /// room's, and no talk was left alone and no other voice heard since the
+    /// start. lamp-c0a4 on 27 Oct (7071), a quiet room read at a quiet of
+    /// -45 dBFS and levels of -43 to -46, joins; the person's own lines rise
+    /// as they will. Talk or a television between the lines, a loud room's
+    /// quiet, no levels, another voice since the start, talk left alone,
+    /// two faces in view, or the switch off: held, as before.
     #[test]
     fn right_after_a_start_the_ears_quiet_room_lets_a_bare_name_join_its_request() {
         use crate::room_told::Room;
@@ -18550,6 +18610,9 @@ mod tests {
         struct Start {
             /// The ears' quiet, in dBFS; none: no level from the ears.
             floor: Option<f32>,
+            /// The room microphone's rises over its quiet outside the two
+            /// lines, every 100 ms in turn; none: no levels sampled.
+            room: Option<&'static [f32]>,
             /// Faces in the eyes' newest look at each line.
             in_view: usize,
             /// A line said and left alone since the start.
@@ -18561,6 +18624,7 @@ mod tests {
         }
         let quiet = Start {
             floor: Some(-52.0),
+            room: Some(&[0.5, 1.0, 0.0, 1.5]),
             in_view: 0,
             talk: false,
             other_voice: false,
@@ -18599,6 +18663,24 @@ mod tests {
                 heeding.keep_line_room(98, Room::Unknown, true, true);
                 heeding.keep_line_room(99, Room::Unknown, false, false);
             }
+            // "Lamp." from 5 s to 4.4 s ago, a pause, the request from 3 s
+            // to 0.2 s ago; the ears read every 100 ms over the last 8 s,
+            // the person's own lines 20 dB over the quiet.
+            let windows = [
+                (now - 5_000_000, now - 4_400_000),
+                (now - 3_000_000, now - 200_000),
+            ];
+            if let Some(rises) = start.room {
+                let levels: Levels = Arc::default();
+                for (n, at) in (now - 8_000_000..=now).step_by(100_000).enumerate() {
+                    let said = windows
+                        .iter()
+                        .any(|(began, ended)| (*began..=*ended).contains(&at));
+                    let rise = if said { 20.0 } else { rises[n % rises.len()] };
+                    levels.lock().unwrap().push_back((at, rise));
+                }
+                heeding.levels = Some(levels);
+            }
             if let Some(floor) = start.floor {
                 ears.publish_json(
                     monotonic_us(),
@@ -18610,7 +18692,7 @@ mod tests {
                 )
                 .unwrap();
             }
-            for request in [1, 2] {
+            for (request, window) in [1, 2].into_iter().zip(windows) {
                 eyes.publish_json(
                     monotonic_us(),
                     &Faces {
@@ -18630,39 +18712,98 @@ mod tests {
                     },
                 )
                 .unwrap();
-                let at = monotonic_us();
-                heeding.keep_unjudged(request, (at.saturating_sub(1_000_000), at));
+                heeding.keep_unjudged(request, window);
             }
             let _ = std::fs::remove_dir_all(&root);
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             heeding.one_speaker(1, 2)
         };
+        let held = |said: Joined| matches!(said, Joined::Not(why) if why.ends_with("not known to be quiet"));
         assert!(
             matches!(run("a", quiet), Joined::NoSecond(why) if why.contains("a quiet room")),
             "nobody in view, the ears' quiet room, nothing else since the start"
         );
+        // lamp-c0a4, 27 Oct (7071): a quiet of -45 dBFS, levels -43 to -46.
         assert!(
-            matches!(run("b", Start { other_voice: true, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            matches!(
+                run(
+                    "c0a4",
+                    Start {
+                        floor: Some(-45.0),
+                        room: Some(&[2.0, -1.0, 0.5, 1.0, -0.5]),
+                        ..quiet
+                    }
+                ),
+                Joined::NoSecond(_)
+            ),
+            "lamp-c0a4's quiet room"
+        );
+        assert!(
+            held(run(
+                "b",
+                Start {
+                    other_voice: true,
+                    ..quiet
+                }
+            )),
             "another voice heard since the start"
         );
         assert!(
-            matches!(run("c", Start { floor: Some(-38.0), ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
-            "a room whose quiet is loud"
+            held(run(
+                "c",
+                Start {
+                    floor: Some(-28.0),
+                    ..quiet
+                }
+            )),
+            "a loud room's quiet"
         );
         assert!(
-            matches!(run("d", Start { talk: true, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            held(run(
+                "c2",
+                Start {
+                    room: Some(&[1.0, 9.0, 12.0, 3.0]),
+                    ..quiet
+                }
+            )),
+            "talk or a television between the lines"
+        );
+        assert!(
+            held(run(
+                "d",
+                Start {
+                    talk: true,
+                    ..quiet
+                }
+            )),
             "talk left alone since the start"
         );
         assert!(
-            matches!(run("e", Start { floor: None, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            held(run(
+                "e",
+                Start {
+                    floor: None,
+                    ..quiet
+                }
+            )),
             "no level from the ears"
+        );
+        assert!(
+            held(run(
+                "e2",
+                Start {
+                    room: None,
+                    ..quiet
+                }
+            )),
+            "no levels sampled"
         );
         assert!(
             matches!(run("f", Start { in_view: 2, ..quiet }), Joined::Not(why) if why.contains("2 faces in view")),
             "two faces in view"
         );
         assert!(
-            matches!(run("g", Start { on: false, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            held(run("g", Start { on: false, ..quiet })),
             "the switch off"
         );
     }
