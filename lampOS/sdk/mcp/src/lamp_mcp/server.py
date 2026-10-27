@@ -570,6 +570,31 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             reply = await act("camera.snapshot")
             return Image(data=base64.b64decode(reply["jpeg"]), format="jpeg")
 
+    if allowed("skills"):
+
+        @server.tool()
+        async def lamp_skill_push(folder: str) -> dict:
+            """Put a skill folder from this computer on the lamp, where it runs on its own after you go,
+            never beyond this computer's other grants. The folder is checked first, as `lamp skill check`
+            does, and nothing is sent if it fails. Says what the skill asks and whether it is on or waits
+            for the owner's yes."""
+            limits.take("skill.push")
+            try:
+                return await lamp.push_skill(folder)
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_skills() -> list[dict]:
+            """The skills this computer has put on the lamp, and whether each is on."""
+            return (await act("skill.list")).get("skills", [])
+
+        @server.tool()
+        async def lamp_skill_remove(name: str) -> str:
+            """Take one of this computer's own skills off the lamp, by its name."""
+            await act("skill.remove", name=name)
+            return f"{name} removed"
+
     if allowed("body", "look"):
 
         @server.tool()
