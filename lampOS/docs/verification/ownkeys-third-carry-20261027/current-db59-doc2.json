@@ -1,0 +1,348 @@
+{
+  "bank_release": {
+    "all_local_gate_children_reaped": true,
+    "current_artifact_ledger_sha256": "623e73c350ae39eddffaaeca75de7d148fada0220e5137f36ebccd1fbcabb650",
+    "current_saved_count": 3,
+    "owner_lock_verified_unheld": true,
+    "prior_saved_count": 185,
+    "saved_postguard_sha256": "96ed9f428f9331b62917e9469974fab35da8ac44fce53687a823743083853413",
+    "state": {
+      "head": "db59beb36e7907827b4a4e7406e34e4eaed5f37a",
+      "owner": "third-ownkeys-c1fa2",
+      "pid": 59835,
+      "state": "RELEASED_ALL_GUARDS_CLOSED"
+    }
+  },
+  "compiler_elapsed_seconds": 116.52853045999655,
+  "hashes": {
+    "bank-release.json": "727d6d5d86ae1dabebd5a7380c7a452c2f959be94b1bdd7f34e9b7bb8418b67e",
+    "current-artifacts.json": "623e73c350ae39eddffaaeca75de7d148fada0220e5137f36ebccd1fbcabb650",
+    "gate.terminal.json": "b99d4f1d4295f96cb9708dcb52a16edc283db8333ea8b62ce5fbf5f2cfdae02b",
+    "post-saved-preservation.json": "96ed9f428f9331b62917e9469974fab35da8ac44fce53687a823743083853413",
+    "qualified-c1fa2.json": "4605591b82674166d309b916f980ed63663791e7f20e1e0fb6c91cfdfa6a7c76"
+  },
+  "historical_results_transferred": false,
+  "qualified": {
+    "Linux_previous8_and_newmeasure1_not_executed": true,
+    "all_source_raw_helper_lock_depinfo_actual_saved_guards_match": true,
+    "caught_Round_hooks_current_scope": 0,
+    "compiler_features_opaqueIDs_actual": true,
+    "counts": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 2
+    },
+    "current_executable_paths": 3,
+    "discovery_drivers": 2,
+    "discovery_required": 2,
+    "drivers": 2,
+    "expected_should_panic": 0,
+    "hashes": {
+      "audit-c1fa.py": "6f70424fc2639edfd02828ccf64a8a32418bc276f550fce2f7464acc31de344b",
+      "compiler-artifact-records.json": "bf646c6069c4a2c3a3fb62a68e2fe52429b8c38b39ae5f7b90adbb8b24b27332",
+      "compiler-plan.json": "5b5a1b4598722d582cf5b3b5b566956e9bcf68798c8aa0b004bb03272e475211",
+      "compiler.terminal.json": "95eca2163485d33c9a0cab7b95e18f9b8f8459c49f4a9c8a2deb091559617db8",
+      "current-artifacts.json": "623e73c350ae39eddffaaeca75de7d148fada0220e5137f36ebccd1fbcabb650",
+      "current-unit-switch-hashes.json": "3cd61cbfff8b31a0c5c336edd30d9cc2294c618db3bd82dbc5a97864e04b823f",
+      "emitted-features.json": "fcdc763f07dd27cf62931ad959046c8ea6d0e3871671ebda73ae0a355251162f",
+      "expected-results.json": "c732512ba01f8ace28b451b783d37e1c0f25c54c38c4be8d326546a815318389",
+      "expected-should-panic.json": "7f5168c55b559857a162ebba7e76e949319ff4f70724ff27ea40d4471ace922c",
+      "immutable-saved185.json": "4b796f676fb85b35aab6ec42127123056185a2830c0e4b3297d337fb61c41c17",
+      "metadata.json": "1fa9740222eca7c074222ba9e6bc1754864bd60c5665874c7e2e46846880c71c",
+      "normal-child-current-admission.json": "1515123bb983b6b68c890fe1257186ff2c31e860eb8c6c346557e4c544b59410",
+      "required-cases.json": "8412f9b7e277fe37d02d2629e7ab31a93b9b4352e3056321cdfa7e2a4161084c",
+      "root-approval.json": "ef9632d0ec610cf100756c4f555b21abaa0cec96f222afe21155ac2054a0ff87",
+      "runtime-plan.json": "e317640685755fee39154477901ac9cd5a287c8d8489bf0c54fd64b33b43ec76",
+      "scope-plan.json": "fe0f63aad0533b2b4d4c51be249d410f37b0ed7769b632394005409a3fd09591",
+      "source-audit-receipt.json": "da07165ef6f99cc19aff6d4e6ddc3b89d443d4d77cdbc2797b3d60b652be7577"
+    },
+    "historical318_current_credit_transferred": false,
+    "historical44_caught4_not_imported": true,
+    "historical_holds": [
+      "Own3646 DRAFT broker2094; no activation/device/provider",
+      "539Reader failure remains unexplained/unwaived",
+      "#3890 parallelreport not rerun/repaired/waived"
+    ],
+    "holds": [],
+    "host_required": 2,
+    "identity": {
+      "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+      "head": "db59beb36e7907827b4a4e7406e34e4eaed5f37a",
+      "tree": "7bcfd7381c445c7cc0bbf944f68b7233d650f309"
+    },
+    "independent_saved_paths": 3,
+    "metadata_local_packages": 49,
+    "metadata_workspace_members": 47,
+    "no_Memory_semantic_or_feature_expansion": true,
+    "normal_build_roots": 0,
+    "normal_runtime_children": [],
+    "observed_should_panic": [],
+    "own_selected": 0,
+    "phase": "final",
+    "prior185_saved_match": true,
+    "results": [
+      {
+        "cases": {
+          "every_part_of_the_lamp_waits_for_setups_marker_itself": [
+            {
+              "line": 3,
+              "status": "ok"
+            }
+          ]
+        },
+        "label": "runtime-01-lamp-update-install",
+        "log_sha256": "1a145d452fae6210092076b3fc2e2addf9821fef723b8ded2e3afbed2c8ef30a",
+        "summaries": [
+          {
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "passed": 1,
+            "status": "ok"
+          }
+        ]
+      },
+      {
+        "cases": {
+          "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths": [
+            {
+              "line": 3,
+              "status": "ok"
+            }
+          ]
+        },
+        "label": "runtime-02-lamp-update-it",
+        "log_sha256": "94811e81cb5bdb1716097793219236298552dbfeae2e02883e066a75440589fb",
+        "summaries": [
+          {
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "passed": 1,
+            "status": "ok"
+          }
+        ]
+      }
+    ],
+    "selected_case_unrun": 0,
+    "status": "VERIFIED_C1FA_RUNTIME2",
+    "strict_roots": 1,
+    "unique_actual_discovery": 2,
+    "unknown_panics": [],
+    "witnesses": {
+      "lamp-update::install::every_part_of_the_lamp_waits_for_setups_marker_itself": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-update::it::ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths": {
+        "own": false,
+        "pass_once": true
+      }
+    }
+  },
+  "runtime_command_seconds": 0.5022943899966776,
+  "source_audit": {
+    "Cargo_or_test_commands": 0,
+    "Memory_semantic_review": false,
+    "actual_historical_depinfo_changed_source_rows": [
+      {
+        "historical_artifact": "[workspace]/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "new_sha256": "d3aa722db38cae7aad97b7868c5ceca33e4af835097cff6194b8c397ff1c228f",
+        "old_sha256": "855aa268c9dce3a432c1e03d899edc9e8905b82405d817d765d48875636fd04e",
+        "source": "lampOS/docs/install.md"
+      }
+    ],
+    "all_Rust_deploy_manifest_lock_workflow_bytes_equal": true,
+    "base_delta": [
+      "lampOS/docs/install.md"
+    ],
+    "branch": "third/ownkeys-current-c1fa",
+    "clean_doc_overlay": {
+      "equals_new_doc": true,
+      "exit": 0,
+      "sha256": "d3aa722db38cae7aad97b7868c5ceca33e4af835097cff6194b8c397ff1c228f"
+    },
+    "conflicts": [],
+    "dynamic_census_inputs": "All Rust lexical input bytes and both workflow bytes unchanged. install.md is the only committed guard delta. Repeat its direct include_str census and the workflow/doc lexical census conservatively; no Memory semantic reading.",
+    "historical_depinfo_is_current_admission": false,
+    "identity": {
+      "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+      "head": "db59beb36e7907827b4a4e7406e34e4eaed5f37a",
+      "tree": "7bcfd7381c445c7cc0bbf944f68b7233d650f309"
+    },
+    "manual_resolutions": [],
+    "modified_input_mtime_fresh": true,
+    "new_feature_edges": [],
+    "normal_and_alltarget_dependency_graph_changed": false,
+    "old_fb_source_custody_sha256": "752edf5f0eef5f73972cb3f63f48f201b39a1420f07c2b455f1c65304f45759b",
+    "only_delta": [
+      "lampOS/docs/install.md"
+    ],
+    "owned37_exact": true,
+    "owned38_total": 38,
+    "qualified_fb_native_sha256": "c107636cf5882c9846aba1d817fa6204d9c4fe87cc6c866678607397abf654e9",
+    "range7_equal": true,
+    "raw7_exact": true,
+    "saved185_ledger_sha256": "4b796f676fb85b35aab6ec42127123056185a2830c0e4b3297d337fb61c41c17",
+    "source_guard_equal": 7554,
+    "source_guard_total": 7555,
+    "status": "SOURCE_ONLY_CURRENT_C1FA_PROPOSAL",
+    "switches": {
+      "ownrows": [
+        "| `LAMP_OWN_KEYS` (`lamp-setup`, `lamp-cloud`, `lamp-voice`) | `on`; the product's three units set it on (#2846), effective immediately when installed, with no runtime acceptance gate (the code's default is off: a unit without it reads no person's key); the voice's unit also loads the keys' folder (`LoadCredential=own:/etc/lampOS/voice/own`, made by `ConfigurationDirectory=`); in `lamp-cloud` also with `LAMP_CLOUD` and `LAMP_SETTINGS_CHANGE`, which the product already sets on, so enabling own keys also opens the app's `keys.*` calls; the keys helper's units are in `install`'s list, the socket enabled. A person's own DeepSeek endpoint and key and Deepgram key, at setup or from the app, each checked once before it is kept in root's folder; the second route's chat and speech use them, else the relay, and a key later refused goes back to the relay with `lamp-health`'s `voice-keys` warning. Off on all three units: setup keeps nothing, the app's kinds are \"not on this lamp\", and the voice reads no person's key. A retained voice-only off override leaves setup and app key storage on, while the voice ignores those keys (own-keys.md) | \u2014 | on in the product units (#2846; pinned by install.rs) | #2167 (#2094) | Historical drop-in trial on 22 Oct (#2845, #2861): setup keys worked and file modes/journal checks were recorded. That is not current-head acceptance. Owed: fresh install with no key keeps the relay; app set/remove/get with current settings on; keys remain in use after a full update; broker/account/TLS acceptance (#2094) | Merge prerequisite: explicit acceptance on the activation PR for #2094 and a fresh current-base lamp check; the PR stays HOLD until then, not the installed units | A person's keys send conversations to their chosen provider; settings is already on, so this change also opens the app calls. Installer tests alone do not qualify that activation | on |"
+      ],
+      "sha256": "2d65fc7cb82db72efee158876281e21f912d808eff0ad3f043e0dd700c01e461",
+      "whole_blob_equal": true
+    },
+    "target_reads": false,
+    "unchanged_mtimes_preserved_naturally": true,
+    "unit": {
+      "ownkeys_on": true,
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "sha256": "5cf1a7bd3e54a4142c8fc3a72800ab986424126cde1c910f0eed880a4d5d25e1",
+      "unitEnvironment": [
+        "LAMP_THREAD_FILE=/run/lampos-voice/thread.json",
+        "LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json",
+        "LAMP_ONBOARDING=on",
+        "LAMP_BUS=on",
+        "LAMP_PRIVACY_CONTROLS=on",
+        "LAMP_BUS_ROOT=/run/lampos-bus",
+        "LAMP_BUS_AUDIO=on",
+        "LAMP_ATTENTION=busy-near",
+        "LAMP_AIR_FACTS=on",
+        "LAMP_RING_EYE=strong",
+        "LAMP_SHORT_SOUNDS=quiet-room-checked",
+        "LAMP_TURN_END_PRIORITY=10",
+        "LAMP_TURN_END_NO_SPIN=on",
+        "LAMP_FIRST_OUTPUT=/var/lib/lampOS/voice/first-output",
+        "LAMP_VOICE_ROUTE=second",
+        "LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json",
+        "LAMP_SECOND_CHAT=deepseek",
+        "LAMP_SECOND_SEARCH=deepseek",
+        "LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo",
+        "LAMP_OWN_KEYS=on",
+        "LAMP_SECOND_DOWN_LINE=on",
+        "LAMP_SECOND_WAIT_CUE=on",
+        "LAMP_SECOND_LOOK=on",
+        "LAMP_SECOND_SCOPED_CONTEXT=on",
+        "LAMP_SECOND_STEADY_FIRST=on",
+        "LAMP_SECOND_CHAT_WARM=on",
+        "LAMP_SECOND_SPEECH_WARM=on",
+        "LAMP_SECOND_STT_WARM=on",
+        "LAMP_SECOND_PLAYOUT_START_MS=100",
+        "LAMP_SECOND_NAME_CARRIES=on",
+        "LAMP_CALL_TAKES_NEXT_LINE=on",
+        "LAMP_FIRST_SECONDS_QUIET=on",
+        "LAMP_SECOND_OPEN_NAME=on",
+        "LAMP_NAME_NEAR=on",
+        "LAMP_NAME_SECOND_SIGN=on",
+        "LAMP_NAME_STAYS_IN_ITS_LINE=on",
+        "LAMP_ENDPOINT_LEAST_SPEECH_MS=500",
+        "LAMP_ENDPOINT_SHORT_VERDICT=on",
+        "LAMP_ENDPOINT_UNFINISHED_BELOW=0.5",
+        "LAMP_ENDPOINT_UNSURE_MS=1200",
+        "LAMP_SECOND_UNFINISHED_WAIT=on",
+        "LAMP_JOIN_CUT_WORDS=on",
+        "LAMP_REPLY_END_REACH=on",
+        "LAMP_SECOND_OWN_ECHO=on",
+        "LAMP_CUT_IN_TOLD=on",
+        "LAMP_SECOND_SAID_ONCE=on",
+        "LAMP_NOT_FOR_ME_WORDS=on",
+        "LAMP_BUSY_ENDS_SOONER=on",
+        "LAMP_SECOND_WEATHER=on",
+        "LAMP_RELAY_ROUTES=on",
+        "LAMP_SECOND_CHAT_KEPT=on",
+        "LAMP_VOICE_LINK=on",
+        "LAMP_CAMERA_FOLLOWS_EYES=on",
+        "LAMP_SECOND_SPEAKING_FACE=on",
+        "LAMP_EYES_SPEAKING=on",
+        "LAMP_NAME_NOTE=on",
+        "LAMP_NAME_NOTE_BUSY=face",
+        "LAMP_EXPRESSION_OUT=on",
+        "LAMP_FAINT_HOLD_MS=400",
+        "LAMP_TOOLS=on",
+        "LAMP_CLOCK=on",
+        "LAMP_TIME_PLACES=on",
+        "LAMP_KERNEL_CLOCK=on",
+        "LAMP_SESSION_FACT=on",
+        "LAMP_TOOL_LEAD_IN=on",
+        "LAMP_WAIT_KEEPS_ANSWER=on",
+        "LAMP_STOP_TOLD=on",
+        "LAMP_ASKER_FIRST=record",
+        "LAMP_NAMES=checked",
+        "LAMP_STAFF_NOTE=on",
+        "LAMP_TASK_NEWS_AT_PAUSE=on",
+        "LAMP_MEMORY_RULES=on",
+        "LAMP_LIGHT_REQUESTS=on",
+        "LAMP_QUIET_PACE=on",
+        "LAMP_PROVIDER_PATIENCE=on",
+        "LAMP_START_OFFLINE=on",
+        "LAMP_OFFLINE_VOICE=on",
+        "LAMP_RING_ASLEEP=on",
+        "LAMP_HEAD_TOUCH=on",
+        "LAMP_RESTORED_MUTE=on",
+        "LAMP_OTHER_LANGUAGE=sorry",
+        "LAMP_NAME_IN_PASSING=ignored",
+        "LAMP_SPOKEN_TO=on",
+        "LAMP_FIRST_WORDS=kept",
+        "LAMP_SOFT_START=on",
+        "LAMP_TASKS_ASKED=on",
+        "LAMP_TASKS_WHO=on",
+        "LAMP_TASKS_NAMED_ONLY=on",
+        "LAMP_CUT_KEEPS_NAME=on",
+        "LAMP_SELFTEST_SPEAKER=on",
+        "LAMP_STALLS=on",
+        "LAMP_ROOM_FACTS=on",
+        "LAMP_SAY=on",
+        "LAMP_SAY_GROUP=lampos",
+        "LAMP_ACTIONS_DIR=/run/lampos-actions",
+        "LAMP_SKILLS_DIR=/run/lampos-skills",
+        "LAMP_TASKS_DIR=/run/lampos-tasks",
+        "LAMP_TASKS_NEEDS=/usr/local/bin/harness",
+        "LAMP_TASK_NEWS=skill",
+        "LAMP_SCHEDULE_TOOLS=on",
+        "LAMP_SCHEDULE_SPEAK=skill",
+        "LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock",
+        "LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery",
+        "LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
+        "LAMP_MEMORY_DAYS=on",
+        "LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
+        "LAMP_MEMORY_KEEP_ASKED=on",
+        "LAMP_SCHEDULE_ASKED=on",
+        "LAMP_PERSON_SCOPE_SEEN=on",
+        "LAMP_MEMORY_OBSERVE=on",
+        "LAMP_MEMORY_EVENTS=on",
+        "LAMP_MEMORY_THREADS=on",
+        "LAMP_MEMORY_FORGET_ALL=on",
+        "LAMP_MEMORY_JOURNAL_RESUMES=on",
+        "LAMP_MEMORY_ROOM_NOT_ASKER=on",
+        "LAMP_MEMORY_FORGET_ASKS=on",
+        "LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock",
+        "LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock",
+        "LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present",
+        "LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock",
+        "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+        "LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg",
+        "LAMP_LOOK_FULL=on",
+        "LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg"
+      ],
+      "whole_blob_equal": true
+    },
+    "worktree": "[workspace]/.claude/worktrees/third-ownkeys-a17-prep"
+  },
+  "terminal": {
+    "all_gate_children_common_run_reaped": true,
+    "compiler_stages_completed": 4,
+    "elapsed_seconds": 266.9261898499972,
+    "error": null,
+    "identity": {
+      "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+      "head": "db59beb36e7907827b4a4e7406e34e4eaed5f37a",
+      "tree": "7bcfd7381c445c7cc0bbf944f68b7233d650f309"
+    },
+    "ok": true,
+    "phase": "complete",
+    "runtime_groups_completed": 2,
+    "source_raw_helper_saved185_final_guard": true
+  }
+}

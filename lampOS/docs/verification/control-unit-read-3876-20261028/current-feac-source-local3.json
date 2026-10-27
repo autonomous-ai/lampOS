@@ -1,0 +1,585 @@
+{
+  "actual_current_emission": {
+    "executable": "T/debug/deps/install-56b9137cd677b603",
+    "features": [],
+    "filenames": [
+      "T/debug/deps/install-56b9137cd677b603"
+    ],
+    "fresh": false,
+    "manifest_path": "W/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://W/lampOS/crates/update#lamp-update@0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "install",
+      "src_path": "W/lampOS/crates/update/tests/install.rs",
+      "test": true
+    }
+  },
+  "disposition": "SCOPED_SOURCE_AND_LOCAL_READ_OK",
+  "evidence_sha256": {
+    "authored-nine-paths.patch": "845e43ff77f207ccb914f2b95a51465ee253436f0275e010a72b8d9d20946c15",
+    "focused-three-proposal.json": "b799981b04754dec979ed7270d8227f5906176161fff65b17bce5ad8d8e5ec1c",
+    "focused3-artifact.json": "06dac2e7e5d24f08da01d73347b6a1c72de3fa417f9b0ca6f75c7d56d8271bbe",
+    "focused3-compile.started.json": "20ba31e310352dee14cedd72706b094cd1f79d963ce9c7a72b11dad07d1392ce",
+    "focused3-compile.stderr": "3e2b53664c5f563171d1b3ada9a52eab24da16c6cfeccad654ca179105069034",
+    "focused3-compile.stdout": "c059efe289cd4f19ebd6f56ceaacd781eb7b3306bd7653b09800343eb7f15101",
+    "focused3-compile.terminal.json": "b7e27fa6708ea1e8e7770c8619ae5c4e9f293b6d9b2af48b82ff8a9fa250bd47",
+    "focused3-discovery.started.json": "4a9778da90d5d7a7674ce2f66604eebb0f7f77f458ef04183a6a5d0cef19ebe6",
+    "focused3-discovery.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused3-discovery.stdout": "e93bfbdfd67c855416787ec6e11690259944e4b54e4130921dedd3a958380005",
+    "focused3-discovery.terminal.json": "d0a2ec141ac2be2c462323d9981403b857974b86e4421abb8ce9cb612583b66c",
+    "focused3-runtime-1.started.json": "74d7b419fa6fc843e67f292f52cbc1adff1553672941e031ac2a700c8c381ba9",
+    "focused3-runtime-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused3-runtime-1.stdout": "d180c5699d1aaa65d98687d64607c66479aeb127d5a4f499f9754029339c42fd",
+    "focused3-runtime-1.terminal.json": "3da6c1a8f45b77c290c0a6bbe32fb8bf96d935dc27146a183580d8bf31638153",
+    "focused3-runtime-2.started.json": "df5d599ca816b69491b9429ecdef64ec0f1f88a219a224f1946b2029457db913",
+    "focused3-runtime-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused3-runtime-2.stdout": "af08d54c5b040165a85c694659ad0440781e7987b95b691c540347db3ed5296f",
+    "focused3-runtime-2.terminal.json": "d25b46e532068c30b4de9590b782ce0d4898c8ad1b580b141311070f645aae46",
+    "focused3-runtime-3.started.json": "bba32bf0fc21b953413dcee95070f2191a216a7f3bfd2489f25389354ec4d267",
+    "focused3-runtime-3.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused3-runtime-3.stdout": "17ce373520f76b114f2610880b2f9f904dfdb6e1c822c876d8b29022546a4616",
+    "focused3-runtime-3.terminal.json": "b7e85f796a1a4ee901be9f0f3458d83b1bc5f606a3d53deb1307cc9542ed0edd",
+    "gate-index-after.bin": "a088d18ed820e9800238d8d1616e48a8a7e81d2c37b6ec00dca954cbe3e77ed6",
+    "gate-index-before.bin": "a088d18ed820e9800238d8d1616e48a8a7e81d2c37b6ec00dca954cbe3e77ed6",
+    "gate-source-after.json": "cb723917bc63df3ea1ab0b5fcdc43e9c173c5a62c5293a3d5d66300f62d8332f",
+    "gate-source-before.json": "cb723917bc63df3ea1ab0b5fcdc43e9c173c5a62c5293a3d5d66300f62d8332f",
+    "original-arm-job-metadata.json": "ec26b161b6da1ae094ff98caf3efc3503e4e012864bbac80f001b3acb9d413af",
+    "original-arm-job.log": "883a24f1d37f6160de90b010dd63b682dec44a6a879b9de51534d0927862a613",
+    "original-arm-metadata.json": "760f5f8a9ccd52b5462a10a0246cb7b849352fcc075b4946c0b8129b928480d8",
+    "original-linux-job.log": "37f17a7da69bcc6ecb9a844477d45da2196275a87fe2616afdb42b68b72a45e4",
+    "original-linux-metadata.json": "7abaa15869d1d12aa3056c1248c38be911aa320498fb303d214534e10e632a03",
+    "original-preview-commit.json": "3b1100a8ba90d1cc7dd18eb2ba64641d38a1f2f23d1d94dccc91e87339d2a1a2",
+    "pr-source-first.json": "008d63c5d7b0606611a6c87a3292e37ad810b8c668a154270344cd7948c6e5ef",
+    "prior-saved188.json": "33114ff3e44140e61be3ede1e55d65886e48e8b380225c7c32fd2d190293acf5",
+    "qualified-focused-three.json": "a9f8754d8ac2ec51d5a4ec56bc25470ff8a25465215372087391c46026d90699",
+    "root-gate-approval.json": "fa4695faa0c1e84663a5160df2df045c40afbde8bc6db8a52046358a2be40c16",
+    "run-focused-three.py": "5a4481d9f46114abfcffc55fe4b7fc4dbdc5ffa6f2065b8b4cac3f8262615c7a",
+    "saved188-after.json": "fc6147a428c75888fa0f465c92c1acd99b1a63850bff9a3ab4a7f5a20515dd0b",
+    "saved188-before.json": "fc6147a428c75888fa0f465c92c1acd99b1a63850bff9a3ab4a7f5a20515dd0b",
+    "selected-three-source.json": "61c72bc085301ab4e7190e8e0c4fcf444325c879e9b94046cc10b57ec9690d12",
+    "source-bindings.json": "eae097409bd90a2d108304992f236c3bb3d31e57850f2e251fc63eed5c3dd539",
+    "source-review-and-proposal.json": "cedcf5ed8e8d0d27644a833a52844720346fdf8d0ff1f0b5cf3dc0700e9d4de8"
+  },
+  "exact_env_overrides": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "T",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_TEST_THREADS": "1"
+  },
+  "head": "feac15c01064471773b1fc4311c6f0ecf443d15a",
+  "historical_failures": "Original authorUpdate writer_refresh failed cohort remains failed; isolated passes do not establish load cause or waive it. No semantic inspection there.",
+  "host_platform": {
+    "machine": "x86_64",
+    "release": "25.6.0",
+    "system": "Darwin",
+    "tools": {
+      "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+      "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+    }
+  },
+  "latest_base_limit": "AuthoredAF and exact originalAF/feac preview are distinct from API targeta808 and futuretrain. Source-safe review is not owner latest-parent/current-train eligibility waiver.",
+  "native_handle": {
+    "all_five_groups_absent": true,
+    "bank_explicitly_released": true,
+    "session_id": 97926,
+    "terminal_exit": 0
+  },
+  "native_original_separate": {
+    "ARM": {
+      "attempt": 1,
+      "job": 122433319502,
+      "run": 40573408110,
+      "status": "success"
+    },
+    "Linux": {
+      "attempt": 1,
+      "job": 122433323211,
+      "run": 40573408562,
+      "status": "success"
+    },
+    "logged_checkout": "398c5ed9e31e6cf42b19d7716184fe50720b30d8",
+    "ordered_parents": [
+      "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+      "feac15c01064471773b1fc4311c6f0ecf443d15a"
+    ],
+    "owned9_bindings": {
+      "lampOS/crates/cloud/src/reports.rs": {
+        "authored": "100644 blob ab0d7971035f950fab5020eeb9404605789d67d9\tlampOS/crates/cloud/src/reports.rs",
+        "equal": true,
+        "preview": "100644 blob ab0d7971035f950fab5020eeb9404605789d67d9\tlampOS/crates/cloud/src/reports.rs"
+      },
+      "lampOS/crates/setup/fixtures/reset-plan-example.json": {
+        "authored": "100644 blob ef5b6cc151531462b4345375ae06cef080f63a2a\tlampOS/crates/setup/fixtures/reset-plan-example.json",
+        "equal": true,
+        "preview": "100644 blob ef5b6cc151531462b4345375ae06cef080f63a2a\tlampOS/crates/setup/fixtures/reset-plan-example.json"
+      },
+      "lampOS/crates/setup/fixtures/reset-plan-product.json": {
+        "authored": "100644 blob a37ace47d97ffe1c0bab3208c7100cd2e21e18d3\tlampOS/crates/setup/fixtures/reset-plan-product.json",
+        "equal": true,
+        "preview": "100644 blob a37ace47d97ffe1c0bab3208c7100cd2e21e18d3\tlampOS/crates/setup/fixtures/reset-plan-product.json"
+      },
+      "lampOS/crates/update/src/install.rs": {
+        "authored": "100644 blob 7ec5f421abd948b719e1c5c9e817958cc24e1ccc\tlampOS/crates/update/src/install.rs",
+        "equal": true,
+        "preview": "100644 blob 7ec5f421abd948b719e1c5c9e817958cc24e1ccc\tlampOS/crates/update/src/install.rs"
+      },
+      "lampOS/crates/update/tests/install.rs": {
+        "authored": "100644 blob c45d01f65775c2b92d1610a00a53fc28cc7f9488\tlampOS/crates/update/tests/install.rs",
+        "equal": true,
+        "preview": "100644 blob c45d01f65775c2b92d1610a00a53fc28cc7f9488\tlampOS/crates/update/tests/install.rs"
+      },
+      "lampOS/crates/voice-eval/src/export.rs": {
+        "authored": "100644 blob 3d569fdc86afa976bd6d1316305516557cc84401\tlampOS/crates/voice-eval/src/export.rs",
+        "equal": true,
+        "preview": "100644 blob 3d569fdc86afa976bd6d1316305516557cc84401\tlampOS/crates/voice-eval/src/export.rs"
+      },
+      "lampOS/deploy/product/lamp-control.service": {
+        "authored": "100644 blob 9cfa8fec2bc121fefefa1a3f460d62bef3298eda\tlampOS/deploy/product/lamp-control.service",
+        "equal": true,
+        "preview": "100644 blob 9cfa8fec2bc121fefefa1a3f460d62bef3298eda\tlampOS/deploy/product/lamp-control.service"
+      },
+      "lampOS/docs/install.md": {
+        "authored": "100644 blob a1568df2a355255796a0222562b39e1a4ef68423\tlampOS/docs/install.md",
+        "equal": true,
+        "preview": "100644 blob a1568df2a355255796a0222562b39e1a4ef68423\tlampOS/docs/install.md"
+      },
+      "lampOS/docs/switches.md": {
+        "authored": "100644 blob 01e38ce2182c39febaf8b25e1fe503dfd87463fe\tlampOS/docs/switches.md",
+        "equal": true,
+        "preview": "100644 blob 01e38ce2182c39febaf8b25e1fe503dfd87463fe\tlampOS/docs/switches.md"
+      }
+    },
+    "scope": "Original completed text/source binding and only3 required primaryrows. No full11794/native census,unrelated failure-cause,artifact execution,publication or signature claim.",
+    "selected_native_observations": [
+      {
+        "name": "every_units_state_folder_is_wiped_by_a_reset_or_kept_on_purpose",
+        "occurrences": 1,
+        "raw_row": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-27T20:08:43.6703301Z         PASS [   0.004s] ( 6661/11794) lamp-update::install every_units_state_folder_is_wiped_by_a_reset_or_kept_on_purpose",
+        "status": "PASS"
+      },
+      {
+        "name": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+        "occurrences": 1,
+        "raw_row": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-27T20:08:43.6622838Z         PASS [   0.004s] ( 6659/11794) lamp-update::install every_part_of_the_lamp_waits_for_setups_marker_itself",
+        "status": "PASS"
+      },
+      {
+        "name": "the_plans_install_shipped_are_listed",
+        "occurrences": 1,
+        "raw_row": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-27T20:08:45.7621622Z         PASS [   0.004s] ( 6712/11794) lamp-update::install the_plans_install_shipped_are_listed",
+        "status": "PASS"
+      }
+    ],
+    "tree": "41c72f8b86c6d3b9f2551831633fecf82c791ec4",
+    "whole_tree_equals_authored": true
+  },
+  "no_public_comments_code_edits_commits_push_or_CI_actions": true,
+  "parent": "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+  "planning_note": "The source/proposal and raw qualified receipt retain a preapproval no-Cargo-now planning sentence. That sentence is superseded solely by Root approval and the recorded one compile/discovery/three local invocations here; no historical packet was rewritten.",
+  "qualification_scope": [
+    "Current feac authored source on AF, three unique exact installer controls, one fresh current driver, no child.",
+    "OriginalARM/Linux checkout/tree source binding and3 originalnative requiredPASSonce are separate from Mac3; no fullnative census supplied.",
+    "All7471 tracked source entries,index/modes/tools/helpers/current+retained driver and188 prior saved copies unchanged; five numericgroups absent, no cleanup/timeout/retry.",
+    "No Control off-child/socket/listener, actual reset/systemd, physical latency, port, package-wide/full109 runtime, fmt/Clippy, futureMain or activation claim."
+  ],
+  "retained_current_artifact": {
+    "path": "retained-current-install-driver",
+    "sha256": "997019b9f398222d365605128ab273a3730c75060d6c697ace68ded604d53819",
+    "stat": {
+      "ctime_ns": 1793137393328706088,
+      "device": 16777222,
+      "inode": 329177305,
+      "links": 1,
+      "mode": 493,
+      "mtime_ns": 1793137392672814000,
+      "sha256": "997019b9f398222d365605128ab273a3730c75060d6c697ace68ded604d53819",
+      "size": 14568172
+    }
+  },
+  "runtime": {
+    "all_source_index_mode_tools_helpers_current_saved_and188_guards_unchanged": true,
+    "artifact": {
+      "emitted_path": "T/debug/deps/install-56b9137cd677b603",
+      "features": [],
+      "fresh": false,
+      "profile_test": true,
+      "retained_copy": "retained-current-install-driver",
+      "sha256": "997019b9f398222d365605128ab273a3730c75060d6c697ace68ded604d53819"
+    },
+    "bank_released": true,
+    "child_scope": "All3 selected bodies are source/config inventory calculations over embedded strings, JSON parse and SHA256. section helper is string parsing. No child/self-exec, filesystem mutation, listener, network, systemctl or reset execution; other process-using tests in same driver are not selected.",
+    "counts": {
+      "FAIL": 0,
+      "PASS": 3,
+      "ignored": 0,
+      "retries": 0,
+      "selected": 3,
+      "unrun": 0
+    },
+    "head": "feac15c01064471773b1fc4311c6f0ecf443d15a",
+    "helper_sha256": {
+      "focused-three-proposal.json": "b799981b04754dec979ed7270d8227f5906176161fff65b17bce5ad8d8e5ec1c",
+      "prior-saved188.json": "33114ff3e44140e61be3ede1e55d65886e48e8b380225c7c32fd2d190293acf5",
+      "root-gate-approval.json": "fa4695faa0c1e84663a5160df2df045c40afbde8bc6db8a52046358a2be40c16",
+      "run-focused-three.py": "5a4481d9f46114abfcffc55fe4b7fc4dbdc5ffa6f2065b8b4cac3f8262615c7a",
+      "source-review-and-proposal.json": "cedcf5ed8e8d0d27644a833a52844720346fdf8d0ff1f0b5cf3dc0700e9d4de8"
+    },
+    "index_bookend_sha256": {
+      "after": "a088d18ed820e9800238d8d1616e48a8a7e81d2c37b6ec00dca954cbe3e77ed6",
+      "before": "a088d18ed820e9800238d8d1616e48a8a7e81d2c37b6ec00dca954cbe3e77ed6"
+    },
+    "limits": [
+      "No full109 installer, Update library, Voice/Eval/Cloud package runtime or fmt/Clippy repetition.",
+      "No normal Control child/off-listener execution, live systemd, reset wipe, device or port probe."
+    ],
+    "parent": "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+    "prior_saved_bookend_sha256": {
+      "after": "fc6147a428c75888fa0f465c92c1acd99b1a63850bff9a3ab4a7f5a20515dd0b",
+      "before": "fc6147a428c75888fa0f465c92c1acd99b1a63850bff9a3ab4a7f5a20515dd0b"
+    },
+    "prior_saved_count": 188,
+    "source_bookend_sha256": {
+      "after": "cb723917bc63df3ea1ab0b5fcdc43e9c173c5a62c5293a3d5d66300f62d8332f",
+      "before": "cb723917bc63df3ea1ab0b5fcdc43e9c173c5a62c5293a3d5d66300f62d8332f"
+    },
+    "source_guard_count": 7471,
+    "stages": [
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--test",
+          "install",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "bound_seconds": 1200,
+        "cleanup": [],
+        "elapsed_seconds": 93.3084,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 68719,
+        "pid": 68719,
+        "stage": "focused3-compile",
+        "stderr_sha256": "3e2b53664c5f563171d1b3ada9a52eab24da16c6cfeccad654ca179105069034",
+        "stdout_sha256": "c059efe289cd4f19ebd6f56ceaacd781eb7b3306bd7653b09800343eb7f15101",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/install-56b9137cd677b603",
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "bound_seconds": 60,
+        "cleanup": [],
+        "elapsed_seconds": 0.83,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 70282,
+        "pid": 70282,
+        "stage": "focused3-discovery",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e93bfbdfd67c855416787ec6e11690259944e4b54e4130921dedd3a958380005",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/install-56b9137cd677b603",
+          "every_units_state_folder_is_wiped_by_a_reset_or_kept_on_purpose",
+          "--exact",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "bound_seconds": 30,
+        "cleanup": [],
+        "elapsed_seconds": 0.0264,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 70287,
+        "pid": 70287,
+        "stage": "focused3-runtime-1",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "d180c5699d1aaa65d98687d64607c66479aeb127d5a4f499f9754029339c42fd",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/install-56b9137cd677b603",
+          "every_part_of_the_lamp_waits_for_setups_marker_itself",
+          "--exact",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "bound_seconds": 30,
+        "cleanup": [],
+        "elapsed_seconds": 0.0259,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 70288,
+        "pid": 70288,
+        "stage": "focused3-runtime-2",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "af08d54c5b040165a85c694659ad0440781e7987b95b691c540347db3ed5296f",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/install-56b9137cd677b603",
+          "the_plans_install_shipped_are_listed",
+          "--exact",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "bound_seconds": 30,
+        "cleanup": [],
+        "elapsed_seconds": 0.0253,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 70289,
+        "pid": 70289,
+        "stage": "focused3-runtime-3",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "17ce373520f76b114f2610880b2f9f904dfdb6e1c822c876d8b29022546a4616",
+        "timed_out": false
+      }
+    ],
+    "status": "PASS",
+    "terminals": [
+      [
+        "every_units_state_folder_is_wiped_by_a_reset_or_kept_on_purpose",
+        "ok"
+      ],
+      [
+        "every_part_of_the_lamp_waits_for_setups_marker_itself",
+        "ok"
+      ],
+      [
+        "the_plans_install_shipped_are_listed",
+        "ok"
+      ]
+    ],
+    "tool_sha256": {
+      "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+      "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+    },
+    "tree": "41c72f8b86c6d3b9f2551831633fecf82c791ec4"
+  },
+  "selected_source": [
+    {
+      "child": false,
+      "filesystem_or_network_effects": false,
+      "line": 4594,
+      "name": "every_units_state_folder_is_wiped_by_a_reset_or_kept_on_purpose",
+      "path": "lampOS/crates/update/tests/install.rs",
+      "sha256": "8cb3b7626cc3d7a271dcac17c9d32ec12cb80852d4b7f1517a0fd5b0fb88f7fb"
+    },
+    {
+      "child": false,
+      "filesystem_or_network_effects": false,
+      "line": 1025,
+      "name": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "path": "lampOS/crates/update/tests/install.rs",
+      "sha256": "1af7c453e84e8cc0c817b5030b6c9a234694e575f7ef6ebfce2de41757dd0311"
+    },
+    {
+      "child": false,
+      "filesystem_or_network_effects": false,
+      "line": 4565,
+      "name": "the_plans_install_shipped_are_listed",
+      "path": "lampOS/crates/update/tests/install.rs",
+      "sha256": "0d73600b47a00c436d534591183539c6d46a87f3148065ca1875a7df5eccb492"
+    }
+  ],
+  "source_bindings": {
+    "lampOS/.cargo/config.toml": {
+      "bytes": 210,
+      "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+    },
+    "lampOS/Cargo.lock": {
+      "bytes": 122933,
+      "mode_blob": "100644 blob 654c56da19747b0a1c613a416f8a4a7e02ce8f64",
+      "sha256": "e4f567679e5b62bf5b1fe5c93b5ce923449b7912d72c2befd8651d0235b09b22"
+    },
+    "lampOS/Cargo.toml": {
+      "bytes": 1442,
+      "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+      "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "bytes": 148575,
+      "mode_blob": "100644 blob ab0d7971035f950fab5020eeb9404605789d67d9",
+      "sha256": "3b71721ea498b151539225faf8809f7316ef1c225e469a8830ddacb92b11f25c"
+    },
+    "lampOS/crates/control/src/main.rs": {
+      "bytes": 8021,
+      "mode_blob": "100644 blob 39f9592377f7c99d0d6c2e8a9d1f2d2aef6aa91f",
+      "sha256": "2d89c5ad83991796dff511af54943c0948bc9939c03cc48d689a3d790728050d"
+    },
+    "lampOS/crates/setup/fixtures/reset-plan-example.json": {
+      "bytes": 2118,
+      "mode_blob": "100644 blob ef5b6cc151531462b4345375ae06cef080f63a2a",
+      "sha256": "7881c86264ae47c0ebefc77f0aa7947043ad8316f8183e631b903271f6dcc5ba"
+    },
+    "lampOS/crates/setup/fixtures/reset-plan-product.json": {
+      "bytes": 2119,
+      "mode_blob": "100644 blob a37ace47d97ffe1c0bab3208c7100cd2e21e18d3",
+      "sha256": "0021544b0e2294d160b0ae4cc116b17a008760a4f308ab538bdb485b6e616422"
+    },
+    "lampOS/crates/setup/src/reset.rs": {
+      "bytes": 27537,
+      "mode_blob": "100644 blob 0ac8d89a24d8f1b5504c49bcb16b190aa1dc01c3",
+      "sha256": "512bd7387d61d61f960ebe8bd3857ab37f4ed9a1e74d88692ebc027e79881c83"
+    },
+    "lampOS/crates/update/Cargo.toml": {
+      "bytes": 2172,
+      "mode_blob": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4",
+      "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+    },
+    "lampOS/crates/update/src/install.rs": {
+      "bytes": 135038,
+      "mode_blob": "100644 blob 7ec5f421abd948b719e1c5c9e817958cc24e1ccc",
+      "sha256": "be96d27c2653299cbc87526881b4e58bf63fc4c722a0b839d4a3409f7a65d396"
+    },
+    "lampOS/crates/update/tests/install.rs": {
+      "bytes": 215035,
+      "mode_blob": "100644 blob c45d01f65775c2b92d1610a00a53fc28cc7f9488",
+      "sha256": "dc92b83a562dfb9c670c31075aabb9a3549278d8d6beadeff58b5139fc0807c2"
+    },
+    "lampOS/crates/voice-eval/src/export.rs": {
+      "bytes": 87801,
+      "mode_blob": "100644 blob 3d569fdc86afa976bd6d1316305516557cc84401",
+      "sha256": "17262641fdc70d930d6f6e151ae65e5341c6f889e149edb2d64081eb6d722d9a"
+    },
+    "lampOS/deploy/package-binaries.json": {
+      "bytes": 1384,
+      "mode_blob": "100644 blob 324a0bb3767ce09367b1274c35226042ebd4c070",
+      "sha256": "ec0fa61b1a11b15ec61d7f594ccefd88eb0a6f2ef41a20c0ae46331a3536cbc0"
+    },
+    "lampOS/deploy/product/lamp-control.service": {
+      "bytes": 2451,
+      "mode_blob": "100644 blob 9cfa8fec2bc121fefefa1a3f460d62bef3298eda",
+      "sha256": "e61e5b4b1894779ad66595ade829b0c10b5a5a5b6e7844baae411792188ac5d6"
+    },
+    "lampOS/docs/install.md": {
+      "bytes": 106835,
+      "mode_blob": "100644 blob a1568df2a355255796a0222562b39e1a4ef68423",
+      "sha256": "568c44a3bdbd96ffde0b0132a060956d465b571870c612afbdb736523344a043"
+    },
+    "lampOS/docs/switches.md": {
+      "bytes": 341083,
+      "mode_blob": "100644 blob 01e38ce2182c39febaf8b25e1fe503dfd87463fe",
+      "sha256": "8f594aa4a5856c7e22c86357fcdd1c67d4132b5305a2e0f44e117fee3ff4e017"
+    },
+    "lampOS/rust-toolchain.toml": {
+      "bytes": 86,
+      "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+      "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    }
+  },
+  "source_findings_P1_P2": [],
+  "source_review": [
+    {
+      "finding": "Product entry follows target/marker,lampos user/parts slice;defaultoff env and failure-only restart. State/runtime0700,strict FS/capability/address-family/device hardening. Systemd may make its empty managed directories even off; no claim that service installation has no filesystem effects.",
+      "lines": [
+        13,
+        15,
+        22,
+        27,
+        30,
+        33,
+        35,
+        36,
+        43,
+        58
+      ],
+      "path": "lampOS/deploy/product/lamp-control.service"
+    },
+    {
+      "finding": "serve checks exact on before state creation,hostname/certificate/client load,bus/listener creation. No grant/protocol authority changes in this PR. Reading off path only; no current child listener trial.",
+      "lines": [
+        54,
+        87,
+        101
+      ],
+      "path": "lampOS/crates/control/src/main.rs"
+    },
+    {
+      "finding": "Unit is embedded in PRODUCT and exit-report allowlist; reset fixture consumed directly,0021544b0e2294d160b0ae4cc116b17a008760a4f308ab538bdb485b6e616422 first in shipped27,all prior26 kept. Reset installer journals/persists its own setting before write and records exact new hash.",
+      "lines": [
+        129,
+        264,
+        594,
+        600,
+        2085
+      ],
+      "path": "lampOS/crates/update/src/install.rs"
+    },
+    {
+      "finding": "Both product/example plans wipe exactControl state path /var/lib/lampos-control,which matches unit and server defaults. No pairing keys retained for nextowner by this stockplan.",
+      "lines": [
+        27
+      ],
+      "path": "lampOS/crates/setup/fixtures/reset-plan-product.json"
+    },
+    {
+      "finding": "Existing bounded target-membership discovery includes new PartOf unit; stop/read inactive-or-failed and membership recheck precede wipe; stop failure reboots without wipe, resume completes it before target. Not a new device or runtime reset qualification.",
+      "lines": [
+        424,
+        441,
+        486,
+        638,
+        691
+      ],
+      "path": "lampOS/crates/setup/src/reset.rs"
+    },
+    {
+      "finding": "Control added to bounded product-service allowlist; no new report payload/secret fields. Installer EXIT_NOTE_UNITS mirrors it.",
+      "lines": [
+        104,
+        111
+      ],
+      "path": "lampOS/crates/cloud/src/reports.rs"
+    },
+    {
+      "finding": "Control tag added to existing sanitized left-out part census; own name counts instead of other. No producer/raw-log-content export semantics change.",
+      "lines": [
+        132,
+        139
+      ],
+      "path": "lampOS/crates/voice-eval/src/export.rs"
+    },
+    {
+      "finding": "Control user/state/runtime/port/socket row and installed-but-off switch reflect unit,with owner enable/app/pairing/physical acceptance still separate.",
+      "path": "lampOS/docs/install.md and lampOS/docs/switches.md"
+    }
+  ],
+  "tree": "41c72f8b86c6d3b9f2551831633fecf82c791ec4"
+}
