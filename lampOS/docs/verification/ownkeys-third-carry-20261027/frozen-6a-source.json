@@ -1,0 +1,921 @@
+{
+  "archive_bundle_sha256": "9e6ad671e4436ce3f07c05ef95693b9c5e0bd66d04ae150c343442ff3a3e162d",
+  "archive_proof_sha256": "d07ba71a811ea9b5d4b2dfb779538bdbfe3c04ae4b7afbd031b0fb4dd826e79c",
+  "archive_seal": {
+    "at": "2026-10-27T19:24:45.347798+00:00",
+    "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+    "head": "6a0e1a62f56c642d3e2ddc781073a477a5c0428f",
+    "old_source_guard_hashes_matched": 7554,
+    "physical_frozen_WT_unchanged": true,
+    "proof_preservation_sha256": "d07ba71a811ea9b5d4b2dfb779538bdbfe3c04ae4b7afbd031b0fb4dd826e79c",
+    "saved_artifacts_verified": 134,
+    "separate_reader_saved_verified": 3,
+    "source_bytes": 283297565,
+    "source_directories": 2014,
+    "source_directory_inventory_sha256": "c6ca7f61ebfe1a0f1214fc5f028c70eb50eff0b2d6a6be16d81935f5cc7aaa90",
+    "source_file_inventory_sha256": "efb7e21de3d4d9348eaf7884393802139efdedc0cd829e4417571b4b576f5c2c",
+    "source_files": 10934,
+    "status": "IMMUTABLE_6A_EPOCH_SEALED_BEFORE_NEW_WT_SOURCE_CARRY",
+    "target_binary_read_or_copy": false,
+    "tree": "fba0ef347344be83824d225d236e0a7b1d6cf7e6"
+  },
+  "compiler_seconds": 892.743520211021,
+  "function_boundaries": {
+    "new10_guard_names_current_discovered_and_once_PASS": true,
+    "one_changed_retained_quiet_bare_name_fixture_explicit": true,
+    "retained315_exact_bodies": true,
+    "test_replay_to_fix_source_comparisons": false
+  },
+  "historical_scope": "318 hostcase qualification on frozen6a/44 only;8Linux separate,currentnative unrun,no push. #3890/old539/brokerDRAFT holds unchanged. Latestf0source refresh pending Root review.",
+  "identity": {
+    "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+    "head": "6a0e1a62f56c642d3e2ddc781073a477a5c0428f",
+    "tree": "fba0ef347344be83824d225d236e0a7b1d6cf7e6"
+  },
+  "owned38": {
+    "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+    "exact_equal_4d": 37,
+    "head": "6a0e1a62f56c642d3e2ddc781073a477a5c0428f",
+    "integrated_paths": [
+      {
+        "exact_blob_equal": false,
+        "integration": "Exact clean three-way Main overlay; zero manual source/prose edit.",
+        "old": {
+          "blob": "a5081b299e487c24dbd143dafa3870bff44b8128",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/switches.md",
+        "prepared": {
+          "blob": "ae67abcc8352e4e6929198a80cd5d1148dc4d99b",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "prepared_sha256": "2d65fc7cb82db72efee158876281e21f912d808eff0ad3f043e0dd700c01e461"
+      }
+    ],
+    "owned": 38,
+    "rows": [
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "d7dbb6121d0b001e46e01681c47ac17391fe45db",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/crates/selftest/src/voice_route.rs",
+        "prepared": {
+          "blob": "d7dbb6121d0b001e46e01681c47ac17391fe45db",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "0746cad94d375fd6d6d788b68e92d671bdc781c6",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/crates/update/src/install.rs",
+        "prepared": {
+          "blob": "0746cad94d375fd6d6d788b68e92d671bdc781c6",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "ce1cee3234fe14c3cd5d80f66af94b0349a15ee7",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/crates/update/src/retired-own-keys-voice.conf",
+        "prepared": {
+          "blob": "ce1cee3234fe14c3cd5d80f66af94b0349a15ee7",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "4dfd76af3779dba44630681b7859dd89225d9a60",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/crates/update/tests/install.rs",
+        "prepared": {
+          "blob": "4dfd76af3779dba44630681b7859dd89225d9a60",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "40c2c89bc247ed46a03f2c22b999ed8e95a4fc52",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/crates/voice/src/second_config.rs",
+        "prepared": {
+          "blob": "40c2c89bc247ed46a03f2c22b999ed8e95a4fc52",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "17efe0bfa3cf91e128eb5ef441ffb111d34107e5",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/deploy/product/README.md",
+        "prepared": {
+          "blob": "17efe0bfa3cf91e128eb5ef441ffb111d34107e5",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "3a754428d4275a095d706286cc5ba22165731dea",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/deploy/product/lamp-cloud.service",
+        "prepared": {
+          "blob": "3a754428d4275a095d706286cc5ba22165731dea",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "6706f518997442593a66e86cd09a5b423a3b893a",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/deploy/product/lamp-setup-keys.socket",
+        "prepared": {
+          "blob": "6706f518997442593a66e86cd09a5b423a3b893a",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "d5ebabfb680eaac39917f5dd86372243b02e70d6",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/deploy/product/lamp-setup.service",
+        "prepared": {
+          "blob": "d5ebabfb680eaac39917f5dd86372243b02e70d6",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "32c3385a54e5f90cc6f11b2e76b001ea64838122",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/deploy/product/lamp-voice.service",
+        "prepared": {
+          "blob": "32c3385a54e5f90cc6f11b2e76b001ea64838122",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "734a4e560b896cdb913847d17ca672a8ee6d393d",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/cloud.md",
+        "prepared": {
+          "blob": "734a4e560b896cdb913847d17ca672a8ee6d393d",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "e01f56f602f0af1d96ce68acd9550ee163764ee6",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/install.md",
+        "prepared": {
+          "blob": "e01f56f602f0af1d96ce68acd9550ee163764ee6",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "b87bacb3d344a61f8a9d7783313d1ed89122daba",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/own-keys.md",
+        "prepared": {
+          "blob": "b87bacb3d344a61f8a9d7783313d1ed89122daba",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "16bcde45592599461dc7cba485de14048ef2c6e9",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/selftest.md",
+        "prepared": {
+          "blob": "16bcde45592599461dc7cba485de14048ef2c6e9",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "c2c4bc957459e2043ebda938f7f05fdaab221c71",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/setup.md",
+        "prepared": {
+          "blob": "c2c4bc957459e2043ebda938f7f05fdaab221c71",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": false,
+        "integration": "Exact clean three-way Main overlay; zero manual source/prose edit.",
+        "old": {
+          "blob": "a5081b299e487c24dbd143dafa3870bff44b8128",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/switches.md",
+        "prepared": {
+          "blob": "ae67abcc8352e4e6929198a80cd5d1148dc4d99b",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "prepared_sha256": "2d65fc7cb82db72efee158876281e21f912d808eff0ad3f043e0dd700c01e461"
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "4aef32d676f1c4d56c1ce7004c1ef0530112a60b",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/README.md",
+        "prepared": {
+          "blob": "4aef32d676f1c4d56c1ce7004c1ef0530112a60b",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "bc3f4d823d9f86e34944e37786d9dcd6a46539bd",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/SHA256SUMS",
+        "prepared": {
+          "blob": "bc3f4d823d9f86e34944e37786d9dcd6a46539bd",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "1d32358e15322d7dc3dd044c7db75da3d8e453fa",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/README.md",
+        "prepared": {
+          "blob": "1d32358e15322d7dc3dd044c7db75da3d8e453fa",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "dddf0ccb4a66655b14233ca89f7e4e6b98ab0e8b",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/SHA256SUMS",
+        "prepared": {
+          "blob": "dddf0ccb4a66655b14233ca89f7e4e6b98ab0e8b",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "4eec44475cf499ef30897845e75805eb5ddb170b",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/inputs.sha256",
+        "prepared": {
+          "blob": "4eec44475cf499ef30897845e75805eb5ddb170b",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "662060cdbf4516e197f37b525b1f066250c84c6e",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/range-diff.txt",
+        "prepared": {
+          "blob": "662060cdbf4516e197f37b525b1f066250c84c6e",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "8a14bba2b6871d75aafdb9acfdba2560239a36af",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/results.json",
+        "prepared": {
+          "blob": "8a14bba2b6871d75aafdb9acfdba2560239a36af",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "7fa44d571bcdcde5751495b2ad0e9fe3fa52bd0a",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/README.md",
+        "prepared": {
+          "blob": "7fa44d571bcdcde5751495b2ad0e9fe3fa52bd0a",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "f1cb91bf36514452a299a9099d2d8efacd56c648",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/SHA256SUMS",
+        "prepared": {
+          "blob": "f1cb91bf36514452a299a9099d2d8efacd56c648",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "0580d69e60553fbe95d541d74177d0400afb43cc",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/inputs.sha256",
+        "prepared": {
+          "blob": "0580d69e60553fbe95d541d74177d0400afb43cc",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "9f411acd34003dcb0d203fd62300467eb61265f1",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/range-diff.txt",
+        "prepared": {
+          "blob": "9f411acd34003dcb0d203fd62300467eb61265f1",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "23116f7dbfa5d0aa1806fc3c5b8e65aa7bad9e7b",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/results.json",
+        "prepared": {
+          "blob": "23116f7dbfa5d0aa1806fc3c5b8e65aa7bad9e7b",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "d475f1e0d78194684d2e19632b9166656b323bbd",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/README.md",
+        "prepared": {
+          "blob": "d475f1e0d78194684d2e19632b9166656b323bbd",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "5fbda765b06200e590401f74fe593562b296944b",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/SHA256SUMS",
+        "prepared": {
+          "blob": "5fbda765b06200e590401f74fe593562b296944b",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "1b420823f8cc4c2447a01ea69c6652ad25296140",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/inputs.sha256",
+        "prepared": {
+          "blob": "1b420823f8cc4c2447a01ea69c6652ad25296140",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "5055526b3c731b763ae0a6c02ee745108386eab9",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/range-diff.txt",
+        "prepared": {
+          "blob": "5055526b3c731b763ae0a6c02ee745108386eab9",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "c5b2a38c710ce74195f1c54693864b4adbacf114",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/results.json",
+        "prepared": {
+          "blob": "c5b2a38c710ce74195f1c54693864b4adbacf114",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "c058e0b698621c2df923c3866a4a30d7c65dfca6",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/inputs.sha256",
+        "prepared": {
+          "blob": "c058e0b698621c2df923c3866a4a30d7c65dfca6",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "055ba371c93a3d2dc614fe6212428d7eb315c207",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/results.json",
+        "prepared": {
+          "blob": "055ba371c93a3d2dc614fe6212428d7eb315c207",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "ae7a87cdaeb17232418c886794c918e43eb64916",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/README.md",
+        "prepared": {
+          "blob": "ae7a87cdaeb17232418c886794c918e43eb64916",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "c8737a31184da7637dfd35eb3d229255ee680108",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/SHA256SUMS",
+        "prepared": {
+          "blob": "c8737a31184da7637dfd35eb3d229255ee680108",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      },
+      {
+        "exact_blob_equal": true,
+        "old": {
+          "blob": "ade447267c3def3134d8f69335ae2a61b7c45402",
+          "kind": "blob",
+          "mode": "100644"
+        },
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/results.json",
+        "prepared": {
+          "blob": "ade447267c3def3134d8f69335ae2a61b7c45402",
+          "kind": "blob",
+          "mode": "100644"
+        }
+      }
+    ]
+  },
+  "raw7": {
+    "authored_semantic_update_performed": false,
+    "commits": [
+      {
+        "all_raw_author_message_payloads_equal": true,
+        "ordinal": 1,
+        "per_file_added_removed_line_sha256": {
+          "lampOS/crates/selftest/src/voice_route.rs": "192392ec72ad85c886c40803fdb6331ac8c8f156a726fa87427c6fccb9158a5b",
+          "lampOS/crates/update/src/install.rs": "884ad55f3f70ba3bf9ac9c8246c1ff0836ca0237ef98418797a08d4141bb9b18",
+          "lampOS/crates/update/tests/install.rs": "98fc6caa090bc6c8b7dcc14c3ef4717de1a80c89c3176841099bdff10db454f5",
+          "lampOS/crates/voice/src/second_config.rs": "e572e7f4330efd5ce8d1f7ef5e715395149c9e6904df4231b382f8597a2534a8",
+          "lampOS/deploy/product/README.md": "0bd4de1b1f358e3d6e002cd4a61a61174aa0fa5889a3022515e6c73941e33108",
+          "lampOS/deploy/product/lamp-cloud.service": "11ab65f5ab2bf3cc81031ab79b996371fffb78f8a7977bc3a958a40d9edbccdd",
+          "lampOS/deploy/product/lamp-setup-keys.socket": "45315984371e2d47505f62c1192be7acb5842d3d4204fff3d7d46666d9a75faf",
+          "lampOS/deploy/product/lamp-setup.service": "1988020e7c0def79823e945519379e8f02f33022dfe6fcd0eb2b6bbf9e04b1fc",
+          "lampOS/deploy/product/lamp-voice.service": "f7ff444a87dc56db22d21dc17eea6109e81ae175e0bb690c931a7d2f4f90b5ac",
+          "lampOS/deploy/product/own-keys-voice.conf": "19e94a8aaf8371022be34ce0ce4dc6bc6cee97a054c08b8c8459cb5660d3cee8",
+          "lampOS/docs/cloud.md": "94f52f54642f7ae5ea0151b8dc0020d987583a2f5a8d7e29bceb05e65133f729",
+          "lampOS/docs/install.md": "69d616e5a314a16c2b1a0cea8901203f347b29927f9e05c57eddd60eada82e4a",
+          "lampOS/docs/own-keys.md": "d711a6cc46c638f30f65024ca49405852a5045168b684f433b2fef8b4756e001",
+          "lampOS/docs/setup.md": "ed1e82e9d7f870f92d302343c64b26e7d9a39825a93f462a22c3023c9461f85b",
+          "lampOS/docs/switches.md": "0feffc87979d8ae39bca549bd9f0c3ad8bba3480af59866598eb0b8dbd407097"
+        },
+        "prepared": "3e8cb45a222f5a7fcda380d2685b0aaf2bb67669",
+        "previous": [
+          {
+            "commit": "a846ba98f0005a71ed053b7ddb766a6b24893398",
+            "epoch": "4d"
+          },
+          {
+            "commit": "b9dcfa369380082d6fa000da54d9850b3bb0cf3b",
+            "epoch": "f43"
+          },
+          {
+            "commit": "809dfe4a60c52dbede5e7f936f108fc38e38c4b5",
+            "epoch": "cd288"
+          },
+          {
+            "commit": "c86e0530b9a953b079ca9a73f5d5a4827ede23db",
+            "epoch": "430"
+          },
+          {
+            "commit": "1b089e68ad798f368846606233dac0069ea9414f",
+            "epoch": "01897"
+          }
+        ],
+        "raw_author_sha256": "b8a65b6a9b2026bc2d451bffe49a069ce4bf30a902a8375e0701f780059f8499",
+        "raw_message_sha256": "24664bc24af7b573ff5d7301304bfb1c5e72c4f2e61f1c2ecfc0579b4a361fce",
+        "raw_prepared_commit_sha256": "94f3ed8389117e5b07e9378a8b40956882921370cb58bba0831f4fb9158e0efe"
+      },
+      {
+        "all_raw_author_message_payloads_equal": true,
+        "ordinal": 2,
+        "per_file_added_removed_line_sha256": {
+          "lampOS/crates/update/src/install.rs": "b931a5cb5b8f4c39ed28174380069e52a71522995eca992032895af80d81b428",
+          "lampOS/crates/update/src/retired-own-keys-voice.conf": "d8cab05bc7300b26c98a8f091452c849a785a8d04e8e3225c120ad338ce71610",
+          "lampOS/crates/update/tests/install.rs": "91e6566279bfb0fefe2b87c3b9b6a67e354159d6c2fcf862274296501a9ce1c0",
+          "lampOS/deploy/product/README.md": "1871eb9c42284f38e59f5afb95281d2faa16e30e72a68010a260fd386aee7ae6",
+          "lampOS/docs/cloud.md": "a124686f8451e7c36cb81727d10e27cf371f7423d0f62be34d88b7a4213d595b",
+          "lampOS/docs/install.md": "9dd10370dd6f6fd1f72cf756d8d35edb5e60785ea1f51b27400de9ad7ea5c237",
+          "lampOS/docs/own-keys.md": "548d7ca76cc877d191b51a330d85dcb80ac557dec2d77e0f35f5b5ff082dbe80",
+          "lampOS/docs/selftest.md": "69ffde5f2b565ebbfb1922e5e489e0c568e693b9f2cc9c606786aa33cd40a1c3",
+          "lampOS/docs/setup.md": "a1fe9e671a781f6d038a6e9f7515fae4d17baef0472d11ab010851659123ea9a",
+          "lampOS/docs/switches.md": "cadca84717e5f199caaeb6cdbc618a130481923e773128b678bb07bfb22dd6cd"
+        },
+        "prepared": "47076d99ba233390d2df29546fc646f21df2f1de",
+        "previous": [
+          {
+            "commit": "d8ff813ae5d95e1bb2d1b4ac67f6dd756bd82c78",
+            "epoch": "4d"
+          },
+          {
+            "commit": "b7885c6a1ad757b8bf30cb5e7430b6dccda895bf",
+            "epoch": "f43"
+          },
+          {
+            "commit": "c098f4544ebc9a59e787919ae523da106fcdb670",
+            "epoch": "cd288"
+          },
+          {
+            "commit": "fb43cc1f0abbf1383ec909637b88ca1272c31068",
+            "epoch": "430"
+          },
+          {
+            "commit": "2ef8af22937f52303f1b5c1d382158726ac8f2b2",
+            "epoch": "01897"
+          }
+        ],
+        "raw_author_sha256": "3542e322f5455809de25b6e0c3e721cff26d8538f165c9e48d04a9af96a57ba2",
+        "raw_message_sha256": "2a97f7921801ab86d0abcd2a5c5cda922952c9c88385251ff8a6d54d5d7b817a",
+        "raw_prepared_commit_sha256": "43f0fe3cb94929900ff3a2e4255349284540f7f616826772d40d24d3ddd451a1"
+      },
+      {
+        "all_raw_author_message_payloads_equal": true,
+        "ordinal": 3,
+        "per_file_added_removed_line_sha256": {
+          "lampOS/docs/verification/own-keys-product-carry-20261026/README.md": "cf30236de788316ed3e82e234349e75f9ae337e82b1851584d5242016b0cbc63",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/SHA256SUMS": "cfcc5c2fad0cd88df5952766c79c2807ac732f8b75093772b72e57c2f6e66411",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/inputs.sha256": "6c5e80053ab29aa9d06450ded516b97b350d02140a95d3f96d02f66a9929f323",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/results.json": "68545fc8fb7a52c38e37d713a7c0b0c6f71b9c7375e7359a8a9a43ceac6ae28c"
+        },
+        "prepared": "4dc2b5f7ca72f1a9bff24575613123cbd491fbf7",
+        "previous": [
+          {
+            "commit": "f5177545f8ebe43a6943bb82b1b47c7707c50505",
+            "epoch": "4d"
+          },
+          {
+            "commit": "879e035414f912bf5d5e367092211d080f4de2e3",
+            "epoch": "f43"
+          },
+          {
+            "commit": "8b9025b9363210f7f705d7323dfcfe855cff6066",
+            "epoch": "cd288"
+          },
+          {
+            "commit": "0602cf633d6f359995dddd6737ee74b13df8bad7",
+            "epoch": "430"
+          },
+          {
+            "commit": "296b30eca1d75cce9345d371e1596ce658e332fc",
+            "epoch": "01897"
+          }
+        ],
+        "raw_author_sha256": "d829b1603833b38035839f2d9d0b0411e822df2d2b5af99fdff1480680977381",
+        "raw_message_sha256": "d0fb870995703460f82843e2b460e097714c550071ac995beef8cae3e2980732",
+        "raw_prepared_commit_sha256": "9b7d55017bf2eb7c7789f2e577cba2cf151dabe0f8aa2144ac2deb93cffa8f1f"
+      },
+      {
+        "all_raw_author_message_payloads_equal": true,
+        "ordinal": 4,
+        "per_file_added_removed_line_sha256": {
+          "lampOS/docs/own-keys.md": "56bbf810d662e2c949187bdf55ce8bfcc37203232a66d461134bcab3e4d8b0ea",
+          "lampOS/docs/switches.md": "41c55ecbe728277f6fe38029679daa76b804229f1cf1afe490c11872d4d70c2d",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/README.md": "04f7a4926cc4d1b26e04e58dbedd4d48409698a97ee91e5f5e129b70ef02603a",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/SHA256SUMS": "17e0ebdd2244214575a17c34f6ae836793aa9b6fb161745633700e2e87f52d2b",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/results.json": "e5cc19de76b7a2d11a88a367c4c55e85e3b674512ee81ca9f2d77ec28ccf1054"
+        },
+        "prepared": "165fc8174f86d83a31eb5bfa4be5e2d66d4f6522",
+        "previous": [
+          {
+            "commit": "8fe065beacd07581a4da5c72682bab9714e8df4a",
+            "epoch": "4d"
+          },
+          {
+            "commit": "9e605545d2d330b4c469589a303cac8050cfe605",
+            "epoch": "f43"
+          },
+          {
+            "commit": "525fe5d82e46b50c79a440ffca083b429c7f4615",
+            "epoch": "cd288"
+          },
+          {
+            "commit": "cf35422c5b216e8c663f95fa0a5c02dba01ee227",
+            "epoch": "430"
+          },
+          {
+            "commit": "d2123ff7a1cb28bb339b6fffb8fce5a41e1a080d",
+            "epoch": "01897"
+          }
+        ],
+        "raw_author_sha256": "d70fdb0a6d47d6a320707d88c6ad71623ff0f302c6c406c3905bb8b93cd369e0",
+        "raw_message_sha256": "535e137c11752bb9aa8c297aba361f84e02a50a58aaedbd8e71ed8d9cda6a433",
+        "raw_prepared_commit_sha256": "e976cc2681df44d5e35c009d8212d511a01d676ac6fb435df5204c5584314c59"
+      },
+      {
+        "all_raw_author_message_payloads_equal": true,
+        "ordinal": 5,
+        "per_file_added_removed_line_sha256": {
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/README.md": "6d136182e9869fc2c9baa45e11a8d558659a58c13f27f7de74d8994c46376cf2",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/SHA256SUMS": "2eea276e791b552fd64b3701414acbe94353042a7bdc644933d22d09f6e50dc9",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/inputs.sha256": "6bb4df03a4b841e172c958d1555bf4d804670b233d6701c649029e59463a9de3",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/range-diff.txt": "450507b71247853b8386f0f56e5be19512b79e0bbde7e9a544c0d390281d78ff",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/results.json": "037ffae0b645725b4e3c0945648461053e32d036c91db2aaa433d4d4d4ee5dc6"
+        },
+        "prepared": "798ab33f43fe9d4838fb3d84d5a7330730143249",
+        "previous": [
+          {
+            "commit": "7714ec4f597d8f4174e9a585b2fff7edc30e21c7",
+            "epoch": "4d"
+          },
+          {
+            "commit": "7762018fd303f7e061aeb1a8b634258f71716143",
+            "epoch": "f43"
+          },
+          {
+            "commit": "4aae5f4eee65270bb2b5696f2b05dc185aef2308",
+            "epoch": "cd288"
+          },
+          {
+            "commit": "9818c61b8d8c7924f5a47d0eda705510b49172bb",
+            "epoch": "430"
+          },
+          {
+            "commit": "764362f60d3ec0f0402174104b1a42e7eefe28c2",
+            "epoch": "01897"
+          }
+        ],
+        "raw_author_sha256": "4add4801949fc7c9620e06091bb9e5065c14471eb23f2d51f32775bf217b9d68",
+        "raw_message_sha256": "15a8c9f6d5ade10e78514bb0dac66ce96de0cf92ec8d7f06eba8687c10fbc4c2",
+        "raw_prepared_commit_sha256": "ffe6417bb357a6fc310320d1fcba473b4b2d2826704df0e28ea35525b7eccd94"
+      },
+      {
+        "all_raw_author_message_payloads_equal": true,
+        "ordinal": 6,
+        "per_file_added_removed_line_sha256": {
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/README.md": "ed577aff5d0035ac76852834e56d995fab0b02fd01f742e1554b0194e5045a75",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/SHA256SUMS": "61a1bba0bc0e48185a2b543d9eba86e265fac4445ff1b8e73348403c68a6cf2e",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/inputs.sha256": "029b77288bb4e0448fec5bab36fce117b8458b5751356ba1c963a2404d5651df",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/range-diff.txt": "17745650b2fecd4a3d9f3b2718afb2189143a535816a253b4f38dbbad92f04c1",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/results.json": "7a771dc726181c9295d1060ece21e801e87fa666d05d65399b174e162fb174f1"
+        },
+        "prepared": "b688b9b4f8310e128a29c7ff88c5bdd6d251502c",
+        "previous": [
+          {
+            "commit": "a1fd59b06f8d4a4ff32892300b6cddf533f53f4e",
+            "epoch": "4d"
+          },
+          {
+            "commit": "fd82df3e784308a203b1d104c7bdd6551b5330a3",
+            "epoch": "f43"
+          },
+          {
+            "commit": "7a479bc46e11ce81b04aeabf0a35bdc63a6dbd2b",
+            "epoch": "cd288"
+          },
+          {
+            "commit": "dbb4b7abf8321a99049cc6c356a537f0ca0461d5",
+            "epoch": "430"
+          },
+          {
+            "commit": "3da54bd82c276e71dc643b0fc188502ce2d3c2fd",
+            "epoch": "01897"
+          }
+        ],
+        "raw_author_sha256": "ec3a1952a92c907d96fb1a712337293623152d563001a489c3f94dc90cea9123",
+        "raw_message_sha256": "6102c09a203e797b56b14df56e54e842a4bfbc00ec4eef38ca7bd2d956bf9096",
+        "raw_prepared_commit_sha256": "f661f3a02264f080fc9edbf5c4e265c06e991c66129c75904cf8da411c4e63f0"
+      },
+      {
+        "all_raw_author_message_payloads_equal": true,
+        "ordinal": 7,
+        "per_file_added_removed_line_sha256": {
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/README.md": "50a5d4346eefa3ae4e48386cb77f0b7434024d962d5f06af5edd676f4be38764",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/SHA256SUMS": "d4d45bb353d05f635cc0a95b300b706f090bab05f76e1f474276f1574ab6ca9f",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/inputs.sha256": "5e7ebe1ef308ac07ba24cbcb5d4dabec3e8b7e1d46bc6b372cc73cb607493369",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/range-diff.txt": "e32c83de37774e0e1c138936369276cf4a25f4d839f5d741e6cd83c74a4af349",
+          "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/results.json": "fb1d517772a7b5319289c16b226005d9e7f58a6de5f34378167d21fb065554cc"
+        },
+        "prepared": "6a0e1a62f56c642d3e2ddc781073a477a5c0428f",
+        "previous": [
+          {
+            "commit": "4d786be864a2a7a83ed4d48de12a6de12c3c620e",
+            "epoch": "4d"
+          },
+          {
+            "commit": "f43b550430ac65be20c218681be3b8fc4fbda43e",
+            "epoch": "f43"
+          },
+          {
+            "commit": "cd288db20fa62838b1c8bbad1573620149b8061f",
+            "epoch": "cd288"
+          },
+          {
+            "commit": "430a76dca4c0c92fe6a1fab0185bdd927ffa3202",
+            "epoch": "430"
+          },
+          {
+            "commit": "01897b09143ebffc99fb2d108f8dc7b4150c2236",
+            "epoch": "01897"
+          }
+        ],
+        "raw_author_sha256": "4fa6727b24fcb3454ebe904225636d6f0910da2a890d2780c1d840dc3d31898f",
+        "raw_message_sha256": "e5dd8c254f26f8e16f30d2f6b677767edbe59ea63f713a9100d652b7c2af5dd3",
+        "raw_prepared_commit_sha256": "52090495483316eef84efccd71cbf52bd7f51e74b977a27ba274f3609951511d"
+      }
+    ],
+    "committer_parent_tree_admin_headers": "Rebase-specific; original complete raw preimages and original seven-commit bundle retained in ../prep-a17/old-4d/git-data.",
+    "identity": {
+      "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+      "head": "6a0e1a62f56c642d3e2ddc781073a477a5c0428f",
+      "tree": "fba0ef347344be83824d225d236e0a7b1d6cf7e6"
+    },
+    "manual_conflicts": [],
+    "original7_raw_authors_messages_and_payloads_preserved": true
+  },
+  "runtime_seconds": 380.33822123799473,
+  "source_assembly_corrections": {
+    "capture_setup_exit1": "Compared legacy opaque fixture_body_sha256 against current lexer braced-body hash; hashes differ and legacy recipe is not assumed/reproduced. Corrected via exact old4d/current raw function-byte equality with the same current lexer; legacy hash separately preserved opaque. No listing/copy/compiler/runtime rerun or Memory semantic review.",
+    "preserved_v1": "[workspace]/.claude/worktrees/third-ownkeys-carry-evidence/prep-44d1/selected-function-and-overlay-bindings.json",
+    "source_comparison_corrections": [
+      "role-based classifier excluded5oldcurrentcontrols from equality view; exactidentityset corrected",
+      "exit1 assuming316equal; actual315equal/1changed retainedbare-namefixture,10new explicit"
+    ],
+    "v1_sha256": "620d39acee1fea5e07c057671bbb0bc0f8905e69afdd23bd5e9c80c33d099e5a",
+    "v2_sha256": "55f9277d5bb8e60bec01f0b09a0a8e23dc64e51492815bd8d6fb117b6370c7e4"
+  },
+  "source_audit_sha256": "5147a97b6f679cf850bab410aa818b14eb0e9df258a44948a5c0c76584562128",
+  "source_function_correction": {
+    "prior_preserved": "selected-function-and-overlay-bindings.json",
+    "prior_sha256": "620d39acee1fea5e07c057671bbb0bc0f8905e69afdd23bd5e9c80c33d099e5a",
+    "scope": "Source-only helper classified five retained0d added guards by role instead of selector identity; fixed via exact316 identity set. Second assembly exit1 assumed316 identical bodies; current changed retained body must stay explicit. No compiler/discovery/runtime/source mutation."
+  },
+  "status": "FROZEN44_SOURCE_PROOF_HOST318_NOT_LATEST_BASE_PUSH",
+  "unit_switch": {
+    "LAMP_OWN_KEYS_on_preserved": true,
+    "OwnKeys_switch_row_sha256": "c203f2cbd3c1c3db32f124e41df4ae4ece206794ea9c66165b24691deb0b0b20",
+    "added_environment_names_from_Main_only": [],
+    "exact_OwnKeys_switch_row_equal": true,
+    "existing_value_changed_names": [],
+    "identity": {
+      "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+      "head": "6a0e1a62f56c642d3e2ddc781073a477a5c0428f",
+      "tree": "fba0ef347344be83824d225d236e0a7b1d6cf7e6"
+    },
+    "relevant_producer_switches": {
+      "LAMP_EYES_YAWN": "New source/documented reader, product unit not enabled by this carry; no Eyes runtime/physical acceptance.",
+      "LAMP_FIRST_SECONDS_QUIET": "Retained existing selected Heeding readers change; retained serial fixture does not waive3890 parallel report.",
+      "LAMP_MEMORY_JOURNAL_RESUMES": "Main-added unit environment row only; existing selected process/worker census and3 known Memory protocol fixtures retained. No new journal/Memory feature suite.",
+      "LAMP_TURNED_AWAY": "Main new default-off reader, module/parser/worker focused5 guards proposed."
+    },
+    "removed_names": [],
+    "scope": "Safe literal environment names and OwnKeys on value only; no keys/device/systemd or Memory semantic review.",
+    "unit": "lampOS/deploy/product/lamp-voice.service",
+    "whole_unit_current_equals_Main_plus_unchanged_authored_payload_proven_by_raw7_and3way": true
+  }
+}

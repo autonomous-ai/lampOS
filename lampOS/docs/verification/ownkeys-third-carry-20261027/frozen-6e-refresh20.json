@@ -1,0 +1,466 @@
+{
+  "qualification": {
+    "Linux_previous8_and_newmeasure1_not_executed": true,
+    "all_source_raw_helper_lock_depinfo_actual_saved_guards_match": true,
+    "caught_Round_hooks_current_scope": 0,
+    "compiler_features_opaqueIDs_actual": true,
+    "counts": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 20
+    },
+    "current_executable_paths": 13,
+    "drivers": 5,
+    "expected_should_panic": 1,
+    "hashes": {
+      "audit-refresh.py": "8f359fa83741cfe76df8226be5077cd0d0cd11ae675cf0bb33818808b658607d",
+      "compiler-artifact-records.json": "83de340bc7c818aa1733b2e8b813f1ee9a8e2d4f0cf5628adcafc5d550553073",
+      "compiler-plan.json": "1de244f4fc002063d69cde78da419b69c072f63269c96f543f5a2a276d0d7ed9",
+      "compiler.terminal.json": "6aac4b4a98094255f60fd0111b252b199abab22b444ed9a69bd0a54189cee431",
+      "current-artifacts.json": "eb1238fe56d44eb925f8a2d63c0bb07489a9081bc3d434059e950d13c5ee63ef",
+      "emitted-features.json": "b33e76e9883ee9e6e7c79fc4859898904c91c8ed46fb874f0c45a2b06d310ed0",
+      "expected-should-panic.json": "50c1fb79ed216a61697334fe3cec46aee339c65b74463c61272fa08da1f986b1",
+      "immutable-saved139.json": "dc73858ccb0be89eea4600839ad311b15106959c9a5c77adaf14a3a0b1b2c523",
+      "metadata.json": "ca53fe5b577ce38b2ce8d28bac359e8e95880f26934b6f75368f67adf055c2a0",
+      "required-cases.json": "fa083a9edba905592edefcdee19535f56c7129c7c76c7e0c2d5436c05f4bedab",
+      "root-approval.json": "138b967c61e986e729df8e12cad1e1beef06cbd1d09474c427775c071e76365e",
+      "runtime-plan.json": "08e6600dc942088fc971aee06bebc810c0780f2b34aa892f9e07403e5c2cfc9d",
+      "scope-plan.json": "58fa359850ac1f3cffbc34121caa7c78ca841623290c68aa39bad48cc389feaf",
+      "source-audit-receipt.json": "b041864cb22a8463ab44d1a81ccbc42d122f42062ca21ba07ca013691dbb7fb8"
+    },
+    "historical318_current_credit_transferred": false,
+    "historical44_caught4_not_imported": true,
+    "historical_holds": [
+      "Own3646 DRAFT broker2094; no activation/device/provider",
+      "539Reader failure remains unexplained/unwaived",
+      "#3890 parallelreport not rerun/repaired/waived"
+    ],
+    "holds": [],
+    "host_required": 20,
+    "identity": {
+      "base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+      "head": "6e6da7afa240850d5206cd9ad5b60ee15b9ce748",
+      "tree": "72874e5d0d6da02f342bb333c85387bba3693219"
+    },
+    "independent_saved_paths": 13,
+    "metadata_local_packages": 49,
+    "metadata_workspace_members": 47,
+    "no_Memory_semantic_or_feature_expansion": true,
+    "normal_build_roots": 3,
+    "normal_runtime_children": [],
+    "observed_should_panic": [
+      {
+        "line": 18,
+        "payload": "cold is not in LOST_WHYS",
+        "source": "crates/body/src/lease.rs:105",
+        "test": "lease::tests::a_seventh_why_is_refused_where_it_is_said",
+        "thread": "lease::tests::a_seventh_why_is_refused_where_it_is_said"
+      }
+    ],
+    "own_selected": 7,
+    "phase": "final",
+    "prior139_saved_match": true,
+    "results": [
+      {
+        "cases": {
+          "body::tests::a_base_given_way_and_held_still_under_its_bound_is_not_a_hand": [
+            {
+              "line": 3,
+              "status": "ok"
+            }
+          ],
+          "body::tests::a_base_turned_by_hand_in_small_steps_under_its_bound_says_a_hand": [
+            {
+              "line": 4,
+              "status": "ok"
+            }
+          ],
+          "body::tests::a_lamp_held_by_its_lease_stays_up_and_a_hold_alone_never_stands_it": [
+            {
+              "line": 5,
+              "status": "ok"
+            }
+          ],
+          "body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone": [
+            {
+              "line": 6,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window": [
+            {
+              "line": 7,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_a_hold_of_the_head_near_its_stop_is_written_and_motion_is_not": [
+            {
+              "line": 8,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_a_home_outside_them_is_refused": [
+            {
+              "line": 9,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_a_joint_arrived_near_a_stop_rests_there": [
+            {
+              "line": 10,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold": [
+            {
+              "line": 11,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start": [
+            {
+              "line": 12,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written": [
+            {
+              "line": 13,
+              "status": "ok"
+            }
+          ],
+          "body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before": [
+            {
+              "line": 14,
+              "status": "ok"
+            }
+          ],
+          "body::tests::without_own_ranges_the_servos_limits_change_nothing": [
+            {
+              "line": 15,
+              "status": "ok"
+            }
+          ],
+          "lease::tests::a_hand_privacy_a_pause_or_a_sleep_ends_it": [
+            {
+              "line": 16,
+              "status": "ok"
+            }
+          ],
+          "lease::tests::a_seventh_why_is_refused_where_it_is_said": [
+            {
+              "line": 17,
+              "status": "ok"
+            }
+          ],
+          "lease::tests::every_lost_why_is_one_of_the_closed_six": [
+            {
+              "line": 22,
+              "status": "ok"
+            }
+          ]
+        },
+        "label": "runtime-01-lamp-body-lamp_body",
+        "log_sha256": "92c416253984da6ea5369f952de11c26e01f4a604588075f8873966f5269d930",
+        "summaries": [
+          {
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "passed": 16,
+            "status": "ok"
+          }
+        ]
+      },
+      {
+        "cases": {
+          "a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease": [
+            {
+              "line": 3,
+              "status": "ok"
+            }
+          ]
+        },
+        "label": "runtime-02-lamp-control-door",
+        "log_sha256": "776858a68ca650c10ba3681b40cb2dfba9cd2d25e8d70262e3d77a60c4fd80a7",
+        "summaries": [
+          {
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "passed": 1,
+            "status": "ok"
+          }
+        ]
+      },
+      {
+        "cases": {
+          "the_quiet_hours_are_ten_at_night_to_seven_in_the_morning": [
+            {
+              "line": 3,
+              "status": "ok"
+            }
+          ]
+        },
+        "label": "runtime-03-lamp-local-time-local_time",
+        "log_sha256": "e494e600aed598159832517985142b1cc7e792e69be0d13d220e9bbb8aa2871b",
+        "summaries": [
+          {
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "passed": 1,
+            "status": "ok"
+          }
+        ]
+      },
+      {
+        "cases": {
+          "format::the_schemas_lists_are_the_codes": [
+            {
+              "line": 3,
+              "status": "ok"
+            }
+          ]
+        },
+        "label": "runtime-04-lamp-skills-it",
+        "log_sha256": "209541fe0c80ddfebde5d3a7e901231d10ac51ca4a371662e8b8b1ebd0786c33",
+        "summaries": [
+          {
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "passed": 1,
+            "status": "ok"
+          }
+        ]
+      },
+      {
+        "cases": {
+          "every_part_of_the_lamp_waits_for_setups_marker_itself": [
+            {
+              "line": 3,
+              "status": "ok"
+            }
+          ]
+        },
+        "label": "runtime-05-lamp-update-install",
+        "log_sha256": "1a145d452fae6210092076b3fc2e2addf9821fef723b8ded2e3afbed2c8ef30a",
+        "summaries": [
+          {
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "passed": 1,
+            "status": "ok"
+          }
+        ]
+      }
+    ],
+    "selected_case_unrun": 0,
+    "status": "VERIFIED_REFRESH20_2E66",
+    "strict_roots": 5,
+    "unique_actual_discovery": 20,
+    "unknown_panics": [],
+    "witnesses": {
+      "lamp-body::lamp_body::body::tests::a_base_given_way_and_held_still_under_its_bound_is_not_a_hand": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::a_base_turned_by_hand_in_small_steps_under_its_bound_says_a_hand": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::a_lamp_held_by_its_lease_stays_up_and_a_hold_alone_never_stands_it": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone": {
+        "own": true,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window": {
+        "own": true,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_a_hold_of_the_head_near_its_stop_is_written_and_motion_is_not": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_a_home_outside_them_is_refused": {
+        "own": true,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_a_joint_arrived_near_a_stop_rests_there": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold": {
+        "own": true,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start": {
+        "own": true,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before": {
+        "own": true,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::body::tests::without_own_ranges_the_servos_limits_change_nothing": {
+        "own": true,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::lease::tests::a_hand_privacy_a_pause_or_a_sleep_ends_it": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::lease::tests::a_seventh_why_is_refused_where_it_is_said": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-body::lamp_body::lease::tests::every_lost_why_is_one_of_the_closed_six": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-control::door::a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-local-time::local_time::the_quiet_hours_are_ten_at_night_to_seven_in_the_morning": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-skills::it::format::the_schemas_lists_are_the_codes": {
+        "own": false,
+        "pass_once": true
+      },
+      "lamp-update::install::every_part_of_the_lamp_waits_for_setups_marker_itself": {
+        "own": false,
+        "pass_once": true
+      }
+    }
+  },
+  "sanitization": "Recursive all pathkeys/values normalized for display only; actualopaqueIDs remainprivate; allhashes/booleans unchanged",
+  "source_audit": {
+    "alltarget_static_reverse_closure": [
+      "lamp-memory",
+      "lamp-voice-eval"
+    ],
+    "base_changed_files": 3,
+    "base_tree": "a89397965f659e2fc5b5e34ed233bd5894cd3de7",
+    "branch": "third/ownkeys-current-2e66",
+    "compiler_test_native_commands_run": 0,
+    "extra_normal_roots_not_yet_authorized_or_built": true,
+    "fresh_new_worktree_boundary": "Old6a source fully archived before this physical sourcepath advanced. Old6a ref/archive,old4d WT/bank unchanged. Natural checkout retains exact unchanged-path/mode/byte mtimes; modified files fresh, no manualmtime import,targetcopy,clean or forcefresh.",
+    "identity": {
+      "base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+      "head": "6e6da7afa240850d5206cd9ad5b60ee15b9ce748",
+      "tree": "72874e5d0d6da02f342bb333c85387bba3693219"
+    },
+    "integrated_owned_paths": [],
+    "manual_doc_conflicts": 0,
+    "manual_rows_unchanged": true,
+    "modified_new_inputs_mtimes_not_restored": true,
+    "mtime_eligible": 10931,
+    "mtime_restored_only_exact_path_mode_bytes": 0,
+    "no_Memory_or_Friday_semantic_review": true,
+    "no_compiled_binary_copy_or_forcefresh": true,
+    "normal_static_reverse_closure": [],
+    "only_conflict_file": null,
+    "owned_blobs_exact": 38,
+    "owned_total": 38,
+    "previous_source_anchor_ref": {
+      "head": "80ddb02ad960da3822916e1fa5ee93030d9125c0",
+      "ref": "refs/heads/third/ownkeys-current-f0f6-live",
+      "unchanged": true
+    },
+    "raw7_author_message_payloads_preserved_against_all7_epochs": true,
+    "receipt_sha256": {
+      "../prep-f0f6/old-6a/git-data/bundle-verification.json": "cccb6e6cb1cadae25e98eacb08a81e763874e8c02c79d803f77dfdae66b2ac38",
+      "../prep-f0f6/old-6a/proof-preservation.json": "d07ba71a811ea9b5d4b2dfb779538bdbfe3c04ae4b7afbd031b0fb4dd826e79c",
+      "../prep-f0f6/old-6a/source-snapshot-complete.json": "03d31d29f566a7fb7a04b9414debe5c468cc8443913db05063c65f65b46e8a89",
+      "cargo-source-closure.json": "0b6e7300fc628d5d06e4ffd84067c24241a298b9c0372b22cdcbedfc99474cde",
+      "inherited-base-files.json": "332fe395707f9dec40d9735a163c982f1065ee1291d79f8c08c8ba0f3336ff0e",
+      "mtime-preservation.json": "2cadc85eb2bf117482949ef095d6fd10eeaeac004cacab3f345e5b35c2c2e511",
+      "owned38-blobs.json": "9c0748716d8c91405e985accfaaaf9996241c2ae974017d05cd0ecd98e60b681",
+      "raw-authored-preservation.json": "eb2da39139f8e8d7de622c04e632212e029fe5d6874e5df7ff9578ef5dfcbd23",
+      "source-after-audit.json": "8a3b36d1f4968045e13f81773d712b92492e2ea63f6394c8ffecf7f0bee955e9",
+      "source-before-audit.json": "8a3b36d1f4968045e13f81773d712b92492e2ea63f6394c8ffecf7f0bee955e9"
+    },
+    "source_guard_files": 7554,
+    "source_guard_unchanged": true,
+    "status": "SOURCE_AUDIT_PASSED_FRESH_GATE_PROPOSAL_PENDING_ROOT",
+    "worktree": "[workspace]/.claude/worktrees/third-ownkeys-a17-prep"
+  },
+  "source_only_preflight_correction": {
+    "Cargo_or_tests_started": false,
+    "error": "Overstrong assumption: all equal-byte files keepmtime through same-path rebase; Git may rewrite authoredfiles with identical finalbytes.",
+    "helper_sha256": "8cbd1f04f15404554fabc44fbbe3d1d0d38adf4cee0723fcd3804d0ebd1c22c1",
+    "no_manualmtime_import_or_replay": true,
+    "phase": "Source metadata only, before sourceaudit/Cargo"
+  },
+  "summary": {
+    "Linux_previous8_plus_newmeasure1": "Separate not executed on Mac",
+    "actual_compiler_package_ids": 202,
+    "actual_metadata_local_packages": 49,
+    "actual_workspace_members": 47,
+    "admission_audit_sha256": "a050878250c4b3835ed23554d2ece8846451914a50b6341ecec9c8ab388df392",
+    "all_command_groups_closed0_reaped": true,
+    "all_source_raw_lock_helper_depinfo_actual_saved_guards_match": true,
+    "bank_release": {
+      "head": "6e6da7afa240850d5206cd9ad5b60ee15b9ce748",
+      "owner": "third-ownkeys-refresh20-2e66",
+      "pid": 29516,
+      "state": "RELEASED_ALL_GUARDS_CLOSED"
+    },
+    "caught_Round_hooks_current0_historical44only4": true,
+    "compiler_seconds": 322.8480425250018,
+    "compiler_stages": 8,
+    "counts": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 20
+    },
+    "current_actual_and_independent_saved": 13,
+    "current_artifacts_manifest_sha256": "eb1238fe56d44eb925f8a2d63c0bb07489a9081bc3d434059e950d13c5ee63ef",
+    "drivers": 5,
+    "expected_body_should_panic": 1,
+    "gate_terminal_sha256": "bd8d4bdd7a80b2eddc744542ec25e74f8f8f8e9ddc56aef80360e90297c4e2f5",
+    "historical318": "Completed6a/44 only; no current318/338claim or transferred runtime/admission",
+    "historical_holds": [
+      "Own3646 DRAFT broker2094; no activation/device/provider",
+      "539Reader failure remains unexplained/unwaived",
+      "#3890 parallelreport not rerun/repaired/waived"
+    ],
+    "identity": {
+      "base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+      "head": "6e6da7afa240850d5206cd9ad5b60ee15b9ce748",
+      "tree": "72874e5d0d6da02f342bb333c85387bba3693219"
+    },
+    "no_Memory_semantic_feature_SDK_publisher_device_provider_activation": true,
+    "no_push_or_rebase_after_gate": true,
+    "normal_build_roots": 3,
+    "normal_roots_kind": "Body/Control product packages plusLocalTime library",
+    "normal_runtime_children": [],
+    "observed_body_should_panic": 1,
+    "own_passed": 7,
+    "parent_handle32924_closed0": true,
+    "post_saved_preservation_sha256": "490354b4d741b79352d6047a497464a87315773abb76059ecf03f7b38bc5274c",
+    "prior_saved139_unchanged": true,
+    "qualified_receipt_sha256": "d94932652d7a5599a087fd67c12dd8f5dc6384aa803c63d5e93ddebb38789418",
+    "root_conditional_approval_sha256": "138b967c61e986e729df8e12cad1e1beef06cbd1d09474c427775c071e76365e",
+    "runtime_once_serial_no_retries": true,
+    "runtime_seconds": 79.54382905800594,
+    "selected_unrun": 0,
+    "source_guards": 7554,
+    "status": "VERIFIED_REFRESH20_2E66",
+    "strict_roots": 5,
+    "unknown_panics": 0,
+    "whole_gate_seconds": 496.74842126099975
+  }
+}
