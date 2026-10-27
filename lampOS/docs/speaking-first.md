@@ -484,6 +484,17 @@ provider request, no face on the ring. `begun` comes as it is begun, and
 otherwise: a person speaking over it ends it as any turn). The voice traces
 `skill_sound` with the skill, whether it plays and why not.
 
+**The shutdown's last words** (#3697, [shutdown.md](shutdown.md)): the skill
+`shutdown` is root's alone (`say::SHUTDOWN_SKILL`; from any other caller,
+`skill shutdown is asked by root only`), and its ask is taken before any
+other say, whatever their priority (`say::is_last_words`). None of the gates
+above or below holds it but the keeper's pause and the privacy switch
+(`say::may_play_last_words`; a muted lamp stays silent): not right after a
+turn, not one sound in 30 s, not listening, not speaking. The lamp's own
+speech is cut for it (`last_words`, the reason its turn is dropped with),
+as it is the last thing the lamp says. Every other skill's say and sound
+keeps every gate.
+
 `cue: "hum"` uses the same sound admission and speaker path. Its samples
 come from the existing head-cue renderer at its -20 dBFS default, without a file, model
 request or extra actuator writer. It is an alternative to every other

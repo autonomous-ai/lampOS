@@ -11001,26 +11001,39 @@ fn conversation_with_gate_inner(
         if let Some(says) = says.as_mut() {
             says.poll(say_now_us);
         }
+        // The shutdown's last words (#3697) wait for none of it: the lamp's
+        // own speech is cut for them. A muted lamp stays silent.
+        let last_words_now = says
+            .as_ref()
+            .is_some_and(crate::say::Says::last_words_waiting)
+            && snapshot.microphone_permission() == Permission::Allowed;
         if let Some(says) = says.as_mut()
-            && !reminder_waiting
-            && let Some(quiet) = says.quiet_needed_us()
-            && clock.saturating_sub(last_turn_us) >= quiet
-            && reply.is_none()
-            && provider_queue.is_empty()
-            && speaker_pending.is_none()
-            && admission.idle_for_reminder()
-            && !submission_draining
-            && snapshot.listening_ready(MonoTime::from_micros(say_now_us))
-            && reminder_quiet(
-                say_now_us,
-                reminder_cycle_started_us,
-                last_speech_us,
-                last_capture,
-            )
-            && playback_mask.available(say_now_us)
+            && (last_words_now
+                || (!reminder_waiting
+                    && says
+                        .quiet_needed_us()
+                        .is_some_and(|quiet| clock.saturating_sub(last_turn_us) >= quiet)
+                    && reply.is_none()
+                    && provider_queue.is_empty()
+                    && speaker_pending.is_none()
+                    && admission.idle_for_reminder()
+                    && !submission_draining
+                    && snapshot.listening_ready(MonoTime::from_micros(say_now_us))
+                    && reminder_quiet(
+                        say_now_us,
+                        reminder_cycle_started_us,
+                        last_speech_us,
+                        last_capture,
+                    )
+                    && playback_mask.available(say_now_us)))
             && let Some(provider_session) = unasked_session(&cloud, paused)
             && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
         {
+            if ticket.last_words() {
+                cancel_reply(owner, reply, trace, "last_words")?;
+                provider_queue.clear();
+                speaker_pending = None;
+            }
             // An add-on's quoted line is the second route's alone: there its
             // turn is asked with no functions (#2530 part 2). The Live
             // session's functions are declared once, so it never takes one.
@@ -11119,6 +11132,8 @@ fn conversation_with_gate_inner(
                 at_us,
                 owner,
                 reply,
+                &mut provider_queue,
+                &mut speaker_pending,
                 rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
@@ -12339,6 +12354,7 @@ fn tell_voice_of_turn(
 
 /// A skill's sound asked for, if one waits: played now as a turn of the
 /// lamp's own, on the head cue's speaker path, or refused now with why.
+/// The shutdown's last words (#3697) cut the lamp's own speech for it.
 /// The authority's new snapshot when it plays.
 #[allow(clippy::too_many_arguments)]
 fn play_skill_sound(
@@ -12347,6 +12363,8 @@ fn play_skill_sound(
     at_us: u64,
     owner: &mut Controller,
     reply: &mut Option<Reply>,
+    provider_queue: &mut VecDeque<ProviderInput>,
+    speaker_pending: &mut Option<PendingSpeaker>,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -12354,14 +12372,23 @@ fn play_skill_sound(
     let Some((samples, ticket)) = says.take_sound(at_us) else {
         return Ok(None);
     };
-    let decided = crate::say::may_play_sound(now_is);
+    let decided = if ticket.last_words() {
+        crate::say::may_play_last_words(now_is)
+    } else {
+        crate::say::may_play_sound(now_is)
+    };
     record(
         trace,
-        json!({"kind":"skill_sound","at_us":at_us,"skill":ticket.skill(),"plays":decided.is_ok(),"why":decided.err()}),
+        json!({"kind":"skill_sound","at_us":at_us,"skill":ticket.skill(),"plays":decided.is_ok(),"why":decided.err(),"last_words":ticket.last_words()}),
     )?;
     if let Err(why) = decided {
         ticket.answer(crate::say::Outcome::Refused(why.into()));
         return Ok(None);
+    }
+    if ticket.last_words() {
+        cancel_reply(owner, reply, trace, "last_words")?;
+        provider_queue.clear();
+        *speaker_pending = None;
     }
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,

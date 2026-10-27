@@ -51,6 +51,10 @@
 //!   helper, the shutdown) may ask for one: the socket's peer is root
 //!   ([`Caller`], by `SO_PEERCRED`), so a skill cannot say there is no Wi-Fi
 //!   while the lamp is online.
+//! - **The shutdown's last words** (#3697): the skill [`SHUTDOWN_SKILL`] is
+//!   root's alone; its say or sound goes first and skips every gate above
+//!   but the keeper's pause and the privacy switch, cutting the lamp's own
+//!   speech ([`is_last_words`], [`may_play_last_words`]).
 //! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
 //!   fixed -20 dBFS default on the client's thread, without a file or model
 //!   request. It is a sound through the same queue, quiet, rarity, privacy
@@ -386,6 +390,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     {
         return Err("skill is 1 to 64 of a-z, 0-9, - and _".into());
     }
+    if skill == SHUTDOWN_SKILL && caller != Caller::WifiHelper {
+        return Err("skill shutdown is asked by root only".into());
+    }
     if let Some(line) = wire.quoted {
         if wire.note.is_some()
             || wire.text.is_some()
@@ -613,6 +620,11 @@ impl Ticket {
 
     pub fn skill(&self) -> &str {
         &self.skill
+    }
+
+    /// Whether it is the shutdown's last words ([`is_last_words`]).
+    pub fn last_words(&self) -> bool {
+        self.skill == SHUTDOWN_SKILL
     }
 
     /// Whether its note is to be told who is at the lamp ([`Request::who`]).
@@ -1043,15 +1055,16 @@ impl Says {
         });
     }
 
-    /// The next of those `of` takes: highest priority, then oldest.
+    /// The next of those `of` takes: the shutdown's last words, then the
+    /// highest priority, then the oldest.
     fn next_of(&self, of: impl Fn(&Request) -> bool) -> Option<usize> {
         (0..self.waiting.len())
             .filter(|&index| of(&self.waiting[index].request))
             .max_by(|&a, &b| {
                 let (a, b) = (&self.waiting[a], &self.waiting[b]);
-                a.request
-                    .priority
-                    .cmp(&b.request.priority)
+                is_last_words(&a.request)
+                    .cmp(&is_last_words(&b.request))
+                    .then(a.request.priority.cmp(&b.request.priority))
                     .then(b.order.cmp(&a.order))
             })
     }
@@ -1085,6 +1098,13 @@ impl Says {
                 who: false,
             },
         ))
+    }
+
+    /// Whether the next say is the shutdown's last words ([`is_last_words`]):
+    /// a say, not a sound, which [`Self::take_sound`] takes.
+    pub fn last_words_waiting(&self) -> bool {
+        self.next_index()
+            .is_some_and(|index| is_last_words(&self.waiting[index].request))
     }
 
     /// When the last skill's sound was played, if one was.
@@ -1604,6 +1624,18 @@ pub(crate) fn decode_sound_with_limit(bytes: &[u8], most_frames: u32) -> Result<
     Ok(samples)
 }
 
+/// The skill only root may ask as (the shutdown, `lamp-setup shutdown-now`,
+/// #3697, `docs/shutdown.md`): its say is the last thing the lamp says.
+pub const SHUTDOWN_SKILL: &str = "shutdown";
+
+/// Whether `request` is the shutdown's last words: asked as
+/// [`SHUTDOWN_SKILL`], which [`parse_from`] takes from root only. They are
+/// taken before any other say, and neither a say's quiet nor a sound's gates
+/// hold them ([`may_play_last_words`]).
+pub fn is_last_words(request: &Request) -> bool {
+    request.skill == SHUTDOWN_SKILL
+}
+
 /// What the voice knows when a sound is taken: the say service's gates.
 #[derive(Clone, Copy)]
 pub struct SoundNow {
@@ -1649,6 +1681,20 @@ pub fn may_play_sound(now: &SoundNow) -> Result<(), &'static str> {
         .is_some_and(|since| since < SOUND_EVERY_US)
     {
         Err("a sound played less than 30 s ago")
+    } else {
+        Ok(())
+    }
+}
+
+/// Whether the shutdown's last words ([`is_last_words`]) play now: unless
+/// the keeper has paused the lamp or it is muted, at once. The lamp's own
+/// speech is cut for them, and no quiet, rarity or listening gate holds
+/// them: they are the last thing the lamp says (#3697).
+pub fn may_play_last_words(now: &SoundNow) -> Result<(), &'static str> {
+    if now.paused {
+        Err("the lamp is paused")
+    } else if now.muted {
+        Err("the lamp is muted")
     } else {
         Ok(())
     }
@@ -2456,6 +2502,82 @@ mod tests {
             None
         );
         assert_eq!(says.quiet_needed_us(), None);
+    }
+
+    /// #3697: the skill `shutdown` is root's only; its say is taken before
+    /// any other, whatever their priority.
+    #[test]
+    fn the_shutdown_is_roots_alone_and_its_last_words_go_first() {
+        let line = r#"{"skill":"shutdown","text":"Going to sleep now.","priority":9,"expires_in_ms":10000}"#;
+        assert_eq!(
+            parse(line).unwrap_err(),
+            "skill shutdown is asked by root only"
+        );
+        let request = parse_from(line, Caller::WifiHelper).unwrap();
+        assert!(is_last_words(&request));
+        assert!(!is_last_words(
+            &parse(&line.replace("shutdown", "stretch")).unwrap()
+        ));
+        let (mut says, ask) = Says::by_hand();
+        let (urgent, _urgent_answer) = asked("reminders", 9, 61_000_000);
+        let (last, _last_answer) = asked(SHUTDOWN_SKILL, 1, 61_000_000);
+        for one in [urgent, last] {
+            ask.send(one).unwrap();
+        }
+        says.poll(1_000_000);
+        assert!(says.last_words_waiting());
+        let (_, _, ticket, _) = says.take(1_000_000).unwrap();
+        assert!(ticket.last_words());
+        assert!(!says.last_words_waiting());
+        assert!(!says.take(1_000_000).unwrap().2.last_words());
+    }
+
+    /// #3697: the shutdown's last words play right after a turn, while the
+    /// lamp speaks or listens and within 30 s of another sound, where any
+    /// other sound is refused; a paused or muted lamp stays silent.
+    #[test]
+    fn the_last_words_skip_the_sound_gates_but_never_a_mute_or_a_pause() {
+        for busy in [
+            SoundNow {
+                since_turn_us: 0,
+                ..REST
+            },
+            SoundNow {
+                speaking: true,
+                ..REST
+            },
+            SoundNow {
+                listening: true,
+                ..REST
+            },
+            SoundNow {
+                since_sound_us: Some(0),
+                ..REST
+            },
+            SoundNow {
+                reply_owed: true,
+                reminder_waiting: true,
+                ..REST
+            },
+        ] {
+            assert_eq!(may_play_last_words(&busy), Ok(()));
+            assert!(may_play_sound(&busy).is_err(), "another sound is refused");
+        }
+        assert_eq!(
+            may_play_last_words(&SoundNow {
+                muted: true,
+                speaking: true,
+                ..REST
+            }),
+            Err("the lamp is muted")
+        );
+        assert_eq!(
+            may_play_last_words(&SoundNow {
+                paused: true,
+                ..REST
+            }),
+            Err("the lamp is paused")
+        );
     }
 
     /// #939, (c): `from` asks for what the voice keeps. Read as exactly one
