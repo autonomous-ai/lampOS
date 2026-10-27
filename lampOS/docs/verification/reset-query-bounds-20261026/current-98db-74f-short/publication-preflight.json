@@ -1,0 +1,9 @@
+{
+  "base": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "branch": "second/reset-query-bounds",
+  "head": "98db0197c52217b88013a690353355f5d82c6baf",
+  "remote_before": {
+    "refs/heads/lamp-voice": "74f563606186fd48f3a062976fc6178fc68148d3",
+    "refs/heads/second/reset-query-bounds": "23d0c3fbbfe050dae1979c0de0b8127e8ed4de60"
+  }
+}

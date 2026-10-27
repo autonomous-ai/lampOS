@@ -1,0 +1,26 @@
+{
+  "actual_preserved_outputs_depfiles_executables_verified_before_compile": true,
+  "changed_source_entries": [
+    "lampOS/Cargo.lock",
+    "lampOS/crates/control/Cargo.toml",
+    "lampOS/crates/control/src/lease.rs",
+    "lampOS/crates/control/src/lib.rs",
+    "lampOS/crates/control/src/pairing.rs",
+    "lampOS/crates/control/src/protocol.rs",
+    "lampOS/crates/control/src/session.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/vi/control_vi.md"
+  ],
+  "previous_head": "9b3d00406dc716b6e10de0c5545a0273bd0a7c92",
+  "prior_closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 439,
+    "executable_count": 5,
+    "exit_code": 0,
+    "local_output_count": 58,
+    "source_unchanged": true
+  },
+  "prior_closure_sha256": "1e7bea44b25595a86e4362d2a83330d330a4c2df443d5f52a07db29174f6d14d",
+  "prior_source_sha256": "5d2e1b7134bcc83192de941dad08729f03ff29a58ea22ff5171f2adb8ea7f9d0",
+  "reason": "Exact two-patch carry onto74f, using latest9b3d/3d8 successful206/0/4 completed boundary. Earlier sandbox-failed131/73/4 remains separate; its old actual paths are not reasserted after subsequent compilation."
+}

@@ -1,0 +1,23 @@
+{
+  "source_count": 7285,
+  "before_sha256": "969eaefc5cf876225fad22a2b030c131b232c3b99d266f6a81253d004c80fee8",
+  "after_sha256": "969eaefc5cf876225fad22a2b030c131b232c3b99d266f6a81253d004c80fee8",
+  "unchanged": true,
+  "owned_tested_sources": {
+    "lampOS/crates/update/src/writer_refresh.rs": {
+      "sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "mode": 420
+    },
+    "lampOS/docs/settings-writer-refresh.md": {
+      "sha256": "6d62c397de6e52d46877d954be45e84adbcd7f5d60660fad716cbf2ccd974460",
+      "mode": 420
+    }
+  },
+  "local_commit_after_doc_only_count_update": "63300fca27ef8a346504e64f6f54330f8baaa2d5",
+  "folded_into_foundation": true,
+  "execution_not_relabelled_as_current_Main": true
+}

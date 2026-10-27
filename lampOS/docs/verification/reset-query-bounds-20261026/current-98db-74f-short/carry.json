@@ -1,0 +1,44 @@
+{
+  "authored_delta_equal_excluding_blob_headers_line_anchors": true,
+  "base_change": "Only unwired Control library, its docs and existing dependency edges in its own lock entry; selected dependency/feature comparison runs in current gate.",
+  "base_changed_paths": [
+    "lampOS/Cargo.lock",
+    "lampOS/crates/control/Cargo.toml",
+    "lampOS/crates/control/src/lease.rs",
+    "lampOS/crates/control/src/lib.rs",
+    "lampOS/crates/control/src/pairing.rs",
+    "lampOS/crates/control/src/protocol.rs",
+    "lampOS/crates/control/src/session.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/vi/control_vi.md"
+  ],
+  "counts_not_relabelled": true,
+  "files": {
+    "lampOS/crates/setup/src/reset.rs": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+      "old": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs"
+    },
+    "lampOS/crates/setup/src/reset/query.rs": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+      "old": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob d9e1644dc2a13638afa72826f95a77aa73d71132\tlampOS/docs/reuse-decisions.md",
+      "old": "100644 blob d9e1644dc2a13638afa72826f95a77aa73d71132\tlampOS/docs/reuse-decisions.md"
+    },
+    "lampOS/docs/setup.md": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md",
+      "old": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md"
+    }
+  },
+  "kind": "reset",
+  "new_base": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "new_head": "98db0197c52217b88013a690353355f5d82c6baf",
+  "old_base": "3d8c75558e235c125b9cf953a66a6c193888fd9e",
+  "old_head": "23d0c3fbbfe050dae1979c0de0b8127e8ed4de60",
+  "range_diff": "1:  23d0c3fbbf = 1:  98db0197c5 lampOS: bound reset read-only queries and retain failed-reset recovery\n"
+}

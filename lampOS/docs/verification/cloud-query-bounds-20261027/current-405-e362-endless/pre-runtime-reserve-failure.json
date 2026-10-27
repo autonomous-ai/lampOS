@@ -1,0 +1,18 @@
+{
+  "all_requested_outputs_depfiles_executables_preserved": true,
+  "applied_reserve_bytes": 4294967296,
+  "available_after": 26079526912,
+  "available_before": 26168643584,
+  "code_or_test_failure": false,
+  "dedup_receipt_sha256": "8d325da974a62e3672143132d1cb36fbeff532d54e14d602740008ba7905b66e",
+  "exact_partial_preserved_prefix_verified": true,
+  "measured_remaining_copy_bytes": 87552705,
+  "no_recompile_or_test_replay": true,
+  "note": "Only exact bytes/modes/mtimes duplicate positive artifact copies were hard-linked, preserving every path. No negative/failure witness or actual Cargo target removed. Reserve adjusted with explicit parent instruction.",
+  "old_guard_bytes": 21474836480,
+  "original_controller_exit": 1,
+  "original_stage": "after successful compile, before runtime; projected20GiB reserve check",
+  "runtime_budget_bytes": 1073741824,
+  "runtime_executed": false,
+  "source_unchanged": true
+}

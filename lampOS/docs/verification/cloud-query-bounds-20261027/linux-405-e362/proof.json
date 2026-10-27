@@ -1,0 +1,88 @@
+{
+  "actual_executed_commands": [
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "attempt": 1,
+  "base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "conclusion": "success",
+  "head": "405f32be613538d863f659bfbac5e01a5e63567b",
+  "job_id": 122111638634,
+  "parents": [
+    "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+    "405f32be613538d863f659bfbac5e01a5e63567b"
+  ],
+  "pr": 3644,
+  "preview": "15ced37bcf5363512cbfc1eaa0036ce048c1dbe9",
+  "raw_sha256": {
+    "job.log": "bbd1f13663fadd5cd45e8a86a21b1ba2a478a4cdfac480401758760a3904a902",
+    "jobs-final.json": "a250d895256e67fb1c38d88250be04f4c02e05b6dde2ea12fbea4b18b0130907",
+    "run-final.json": "a773c23cb33991beef22902e0bdd5cb911b35ed848ab6f0f90dcdf0bb428042a",
+    "run-first.json": "50893e7b02c3f9668202f12175ac9ff267a2ae8a7437a8c936072bdf3b576680"
+  },
+  "run_id": 40481190819,
+  "steps": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "status": "completed"
+    }
+  ],
+  "tree": "f6c60437673e9573688938f7a9ee0b9ecf1ea5f6",
+  "whole_authored_tree_equal": true
+}

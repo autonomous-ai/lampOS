@@ -1,0 +1,8 @@
+{
+  "actual": "<target>/debug/deps/lamp_update-2fc2e5180de6bc32",
+  "sha256": "a449e0a10ad582f80c0dbb0d142c49c1b702fd5d993195cb3349eb8f5baa6baf",
+  "size": 14950976,
+  "preserved": "<gate>/actual-library-test-executable",
+  "preserved_sha256": "a449e0a10ad582f80c0dbb0d142c49c1b702fd5d993195cb3349eb8f5baa6baf",
+  "binding": "compiler artifact and actual library execution belong to this single Cargo invocation; post-run byte identity"
+}

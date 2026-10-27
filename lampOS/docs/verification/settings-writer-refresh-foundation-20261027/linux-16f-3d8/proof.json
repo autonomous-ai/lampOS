@@ -1,0 +1,108 @@
+{
+  "scope": "Original PR Linux formatting/Clippy only; no ARM, runtime test, local compiler, device or public mutation performed by auditor.",
+  "run": {
+    "id": 40474816661,
+    "name": "lampOS clippy",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "head_sha": "16f0e1cb27d2796c953ba1e0d0de92f4e37aff53",
+    "head_branch": "second/settings-writer-refresh",
+    "path": ".github/workflows/lampos-clippy.yml",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40474816661"
+  },
+  "job": {
+    "id": 122090318699,
+    "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "head_sha": "16f0e1cb27d2796c953ba1e0d0de92f4e37aff53",
+    "labels": [
+      "ubuntu-22.04"
+    ],
+    "started_at": "2026-10-27T08:37:38Z",
+    "completed_at": "2026-10-27T08:42:08Z",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40474816661/job/122090318699"
+  },
+  "checkout": {
+    "sha": "27a5cd9bcbc52abdd121a97f7ae33b1aa08a71f7",
+    "ordered_parents": [
+      "3d8c75558e235c125b9cf953a66a6c193888fd9e",
+      "16f0e1cb27d2796c953ba1e0d0de92f4e37aff53"
+    ],
+    "full_tree": "ad933fb9f533d3fee3642ad5074cec447bfe7b3f",
+    "authored_head": "16f0e1cb27d2796c953ba1e0d0de92f4e37aff53",
+    "authored_parent": [
+      "97fdcd3f20f2a0446388d4e08fb4a9bae09b3352"
+    ],
+    "authored_full_tree": "ad933fb9f533d3fee3642ad5074cec447bfe7b3f",
+    "full_tree_equal": true,
+    "checkout_log_lines": [
+      289,
+      334,
+      336,
+      337
+    ]
+  },
+  "toolchain": {
+    "version": "1.96.0",
+    "host": "x86_64-unknown-linux-gnu",
+    "source_pin": "lampOS/rust-toolchain.toml",
+    "installation_log_line": 353
+  },
+  "stages": [
+    {
+      "name": "stable promotion formatting and strict Clippy",
+      "number": 5,
+      "commands": [
+        "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+        "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings"
+      ],
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-27T08:38:20Z",
+      "completed_at": "2026-10-27T08:38:31Z"
+    },
+    {
+      "name": "formatting (whole workspace, pinned Rust)",
+      "number": 6,
+      "commands": [
+        "cargo +1.96.0 fmt --all --check"
+      ],
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-27T08:38:31Z",
+      "completed_at": "2026-10-27T08:38:39Z"
+    },
+    {
+      "name": "clippy (every crate and target, warnings as errors)",
+      "number": 9,
+      "commands": [
+        "cargo clippy --locked --workspace --all-targets -- -D warnings"
+      ],
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-27T08:40:38Z",
+      "completed_at": "2026-10-27T08:42:06Z"
+    }
+  ],
+  "log": {
+    "bytes": 48851,
+    "lines": 623,
+    "sha256": "a690e2224173951e2c12b44c74a610cfac74ef7be3817804117b701afb973137",
+    "error_markers": 0,
+    "cargo_finished_lines": [
+      483,
+      607
+    ],
+    "actual_update_check_lines": [
+      481,
+      577
+    ],
+    "completion_note": "Runner API reports each required step successful; bash -e actual commands and Finished output corroborate success. Numeric per-command exit codes are not separately printed. The cache-save step is skipped by design; required gates are not skipped.",
+    "cache_note": "Existing CI cache restored; source-time helper reports7219/7285 unchanged and66changed/new. This is actual executed Clippy, not a claim of cache-free rebuild.",
+    "warning_note": "One final Node action deprecation warning retained in raw log; not a Rust diagnostic or skipped gate."
+  }
+}

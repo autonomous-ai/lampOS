@@ -1,0 +1,33 @@
+{
+  "own_head": "98db0197c52217b88013a690353355f5d82c6baf",
+  "own_base": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "landed_commit": "e005e5738712348dea22e566acd290f50e92675c",
+  "landed_parent": "1ec64b21de8f77b26b4aa7d27f0f53e39b4027d8",
+  "observed_main": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "landed_is_ancestor": true,
+  "range_diff": "1:  98db0197c5 = 1:  e005e57387 lampOS: bound reset read-only queries and retain failed-reset recovery",
+  "authored_file_bindings": {
+    "lampOS/crates/setup/src/reset.rs": {
+      "own": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+      "landed": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+      "full_blob_mode_equal": true
+    },
+    "lampOS/crates/setup/src/reset/query.rs": {
+      "own": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+      "landed": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+      "full_blob_mode_equal": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "own": "100644 blob d9e1644dc2a13638afa72826f95a77aa73d71132\tlampOS/docs/reuse-decisions.md",
+      "landed": "100644 blob d9e1644dc2a13638afa72826f95a77aa73d71132\tlampOS/docs/reuse-decisions.md",
+      "full_blob_mode_equal": true
+    },
+    "lampOS/docs/setup.md": {
+      "own": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md",
+      "landed": "100644 blob e2034941b5146f039298d0df1300fcee0b4e6e9c\tlampOS/docs/setup.md",
+      "full_blob_mode_equal": false
+    }
+  },
+  "following_consumer_commit": "45b133eeae4a2a287f03e373a209c2e83405a7e4",
+  "note": "Same complete authored patch. Both production blobs and reuse-decisions match; setup.md retains intervening Main documentation. Do not reapply over Sixth query reuse. No whole-current-Main runtime/tree-equality claim."
+}

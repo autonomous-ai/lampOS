@@ -1,0 +1,10 @@
+{
+  "actual_and_preserved_outputs_unchanged": true,
+  "base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "controller_sha256": "3626b691545e6227d474942398f9ddfe919f2267b705c7710b0397e334ac10a5",
+  "head": "405f32be613538d863f659bfbac5e01a5e63567b",
+  "prepared": true,
+  "runtime_executed": false,
+  "scope": "cloud",
+  "source_unchanged": true
+}

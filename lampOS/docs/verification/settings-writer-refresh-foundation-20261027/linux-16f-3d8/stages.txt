@@ -1,0 +1,20 @@
+289: 2026-10-27T08:38:05.5132451Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +27a5cd9bcbc52abdd121a97f7ae33b1aa08a71f7:refs/remotes/pull/3775/merge
+334: 2026-10-27T08:38:11.4536242Z HEAD is now at 27a5cd9 Merge 16f0e1cb27d2796c953ba1e0d0de92f4e37aff53 into 3d8c75558e235c125b9cf953a66a6c193888fd9e
+336: 2026-10-27T08:38:11.5317877Z [command]/usr/bin/git log -1 --format=%H
+337: 2026-10-27T08:38:11.5344004Z 27a5cd9bcbc52abdd121a97f7ae33b1aa08a71f7
+353: 2026-10-27T08:38:20.1318590Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)
+387: 2026-10-27T08:38:20.4569740Z ##[group]Run cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+388: 2026-10-27T08:38:20.4570232Z cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+389: 2026-10-27T08:38:20.4570747Z cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings
+390: 2026-10-27T08:38:20.4636242Z shell: /usr/bin/bash -e {0}
+481: 2026-10-27T08:38:29.3523695Z     Checking lamp-update v0.1.0 (<workspace>/lampOS/crates/update)
+483: 2026-10-27T08:38:31.4764605Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.92s
+484: 2026-10-27T08:38:31.5054767Z ##[group]Run cargo +1.96.0 fmt --all --check
+485: 2026-10-27T08:38:31.5055066Z cargo +1.96.0 fmt --all --check
+486: 2026-10-27T08:38:31.5118375Z shell: /usr/bin/bash -e {0}
+563: 2026-10-27T08:40:26.0733146Z ##[endgroup]
+565: 2026-10-27T08:40:38.3951833Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings
+566: 2026-10-27T08:40:38.3952294Z cargo clippy --locked --workspace --all-targets -- -D warnings
+567: 2026-10-27T08:40:38.4011641Z shell: /usr/bin/bash -e {0}
+577: 2026-10-27T08:40:44.2456419Z     Checking lamp-update v0.1.0 (<workspace>/lampOS/crates/update)
+607: 2026-10-27T08:42:06.5394580Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 27s

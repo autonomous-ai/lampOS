@@ -1,0 +1,32 @@
+{
+  "reason": "compiler-artifact",
+  "package_id": "path+file://<checkout>/lampOS/crates/update#lamp-update@0.1.0",
+  "manifest_path": "<checkout>/lampOS/crates/update/Cargo.toml",
+  "target": {
+    "kind": [
+      "lib"
+    ],
+    "crate_types": [
+      "lib"
+    ],
+    "name": "lamp_update",
+    "src_path": "<checkout>/lampOS/crates/update/src/lib.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": true,
+    "test": true
+  },
+  "profile": {
+    "opt_level": "0",
+    "debuginfo": 2,
+    "debug_assertions": true,
+    "overflow_checks": true,
+    "test": true
+  },
+  "features": [],
+  "filenames": [
+    "<target>/debug/deps/lamp_update-2fc2e5180de6bc32"
+  ],
+  "executable": "<target>/debug/deps/lamp_update-2fc2e5180de6bc32",
+  "fresh": false
+}

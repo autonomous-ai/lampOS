@@ -1,0 +1,49 @@
+{
+  "base_consumed_runtime_changed": true,
+  "files": {
+    "lampOS/Cargo.lock": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob b85c6e3642a4cdbc078eb8d593ab2a5a9158ac6f\tlampOS/Cargo.lock",
+      "old": "100644 blob b85c6e3642a4cdbc078eb8d593ab2a5a9158ac6f\tlampOS/Cargo.lock"
+    },
+    "lampOS/crates/cloud/Cargo.toml": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob 65558e699d91e56ed8447e3091bbda483666ac8e\tlampOS/crates/cloud/Cargo.toml",
+      "old": "100644 blob 65558e699d91e56ed8447e3091bbda483666ac8e\tlampOS/crates/cloud/Cargo.toml"
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob 3416199eef9b60ad07f0a68b669c9caa6019df48\tlampOS/crates/cloud/src/reports.rs",
+      "old": "100644 blob 3416199eef9b60ad07f0a68b669c9caa6019df48\tlampOS/crates/cloud/src/reports.rs"
+    },
+    "lampOS/crates/cloud/src/reports/query.rs": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob 6d603d768711844dd2892419f27fdd063d1db349\tlampOS/crates/cloud/src/reports/query.rs",
+      "old": "100644 blob 6d603d768711844dd2892419f27fdd063d1db349\tlampOS/crates/cloud/src/reports/query.rs"
+    },
+    "lampOS/crates/cloud/src/reports/query_tests.rs": {
+      "full_blob_mode_equal": true,
+      "new": "100644 blob 03fde84f15e7ad5a22079bcea6e8805f3f5fdc57\tlampOS/crates/cloud/src/reports/query_tests.rs",
+      "old": "100644 blob 03fde84f15e7ad5a22079bcea6e8805f3f5fdc57\tlampOS/crates/cloud/src/reports/query_tests.rs"
+    },
+    "lampOS/docs/cloud.md": {
+      "full_blob_mode_equal": false,
+      "new": "100644 blob 048f90f4c56583b9de0bc463f8e35f8d5fe8e70e\tlampOS/docs/cloud.md",
+      "old": "100644 blob 8311a75c9248bf7e54f2c98869c4106a2a29d3aa\tlampOS/docs/cloud.md"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "full_blob_mode_equal": false,
+      "new": "100644 blob bf434a7b6c17bac03e43f0181554bf1824eb6d3f\tlampOS/docs/reuse-decisions.md",
+      "old": "100644 blob 077e3b8148950d335486865ba83fb324d61c2506\tlampOS/docs/reuse-decisions.md"
+    }
+  },
+  "full_new_cloud_gate_required": true,
+  "new_base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "new_head": "405f32be613538d863f659bfbac5e01a5e63567b",
+  "normalized_authored_delta_identical": true,
+  "note": "The ! range-diff marker is only reuse-doc hunk context. Both exact rows retained; no implementation/test delta.",
+  "old_base": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "old_head": "e2c1779abaf5bb13f83d8bc7cbb44bdbf1c0b332",
+  "range_diff": "1:  f39a91130a ! 1:  700b36bc88 lampOS: bound report query pipes and require complete output\n    @@ lampOS/docs/cloud.md: by name, plus `skills` and `cloud`. Units: the product's `\n      the list on the next fresh successful systemd sample. The usual health\n     \n      ## lampOS/docs/reuse-decisions.md ##\n    -@@ lampOS/docs/reuse-decisions.md: systemd job cancellation and reset policy are outside this piece. Exclusive\n    - child ownership and normal-success descendant limits remain explicit; host\n    - controls do not establish installed update acceptance or a hard kernel-I/O\n    - deadline.\n    +@@ lampOS/docs/reuse-decisions.md: two-minute unit allowance); neither a shared 60-second stop limit nor a new\n    + reset-wide deadline is introduced. Query failures keep data and the journal\n    + and take the existing reboot path. Host subprocess controls do not prove\n    + installed reset acceptance or a hard bound on kernel spawn/reap/filesystem I/O.\n     +\n     +## Cloud manager query ownership and complete output (2026-10-27)\n     +\n2:  e2c1779aba = 2:  405f32be61 lampOS: test cloud query caps against endless writers\n",
+  "reuse_doc_exact_new_main_prefix_and_authored_suffix": true
+}

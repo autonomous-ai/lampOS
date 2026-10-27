@@ -1,0 +1,9 @@
+{
+  "base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "branch": "second/cloud-query-bounds",
+  "head": "405f32be613538d863f659bfbac5e01a5e63567b",
+  "remote_before": {
+    "refs/heads/lamp-voice": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+    "refs/heads/second/cloud-query-bounds": "e2c1779abaf5bb13f83d8bc7cbb44bdbf1c0b332"
+  }
+}

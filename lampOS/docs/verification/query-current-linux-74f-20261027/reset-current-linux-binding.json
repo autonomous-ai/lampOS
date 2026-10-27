@@ -1,0 +1,15 @@
+{
+  "attempt": 1,
+  "authored_tree_equal": true,
+  "base": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "conclusion": "success",
+  "head": "98db0197c52217b88013a690353355f5d82c6baf",
+  "preview": "eb0afe05ca98ebabd9554b59070087c27506ad15",
+  "preview_parents": [
+    "74f563606186fd48f3a062976fc6178fc68148d3",
+    "98db0197c52217b88013a690353355f5d82c6baf"
+  ],
+  "run": 40475628470,
+  "tree": "710b1d0aedfc4f9da36cc2060ac3fb7345ca571f",
+  "whole_workspace_pinned_fmt_and_strict_clippy": true
+}

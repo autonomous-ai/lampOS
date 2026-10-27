@@ -1,0 +1,20 @@
+{
+  "head": "fa8ac496353c4679d2ab43e70e37b80f1924296f",
+  "head_status": "fa8 foundation plus exactly three uncommitted continuation files; not current Main",
+  "status": " M lampOS/crates/update/src/writer_refresh.rs\n M lampOS/crates/update/src/writer_refresh/tests.rs\n M lampOS/docs/settings-writer-refresh.md\n",
+  "owned": {
+    "lampOS/crates/update/src/writer_refresh.rs": {
+      "sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "mode": 420
+    },
+    "lampOS/docs/settings-writer-refresh.md": {
+      "sha256": "6d62c397de6e52d46877d954be45e84adbcd7f5d60660fad716cbf2ccd974460",
+      "mode": 420
+    }
+  },
+  "target": "<target>"
+}

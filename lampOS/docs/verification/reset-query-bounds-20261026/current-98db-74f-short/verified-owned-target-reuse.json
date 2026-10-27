@@ -1,0 +1,24 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/Cargo.lock",
+    "lampOS/crates/control/Cargo.toml",
+    "lampOS/crates/control/src/lease.rs",
+    "lampOS/crates/control/src/lib.rs",
+    "lampOS/crates/control/src/pairing.rs",
+    "lampOS/crates/control/src/protocol.rs",
+    "lampOS/crates/control/src/session.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/vi/control_vi.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree. Latest23d0/3d8 short scope succeeded30/0/0; its actual and preserved source/artifact boundary is verified. Current new74f composition uses one runtime thread. Old ff03/737 failure remains historical only, with no causal attribution or waiver. No cold-target or automatic retry claim.",
+  "previous_artifact_closure_sha256": "ac25cc056665982804319fde041cd2c41ce84438d09cf333652370fb8f2fc144",
+  "previous_head": "23d0c3fbbfe050dae1979c0de0b8127e8ed4de60",
+  "previous_runtime_exit_code": 0,
+  "previous_runtime_receipt_sha256": "f732a4346116a7720a2bdf3d4ac3f5b0d09f1717128152ff922738455e106cb5",
+  "previous_source_inventory_sha256": "ac39e374d985e507e954de4ec04b5e20304a9bea0a9f4b4d321f56f19356d39f",
+  "source_worktree": "<review-scratch>",
+  "target": "<review-scratch>"
+}

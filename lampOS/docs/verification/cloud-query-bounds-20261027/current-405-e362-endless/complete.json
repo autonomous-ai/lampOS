@@ -1,0 +1,11 @@
+{
+  "base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "complete": true,
+  "head": "405f32be613538d863f659bfbac5e01a5e63567b",
+  "note": "Preparation and deferred runtime share exact source/configuration and artifact binding. Only this final scope actual paths remain asserted; previous executions keep their own identities.",
+  "scopes": [
+    "cloud"
+  ],
+  "source_entries": 7288,
+  "source_unchanged": true
+}

@@ -1,3 +1,56 @@
+Ready for lamp-voice: Reset delivered; Cloud current-ready; combined #3775 current gate active
+
+## Current checkpoint: 2026-10-27 16:54 +07, recovery API and receipt bug disposition
+
+Reset #3631 is delivered as e005e5738, followed by Sixth's 45b query reuse;
+[incorporation proof](verification/reset-query-bounds-20261026/incorporated-e362.json)
+retains the identical authored patch/production blobs. Its redundant PR is
+closed, branch/history kept, with no reapplication. Cloud #3644 is now
+**405f32be6 / e362659ce**, conflict resolved, [full 206/0/4](verification/cloud-query-bounds-20261027/current-405-e362-endless/README.txt),
+ten controls and source/artifact closure. [Fresh Linux](verification/cloud-query-bounds-20261027/linux-405-e362/README.md)
+actually passes pinned fmt/strict Clippy with exact authored/tested tree;
+R3 READ-OK and Lead's clean-carry direction are retained. It is ready/NEXT
+TRAIN. The earlier pre-runtime 20GiB reserve stop is retained: measured
+pending copies were 87,552,705 bytes, explicit 4GiB reserve and 24.3GiB free;
+4.37GiB duplicate positive-artifact storage was reclaimed without removing
+any failed/negative witness or actual target. Its first current runtime
+passed without recompilation/replay. [Earlier74 host and Linux/reader proof](verification/query-current-linux-74f-20261027/README.md)
+remains separately bound, as do the original ARM results and failures.
+
+#3775's [original 16f ARM qualification](verification/settings-writer-refresh-foundation-20261027/native-16f-3d8/README.md)
+is complete: **7,644 unique PASS / 0 bad/unrun / 53 skipped**, actual 12
+packages/70 binaries, all fourteen new controls once, 34 echoes excluded.
+[Original Linux](verification/settings-writer-refresh-foundation-20261027/linux-16f-3d8/README.md)
+passes actual pinned workspace fmt/strict Clippy. Preview 27a5cd9bc,
+ordered parents 3d8/16f and complete authored tree ad933fb9f match. Artifact
+ZIP and all 49 AArch64 members independently verify; no per-nextest-executable
+hashes are fabricated from a production-only artifact. Separate helpers,
+process, docs and Python regressions retain their own counts.
+
+The [validated recovery-input accessor](verification/settings-writer-refresh-foundation-20261027/recovery-accessor-fa8/README.md)
+passed its exact earlier-source fmt/strict Clippy/full Update library
+**163/0/2**, all eighteen controls. Second folded it into the same foundation
+PR rather than opening a stacked accessor PR. Combined cb97e867da on actual
+Main 1fb93206e4 is in its new complete Update gate, with 18 controls. The first
+current attempt stopped before Rust compilation because offline Cargo
+lacked Main's new rcgen package; normal locked registry resolution then
+passed fmt/Clippy/compilation, runtime active. No runtime failure/retry there.
+Old source counts remain old source counts. The foundation stays unwired;
+no privileged helper copy or actual rollback is claimed.
+
+Bug disposition for #3689's audit: the existing apply completion could
+change setting records for the wrong operation/build. An actual old-source
+probe failed 2/2 library cases and 1/1 round case (the latter incorrectly
+Switched 2); drivers and first failures were retained. The narrow fix now
+passes full library 152/0/2 and selected round 65/0 on its actual e362 source,
+with the parent's own expected identity and permanent forward-field/version
+contract preserved. It is committed as 1863f6d58c on 1fb, exact patch carry,
+awaiting fresh-current qualification before push. It does not replace the
+future guard's artifact/path/postimage authentication. No lamp-run bug was
+observed by this no-lamp builder; this is a reproduced local fault.
+
+---
+
 Ready for lamp-voice: no (#3775 original native/read pending); query clean carries continue
 
 ## Current checkpoint: 2026-10-27 15:39 +07, writer foundation PR opened
