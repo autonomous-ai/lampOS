@@ -332,6 +332,13 @@ const OWN_RANGE_MARGIN: u16 = 20;
 /// stores `range` (registers 9 and 11): the range less `OWN_RANGE_MARGIN`
 /// either side. A servo storing the whole turn, 0..=4095, was never
 /// calibrated by V1 and keeps today's 0..=4095.
+/// A joint off its goal that is nearer it, by more than [`STALL_SLACK`],
+/// than where it last tracked: turning toward a goal that jumped faster
+/// than it turns. A hand holds it there or moves it away.
+fn closing_on(goal: u16, position: u16, tracked_at: u16) -> bool {
+    goal.abs_diff(position) + STALL_SLACK < goal.abs_diff(tracked_at)
+}
+
 fn own_window((min, max): (u16, u16)) -> (u16, u16) {
     if (min, max) == (0, 4_095) {
         (0, 4_095)
@@ -6549,9 +6556,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // Under `--give-way`, a joint held off its goal by more than its
             // tracking while it pushes is a hand too, under the load that
             // ends a run: lamp-52e6's base turned 38 counts by a hand read
-            // 120.
-            let pushed =
-                in_a_hand && off_track[index] >= limits.load_steps.max(1) && is.load > STALL_LOAD;
+            // 120. One still closing on its goal is only following a goal
+            // that jumped faster than it turns, and its load is the move's:
+            // lamp-52e6 on 27 Oct "met resistance" 98 times in four hours
+            // with nobody near, each a two-second hitch in a glance.
+            let following = closing_on(written[index], is.position, on_track_at[index]);
+            let pushed = in_a_hand
+                && off_track[index] >= limits.load_steps.max(1)
+                && is.load > STALL_LOAD
+                && !following;
             if over_load[index] >= limits.load_steps.max(1) || pushed || touched {
                 // Something resists. A living thing stops pushing; it does
                 // not faint. The joint's goal becomes where it is and it is

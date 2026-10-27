@@ -175,6 +175,15 @@ all motion until someone started the body again: on lamp-4ace that happened
 twice in a quarter of an hour, at 217 and at 190 on the head joint, with
 nothing in its way either time.
 
+Under `--give-way`, a joint off its goal by more than its tracking for six
+steps while it reads over 100 gives way too, as a hand holding it; but not
+one that has come nearer its goal, by more than 6 counts, than where it last
+tracked (`closing_on`): that one is following a goal that jumped faster than
+it turns, and its load is the move's. On lamp-52e6 on 27 October, before
+this, the head pitch and the base gave way 98 times in four hours with
+nobody near, each a two-second hitch in a glance
+(`a_joint_closing_on_its_goal_is_following_not_pushed`).
+
 The bounds for the head and the base were 170 and 150 until 2026-10-13.
 With everything above in place the head still gave way now and then when
 it began to lift from rest, reading 173 to 203 for a little over 120 ms
