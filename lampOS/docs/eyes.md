@@ -2366,8 +2366,12 @@ runs on the look as with it alone, one mesh a look whose points a
 Blendshape V2 read due on that face takes (above). The largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
-With `--full-look` (the product's 1280 by 960) it is cut from the frame at
-its own size instead (`mesh::crop_full`): the detector's box and marks are
+With `LAMP_EYES_MOUTH_FULL_LOOK=on` and `--full-look` (the product's 1280
+by 960) it is cut from the frame at its own size instead
+(`mesh::crop_full`). The switch is off in the product until a silent, still
+face at the desk is measured to read `no` on those crops at
+`MESH_SPEAKING_AT`, and someone off camera speaking is not given that face
+(a false `yes` would give a silent known person another's line, #3679): the detector's box and marks are
 scaled back to the frame's pixels, as `LAMP_FACE_FULL_CROP=on` does for a
 print (`who::align_full`), and the frame is the one the look's picture was
 shrunk from, kept for the look, never a second decode. On lamp-52e6 a face
@@ -2383,7 +2387,7 @@ the product: it is a line a look, up to four a second) the journal says
 `lamp-eyes: mouth open 0.0123 eyes 31 px (124 px meshed) mesh 84 ms`. That
 is the inner lips' gap (points 13 and 14) over the face's height (10 to
 152), the eye distance in detector pixels and in the pixels the mesh's crop
-was cut from (the same without `--full-look`), and the time. No picture is kept.
+was cut from (the same without the switch), and the time. No picture is kept.
 
 With `LAMP_EYES_SPEAKING=on` as well, that face's `speaking` reads the
 mesh instead of the corners whenever every look in its 2 s window had the
@@ -2454,14 +2458,15 @@ emitted without a valid largest box or without the already enabled judge. If
 that tallest box is clipped to zero area, it does not substitute a smaller face.
 
 Coordinates and the 24 px gate are in **working-detector pixels**, not the
-mesh crop's 256-square coordinates, with one exception: with `--full-look`,
+mesh crop's 256-square coordinates, with one exception: with the mouths cut
+from the full look (`LAMP_EYES_MOUTH_FULL_LOOK=on`),
 a window the mesh read on every look holds its mean eye distance to 24 px in
 the frame's own pixels (`Mouths::set_mesh_scale`, four a detector pixel at
 1280 by 960), since those are the pixels the mesh saw, and
 `window_mean_eyes_px` says that value; `eyes_px` stays the detector's. A
 window with a look the mesh missed is judged by the corners, on the
 detector's marks, so it is gated in the detector's pixels as before. Without
-`--full-look` nothing changes. `filled` excludes padding; the existing
+the switch or `--full-look` nothing changes. `filled` excludes padding; the existing
 camera-open line gives capture dimensions. The frame is shrunk uniformly to
 fit 320 by 256, never enlarged; a 320 by 240 capture adds sixteen black rows,
 without stretching. Mesh crop upsampling does not change `eyes_px`. The box
