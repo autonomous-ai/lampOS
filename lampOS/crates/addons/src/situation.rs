@@ -326,6 +326,7 @@ mod tests {
             attention: None,
             familiarity: lamp_msgs::Familiarity::Unknown,
             familiar: None,
+            felt: None,
             breath: None,
         }
     }

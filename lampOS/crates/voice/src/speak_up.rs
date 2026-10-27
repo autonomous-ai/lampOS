@@ -277,6 +277,7 @@ mod tests {
             attention: None,
             familiarity: lamp_msgs::Familiarity::Unknown,
             familiar,
+            felt: None,
             breath: None,
         };
         let mut mood = bus

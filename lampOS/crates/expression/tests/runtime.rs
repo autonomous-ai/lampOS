@@ -722,6 +722,7 @@ mod sleep_name {
                     attention: None,
                     familiarity: lamp_msgs::Familiarity::Unknown,
                     familiar: None,
+                    felt: None,
                     breath: Some(lamp_msgs::MoodBreath {
                         phase: *phase,
                         pace: lamp_msgs::mood_pace(0.7, *energy, false),
@@ -1303,6 +1304,7 @@ fn mood_in_reads_only_a_fresh_valid_state_from_mood() {
         attention: None,
         familiarity: Familiarity::Unknown,
         familiar: None,
+        felt: None,
         breath: Some(MoodBreath {
             phase: 0.5,
             pace: lamp_msgs::mood_pace(0.85, energy, false),

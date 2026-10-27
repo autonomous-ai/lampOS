@@ -1,8 +1,8 @@
 //! A deterministic, temporary inner state. Time and observations are supplied
 //! by the caller; this module performs no I/O and owns no output permission.
 use lamp_msgs::{
-    AttentionTarget, ClockStamp, FamiliarLevel, Familiarity, MOOD_BREATH_US, MoodBreath, MoodState,
-    SeemsKind, mood_pace, plain_breath_phase,
+    AttentionTarget, ClockStamp, FamiliarLevel, Familiarity, Felt, FeltKind, MOOD_BREATH_US,
+    MoodBreath, MoodState, SeemsKind, mood_pace, plain_breath_phase,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -57,6 +57,9 @@ pub const TONE_LIVELY: f32 = 0.6;
 /// How sure the voice must be of its arousal for it to count.
 pub const TONE_SURE: f32 = 0.6;
 const LIVELY_ENERGY: f64 = SMILE_ENERGY / 2.0;
+/// How long glad or lively is said on `mood/state` after what made it
+/// (#3691); low is said for its two-minute spell ([`QUIET_US`]).
+pub const FELT_HOLD_US: u64 = 20 * SECOND_US;
 
 /// What a line's tone counts as, if anything.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -297,6 +300,8 @@ pub struct Engine {
     breath_phase: f64,
     /// The newest add-on nudge (#2530); none after it ends or in sleep.
     nudge: Option<Nudge>,
+    /// The newest feeling (#3691), replaced by the next; none in sleep.
+    felt: Option<Felt>,
 }
 
 impl Engine {
@@ -335,6 +340,7 @@ impl Engine {
             quiet_until_us: None,
             breath_phase: plain_breath_phase(now_us),
             nudge: None,
+            felt: None,
         })
     }
 
@@ -417,6 +423,7 @@ impl Engine {
                 phase: (self.breath_phase as f32).min(1.0 - f32::EPSILON),
                 pace: self.pace(),
             }),
+            felt: self.felt_at(now_us),
         };
         state.check().map_err(|_| Reject::InvalidSnapshot)?;
         Ok(state)
@@ -435,6 +442,19 @@ impl Engine {
         self.familiar
             .filter(|(_, until_us)| now_us < *until_us)
             .map(|(level, _)| level)
+    }
+
+    /// The feeling while it holds: low only while its quiet spell does,
+    /// which ends early when nobody is near.
+    fn felt_at(&self, at_us: u64) -> Option<Felt> {
+        self.felt.filter(|felt| {
+            at_us < felt.until_us && (felt.kind != FeltKind::Low || self.quiet_at(at_us))
+        })
+    }
+
+    /// A feeling seen at `observed`, replacing any older one.
+    fn feel(&mut self, kind: FeltKind, until_us: u64) {
+        self.felt = Some(Felt { kind, until_us });
     }
 
     fn pace(&self) -> f32 {
@@ -485,6 +505,7 @@ impl Engine {
             || (self.energy() - next.energy()).abs() >= CHANGE_DELTA
             || (self.warmth() - next.warmth()).abs() >= CHANGE_DELTA
             || self.familiar_at(self.now_us) != next.familiar_at(next.now_us)
+            || self.felt_at(self.now_us) != next.felt_at(next.now_us)
     }
 
     fn activity(&mut self, observed_us: u64) {
@@ -549,6 +570,7 @@ impl Engine {
                 );
                 if kind {
                     self.warm(observed, 0.05);
+                    self.feel(FeltKind::Glad, observed.saturating_add(FELT_HOLD_US));
                 }
             }
             EventKind::UserReminder => {
@@ -666,6 +688,7 @@ impl Engine {
         match self.seems_run {
             Some((SeemsKind::Positive, SMILE_READS)) => {
                 self.quiet_until_us = None;
+                self.feel(FeltKind::Glad, observed.saturating_add(FELT_HOLD_US));
                 self.brighten(now_us, observed, SMILE_ENERGY, SMILE_WARMTH);
             }
             Some((SeemsKind::Negative, LOW_READS)) => self.keep_quiet(observed),
@@ -685,9 +708,13 @@ impl Engine {
         match kind {
             ToneKind::Glad => {
                 self.quiet_until_us = None;
+                self.feel(FeltKind::Glad, observed.saturating_add(FELT_HOLD_US));
                 self.brighten(now_us, observed, SMILE_ENERGY, SMILE_WARMTH);
             }
-            ToneKind::Lively => self.brighten(now_us, observed, LIVELY_ENERGY, 0.0),
+            ToneKind::Lively => {
+                self.feel(FeltKind::Lively, observed.saturating_add(FELT_HOLD_US));
+                self.brighten(now_us, observed, LIVELY_ENERGY, 0.0);
+            }
             ToneKind::Low if self.face.is_some() => self.keep_quiet(observed),
             ToneKind::Low => {}
         }
@@ -712,9 +739,11 @@ impl Engine {
     }
 
     /// Someone low, by their face or their words: two minutes' quiet while a
-    /// face is near, and a startle's energy let go.
+    /// face is near, felt as low, and a startle's energy let go.
     fn keep_quiet(&mut self, observed: u64) {
-        self.quiet_until_us = Some(observed.saturating_add(QUIET_US));
+        let until_us = observed.saturating_add(QUIET_US);
+        self.quiet_until_us = Some(until_us);
+        self.feel(FeltKind::Low, until_us);
         self.energy_pulse = 0.0;
     }
 
@@ -754,6 +783,7 @@ impl Engine {
         self.seems_run = None;
         self.quiet_until_us = None;
         self.nudge = None;
+        self.felt = None;
     }
 
     fn maybe_sleep(&mut self, at_us: u64) {
