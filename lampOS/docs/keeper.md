@@ -390,7 +390,7 @@ keeps its own:
   account's, `orangepi` on a V1 image).
 - The voice's recorded failure lines (#2943), last, in
   `/var/lib/lampOS/voice/notices`, the folder the generic voice unit
-  names: the six files `deploy/product/models.json` pins under
+  names: the five files `deploy/product/models.json` pins under
   `/opt/lampOS/voice/notices`, fetched from their release and checked by
   size and SHA-256 with `lamp-update install`'s own code
   (`install::place_moved_notices`). Only a missing one is fetched; one there

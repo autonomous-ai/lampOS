@@ -56,7 +56,7 @@ No wording or voice has been approved.
 
 | Field | Rule |
 |---|---|
-| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) or `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) or `going_to_sleep` (#3697: the safe shutdown's line, asked the same way, `shutdown.md`) |
+| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) or `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) |
 | `language` | A BCP 47 tag, matched exactly. `en` does not satisfy `en-US` |
 | `transcript` | The words in the recording, 1 to 240 bytes, no control characters. Kept for records and review; never sent anywhere to be spoken |
 | `voice`, `voice_revision` | What produced the recording, 1 to 64 bytes each |
@@ -238,7 +238,6 @@ the install change merges.
 | `back_online` | "I'm back online." | `back-online.en-US.wav` |
 | `voice_service_unreachable` | "Sorry, I'm having trouble thinking right now. Give me a moment." | `voice-service-unreachable.en-US.wav` |
 | `wifi_lost` | "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again." | `wifi-lost.en-US.wav` |
-| `going_to_sleep` | "Going to sleep now. Unplug me when my light turns green." (`shutdown::GOING_TO_SLEEP`) | `going-to-sleep.en-US.wav` |
 
 The `wifi_lost` words above are the new ones (#3743), naming the RESET
 pinhole on the back of the base. The clip `wifi-lost.en-US.wav` pinned in
@@ -246,15 +245,11 @@ pinhole on the back of the base. The clip `wifi-lost.en-US.wav` pinned in
 changed, hold the reset button for five seconds."). A lamp plays the clip, so
 the new words arrive from the next notices release.
 
-The first four are in the release `notices-2026-10-20`. The fifth, the safe
-shutdown's line (#3697), was rendered on 27 Oct the same way
-(`render_line_second`, Rachel, `eleven_v4_turbo`, 3.47 s, mean -19.6 dBFS
-against the others' -16.4 to -22.0), and it and the manifest that names all
-five are in `notices-2026-10-27`. Each is pinned by size and SHA-256 in
-`deploy/product/models.json`. `lamp-update install`
+They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
+size and SHA-256 in `deploy/product/models.json`. `lamp-update install`
 places them in `/opt/lampOS/voice/notices`, the folder the product unit's
 `--failure-notice-dir` names. A lamp moved from V1 gets no install, and its
-package carries no notices, so `lamp-keeper prepare` places the same six
+package carries no notices, so `lamp-keeper prepare` places the same five
 files, by install's own fetch and check, in `/var/lib/lampOS/voice/notices`
 (#2943, [keeper.md](keeper.md)): only a missing one, and a failed fetch is
 said, never a refusal. The generic voice unit (`deploy/units`) names that
@@ -262,10 +257,7 @@ folder, in the product unit's language, held to both by `lamp-update`'s
 unit test. Not the product's folder: the package's packager takes every
 `/opt/lampOS` path in a unit for one it carries. The manifest lists every kind, so it goes only
 onto a voice that knows them all: `wifi_lost` is known from `a441fea06`,
-build 4142 on, and `going_to_sleep` from the build that brings the shutdown's
-recording (#3697). A moved lamp's keeper keeps a manifest already there, so
-there the shutdown's line is `not_provisioned` and the shutdown sends the
-words instead.
+build 4142 on.
 
 ## When a line is missing: the lamp's sigh (#2943)
 
