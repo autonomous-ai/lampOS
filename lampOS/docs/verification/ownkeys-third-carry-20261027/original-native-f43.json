@@ -1,0 +1,1195 @@
+{
+  "Root_independent_raw_ordinal_check": {
+    "complete_ordinal_set": true,
+    "exact_post_summary_reprints": 35,
+    "independent_unique_PASS": 11754,
+    "limits": "Raw ordinal/status census only; detailed311 source witness and docs/custom receipts remain separately bound. No Memory semantics, workflow rerun or native reexecution.",
+    "raw_log_sha256": "0e780d417d76d59634f1da9ba955e36a629035188c42c5f25ef30c24169044dc",
+    "structured_failure_retry_markers_observed": 0
+  },
+  "raw_private_sha256": "62345e0b3d582d29b055922aba0ecc13d053e24445957a583fc8632541b71bb6",
+  "receipt": {
+    "all_native_phase_handles_closed": {
+      "64713": "watch controller0",
+      "66486": "Linux collection0",
+      "81639": "ARM collection0",
+      "97486": "source binding0",
+      "auditors_and_finish": "closed0 synchronous"
+    },
+    "attempt_inventory": {
+      "attempt_failure_retry_marker_count": 0,
+      "raw_log_preserved_complete": true,
+      "sha256": "ce67ecd6376dca361c58dc2ac48246efdef2767b2dfaa130c89d9f9599790b1f",
+      "status_terminal_count": 11754,
+      "stderr_marker_count": 0,
+      "workflow_automatic_retry_observed": false
+    },
+    "authored_f43_host303_proof_standalone_sha256": "da0a49dcf6d3bf09348a205ebee9fcc400121489dcc4c55c33db969bff1ddec7",
+    "custom_harness_separate": {
+      "process13_0": true,
+      "relay_signals_ok": true
+    },
+    "docs_separate": {
+      "failed": 0,
+      "headings": 47,
+      "ignored": 0,
+      "incomplete_group": null,
+      "interleaved_groups": [],
+      "passed": 4,
+      "step_conclusion": "success",
+      "summaries": 47
+    },
+    "hashes": {
+      "arm-checkout.json": "dda2c0c7554cce4dab88c524d8c0e61d81ac1d7fad8f79f0a7382ac95d3fb30a",
+      "arm-job.log": "0e780d417d76d59634f1da9ba955e36a629035188c42c5f25ef30c24169044dc",
+      "arm-jobs.json": "7492801de8ad06cfa7b0f3fbb59b4a70d0b53de5d6651cd24c741ea2dc4223a1",
+      "arm-original-attempt.json": "62c1edf2a6c5fd3c2b4b226ffff14704405672770555c3d56a0b82b606e6df85",
+      "arm-receipt.json": "b83c981da786d742e25f529fe3a85d1cd9469462f5002fef62f6f6e5d5dd7dbb",
+      "arm-run.json": "c237e990a5d7834d4d2c098b95483267cdb7247f390c62f206c613eba8ac5f75",
+      "audit-arm.py": "adaaa5682911445613fd2ebb834ec793c1a5db4a69abeadc5c39b944010a1558",
+      "audit-linux.py": "490f7972399f70eb9463edb720562311665b44b2eadd48be1f5b6e6ca875dc75",
+      "authored-census.json": "7410c06d9e62d3c5eb6e004bb99069c6db7b9da0467275d9c702119c2eecc43f",
+      "bind-overlay-payloads.py": "2bc935b380874da585de1370945eef36fbcbd913071a7f82d1d8b0a16d11b9dc",
+      "bind-preview-source.py": "9783fab42daa06c55c520ed2df85f309e4c47527bfe2dcc76c8fc72f39264d94",
+      "census-helper-routing-failure.json": "8d13bb1cc7fb650b4a3ec67fc0dd164e99d8846ac6e3e375f531a65a5177eced",
+      "collect-original.py": "205c42367e90caaea4315d5e15935db1a91a318ff5c67e8c9ad2352a0f5b5cea",
+      "finish-native-packet.py": "96e1e74f63a27f025416e87ac7ea1c06695846b71778ab1487361c60417fdf3d",
+      "inventory-attempts.py": "700c622bb08d7d469bb88d8efce00dfd37cd251d8b1c66111254ae94c5507a31",
+      "linux-checkout.json": "6f5e94c982739284dcf1cba4c4612175406b6ef5a3724ddb140fc4129166ba5d",
+      "linux-job.log": "486a6ebb454d94e3a170b2edca01c403618b2ec39c2868caaaa708b502541966",
+      "linux-jobs.json": "9b963e8f51d0f10d65d704f0a93621bdbe008459ec6a89992b62de9f362fcbdf",
+      "linux-original-attempt.json": "b49d28352d95bbd4c1d457bc355a5a6bbd585acea023c635b74bb7137758f50d",
+      "linux-receipt.json": "869d7da1f1f851b55fc72bb8c80198a6a4f263930a2951ea651e239a4c227b89",
+      "linux-run.json": "e0addd718fb9077e7fea66df8ce935ec891024d32bccaed91ea7674b594dc316",
+      "native-attempt-inventory.json": "ce67ecd6376dca361c58dc2ac48246efdef2767b2dfaa130c89d9f9599790b1f",
+      "overlay-raw-payload-bindings.json": "012ce165da1d898abdd99cfe981073b12e51bfd6657fc9acc06cf892e4f373e9",
+      "preview-dd29c4743631adab450ee009e38990075bea1b81-fetch.json": "c05d0292b7b65ef262e9f1ca06560670fb7aab8b95b1915ebeb6ab2a5805787f",
+      "preview-dd29c4743631adab450ee009e38990075bea1b81-source-bindings.json": "706cf956a863328d4cb1b3f4fceb3bee6f400afa6fc29cbf4bc7df710dbf293c",
+      "remember-preexisting-bytes-proof.json": "22b90734eab62f8412ceb499bc21d6cf13f350ef28b22feb36ae8ad6db3b2be2",
+      "source-bindings-summary.json": "a299e6a4e286a1080720a679f145a3f978d05128bb672982214cb6f60cdb0800",
+      "watch-controller.terminal.json": "18677b57ab703e4775f707842ad7e20c0f026abe37176e09554da5d4bde449ed",
+      "watch-original.py": "a678e109af28f3b6694efdaac901e0bd95c87898ba2d08f731204d682acafb69"
+    },
+    "helper_failure_observation": {
+      "count": 1,
+      "scope": "Source-only census filepath routing, preserved and corrected; not compiler/test/native failure or rerun."
+    },
+    "historical_holds": [
+      "PR3646 stays DRAFT behind broker prerequisite2094.",
+      "Original539 Reader failure remains unexplained/unwaived; current passing row is a different original run/preview observation.",
+      "Physical/device/provider/key activation and latency acceptance are not granted."
+    ],
+    "holds": [],
+    "native_package_filter": {
+      "command_lines": [
+        {
+          "line": 780,
+          "text": "##[group]Run echo \"cores: $(nproc)\""
+        },
+        {
+          "line": 781,
+          "text": "echo \"cores: $(nproc)\""
+        },
+        {
+          "line": 782,
+          "text": "filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'"
+        },
+        {
+          "line": 783,
+          "text": "if [ -n \"$PICKED\" ]; then filter=\"$filter & ($PICKED)\"; fi"
+        },
+        {
+          "line": 784,
+          "text": "cargo nextest run --locked --release --workspace \\"
+        },
+        {
+          "line": 785,
+          "text": "  --profile pr \\"
+        },
+        {
+          "line": 786,
+          "text": "  --no-tests=pass -j num-cpus \\"
+        },
+        {
+          "line": 787,
+          "text": "  --partition hash:1/1 \\"
+        },
+        {
+          "line": 788,
+          "text": "  -E \"$filter\""
+        },
+        {
+          "line": 789,
+          "text": "shell: /usr/bin/bash -e {0}"
+        },
+        {
+          "line": 790,
+          "text": "env:"
+        },
+        {
+          "line": 791,
+          "text": "  PICKED: "
+        }
+      ],
+      "scope": "--release --workspace, profile pr, hash:1/1; PICKED empty. Filter explicitly excludes only relay_signals and turn-end process binaries, which run separately in docs/custom-harness step."
+    },
+    "nextest": {
+      "bad_statuses": [],
+      "executed_ordinal_unrun": 0,
+      "named_skips": [],
+      "per_package_PASS": {
+        "lamp-actions": 123,
+        "lamp-addons": 50,
+        "lamp-air": 27,
+        "lamp-audio": 193,
+        "lamp-body": 656,
+        "lamp-bus": 107,
+        "lamp-camera": 90,
+        "lamp-cloud": 207,
+        "lamp-control": 47,
+        "lamp-controls": 517,
+        "lamp-ears": 76,
+        "lamp-environment": 12,
+        "lamp-expression": 341,
+        "lamp-eyes": 342,
+        "lamp-gemini": 285,
+        "lamp-health": 91,
+        "lamp-ipc": 52,
+        "lamp-keeper": 42,
+        "lamp-lean": 61,
+        "lamp-local-time": 11,
+        "lamp-memory": 338,
+        "lamp-mood": 124,
+        "lamp-msgs": 179,
+        "lamp-name": 44,
+        "lamp-near-call": 9,
+        "lamp-observer": 46,
+        "lamp-peek": 26,
+        "lamp-policy": 286,
+        "lamp-records": 193,
+        "lamp-ring": 53,
+        "lamp-same-voice": 5,
+        "lamp-schedule": 215,
+        "lamp-selftest": 85,
+        "lamp-settings": 49,
+        "lamp-setup": 197,
+        "lamp-skills": 558,
+        "lamp-sound-fixtures": 15,
+        "lamp-station": 69,
+        "lamp-surround": 268,
+        "lamp-tasks": 226,
+        "lamp-turn-end": 32,
+        "lamp-turn-end-wire": 5,
+        "lamp-turn-owner": 37,
+        "lamp-update": 521,
+        "lamp-voice": 4219,
+        "lamp-voice-eval": 623,
+        "lamp-voice-processes": 2
+      },
+      "selection_and_profile_evidence": [
+        {
+          "line": 784,
+          "text": "cargo nextest run --locked --release --workspace \\"
+        },
+        {
+          "line": 791,
+          "text": "  PICKED: "
+        },
+        {
+          "line": 830,
+          "text": " Nextest run ID 1bbfa576-ba1a-4f33-8646-aacc812b0e0f with nextest profile: pr"
+        },
+        {
+          "line": 831,
+          "text": "    Starting 11754 tests across 187 binaries (106 tests and 2 binaries skipped)"
+        }
+      ],
+      "status_counts": {
+        "PASS": 11754
+      },
+      "summary": {
+        "executed": 11754,
+        "failed": 0,
+        "line": 12587,
+        "passed": 11754,
+        "raw_suffix": "11754 passed, 106 skipped",
+        "selected": 11754,
+        "skipped": 106
+      },
+      "summary_skips_not_named_or_unrun_inferred": 106,
+      "unique_executed": 11754,
+      "unmatched_post_summary_rows": [],
+      "verified_post_summary_reprints": 35
+    },
+    "observed_native_gate_scope_limits": [
+      "ARM full original release/pr/hash1of1 selection has11754 unique PASS;106 summary skips have no inferred named status.35 exact post-summary reprints are not executions.",
+      "311 required names pass in actual preview;303 authored host proof remains standalone. Preview source/equality flags do not transfer wholef43 source/runtime equivalence.",
+      "No observed nextest TRY/RETRY/FLAKY/FAIL attempt markers in this original raw log; no assumption that workflow retry policy is disabled. Entire original text logs/stderr retained.",
+      "Docs4passes/47headings and relay/process13 are separate from nextest; interleaved groups only attributed as observed (none here).",
+      "7546 guarded committed source paths are not all claimed consumed by selected303. Private27helpers/34depinfos/34actual+34saved remain host-only and never map to preview Git entries.",
+      "Only opaque source hashes/known authorized protocol fixture names/raw function bytes and hunk ranges inspected for Memory-related paths; no Memory/Friday semantic review.",
+      "No workflow rerun/cancel/manualdispatch, no local Cargo/rebase/push or binary artifact download/execution/signature/device claim. GenericCI40539297215 is outside this two-gate packet."
+    ],
+    "old539_Reader_current_observation_only": {
+      "rows": [
+        {
+          "binary": "lamp-voice",
+          "duration": "0.009s",
+          "line": 11270,
+          "name": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+          "ordinal": 10439,
+          "status": "PASS",
+          "total": 11754
+        }
+      ],
+      "scope": "Current originalf43 observation only; no cause, repair, or waiver inferred for original539 failure."
+    },
+    "raw_logged_toolchain_triples": {
+      "arm": [
+        {
+          "line": 327,
+          "text": "info: default host tuple is aarch64-unknown-linux-gnu"
+        },
+        {
+          "line": 331,
+          "text": "info: default toolchain set to 1.96.0-aarch64-unknown-linux-gnu"
+        },
+        {
+          "line": 333,
+          "text": "  1.96.0-aarch64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)"
+        },
+        {
+          "line": 627,
+          "text": "host: aarch64-unknown-linux-gnu"
+        }
+      ],
+      "linux": [
+        {
+          "line": 333,
+          "text": "info: default host tuple is x86_64-unknown-linux-gnu"
+        },
+        {
+          "line": 337,
+          "text": "info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu"
+        },
+        {
+          "line": 339,
+          "text": "  1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)"
+        }
+      ]
+    },
+    "required_current_name_coverage": {
+      "Linux_once_PASS": 8,
+      "Linux_required": 8,
+      "active_required": 311,
+      "host_once_PASS": 303,
+      "host_required": 303,
+      "once_PASS": 311,
+      "ownLinux6_once_PASS": 6,
+      "own_once_PASS": 71,
+      "own_required": 71,
+      "required_selected_missing_or_nonpass": 0,
+      "upstreamBodyLinux2_once_PASS": 2
+    },
+    "runs": {
+      "arm": {
+        "all_job_summaries": [
+          {
+            "conclusion": "success",
+            "id": 122313021846,
+            "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 122313023949,
+            "name": "lampOS \u2014 promote a tested release to the stable feed",
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 122322268693,
+            "name": "report-full-run-failure",
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 122322269473,
+            "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+            "status": "completed"
+          }
+        ],
+        "complete_text_job_log_sha256": "0e780d417d76d59634f1da9ba955e36a629035188c42c5f25ef30c24169044dc",
+        "event": "pull_request",
+        "event_head": "f43b550430ac65be20c218681be3b8fc4fbda43e",
+        "job_conclusion": "success",
+        "job_count": 4,
+        "job_id": 122313021846,
+        "job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "job_status": "completed",
+        "original_attempt_endpoint_conclusion": "success",
+        "original_attempt_endpoint_status": "completed",
+        "run_attempt": 1,
+        "run_id": 40539307194,
+        "shard_scope": "1/1",
+        "watcher": {
+          "at": "2026-10-27T16:33:04.630309+00:00",
+          "driver_reaped": true,
+          "elapsed_seconds": 871.5120831489912,
+          "error": null,
+          "job": 122313021846,
+          "process_group": "absent",
+          "returncode": 0,
+          "run": 40539307194,
+          "timed_out": false,
+          "watcher_only_cleanup": [],
+          "workflow_modified": false
+        },
+        "workflow_aggregate_conclusion": "success",
+        "workflow_aggregate_status": "completed"
+      },
+      "linux": {
+        "all_job_summaries": [
+          {
+            "conclusion": "success",
+            "id": 122313022409,
+            "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+            "status": "completed"
+          }
+        ],
+        "complete_text_job_log_sha256": "486a6ebb454d94e3a170b2edca01c403618b2ec39c2868caaaa708b502541966",
+        "event": "pull_request",
+        "event_head": "f43b550430ac65be20c218681be3b8fc4fbda43e",
+        "job_conclusion": "success",
+        "job_count": 1,
+        "job_id": 122313022409,
+        "job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+        "job_status": "completed",
+        "original_attempt_endpoint_conclusion": "success",
+        "original_attempt_endpoint_status": "completed",
+        "run_attempt": 1,
+        "run_id": 40539307052,
+        "shard_scope": "single observed required Linux job",
+        "watcher": {
+          "at": "2026-10-27T16:27:41.044922+00:00",
+          "driver_reaped": true,
+          "elapsed_seconds": 547.8172570699826,
+          "error": null,
+          "job": 122313022409,
+          "process_group": "absent",
+          "returncode": 0,
+          "run": 40539307052,
+          "timed_out": false,
+          "watcher_only_cleanup": [],
+          "workflow_modified": false
+        },
+        "workflow_aggregate_conclusion": "success",
+        "workflow_aggregate_status": "completed"
+      }
+    },
+    "source_comparison": {
+      "actual_preview_declarations_present": 311,
+      "changed_control_declaration_files": [
+        "lampOS/crates/voice/src/remember.rs"
+      ],
+      "changed_qualified_source_paths": [
+        "lampOS/crates/control/tests/doc_examples.rs",
+        "lampOS/crates/policy/tests/it/policy.rs",
+        "lampOS/crates/voice/src/remember.rs",
+        "lampOS/deploy/product/lamp-voice.service",
+        "lampOS/docs/control.md",
+        "lampOS/docs/control.schema.json",
+        "lampOS/docs/memory-days.md",
+        "lampOS/docs/skill-format.md",
+        "lampOS/docs/skills.md",
+        "lampOS/docs/switches.md",
+        "lampOS/docs/vi/memory-days_vi.md",
+        "lampOS/sdk/js/README.md",
+        "lampOS/sdk/js/src/control.schema.json",
+        "lampOS/sdk/mcp/src/lamp_mcp/server.py",
+        "lampOS/sdk/mcp/tests/test_server.py",
+        "lampOS/sdk/python/README.md",
+        "lampOS/sdk/python/pyproject.toml",
+        "lampOS/sdk/python/src/lampos/cli.py",
+        "lampOS/sdk/python/src/lampos/control.schema.json",
+        "lampOS/skills/desk-tutor/skill.toml",
+        "lampOS/skills/look-for-things/skill.toml",
+        "lampOS/skills/point-light/skill.toml"
+      ],
+      "control_declaration_files": 59,
+      "control_files_blob_and_mode_equal": 58,
+      "owned38_blob_and_mode_equal": 36,
+      "owned38_total": 38,
+      "owned_changed_paths": [
+        "lampOS/deploy/product/lamp-voice.service",
+        "lampOS/docs/switches.md"
+      ],
+      "private_host_only_guard_partition": {
+        "actual_executable_paths": 34,
+        "depinfo_file_paths": 34,
+        "private_runtime_helper_pin_count": 27,
+        "saved_executable_paths": 34,
+        "scope": "Host-only private helper/dep-info/artifact evidence counts; none mapped to or claimed as preview Git source entries. Raw physical source guard metadata remains host-only too."
+      },
+      "qualified_source_guard_partition": {
+        "blob_and_mode_equal": 7524,
+        "committed_absent_in_preview": 0,
+        "committed_present_in_preview": 7546,
+        "qualified_guarded_source_paths_total": 7546,
+        "scope": "Metadata comparison of guarded source inventory; not all paths claimed consumed by selected303. Only committed source paths are preview Git entries; no private raw/helper/dep-info target inputs are included.",
+        "total": 7546,
+        "uncommitted_or_unmatched_count": 0
+      },
+      "remember_exact_required_function_bodies": 12,
+      "remember_helper_behavior_equivalence_inferred": false,
+      "remember_preexisting_bytes_preserved_except104_inserted_lines": true,
+      "remember_required_functions": 12,
+      "retained_OwnKeys_payloads": {
+        "additional_environment_assignments_exactly_Main_values": true,
+        "all_authored_unit_added_payload_lines_survive_in_order_exactly": true,
+        "authored_LAMP_OWN_KEYS": "on",
+        "authored_unit_added_payload_sha256": "2caf8805b7a46aecdc6a2576d32950fb727046054b65427b898d309af249ce18",
+        "exact_own_keys_switch_row_equal": true,
+        "only_Main_added_environment_rows": true,
+        "original_authored_net_unit_added_payload_lines": 9,
+        "own_keys_on_in_both": true,
+        "own_keys_row_sha256": "c203f2cbd3c1c3db32f124e41df4ae4ece206794ea9c66165b24691deb0b0b20",
+        "parsed_environment_added_names": [
+          "LAMP_MEMORY_JOURNAL_RESUMES"
+        ],
+        "parsed_environment_removed_names": [],
+        "parsed_existing_environment_changed_names": [],
+        "preview_LAMP_OWN_KEYS": "on",
+        "scope": "Literal systemd Environment assignment parser, safe product unit names only; additional names reported without values. Entire authored OwnKeys unit-added raw line payload and exact switch row retained; whole unit/doc file equality remains false.",
+        "switches_path": "lampOS/docs/switches.md",
+        "unit_path": "lampOS/deploy/product/lamp-voice.service",
+        "whole_unit_byte_equal": false
+      }
+    },
+    "source_identity": {
+      "actual_Main_base": "197f21533736cc99a1e1a819721a5a96ff8f3033",
+      "actual_preview_tree_API_and_fetched_Git": "22b45b4aaccc7c1e5bee778e7045dad966c0387b",
+      "authored_frozen_base": "3c9838fea6591410cdf534d27088615021c8df30",
+      "authored_head": "f43b550430ac65be20c218681be3b8fc4fbda43e",
+      "authored_to_preview_changed_paths": [
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "7dabd5896c3854af773b5feaf624b65c6674dfb7",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "b42266d96bb27527e34557977658931f42944518",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/tests/doc_examples.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "0626c1c7c97c87f1efee70a8fc8876286a77351d",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "1b721cf0e3e79f252aa67ca04746e579d710864c",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/policy/tests/it/policy.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "7b409c183bc25ae14d7cc80bdc453a1bb0f9e578",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "371c728654e00d7e7c8ff39d55c1b39322383e02",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/remember.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "32c3385a54e5f90cc6f11b2e76b001ea64838122",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "4fd52ee5d7e2b2285e4595848a38c05299516888",
+            "type": "blob"
+          },
+          "path": "lampOS/deploy/product/lamp-voice.service"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "38436bf52cef746e1263921d1720ffe583cc1a4c",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "6d05504c01e4fe17dd9112eed74c4d04a325bbef",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/control.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "b7c9714ca3676bff5581efa9698c8241ced6f821",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "05c7698a318304f5aa01e564ec156e18498efc88",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/control.schema.json"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "250b23a63f541e9f97fb31e6af496a017049dfc1",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "61a2f8ef54c06da45a9af727ff7b7b84bad01163",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/memory-days.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "04b0b7703441bfe84993886d184b516932bb530a",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "0ec8d2273258249c690e167be9234049467de9c1",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/skill-format.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "e50e717a59355e5238942bf9bceec3bcb2020093",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "6006c8633cdded55cc780101da8319811296c427",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/skills.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "288070100aed369557264af9c28a96d76b57e98f",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "177facc37dbbd19c4a36799bc598b3cacdce68fc",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/switches.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "8b3a850341a4e6e266f58d2a712cae268c99c114",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "baeef058863af8c9af6b0b13360c3c028b770256",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/vi/memory-days_vi.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "93b60e84c0f92744ea97f13634a0829f898116b4",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "8569e38d4c7f826bbc307cd14da012482d960d4a",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/js/README.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "b7c9714ca3676bff5581efa9698c8241ced6f821",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "05c7698a318304f5aa01e564ec156e18498efc88",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/js/src/control.schema.json"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "3a85911cfdcd8fde6e60bf18d7ee0452b78856b1",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "f5714bf4170231b3187e78236dc92c11d90a1b5a",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/mcp/src/lamp_mcp/server.py"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "d238a60a9744a8e95f395addacf895a7f6130dd6",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "868008ca9bf8ba77c09814b51ef13a21ec2436a1",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/mcp/tests/test_server.py"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "eb8579f20b697f430567addecd8fe2c9f102aff3",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "70be26b2bd105af11cf96c4211f6e5c72a70ed72",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/python/README.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "10ad282a2fc397f3078cd64def3f21d9b19bf67a",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "2e0df10e98896ccf2570d41f4595fec6d6279e0b",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/python/pyproject.toml"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "3274bc24f3c5e6572eef8bef23f735dfb53d8258",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "71a3510facd7a6376d1b0083449b94ed4aecf452",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/python/src/lampos/cli.py"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "b7c9714ca3676bff5581efa9698c8241ced6f821",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "05c7698a318304f5aa01e564ec156e18498efc88",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/python/src/lampos/control.schema.json"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "4f6a6b8719fb32cda7c44022e2025b34ea90b227",
+            "type": "blob"
+          },
+          "authored": null,
+          "path": "lampOS/sdk/python/src/lampos/skill-format.schema.json"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "09b5e75aac5f1018e56e2ce54eb78a9b54e838c2",
+            "type": "blob"
+          },
+          "authored": null,
+          "path": "lampOS/sdk/python/src/lampos/skillcheck.py"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "15f8e63fb7d36dafdd05effb2929b988316aff4a",
+            "type": "blob"
+          },
+          "authored": null,
+          "path": "lampOS/sdk/python/tests/test_skillcheck.py"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "c3c4fbdf2b2eb49423164592fa40b62c3126de0d",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "c8927f4b8a783358d52f63d1ff89938a1ffbb4a1",
+            "type": "blob"
+          },
+          "path": "lampOS/skills/desk-tutor/skill.toml"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "dbac8b486130c4530726c1dff3a9fc3efa1ec8c5",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "ec976e8d54948eed4f73de530bd30325e0e7ae2c",
+            "type": "blob"
+          },
+          "path": "lampOS/skills/look-for-things/skill.toml"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "b17388b94278982ec3e2b3c6fb60d9752a70a5ff",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "b39051aac9b178d0ca512c5d98a91dfbe90da8cf",
+            "type": "blob"
+          },
+          "path": "lampOS/skills/point-light/skill.toml"
+        }
+      ],
+      "authored_tree": "248ccb038ca25b37ee50ce0f35d714db39f1f631",
+      "logged_actual_checkout": "dd29c4743631adab450ee009e38990075bea1b81",
+      "ordered_parents_source_API_and_fetched_Git": [
+        "197f21533736cc99a1e1a819721a5a96ff8f3033",
+        "f43b550430ac65be20c218681be3b8fc4fbda43e"
+      ],
+      "parent_tree_log_attribution_limit": "Only full checkout SHA is directly logged by checkout git log %H; parents/tree are bound by source API and fetched Git object, not invented as logged.",
+      "whole_tree_equal_authored": false
+    },
+    "status": "ORIGINAL_NATIVE_GATES_PASSED_INTEGRATION_PREVIEW_ONLY",
+    "supplemental_IPC_separate": {
+      "cases": [
+        {
+          "name": "one_revocation_closes_two_independently_transferred_observers",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4038,
+              "name": "one_revocation_closes_two_independently_transferred_observers",
+              "ordinal": 3207,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4033,
+              "name": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+              "ordinal": 3202,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "old_ticket_never_revives_with_a_new_hold",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4037,
+              "name": "old_ticket_never_revives_with_a_new_hold",
+              "ordinal": 3206,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4041,
+              "name": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+              "ordinal": 3210,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4042,
+              "name": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+              "ordinal": 3211,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4046,
+              "name": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+              "ordinal": 3215,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4035,
+              "name": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+              "ordinal": 3204,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4047,
+              "name": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+              "ordinal": 3216,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4036,
+              "name": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+              "ordinal": 3205,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "wrong_fd_kinds_and_unconnected_stream_refuse",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4048,
+              "name": "wrong_fd_kinds_and_unconnected_stream_refuse",
+              "ordinal": 3217,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "cancellation_drops_a_retained_partial_frame_fd",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4030,
+              "name": "cancellation_drops_a_retained_partial_frame_fd",
+              "ordinal": 3199,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "deadline_does_not_renew_while_waiting_for_reply",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4032,
+              "name": "deadline_does_not_renew_while_waiting_for_reply",
+              "ordinal": 3201,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "unexpected_data_never_disappears_between_observers",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4045,
+              "name": "unexpected_data_never_disappears_between_observers",
+              "ordinal": 3214,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4043,
+              "name": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+              "ordinal": 3212,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4031,
+              "name": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+              "ordinal": 3200,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "1.004s",
+              "line": 4040,
+              "name": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+              "ordinal": 3209,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "partial_receive_deadline_immediately_closes_retained_rights",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "1.003s",
+              "line": 4044,
+              "name": "partial_receive_deadline_immediately_closes_retained_rights",
+              "ordinal": 3213,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        },
+        {
+          "name": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4034,
+              "name": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline",
+              "ordinal": 3203,
+              "status": "PASS",
+              "total": 11754
+            }
+          ]
+        }
+      ],
+      "once_PASS": 18,
+      "required": 18,
+      "selected": true
+    }
+  },
+  "summary": {
+    "IPC_once_PASS": 18,
+    "actual_checkout": "dd29c4743631adab450ee009e38990075bea1b81",
+    "actual_preview_tree": "22b45b4aaccc7c1e5bee778e7045dad966c0387b",
+    "attempt_inventory": {
+      "attempt_failure_retry_marker_count": 0,
+      "raw_log_preserved_complete": true,
+      "sha256": "ce67ecd6376dca361c58dc2ac48246efdef2767b2dfaa130c89d9f9599790b1f",
+      "status_terminal_count": 11754,
+      "stderr_marker_count": 0,
+      "workflow_automatic_retry_observed": false
+    },
+    "custom_harness": {
+      "process13_0": true,
+      "relay_signals_ok": true
+    },
+    "docs": {
+      "failed": 0,
+      "headings": 47,
+      "ignored": 0,
+      "incomplete_group": null,
+      "interleaved_groups": [],
+      "passed": 4,
+      "step_conclusion": "success",
+      "summaries": 47
+    },
+    "exact_post_summary_reprints": 35,
+    "historical_holds": [
+      "PR3646 stays DRAFT behind broker prerequisite2094.",
+      "Original539 Reader failure remains unexplained/unwaived; current passing row is a different original run/preview observation.",
+      "Physical/device/provider/key activation and latency acceptance are not granted."
+    ],
+    "host_private_partition": {
+      "actual_executable_paths": 34,
+      "depinfo_file_paths": 34,
+      "private_runtime_helper_pin_count": 27,
+      "saved_executable_paths": 34,
+      "scope": "Host-only private helper/dep-info/artifact evidence counts; none mapped to or claimed as preview Git source entries. Raw physical source guard metadata remains host-only too."
+    },
+    "nextest_bad_statuses": 0,
+    "ordered_parents": [
+      "197f21533736cc99a1e1a819721a5a96ff8f3033",
+      "f43b550430ac65be20c218681be3b8fc4fbda43e"
+    ],
+    "receipt_sha256": "62345e0b3d582d29b055922aba0ecc13d053e24445957a583fc8632541b71bb6",
+    "required": {
+      "Linux_once_PASS": 8,
+      "Linux_required": 8,
+      "active_required": 311,
+      "host_once_PASS": 303,
+      "host_required": 303,
+      "once_PASS": 311,
+      "ownLinux6_once_PASS": 6,
+      "own_once_PASS": 71,
+      "own_required": 71,
+      "required_selected_missing_or_nonpass": 0,
+      "upstreamBodyLinux2_once_PASS": 2
+    },
+    "retained_ownkeys_payload": {
+      "additional_environment_assignments_exactly_Main_values": true,
+      "all_authored_unit_added_payload_lines_survive_in_order_exactly": true,
+      "authored_LAMP_OWN_KEYS": "on",
+      "authored_unit_added_payload_sha256": "2caf8805b7a46aecdc6a2576d32950fb727046054b65427b898d309af249ce18",
+      "exact_own_keys_switch_row_equal": true,
+      "only_Main_added_environment_rows": true,
+      "original_authored_net_unit_added_payload_lines": 9,
+      "own_keys_on_in_both": true,
+      "own_keys_row_sha256": "c203f2cbd3c1c3db32f124e41df4ae4ece206794ea9c66165b24691deb0b0b20",
+      "parsed_environment_added_names": [
+        "LAMP_MEMORY_JOURNAL_RESUMES"
+      ],
+      "parsed_environment_removed_names": [],
+      "parsed_existing_environment_changed_names": [],
+      "preview_LAMP_OWN_KEYS": "on",
+      "scope": "Literal systemd Environment assignment parser, safe product unit names only; additional names reported without values. Entire authored OwnKeys unit-added raw line payload and exact switch row retained; whole unit/doc file equality remains false.",
+      "switches_path": "lampOS/docs/switches.md",
+      "unit_path": "lampOS/deploy/product/lamp-voice.service",
+      "whole_unit_byte_equal": false
+    },
+    "runs": {
+      "arm": {
+        "job_conclusion": "success",
+        "job_id": 122313021846,
+        "run_attempt": 1,
+        "run_id": 40539307194,
+        "shard_scope": "1/1",
+        "workflow_aggregate_conclusion": "success"
+      },
+      "linux": {
+        "job_conclusion": "success",
+        "job_id": 122313022409,
+        "run_attempt": 1,
+        "run_id": 40539307052,
+        "shard_scope": "single observed required Linux job",
+        "workflow_aggregate_conclusion": "success"
+      }
+    },
+    "source_equality": {
+      "actual_preview_declarations_present": 311,
+      "control_files_blob_and_mode_equal": 58,
+      "owned38_blob_and_mode_equal": 36,
+      "remember_exact_required_function_bodies": 12,
+      "remember_preexisting_bytes_preserved_except104_inserted_lines": true
+    },
+    "source_guard_partition": {
+      "blob_and_mode_equal": 7524,
+      "committed_absent_in_preview": 0,
+      "committed_present_in_preview": 7546,
+      "qualified_guarded_source_paths_total": 7546,
+      "scope": "Metadata comparison of guarded source inventory; not all paths claimed consumed by selected303. Only committed source paths are preview Git entries; no private raw/helper/dep-info target inputs are included.",
+      "total": 7546,
+      "uncommitted_or_unmatched_count": 0
+    },
+    "status": "ORIGINAL_NATIVE_GATES_PASSED_INTEGRATION_PREVIEW_ONLY",
+    "summary_skips": 106,
+    "unique_nextest_PASS": 11754,
+    "whole_authored_tree_equal": false
+  }
+}
