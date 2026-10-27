@@ -6,8 +6,14 @@
 # speech). The lamp keeps it and asks "Shall I put it on the lamp?"; the script answers. Nothing reaches a real
 # Harness or agent: lamp-tasks gets lamp-tasks-harness-fixture as its Harness (stand-in.sh) and a targets file for
 # the run, one alias, the voice's own, on the fixture's machine; the voice gets LAMP_MAKE_SKILL=on. All through /run
-# drop-ins put back when this ends (and by a reboot), with any skill this run put on removed. Hand-overs fail while
-# it runs.
+# drop-ins put back when this ends (and by a reboot), with stand-up-nudge and any other skill this run put on removed.
+# The voice's made skills (/var/lib/lampOS/voice/made-skills) and its told news (tasks-told) are saved first, in
+# /usr/local/lib/played-make-skill-saved (outside the stand-in's folder, which `out` and the lamp's guard remove); each
+# arm starts from the saved made skills, so an ask left by one arm is never answered by the next, and both are put
+# back when it ends, checked file by file (SHA-256) against the saved copy, which only then is removed. A put-back
+# that fails or differs exits 8 and keeps the copy, printing its path; the lamp's guard (a Mac that never came back)
+# runs the same put-back first. A copy left by an earlier run stops the next one before any change (exit 3).
+# Hand-overs fail while it runs.
 #
 #   LAMP_HOST=<lamp> lampOS/tools/played/make-skill.sh LABEL FIXTURE [yes|no|both]
 #
@@ -16,7 +22,8 @@
 # Each arm prints PASS or FAIL: asked to confirm (the lamp's own question before a hand-over, answered "Yes, please."
 # once it has played; passed too when it offers at once), offered (make_skill), handed over (the stand-in's `new`),
 # the answer read (its `show`), made (the voice keeps the skill, its SHA-256), asked to put it on, and then:
-# - yes ("Yes, put it on."): nothing on before the yes, that SHA-256 put on, enabled (`lamp-skills list`), loaded by
+# - yes ("Yes, go ahead.", a plain yes: the voice puts it on only at one, `known_faces::plain_agreement`, so never at
+#   "Yes, put it on."): nothing on before the yes, that SHA-256 put on, enabled (`lamp-skills list`), loaded by
 #   the running lamp-skills, and removed (`lamp-skills remove`, gone from the list);
 # - no ("No, not now."): nothing put on within 30 s, and the list unchanged.
 # PLAYS SOUND IN THE ROOM. About 4 minutes an arm. Needs `sudo -n` on the lamp and its voice quiet for 45 s. Not
@@ -28,7 +35,8 @@
 # no spoken ask and no yes to the hand-over; the app's view is read back (`{"made": ...}`) as kept with the same SHA-256,
 # then on (yes arm) or still off (no arm). The lamp still asks aloud, and only the spoken yes puts it on.
 # Settings: as the kit's (README.md), and MAKE_FROM (voice, or app), MAKE_SETTLE (20 s after the stand-in is in), NOT_NOW_WAIT (30 s), LAMP_SSH,
-# QUIET_GATE, SAY and AFPLAY (the kit's own, or the tests' stand-ins). Its stand-in test is make-skill-test.sh.
+# QUIET_GATE, SAY and AFPLAY (the kit's own, or the tests' stand-ins), and for the tests MAKE_SAVED and MAKE_VOICE_DIR
+# (where the copy and the voice's state are). Its stand-in test is make-skill-test.sh.
 set -u
 cd "$(dirname "$0")" || exit 9
 . ./settings.sh
@@ -46,6 +54,8 @@ RATE=${LAMP_SAY_RATE:-185}
 OUT="$PLAYED_OUT/scenarios/make-skill-$L.txt"
 REMOTE=/usr/local/lib/played-stand-in   # /run may be noexec; this folder is removed when the run ends
 SKILLS=/opt/lampOS/skills/current/lamp-skills
+VOICE_DIR=${MAKE_VOICE_DIR:-/var/lib/lampOS/voice}
+SAVED=${MAKE_SAVED:-/usr/local/lib/played-make-skill-saved}   # kept outside REMOTE: `out` and the guard remove REMOTE
 REQUEST="Hey Lamp, make me a skill that reminds me to stand up every hour."
 FROM=${MAKE_FROM:-voice}
 case $FROM in voice|app) ;; *) echo "make-skill.sh: MAKE_FROM is voice or app" >&2; exit 2 ;; esac
@@ -57,6 +67,109 @@ if [ "$(date +%u)" -le 5 ] && [ "$(date +%H)" -ge 12 ] && [ "$(date +%H)" -lt 14
   exit 2
 fi
 lamp() { "$LAMP_SSH" "$@" </dev/null; }
+# The save and put-back, kept in the saved copy as $SAVED/restore and run on the lamp as root, by this script and by the
+# lamp's guard. `check`: each of the voice's two paths is a regular file, a folder of only folders and regular files,
+# or not there at all (neither -e nor -L); anything else (a symbolic link, dangling or not, a fifo, a device) stops
+# the run before any change, and no link is ever copied (Third's P2 on 93f0584c2). `save`: the same check, the
+# copies, and each path's kind recorded in `kinds`. `reset` puts the made skills back as saved; with no argument,
+# both. A put-back first checks every path it would replace: only a plain file or folder, or one recorded absent and
+# so this run's, is ever removed. Each is then checked against the copy, its kind and each file's SHA-256, and only a
+# put-back of both that matches removes the copy. Anything else exits 1 and leaves the copy where it is.
+restore_script() {
+  sed -e "s#@SAVED@#$SAVED#" -e "s#@VOICE@#$VOICE_DIR#" <<'EOF'
+#!/bin/sh
+# make-skill.sh's saved copy of lamp-voice's made skills and told news; `sh restore` puts both back.
+S=@SAVED@
+V=@VOICE@
+NAMES="made-skills tasks-told"
+kind() {  # PATH: file, dir or none on stdout, or a failure saying what else it is
+  if [ -L "$1" ]; then echo "$1 is a symbolic link" >&2; return 1
+  elif [ -f "$1" ]; then echo file
+  elif [ -d "$1" ]; then
+    odd=$(find "$1" ! -type f ! -type d) || { echo "$1 could not be read whole" >&2; return 1; }
+    [ -z "$odd" ] || { echo "$1 holds more than folders and regular files: $odd" >&2; return 1; }
+    echo dir
+  elif [ -e "$1" ]; then echo "$1 is neither a regular file nor a folder" >&2; return 1
+  else echo none; fi
+}
+# No step's failure is hidden in a pipeline (Third's HOLD on 1c4d27e02): each tool's output is taken whole and its
+# own status read, and a manifest is only one whose every step succeeded.
+sha() {  # FILE: its SHA-256, 64 hex digits, or a failure
+  if command -v sha256sum >/dev/null 2>&1; then o=$(sha256sum "$1") || return 1; else o=$(shasum -a 256 "$1") || return 1; fi
+  h=${o%% *}
+  case $h in '' | *[!0-9a-f]*) return 1 ;; esac
+  [ ${#h} -eq 64 ] || return 1
+  printf '%s\n' "$h"
+}
+sums() {  # DIR NAME...: each NAME's kind and its files' SHA-256, in order, then the count of files; or a failure
+  d=$1; shift
+  cd "$d" || return 1
+  n=0
+  for x in "$@"; do
+    if [ -d "$x" ]; then
+      echo "dir $x"
+      found=$(find "$x" -type f) || return 1
+      files=$(printf '%s\n' "$found" | sort) || return 1
+      [ -n "$files" ] || continue
+      while IFS= read -r f; do
+        h=$(sha "$f") || return 1
+        echo "$f $h"; n=$((n + 1))
+      done <<FILES
+$files
+FILES
+    elif [ -e "$x" ]; then
+      h=$(sha "$x") || return 1
+      echo "file $x $h"; n=$((n + 1))
+    else echo "none $x"; fi
+  done
+  echo "files $n"
+}
+case ${1:-all} in
+  check) for x in $NAMES; do kind "$V/$x" >/dev/null || exit 1; done; exit 0 ;;
+  save)
+    [ ! -e "$S/done" ] && [ ! -e "$S/kinds" ] || { echo "save: $S holds a copy already" >&2; exit 1; }
+    for x in $NAMES; do
+      k=$(kind "$V/$x") || exit 1
+      if [ "$k" != none ]; then
+        cp -a "$V/$x" "$S/" || { echo "save: $V/$x could not be copied" >&2; exit 1; }
+        c=$(kind "$S/$x") || exit 1
+        [ "$c" = "$k" ] || { echo "save: the copy of $V/$x is a $c, not a $k" >&2; exit 1; }
+      fi
+      echo "$x $k" >> "$S/kinds" || exit 1
+    done
+    a=$(sums "$S" $NAMES) && b=$(sums "$V" $NAMES) && [ "$a" = "$b" ] || { echo "save: the copy in $S is not as $V" >&2; exit 1; }
+    touch "$S/done" || exit 1
+    exit 0 ;;
+  reset) names=made-skills ;;
+  all) names=$NAMES ;;
+  *) echo "usage: restore [check|save|reset]" >&2; exit 2 ;;
+esac
+[ -e "$S/done" ] && [ -f "$S/kinds" ] || { echo "restore: no complete saved copy at $S" >&2; exit 1; }
+# Every path is checked before any is removed.
+for x in $names; do
+  saved_kind=$(sed -n "s/^$x //p" "$S/kinds") || { echo "restore: $S/kinds could not be read; the copy is kept" >&2; exit 1; }
+  case $saved_kind in file | dir | none) ;; *) echo "restore: $S/kinds records no kind for $x; the copy is kept" >&2; exit 1 ;; esac
+  c=$(kind "$S/$x") || { echo "restore: the copy of $x in $S is not as saved; it is kept" >&2; exit 1; }
+  [ "$c" = "$saved_kind" ] || { echo "restore: the copy of $x in $S is a $c, recorded a $saved_kind; it is kept" >&2; exit 1; }
+  kind "$V/$x" >/dev/null || { echo "restore: $V/$x is not a plain file or folder, so not this run's to replace; the copy in $S is kept" >&2; exit 1; }
+done
+for x in $names; do
+  rm -rf "$V/$x" && { [ ! -e "$S/$x" ] || cp -a "$S/$x" "$V/"; } || { echo "restore: $x could not be put back from $S" >&2; exit 1; }
+done
+saved=$(sums "$S" $names) || { echo "restore: the saved copy in $S could not be read whole; it is kept" >&2; exit 1; }
+now=$(sums "$V" $names) || { echo "restore: $V could not be read whole; the copy in $S is kept" >&2; exit 1; }
+case $saved in *"files "[0-9]*) ;; *) echo "restore: no whole manifest of $S; it is kept" >&2; exit 1 ;; esac
+[ "${saved##*files }" = "${now##*files }" ] && [ "$saved" = "$now" ] || { echo "restore: $V is not as saved in $S" >&2; exit 1; }
+[ "${1:-all}" = reset ] || rm -rf "$S"
+EOF
+}
+voice_state() {  # save | reset | restore: the voice's made skills and told news, saved; made skills back as saved; both
+  case $1 in
+    save) restore_script | "$LAMP_SSH" "sudo -n sh -c 'mkdir -m 0700 $SAVED && cat > $SAVED/restore && sh $SAVED/restore save'" ;;
+    reset) lamp "sudo -n sh $SAVED/restore reset" ;;
+    restore) lamp "sudo -n sh $SAVED/restore" ;;
+  esac
+}
 
 lamp 'sudo -n true' || { echo "make-skill.sh: the lamp's user needs sudo -n" >&2; exit 2; }
 env=$(lamp 'systemctl show -p ActiveState -p Environment lamp-voice') || { echo "make-skill.sh: no answer from the lamp" >&2; exit 3; }
@@ -65,6 +178,25 @@ case $env in *LAMP_TASKS_DIR=*) ;; *) echo "make-skill.sh: lamp-voice has no tas
 case $env in *LAMP_MAKE_SKILL=*) echo "make-skill.sh: LAMP_MAKE_SKILL is already set on lamp-voice; nothing changed" >&2; exit 3 ;; esac
 case $env in *LAMP_APP_MAKE_SKILL=*) echo "make-skill.sh: LAMP_APP_MAKE_SKILL is already set on lamp-voice; nothing changed" >&2; exit 3 ;; esac
 lamp 'systemctl is-active -q lamp-skills-manage.socket' || { echo "make-skill.sh: the skills helper's socket is not active; nothing changed" >&2; exit 3; }
+# The run's skill is removed on exit, so one already on is never the run's to take off. Only a list that succeeded
+# and is whole (its header first) says it is not on; any other answer stops here (Third's P2 on #3889).
+skills=$(lamp "sudo -n $SKILLS list") || { echo "make-skill.sh: the lamp's skills could not be listed (exit $?); nothing changed" >&2; exit 3; }
+case ${skills%%
+*} in NAME*KIND*VERSION*) ;; *) echo "make-skill.sh: the lamp's skill list is not whole; nothing changed" >&2; exit 3 ;; esac
+# grep's own status: 0 on, 1 not on, anything else stops here.
+printf '%s\n' "$skills" | grep -qE '^stand-up-nudge +'
+case $? in
+  0) echo "make-skill.sh: a skill called stand-up-nudge is already on the lamp; nothing changed" >&2; exit 3 ;;
+  1) ;;
+  *) echo "make-skill.sh: the lamp's skill list could not be read; nothing changed" >&2; exit 3 ;;
+esac
+NUDGE=stand-up-nudge   # proved not on: this run's to remove
+# A copy an earlier run could not put back is the only one of the voice's own state: never saved over (Fourteen's P3).
+left=$(lamp "sudo -n sh -c 'if [ -e $SAVED ] || [ -L $SAVED ]; then echo left; else echo none; fi'")
+[ "$left" = none ] || { echo "make-skill.sh: an earlier run's saved copy of the voice's state is at $SAVED (${left:-no answer}); put it back with: sudo sh $SAVED/restore. Nothing changed" >&2; exit 3; }
+# The voice's two paths only as a regular file, a folder of plain files, or not there: a link (dangling or not), a fifo
+# or a device stops here, before any change (Third's P2 on 93f0584c2).
+restore_script | "$LAMP_SSH" "sudo -n sh -s -- check" || { echo "make-skill.sh: the voice's made skills or told news is not a plain file or folder (above); nothing changed" >&2; exit 3; }
 "$QUIET_GATE" 45 || { echo "make-skill.sh: the lamp is not quiet: nothing played" >&2; exit 3; }
 
 # The stand-in's answer: the two files of one small skill, as an agent asked for one writes them
@@ -118,8 +250,8 @@ echo "make-skill $L  $(date -u +%Y-%m-%dT%H:%M:%SZ)  arms: $ARMS  fixture $(shas
 trap 'lamp "sudo -n rm -rf $REMOTE"' EXIT
 "$LAMP_SSH" "sudo -n mkdir -p $REMOTE && sudo -n tee $REMOTE/harness-fixture >/dev/null && sudo -n chmod 0755 $REMOTE/harness-fixture" < "$FIXTURE" || exit 9
 printf '%s\n' "$PLAN" | "$LAMP_SSH" "sudo -n tee $REMOTE/plan.json >/dev/null" || exit 9
-SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_TARGET=auto PLAYED_VOICE_ENV=LAMP_MAKE_SKILL=on"
-[ "$FROM" = app ] && SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_TARGET=auto PLAYED_VOICE_ENV='LAMP_MAKE_SKILL=on LAMP_APP_MAKE_SKILL=on'"
+SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_RESTORE=$SAVED/restore PLAYED_TARGET=auto PLAYED_VOICE_ENV=LAMP_MAKE_SKILL=on"
+[ "$FROM" = app ] && SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_RESTORE=$SAVED/restore PLAYED_TARGET=auto PLAYED_VOICE_ENV='LAMP_MAKE_SKILL=on LAMP_APP_MAKE_SKILL=on'"
 if [ -n "${TASKS:-}" ]; then
   echo "lamp-tasks for this run: $(shasum -a 256 "$TASKS" | cut -c1-12)" | tee -a "$OUT"
   "$LAMP_SSH" "sudo -n tee $REMOTE/lamp-tasks >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-tasks" < "$TASKS" || exit 9
@@ -129,17 +261,30 @@ if [ "$FROM" = app ]; then
   echo "lamp-cloud for this run: $(shasum -a 256 "$CLOUD" | cut -c1-12)" | tee -a "$OUT"
   "$LAMP_SSH" "sudo -n tee $REMOTE/lamp-cloud >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-cloud" < "$CLOUD" || exit 9
 fi
+voice_state save || {
+  lamp "sudo -n sh -c '[ -e $SAVED/done ] || rm -rf $SAVED'"   # a copy cut short is no copy, and nothing was changed
+  echo "make-skill.sh: the voice's made skills and told news could not be saved; nothing played" | tee -a "$OUT" >&2; exit 9; }
 
-# The stand-in in (stand-in.sh, on the lamp as root), and put back whatever happens, with any skill this run put
-# on. A setup that fails says which step and stops here: nothing is played.
+# The stand-in in (stand-in.sh, on the lamp as root), and put back whatever happens, with stand-up-nudge (an arm
+# whose ask the next arm's yes answered leaves it on with no line of its own) and any other skill this run put on, and
+# the voice's made skills and told news as saved. A setup that fails says which step and stops here: nothing is played.
+# A put-back that fails exits 8 and keeps the saved copy (outside REMOTE, so `out` leaves it), naming its path.
 PUT_ON=""
 put_back() {
-  for name in $PUT_ON; do
+  local rc=0 name done_names=" "
+  for name in $NUDGE $PUT_ON; do   # each once, with no pipeline to lose a name
+    case $done_names in *" $name "*) continue ;; esac
+    done_names="$done_names$name "
     lamp "sudo -n $SKILLS remove $name" >/dev/null 2>&1 && echo "removed on exit: $name"
   done
+  if ! voice_state restore; then
+    echo "make-skill.sh: the voice's made skills and told news were not put back as saved; the saved copy is kept at $SAVED: put it back with: sudo sh $SAVED/restore"
+    rc=8
+  fi
   "$LAMP_SSH" "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- out" < stand-in.sh
+  return $rc
 }
-trap 'put_back 2>&1 | tee -a "$OUT"' EXIT
+trap 'put_back 2>&1 | tee -a "$OUT"; [ "${PIPESTATUS[0]}" = 0 ] || exit 8' EXIT
 if ! "$LAMP_SSH" "sudo -n env $SETUP_ENV sh -s -- in" < stand-in.sh >> "$OUT" 2>&1; then
   tail -n 2 "$OUT" >&2
   echo "make-skill $L: the stand-in's setup failed; nothing was played (see $OUT)" | tee -a "$OUT" >&2
@@ -233,6 +378,8 @@ same() {  # VALUE WANTED...: VALUE when it is one of WANTED, else nothing (Bash 
 
 for arm in $ARMS; do
   echo "--- arm: $arm" | tee -a "$OUT"
+  # The made skills as saved: an ask an earlier arm left waiting is not this arm's to answer.
+  voice_state reset || { echo "make-skill.sh: the voice's made skills could not be put back before the $arm arm" | tee -a "$OUT"; FAILS=$((FAILS + 1)); break; }
   START=$(lamp 'date +%s')
   news=$(called new); shows=$(called show)
   asks=$(said | grep -oE 'Shall I put it on the lamp' | wc -l)
@@ -293,7 +440,7 @@ for arm in $ARMS; do
   if [ "$arm" = yes ]; then
     check "nothing on before the yes" "$([ -z "$early" ] && echo "no install line before $ASKED")"
     sleep 1
-    line Samantha "Yes, put it on."
+    line Samantha "Yes, go ahead."
     on=$(wait_for "$ASKED" 'a made skill (is on the lamp|was not put on)' 40)
     name=$(printf '%s' "$on" | sed -n 's/.*is on the lamp: \([a-z0-9-]*\), sha256 .*/\1/p')
     on_sha=$(printf '%s' "$on" | sed -n 's/.*, sha256 \([0-9a-f]\{64\}\).*/\1/p')
@@ -307,8 +454,14 @@ for arm in $ARMS; do
       check "the app told it on" "$([ -n "$sha" ] && same "$view" "on $sha")"
     fi
     if [ -n "$name" ] && lamp "sudo -n $SKILLS remove $name" >/dev/null 2>&1; then
-      PUT_ON=$(printf '%s' "$PUT_ON" | sed "s/ $name//")
-      check "removed" "$(listed | grep -qE "^$name +" || echo "$name is not listed")"
+      PUT_ON=${PUT_ON// $name/}
+      # Gone only by a list that answered and a grep that found none (1), not by one that failed.
+      if after=$(listed); then
+        printf '%s\n' "$after" | grep -qE "^$name +"
+        check "removed" "$([ $? -eq 1 ] && echo "$name is not listed")"
+      else
+        check "removed" ""
+      fi
     else
       check "removed" ""
     fi

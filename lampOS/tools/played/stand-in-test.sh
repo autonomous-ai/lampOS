@@ -178,6 +178,11 @@ STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS="$root/my units" SYSTEMCT
   sh "$here/stand-in.sh" in > "$root/out" 2>&1; code=$?
 check "11. a PLAYED_UNITS with a space is refused too" \
   '[ $code -ne 0 ] && grep -q "PLAYED_UNITS" "$root/out" && [ ! -e "$root/my units" ] && ! grep -qs "^systemd-run" "$root/calls"'
+rm -rf "$root/calls"
+STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units PLAYED_RESTORE="$root/saved/re store" SYSTEMCTL=$root/systemctl \
+  SYSTEMD_RUN=$root/systemd-run sh "$here/stand-in.sh" in > "$root/out" 2>&1; code=$?
+check "11. a PLAYED_RESTORE with a space is refused too" \
+  '[ $code -ne 0 ] && grep -q "PLAYED_RESTORE" "$root/out" && ! grep -qs "^systemd-run" "$root/calls"'
 
 unit_head="ConditionPathExists=/var/lib/lampos-setup/done
 ConditionPathExists=/usr/local/bin/harness"
