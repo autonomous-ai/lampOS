@@ -1,0 +1,26 @@
+{
+  "head": "ea78acf5347c607e3907527914b0538ca9e64d67",
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "tree": "af2123c4891eecfbccdc147dc1423718d1b70859",
+  "own_branch": "second/writer-observation-recheck",
+  "working_patch_sha256": "00e6f0db202173a80e5c71a6104a15d0e5ab56d068d161c4797adf0bd3bbaa19",
+  "dirty_files": [
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-settings-capture.md"
+  ],
+  "uncommitted_source_gate": true,
+  "source_count": 7402,
+  "controller_sha256": "ad6b0a2fc52af1f4f1f74c79f5007c368a8b8870e91d451143d3a2972c438cb4",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "earlier_CI_runner_version": "0.9.149",
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "preferred_runner_scope": "New observation recheck WIP on Rawea78 plus process-isolated nextest; never a fix or rerun of failed4f25 libtest",
+  "earlier_failure_unwaived": true,
+  "baseline_198_pass_INCONCLUSIVE": true
+}

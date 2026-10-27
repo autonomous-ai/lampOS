@@ -1,0 +1,6 @@
+{
+  "old_base": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "new_base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "changed": "M\tlampOS/sdk/js/src/client.js\nM\tlampOS/sdk/js/src/testing.js\nM\tlampOS/sdk/js/test/client.test.js\n",
+  "runtime_equivalence_not_inferred": true
+}

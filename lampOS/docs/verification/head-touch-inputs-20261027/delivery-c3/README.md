@@ -1,0 +1,7 @@
+# HeadInputs delivery and subsequent input change
+
+PR #3856 was delivered by train 242/#3861 at actual authored-equivalent commit df57c6e400b184f02b9637caef2e508e3871316f. Current inspected Main c3eb20be307d06a6d6278254ec54654b68698b0e also contains the later control merge. All five authored patches and modes are equal; both Rust files and the new contract document retain their complete offered blobs. Other accumulated documentation rows are preserved. The train-closed PR is not represented as a direct GitHub merge. No reapply, new PR or merge action was performed by this audit.
+
+The unpushed local e6be1d779/f992 carry completed 510 unique PASS / 0 bad or selected unrun / 6 ignored, separately from original 507 Mac and 7,769 native qualifications. Those counts remain exact-source and are not transferred to current Main. The live-Main guard prevented pushing the already delivered change.
+
+The f992-to-c3 delta has 112 paths. Production Update SETTINGS and product inventories now include five installed-off feelings files, existing skill TOML bytes and the normal Skills permission library changed, and the normal Voice library changes ring capabilities. Fresh qualification is required for the remaining writer piece. Added feelings/tests traces are excluded by the product-skill install walker and are not claimed as Update runtime replay inputs. Actual preserved compiler profiles are used instead of metadata-only reachability. No Cargo or runtime was executed for this source/delivery audit.

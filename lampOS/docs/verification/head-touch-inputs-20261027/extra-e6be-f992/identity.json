@@ -1,0 +1,48 @@
+{
+  "base": "f9926922d0f5c54057ad49f14917ae677e83b028",
+  "cache_reuse_not_clean_rebuild": true,
+  "head": "e6be1d779333ed179dadc153695bcb38feb6ada0",
+  "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "nextest_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "owned": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "actual_mode": 420,
+      "git_blob": "eabce9979706dd25226a36a1720f366351ed3263",
+      "git_mode": "100644",
+      "kind": 32768,
+      "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334"
+    },
+    "lampOS/crates/update/src/head_touch/input_tests.rs": {
+      "actual_mode": 420,
+      "git_blob": "721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+      "git_mode": "100644",
+      "kind": 32768,
+      "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+    },
+    "lampOS/docs/head-touch-inputs.md": {
+      "actual_mode": 420,
+      "git_blob": "9c937e3dbfad026de7f7dfa882992d1ae7f5cbdc",
+      "git_mode": "100644",
+      "kind": 32768,
+      "sha256": "a69da4104f21fe0e8614c11c9edbba72f98312564e6dc473f543942c758b6014"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "actual_mode": 420,
+      "git_blob": "050d3e9eab4bc54a7af2197e7b036f99681316c6",
+      "git_mode": "100644",
+      "kind": 32768,
+      "sha256": "228ad14d843abc457b5ffb7e20e4171f448c2c8803447ed330810efcca21a0be"
+    },
+    "lampOS/docs/updates.md": {
+      "actual_mode": 420,
+      "git_blob": "60151dfe4163e236a653af26712396eae353f797",
+      "git_mode": "100644",
+      "kind": 32768,
+      "sha256": "056fe570dae7cd12ae5c3745ee827a1c043a3fe9be0cb10dab584e3787b71948"
+    }
+  },
+  "prior_ci_version": "0.9.149",
+  "tree": "1a0f889c4d81b2917214bedfd21fecf3a4e2c3b6",
+  "user_config_disabled": true
+}

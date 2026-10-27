@@ -1,0 +1,7 @@
+{
+  "parser_sha256": "aa5d3f538299354393002733fc1826b852f15b30b37aaf7bb51353dc3066e5a8",
+  "first_parser_sha256": "0e7a08a46472461ae836f51e6130f593df19c885e725f3c40aec0404a3838252",
+  "first_failure": "Input selector JSON contains pair lists, so iterating all values as strings failed before census write. Corrected to explicit all_pairs names; only completed log re-parsed, no tests rerun.",
+  "identical_terminal_echoes_excluded": 34,
+  "unique_key": "(binary,name), with unique ordinal and common selected total"
+}

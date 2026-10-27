@@ -1,0 +1,16 @@
+[
+  {
+    "binary": "lamp-update::self-cli-exec",
+    "name": "actual_cli_exec_confirms_before_the_next_round",
+    "exit_code": 0,
+    "matched": true,
+    "already_in_six_nextest_ignored": true
+  },
+  {
+    "binary": "lamp-update::self-process-cuts",
+    "name": "persisted_self_switches_survive_sigkill",
+    "exit_code": 0,
+    "matched": true,
+    "already_in_six_nextest_ignored": true
+  }
+]

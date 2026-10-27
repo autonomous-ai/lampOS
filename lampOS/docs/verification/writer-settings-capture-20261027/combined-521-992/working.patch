@@ -1,0 +1,284 @@
+diff --git a/lampOS/crates/update/src/writer_settings.rs b/lampOS/crates/update/src/writer_settings.rs
+index 749ac3eef0..9c89793772 100644
+--- a/lampOS/crates/update/src/writer_settings.rs
++++ b/lampOS/crates/update/src/writer_settings.rs
+@@ -70,6 +70,55 @@ impl<'a> RawOwnership<'a> {
+     pub fn old_bytes(&self) -> usize {
+         self.old_bytes
+     }
++
++    /// Re-observe the captured paths and require the same bytes, entry kinds,
++    /// selected metadata and ancestor identities. Each read is capped at its
++    /// original byte count, so growth cannot increase the capture's budget.
++    ///
++    /// This read-only check grants no authority and retains no live descriptors.
++    /// The caller must keep the trusted root and writer exclusion in force
++    /// through any later effect. It is not an atomic cross-file snapshot. An
++    /// empty capture observes nothing and establishes no root admission.
++    pub fn revalidate(&self, root: &Path) -> io::Result<()> {
++        for captured in &self.entries {
++            let relative = captured
++                .setting
++                .path
++                .strip_prefix('/')
++                .ok_or_else(|| invalid("captured setting is not absolute"))?;
++            let cap = match &captured.before.entry {
++                Entry::Present { bytes, .. } => bytes.len(),
++                Entry::MissingLeaf | Entry::MissingAncestor { .. } => 0,
++            };
++            let current = writer_files::observe(root, relative, cap)?;
++            if !same_observation(&captured.before, &current) {
++                return Err(invalid("captured setting observation changed"));
++            }
++        }
++        Ok(())
++    }
++}
++
++fn same_observation(before: &Observation, current: &Observation) -> bool {
++    before.ancestors == current.ancestors
++        && match (&before.entry, &current.entry) {
++            (
++                Entry::Present {
++                    bytes: before_bytes,
++                    identity: before_identity,
++                },
++                Entry::Present {
++                    bytes: current_bytes,
++                    identity: current_identity,
++                },
++            ) => before_identity == current_identity && before_bytes == current_bytes,
++            (Entry::MissingLeaf, Entry::MissingLeaf) => true,
++            (
++                Entry::MissingAncestor { component: before },
++                Entry::MissingAncestor { component: current },
++            ) => before == current,
++            _ => false,
++        }
+ }
+ 
+ impl fmt::Debug for RawOwnership<'_> {
+diff --git a/lampOS/crates/update/src/writer_settings/tests.rs b/lampOS/crates/update/src/writer_settings/tests.rs
+index 954c68e08c..00aaca5cff 100644
+--- a/lampOS/crates/update/src/writer_settings/tests.rs
++++ b/lampOS/crates/update/src/writer_settings/tests.rs
+@@ -74,6 +74,8 @@ fn captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops() {
+         (settings[10].path.clone(), manifest::sha256_hex(b"old")),
+     ]);
+     let captured = capture(root.path(), &settings, &recorded, &writing).unwrap();
++    captured.revalidate(root.path()).unwrap();
++    captured.revalidate(root.path()).unwrap();
+     assert_eq!(captured.entries().len(), settings.len());
+     let actions: Vec<_> = captured.entries().iter().map(Captured::act).collect();
+     assert_eq!(actions[0], Some(&Act::Write));
+@@ -145,6 +147,7 @@ fn old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix()
+     let writing = BTreeMap::new();
+     let captured = capture(root.path(), &settings, &recorded, &writing).unwrap();
+     assert_eq!(captured.old_bytes(), MOST_OLD_BYTES);
++    captured.revalidate(root.path()).unwrap();
+     assert!(matches!(
+         &captured.entries()[4].before().entry,
+         Entry::Present { bytes, .. } if bytes.is_empty()
+@@ -253,3 +256,122 @@ fn shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence() {
+         Some(Act::Record)
+     );
+ }
++
++#[test]
++fn revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes() {
++    for change in 0..6 {
++        let root = root();
++        let settings = [setting("private-setting", "new")];
++        let recorded = BTreeMap::from([(
++            settings[0].path.clone(),
++            manifest::sha256_hex(b"private-old"),
++        )]);
++        let writing = BTreeMap::new();
++        put(root.path(), &settings[0], b"private-old");
++        let captured = capture(root.path(), &settings, &recorded, &writing).unwrap();
++        captured.revalidate(root.path()).unwrap();
++        let path = root
++            .path()
++            .join(settings[0].path.strip_prefix('/').unwrap());
++        match change {
++            0 => fs::write(&path, b"PRIVATE-OLD").unwrap(),
++            1 => fs::write(&path, b"short").unwrap(),
++            2 => fs::write(&path, b"private-old!").unwrap(),
++            3 => fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap(),
++            4 => {
++                let replacement = root.path().join("replacement");
++                fs::write(&replacement, b"private-old").unwrap();
++                fs::set_permissions(&replacement, fs::Permissions::from_mode(0o640)).unwrap();
++                fs::rename(replacement, &path).unwrap();
++            }
++            5 => fs::remove_file(&path).unwrap(),
++            _ => unreachable!(),
++        }
++        let error = captured.revalidate(root.path()).unwrap_err();
++        if change == 2 {
++            // One byte of growth, far below the observer's global bound,
++            // must be refused by the smaller original-size read cap.
++            assert_eq!(error.to_string(), "observation file exceeds its byte cap");
++        }
++        assert!(!format!("{error:?}").contains("private-"));
++        let Entry::Present { bytes, .. } = &captured.entries()[0].before().entry else {
++            panic!("revalidation lost the original preimage");
++        };
++        assert_eq!(bytes, b"private-old");
++        assert_eq!(captured.entries()[0].act(), Some(&Act::Write));
++    }
++}
++
++#[test]
++fn revalidation_refuses_new_negative_dependencies_and_replaced_ancestors() {
++    for change in 0..3 {
++        let root = root();
++        let name = if change == 0 {
++            "missing"
++        } else {
++            "nested/setting"
++        };
++        let settings = [setting(name, "new")];
++        let empty = BTreeMap::new();
++        fs::create_dir_all(root.path().join(FOLDER.trim_start_matches('/'))).unwrap();
++        if change == 2 {
++            put(root.path(), &settings[0], b"old");
++        }
++        let captured = capture(root.path(), &settings, &empty, &empty).unwrap();
++        captured.revalidate(root.path()).unwrap();
++        if change == 0 {
++            // A zero-byte file is still a change from an explicit absence.
++            put(root.path(), &settings[0], b"");
++        } else if change == 1 {
++            // The final leaf remains absent, but a missing ancestor appeared.
++            fs::create_dir(root.path().join("etc/lampOS/expression/nested")).unwrap();
++        } else {
++            let folder = root.path().join("etc/lampOS/expression/nested");
++            fs::rename(&folder, root.path().join("saved-ancestor")).unwrap();
++            put(root.path(), &settings[0], b"old");
++            let now = writer_files::observe(root.path(), &settings[0].path[1..], 3).unwrap();
++            assert_ne!(
++                captured.entries()[0].before().ancestors.last(),
++                now.ancestors.last()
++            );
++        }
++        assert!(captured.revalidate(root.path()).is_err());
++    }
++}
++
++#[test]
++fn revalidation_refuses_replaced_roots_links_and_nonregular_leaves() {
++    for change in 0..3 {
++        let container = root();
++        let root = container.path().join("root");
++        fs::create_dir(&root).unwrap();
++        let settings = [setting("private-setting", "new")];
++        let empty = BTreeMap::new();
++        put(&root, &settings[0], b"private-old");
++        let captured = capture(&root, &settings, &empty, &empty).unwrap();
++        let path = root.join(settings[0].path.strip_prefix('/').unwrap());
++        if change == 0 {
++            fs::rename(&root, container.path().join("previous-root")).unwrap();
++            fs::create_dir(&root).unwrap();
++            put(&root, &settings[0], b"private-old");
++        } else {
++            fs::remove_file(&path).unwrap();
++            if change == 1 {
++                let outside = container.path().join("private-outside");
++                fs::write(&outside, b"private-old").unwrap();
++                std::os::unix::fs::symlink(outside, &path).unwrap();
++            } else {
++                fs::create_dir(&path).unwrap();
++            }
++        }
++        let error = captured.revalidate(&root).unwrap_err();
++        assert!(!format!("{error:?}").contains("private-"));
++    }
++    let container = root();
++    let empty = BTreeMap::new();
++    let captured = capture(container.path(), &[], &empty, &empty).unwrap();
++    // No input means no root was observed; success grants no root authority.
++    captured
++        .revalidate(&container.path().join("absent"))
++        .unwrap();
++}
+diff --git a/lampOS/docs/reuse-decisions.md b/lampOS/docs/reuse-decisions.md
+index b27678f6aa..fb06f9c682 100644
+--- a/lampOS/docs/reuse-decisions.md
++++ b/lampOS/docs/reuse-decisions.md
+@@ -2151,3 +2151,10 @@ existing `writer_files` boundary and borrow only selected input records.
+ Do not clone/default whole state, treat a raw Write as authority, or claim
+ head-touch projection, authenticated execution or restoration from this
+ intermediate capture. See [the contract](writer-settings-capture.md).
++
++Recheck retained observations through the same bounded descriptor observer,
++including negative entries and ancestor identities. Cap each reread at its
++original byte count and compare complete evidence; do not recalculate an
++ownership plan from changed files. This remains a read-only prerequisite:
++exclusion through the mutation boundary, projection dependencies and durable
++independent recovery are separate requirements.
+diff --git a/lampOS/docs/updates.md b/lampOS/docs/updates.md
+index a1e58b652b..7c08f39591 100644
+--- a/lampOS/docs/updates.md
++++ b/lampOS/docs/updates.md
+@@ -2294,6 +2294,9 @@ Store signature trust or physical update durability.
+ The unwired `writer_settings` adapter now associates each ordinary setting
+ with bounded descriptor-observed bytes and the shared existing ownership
+ decision, including omitted no-ops. It adds no live apply path, helper,
+-allowlist entry or grant. The [capture contract](writer-settings-capture.md)
++allowlist entry or grant. Its read-only revalidation checks the same bytes,
++selected metadata, ancestor identities and explicit absences without
++re-planning or enlarging the original byte budget. No mutation boundary is
++wired. The [capture contract](writer-settings-capture.md)
+ separates this raw input from authentication, head-touch projection, effect
+ admission and independent recovery.
+diff --git a/lampOS/docs/writer-settings-capture.md b/lampOS/docs/writer-settings-capture.md
+index f1dc78bc9c..b9c8d7ba9b 100644
+--- a/lampOS/docs/writer-settings-capture.md
++++ b/lampOS/docs/writer-settings-capture.md
+@@ -48,12 +48,34 @@ that exact path. Observed root identities must agree across entries.
+ Debug output and returned errors omit path values, contents and record
+ values; no state file or journal is read or written.
+ 
++## Rechecking before a later effect
++
++`RawOwnership::revalidate` re-observes every retained path. It requires the
++same complete bytes, selected file metadata, ancestor identities and absence
++kind, including the missing-ancestor index. A new empty file where no leaf
++existed, or a newly created ancestor while the leaf is still absent, refuses.
++So do same-byte inode, mode, ancestor or root replacements. The check uses
++the observer's existing no-follow and nonregular-file refusal rules.
++
++Each read is capped at the original file's byte count, or zero for an absent
++entry. A growing file cannot expand the original 4 MiB budget. Failure
++returns no partial successful recheck and leaves the original observations
++and decisions intact. It does not re-plan, update ownership records, write a
++journal or grant permission to mutate anything. An empty capture still
++observes no root and establishes no root admission.
++
++The method retains no live descriptors after it returns. The future executor
++must establish and retain exclusion through the final mutation boundary;
++calling this method early and then allowing another writer is insufficient.
++This checks only the captured raw files. It does not revalidate projection
++inputs, record files, signatures, service state or an entire apply plan.
++
+ ## Limits before an executable plan
+ 
+ The caller must establish a trusted stable root and exclude writers. Rust
+ borrows protect the in-memory inputs, not the disk. Per-file checks and
+ matching root identities are not an atomic cross-file snapshot. No final
+-mutation-boundary revalidation, ACL/xattr capture or restoration runs.
++mutation boundary is wired. ACL/xattr capture and restoration remain absent.
+ 
+ This adapter does not verify signatures, update channel/sequence/refusal
+ admission, confirmed self-update or product-journal state. It does not run
+@@ -78,6 +100,9 @@ and mode evidence. They cover exact/exceeded old-byte budgets, zero-budget
+ empty/missing inputs, selected invalid versus unrelated large records,
+ bounded/redacted new inputs, and tmpfiles/image-shipped precedence. The
+ observer's separate controls cover descriptor traversal and substitutions.
++Recheck controls retain unchanged and exact-budget captures, refuse changed
++bytes, growth, mode, deletion, same-byte replacements, changed absences,
++ancestors, roots, symlinks and directories, and retain redacted diagnostics.
+ Local and native results belong to their actual source and scope. No
+ privileged execution, on-lamp GOOD/BAD, reboot or power cut is established
+ by these fixtures.

@@ -1,0 +1,14 @@
+{
+  "nextest": {
+    "version": "0.9.149",
+    "commit": "3fe4ef319",
+    "date": "2026-10-20"
+  },
+  "rust": {
+    "version": "1.96.0",
+    "commit": "ac68faa20",
+    "date": "2026-05-25"
+  },
+  "local_runner": "0.9.150",
+  "native_runner_identical_to_local": false
+}

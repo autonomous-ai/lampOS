@@ -1,0 +1,40 @@
+{
+  "actual_gate_source": "ea78acf5347c607e3907527914b0538ca9e64d67 plus five frozen WIP paths",
+  "dirty_files": [
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-settings-capture.md"
+  ],
+  "source_count": 7402,
+  "raw_source_before_sha256": "491d92237ef0a69acbe0c135771a4d6aac1f571c20ef11491d98d6a9243e59fa",
+  "raw_source_after_sha256": "491d92237ef0a69acbe0c135771a4d6aac1f571c20ef11491d98d6a9243e59fa",
+  "raw_source_snapshots_equal": true,
+  "raw_working_patch_sha256": "b101cf327b74ec8db294ff6aa84b9d611f1410847f72aeac2957bfe1e52eeb74",
+  "working_patch_matches_recorded_identity": false,
+  "commit_after_gate": "41198b14edda404b0333f3ad0e3b0e3d771c3d7e",
+  "commit_tree": "5c3fb3672718dee03fde39eda625273664e10a5b",
+  "all_committed_source_hashes_equal_tested_working_snapshot": true,
+  "local_execution_on_commit_41198_claimed": false,
+  "original_private_compiler_stdout_sha256": "e2c17ad2e64ee77f2d57068184e3dbb63e963bb72808c1dfd6f15cf763113e47",
+  "original_nextest_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "original_nextest_stderr_sha256": "c6dc57778e0196084af2daeb2718d348e0f8e4a56096b5dad96c67aa57c5c403",
+  "all_boundary_guards": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "working_patch_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7402,
+    "configuration_unchanged": true,
+    "controller_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "nextest_config_unchanged": true,
+    "retained_failed_driver_unchanged": true,
+    "receipt_selectors_unchanged": true,
+    "all_stages_passed": true,
+    "controller_error": null
+  },
+  "actual_and_preserved_hashes_at_completed_boundary": true,
+  "preserved_copies_remain_private_after_controlled_target_release": true
+}

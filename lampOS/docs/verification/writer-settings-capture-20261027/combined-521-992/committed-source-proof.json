@@ -1,0 +1,25 @@
+{
+  "head": "41198b14edda404b0333f3ad0e3b0e3d771c3d7e",
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "tree": "5c3fb3672718dee03fde39eda625273664e10a5b",
+  "actual_gate_source": "ea78acf5347c607e3907527914b0538ca9e64d67 plus five frozen WIP paths",
+  "owned_paths": [
+    "lampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "all_7402_working_source_hashes_equal_tested_snapshot": true,
+  "actual_unique_PASS": 521,
+  "all_bad_and_selected_unrun": 0,
+  "ignored": 6,
+  "required_controls_once": 44,
+  "gate_closure_sha256": "ad48043064b313070d9ba8d6570a99b125aabb13e127fe8a1327f1c25a1ebdd1",
+  "commit_after_actual_gate_no_test_replay": true
+}

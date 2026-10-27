@@ -1,0 +1,82 @@
+[
+  {
+    "file": "census.json",
+    "raw_sha256": "ee9160a7d8c0201acd2d39e5f9ac933fc0c037d12a0383b95e936ba8714f6b09",
+    "sanitized_sha256": "ee9160a7d8c0201acd2d39e5f9ac933fc0c037d12a0383b95e936ba8714f6b09",
+    "published_sha256": "ee9160a7d8c0201acd2d39e5f9ac933fc0c037d12a0383b95e936ba8714f6b09",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "terminal-rows.json",
+    "raw_sha256": "d8c9c35b3ac23c4b99e668a45ecbb41477fa9cc627471ae5af7b3df70ec8dac6",
+    "sanitized_sha256": "d8c9c35b3ac23c4b99e668a45ecbb41477fa9cc627471ae5af7b3df70ec8dac6",
+    "published_sha256": "d8c9c35b3ac23c4b99e668a45ecbb41477fa9cc627471ae5af7b3df70ec8dac6",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "preview-binding.json",
+    "raw_sha256": "590f214ed04fccf1799dabc5b0ebc64e739e4aca7daf8f928f6c091c1e11ce6b",
+    "sanitized_sha256": "590f214ed04fccf1799dabc5b0ebc64e739e4aca7daf8f928f6c091c1e11ce6b",
+    "published_sha256": "590f214ed04fccf1799dabc5b0ebc64e739e4aca7daf8f928f6c091c1e11ce6b",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "arm-run.json",
+    "raw_sha256": "4632b5db5f0e44704242e430fc8f1d1c47568d68b4b10978000dee86db807bf0",
+    "sanitized_sha256": "4632b5db5f0e44704242e430fc8f1d1c47568d68b4b10978000dee86db807bf0",
+    "published_sha256": "4632b5db5f0e44704242e430fc8f1d1c47568d68b4b10978000dee86db807bf0",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "arm-scope-witnesses.json",
+    "raw_sha256": "d86c20199c34a2e1770ae49d72c069a8aae61cb9d5c5d2c9723474745fd5d7af",
+    "sanitized_sha256": "d86c20199c34a2e1770ae49d72c069a8aae61cb9d5c5d2c9723474745fd5d7af",
+    "published_sha256": "d86c20199c34a2e1770ae49d72c069a8aae61cb9d5c5d2c9723474745fd5d7af",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "linux-run.json",
+    "raw_sha256": "ff4d9140c8289199fb0b1b9c6f2c5f8099851fd99470bd3bcb734a2587e9a988",
+    "sanitized_sha256": "ff4d9140c8289199fb0b1b9c6f2c5f8099851fd99470bd3bcb734a2587e9a988",
+    "published_sha256": "ff4d9140c8289199fb0b1b9c6f2c5f8099851fd99470bd3bcb734a2587e9a988",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "linux-scope-witnesses.json",
+    "raw_sha256": "30340bb4477b8a4324f3f951f4b29d036d798b5c1bcaad66ee04ef33ac7b48f5",
+    "sanitized_sha256": "30340bb4477b8a4324f3f951f4b29d036d798b5c1bcaad66ee04ef33ac7b48f5",
+    "published_sha256": "30340bb4477b8a4324f3f951f4b29d036d798b5c1bcaad66ee04ef33ac7b48f5",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "raw-log-bindings.json",
+    "raw_sha256": "3a6b3a491fea24a03d5930bfe53496dbcc04376593c39cfabcdfcbfae43efb88",
+    "sanitized_sha256": "3a6b3a491fea24a03d5930bfe53496dbcc04376593c39cfabcdfcbfae43efb88",
+    "published_sha256": "3a6b3a491fea24a03d5930bfe53496dbcc04376593c39cfabcdfcbfae43efb88",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "parser-receipt.json",
+    "raw_sha256": "079b7a8eb0311443c96409f2ff6741bc02b806fa634f9b05e9917f10e56547b6",
+    "sanitized_sha256": "079b7a8eb0311443c96409f2ff6741bc02b806fa634f9b05e9917f10e56547b6",
+    "published_sha256": "079b7a8eb0311443c96409f2ff6741bc02b806fa634f9b05e9917f10e56547b6",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  },
+  {
+    "file": "README.md",
+    "raw_sha256": "7b96fb8591b827a2e854f7dac15cc513d817470ac63a72981a618372811c14ce",
+    "sanitized_sha256": "7b96fb8591b827a2e854f7dac15cc513d817470ac63a72981a618372811c14ce",
+    "published_sha256": "7b96fb8591b827a2e854f7dac15cc513d817470ac63a72981a618372811c14ce",
+    "original_sanitized_trailing_lfs": 1,
+    "reversible_rule": "Remove published terminal LF, append original_sanitized_trailing_lfs LFs."
+  }
+]

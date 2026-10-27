@@ -1,0 +1,105 @@
+{
+  "pr": 3856,
+  "authored_head": "5d866fd9c7fcb55720db478058f5e930b6a63e6e",
+  "authored_base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "delivered_commit": "df57c6e400b184f02b9637caef2e508e3871316f",
+  "delivered_Main": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+  "extra_unpushed_qualification": "e6be1d779/f992 510pass separate; no reapply",
+  "files": [
+    {
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "authored": {
+        "mode": "100644",
+        "blob": "eabce9979706dd25226a36a1720f366351ed3263",
+        "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334"
+      },
+      "delivered": {
+        "mode": "100644",
+        "blob": "eabce9979706dd25226a36a1720f366351ed3263",
+        "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334"
+      },
+      "current": {
+        "mode": "100644",
+        "blob": "eabce9979706dd25226a36a1720f366351ed3263",
+        "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334"
+      },
+      "exact_authored_payload_delivered": true
+    },
+    {
+      "path": "lampOS/crates/update/src/head_touch/input_tests.rs",
+      "authored": {
+        "mode": "100644",
+        "blob": "721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+        "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+      },
+      "delivered": {
+        "mode": "100644",
+        "blob": "721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+        "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+      },
+      "current": {
+        "mode": "100644",
+        "blob": "721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+        "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+      },
+      "exact_authored_payload_delivered": true
+    },
+    {
+      "path": "lampOS/docs/head-touch-inputs.md",
+      "authored": {
+        "mode": "100644",
+        "blob": "9c937e3dbfad026de7f7dfa882992d1ae7f5cbdc",
+        "sha256": "a69da4104f21fe0e8614c11c9edbba72f98312564e6dc473f543942c758b6014"
+      },
+      "delivered": {
+        "mode": "100644",
+        "blob": "9c937e3dbfad026de7f7dfa882992d1ae7f5cbdc",
+        "sha256": "a69da4104f21fe0e8614c11c9edbba72f98312564e6dc473f543942c758b6014"
+      },
+      "current": {
+        "mode": "100644",
+        "blob": "9c937e3dbfad026de7f7dfa882992d1ae7f5cbdc",
+        "sha256": "a69da4104f21fe0e8614c11c9edbba72f98312564e6dc473f543942c758b6014"
+      },
+      "exact_authored_payload_delivered": true
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "authored": {
+        "mode": "100644",
+        "blob": "050d3e9eab4bc54a7af2197e7b036f99681316c6",
+        "sha256": "228ad14d843abc457b5ffb7e20e4171f448c2c8803447ed330810efcca21a0be"
+      },
+      "delivered": {
+        "mode": "100644",
+        "blob": "050d3e9eab4bc54a7af2197e7b036f99681316c6",
+        "sha256": "228ad14d843abc457b5ffb7e20e4171f448c2c8803447ed330810efcca21a0be"
+      },
+      "current": {
+        "mode": "100644",
+        "blob": "050d3e9eab4bc54a7af2197e7b036f99681316c6",
+        "sha256": "228ad14d843abc457b5ffb7e20e4171f448c2c8803447ed330810efcca21a0be"
+      },
+      "exact_authored_payload_delivered": true
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "authored": {
+        "mode": "100644",
+        "blob": "fbe7044fca4a1cb9e7c467b61c4caac488288da4",
+        "sha256": "05f904a4d651e33a5c1318acd9fd392c67fc593832cc43a54c3ad6d71364256a"
+      },
+      "delivered": {
+        "mode": "100644",
+        "blob": "60151dfe4163e236a653af26712396eae353f797",
+        "sha256": "056fe570dae7cd12ae5c3745ee827a1c043a3fe9be0cb10dab584e3787b71948"
+      },
+      "current": {
+        "mode": "100644",
+        "blob": "60151dfe4163e236a653af26712396eae353f797",
+        "sha256": "056fe570dae7cd12ae5c3745ee827a1c043a3fe9be0cb10dab584e3787b71948"
+      },
+      "exact_authored_payload_delivered": true
+    }
+  ]
+}

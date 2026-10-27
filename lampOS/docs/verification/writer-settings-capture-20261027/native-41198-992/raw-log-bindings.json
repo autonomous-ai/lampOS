@@ -1,0 +1,22 @@
+[
+  {
+    "file": "arm-complete.log",
+    "sha256": "f206b47a9f5a4bfeb6c14c14c9d237a71dc53aec743589102cf0c28a9310bfe9",
+    "bytes": 1939346
+  },
+  {
+    "file": "arm-watch.log",
+    "sha256": "45a3bd24fa1d42432910f96c7e2c51732d9e544e3082c693718c466e624b536a",
+    "bytes": 34407
+  },
+  {
+    "file": "linux-complete.log",
+    "sha256": "5696cad2c5383780d648f9c651df0805783bca437cd93a89c80d66b656876a98",
+    "bytes": 116212
+  },
+  {
+    "file": "linux-watch.log",
+    "sha256": "5e9dc944517641279b77f75d1bcbf47c047ab929748e7e97c4fba5a086e23a70",
+    "bytes": 18157
+  }
+]

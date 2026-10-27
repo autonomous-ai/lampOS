@@ -1,0 +1,357 @@
+{
+  "base": "f9926922d0f5c54057ad49f14917ae677e83b028",
+  "Main": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+  "changed_paths": [
+    "lampOS/Cargo.lock",
+    "lampOS/crates/body/src/bin/lamp-body.rs",
+    "lampOS/crates/cloud/src/skills.rs",
+    "lampOS/crates/control/Cargo.toml",
+    "lampOS/crates/control/src/lib.rs",
+    "lampOS/crates/control/src/main.rs",
+    "lampOS/crates/control/src/parts.rs",
+    "lampOS/crates/control/src/rate.rs",
+    "lampOS/crates/control/src/server.rs",
+    "lampOS/crates/control/src/session.rs",
+    "lampOS/crates/control/tests/door.rs",
+    "lampOS/crates/mood/src/engine.rs",
+    "lampOS/crates/mood/tests/it/engine.rs",
+    "lampOS/crates/skills/src/lib.rs",
+    "lampOS/crates/skills/tests/it/addon.rs",
+    "lampOS/crates/skills/tests/it/package.rs",
+    "lampOS/crates/skills/tests/it/skills.rs",
+    "lampOS/crates/update/src/head_touch.rs",
+    "lampOS/crates/update/src/head_touch/input_tests.rs",
+    "lampOS/crates/update/src/install.rs",
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/crates/voice/src/ring_caps.rs",
+    "lampOS/deploy/product/lamp-skills.service",
+    "lampOS/docs/body.md",
+    "lampOS/docs/control.md",
+    "lampOS/docs/control.schema.json",
+    "lampOS/docs/creature.md",
+    "lampOS/docs/head-touch-inputs.md",
+    "lampOS/docs/install.md",
+    "lampOS/docs/mood.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/skill-format.md",
+    "lampOS/docs/skill-format.schema.json",
+    "lampOS/docs/skills.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/updates.md",
+    "lampOS/sdk/js/src/control.schema.json",
+    "lampOS/sdk/python/src/lampos/control.schema.json",
+    "lampOS/skills/desk-tutor/skill.toml",
+    "lampOS/skills/feelings/SKILL.md",
+    "lampOS/skills/feelings/moves/glad-lift.json",
+    "lampOS/skills/feelings/moves/low-droop.json",
+    "lampOS/skills/feelings/moves/perk.json",
+    "lampOS/skills/feelings/skill.toml",
+    "lampOS/skills/feelings/tests/README.md",
+    "lampOS/skills/feelings/tests/a-bang-or-the-air-gives-nothing/expect.toml",
+    "lampOS/skills/feelings/tests/a-bang-or-the-air-gives-nothing/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/a-bang-or-the-air-gives-nothing/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/a-bang-or-the-air-gives-nothing/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/a-glad-line-the-lamp-answers/expect.toml",
+    "lampOS/skills/feelings/tests/a-glad-line-the-lamp-answers/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/a-glad-line-the-lamp-answers/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/a-glad-line-the-lamp-answers/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/a-talk-past-the-wait-gives-none/expect.toml",
+    "lampOS/skills/feelings/tests/a-talk-past-the-wait-gives-none/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/a-talk-past-the-wait-gives-none/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/a-talk-past-the-wait-gives-none/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/asleep-gives-none/expect.toml",
+    "lampOS/skills/feelings/tests/asleep-gives-none/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/asleep-gives-none/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/asleep-gives-none/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/glad-lifts-and-breathes-warm/expect.toml",
+    "lampOS/skills/feelings/tests/glad-lifts-and-breathes-warm/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/glad-lifts-and-breathes-warm/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/glad-lifts-and-breathes-warm/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/head-down-gives-none/expect.toml",
+    "lampOS/skills/feelings/tests/head-down-gives-none/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/head-down-gives-none/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/head-down-gives-none/room_activity.jsonl",
+    "lampOS/skills/feelings/tests/head-down-gives-none/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/lively-perks-and-breathes-quicker/expect.toml",
+    "lampOS/skills/feelings/tests/lively-perks-and-breathes-quicker/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/lively-perks-and-breathes-quicker/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/lively-perks-and-breathes-quicker/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/low-droops-and-dims/expect.toml",
+    "lampOS/skills/feelings/tests/low-droops-and-dims/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/low-droops-and-dims/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/low-droops-and-dims/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/nobody-in-view-is-not-standing/expect.toml",
+    "lampOS/skills/feelings/tests/nobody-in-view-is-not-standing/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/nobody-in-view-is-not-standing/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/nobody-in-view-is-not-standing/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/once-in-twenty-minutes/expect.toml",
+    "lampOS/skills/feelings/tests/once-in-twenty-minutes/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/once-in-twenty-minutes/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/once-in-twenty-minutes/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/quiet-at-night/expect.toml",
+    "lampOS/skills/feelings/tests/quiet-at-night/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/quiet-at-night/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/quiet-at-night/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/stale-mood-gives-none/expect.toml",
+    "lampOS/skills/feelings/tests/stale-mood-gives-none/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/stale-mood-gives-none/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/stale-mood-gives-none/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/two-an-hour/expect.toml",
+    "lampOS/skills/feelings/tests/two-an-hour/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/two-an-hour/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/two-an-hour/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-finish-speaking/expect.toml",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-finish-speaking/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-finish-speaking/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-finish-speaking/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-stand/expect.toml",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-stand/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-stand/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-lamp-to-stand/voice_state.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-person-to-finish/expect.toml",
+    "lampOS/skills/feelings/tests/waits-for-the-person-to-finish/humans_faces_tracked.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-person-to-finish/mood_state.jsonl",
+    "lampOS/skills/feelings/tests/waits-for-the-person-to-finish/voice_state.jsonl",
+    "lampOS/skills/look-for-things/skill.toml",
+    "lampOS/skills/point-light/skill.toml"
+  ],
+  "actual_compile_evidence": {
+    "Head-extra-f992": {
+      "compile_stdout_sha256": "418041439812a35c92815d3c3f26bb79282e4fadd5702d4e6e15b04ee12f94a0",
+      "artifacts": [
+        {
+          "name": "lamp_update",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": false,
+          "src": "crates/update/src/lib.rs"
+        },
+        {
+          "name": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": false,
+          "src": "crates/update/src/main.rs"
+        },
+        {
+          "name": "lamp_skills",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": false,
+          "src": "crates/skills/src/lib.rs"
+        },
+        {
+          "name": "lamp_voice",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": false,
+          "src": "crates/voice/src/lib.rs"
+        },
+        {
+          "name": "self-process-cuts",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/self_process_cuts.rs"
+        },
+        {
+          "name": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": true,
+          "src": "crates/update/src/main.rs"
+        },
+        {
+          "name": "self-cli-exec",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/self_cli_exec.rs"
+        },
+        {
+          "name": "release_pair",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/release_pair.rs"
+        },
+        {
+          "name": "it",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/it/main.rs"
+        },
+        {
+          "name": "functions",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/functions.rs"
+        },
+        {
+          "name": "install",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/install.rs"
+        },
+        {
+          "name": "round",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/round.rs"
+        },
+        {
+          "name": "lamp_update",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": true,
+          "src": "crates/update/src/lib.rs"
+        }
+      ]
+    },
+    "Raw-actual-992": {
+      "compile_stdout_sha256": "e2c17ad2e64ee77f2d57068184e3dbb63e963bb72808c1dfd6f15cf763113e47",
+      "artifacts": [
+        {
+          "name": "lamp_update",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": false,
+          "src": "crates/update/src/lib.rs"
+        },
+        {
+          "name": "lamp_voice",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": false,
+          "src": "crates/voice/src/lib.rs"
+        },
+        {
+          "name": "lamp_skills",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": false,
+          "src": "crates/skills/src/lib.rs"
+        },
+        {
+          "name": "self-cli-exec",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/self_cli_exec.rs"
+        },
+        {
+          "name": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": true,
+          "src": "crates/update/src/main.rs"
+        },
+        {
+          "name": "round",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/round.rs"
+        },
+        {
+          "name": "release_pair",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/release_pair.rs"
+        },
+        {
+          "name": "lamp_update",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": true,
+          "src": "crates/update/src/lib.rs"
+        },
+        {
+          "name": "self-process-cuts",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/self_process_cuts.rs"
+        },
+        {
+          "name": "it",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/it/main.rs"
+        },
+        {
+          "name": "install",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/install.rs"
+        },
+        {
+          "name": "functions",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "src": "crates/update/tests/functions.rs"
+        },
+        {
+          "name": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": false,
+          "src": "crates/update/src/main.rs"
+        }
+      ]
+    }
+  },
+  "consumed_production": [
+    "crates/update/src/install.rs PRODUCT_SKILLS/PRODUCT_SKILLS_OFF/SETTINGS adds installed-off feelings and embeds five files",
+    "crates/skills/src/lib.rs normal library: camera plus format1 compatibility permission reading",
+    "crates/voice/src/ring_caps.rs normal library module",
+    "delivered Head read seam/input tests"
+  ],
+  "consumed_tests": [
+    "crates/update/tests/install.rs actual listed executable: product inventory24to25",
+    "five feelings files directly embedded/copied: skill.toml,SKILL.md,moves/glad-lift.json,moves/perk.json,moves/low-droop.json",
+    "existing desk-tutor/look-for-things/point-light skill.toml inputs change",
+    "Update it source census reads changed Rust across crates, even dependency cfg(test)/binary files not actually compiled"
+  ],
+  "excluded_or_limited": [
+    "feelings/tests is excluded by skill_files walker and not embedded in SETTINGS; no actual replay of those added clips claimed",
+    "Cargo.lock newControl bus/ipc edges alone establish metadata change, not execution or actual compiler membership",
+    "SDK schema copies/documentation are not by themselves the justification for full runtime"
+  ],
+  "decision": "Head3856 delivered: stop carry/no reapply. Preserve unpushed e6be/f992510 qualification separately. Raw3858 must carry currentc3 and freshly qualify full pUpdate after actual source guards/compile/list; no old count transfer.",
+  "tests_executed_for_audit": false
+}

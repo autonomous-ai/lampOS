@@ -1,0 +1,154 @@
+{
+  "head": "41198b14edda404b0333f3ad0e3b0e3d771c3d7e",
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "tree": "5c3fb3672718dee03fde39eda625273664e10a5b",
+  "actual_gate_source": "ea78acf5347c607e3907527914b0538ca9e64d67 plus five frozen WIP files",
+  "source_count": 7402,
+  "working_before_after_equal": true,
+  "all_committed_paths_modes_match_tested_git_census": true,
+  "only_five_tested_WIP_git_blobs_changed_from_ea78": [
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-settings-capture.md"
+  ],
+  "all_ten_owned_committed_bytes_sha256_match_tested_snapshot": {
+    "lampOS/crates/update/src/apply.rs": {
+      "git_blob": "2e5e541d8eb974694cf451f27eac1a57897c1b69",
+      "git_mode": "100644",
+      "tested_working_sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "committed_bytes_match": true
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "git_blob": "d10a9823678d0a044f126c120b394a11147cf25d",
+      "git_mode": "100644",
+      "tested_working_sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47",
+      "committed_bytes_match": true
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "git_blob": "79b0f419624e2ed1f8416673844afd7e988531e7",
+      "git_mode": "100644",
+      "tested_working_sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c",
+      "committed_bytes_match": true
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "git_blob": "9dadf2e73c5db037d5126b95e78a7fcac768df1f",
+      "git_mode": "100644",
+      "tested_working_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "committed_bytes_match": true
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "git_blob": "9c89793772738265c554c39ef62ad786e5e93cc0",
+      "git_mode": "100644",
+      "tested_working_sha256": "684507b4f38ced0370ec38139c2574958a8050ee2a30631089eea2fc0f6698ae",
+      "committed_bytes_match": true
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "git_blob": "00aaca5cffce778e7787b98bb3a4c3f66d85baa3",
+      "git_mode": "100644",
+      "tested_working_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "committed_bytes_match": true
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "git_blob": "5b310eaeca9bfcd1bf9e108d01e4dfe9b89d82f1",
+      "git_mode": "100644",
+      "tested_working_sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684",
+      "committed_bytes_match": true
+    },
+    "lampOS/docs/writer-settings-capture.md": {
+      "git_blob": "b9c8d7ba9bc37b7c26acc19d9723139a211b3f90",
+      "git_mode": "100644",
+      "tested_working_sha256": "9766bdaed2e350b920f2ab09252e5f2435a11a1c8243feb8e25f5442af7ab149",
+      "committed_bytes_match": true
+    },
+    "lampOS/docs/updates.md": {
+      "git_blob": "7c08f39591dcd8ebfa97fbdcd28f6cc05bb77c4c",
+      "git_mode": "100644",
+      "tested_working_sha256": "4c2d34843b217a3a0f5e654645374e95f50a19564c5c6f60d2d97e94679856d5",
+      "committed_bytes_match": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_blob": "fb06f9c68254f003c745d00a7994bc603c0d75b8",
+      "git_mode": "100644",
+      "tested_working_sha256": "41ab0133de31b1758af08d511c62a49f61116b64bb9bea2a8092cf943a795d7e",
+      "committed_bytes_match": true
+    }
+  },
+  "ordinary_classifier_match_table_equivalent_after_borrow_adaptation": true,
+  "ordinary_classifier_builds_closure_equivalent_after_String_membership_adaptation": true,
+  "explicit_equivalence_adaptations": [
+    "Option<String> borrowed as Option<&str>; now==new uses new.as_str()",
+    "Vec<String>::contains(&String) becomes iter().any(|before| before==sha) with sha:&str; both content equality"
+  ],
+  "initial_source_audit_assumption_correction": "Initial audit script expected as_deref in Main; actual Main matched &Option<String>. Corrected audit normalization only; no source/gate changed.",
+  "ordinary_plan_still_reads_and_orders_before_delegating": true,
+  "entire_Main_receipt_merge_and_test_tail_byte_identical": true,
+  "preserved_upstream": {
+    "lampOS/crates/update/src/round.rs": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "2ae7fa83504c7162c59b3fa279d517b35a579994"
+    },
+    "lampOS/crates/update/tests/round.rs": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "2b9cf68c94a0cb30ba30f68002e2a37f541c832c"
+    },
+    "lampOS/crates/update/src/writer_refresh.rs": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "77ad2e38e7a3135fe56723cde18a822df5da8680"
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "a9bb99c4ace0198232f37c658984f7d2a8ec79ae"
+    },
+    "lampOS/docs/settings-writer-refresh.md": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "505455b627bccddcc063650b079d1fb3bfc79fd5"
+    },
+    "lampOS/Cargo.lock": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "08d07c64a9b400b69e8124d45af9b8f206847dc9"
+    },
+    "lampOS/crates/cloud/Cargo.toml": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "65558e699d91e56ed8447e3091bbda483666ac8e"
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "3416199eef9b60ad07f0a68b669c9caa6019df48"
+    },
+    "lampOS/crates/cloud/src/reports/query.rs": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "6d603d768711844dd2892419f27fdd063d1db349"
+    },
+    "lampOS/crates/cloud/src/reports/query_tests.rs": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "03fde84f15e7ad5a22079bcea6e8805f3f5fdc57"
+    },
+    "lampOS/docs/cloud.md": {
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "048f90f4c56583b9de0bc463f8e35f8d5fe8e70e"
+    }
+  },
+  "unknown_enum_behavior": "Entry/Act/RawOwnership are not deserialized. Existing apply::Op unknown values are rejected; Setting additive fields remain tolerated, unchanged. writer_refresh unknown semantic journal versions/phases remain fail-closed.",
+  "PR_self_review": {
+    "wrong_person": "No person/session routing introduced; explicit caller root/authority preconditions; data/errors/Debug redacted.",
+    "stops_forgets": "No worker/cache/retry/cancellation path or live effect introduced. Captured buffers have normal owned lifetime, no zeroization claim.",
+    "default_side_effects": "New capture/revalidate unwired; existing ordinary planner table and I/O ordering preserved.",
+    "census": "No switch/topic/unit/msgs field. All new API/classifier and apply-plan readers found in Update only.",
+    "gates": "Actual combined Mac521 snapshot binding present; original ARM/Linux checks still pending at review. No local extra gate."
+  },
+  "findings": "No P1/P2 within the unwired contract; ancestor replacement dynamic test remains coupled, not an isolated proof.",
+  "review_only_no_Cargo_source_log_or_public_action": true
+}

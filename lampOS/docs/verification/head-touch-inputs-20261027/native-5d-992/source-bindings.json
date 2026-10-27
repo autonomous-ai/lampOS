@@ -1,0 +1,29 @@
+{
+  "files": [
+    {
+      "blob": "eabce9979706dd25226a36a1720f366351ed3263",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334"
+    },
+    {
+      "blob": "721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/head_touch/input_tests.rs",
+      "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+    },
+    {
+      "blob": "77ad2e38e7a3135fe56723cde18a822df5da8680",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca"
+    },
+    {
+      "blob": "a9bb99c4ace0198232f37c658984f7d2a8ec79ae",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c"
+    }
+  ],
+  "head": "5d866fd9c7fcb55720db478058f5e930b6a63e6e"
+}

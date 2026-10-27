@@ -1,0 +1,11 @@
+# Original PR 3858 native qualification
+
+Original attempt-one ARM64 40520632697 and Linux Clippy 40520632166 completed successfully; both native watch handles drained exit 0. Both checkouts are merge preview a52baab08a4b743fc8affb92da2deef528207def, ordered parents [992303fc8d72322bab46cdb18801c853ea43bb81, 41198b14edda404b0333f3ad0e3b0e3d771c3d7e], tree 5c3fb3672718dee03fde39eda625273664e10a5b equals authored tree. This qualifies the original offered content, not subsequent Main/carry heads.
+
+ARM uses Nextest 0.9.149: **7,783 unique PASS / zero FAIL, LEAK, TIMEOUT, other bad or selected unrun / 53 skipped**. Ordinals cover every selected case; 34 identical log echo rows are excluded, not extra passes. All 44 required controls pass once. Runtime selection is 12 packages across 70 binaries; 119 binaries are skipped. The release build is workspace-wide, runtime coverage is the actual selected scope. Both Linux custom updater process controls pass within those rows.
+
+Separate scopes, never added to Nextest: workspace doctests four passes across 47 crate headers; 13 own-process rows; relay_signals OK; promotion helper summaries 25 passes; publication Python suites 35, 12 and 7 passes. Linux runs pinned workspace fmt and strict locked workspace all-target Clippy successfully. There is no physical lamp, unplug, root-guard activation or independent restoration acceptance.
+
+Earlier Raw normal-libtest 509/1/6 remains unwaived, with cause unestablished; the one unmodified-Main 198-pass baseline remains INCONCLUSIVE. Separately, a reader reported an unchanged writer_refresh restart failure once in four shared-process writer-filter runs under load. That P3 remains OPEN pending original errno, source/driver and workload evidence (PR comment 6444989591); isolated passes and these process-isolated green workflows do not dispose of it. No lock policy, timeout, assertion or serialization was changed.
+
+The original completed logs remain private with hashes and sizes; these are sanitized scope witnesses, unique terminal rows, raw log bindings and source proof. Production artifact provenance is not audited by this packet and gives no test-executable hashes. No published binary or Python source. Reversible EOF normalization is recorded before the SHA manifest. Parser input-shape correction is explicit, without runtime rerun.

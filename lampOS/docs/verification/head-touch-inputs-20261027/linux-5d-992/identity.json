@@ -1,0 +1,20 @@
+{
+  "pr": 3856,
+  "head": "5d866fd9c7fcb55720db478058f5e930b6a63e6e",
+  "run": 40518278177,
+  "attempt": 1,
+  "job": 122237712716,
+  "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+  "actual_preview": "6afb02a0050885e1a5018f887c2f7f0a342e903b",
+  "actual_preview_tree": "e8bdde3d851caf502490eb0580ce8806da0d697b",
+  "authored_tree_equal": true,
+  "job_status": "completed",
+  "job_conclusion": "success",
+  "completed_at": "2026-10-27T14:13:31Z",
+  "runner_labels": [
+    "ubuntu-22.04"
+  ],
+  "job_log_sha256": "c02d686242f5eb8be224c37fecfe701ccb550410fcb6b9eb9acf43ad2c64107f",
+  "check_metadata_sha256": "02d40e5afe9fddcc35fd97e6cef048ecf0929c0df28d89a543fc882bb14f55e4",
+  "limits": "Original required Clippy check/job passed; workflow-level metadata remained in_progress at the separate readiness observation. Watcher retained for terminal workflow closure. No Linux test runtime or per-executable provenance inferred."
+}
