@@ -1,0 +1,18 @@
+{
+  "run": 40428072085,
+  "status": "success",
+  "actual_checkout": "06173069dd669cf8d2f174df9aa761bbeb1b57ef",
+  "parents": [
+    "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+    "57f9175ed4e18cb88247aca7e7d1c9e10a62edd8"
+  ],
+  "tested_tree": "fb7e47dc1887daff49e3d159089c6b2dc4356446",
+  "authored_head_tree_equal": true,
+  "formatting_step": "success",
+  "strict_workspace_all_targets_clippy_step": "success",
+  "run_json_sha256": "4c46027996aebebda54d64db7c4ce1edfb16ee32fefc912905313db7f9a8c7c7",
+  "job_log_sha256": "300d1cfa4d3327af03e746a2f0366c1dd07264ec072d7c0eece0099d6dfc9211",
+  "limits": [
+    "Linux formatting/Clippy only. ARM64 remains separate."
+  ]
+}

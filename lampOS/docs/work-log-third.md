@@ -1,3 +1,9 @@
+## 2026-10-27 07:58 — privacy fixture original ARM and Linux green
+
+#3637 remains draft for two current reads. [Original native proof](verification/privacy-kept-resync-fixture-20261027/README.md): ARM40428072057 passes 7,551 unique nextest cases, zero bad, 53 summary skips; all nine Voice privacy controls pass once. Thirty-four post-summary PASS reprints are verified and excluded from the census. Linux40428072085 passes pinned workspace formatting and strict all-target Clippy. Both actual preview checkouts 06173069d have ordered 4bff/57f parents and authored-tree equality. No native binary download/link/execution on the Mac or device claim.
+
+Ownkeys' current full Voice command at 75f8/4bff closed0, summary 3,817/0/15 and all thirty witnesses. Its separate independent parser HOLD is retained with the newly source-bound interleaved success addendum; all 140 artifact pairs and source/raw inputs remain stable. The remaining host controller is being finalized against that closed scope. Reminder 7a5347f84 completed all four current compiler stages and its 133-path capture; its selected current runtime is now active. No old full-gate failure is waived.
+
 ## 2026-10-27 07:44 — privacy fixture committed after current shipping gate
 
 Ready for lamp-voice: no, native and current readers remain. Exact two-file commit 57f9175ed on 4bff has tested tree fb7e47dc1. [Shipping audit and commit binding](verification/privacy-kept-resync-fixture-20261027/README.md): direct selected 4,046/0/16 plus separate three passing doctests; all 16 witnesses and 11 source-expected hooks, no unknown hook or HOLD. Fresh fmt, strict three-package all-target Clippy, workspace build/test compilation and stable source/raw/65 artifact-pair guards pass. No timeout, forced cleanup, product timing change, historical-cause or device claim.

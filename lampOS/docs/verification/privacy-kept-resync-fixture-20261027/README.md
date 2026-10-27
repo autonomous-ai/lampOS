@@ -69,3 +69,22 @@ retried. The unchanged auditor completed under the required index access.
 
 Native ARM64/Linux, two current independent reads and any later base carry are
 separate gates. Historical generic-unavailable causes remain unknown.
+
+## Original native gates on 57f9175ed
+
+[Original ARM64 run 40428072057](https://github.com/autonomous-ai/lampOS/actions/runs/40428072057)
+and [original Linux run 40428072085](https://github.com/autonomous-ai/lampOS/actions/runs/40428072085)
+pass. [ARM source/census audit](native-arm-57f.json) verifies **7,551 unique
+nextest passes, zero bad cases and 53 summary skips**, including all nine Voice
+privacy controls once. This is the PR's affected-crate selection, not the full
+workspace. Thirty-four PASS rows repeated after the summary match the primary
+rows exactly and are not counted twice. The five Msgs and two generic Bus
+witnesses from the Mac selection are not claimed as native executions.
+
+[Linux source binding](native-linux-57f.json) confirms actual pinned workspace
+formatting and strict all-target Clippy passed. Both jobs checked preview
+06173069d with ordered parents 4bff/57f; the preview tree exactly equals the
+authored and locally tested tree fb7e47dc1. No native binary was downloaded,
+linked or executed on the Mac. No device result or historical-cause attribution
+is inferred. Two current independent reads and any later base carry remain
+separate readiness gates.
