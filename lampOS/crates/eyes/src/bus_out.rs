@@ -480,6 +480,22 @@ impl BusOut {
         }
     }
 
+    /// A yawn of the largest face (`yawn`, #3709): one more in the sitting's
+    /// count on `room/activity`. Without activity, nothing.
+    pub fn activity_yawned(&mut self, now_us: u64) {
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge.yawned(now_us);
+        }
+    }
+
+    /// Whether the face-expressions yes is kept (`Judge::yawns_allowed`):
+    /// without it the sitting's yawns are forgotten.
+    pub fn activity_yawns_allowed(&mut self, yes: bool) {
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge.yawns_allowed(yes);
+        }
+    }
+
     /// Which face of the last look the judge wants printed, if any.
     pub fn activity_wants_print(&mut self, now_us: u64) -> Option<usize> {
         self.activity.as_mut()?.judge.wants_print(now_us)

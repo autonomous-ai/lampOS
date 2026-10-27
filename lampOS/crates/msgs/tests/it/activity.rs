@@ -13,6 +13,7 @@ fn activity_is_a_state_and_three_counts() {
         for_s: 340,
         sitting_s: 2710,
         baseline: true,
+        yawns: 0,
     };
     let text = serde_json::to_string(&reading).unwrap();
     assert_eq!(
@@ -45,6 +46,7 @@ fn activity_is_a_state_and_three_counts() {
         for_s: 30,
         sitting_s: 0,
         baseline: false,
+        yawns: 0,
     };
     away.check().unwrap();
     assert!(
@@ -70,6 +72,46 @@ fn activity_is_a_state_and_three_counts() {
     }
     .check()
     .unwrap();
+}
+
+/// A sitting's yawns (#3709): said only once there is one, so an eyes that
+/// counts none says what it said before, and an old eyes' line reads as 0;
+/// away has none.
+#[test]
+fn yawns_are_a_count_said_from_the_first() {
+    let sat = RoomActivity {
+        state: Activity::AtDesk,
+        for_s: 60,
+        sitting_s: 1800,
+        baseline: true,
+        yawns: 2,
+    };
+    let text = serde_json::to_string(&sat).unwrap();
+    assert_eq!(
+        text,
+        r#"{"state":"at_desk","for_s":60,"sitting_s":1800,"baseline":true,"yawns":2}"#
+    );
+    assert_eq!(serde_json::from_str::<RoomActivity>(&text).unwrap(), sat);
+    sat.check().unwrap();
+    let old = r#"{"state":"at_desk","for_s":60,"sitting_s":1800,"baseline":true}"#;
+    assert_eq!(
+        serde_json::from_str::<RoomActivity>(old).unwrap(),
+        RoomActivity { yawns: 0, ..sat }
+    );
+    assert_eq!(
+        serde_json::to_string(&RoomActivity { yawns: 0, ..sat }).unwrap(),
+        old
+    );
+    assert!(
+        RoomActivity {
+            state: Activity::Away,
+            sitting_s: 0,
+            baseline: false,
+            ..sat
+        }
+        .check()
+        .is_err()
+    );
 }
 
 #[test]

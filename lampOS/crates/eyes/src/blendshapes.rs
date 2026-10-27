@@ -43,6 +43,8 @@ const MOUTH_FROWN: [usize; 2] = [30, 31];
 const MOUTH_SMILE: [usize; 2] = [44, 45];
 const NOSE_SNEER: [usize; 2] = [50, 51];
 const BROW_DOWN: [usize; 2] = [1, 2];
+/// `browInnerUp`, one score for both: raised in surprise (`yawn`).
+const BROW_INNER_UP: usize = 3;
 /// With `LAMP_SEEMS_BROW_LOW=on`, a face is also `negative` with the brows
 /// drawn down at or over [`BROW_LOW_FROM`] and the smiles under
 /// [`BROW_LOW_SMILE_UNDER`], its confidence the brows' (#2132). The frowns
@@ -182,6 +184,16 @@ impl Reader {
 /// points of this look, when the look's mouth pass meshed that face, so one
 /// mesh a look serves both the speaking read and this one, else the face's
 /// crop (`mesh::crop`), for the thread's own mesh.
+/// The smiles' mean and the inner brows raised, for a yawn
+/// (`yawn::Mouth`). `None` for scores that aren't 52 numbers.
+pub fn yawn_scores(scores: &[f32]) -> Option<(f32, f32)> {
+    if scores.len() != SCORES || scores.iter().any(|score| !score.is_finite()) {
+        return None;
+    }
+    let smile = (scores[MOUTH_SMILE[0]] + scores[MOUTH_SMILE[1]]) / 2.0;
+    Some((smile, scores[BROW_INNER_UP]))
+}
+
 pub enum Input {
     Landmarks(Vec<f32>),
     Crop(Vec<f32>),
@@ -210,6 +222,15 @@ mod tests {
             out[at] = score;
         }
         out
+    }
+
+    /// A yawn's two scores: the smiles' mean and the inner brows (#3709).
+    #[test]
+    fn a_yawn_reads_the_smiles_mean_and_the_inner_brows() {
+        let (smile, up) = yawn_scores(&scores(&[(44, 0.2), (45, 0.4), (3, 0.9)])).unwrap();
+        assert!((smile - 0.3).abs() < 1e-6 && (up - 0.9).abs() < 1e-6);
+        assert_eq!(yawn_scores(&[0.0; 51]), None);
+        assert_eq!(yawn_scores(&scores(&[(3, f32::NAN)])), None);
     }
 
     /// #2132: with the switch, the brows drawn down with no smile are a long

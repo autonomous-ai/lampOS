@@ -50,3 +50,4 @@ pub mod speaking;
 pub mod steady;
 pub mod still;
 pub mod who;
+pub mod yawn;
