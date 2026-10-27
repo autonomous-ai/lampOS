@@ -525,6 +525,17 @@ invalid (a score that is not finite or outside 0 to 1, an impossible
 hearing, so the try says it was unsure. No sound, no mic2 ratio and no voice
 identity is used or kept.
 
+**Every try says why in the journal** (#3504). Each `onboarding_near_try` and
+`onboarding_sentence_try` record, accepted or not, is also one lamp-voice
+journal line, `lamp-voice onboarding: how_you_sound try: {…}`: the prompt,
+`accepted`, `why` (or the sentence's `short`), and the numbers that decided
+it. A name try lists every name heard as `heard: [[ms from the prompt's end,
+score], …]` and, when refused, when the lamp spoke as `spoke: [[from, to],
+…]` (ms from the prompt's end; the prompt itself is the span ending at 0);
+an accepted one adds `rise_db`. A sentence try has `words`, `speech_ms`,
+`rise_db`, `bar_db` and `said_close`. The session record rolls over and the
+journal is rotated, so read it soon after the walk.
+
 **The reply is held.** An answer that starts within a second of the name
 spoils the try, and a model hearing its name answers ("Yes?"). So while a
 try's window is open, from the prompt's end to 7 s on, the voice holds its
@@ -581,20 +592,32 @@ evidence (`near.rs`, `sentence_judge`):
   `rise_db`) at the sentence's bar or more (`sentence_bar`, the record's
   `bar_db`): this person's quietest accepted call from the seat less 3 dB, as
   their bar is made, so it is relative to this room's quiet at this hour;
-  never over the near rule's bar (`attention::near_rise_db()`: 18 dB, or this
-  home's bar when `LAMP_ATTENTION_NEAR_CALIBRATED` is on), which also stands
-  when no call was accepted, and never under 3 dB (`SENTENCE_LOWEST_DB`). On
-  lamp-52e6 in an office (row 10) the call rose 3.9 dB and a normal sentence
-  (8 words in 1.95 s) fell short of the flat 18 dB; there the bar is 3 dB. A
-  far, quiet line still falls short: people farther off rose 9.8 to 15.1 dB in
-  a quiet room, under its 18 dB, and a line under 3 dB in the office. Test:
-  `in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls`;
+  with no call accepted, 6 dB (`SENTENCE_NO_CALL_DB`); never over the near
+  rule's bar (`attention::near_rise_db()`: 18 dB, or this home's bar when
+  `LAMP_ATTENTION_NEAR_CALIBRATED` is on), and never under 3 dB
+  (`SENTENCE_LOWEST_DB`). On lamp-52e6 in an office (row 10) the call rose
+  3.9 dB and a normal sentence (8 words in 1.95 s) fell short of the flat
+  18 dB; there the bar is 3 dB. A far, quiet line still falls short: people
+  farther off rose 9.8 to 15.1 dB in a quiet room, under its 18 dB, and a line
+  under 3 dB in the office. The no-call bar is not the near rule's 18 dB,
+  which is a call's: a sentence from the seat rose 9.2 dB on lamp-52e6 (row
+  10) and 10.7 to 11.0 dB on lamp-c0a4 (#2844), so on 27 October a person on
+  52e6 whose calls were all refused failed the whole step on their sentence
+  (#3504). 6 dB is 52e6's seat sentence less 3 dB, as a bar is made from
+  calls; the same voice from twice as far rises about 4.5 dB, under it, and
+  the lamp's own voice gives no rise at all. A raised voice from across the
+  room (9.8 to 15.1 dB) is not refused by level, here or at the 3 dB a lamp
+  gets when its calls are accepted (#2844). Tests:
+  `in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls`,
+  `calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_passes`;
 - **its words covering it**: at least one word for each second of the line's
   speech (`MS_A_WORD`, half the pace of ordinary speech; the line's speech is
   its blocks the detector scored as speech, 10 ms each). Fewer is a fragment.
 
-The try is judged as soon as a line's words are in, or 3 s past the window
-with none. Short of the evidence, it is coached once: "a little louder" when
+The try is judged as soon as a line with at least one word is in, or 3 s
+past the window with none. A line whose words came back none ("okay", a hum,
+the room) does not end the try: a later line in the window replaces it, and
+it is judged only if nothing else comes. Short of the evidence, it is coached once: "a little louder" when
 the level fell short or nothing was said, "a little closer" when the words
 didn't come back or didn't cover it. The second try ends the part: done or
 failed. Failed, the lamp says "I'll get used to your voice as we talk."
