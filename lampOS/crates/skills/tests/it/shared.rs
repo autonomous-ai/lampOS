@@ -5,6 +5,7 @@
 //! computer"). A package unsigned, signed as the Store signs, changed after
 //! signing, or whose signature names another key than it carries is
 //! refused.
+use base64::{Engine, engine::general_purpose::STANDARD};
 use lamp_skills::package::{self, MANIFEST, SIGNATURE, check_author, read_shared_package_bytes};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use std::{
@@ -32,6 +33,11 @@ fn copy(from: &Path, to: &Path) {
 /// An author's key, from a seed: `which` tells two authors apart.
 fn key(which: u8) -> Ed25519KeyPair {
     Ed25519KeyPair::from_seed_unchecked(&[which; 32]).unwrap()
+}
+
+/// The Store's key in these tests: one no author holds.
+fn store() -> [u8; 32] {
+    key(3).public_key().as_ref().try_into().unwrap()
 }
 
 fn fingerprint(key: &Ed25519KeyPair) -> String {
@@ -102,10 +108,14 @@ fn an_authors_package_carries_their_key_and_names_them() {
     let dir = tempfile::tempdir().unwrap();
     let author = key(7);
     let bytes = packed(dir.path(), Some(&author), "1.0.0", true);
-    let package = read_shared_package_bytes(&bytes).unwrap();
+    let package = read_shared_package_bytes(&bytes, &[store()]).unwrap();
+    let named = package.author.as_ref().unwrap();
+    assert_eq!(named.fingerprint, fingerprint(&author));
+    // The whole key, for the pin; the fingerprint is only for showing.
+    assert_eq!(named.public.as_slice(), author.public_key().as_ref());
     assert_eq!(
-        package.author.as_deref(),
-        Some(fingerprint(&author).as_str())
+        package.signed_by.as_deref(),
+        Some(named.fingerprint.as_str())
     );
     assert_eq!(package.manifest.name, "desk-tutor");
     // The signature file carries the key itself, which the Store's doesn't.
@@ -113,9 +123,18 @@ fn an_authors_package_carries_their_key_and_names_them() {
     assert_eq!(checked.fingerprint, fingerprint(&author));
     assert_eq!(checked.public.as_slice(), author.public_key().as_ref());
     // Each author's package names its own key: two authors are told apart.
-    let other =
-        read_shared_package_bytes(&packed(dir.path(), Some(&key(9)), "1.0.1", true)).unwrap();
-    assert_eq!(other.author.as_deref(), Some(fingerprint(&key(9)).as_str()));
+    let other = read_shared_package_bytes(
+        &packed(dir.path(), Some(&key(9)), "1.0.1", true),
+        &[store()],
+    )
+    .unwrap();
+    assert_eq!(
+        other
+            .author
+            .as_ref()
+            .map(|author| author.fingerprint.as_str()),
+        Some(fingerprint(&key(9)).as_str())
+    );
     assert_ne!(other.author, package.author);
     // A Store-style package reads as before, its signature the Store's to check.
     let store = packed(dir.path(), Some(&author), "1.0.2", false);
@@ -132,7 +151,7 @@ fn unsigned_store_signed_changed_or_misnamed_packages_are_refused() {
     let author = key(7);
     let good = packed(dir.path(), Some(&author), "1.0.0", true);
     let refused = |bytes: &[u8], said: &str| {
-        let why = read_shared_package_bytes(bytes).unwrap_err();
+        let why = read_shared_package_bytes(bytes, &[store()]).unwrap_err();
         assert!(why.contains(said), "{said}: {why}");
     };
     refused(
@@ -173,6 +192,29 @@ fn unsigned_store_signed_changed_or_misnamed_packages_are_refused() {
         &format!(
             "names key {}, and the key it carries is",
             fingerprint(&key(9))
+        ),
+    );
+    // A genuine Store package with the Store's public key added to its
+    // signature: the signature is the Store's own, so it checks, but it is
+    // no author's (Fourteen's P3 on #3931).
+    let relabelled = changed(
+        &packed(dir.path(), Some(&key(3)), "1.0.0", false),
+        SIGNATURE,
+        |data| {
+            String::from_utf8(data.to_vec())
+                .unwrap()
+                .replace(
+                    "\"signature\":",
+                    &format!("\"public\":\"{}\",\"signature\":", STANDARD.encode(store())),
+                )
+                .into_bytes()
+        },
+    );
+    refused(
+        &relabelled,
+        &format!(
+            "carries the Store's key {}: a Store package is installed from the Store",
+            fingerprint(&key(3))
         ),
     );
 }
