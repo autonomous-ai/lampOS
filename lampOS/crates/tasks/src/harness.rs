@@ -521,6 +521,11 @@ impl Cli {
             self.config.read_timeout,
         );
         seen.took(&preflight);
+        if let Ok(reply) = &preflight {
+            seen.machines = machine_words(&reply.stdout);
+        }
+        seen.machines
+            .insert(launch.target.machine_id.to_lowercase());
         let preflight = match preflight {
             Ok(reply) => reply,
             Err(error) => {
@@ -1366,6 +1371,9 @@ fn folder_missing(bytes: &[u8]) -> bool {
 struct Seen {
     exit: Option<i32>,
     stderr: Vec<u8>,
+    /// Every word of the machines the preflight listed (names, hostnames,
+    /// ids), lowercased: never said ([`said_of_stderr`]).
+    machines: BTreeSet<String>,
 }
 impl Seen {
     fn took(&mut self, result: &Result<Reply, RunError>) {
@@ -1374,6 +1382,32 @@ impl Seen {
             Err(_) => (None, Vec::new()),
         };
     }
+}
+
+/// Every word naming a machine in a `machines --json` reply, lowercased:
+/// each machine's name and hostname whole, word by word and without a
+/// domain (`lans-mbp.local` as `lans-mbp` too), and its ids. A line that
+/// isn't JSON gives nothing; the preflight's own check refuses it.
+fn machine_words(bytes: &[u8]) -> BTreeSet<String> {
+    let mut words = BTreeSet::new();
+    for line in String::from_utf8_lossy(bytes).lines() {
+        let Ok(machine) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        for key in ["name", "hostname", "machineId", "computerId"] {
+            let Some(value) = machine[key].as_str() else {
+                continue;
+            };
+            let value = value.trim().to_lowercase();
+            if let Some((host, _)) = value.split_once('.') {
+                words.insert(host.to_owned());
+            }
+            words.extend(value.split_whitespace().map(str::to_owned));
+            words.insert(value);
+        }
+    }
+    words.remove("");
+    words
 }
 
 /// The most of stderr's last line a journal line keeps.
@@ -1399,7 +1433,7 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
         launch.name,
         took.as_secs_f64()
     );
-    if let Some(said) = said_of_stderr(&seen.stderr, &launch.prompt) {
+    if let Some(said) = said_of_stderr(&seen.stderr, &launch.prompt, &seen.machines) {
         line.push_str(&format!(", stderr: {said}"));
     }
     line.push(')');
@@ -1413,7 +1447,7 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
 /// length, has no `/` or `@`, and doesn't look secret. Anything else, a
 /// name, a computer's label, a folder, a word with an accent, is "…", one
 /// for each run. At most [`STDERR_SAID_CHARS`]; nothing when no word is left.
-fn said_of_stderr(stderr: &[u8], prompt: &str) -> Option<String> {
+fn said_of_stderr(stderr: &[u8], prompt: &str, machines: &BTreeSet<String>) -> Option<String> {
     let text = String::from_utf8_lossy(stderr);
     let last = text.lines().rev().find(|line| !line.trim().is_empty())?;
     let bare = |word: &str| {
@@ -1474,7 +1508,15 @@ fn said_of_stderr(stderr: &[u8], prompt: &str) -> Option<String> {
             && core
                 .chars()
                 .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
-        (plain || code) && !asked.contains(&bare(word)) && !secret(word)
+        // A long run with digits in it: a machine's or a computer's id.
+        let id = core.len() >= 16 && core.chars().any(|c| c.is_ascii_digit());
+        let lower = core.to_lowercase();
+        (plain || code)
+            && !id
+            && !asked.contains(&bare(word))
+            && !machines.contains(&lower)
+            && !machines.contains(&bare(word))
+            && !secret(word)
     };
     let mut words: Vec<&str> = Vec::new();
     for word in unquoted.split_whitespace() {
