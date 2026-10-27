@@ -1,0 +1,32 @@
+{
+  "head": "9ddce42c961044c63bd6f9969d658a5339f092f3",
+  "base": "f9a9404de4d6cad65e6f3945ab2e60c50eb5eacc",
+  "qualification": "Completed fmt/metadata/strict from retained resource-FAIL parent, then first unstarted workspace/Voice-lib compilation and runtime",
+  "counts": {
+    "passed": 21,
+    "failed": 0,
+    "ignored": 0
+  },
+  "runtime_attempts": 1,
+  "Voice_lib_inventory_total": 3844,
+  "ordinary_filtered_out": 3823,
+  "protected_count": 339,
+  "source_unchanged": true,
+  "owner_unchanged": true,
+  "actual_executable_unchanged": true,
+  "full_Voice_runtime_claim": false,
+  "original_parent_status": "FAIL",
+  "original_parent_native_exit": 1,
+  "continuation_native_exit": 0,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "native_identity": {
+    "controller_sha256": "44f7eba21075ed5a4791bed3b3fdcba37429e291c0d52364ce1f9bf1c18e7ddb",
+    "plan_sha256": "fe5c2b6bbbab48a3ca69a8a0b733aad6b4bb8bb8b31278c2bd81688364d19cfa",
+    "started_at": "2026-10-27T07:52:27.477546+00:00",
+    "finished_at": "2026-10-27T08:12:14.998405+00:00",
+    "elapsed_s": 1187.4819652859878
+  }
+}

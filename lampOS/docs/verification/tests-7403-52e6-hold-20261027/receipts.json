@@ -1,0 +1,66 @@
+{
+  "status": "HOLD_SPECIFIC_TO_52E6_PUBLISHED_HOST_TEMPLATE",
+  "baseline": {
+    "utc": "2026-10-27T08:11:23.675304+00:00",
+    "installed": {
+      "sequence": 7071,
+      "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490"
+    },
+    "pending_self": false,
+    "pending_journal": false,
+    "update_sha256": "e42c8d69422f4d222ce10c0259d7265a6ced5e84b60523fbcc5b2ec6d53697f6",
+    "voice_sha256": "fde6fd0eb5696efe001949ab39a52ef3aa081438a9c75c1641beaeb03b60ef38",
+    "voice_unit_sha256": "3f9356d49697ee9932f4d4f8b3d6a343ef15239e638d7630cf5754ebc1e9a705",
+    "key_file_sha256": "203c3cb5563d6c85f6019211a987369e0063200fa9796f4c43b0888768c65813",
+    "key_fingerprint": "54213f8d3aa2f241"
+  },
+  "observed_control_plane": {
+    "evidence_private_root": "/var/lib/lampos-carrier-backups/7071-tests-7403-production-20261027/live-production-1793089736934469106",
+    "installed": {
+      "sequence": 7071,
+      "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490"
+    },
+    "pending_self": true,
+    "control_plane_lines": [
+      "2026-10-27T15:17:43.007377+0700 lamp-52e6 lamp-update[4400]: lamp-update: build 7403 needs updater 6; lamp-update switches from its build e42c8d69422f to b35b4c9b0de1, which the build carries, and takes nothing else of it until that one has confirmed itself",
+      "2026-10-27T15:18:08.884973+0700 lamp-52e6 lamp-update[4400]: lamp-update: not confirmed yet: refused, nothing switched: the build's lamp-actions.service does not start /opt/lampOS/actions/ through its current link"
+    ],
+    "journal_sha256": "e289d4a9b5af91e792ba0cacbe59df5a3041ad33bc4c364dcc6835a5f4d7d1fb",
+    "read_only": true,
+    "utc": "2026-10-27T08:28:56.956458+00:00"
+  },
+  "final": {
+    "status": "PRODUCTION7403_CONFIRMATION_HOLD_AUTOMATIC_RECOVERY_VERIFIED",
+    "installed": {
+      "sequence": 7071,
+      "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490"
+    },
+    "original_updater_restored_by_independent_recovery": true,
+    "updater_sha256": "e42c8d69422f4d222ce10c0259d7265a6ced5e84b60523fbcc5b2ec6d53697f6",
+    "new_updater_refused": true,
+    "self_and_round_journals_absent": true,
+    "real_key_and_stable_feed_unchanged": true,
+    "voice_unit_and_binary_unchanged": true,
+    "voice_body_eyes_baseline_pids_unchanged": true,
+    "recovery_timer_active": true,
+    "no_Test_once_override_started": true,
+    "no_test_key_or_Bad_trial": true,
+    "full_fresh_snapshot_not_completed": true,
+    "prior7071_recovery_archive_retained": true,
+    "automatic_recovery_control_lines": [
+      "2026-10-27T15:29:35.724056+0700 lamp-52e6 lamp-update-back[8842]: lamp-update-back: lamp-update's build b35b4c9b0de1 did not confirm itself (too late): /opt/lampOS/update/current names e42c8d69422f again"
+    ],
+    "private_evidence_root": "/var/lib/lampos-carrier-backups/7071-tests-7403-production-20261027/hold-final-1793090250099496115",
+    "utc": "2026-10-27T08:37:30.356699+00:00"
+  },
+  "owned_input_cleanup": {
+    "only_owned_public_input_removed": true,
+    "no_once_override_ever_started": true,
+    "private_failure_and_phase_evidence_retained": true
+  },
+  "lease_released": true,
+  "slot_quiet_comment": "https://github.com/autonomous-ai/lampOS/issues/3336#issuecomment-6437414869",
+  "independent_29e7_success": "https://github.com/autonomous-ai/lampOS/pull/3466#issuecomment-6437389942",
+  "no_29e7_device_access_by_Tests": true,
+  "private_customer_config_or_journal_exported": false
+}

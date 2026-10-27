@@ -1,0 +1,881 @@
+{
+  "status": "READ_ONLY_SOURCE_CAUSAL_PATH_CONFIRMED_DEVICE_CAUSE_ROOT_NEEDS_BASELINE_BINDING",
+  "candidate": {
+    "sequence": 7403,
+    "commit": "f9a9404de4d6cad65e6f3945ab2e60c50eb5eacc",
+    "envelope_sha256": "09d390d700b961b98dfca479e0f11182280c96405e20b698bc28aa5d21459ff7",
+    "manifest_sha256": "6be744315637d0cc708982151833c1d6189eee29aa83d3f25f7ef951c5badb55"
+  },
+  "actual_failure_receipt_sha256": "81992a2ceda4c72585c883fcfdc46994a656e3a62c033e453492a08393038052",
+  "actual_failed_unit": "lamp-actions.service",
+  "actual_error": "the build\u2019s lamp-actions.service does not start /opt/lampOS/actions/ through its current link",
+  "root_cause": "carried_units gives any hostname-specific template priority. Signed hostname templates are legacy pinned while7071 parts are current-linked. plan requires linked identity and refuses the selected pinned text. Valid product text is never chosen.",
+  "source_paths": [
+    {
+      "path": "lampOS/crates/update/src/round.rs",
+      "lines": [
+        1271,
+        1284,
+        1297
+      ],
+      "meaning": "Installed part lookup and unconditional hostname precedence over product, regardless layout"
+    },
+    {
+      "path": "lampOS/crates/update/src/round.rs",
+      "lines": [
+        2908,
+        2924
+      ],
+      "meaning": "Chosen pinned hostname text fails linked program validation with exact observed error"
+    },
+    {
+      "path": "lampOS/crates/update/src/unit.rs",
+      "lines": [
+        94,
+        107
+      ],
+      "meaning": "linked accepts onlycurrent segment; signed productactions parses correctly"
+    }
+  ],
+  "all54_unit_layouts": [
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-actions.service",
+      "signed_asset_sha256": "5da81bcc0610cadaa364c2bfa14e0b6d55fb48ce32c6037dbbcd12cbc901ce06",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/actions/",
+      "binary": "lamp-actions",
+      "ExecStart_program": "/opt/lampOS/actions/ae03ebf3c49c97f84a04f42b95f9ac0c5793bd9401437f565a2ee980c02e4643/lamp-actions"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-air.service",
+      "signed_asset_sha256": "da75948c1e08054ca79b464a0322eb977e91ddf594325b9c6e84a70e77014c83",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/air/",
+      "binary": "lamp-air",
+      "ExecStart_program": "/opt/lampOS/air/42f93235192364e637076d29ec26926bc98e51f49b75c1ddc573717a0a5bd811/lamp-air"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-body.service",
+      "signed_asset_sha256": "a362a08e4c2de1c1a3817404805b42a9c10a476b0f7ac6c6fd10ffc40bc8d461",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/body/",
+      "binary": "lamp-body",
+      "ExecStart_program": "/opt/lampOS/body/874ee83c1d55d6442aeb759270e665da87add4a354c95bdce528833916f166e6/lamp-body"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-controls.service",
+      "signed_asset_sha256": "a3286a3fe0b20781de2f215701c4d028cfe8afc45ed5c07bce96a74364cec94c",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/controls/",
+      "binary": "lamp-controls",
+      "ExecStart_program": "/opt/lampOS/controls/e16ef23448578827603acd8471914a833aac6ba9169858f8fd854874a2c7ad01/lamp-controls"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-ears.service",
+      "signed_asset_sha256": "9507ec1c1c0792e16d055c515b73305e052bf1b7c4ecc6ff5e88a363a8387320",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/ears/",
+      "binary": "lamp-ears",
+      "ExecStart_program": "/opt/lampOS/ears/c7bb39911e66496822b2c07eece33ab44b361abff2dc190d8b62bf72e8e6c07f/lamp-ears"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-expression.service",
+      "signed_asset_sha256": "7d0843ed63ea2d59d9b907893547f5e184da81957edd60ad048f56d6656ed45d",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/expression/",
+      "binary": "lamp-expression",
+      "ExecStart_program": "/opt/lampOS/expression/6cf80d7bc8817f3333b7f2d08aab349417eec90017572fa9c6ef13cd2b058f5a/lamp-expression"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-eyes.service",
+      "signed_asset_sha256": "f024fcbe5dfb1838905d13db0af003fc0ea95570afbdf7fabce1b14b1db8d21e",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/eyes/",
+      "binary": "lamp-eyes",
+      "ExecStart_program": "/opt/lampOS/eyes/bee4cb54e005008073cbcb1bd575e63674d6286120e55368f3aa0fd917d69658/lamp-eyes"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-health.service",
+      "signed_asset_sha256": "c9616878b2ae990cb819c68263b89d99050dcc266f3f3e6d4acb13027297c676",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/health/",
+      "binary": "lamp-health",
+      "ExecStart_program": "/opt/lampOS/health/d2208403b0bac9ea5a8aa6d04b4949a01ec7122a719654767ae3365ce9afd68b/lamp-health"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-memory.service",
+      "signed_asset_sha256": "bd96a07c00c29fc294f5d8c76de1edf8f4b8ac02694a4e4206fb96da03cccbb6",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/memory/",
+      "binary": "lamp-memory",
+      "ExecStart_program": "/opt/lampOS/memory/cc4673893ebbb7d042d65fe2d852dfad2de4e70be67ec9d31d1e664ad20d151f/lamp-memory"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-name.service",
+      "signed_asset_sha256": "4e8571f7f4e51e027a65e3f394c2c50da891a2943c53ce8661055872dc23b32d",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/name/",
+      "binary": "lamp-name",
+      "ExecStart_program": "/opt/lampOS/name/47d31414ef8931c395de6e14730a347c959a5225daed5cf893a9c2b791b2aeb9/lamp-name"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-policy.service",
+      "signed_asset_sha256": "60b4f971c07fa731f5a9bc207ccdd993eb34863d32eb9f111a60bc406cfd5149",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/policy/",
+      "binary": "lamp-policy",
+      "ExecStart_program": "/opt/lampOS/policy/aef70157b022d155794f9396da27e6606d839aeab690f6fffb1d51a84f8e9dd4/lamp-policy"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-schedule.service",
+      "signed_asset_sha256": "4ef351aabde2e3e1342e189db152b27ddaddf68d7c51a7b82080884d5b9d615d",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/schedule/",
+      "binary": "lamp-schedule",
+      "ExecStart_program": "/opt/lampOS/schedule/a834961a4f8c36f0a8989ec04f7f44c601eb03410857dd48927f07c6854e5e74/lamp-schedule"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-selftest.service",
+      "signed_asset_sha256": "2f768e65cc19e271c0420f88350d9f556facb50f9e2712a76940783909dffc26",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/selftest/",
+      "binary": "lamp-selftest",
+      "ExecStart_program": "/opt/lampOS/selftest/39364926cf2670315d6264539ccee2c13a4cd6d7a6b59cf0fd47db8a0ca733f7/lamp-selftest"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-skills.service",
+      "signed_asset_sha256": "5d6bb2c078fb2f04c5504b8122737ae304075b7cf5de603fbd9bf072844e0f87",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/skills/",
+      "binary": "lamp-skills",
+      "ExecStart_program": "/opt/lampOS/skills/229504a0c1cd392c28a326591b2e9c6cf4398b4ddea7f1fe23428c3ee4e068c5/lamp-skills"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-tasks.service",
+      "signed_asset_sha256": "54aa294c9cab288b558cc28f2438b11677db4146566d83f35773bdb8dd68d68c",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/tasks/",
+      "binary": "lamp-tasks",
+      "ExecStart_program": "/opt/lampOS/tasks/52d1c9de52f5aeabdc3aa95ffaa6108cc0f7970ae46674d45e0752ff7c4a8a40/lamp-tasks"
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-voice.service",
+      "signed_asset_sha256": "32abc88efd626f3fc21bd943afc43d2dc569ab58630518efcca62630bdb797dc",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/releases/",
+      "binary": "lamp-voice",
+      "ExecStart_program": "/opt/lampOS/releases/f70b4961c757c107c44713b11a59c4cffc2b67444fba907a5840086063f9f2ce/lamp-voice"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-actions.service",
+      "signed_asset_sha256": "9252efebc17d32535200fe00eead895006b62850c31d7be890a7660946c58d4c",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/actions/",
+      "binary": "lamp-actions",
+      "ExecStart_program": "/opt/lampOS/actions/a90e423ad71302d363489763f01fa5050284dc558c0f33ad607a1c4501bec279/lamp-actions"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-air.service",
+      "signed_asset_sha256": "7b32818872b5f45b52fc0bf4ee41cad78771f5c4da6f3a99edf0e30969e0a073",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/air/",
+      "binary": "lamp-air",
+      "ExecStart_program": "/opt/lampOS/air/bc5668c25cefbca493254b245808025481e24d5c27ba2e0ef331ed52d850852a/lamp-air"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-body.service",
+      "signed_asset_sha256": "b352bfdae9c2de2f19400ee5868e69abcc14f758a0e7600c4abfea6969c9458b",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/body/",
+      "binary": "lamp-body",
+      "ExecStart_program": "/opt/lampOS/body/0d7899998d4b96d4d65689ad632a915f8587db143d477f27d6c409f1a0bd2e98/lamp-body"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-controls.service",
+      "signed_asset_sha256": "0888edee20d538eec7cd32d6adaa2581d2aeb61305200f233b7c34915e3cf382",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/controls/",
+      "binary": "lamp-controls",
+      "ExecStart_program": "/opt/lampOS/controls/7db31af79f8f780d88dfb30c186f25d7424664067501a9c03a6ec7686cc64799/lamp-controls"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-ears.service",
+      "signed_asset_sha256": "0d3f7f069cfacec40259869cb1d71ab466e9f34c627e19fd1c3395be5c895901",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/ears/",
+      "binary": "lamp-ears",
+      "ExecStart_program": "/opt/lampOS/ears/bb5572fa025b809ff81b380e462c0a0563560a00b5c90d117e63c647058b2a71/lamp-ears"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-expression.service",
+      "signed_asset_sha256": "784ac5b5628717c7753c2ac7c04b08d8f74abd1485604883f84646ccc60617df",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/expression/",
+      "binary": "lamp-expression",
+      "ExecStart_program": "/opt/lampOS/expression/09783f142a95aaf5cbadd723f940b2f073bdc3591866c5fc8c74e4814d400006/lamp-expression"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-eyes.service",
+      "signed_asset_sha256": "40d143b1befba5746509bca359a3f91fc00072340f364c193fd891568da72c3f",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/eyes/",
+      "binary": "lamp-eyes",
+      "ExecStart_program": "/opt/lampOS/eyes/22aa4eaa25ccb03e6226f11772cab8f4892b714e1aeb7690829ae625a1d5484f/lamp-eyes"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-health.service",
+      "signed_asset_sha256": "4361e26f2186ade710b65cb1d9b761f27ce02178c72b1b1c933ecdd0271719fa",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/health/",
+      "binary": "lamp-health",
+      "ExecStart_program": "/opt/lampOS/health/7889eae01722cf4dc47bb01350e9e520730a364c7949d8bf4e15f263ef1e26c1/lamp-health"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-memory.service",
+      "signed_asset_sha256": "e7f062d09e12fb89dca690bb983508026ca051462efe688b4b1272873b4337c5",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/memory/",
+      "binary": "lamp-memory",
+      "ExecStart_program": "/opt/lampOS/memory/eea06c64222b22c372dc47a95ed6b0c62177557813c26c3ea265b9a24ec4f58f/lamp-memory"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-name.service",
+      "signed_asset_sha256": "6dbe289b6d6270026233b5e22281d15f40c4b931e2a3a4d6da7cd06247de357f",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/name/",
+      "binary": "lamp-name",
+      "ExecStart_program": "/opt/lampOS/name/4b06d9dc77bf5749ad806ef10cc9baa052cdd2c3753f262038486ea46c7378cf/lamp-name"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-schedule.service",
+      "signed_asset_sha256": "fb6cfe0253ad9395391b4b5433da7a54ceb803c87a5046f0118cd8dd9d935dd0",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/schedule/",
+      "binary": "lamp-schedule",
+      "ExecStart_program": "/opt/lampOS/schedule/05fe02e2ec78eb9066aeddf285d99493fd6076b4cdcea3e8b97de814932cc6fd/lamp-schedule"
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-voice.service",
+      "signed_asset_sha256": "2a533f91c15d5a17de2e3371a2ff7d71839d3cf3611d00cb33ce1755a7900d8a",
+      "layout": "pinned",
+      "builds": "/opt/lampOS/releases/",
+      "binary": "lamp-voice",
+      "ExecStart_program": "/opt/lampOS/releases/e4f1d32bcf44eb446c642d65c2b033be8f64c1d72b59b9a224fed8ef0043cf80/lamp-voice"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-actions.service",
+      "signed_asset_sha256": "4a5c4fd9453490d6c6ae44b4c1e5d056a902752944a27c93362401bc0ba22713",
+      "layout": "linked",
+      "builds": "/opt/lampOS/actions/",
+      "binary": "lamp-actions",
+      "ExecStart_program": "/opt/lampOS/actions/current/lamp-actions"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-addons.service",
+      "signed_asset_sha256": "682e52ce43e60eda3df6781587033244773493b835bb89e9eed48ce931934adf",
+      "layout": "linked",
+      "builds": "/opt/lampOS/addons/",
+      "binary": "lamp-addons",
+      "ExecStart_program": "/opt/lampOS/addons/current/lamp-addons"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-air-clock.service",
+      "signed_asset_sha256": "4ee0097764d5b825f4080937fb2f9bd7ebeca634a1d68d9fe49476b0a0120275",
+      "layout": "linked",
+      "builds": "/opt/lampOS/air/",
+      "binary": "lamp-air",
+      "ExecStart_program": "/opt/lampOS/air/current/lamp-air"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-air.service",
+      "signed_asset_sha256": "187e37b871a48942f0ae190b679378778a8354b8407ccc6458bce20a9284b4c1",
+      "layout": "linked",
+      "builds": "/opt/lampOS/air/",
+      "binary": "lamp-air",
+      "ExecStart_program": "/opt/lampOS/air/current/lamp-air"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-body.service",
+      "signed_asset_sha256": "bf5e5fc2a2cf0573c9fdbbc86c302dbe37d9534550572cb40fac4de083a7d12b",
+      "layout": "linked",
+      "builds": "/opt/lampOS/body/",
+      "binary": "lamp-body",
+      "ExecStart_program": "/opt/lampOS/body/current/lamp-body"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-cloud.service",
+      "signed_asset_sha256": "afc2bd60fe0e740b9583fa3a1d3851a9b5d5812e3a3a9711785cfe3693c6ba03",
+      "layout": "linked",
+      "builds": "/opt/lampOS/cloud/",
+      "binary": "lamp-cloud",
+      "ExecStart_program": "/opt/lampOS/cloud/current/lamp-cloud"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-controls.service",
+      "signed_asset_sha256": "1a01dd19b140621fa29079823eb66241bf9dcfcf528e295afb83d4c30455ecc9",
+      "layout": "linked",
+      "builds": "/opt/lampOS/controls/",
+      "binary": "lamp-controls",
+      "ExecStart_program": "/opt/lampOS/controls/current/lamp-controls"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-ears.service",
+      "signed_asset_sha256": "fa17ba7b92f2802ba6cbca1b3cbc377df90c8cdbbb58bcf963a129da1aeb0ccc",
+      "layout": "linked",
+      "builds": "/opt/lampOS/ears/",
+      "binary": "lamp-ears",
+      "ExecStart_program": "/opt/lampOS/ears/current/lamp-ears"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-expression.service",
+      "signed_asset_sha256": "e7b74d8b2754a3fcdffceb6358849c73d12f3fe48e0d4fb0ede0f9cdc911de85",
+      "layout": "linked",
+      "builds": "/opt/lampOS/expression/",
+      "binary": "lamp-expression",
+      "ExecStart_program": "/opt/lampOS/expression/current/lamp-expression"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-eyes.service",
+      "signed_asset_sha256": "d8dd69b236a7e7d415772a12a871cfb388e05dac5ff2615b464899fc840aa414",
+      "layout": "linked",
+      "builds": "/opt/lampOS/eyes/",
+      "binary": "lamp-eyes",
+      "ExecStart_program": "/opt/lampOS/eyes/current/lamp-eyes"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-health.service",
+      "signed_asset_sha256": "d61f8f29b534d2e43789f5ddb942342f365d2b5dde2a1a8d8afa5f39d6e919c3",
+      "layout": "linked",
+      "builds": "/opt/lampOS/health/",
+      "binary": "lamp-health",
+      "ExecStart_program": "/opt/lampOS/health/current/lamp-health"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-memory.service",
+      "signed_asset_sha256": "56e15728e6be22424d782463a5d9fb3a887dfc675ef5c80a17114bddb44f6b49",
+      "layout": "linked",
+      "builds": "/opt/lampOS/memory/",
+      "binary": "lamp-memory",
+      "ExecStart_program": "/opt/lampOS/memory/current/lamp-memory"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-mood.service",
+      "signed_asset_sha256": "5e06481b4dffbdaf290e970ffb5a65abac2173ceb17f224241961f8d78f95cb5",
+      "layout": "linked",
+      "builds": "/opt/lampOS/mood/",
+      "binary": "lamp-mood",
+      "ExecStart_program": "/opt/lampOS/mood/current/lamp-mood"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-name.service",
+      "signed_asset_sha256": "8da82a4a7a5620a91850adfee456139a092fabdad50c65319d9e492eb8cc7205",
+      "layout": "linked",
+      "builds": "/opt/lampOS/name/",
+      "binary": "lamp-name",
+      "ExecStart_program": "/opt/lampOS/name/current/lamp-name"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-policy.service",
+      "signed_asset_sha256": "686df23f189912d88be530372e33c458a8ff326b5fc1708014ba3c3fb7f75aa2",
+      "layout": "linked",
+      "builds": "/opt/lampOS/policy/",
+      "binary": "lamp-policy",
+      "ExecStart_program": "/opt/lampOS/policy/current/lamp-policy"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-records.service",
+      "signed_asset_sha256": "494fc5c1073d9ec4fa94264881450e6b0ccd2740554f7a19a5d4b54de05df3d3",
+      "layout": "linked",
+      "builds": "/opt/lampOS/records/",
+      "binary": "lamp-records",
+      "ExecStart_program": "/opt/lampOS/records/current/lamp-records"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-schedule.service",
+      "signed_asset_sha256": "d99f87f88d2dc9a87ce8d027b5dd986258428d0b9c80dfd46c03d8fb6ff3167c",
+      "layout": "linked",
+      "builds": "/opt/lampOS/schedule/",
+      "binary": "lamp-schedule",
+      "ExecStart_program": "/opt/lampOS/schedule/current/lamp-schedule"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-selftest.service",
+      "signed_asset_sha256": "c0cfc8fde31431ef9238a0ad899703c2b6c496a39273a7003062dac6c6744270",
+      "layout": "linked",
+      "builds": "/opt/lampOS/selftest/",
+      "binary": "lamp-selftest",
+      "ExecStart_program": "/opt/lampOS/selftest/current/lamp-selftest"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-setup-recover.service",
+      "signed_asset_sha256": "0b3b93c9020045669ae91bd97a1b8432ea0cb0aa72c0e5fda36021feae04b15f",
+      "layout": "linked",
+      "builds": "/opt/lampOS/setup/",
+      "binary": "lamp-setup",
+      "ExecStart_program": "/opt/lampOS/setup/current/lamp-setup"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-setup-reset.service",
+      "signed_asset_sha256": "f0bab1f7f8e8b858a3dd69ce3501a95763546d670f213983f7abc6d1f348a248",
+      "layout": "linked",
+      "builds": "/opt/lampOS/setup/",
+      "binary": "lamp-setup",
+      "ExecStart_program": "/opt/lampOS/setup/current/lamp-setup"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-setup-wifi-restore.service",
+      "signed_asset_sha256": "460d50ac298751592c3211a02a10c69fbc86c13df410d4c20d2f512b9516e5e9",
+      "layout": "linked",
+      "builds": "/opt/lampOS/setup/",
+      "binary": "lamp-setup",
+      "ExecStart_program": "/opt/lampOS/setup/current/lamp-setup"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-setup.service",
+      "signed_asset_sha256": "d666db74e6e52479ec16179bc2b4a593b608938a776a35e9fd111ef5a6ca3869",
+      "layout": "linked",
+      "builds": "/opt/lampOS/setup/",
+      "binary": "lamp-setup",
+      "ExecStart_program": "/opt/lampOS/setup/current/lamp-setup"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-skills.service",
+      "signed_asset_sha256": "11ea995dfcb620e9ef18aeefd5fcdf62a407e3a426a81df41a9e2d4fbc585a25",
+      "layout": "linked",
+      "builds": "/opt/lampOS/skills/",
+      "binary": "lamp-skills",
+      "ExecStart_program": "/opt/lampOS/skills/current/lamp-skills"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-tasks.service",
+      "signed_asset_sha256": "11eca895835818547f6cdbe47ee0a1b2bba854ff902ecf81ad4076336b1a51b2",
+      "layout": "linked",
+      "builds": "/opt/lampOS/tasks/",
+      "binary": "lamp-tasks",
+      "ExecStart_program": "/opt/lampOS/tasks/current/lamp-tasks"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-voice.service",
+      "signed_asset_sha256": "54f269ac84f566e66628e35c85b610a510a5b2467be725328a5952acbe47f5cd",
+      "layout": "linked",
+      "builds": "/opt/lampOS/voice/",
+      "binary": "lamp-voice",
+      "ExecStart_program": "/opt/lampOS/voice/current/lamp-voice"
+    },
+    {
+      "lamp": "product",
+      "unit": "lamp-waking.service",
+      "signed_asset_sha256": "88c4d568b4e10547ebd7288556c1e36cc3eb9cc8008910a327e677adbd71fa71",
+      "layout": "linked",
+      "builds": "/opt/lampOS/setup/",
+      "binary": "lamp-setup",
+      "ExecStart_program": "/opt/lampOS/setup/current/lamp-setup"
+    }
+  ],
+  "layout_counts": {
+    "lamp-4ace": {
+      "pinned": 16
+    },
+    "lamp-52e6": {
+      "pinned": 12
+    },
+    "product": {
+      "linked": 26
+    }
+  },
+  "all_28_hostname_product_collisions": [
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-actions.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-air.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-body.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-controls.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-ears.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-expression.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-eyes.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-health.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-memory.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-name.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-policy.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-schedule.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-selftest.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-skills.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-tasks.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-4ace",
+      "unit": "lamp-voice.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": false,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-actions.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-air.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-body.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-controls.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-ears.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-expression.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-eyes.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-health.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-memory.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-name.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-schedule.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": true,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    },
+    {
+      "hostname": "lamp-52e6",
+      "unit": "lamp-voice.service",
+      "hostname_layout": "pinned",
+      "product_layout": "linked",
+      "same_folder": false,
+      "same_binary": true,
+      "when_installed_product_linked": "hostname pinned entry wins carried selection, then plan refuses; product is suppressed",
+      "when_installed_pinned": "hostname pinned entry remains supported; product must not migrate it"
+    }
+  ],
+  "offered4fd_comparison": {
+    "unconditional_specific_precedence_and_same_refusal_already_present": true,
+    "introduced_only_by_f9": false,
+    "prior_one_product_unit_trial_did_not_include_mixed_host_templates": true,
+    "own_rs_full_SHA_aa9_4fd_f9_equal": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7"
+  },
+  "missing_test": {
+    "path": "lampOS/crates/update/tests/round/product_carrier.rs",
+    "specific_precedence_test_line": 70,
+    "existing_fixture": "with_linked_eyes plus hostname eyes_unit() stillcurrent-linked, so compatible precedence only",
+    "pinned_protection_test_line": 126,
+    "gap": "No signed pair combining linkedproduct template with oldpinned hostname template on a linked installation"
+  },
+  "minimal_patch_proposal": {
+    "product_edit_authorized": false,
+    "policy_requires_owner_decision": "Prioritize template compatible with installed layout: linkedhostname if validmatching; legacy pinnedhostname not eligible for linkedpart, so productcurrent wins. Pinned installations retain hostnamepinned and never acquire productcurrent.",
+    "implementation_scope": "Refactor carried candidate selection around authenticated candidate text and installed program layout before precedence; do not weaken plan validator, signedhash checks, folder/binary identity or quiet/watch/fallback.",
+    "required_controls": [
+      "linked installation + signedproductcurrent + signedhostnamepinned reproducesoldrefusal; correctedselection switchesproduct; bothmanifestorders",
+      "compatible linkedhostname stillwins",
+      "pinned installation stillpinned; no productmigration",
+      "incompatible linkedfolder/binary stillrefused beforewrites",
+      "damaged hostname signature/hash stillrefused; never fallback silently on corrupt data",
+      "selfbootstrap dryconfirmation with exactmixed envelope completes Would/confirm; no manualinstall/trust bypass"
+    ]
+  },
+  "self_fallback": {
+    "source_unchanged_aa9_4fd_f9": true,
+    "deadline_eligibility_seconds": 600,
+    "timer_period_seconds": 120,
+    "timer_AccuracySec": 30,
+    "pending_age_at_last_receipt_seconds_approx": 674,
+    "not_exact_600s_callback_bound": true,
+    "busy_flock_may_defer_callback": true,
+    "conditional_source_behavior": "nonbusy callback afterdeadline restoresoldlink/refusesnew/removesself then caller restartno-block",
+    "why_observed_pending_not_proven": [
+      "no actual self.at_unix_ms/timerlastnext/backlogs/helperhash/flock snapshot yet",
+      "674s age can precede next120s/30s timerwindow; no fallbackfailure inferred"
+    ]
+  },
+  "operations": {
+    "source_edit": false,
+    "Git_ref_mutation": false,
+    "device_or_SSH": false,
+    "tests_or_build": false,
+    "ARM_execution": false,
+    "force_trust_quiet_or_manual_install": false
+  },
+  "receipt_sha256": {
+    "aa9ec9e27__lampOS__crates__update__src__round.rs": "c4816a00bc4e7ff2fc29584ca93c116b421f69d9cbfdcdd1ff953fb3149ca565",
+    "lampOS__crates__update__tests__round__product_carrier.rs": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+    "lampOS__crates__update__src__main.rs": "a5dc33e8a6d6c951e14386d1f63164ca73680a48d4223d9215d8bbbc5d2c79a1",
+    "lampOS__deploy__product__lamp-update-back.service": "75310aad1d27da3abb1cd5365a2640dfb0710247a0986e4450138bd8c1ce97fa",
+    "aa9-main.rs": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+    "4fd14a8ed__lampOS__crates__update__src__own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "4fd14a8ed__lampOS__crates__update__src__round.rs": "24c9700648458251cecdca9f2fa41da7b5b1a635928afbdbc4f6313a44ec9c5a",
+    "lampOS__deploy__product__lamp-update-back.timer": "a479cb208cc186eed53cf9672f195d6ba226797ed38cee83ec6f8b295ad92580",
+    "aa9ec9e27__lampOS__crates__update__src__own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "lampOS__crates__update__src__own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7"
+  }
+}

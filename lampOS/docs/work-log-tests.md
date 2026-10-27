@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 15:46 — 7403 host-template HOLD safely closed; Restart current gates pass
+
+Ready for lamp-voice: no (fixture PRs need current reader marks and latest-base handling; #3466 already landed).
+
+[Real7403 on52e6](verification/tests-7403-52e6-hold-20261027/) genuinely climbed level5→6 but failed signed dry confirmation on the [legacy hostname template](verification/tests-7403-host-template-selection-20261027/). Independent recovery restored the updater at15:29:35; original7071 parts, key/stable and Voice/Body/Eyes PIDs remained. No carried-parts/watch pass on52e6. Fresh full backup preparation held before completion; earlier private recovery remains, raw evidence stays private. Lock released and QUIET posted for Sixth. The lead’s separate29e7 update reached everypartwell at15:19:12; it is not reattributed to52e6. Successful-production leave7403 policy never applied to this refused round.
+
+[Main7403 native audit](verification/tests-main-7403-native-20261027/) records original f9 push ARM40467022152:11,539 uniquePASS/zero bad/106skips,35 reprints excluded, with build warnings retained. Promoter workflowf725 and actual promoted sourcef9 remain distinct; payload authenticity was independently verified publicly with no ARM execution on the Mac.
+
+[Restart9dd composite host proof](verification/tests-restart-9dd-composite-host-20261027/) passes21/0/0 once, full3844 inventory/3823filtered, all339 guards and native0. [Original native proof](verification/tests-restart-9dd-native-20261027/) records ARM40471968680/Linux40471968675 green, actual12037 preview[75571,9dd],7,630 uniquePASS/zero bad/53skips; all21SameVoice and14Reader once. Historical Cloud LEAK and original resource failures remain unchanged. Own9dd was pushed with exact lease. Next is current held-Mood full qualification and the test-only mixed-template regression; no product fix or further lamp access is claimed.
+
 ## 2026-10-27 14:56 — Carrier landed; current fixture carries and retained admission failure
 
 Ready for lamp-voice: #3466 landed through train #3744; remaining test PRs are drafts pending current gates.
