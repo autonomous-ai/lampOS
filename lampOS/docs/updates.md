@@ -33,6 +33,12 @@ files remain separate. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
+The unwired [private before-image bundle](writer-preimages.md) preserves bounded
+ordinary captures as immutable, versioned bytes, with fixed-name durable
+publication in an existing private directory. This adds no live write, apply
+admission, restoration or helper bootstrap. Unknown semantics retain bytes
+and refuse; content identity does not authenticate the caller.
+
 The unwired [setting-file observer](writer-file-observation.md), a #3689
 prerequisite, provides bounded read-only descriptor observations for a
 future independent writer guard. It grants no path authority and performs
