@@ -5,6 +5,7 @@ it all with no lamp.
     lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
     lamp hello [LAMP_ID]
     lamp fake [--every 10] [--cycles N]
+    lamp skill check FOLDER...
 """
 
 from __future__ import annotations
@@ -72,6 +73,23 @@ async def _find(_args) -> int:
     return 0
 
 
+async def _skill_check(args) -> int:
+    from .skillcheck import check
+
+    failed = 0
+    for folder in args.folders:
+        report = check(folder)
+        for line in report.errors:
+            print(f"{report.folder.name}: error: {line}")
+        for line in report.warnings:
+            print(f"{report.folder.name}: warning: {line}")
+        if report.ok:
+            print(f"{report.folder.name}: ok, format 1")
+        else:
+            failed += 1
+    return 1 if failed else 0
+
+
 async def _hello(args) -> int:
     async with await Lamp.connect(args.lamp) as lamp:
         print(f"{lamp.info.get('id')}: grants {', '.join(lamp.grants)}")
@@ -96,6 +114,11 @@ def main(argv: list[str] | None = None) -> int:
     hello = commands.add_parser("hello", help="connect to a paired lamp and show its grants")
     hello.add_argument("lamp", nargs="?")
     hello.set_defaults(run=_hello)
+    skill = commands.add_parser("skill", help="skill folders: lamp skill check FOLDER...")
+    skill_commands = skill.add_subparsers(dest="skill_command", required=True)
+    skill_check = skill_commands.add_parser("check", help="check skill folders against the skill format, version 1")
+    skill_check.add_argument("folders", nargs="+", help="each a folder with SKILL.md and skill.toml")
+    skill_check.set_defaults(run=_skill_check)
     args = parser.parse_args(argv)
     try:
         return asyncio.run(args.run(args))

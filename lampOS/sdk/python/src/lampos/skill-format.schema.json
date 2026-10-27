@@ -1,0 +1,1241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lampos.dev/schema/skill-format/1",
+  "title": "lampOS skill.toml, format 1",
+  "description": "The shape of a skill package's skill.toml, as lamp-skills reads it (docs/skill-format.md). A TOML file is read as the JSON value of its tables. Shape only: the rules between keys (a trigger or a tool, a field test, permissions that cover every read and call) are lamp-skills' load check, listed in docs/skill-format.md. Tables marked core are read only for core skills and are checked by their own part.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "type": "boolean"
+    },
+    "needs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kind": {
+      "enum": [
+        "core",
+        "installable",
+        "addon"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})$"
+    },
+    "permissions": {
+      "$ref": "#/$defs/permissions"
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/trigger"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/trigger"
+          }
+        }
+      ]
+    },
+    "while": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/while"
+      }
+    },
+    "ask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy"
+      ],
+      "properties": {
+        "policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tool": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,47}$"
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "about",
+        "one_of"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,64}$",
+          "description": "A tool's argument is [a-z][a-z0-9_]{0,31}; a choice read from a trigger's field is a plain name."
+        },
+        "about": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "one_of": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "string"
+          }
+        },
+        "default": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        }
+      }
+    },
+    "flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "about"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
+        "about": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "again": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "within",
+        "if_heard"
+      ],
+      "properties": {
+        "within": {
+          "$ref": "#/$defs/duration"
+        },
+        "if_heard": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "told": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "still": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "most_a_day": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 24
+    },
+    "quiet": {
+      "$ref": "#/$defs/window"
+    },
+    "active": {
+      "$ref": "#/$defs/window"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group",
+        "per_hour"
+      ],
+      "properties": {
+        "group": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "per_hour": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        }
+      }
+    },
+    "rest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "after_ignored"
+      ],
+      "properties": {
+        "after_ignored": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "within": {
+          "$ref": "#/$defs/duration"
+        }
+      }
+    },
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "about"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,47}$"
+        },
+        "about": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "looks",
+        "give_up"
+      ],
+      "description": "A search a person asked for (look-for-things): its looks, and what the model is told past the last.",
+      "properties": {
+        "looks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "give_up": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "found": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "walk": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "looked": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic",
+        "within"
+      ],
+      "description": "The room's presence over the last hours, for the model (who-was-here).",
+      "properties": {
+        "topic": {
+          "const": "room/presence"
+        },
+        "within": {
+          "$ref": "#/$defs/duration"
+        },
+        "words": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "[history.words]: the record's own words. Every slot is words; which are required is lamp-skills' check.",
+          "properties": {
+            "record": {
+              "type": "string"
+            },
+            "record_known": {
+              "type": "string"
+            },
+            "record_named": {
+              "type": "string"
+            },
+            "no_record": {
+              "type": "string"
+            },
+            "someone": {
+              "type": "string"
+            },
+            "known": {
+              "type": "string"
+            },
+            "and": {
+              "type": "string"
+            },
+            "was": {
+              "type": "string"
+            },
+            "were": {
+              "type": "string"
+            },
+            "heard": {
+              "type": "string"
+            },
+            "heard_many": {
+              "type": "string"
+            },
+            "still": {
+              "type": "string"
+            },
+            "still_many": {
+              "type": "string"
+            },
+            "still_heard": {
+              "type": "string"
+            },
+            "still_heard_many": {
+              "type": "string"
+            },
+            "unseen": {
+              "type": "string"
+            },
+            "not_seeing": {
+              "type": "string"
+            },
+            "nobody_else": {
+              "type": "string"
+            },
+            "ago": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            },
+            "under_a_minute": {
+              "type": "string"
+            },
+            "minutes": {
+              "type": "string"
+            },
+            "hours": {
+              "type": "string"
+            },
+            "hours_minutes": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "watch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "every",
+        "asked_within",
+        "if_heard",
+        "most",
+        "mark"
+      ],
+      "description": "A watch, turned on and off by the skill's tool (guard-mode). Needs the light, messages and known_faces permissions.",
+      "properties": {
+        "every": {
+          "$ref": "#/$defs/duration"
+        },
+        "asked_within": {
+          "$ref": "#/$defs/duration"
+        },
+        "if_heard": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "most": {
+          "$ref": "#/$defs/duration"
+        },
+        "mark": {
+          "$ref": "#/$defs/light"
+        },
+        "words": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "[watch.words]: the watch's own words. Every slot is words; which are required is lamp-skills' check.",
+          "properties": {
+            "on": {
+              "type": "string"
+            },
+            "on_unknown": {
+              "type": "string"
+            },
+            "already_on": {
+              "type": "string"
+            },
+            "on_again": {
+              "type": "string"
+            },
+            "off": {
+              "type": "string"
+            },
+            "was_off": {
+              "type": "string"
+            },
+            "not_asked": {
+              "type": "string"
+            },
+            "no_mark": {
+              "type": "string"
+            },
+            "closed": {
+              "type": "string"
+            },
+            "paused_from_app": {
+              "type": "string"
+            },
+            "blind": {
+              "type": "string"
+            },
+            "paused": {
+              "type": "string"
+            },
+            "off_guard": {
+              "type": "string"
+            },
+            "stopped": {
+              "type": "string"
+            },
+            "an_hour": {
+              "type": "string"
+            },
+            "hours": {
+              "type": "string"
+            },
+            "visit": {
+              "type": "string"
+            },
+            "came_in": {
+              "type": "string"
+            },
+            "visit_many": {
+              "type": "string"
+            },
+            "came_in_many": {
+              "type": "string"
+            },
+            "known": {
+              "type": "string"
+            },
+            "unknown": {
+              "type": "string"
+            },
+            "someone": {
+              "type": "string"
+            },
+            "named_and_known": {
+              "type": "string"
+            },
+            "and": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            },
+            "under_a_minute": {
+              "type": "string"
+            },
+            "a_minute": {
+              "type": "string"
+            },
+            "minutes": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "limits": {
+      "$ref": "#/$defs/core_table",
+      "description": "Output ceilings in local hours; needs the output_limits permission. Used by the lamp's own skills; checked by lamp-skills."
+    },
+    "unplug": {
+      "$ref": "#/$defs/core_table",
+      "description": "Prepare to unplug's lines; needs the prepare_unplug core grant."
+    },
+    "news": {
+      "$ref": "#/$defs/core_table",
+      "description": "The words of a say from tasks; checked by lamp-voice. Used by the lamp's own skills."
+    },
+    "reminder": {
+      "$ref": "#/$defs/core_table",
+      "description": "The words of a say from schedule; checked by lamp-voice. Used by the lamp's own skills."
+    },
+    "onboarding": {
+      "$ref": "#/$defs/core_table",
+      "description": "The onboarding walk; needs the onboarding core grant; checked by lamp-voice."
+    },
+    "startle": {
+      "$ref": "#/$defs/core_table",
+      "description": "The startle's move; needs the startle core grant; checked by lamp-expression."
+    },
+    "do": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    }
+  },
+  "$defs": {
+    "duration": {
+      "type": "string",
+      "pattern": "^[0-9]+(ms|s|m|h)$",
+      "description": "A whole number and its unit: 500ms, 20s, 5m, 1h."
+    },
+    "time_of_day": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/time_of_day"
+        },
+        "to": {
+          "$ref": "#/$defs/time_of_day"
+        }
+      }
+    },
+    "core_table": {
+      "type": "object",
+      "description": "A table of the lamp's own skills, checked by the part that reads it; not part of the public format, and the schema doesn't look inside it."
+    },
+    "topic": {
+      "type": "string",
+      "maxLength": 96,
+      "pattern": "^[a-z][a-z0-9_]{0,31}(/[a-z][a-z0-9_]{0,31})*$"
+    },
+    "plain_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]{1,64}$"
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "boolean"
+        },
+        "light": {
+          "type": "boolean"
+        },
+        "speak": {
+          "type": "boolean"
+        },
+        "look": {
+          "description": "Presence and face position only, the protocol's look. In format 1 it still also gives the camera's picture, as camera does.",
+          "type": "boolean"
+        },
+        "camera": {
+          "description": "The model may see a picture through the lamp's camera (a look = true step). Its own grant, shown apart with a strong warning, never given by default.",
+          "type": "boolean"
+        },
+        "topics": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/topic"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "messages": {
+          "type": "boolean"
+        },
+        "known_faces": {
+          "type": "boolean"
+        },
+        "who": {
+          "type": "boolean"
+        },
+        "output_limits": {
+          "type": "boolean"
+        },
+        "propose": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "say",
+              "light",
+              "move",
+              "mood"
+            ]
+          }
+        },
+        "say": {
+          "const": "quoted"
+        },
+        "core": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "onboarding",
+              "prepare_unplug",
+              "sleep",
+              "startle"
+            ]
+          }
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic"
+      ],
+      "properties": {
+        "topic": {
+          "$ref": "#/$defs/topic"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]{1,64}$"
+        },
+        "each": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "when": {
+          "enum": [
+            "appears",
+            "present",
+            "changes"
+          ]
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "field": {
+          "type": "string"
+        },
+        "equals": {},
+        "above": {
+          "type": "number"
+        },
+        "below": {
+          "type": "number"
+        },
+        "near": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "present": {
+          "type": "boolean"
+        },
+        "during": {
+          "$ref": "#/$defs/window"
+        },
+        "once_per_day": {
+          "type": "boolean"
+        },
+        "unless_heard": {
+          "type": "boolean"
+        },
+        "absent_for": {
+          "$ref": "#/$defs/duration"
+        },
+        "for": {
+          "$ref": "#/$defs/duration"
+        },
+        "gap": {
+          "$ref": "#/$defs/duration"
+        },
+        "cooldown": {
+          "$ref": "#/$defs/duration"
+        },
+        "wait": {
+          "$ref": "#/$defs/duration"
+        },
+        "rearm": {
+          "oneOf": [
+            {
+              "enum": [
+                "leaves",
+                "ends"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "above": {
+                  "type": "number"
+                },
+                "below": {
+                  "type": "number"
+                },
+                "for": {
+                  "$ref": "#/$defs/duration"
+                }
+              }
+            }
+          ]
+        },
+        "rise": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "by",
+            "within"
+          ],
+          "properties": {
+            "by": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "within": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        },
+        "yields_to": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "skill",
+            "trigger"
+          ],
+          "properties": {
+            "skill": {
+              "type": "string"
+            },
+            "trigger": {
+              "type": "string"
+            }
+          }
+        },
+        "sooner": {
+          "description": "A shorter `for` while another topic's field is above a line (#3709); kept only with LAMP_YAWN_SOONER=on. The trigger needs a `for`, and sooner's `for` is shorter.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "topic",
+            "field",
+            "above",
+            "for"
+          ],
+          "properties": {
+            "topic": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            },
+            "above": {
+              "type": "number"
+            },
+            "for": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        }
+      }
+    },
+    "while": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic"
+      ],
+      "properties": {
+        "topic": {
+          "$ref": "#/$defs/topic"
+        },
+        "field": {
+          "type": "string"
+        },
+        "equals": {},
+        "not_equals": {},
+        "above": {
+          "type": "number"
+        },
+        "below": {
+          "type": "number"
+        },
+        "present": {
+          "const": true
+        },
+        "faces_at_most": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "for": {
+          "$ref": "#/$defs/duration"
+        },
+        "unknown": {
+          "const": "holds"
+        },
+        "through": {
+          "type": "array"
+        },
+        "broken_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "breathe",
+            "candle",
+            "pulse"
+          ]
+        },
+        "period": {
+          "$ref": "#/$defs/duration"
+        },
+        "low": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      }
+    },
+    "colour": {
+      "enum": [
+        "yellow",
+        "red",
+        "green",
+        "blue",
+        "cyan",
+        "purple",
+        "orange",
+        "pink",
+        "white",
+        "warm"
+      ]
+    },
+    "light": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "colour": {
+          "$ref": "#/$defs/colour"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "for": {
+          "$ref": "#/$defs/duration"
+        },
+        "dim": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "out": {
+          "const": true
+        },
+        "over": {
+          "$ref": "#/$defs/duration"
+        },
+        "until": {
+          "const": "ends"
+        },
+        "pattern": {
+          "$ref": "#/$defs/pattern"
+        },
+        "keep": {
+          "type": "boolean"
+        },
+        "relative": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "warmer": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "dimmer": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4
+            }
+          }
+        }
+      }
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prepare_unplug": {
+          "type": "boolean"
+        },
+        "look_at": {
+          "const": "face"
+        },
+        "gesture": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/gesture"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/gesture"
+                }
+              }
+            }
+          ]
+        },
+        "again_if": {
+          "type": "string"
+        },
+        "move": {
+          "$ref": "#/$defs/plain_name"
+        },
+        "mood": {
+          "const": "reading"
+        },
+        "for": {
+          "$ref": "#/$defs/duration"
+        },
+        "toward": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        }
+      }
+    },
+    "say": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "from"
+          ],
+          "properties": {
+            "from": {
+              "enum": [
+                "schedule",
+                "tasks",
+                "onboarding"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 8
+            },
+            "expires": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        }
+      ]
+    },
+    "propose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "act",
+        "why",
+        "sure",
+        "holds"
+      ],
+      "properties": {
+        "act": {
+          "enum": [
+            "say",
+            "light",
+            "move",
+            "mood",
+            "note"
+          ]
+        },
+        "why": {
+          "enum": [
+            "music",
+            "laughter",
+            "evening",
+            "morning",
+            "arrived",
+            "left",
+            "quiet",
+            "long_sitting",
+            "mood"
+          ]
+        },
+        "sure": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "holds": {
+          "$ref": "#/$defs/duration"
+        },
+        "light": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "colour",
+            "level"
+          ],
+          "properties": {
+            "colour": {
+              "$ref": "#/$defs/colour"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "pattern": {
+              "$ref": "#/$defs/pattern"
+            }
+          }
+        },
+        "gesture": {
+          "enum": [
+            "nod",
+            "curious",
+            "stretching"
+          ]
+        },
+        "mood": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "for"
+          ],
+          "properties": {
+            "energy": {
+              "type": "number",
+              "minimum": -0.1,
+              "maximum": 0.1
+            },
+            "warmth": {
+              "type": "number",
+              "minimum": -0.1,
+              "maximum": 0.1
+            },
+            "for": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/body"
+        },
+        "light": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/plain_name"
+            },
+            {
+              "$ref": "#/$defs/light"
+            }
+          ]
+        },
+        "say": {
+          "$ref": "#/$defs/say"
+        },
+        "sound": {
+          "$ref": "#/$defs/plain_name"
+        },
+        "cue": {
+          "const": "hum"
+        },
+        "rest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "rest",
+                "wake",
+                "cancel"
+              ]
+            },
+            "during": {
+              "$ref": "#/$defs/window"
+            },
+            "resettle": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "most",
+                "after",
+                "during"
+              ],
+              "properties": {
+                "most": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "after": {
+                  "$ref": "#/$defs/duration"
+                },
+                "during": {
+                  "$ref": "#/$defs/window"
+                }
+              }
+            }
+          }
+        },
+        "requested_audio": {
+          "type": "string",
+          "pattern": "\\.wav$"
+        },
+        "look": {
+          "const": true
+        },
+        "after": {
+          "const": "say"
+        },
+        "on": {
+          "type": "string"
+        },
+        "if_choice": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "show": {
+          "$ref": "#/$defs/plain_name"
+        },
+        "propose": {
+          "$ref": "#/$defs/propose"
+        }
+      }
+    },
+    "gesture": {
+      "enum": [
+        "nod",
+        "headshake",
+        "greeting",
+        "laugh",
+        "shy",
+        "stretching",
+        "acknowledge",
+        "curious",
+        "happy",
+        "caring",
+        "surprised",
+        "confused",
+        "sleepy",
+        "excited",
+        "dance_chill",
+        "dance_groove",
+        "dance_hype",
+        "dance_waltz",
+        "dance_jazz"
+      ],
+      "description": "The body's clips a skill may name: control.schema.json's gestures."
+    }
+  }
+}
