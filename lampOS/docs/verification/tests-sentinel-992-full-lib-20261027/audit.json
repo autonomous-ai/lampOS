@@ -1,0 +1,30 @@
+{
+  "terminal.json": {
+    "bytes": 1736,
+    "sha256": "ffb638c22eb53927cadb233b1860ebd893857b0a1c67994f6d78076b746cdf43"
+  },
+  "native-controller-result.json": {
+    "bytes": 472,
+    "sha256": "dad109e93d6ab0acd43e2b981548102c9410f76f78309396fd44fca73dc7d483"
+  },
+  "observed-census.json": {
+    "bytes": 934066,
+    "sha256": "dfaf92b1731c69dc4d93ca91537ddc22db0e7c64728cd46189eebea4722f391a"
+  },
+  "cmd-full-Voice-lib.json": {
+    "bytes": 1903,
+    "sha256": "d34a521ff6ccc70e7296cedd7d096e244d94b6eb0621f06d3109002d14295138"
+  },
+  "cmd-full-Voice-lib.stdout.txt": {
+    "bytes": 385565,
+    "sha256": "33ff626f045a8920c3bef4825b3115fea6df7c40dcdd896dce76f9b77153ed31"
+  },
+  "cmd-full-Voice-lib.stderr.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "folded-source-bridge.json": {
+    "bytes": 449,
+    "sha256": "ef635f750dcb9fac8fc4b961bba31e2322a327768dca22c0af62afb1b191157d"
+  }
+}

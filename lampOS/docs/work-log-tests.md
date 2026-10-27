@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-27 22:25 — full Reader-containing library result published
+
+Ready for lamp-voice: no (#3543 current carry and native gates pending).
+
+[The original full local Voice library](verification/tests-sentinel-992-full-lib-20261027/) passed **3866/0/15** once, inventory3881, including all four Mac Reader cases. Formatting, strict twelve-package all-target Clippy and workspace build passed; all514 witness/source/actual-executable/group guards passed. Clean folded0f4311d95 exactly matches all10,808 qualified source files; compilation predates the fold. Linux's fifteen ordinary Reader cases were not run on the Mac. This does not explain the historical positive-projection failure or qualify later Main. Fresh current-base qualification is being prepared, with no private diagnostic wrapper in the offered change.
+
 ## 2026-10-27 22:18 — current updater native proof; Reader library passed
 
 Ready for lamp-voice: no (#3843 current readers and physical acceptance remain; #3543 latest carry/native gates next).

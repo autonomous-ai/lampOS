@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-27T22:13:51.655449+07:00",
+  "qualified_dirty_head": "b4420caae859a4e5551ea01635b23d72a3efaf20",
+  "committed_head": "0f4311d95cc7ac63a8743024229d5590027b93fa",
+  "all_source_files_equal": 10808,
+  "full_local_counts": {
+    "passed": 3866,
+    "failed": 0,
+    "ignored": 15
+  },
+  "scope": "Exact qualified source folded into own single commit; local compilation predates fold",
+  "native_Linux_and_latest_base_pending": true
+}

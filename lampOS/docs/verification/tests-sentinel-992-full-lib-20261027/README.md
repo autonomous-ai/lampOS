@@ -1,0 +1,9 @@
+# Reader sentinel full local Voice library qualification
+
+This is the original once-only local full library run, not an isolated rerun or a Linux/ARM claim. Native controller40840 closed with exit0 at2026-10-27 22:09:13+07. Formatting, metadata-derived twelve-package all-target strict Clippy, workspace build and full Voice library compilation passed. The actual library executable ran serially without a filter: **3,866 passed, zero failed,15 ignored**, inventory3,881. All four Mac Reader cases ran once in that same run. Fifteen ordinary Linux Reader cases and the privileged ignored DAC case were not run on the Mac. No program-integration or documentation test qualification is claimed here.
+
+The qualified source was own b4420caae on992303fc8 with exactly the approved Reader test/document payloads. It was folded to clean own0f4311d95 afterward; the source bridge verifies all10,808 tracked file bytes/kinds/modes match the qualified source. Compilation predates that fold. Source, owner,514 sealed witnesses and three actual-executable guards passed; all owned groups closed and the lease released. The committed source alone was not the gate input; the exact dirty payload and bridge matter. Later carries need fresh qualification.
+
+The fix scopes synthetic fixture trust at its owned root and adds a boundary regression while retaining below-root validation and original assertions/time bounds. The historic Linux positive-projection failure completed in9ms, not by exhausting its500ms bound. Shared-ancestor churn remains a hypothesis, not a demonstrated historical cause. The earlier failed runs, Cloud LEAK and other open holds remain unwaived. No private control/probe wrapper is offered and no device action occurred.
+
+Raw case output, census, controller result and bridge are included. audit.json hashes these public copies; this is an extracted result packet, not the entire private guard archive.

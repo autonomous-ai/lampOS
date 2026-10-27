@@ -1,0 +1,52 @@
+{
+  "status": "PASS",
+  "head": "b4420caae859a4e5551ea01635b23d72a3efaf20",
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "runtime_attempts": 1,
+  "runtime_scope": "One full actual lamp-voice LIB executable, serial, no filter; actual full case census; required Reader platform subset reconciled from this same run, no second module execution",
+  "source_state": "HEAD plus exact2 approved dirty files; committed HEAD alone not qualified",
+  "committed_head_alone_qualification_claim": false,
+  "Linux_reader_cases_run": false,
+  "old_mutable_bindings_retired_count": 102,
+  "no_clean": true,
+  "full_Voice_LIB_counts": {
+    "passed": 3866,
+    "failed": 0,
+    "ignored": 15
+  },
+  "actual_full_inventory_count": 3881,
+  "Reader_platform_cases": [
+    "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+    "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+    "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+    "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata"
+  ],
+  "Reader_cases_executed_once": true,
+  "Voice_test_fresh": false,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 514,
+  "actual_count": 3,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}
