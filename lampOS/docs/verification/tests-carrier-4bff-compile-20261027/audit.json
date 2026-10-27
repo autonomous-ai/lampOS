@@ -1,0 +1,764 @@
+{
+  "head": "4fd14a8edeff7bd24ba6382a23da34155ddb6882",
+  "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "status": "PASS_COMPILE_COMPARE_ONLY",
+  "native_result": {
+    "controller_exit": 0,
+    "wrapper_exit": 0,
+    "started_at": "2026-10-27T00:34:17.936973+00:00",
+    "finished_at": "2026-10-27T00:43:06.214568+00:00",
+    "elapsed_s": 528.2863375070156,
+    "permission_mode": "require_escalated",
+    "activation_verified": true,
+    "controller_pid": 58628,
+    "exit_code": 0,
+    "controller_sha256": "ee893ffe53647957da4261d0e48f1016fb8b227966701d10912d0c124b12e9f8",
+    "plan_sha256": "bdbb3833b932c331e57170555f53fdbfe67215b8cdf3dfb0eeea88a08f21aa2d",
+    "terminal_present": true,
+    "terminal_status": "PASS_COMPILE_COMPARE_ONLY",
+    "stdout_sha256": "c1aa4df6e2a6a15b2b8231d40c8d0d0b961d6a9b65ed124fd61be3b6195efb60",
+    "stdout_bytes": 4479,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "terminal": {
+    "status": "PASS_COMPILE_COMPARE_ONLY",
+    "head": "4fd14a8edeff7bd24ba6382a23da34155ddb6882",
+    "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+    "runtime_attempts": 0,
+    "list_attempts": 0,
+    "clean_commands": 0,
+    "reuse_authorized": false,
+    "old_qualification_not_current": true,
+    "hash_policy": "Full SHA at initial/final boundaries and each artifact capture/compare consumption; strict all-bound stat attributes at other boundaries; current active actual executable SHA at every boundary.",
+    "fmt": true,
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build": true,
+    "all_update_executable_bytes_identical": false,
+    "all_promoter_executable_bytes_identical": true,
+    "runtime_reuse_authorized": false,
+    "source_unchanged": true,
+    "protected_witnesses_unchanged": true,
+    "active_actuals_unchanged": true,
+    "protected_count": 278,
+    "active_actual_count": 15,
+    "owned_groups_closed": true,
+    "unresolved_owned_pids": [],
+    "lease_held": false
+  },
+  "current_ordinary_runtime_attempts": 0,
+  "runtime_reuse_authorized": false,
+  "old_qualification": {
+    "head": "63a2a9579f1434ee9c4f323209c89073d918c614",
+    "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+    "ordinary_unique": 448,
+    "passed": 442,
+    "failed": 0,
+    "ignored": 6,
+    "scope": "Across separate preserved commands; not a current full run."
+  },
+  "comparisons": {
+    "update": [
+      {
+        "target": [
+          "it",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "0e819852bb302b9d9f52156d135f18f4f573bea16e678f48fd188401d85b271b",
+        "old_bytes": 1648848,
+        "new_sha256": "0e819852bb302b9d9f52156d135f18f4f573bea16e678f48fd188401d85b271b",
+        "new_bytes": 1648848,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "self-cli-exec",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "5ef45ffe216d697c28c2ad1ca3d4f2a96660b8782cd88baebc2f123256c4d581",
+        "old_bytes": 473952,
+        "new_sha256": "5ef45ffe216d697c28c2ad1ca3d4f2a96660b8782cd88baebc2f123256c4d581",
+        "new_bytes": 473952,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "self-process-cuts",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "bbec57611a6decf7fa05766ede1d1b7dc5ec9295a0e88e9cd4fd2d0a1e96aa61",
+        "old_bytes": 474016,
+        "new_sha256": "bbec57611a6decf7fa05766ede1d1b7dc5ec9295a0e88e9cd4fd2d0a1e96aa61",
+        "new_bytes": 474016,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "round",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "91e79d93c062c6e642c26ebdcb3294fb967e5d990c2577803d5bdb246e266081",
+        "old_bytes": 16985188,
+        "new_sha256": "f502e9c78b774ef62e760a9bf0623274f95417e9fcdb2473fb87dc6545685d9f",
+        "new_bytes": 16984516,
+        "byte_identical": false,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "lamp_update",
+          [
+            "lib"
+          ],
+          true
+        ],
+        "old_sha256": "ce51484500e4d053d1f23e5b840fed70bc869c12115988ac6cfbc94cefba203b",
+        "old_bytes": 11411540,
+        "new_sha256": "ce51484500e4d053d1f23e5b840fed70bc869c12115988ac6cfbc94cefba203b",
+        "new_bytes": 11411540,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "functions",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "e51dca4d43bb17d2ba12eaf7936c23e6dbe949e8a2c3e3a4f7cdfe3f016578d6",
+        "old_bytes": 18488328,
+        "new_sha256": "2c856bec5ac726287ccc3956c90c9ecc9b46bc999254677869cd44e8a4ca0e3f",
+        "new_bytes": 18488728,
+        "byte_identical": false,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "lamp-update",
+          [
+            "bin"
+          ],
+          true
+        ],
+        "old_sha256": "33a513463794698385400ed74d91c898c99bda92af594e3fb122353c02a28080",
+        "old_bytes": 1184760,
+        "new_sha256": "33a513463794698385400ed74d91c898c99bda92af594e3fb122353c02a28080",
+        "new_bytes": 1184760,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "install",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "5f594b279f2cce5e42444a07a9b0b99ef16094d641412ee9f2e67900cad67505",
+        "old_bytes": 13918228,
+        "new_sha256": "b2da92bb4fe00e93931162d997bdbfeaa6b76d91e1fa6e0efbb5519c1052d82f",
+        "new_bytes": 13917644,
+        "byte_identical": false,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "release_pair",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "af5db66da111e5b3750028d00ad0c076939dcf2ab5c58e137f9d26cb15bd49fc",
+        "old_bytes": 2820076,
+        "new_sha256": "af5db66da111e5b3750028d00ad0c076939dcf2ab5c58e137f9d26cb15bd49fc",
+        "new_bytes": 2820076,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "lamp-update",
+          [
+            "bin"
+          ],
+          false
+        ],
+        "old_sha256": "1d138ec983eb329c0132d66711c77e3c47c47d281371d5d820c55ef79e91bf8a",
+        "old_bytes": 10901748,
+        "new_sha256": "1d138ec983eb329c0132d66711c77e3c47c47d281371d5d820c55ef79e91bf8a",
+        "new_bytes": 10901748,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      }
+    ],
+    "promotion": [
+      {
+        "target": [
+          "lampos-promote",
+          [
+            "bin"
+          ],
+          false
+        ],
+        "old_sha256": "0e2e95767f7db4024b03ba341d8a9aac6c22f504992e43215a3e14dcaeed9f6b",
+        "old_bytes": 2765068,
+        "new_sha256": "0e2e95767f7db4024b03ba341d8a9aac6c22f504992e43215a3e14dcaeed9f6b",
+        "new_bytes": 2765068,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "workflow",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "5d7933f70fb1a2c39beff6b7d52e24189595bb8906d2af00a6d307fd20073f72",
+        "old_bytes": 1003704,
+        "new_sha256": "5d7933f70fb1a2c39beff6b7d52e24189595bb8906d2af00a6d307fd20073f72",
+        "new_bytes": 1003704,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "lampos-promote",
+          [
+            "bin"
+          ],
+          true
+        ],
+        "old_sha256": "cd1342401c70e490d3d9752dd10540b8d5123c5d42d659ab3ea6d9976e18b116",
+        "old_bytes": 941840,
+        "new_sha256": "cd1342401c70e490d3d9752dd10540b8d5123c5d42d659ab3ea6d9976e18b116",
+        "new_bytes": 941840,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "promotion",
+          [
+            "test"
+          ],
+          true
+        ],
+        "old_sha256": "509d033d97320eb30d2899b1931a357b725ea197d318d0f5f5893bc0c23cd931",
+        "old_bytes": 2936524,
+        "new_sha256": "509d033d97320eb30d2899b1931a357b725ea197d318d0f5f5893bc0c23cd931",
+        "new_bytes": 2936524,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      },
+      {
+        "target": [
+          "lampos_promote",
+          [
+            "lib"
+          ],
+          true
+        ],
+        "old_sha256": "fac18b18a0474955b2446cff9a37f185034e2d78e8fffa131423f9e5bd942076",
+        "old_bytes": 1442820,
+        "new_sha256": "fac18b18a0474955b2446cff9a37f185034e2d78e8fffa131423f9e5bd942076",
+        "new_bytes": 1442820,
+        "byte_identical": true,
+        "profile_identical": true,
+        "features_identical": true,
+        "target_identical": true,
+        "full_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "runtime_reuse_authorized": false
+      }
+    ]
+  },
+  "prior_failure": {
+    "terminal": {
+      "status": "FAIL",
+      "head": "4fd14a8edeff7bd24ba6382a23da34155ddb6882",
+      "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+      "runtime_attempts": 0,
+      "list_attempts": 0,
+      "clean_commands": 0,
+      "reuse_authorized": false,
+      "old_qualification_not_current": true,
+      "hash_policy": "Full SHA at initial/final boundaries and each artifact capture/compare consumption; strict all-bound stat attributes at other boundaries; current active actual executable SHA at every boundary.",
+      "fmt": true,
+      "error": "AssertionError()",
+      "source_unchanged": true,
+      "protected_witnesses_unchanged": true,
+      "active_actuals_unchanged": true,
+      "protected_count": 263,
+      "active_actual_count": 15,
+      "owned_groups_closed": true,
+      "unresolved_owned_pids": [],
+      "lease_held": false
+    },
+    "native": {
+      "controller_exit": 1,
+      "wrapper_exit": 1,
+      "started_at": "2026-10-27T00:32:16.561291+00:00",
+      "finished_at": "2026-10-27T00:32:58.764263+00:00",
+      "elapsed_s": 42.20339507199242,
+      "permission_mode": "require_escalated",
+      "activation_verified": true,
+      "controller_pid": 54901,
+      "exit_code": 1,
+      "controller_sha256": "ee893ffe53647957da4261d0e48f1016fb8b227966701d10912d0c124b12e9f8",
+      "plan_sha256": "c6a0613274e5f24757aee9416be5e160f102c588bbe649bde2a2835b6ac827b0",
+      "terminal_present": true,
+      "terminal_status": "FAIL",
+      "stdout_sha256": "7bd34d15e3e3608dd11e1b4572fed01bf0b212dba0ec7e167ef44b2fe21bb94a",
+      "stdout_bytes": 1951,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    "disposition": {
+      "original_native_result_sha256": "f8493a3d9f9435bda2f41faf5b4e01168f179a2463d5fbd178e27fc45a9b3e7f",
+      "original_terminal_sha256": "dac5632c65d5df47261ed2eede9d1474b57372d56a2df88f99063b06f4c1d1aa",
+      "actual_metadata_sha256": "534266792e4f0b8c6503536f758696a1a7e8051495bfbb35a647f8d477dd27bc",
+      "original_outcome": "FAIL/1 retained",
+      "cause": "Private expected reverse-closure overincluded Eyes and TurnEnd; actual Cargo metadata yielded twelve packages. Four prior tool/fmt/metadata commands all exited zero; no compiler/no-run/runtime/list had started.",
+      "original_expected": [
+        "lamp-body",
+        "lamp-cloud",
+        "lamp-expression",
+        "lamp-eyes",
+        "lamp-keeper",
+        "lamp-lean",
+        "lamp-memory",
+        "lamp-peek",
+        "lamp-setup",
+        "lamp-skills",
+        "lamp-turn-end",
+        "lamp-update",
+        "lamp-voice",
+        "lamp-voice-eval"
+      ],
+      "actual_expected": [
+        "lamp-body",
+        "lamp-cloud",
+        "lamp-expression",
+        "lamp-keeper",
+        "lamp-lean",
+        "lamp-memory",
+        "lamp-peek",
+        "lamp-setup",
+        "lamp-skills",
+        "lamp-update",
+        "lamp-voice",
+        "lamp-voice-eval"
+      ],
+      "source_witness_actual_guards_pass": true,
+      "root_decision": "New separately recorded compile/compare-only attempt with actual twelve-package expected set; no old failure overwritten and no test result waived."
+    }
+  },
+  "guard_scope": {
+    "source": "Initial/final full SHA and all originally bound file bytes/mode/kind/mtime plus Git HEAD/branch/index/clean at command boundaries; no new source inode claim.",
+    "frozen": "263 inherited external witnesses plus15 new copies, exact originally bound metadata at all boundaries/full SHA initial/final and artifact compare consumption.",
+    "active_actual": "All15 initially remain guarded until explicit release before current compiler writes. New current15 SHA/metadata checked after capture and at subsequent boundaries.",
+    "no_os_read_only_claim": true,
+    "current_counts_not_transferred": true
+  },
+  "private_receipt_digests": {
+    "terminal.json": {
+      "sha256": "f11a845d73d56a56dc20eef1ed28519ec11dd61f8454a2401bc4b935efd84bda",
+      "bytes": 1185
+    },
+    "native-controller-result.json": {
+      "sha256": "07a25e21c281de8af361176af3631e3cfae6072f35075ebfb83a42d9dca55794",
+      "bytes": 778
+    },
+    "source-before.json": {
+      "sha256": "a18105a024d270599fcc3d558a715c6a6e7e6e28fb54f6acf29ffdf5aba64228",
+      "bytes": 2822846
+    },
+    "source-after.json": {
+      "sha256": "a18105a024d270599fcc3d558a715c6a6e7e6e28fb54f6acf29ffdf5aba64228",
+      "bytes": 2822846
+    },
+    "protected-before.json": {
+      "sha256": "6ec5bc34b8b241b9b184a2639cfb0dd4a236c9b72493d6afb22e6e0905e0655b",
+      "bytes": 106372
+    },
+    "protected-after.json": {
+      "sha256": "cb271506c66ef5e1fa0fb233ce3166aeb87bd7b3b44f1c324eda98993c996101",
+      "bytes": 112632
+    },
+    "actuals-after.json": {
+      "sha256": "63ab5d2286758cc44f0a6b0206ba4e1887c661fffa7206230937f5decd3e5230",
+      "bytes": 4708
+    },
+    "prepared-source.json": {
+      "sha256": "a18105a024d270599fcc3d558a715c6a6e7e6e28fb54f6acf29ffdf5aba64228",
+      "bytes": 2822846
+    },
+    "actual-toolchain.json": {
+      "sha256": "3e6501a848702635cda8fc68fd679391a6fc953782d692767e4906d9a9bd70c2",
+      "bytes": 859
+    },
+    "metadata.json": {
+      "sha256": "534266792e4f0b8c6503536f758696a1a7e8051495bfbb35a647f8d477dd27bc",
+      "bytes": 3828179
+    },
+    "affected.json": {
+      "sha256": "b094e6ba05380e18c64acef2d4d80792d7457df5e430aaf2f2aac11f95bb4dc4",
+      "bytes": 206
+    },
+    "update-executable-comparison.json": {
+      "sha256": "7ade6b7f3336aaf2c2c96dd6ebf10b2d6ec5e213e4b72b5ca8c915548e1967dd",
+      "bytes": 41355
+    },
+    "promotion-executable-comparison.json": {
+      "sha256": "c5678f996d0c4937340d50c6fde17b0de1a4173b896260e795703c8b5ceb7d8f",
+      "bytes": 20832
+    },
+    "environment.json": {
+      "sha256": "303e4d56249034b9f06fdeca02c89b69c8ad045f0c65314a1e03918ed4ac184e",
+      "bytes": 5740
+    },
+    "run.py": {
+      "sha256": "ee893ffe53647957da4261d0e48f1016fb8b227966701d10912d0c124b12e9f8",
+      "bytes": 13129
+    },
+    "plan.json": {
+      "sha256": "bdbb3833b932c331e57170555f53fdbfe67215b8cdf3dfb0eeea88a08f21aa2d",
+      "bytes": 8780
+    },
+    "native-wrapper.py": {
+      "sha256": "83e4554890ca760498b506eef43d945e7857d68c99f960cfa4db07dae756fa07",
+      "bytes": 2624
+    },
+    "prior-disposition.json": {
+      "sha256": "a6d169831c6f98ef5b9abf9df4460db878a3a1a09b29064337ed9123abe5cdd0",
+      "bytes": 1329
+    },
+    "cmd-fmt.json": {
+      "sha256": "93f3d80d75e74a489a1fe3e7898035b77482d978543353670efb3158dd8fb04d",
+      "bytes": 1995
+    },
+    "cmd-fmt.stdout.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-fmt.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-metadata.json": {
+      "sha256": "3671599994c806484897924ea6d606428545d85a24fd06b1a3e63795bc63ee24",
+      "bytes": 2051
+    },
+    "cmd-metadata.stdout.txt": {
+      "sha256": "891cecea57976cf8572901ec6f15ce7becbde0302a103452ad189590a77fee8b",
+      "bytes": 2393369
+    },
+    "cmd-metadata.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-promotion-compile.json": {
+      "sha256": "9343c0679938d2827bcb2ed0227c38cdd5251dbc8d1ddb3bc39cb0f360764a6b",
+      "bytes": 2157
+    },
+    "cmd-promotion-compile.stdout.txt": {
+      "sha256": "f04cc205d3ad7be088a7d2e15420249d6231956cd1c906ce264e510102ff9214",
+      "bytes": 66159
+    },
+    "cmd-promotion-compile.stderr.txt": {
+      "sha256": "40b5bd994c11d45508994c7d538c01aee2f9170ff65ed09d3e884953cbf2b02d",
+      "bytes": 461
+    },
+    "cmd-promotion-fmt.json": {
+      "sha256": "1b84605d2dc40fc2e864664731e336ca5bc911296b1acd793f747e96c352c484",
+      "bytes": 2037
+    },
+    "cmd-promotion-fmt.stdout.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-promotion-fmt.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-promotion-metadata.json": {
+      "sha256": "0a4742ceca9ffaa372dbc7fe76eafa612d3fc7a4113f26d1c2eb4338109dab70",
+      "bytes": 2093
+    },
+    "cmd-promotion-metadata.stdout.txt": {
+      "sha256": "c0a07e8651cfb9f74ec7ea71ba0befadff55f0d19104a398a4ba8f690597df37",
+      "bytes": 256349
+    },
+    "cmd-promotion-metadata.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-promotion-strict.json": {
+      "sha256": "cebdab481cfc24560a243d9ac315724ff3e96c0283468f4276ee518f15dd045c",
+      "bytes": 2164
+    },
+    "cmd-promotion-strict.stdout.txt": {
+      "sha256": "fb44ee6d92a29db4bf727c6491073011f57a51d3c9c7a6abfad0a1fed4501151",
+      "bytes": 59781
+    },
+    "cmd-promotion-strict.stderr.txt": {
+      "sha256": "85f4bd9296da384f94974640387ce01f27c65b597a6dbb047210cb8dc651e3d0",
+      "bytes": 459
+    },
+    "cmd-rustc-cfg.json": {
+      "sha256": "708eec485fd563f897d1ac305244da963498d8fa46a5079f8339d14c603d0b80",
+      "bytes": 1994
+    },
+    "cmd-rustc-cfg.stdout.txt": {
+      "sha256": "5dc4cdf27256fd27ec914d30d7d590bc3729e2bd7305cc1fb2f7efb7319da801",
+      "bytes": 497
+    },
+    "cmd-rustc-cfg.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-rustc-version.json": {
+      "sha256": "3eec44faf5bae6c312b571f33ec871b3e768c7386e9083e92ad0367e57f25981",
+      "bytes": 1987
+    },
+    "cmd-rustc-version.stdout.txt": {
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "bytes": 191
+    },
+    "cmd-rustc-version.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "cmd-strict.json": {
+      "sha256": "c430e979e1ada6577f99c6aaa85313e9305f7971265b7fdd19fabca7bdafd3c0",
+      "bytes": 2474
+    },
+    "cmd-strict.stdout.txt": {
+      "sha256": "ec6c259c433cbf77aa890164ebd5ba8aa205468a05402a9bbc76e97291074821",
+      "bytes": 430270
+    },
+    "cmd-strict.stderr.txt": {
+      "sha256": "c6a3a04165940b519aabf1087d9460d11a8de76717c6e127eaa9584367f9c70b",
+      "bytes": 4948
+    },
+    "cmd-update-compile.json": {
+      "sha256": "33859b4f993dc53529b6f3c47413d3d44908ea1d7f1385d1d84de8f22fc949cc",
+      "bytes": 2129
+    },
+    "cmd-update-compile.stdout.txt": {
+      "sha256": "ec65c319eace390a90147391aa48fa85c62f0272026eeaecedbf458bb400dde4",
+      "bytes": 230305
+    },
+    "cmd-update-compile.stderr.txt": {
+      "sha256": "e64ab9cc88e54d3927ffb34d6fdabb42a577145d7464f3b9ab4501dd9e8d80b3",
+      "bytes": 642
+    },
+    "cmd-workspace.json": {
+      "sha256": "713df380c67ad72532a40012d9dfcf699e251075f55c2c37898c240d3786471e",
+      "bytes": 2095
+    },
+    "cmd-workspace.stdout.txt": {
+      "sha256": "a7e42488b6a3ae3e6f6b6b14684af637fb18ca95d9b707afc1c3a49414719cf4",
+      "bytes": 450179
+    },
+    "cmd-workspace.stderr.txt": {
+      "sha256": "a755253208c19a2be12747870e67548d78b60f98dd402de8c2229857021cf941",
+      "bytes": 2197
+    }
+  },
+  "physical_scope": "The one completed GOOD/BAD/fallback/restore round retains its documented older build; no new device action."
+}

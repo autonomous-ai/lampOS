@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 07:44 — Carrier current compile comparison passes; changed drivers require fresh runs
+
+Ready for lamp-voice: no (#3466 current runtime/native/read gates pending)
+
+[Current Carrier compile proof](verification/tests-carrier-4bff-compile-20261027/) records current `4fd14a8ed/4bff`: formatting, strict twelve-package Clippy, workspace, full Update/promoter no-run checks pass, controller/wrapper **0**, all **278** witnesses and **15** current executables guarded, groups closed. Seven Update executable bytes and all five promoter bytes match the original 63a proof, with identical profiles/features/targets. **Round, Functions and Install differ**, so those complete current drivers will run once; the two changed-input source scanners also need fresh observations. No old 442-count transfer is authorized. The initial metadata-expectation FAIL/1 is retained explicitly with the corrected actual twelve-package disposition.
+
+Restart current485/4bff gate is active on a separate warm target; Carrier runtime-only preparation is independent. Mood second current clearance and Sentinel fresh native/read audit continue. No device action.
+
 ## 2026-10-27 07:38 — Sentinel latest gate passes and current head pushed
 
 Ready for lamp-voice: no (#3543 fresh native and current reads pending)
