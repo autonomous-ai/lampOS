@@ -40,7 +40,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
                      lamp-skills remove [--dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
-                     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR\n       \
+                     lamp-skills pack [--out DIR] [--key-file PRIVATE [--author]] SKILL_DIR\n       \
                      lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH]";
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
@@ -331,6 +331,9 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
     // `asked`: the Store's public key a package must be
     // signed with. `pack`: the private key it is signed with, if any.
     let mut key_file: Option<PathBuf> = None;
+    // `pack --author`: the signature carries the author's public key, for a
+    // package they share (`package::author_signature_for`).
+    let mut author = false;
     let mut named = Vec::new();
     let mut given = given.iter();
     while let Some(word) = given.next() {
@@ -338,6 +341,10 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
             "--state-dir" if command == "asked" => &mut state,
+            "--author" if command == "pack" => {
+                author = true;
+                continue;
+            }
             "--key-file" if matches!(command, "pack" | "asked") => {
                 let Some(value) = given.next() else {
                     eprintln!("{USAGE}");
@@ -440,6 +447,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             };
         }
         ("pack", [skill]) => match &key_file {
+            None if author => Err("--author signs as the author: give --key-file too".into()),
             None => package::pack(Path::new(skill), &out)
                 .map(|path| format!("packed {}", path.display())),
             Some(key_file) => std::fs::read_to_string(key_file)
@@ -447,8 +455,14 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 .and_then(|text| {
                     lamp_update::manifest::read_private_key(&text).map_err(|why| why.0)
                 })
-                .and_then(|key| package::pack_signed(Path::new(skill), &out, Some(&key)))
-                .map(|path| format!("packed and signed {}", path.display())),
+                .and_then(|key| package::pack_signed_by(Path::new(skill), &out, Some(&key), author))
+                .map(|path| {
+                    format!(
+                        "packed and signed{} {}",
+                        if author { " by its author" } else { "" },
+                        path.display()
+                    )
+                }),
         },
         _ => {
             eprintln!("{USAGE}");

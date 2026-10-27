@@ -29,9 +29,11 @@ my-skill/
 ```
 
 A packaged skill adds `lamp-skill.json`, with `format: 1`, the skill's
-`version` and the SHA-256 of every file, and the Store's signature
+`version` and the SHA-256 of every file, and a signature,
 `lamp-skill.sig` ([skills.md](skills.md), "Core and installable skills",
-`crates/skills/src/package.rs`). A folder with a `run.py`, or any script,
+`crates/skills/src/package.rs`): the Store's, or for a package its author
+shares, the author's own, carrying their public key (`lamp-skills pack
+--key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
 is refused: script skills are a later format.
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
