@@ -1,0 +1,51 @@
+{
+  "compile": {
+    "cleanup_actions": [],
+    "cleanup_errors": [],
+    "cleanup_seconds": 15,
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-cloud",
+      "--lib",
+      "reports::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "deadline_seconds": 1800,
+    "elapsed_seconds": 142.865,
+    "error": null,
+    "exit_code": 0,
+    "log_sha256": "1afa4cf5016dc3e662ee262feb7224f97782a29cbf46ced71e4ff60cf105f69b",
+    "source_unchanged": true
+  },
+  "runtime": {
+    "cleanup_actions": [],
+    "cleanup_errors": [],
+    "cleanup_seconds": 15,
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-cloud",
+      "--lib",
+      "reports::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "deadline_seconds": 45,
+    "elapsed_seconds": 4.641,
+    "error": null,
+    "exit_code": 101,
+    "log_sha256": "aaab25b5559dabfca53369296eec562255a261ddbc33948dccf5fe0226652f67",
+    "source_unchanged": true
+  }
+}

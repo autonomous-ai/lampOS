@@ -1,0 +1,32 @@
+{
+  "arm_attempt": 2,
+  "arm_job": 121954975951,
+  "clippy_attempt": 1,
+  "clippy_job": 121954069830,
+  "original_failure_packet_sha256": "14b3783ce07cfde5865e87790a6e3b7cb6becfd2b2796a049f178266de45bd63",
+  "original_failure_scope": "Attempt1 failed before runtime selection; nine Update and two Linux custom controls unrun then.",
+  "receipt_hashes": {
+    "arm64-jobs-final.json": "52b9675e5b944ff7af9c2a66a0805f9837589237ccdf21ea17cc2b6141c8d37c",
+    "arm64-jobs-first.json": "a4c1203a353956bc0afd4d2302afe4c0b301210f1d7c42b89849d2824e682ebc",
+    "arm64-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "arm64-run-final.json": "e0fea8341e40705b79a4734a3c8e196bb0f6cb8d924992f660367917c2c6816d",
+    "arm64-run-first.json": "d85c8ec2c5c6467949d93162f0c5818ed0a683ff0ac6161b7f9f6322f5d2db82",
+    "arm64-watch.json": "f0bcfb9c99db74f15037470b29c5d870ab4e2c48d7ca6c4d72a2544a9e67f6b8",
+    "arm64-watch.log": "3c14e369dfe77441d763bdce715af74ce0f12f35067c62a0dca5e05ef81b529e",
+    "clippy-jobs-final.json": "eee25d4cc9ebf97866a97c5ab2a6c7bc70ee667c1480cd3ed05bb0574ce817f8",
+    "clippy-jobs-first.json": "e7005afe74eef242f0b30012c254fa1fedd54ed0f79812ba940ec2b7704613a2",
+    "clippy-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "clippy-run-final.json": "07a2c6961bfd22e22cd9d0cbb63167e3e98154ee3a9e90f08ac1bd552e7e03f5",
+    "clippy-run-first.json": "535dd656acc6ac2f34e072edd12cef2db0b9a703f616d42f7acf0dcdcc7440e8",
+    "clippy-watch.json": "15ae2451c0200817e91696c169b4abc0b00ac5da07dd9d37a1d9e92e66339c67",
+    "clippy-watch.log": "0adc86c44302be6b9419b47b0d204e691e0da3fa44a13a8986db8361dc91dcfc"
+  },
+  "retry_authorization": "Root explicitly requested one failed ARM job retry after attempt1 dependency-download failure; this audit triggered no workflow action.",
+  "watch": {
+    "deadline_seconds": 3600,
+    "elapsed_seconds": 708.553,
+    "error": null,
+    "exit_code": 0,
+    "interval_seconds": 30
+  }
+}

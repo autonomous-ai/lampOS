@@ -1,0 +1,17 @@
+{
+  "archive_sha256": "972d99b67807a5a41ad5024dca287ab232cd3f157fdc68ba7288af9edca9b185",
+  "mutant_patch_sha256": "ba60a9baacc032884bc6cadcc2fd4163e87c5cb52e2d1e2db1c8d7185fb84971",
+  "original_head": "129774137f7455e8473200df64dd5a3f6959b8b0",
+  "selection": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-cloud",
+    "--lib",
+    "reports::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant"
+  ],
+  "target_absent_and_atomically_empty_before_compile": true
+}

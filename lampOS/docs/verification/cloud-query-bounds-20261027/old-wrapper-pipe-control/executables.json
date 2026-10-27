@@ -1,0 +1,21 @@
+[
+  {
+    "fresh": false,
+    "path": "<target>/debug/deps/lamp_cloud-d547dc199ae9939d",
+    "sha256": "e9b1392cc6595b6c230b55b4480e3f2255ce6c8a062c3b3a99ecd4a1879126f7",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_cloud",
+      "src_path": "<mutant-source>/lampOS/crates/cloud/src/lib.rs",
+      "test": true
+    }
+  }
+]

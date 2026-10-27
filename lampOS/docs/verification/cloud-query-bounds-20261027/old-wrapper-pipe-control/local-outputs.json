@@ -1,0 +1,418 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/bus#lamp-bus@0.1.0",
+    "path": "<target>/debug/deps/liblamp_bus-8ed4963f3a74bcdb.rlib",
+    "preserved_path": "<gate>/artifacts/0-liblamp_bus-8ed4963f3a74bcdb.rlib",
+    "sha256": "1bf25afb79350b19a4dabe6d750b78282f7879331e13d3b367ab621c9dd250fb",
+    "target": "lamp_bus"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/bus#lamp-bus@0.1.0",
+    "path": "<target>/debug/deps/liblamp_bus-8ed4963f3a74bcdb.rmeta",
+    "preserved_path": "<gate>/artifacts/1-liblamp_bus-8ed4963f3a74bcdb.rmeta",
+    "sha256": "8d5489f029cb7beaa24165e970d42bddcd1b6730603778d3b0ef2ab3340cacfb",
+    "target": "lamp_bus"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/msgs#lamp-msgs@0.1.0",
+    "path": "<target>/debug/deps/liblamp_msgs-cc94888f7c30d4b4.rlib",
+    "preserved_path": "<gate>/artifacts/2-liblamp_msgs-cc94888f7c30d4b4.rlib",
+    "sha256": "23d0b75c131396963a813b6001559f7cb7c00384e91e11e3ffc13abf0b7e405c",
+    "target": "lamp_msgs"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/msgs#lamp-msgs@0.1.0",
+    "path": "<target>/debug/deps/liblamp_msgs-cc94888f7c30d4b4.rmeta",
+    "preserved_path": "<gate>/artifacts/3-liblamp_msgs-cc94888f7c30d4b4.rmeta",
+    "sha256": "7b5e8a05b891e79d4663ce6cc75427e7c7b6529d492a4076e4aeab3124f1f791",
+    "target": "lamp_msgs"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/ipc#lamp-ipc@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ipc-462d67a2441dcd1e.rlib",
+    "preserved_path": "<gate>/artifacts/4-liblamp_ipc-462d67a2441dcd1e.rlib",
+    "sha256": "1445d63f284b039a431e8cb54a04c51c9dc16e6aa0e04cab2f8b151f909956bc",
+    "target": "lamp_ipc"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/ipc#lamp-ipc@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ipc-462d67a2441dcd1e.rmeta",
+    "preserved_path": "<gate>/artifacts/5-liblamp_ipc-462d67a2441dcd1e.rmeta",
+    "sha256": "9c44f04b1727fd3ef4b28ccc3f6f599d38b90891648a3c30d0962247e9d35166",
+    "target": "lamp_ipc"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "path": "<target>/debug/deps/liblamp_turn_owner-dd9e1e6bd8d30965.rlib",
+    "preserved_path": "<gate>/artifacts/6-liblamp_turn_owner-dd9e1e6bd8d30965.rlib",
+    "sha256": "37dd75ad99a70d359db9008e122f0f26d1283db9cd2a6623e30d7dcd703fb8cf",
+    "target": "lamp_turn_owner"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "path": "<target>/debug/deps/liblamp_turn_owner-dd9e1e6bd8d30965.rmeta",
+    "preserved_path": "<gate>/artifacts/7-liblamp_turn_owner-dd9e1e6bd8d30965.rmeta",
+    "sha256": "4d8a7d20ef1b01d6d3940b9b90e0b521553bd6f67968ac8c9084e7d303178530",
+    "target": "lamp_turn_owner"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/local-time#lamp-local-time@0.1.0",
+    "path": "<target>/debug/deps/liblamp_local_time-a94bd49b993aa9ff.rlib",
+    "preserved_path": "<gate>/artifacts/8-liblamp_local_time-a94bd49b993aa9ff.rlib",
+    "sha256": "e5a750f6f1671ab42f771ab53ef02d9b04cf428f211e534895076ccc842f27f7",
+    "target": "lamp_local_time"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/local-time#lamp-local-time@0.1.0",
+    "path": "<target>/debug/deps/liblamp_local_time-a94bd49b993aa9ff.rmeta",
+    "preserved_path": "<gate>/artifacts/9-liblamp_local_time-a94bd49b993aa9ff.rmeta",
+    "sha256": "8f06ff047ab81e7423be4519f55d81c56749b42225400e368ab001eaa3d7576a",
+    "target": "lamp_local_time"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/lean#lamp-lean@0.1.0",
+    "path": "<target>/debug/deps/liblamp_lean-50a507eb0feae6c8.rlib",
+    "preserved_path": "<gate>/artifacts/10-liblamp_lean-50a507eb0feae6c8.rlib",
+    "sha256": "be062b1fe68c24540d9e08e8b1fa99916c0392288d292514c0f05d05d1e57bd4",
+    "target": "lamp_lean"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/lean#lamp-lean@0.1.0",
+    "path": "<target>/debug/deps/liblamp_lean-50a507eb0feae6c8.rmeta",
+    "preserved_path": "<gate>/artifacts/11-liblamp_lean-50a507eb0feae6c8.rmeta",
+    "sha256": "fc1add099f3f394096a69b7b95ee2daccaad467a66f59e9f9e585393a7ce8f0a",
+    "target": "lamp_lean"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/camera#lamp-camera@0.1.0",
+    "path": "<target>/debug/build/lamp-camera-ab31f4ad76d61eec/build-script-build",
+    "preserved_path": "<gate>/artifacts/12-build-script-build",
+    "sha256": "d60648ed8da5ebca13f826857ee3e22754ea668a7eb5f9f8b58157ff4b575014",
+    "target": "build-script-build"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/keeper#lamp-keeper@0.1.0",
+    "path": "<target>/debug/deps/liblamp_keeper-293665a026b9f994.rlib",
+    "preserved_path": "<gate>/artifacts/13-liblamp_keeper-293665a026b9f994.rlib",
+    "sha256": "38335531bbd98d65d17fb1ac1d7a28e69eb3eb2c1840de777a40da98a66bdfea",
+    "target": "lamp_keeper"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/keeper#lamp-keeper@0.1.0",
+    "path": "<target>/debug/deps/liblamp_keeper-293665a026b9f994.rmeta",
+    "preserved_path": "<gate>/artifacts/14-liblamp_keeper-293665a026b9f994.rmeta",
+    "sha256": "b57dc09490d7d79053e17a9203d0bcc844da7af17d913a2397ab53f9309ae600",
+    "target": "lamp_keeper"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/body#lamp-body@0.1.0",
+    "path": "<target>/debug/deps/liblamp_body-c5e3c4a19dac47ea.rlib",
+    "preserved_path": "<gate>/artifacts/15-liblamp_body-c5e3c4a19dac47ea.rlib",
+    "sha256": "20f50a50f619a316261d4ba7cf5429bbb1cf2c6850bcfd9b5ef08ff618fc4b7e",
+    "target": "lamp_body"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/body#lamp-body@0.1.0",
+    "path": "<target>/debug/deps/liblamp_body-c5e3c4a19dac47ea.rmeta",
+    "preserved_path": "<gate>/artifacts/16-liblamp_body-c5e3c4a19dac47ea.rmeta",
+    "sha256": "d26d2bc4fa3e577fbb7cbe8aea1b0724696fb890df681e3c80db1b88ab66a282",
+    "target": "lamp_body"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/third_party/sonora#0.2.0",
+    "path": "<target>/debug/deps/libsonora-4bce285281aee78a.rlib",
+    "preserved_path": "<gate>/artifacts/17-libsonora-4bce285281aee78a.rlib",
+    "sha256": "20c6025f95ceed9bd1bd48a47444bee031af28358edb0cc7b5811b3785ee79cc",
+    "target": "sonora"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/third_party/sonora#0.2.0",
+    "path": "<target>/debug/deps/libsonora-4bce285281aee78a.rmeta",
+    "preserved_path": "<gate>/artifacts/18-libsonora-4bce285281aee78a.rmeta",
+    "sha256": "3b865ce6d26cca78d0cd1c819002edcb3a70e05e161417a9d48363c6acc256e7",
+    "target": "sonora"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/schedule#lamp-schedule@0.1.0",
+    "path": "<target>/debug/deps/liblamp_schedule-98189ef59a2c1034.rlib",
+    "preserved_path": "<gate>/artifacts/19-liblamp_schedule-98189ef59a2c1034.rlib",
+    "sha256": "6d8475589967af7376942265ad05cefe18f06225cdcff0ad151c32e65adc3ba3",
+    "target": "lamp_schedule"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/schedule#lamp-schedule@0.1.0",
+    "path": "<target>/debug/deps/liblamp_schedule-98189ef59a2c1034.rmeta",
+    "preserved_path": "<gate>/artifacts/20-liblamp_schedule-98189ef59a2c1034.rmeta",
+    "sha256": "577ea106fab6128b6781ac7540cadb62bc6ca2e66a8aa942bc00952b53943001",
+    "target": "lamp_schedule"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/ring#lamp-ring@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ring-3525d8870916e9fc.rlib",
+    "preserved_path": "<gate>/artifacts/21-liblamp_ring-3525d8870916e9fc.rlib",
+    "sha256": "acb2080af3f932f1c9ee6a9a3f4ff97f4be2af629d6c72e6347adea218d125f8",
+    "target": "lamp_ring"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/ring#lamp-ring@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ring-3525d8870916e9fc.rmeta",
+    "preserved_path": "<gate>/artifacts/22-liblamp_ring-3525d8870916e9fc.rmeta",
+    "sha256": "652afb8f0ad674f5e5c5b7e620c80ef99c16bfb57263c7789c38610810abb41a",
+    "target": "lamp_ring"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/audio#lamp-audio@0.1.0",
+    "path": "<target>/debug/deps/liblamp_audio-71977b0499e542f1.rlib",
+    "preserved_path": "<gate>/artifacts/23-liblamp_audio-71977b0499e542f1.rlib",
+    "sha256": "197fb49128db236f2d5e669d52c17fabc6294b367ad00597080f6a9a19e6340e",
+    "target": "lamp_audio"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/audio#lamp-audio@0.1.0",
+    "path": "<target>/debug/deps/liblamp_audio-71977b0499e542f1.rmeta",
+    "preserved_path": "<gate>/artifacts/24-liblamp_audio-71977b0499e542f1.rmeta",
+    "sha256": "b5ab2793e9a2722e57f259c365651b8d96b354c9b4373300bce309f618660dc5",
+    "target": "lamp_audio"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/camera#lamp-camera@0.1.0",
+    "path": "<target>/debug/deps/liblamp_camera-97cc8d74fcf348f5.rlib",
+    "preserved_path": "<gate>/artifacts/25-liblamp_camera-97cc8d74fcf348f5.rlib",
+    "sha256": "e7f6c270a4c668f54a8a0fb26c952de612b760bd6a4ab96c1484e2c0d99b2b49",
+    "target": "lamp_camera"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/camera#lamp-camera@0.1.0",
+    "path": "<target>/debug/deps/liblamp_camera-97cc8d74fcf348f5.rmeta",
+    "preserved_path": "<gate>/artifacts/26-liblamp_camera-97cc8d74fcf348f5.rmeta",
+    "sha256": "57b7ed16b85b7eac3a5dfb99e79da9b0570fd787994bc8587b2c2ed727dd9b08",
+    "target": "lamp_camera"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/gemini#lamp-gemini@0.1.0",
+    "path": "<target>/debug/deps/liblamp_gemini-a852c04a549ba2d1.rlib",
+    "preserved_path": "<gate>/artifacts/27-liblamp_gemini-a852c04a549ba2d1.rlib",
+    "sha256": "7145d53adc05b3d70a28af2aa0df1deb4403fad4fc8ecc170625b7f9a8ead2c9",
+    "target": "lamp_gemini"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/gemini#lamp-gemini@0.1.0",
+    "path": "<target>/debug/deps/liblamp_gemini-a852c04a549ba2d1.rmeta",
+    "preserved_path": "<gate>/artifacts/28-liblamp_gemini-a852c04a549ba2d1.rmeta",
+    "sha256": "8d005883f4262dd4989264f375ec25e074f15a62822117ff9203381d4ea28924",
+    "target": "lamp_gemini"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "path": "<target>/debug/deps/liblamp_controls-218d6f56f141e6de.rlib",
+    "preserved_path": "<gate>/artifacts/29-liblamp_controls-218d6f56f141e6de.rlib",
+    "sha256": "8dd27179024dd7fb0e6110f48e1532a4e8a01c87a5ce4b957cf90deb97ac0be4",
+    "target": "lamp_controls"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "path": "<target>/debug/deps/liblamp_controls-218d6f56f141e6de.rmeta",
+    "preserved_path": "<gate>/artifacts/30-liblamp_controls-218d6f56f141e6de.rmeta",
+    "sha256": "1a2e3e00a001c35a4e87dbacb7d079976a8e7aa9a1bb368634e4eef85ac51f03",
+    "target": "lamp_controls"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/liblamp_update-752c834b154ca356.rlib",
+    "preserved_path": "<gate>/artifacts/31-liblamp_update-752c834b154ca356.rlib",
+    "sha256": "ff67e15da21fea11ce301adb1f0784ac5376b26e9a1b1e0f2f7ccc560a74d2a7",
+    "target": "lamp_update"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/liblamp_update-752c834b154ca356.rmeta",
+    "preserved_path": "<gate>/artifacts/32-liblamp_update-752c834b154ca356.rmeta",
+    "sha256": "9d4dac5157e63cef3aae59e22376387ec0c27cdef9a080ee5dcf63f6879471aa",
+    "target": "lamp_update"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+    "path": "<target>/debug/deps/liblamp_turn_end_wire-f10ac37de84182b6.rlib",
+    "preserved_path": "<gate>/artifacts/33-liblamp_turn_end_wire-f10ac37de84182b6.rlib",
+    "sha256": "4b704c2ab5728548c117bda709816fb44cf534c3f718b3140657b75a90929034",
+    "target": "lamp_turn_end_wire"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+    "path": "<target>/debug/deps/liblamp_turn_end_wire-f10ac37de84182b6.rmeta",
+    "preserved_path": "<gate>/artifacts/34-liblamp_turn_end_wire-f10ac37de84182b6.rmeta",
+    "sha256": "a04b4f807b21ad782e34ccd33b1339d6dfc4be6a349380a407a1907af48ffa35",
+    "target": "lamp_turn_end_wire"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/health#lamp-health@0.1.0",
+    "path": "<target>/debug/deps/liblamp_health-918dbc034a29e444.rlib",
+    "preserved_path": "<gate>/artifacts/35-liblamp_health-918dbc034a29e444.rlib",
+    "sha256": "f0a3695d5fa607a117d770be9772d490760b8915971d1e545ff63a3d293920b7",
+    "target": "lamp_health"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/health#lamp-health@0.1.0",
+    "path": "<target>/debug/deps/liblamp_health-918dbc034a29e444.rmeta",
+    "preserved_path": "<gate>/artifacts/36-liblamp_health-918dbc034a29e444.rmeta",
+    "sha256": "e901154ca275e39764b8f1d9d63d6643d4c7e66e90bbf5020bb70994a982b2bd",
+    "target": "lamp_health"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/near-call#lamp-near-call@0.1.0",
+    "path": "<target>/debug/deps/liblamp_near_call-8e92587c4b0bd452.rlib",
+    "preserved_path": "<gate>/artifacts/37-liblamp_near_call-8e92587c4b0bd452.rlib",
+    "sha256": "5332a87d7595a55601d34f8a8443ebe2ab534025b8f7c97b88eba5bdb1063d67",
+    "target": "lamp_near_call"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/near-call#lamp-near-call@0.1.0",
+    "path": "<target>/debug/deps/liblamp_near_call-8e92587c4b0bd452.rmeta",
+    "preserved_path": "<gate>/artifacts/38-liblamp_near_call-8e92587c4b0bd452.rmeta",
+    "sha256": "5925a60cd6de65310246a6e624b443fe3fa43925d828afa80a003b8939782d36",
+    "target": "lamp_near_call"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+    "path": "<target>/debug/deps/liblamp_voice_processes-b90a3866b01e4ab3.rlib",
+    "preserved_path": "<gate>/artifacts/39-liblamp_voice_processes-b90a3866b01e4ab3.rlib",
+    "sha256": "02bf65b2a8b587dac69c91ef1e396ab85f24e2df4409b162ab0fad473f6f99f3",
+    "target": "lamp_voice_processes"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+    "path": "<target>/debug/deps/liblamp_voice_processes-b90a3866b01e4ab3.rmeta",
+    "preserved_path": "<gate>/artifacts/40-liblamp_voice_processes-b90a3866b01e4ab3.rmeta",
+    "sha256": "f00aae843f01754e1dd050773a1061ffac8fb48be6b7689d37b7b89b91b0161c",
+    "target": "lamp_voice_processes"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "path": "<target>/debug/deps/liblamp_voice-271ac1617593d802.rlib",
+    "preserved_path": "<gate>/artifacts/41-liblamp_voice-271ac1617593d802.rlib",
+    "sha256": "6bf31b004e3b7d1c2735bae442469d039963ad1fa6988ddfe0563f31c8e43ffc",
+    "target": "lamp_voice"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "path": "<target>/debug/deps/liblamp_voice-271ac1617593d802.rmeta",
+    "preserved_path": "<gate>/artifacts/42-liblamp_voice-271ac1617593d802.rmeta",
+    "sha256": "cf7dceb418a96854b756c3f6d7bdf366a779c4856d69f4490871d2aab2d6214a",
+    "target": "lamp_voice"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "path": "<target>/debug/deps/liblamp_expression-e0bf68dbe053095d.rlib",
+    "preserved_path": "<gate>/artifacts/43-liblamp_expression-e0bf68dbe053095d.rlib",
+    "sha256": "ba25d062980f250f4ca59c5c4fafbdb2a8635af1b499aee7277c774594b4b304",
+    "target": "lamp_expression"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "path": "<target>/debug/deps/liblamp_expression-e0bf68dbe053095d.rmeta",
+    "preserved_path": "<gate>/artifacts/44-liblamp_expression-e0bf68dbe053095d.rmeta",
+    "sha256": "f5d916a28f2a164e00f30316fb68c6a5d385e160e3679a5d5296a54edbbfd283",
+    "target": "lamp_expression"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/liblamp_skills-b46c6b4bb9886e9f.rlib",
+    "preserved_path": "<gate>/artifacts/45-liblamp_skills-b46c6b4bb9886e9f.rlib",
+    "sha256": "0b10b07cafc15b542b22221504926762aab021ed496fbf24cf8b8bf3cad34311",
+    "target": "lamp_skills"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/liblamp_skills-b46c6b4bb9886e9f.rmeta",
+    "preserved_path": "<gate>/artifacts/46-liblamp_skills-b46c6b4bb9886e9f.rmeta",
+    "sha256": "8cbacaada6c6ddc9a2e85cc60901a8de782227f093a68f1024a8ea2cbed63033",
+    "target": "lamp_skills"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<target>/debug/deps/liblamp_setup-f0d7fac71cf707ca.rlib",
+    "preserved_path": "<gate>/artifacts/47-liblamp_setup-f0d7fac71cf707ca.rlib",
+    "sha256": "60e12d0ad8e97f4f42ffff5bbe4aa123cc64f4e250be3e851f2362022cf02447",
+    "target": "lamp_setup"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<target>/debug/deps/liblamp_setup-f0d7fac71cf707ca.rmeta",
+    "preserved_path": "<gate>/artifacts/48-liblamp_setup-f0d7fac71cf707ca.rmeta",
+    "sha256": "38513c106850b9a74e542a1d7d3c00d1727d24e67a448744065b9facaa335b2c",
+    "target": "lamp_setup"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/actions#lamp-actions@0.1.0",
+    "path": "<target>/debug/deps/liblamp_actions-8ccaf5ce89062fe7.rlib",
+    "preserved_path": "<gate>/artifacts/49-liblamp_actions-8ccaf5ce89062fe7.rlib",
+    "sha256": "ea087d513e21b612276e27cfb887cd94d6bbc5cd50d9499e8c05f50099178dee",
+    "target": "lamp_actions"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/actions#lamp-actions@0.1.0",
+    "path": "<target>/debug/deps/liblamp_actions-8ccaf5ce89062fe7.rmeta",
+    "preserved_path": "<gate>/artifacts/50-liblamp_actions-8ccaf5ce89062fe7.rmeta",
+    "sha256": "a35f3d750dc7455468cb9f62411d7961614e69f55f80fa088cd6dccc7f14b990",
+    "target": "lamp_actions"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<mutant-source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<target>/debug/deps/lamp_cloud-d547dc199ae9939d",
+    "preserved_path": "<gate>/artifacts/51-lamp_cloud-d547dc199ae9939d",
+    "sha256": "e9b1392cc6595b6c230b55b4480e3f2255ce6c8a062c3b3a99ecd4a1879126f7",
+    "target": "lamp_cloud"
+  }
+]

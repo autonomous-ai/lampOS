@@ -1,0 +1,9 @@
+{
+  "case": "reports::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+  "failure": "public reader accepted a pipe held past its deadline",
+  "observed_once": true,
+  "original_source_unchanged": true,
+  "raw_runtime_log_sha256": "aaab25b5559dabfca53369296eec562255a261ddbc33948dccf5fe0226652f67",
+  "reason": "Only public reports::bounded_output_within restored from 7373; private query, eight tests and Cargo unchanged. The old public reader joined a descendant-held pipe after its configured deadline despite the new helper remaining present.",
+  "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 175 filtered out; finished in 3.02s"
+}

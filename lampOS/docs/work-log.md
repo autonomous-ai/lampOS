@@ -1,3 +1,17 @@
+Ready for lamp-voice: yes (#3635, subject to final live-Main check)
+
+## Current checkpoint: 2026-10-27 08:47 +07, bounded updater native qualification complete
+
+#3635 **99422939f/737331535** has [qualified retry proof](verification/update-output-bounds-20261027/native-994-attempt2/README.md). ARM40432733066 **attempt2**, job121954975951, passes **11,443 unique PASS /0 bad/106 skipped/0 selected unrun**; all nine Update controls and both Linux custom self-cut/CLI-exec controls pass once, already subsets of nextest. Thirty-five identical echoes excluded. Separate process13, docs4, helper25 and relay pass; no promotion/signing/publication acceptance. Actual preview a2f11eafd has ordered737/994 parents and authored-tree equality. Linux40432732912 remains qualified **attempt1**, job121954069830. Original ARM attempt1 infrastructure failure is separately retained, not erased or relabelled. No further rerun.
+
+Current focused host131/0/2 plus exact round1/0/0 remains distinct from the historical full431 host433/0/4. The lead confirms clean carry/current source with no finding and merge order before #3641. Final live-ref/check verification precedes ready; reviewer owns merge.
+
+#3644's [actual old-public-wrapper pipe control](verification/cloud-query-bounds-20261027/old-wrapper-pipe-control/README.md) compiled successfully and failed exactly once at the expected accepted-late-response assertion: **0/1/0**,175filtered,3.02s; original129source unchanged, one driver/52local outputs/237depfiles guarded. Correct current Cloud fullhost204/0/4 and restricted failed131/73/4 remain separate. Sanitized reader-scope corrections now name actual Lamp::unit_states/waits and main::exit_note; the raw controller mistake is retained. Original Cloud native/readers and peer reads are pending.
+
+Second takes an independent second read of #3643's holds on90d/737 meanwhile. No device, provider, key, signing or release action.
+
+---
+
 Ready for lamp-voice: no
 
 ## Current checkpoint: 2026-10-27 08:44 +07, Cloud host gate and original native failure
