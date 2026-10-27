@@ -202,6 +202,18 @@ later bootstrap. No CLI or round currently calls this module. Fourteen
 focused tests cover the admission and record boundaries; broader gates and
 original native qualification are recorded separately on the PR.
 
+The local recovery-input follow-up adds `Session::recovery_inputs`, a
+borrowed view available only after `Store::recover` loads a valid journal.
+It distinguishes writer-only restoration, first-apply restoration with
+its retained plan/preimages and original stage, qualified product recovery
+with the compatible writer, and terminal ordinary admission. Poisoned or
+live sessions cannot obtain that view; it neither authenticates represented
+bytes nor executes recovery. The source-bound local follow-up passed fmt,
+strict all-target Update Clippy and the complete library: 163 passed,
+0 failed and 2 ignored, including all eighteen writer-refresh controls.
+That execution used the earlier foundation plus these owned changes;
+current-base and native qualification remain separate.
+
 Implement in reviewable steps: protocol/guard records and restore engine;
 root bootstrap plus failure/boot admission; supervised first use and round
 integration; then the new setting's consumer and installed rehearsal.
