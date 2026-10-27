@@ -176,6 +176,10 @@ that connection, which pairing's proof and hello's signature cover:
   `welcome`, `lease` and `done` may not.
 - A client ignores a field it doesn't know, in a reply, an error or an
   event, so new fields can be added without a new version.
+- **Keepalive:** after `hello`, a connection that sends nothing for 2 minutes
+  is closed, and a WebSocket ping counts. The SDKs ping every 20 s and let
+  the connection go when a ping gets no pong by the next one, so a client
+  that only listens stays open, and a lamp gone without a close is noticed.
 
 ### Pairing, once per computer
 
@@ -185,8 +189,9 @@ that connection, which pairing's proof and hello's signature cover:
    SHA-256, 64 hex), the lamp's id and the expiry (5 min). A new code voids
    the old one.
 2. **`lamp pair`** (in the SDKs) finds the lamp by mDNS, connects, and
-   **checks the certificate against the app's pin before it sends
-   anything**. An SDK that can't check it must not pair. Then it sends the
+   **checks the certificate against the app's pin before it sends any
+   frame**: only the TLS handshake and the WebSocket's upgrade request, which
+   carry no secret, go before it. An SDK that can't check it must not pair. Then it sends the
    computer's new Ed25519 public key with a proof it holds the code:
    ```json
    {"id":1,"op":"pair","name":"Dev's laptop","key":"<32 bytes, base64>","proof":"<32 bytes, base64>"}
@@ -267,7 +272,7 @@ lamp says what happens to it:
 `{"ev":"lease","lease":"l_81","state":"suspended","why":"conversation"}`,
 later `held` again or `lost`, with `why` one of `conversation`, `hand`,
 `stop_heard`, `private`, `paused`, `asleep`, `expired`,
-`taken_by_owner_app`, `revoked`, `released` (by the client, or its
+`taken_by_owner_app`, `revoked`, `released` (by the client, or its last
 connection closed). Ids are `l_` and a number.
 
 - **Suspended** (`conversation`) is held again when the talk ends, if it
@@ -285,6 +290,8 @@ connection closed). Ids are `l_` and a number.
 {"id":12,"op":"joints","lease":"l_81","targets":{"pitch":4.0,"yaw":-12.0},"within_ms":300}
 {"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}
 {"id":14,"op":"say","text":"Build passed."}
+{"id":16,"op":"play","name":"wave"}
+{"id":17,"op":"sound","name":"chime"}
 {"id":15,"op":"stop"}
 ```
 
