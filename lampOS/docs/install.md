@@ -609,6 +609,7 @@ units stopped:
    # then root installs the file it wrote, never over one already there
    if sudo test -e /etc/lampOS/body/lamp.env; then
      echo "/etc/lampOS/body/lamp.env is already there: move it aside first"
+     false
    else
      sudo install -o root -g root -m 0644 ~/lamp.env /etc/lampOS/body/lamp.env
    fi
@@ -618,7 +619,8 @@ units stopped:
    tool does for its own file: a lamp with poses set by hand keeps them
    (Fourteen's P3 on #3919). It looks as root, so a folder the person can't
    search still shows the file (Fourteen's P3 on #3932), and says why when
-   it refuses (Sixth's). To replace them, move the old file aside first.
+   it refuses (Sixth's), ending false so a script reads the refusal as one
+   (Fourteen's P3 on #3940). To replace them, move the old file aside first.
 
    `lamp-body-measure` runs **unprivileged**. As root it refuses by design:
    a process with `CAP_SYS_ADMIN` could bypass the servo port's exclusive
