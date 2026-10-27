@@ -1,3 +1,40 @@
+Ready for lamp-voice: no (latest-base query carries); #3689 foundation complete gate active
+
+## Current checkpoint: 2026-10-27 15:15 +07, both query native gates clean
+
+[Reset ad693/f725 original native](verification/reset-query-bounds-20261026/native-ad693-f725/README.md)
+passes ARM40469368446 and Linux40469368272, attempt1: **1,482 unique PASS /
+0 bad / 9 skipped / 0 selected unrun**, eight controls once over the actual
+four-package selection. [Cloud238c/f725 native](verification/cloud-query-bounds-20261027/native-238c-f725/README.md)
+passes ARM40469605818/Linux40469605765: **11,551 unique PASS / 0 bad /
+106 skipped / 0 selected unrun**, all ten controls and both Linux custom
+cases once. Separate reader workflows2/0/0 each pass with uploaded source
+and executable witnesses. Preview ordered parents and complete authored
+trees match exactly; no rerun. These are actual f725 executions, not new
+execution of the prepared755 carries. Reviewer-two cleared Reset's repair
+and read; its current HOLD is latest-base qualification only. Fresh scoped
+755 gates follow the active updater compiler slot; train owns merge.
+
+#3689's unwired record/admission foundation is committed locally as
+fa8ac4963 on75571bd0a. Fourteen focused controls pass with fmt and strict
+Update Clippy, after retained first-format/lint/Apple-compile failures and
+an actual14-failure fixture-precondition run; that fixture now explicitly
+requests0700 without changing production policy. Root's review fixed
+ambiguous persistence poisoning; restoration provenance and a distinct
+later first-apply envelope/sequence are retained. An independent source
+read finds noP1/P2 within this unwired scope; validated saved-plan access
+is still required before privileged wiring. Complete scoped Update gate
+is active, with source and executable bindings; no helper has been copied.
+
+The later [activation-aware carrier design](https://github.com/autonomous-ai/lampOS/blob/37850309f6/lampOS/docs/ota-unit-carrier-plan.md)
+is also pushed. Review added a durable boot-admission barrier so enabled
+sockets/timers cannot outrun recovery, and explicitly forbids side-effecting
+blind helper probes. It allocates no capability and claims no execution.
+Settings-writer work remains first; Store/Harness lanes remain separate.
+No device, signing, promotion, attribution or self-merge action.
+
+---
+
 Ready for lamp-voice: no (current query CI/readiness); #3689 protocol foundation active
 
 ## Current checkpoint: 2026-10-27 14:53 +07, both query carries pushed

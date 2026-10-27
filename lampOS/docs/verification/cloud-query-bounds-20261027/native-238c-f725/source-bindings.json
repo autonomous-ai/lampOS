@@ -1,0 +1,48 @@
+{
+  "files": {
+    "lampOS/Cargo.lock": {
+      "blob": "1239bb909b57b2aa8c2df5034814b2f32f78eeae",
+      "kind": "blob",
+      "mode": "100644",
+      "sha256": "f300299277aa5c6fb74f5b6c050d4ac8739894c0b490b30d8f8ee53b88f415b9"
+    },
+    "lampOS/crates/cloud/Cargo.toml": {
+      "blob": "65558e699d91e56ed8447e3091bbda483666ac8e",
+      "kind": "blob",
+      "mode": "100644",
+      "sha256": "ba13fdee2a3ea4025b9153ca2fd04ac059e004c340fa9237c0f12edc6b0e0b8a"
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "blob": "3416199eef9b60ad07f0a68b669c9caa6019df48",
+      "kind": "blob",
+      "mode": "100644",
+      "sha256": "d27bc36695ff82e4cba65cfb2749e48d7b9d38482543dffb039b8db0a4c73dbe"
+    },
+    "lampOS/crates/cloud/src/reports/query.rs": {
+      "blob": "6d603d768711844dd2892419f27fdd063d1db349",
+      "kind": "blob",
+      "mode": "100644",
+      "sha256": "23df4a7092a7c4829afb6afa9a95738c6b7aeb388fe5f0a8fc42d130c893e444"
+    },
+    "lampOS/crates/cloud/src/reports/query_tests.rs": {
+      "blob": "03fde84f15e7ad5a22079bcea6e8805f3f5fdc57",
+      "kind": "blob",
+      "mode": "100644",
+      "sha256": "3b36f1c5089666b1fc39b4b7c373913127cc61c9c46b7946284d661704f3b5a1"
+    },
+    "lampOS/docs/cloud.md": {
+      "blob": "8311a75c9248bf7e54f2c98869c4106a2a29d3aa",
+      "kind": "blob",
+      "mode": "100644",
+      "sha256": "794935ea09ad991b374ecc59d421c335fd579839d66ef68c7b391518457a2bfb"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "blob": "077e3b8148950d335486865ba83fb324d61c2506",
+      "kind": "blob",
+      "mode": "100644",
+      "sha256": "8bfa79e518536d6c4cf48d6de1c5ca21f683b222d85df79d9c6261d022241737"
+    }
+  },
+  "head": "238c12bf981c157029e5962a59a345b761626126",
+  "tree": "f88b521e7ca4c9ec9b9eaaadfad3ba4b918fc38c"
+}

@@ -1,0 +1,14 @@
+{
+  "names": [
+    "reports::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+    "reports::query::tests::invalid_utf8_cleans_closed_output_child",
+    "reports::query::tests::public_output_accepts_256_kib_and_refuses_one_byte_more",
+    "reports::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string",
+    "reports::query::tests::query_deadline_applies_after_stdout_closes",
+    "reports::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+    "reports::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+    "reports::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+    "reports::query::tests::an_endless_writer_is_refused_at_the_cap_and_its_group_killed",
+    "reports::query::tests::an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed"
+  ]
+}
