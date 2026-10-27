@@ -563,6 +563,7 @@ fn over_a_persons_light_that_rests_a_glow_is_asked_briefly() {
         attention: None,
         familiarity: lamp_msgs::Familiarity::Unknown,
         familiar: None,
+        felt: None,
         breath: None,
     };
     bus.publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "mood")

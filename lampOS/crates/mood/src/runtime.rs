@@ -362,6 +362,7 @@ fn changed(last: &MoodState, next: &MoodState) -> bool {
         || (last.awake - next.awake).abs() >= 0.01
         || (last.energy - next.energy).abs() >= 0.01
         || (last.warmth - next.warmth).abs() >= 0.01
+        || last.felt != next.felt
 }
 
 struct StopOnDrop(Arc<AtomicBool>);
