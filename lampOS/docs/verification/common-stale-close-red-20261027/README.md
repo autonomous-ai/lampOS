@@ -1,0 +1,13 @@
+# Common stale-close RED receipt
+
+**Result: FAILED — expected negative control.** One exact test body ran once, without retries: zero passed, one failed, zero ignored; 367 cases were filtered. Compilation exited zero, but the test and controller exited 101. This is retained failure evidence, not a passing gate or repaired-source qualification.
+
+Source HEAD is `ed9aff39b609676535343f8979631c909e2a430a`; the private counterfactual index tree is `89617df059a856fe5250a8b31bbe48ec306a8ca7`. Only Eyes camera authority and its English documentation differ from the prior source. The candidate repair distinguishes a stale no-op from completed kernel shutdown. The counterfactual restores old completion semantics in one branch by returning `Ok(true)` for that stale mismatch. Exact repair, counterfactual and source hashes are recorded in the receipt.
+
+The source-only P2 schedule is a stale expiry snapshot racing with a closer whose mutex phase has marked Closing but whose kernel shutdown has not completed. Reporting that stale no-op as completed can wrongly authorize capture rollover. The deterministic test reconstructs that scalar interval with real production authority/witness code and a real transferred ticket; it does not claim a production thread was paused by a scheduler.
+
+`camera_authority::tests::stale_expected_close_cannot_roll_capture_before_real_shutdown_completes` reached the assertion at `lampOS/crates/eyes/src/camera_authority.rs:732`: actual `NeedNewHold`, expected `Unavailable`. The real ticket's open assertion before the stale operation completed. The open assertion after the stale operation and all later shutdown, buffered-frame and fresh-floor assertions were **not reached**. This failure exposes the false-completion/rollover result; it does not demonstrate the complete buffered-frame exploit.
+
+Host test compilation used debug information level 0, optimization level 0, debug assertions enabled and overflow checks enabled. Source remained stable; both owned sessions were observed closed. The independent failed executable copy remains private, mode 0600, 83,704,712 bytes, with SHA-256 `ad88c7d44eeac83409996c9017eaba1c2f282ecd08b1512c2ef3d6b0c352453c`.
+
+Separate retention inspection exited zero. Actual dsymutil succeeded with zero debug-map object entries; independent Mach-O inspection found zero N_OSO entries. Therefore zero actual object backings were present, and the retained clone manifest is genuinely empty, rather than assumed empty. That retention success does not relabel the original failed 101 result. No raw log, private path, environment, binary, binary archive or full gate packet is included here. GREEN runtime, native ARM, runtime consumers, hardware, activation and latency remain outside this receipt.

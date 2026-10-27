@@ -1,0 +1,88 @@
+{
+  "execution": {
+    "actual_native_exit": 101,
+    "case_bodies_attempted": 1,
+    "compile_exit": 0,
+    "controller_exit": 101,
+    "failed": 1,
+    "failure": {
+      "actual_left": "NeedNewHold",
+      "expected_right": "Unavailable",
+      "line": 732,
+      "source": "lampOS/crates/eyes/src/camera_authority.rs"
+    },
+    "filtered": 367,
+    "fresh_owned_SIDs_closed": 2,
+    "ignored": 0,
+    "measured": 0,
+    "native_chunk": "033b80",
+    "native_session": 15520,
+    "observed_boundary": {
+      "later_shutdown_buffered_frame_and_fresh_floor_assertions": "Not reached.",
+      "open_assertion_after_stale_operation": "Not reached.",
+      "real_transferred_ticket_open_assertion_before_stale_operation": "Completed before the later observed assertion failure.",
+      "stale_rollover_result": "NeedNewHold instead of Unavailable."
+    },
+    "passed": 0,
+    "platform": "macOS host",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "retries": 0,
+    "source_stable": true,
+    "test": "camera_authority::tests::stale_expected_close_cannot_roll_capture_before_real_shutdown_completes",
+    "test_binary": "lamp-eyes library test",
+    "test_exit": 101
+  },
+  "limits": [
+    "Expected failure remains FAILED; compile success and retention success do not turn it into a passing test.",
+    "The scalar pre-syscall state is reconstructed deterministically; no claim that a production thread was suspended by scheduling.",
+    "No complete buffered-frame exploit or post-stale ticket-peek result was executed after the failure.",
+    "No GREEN, default-profile native ARM, Eyes/Voice integration, device, activation or latency qualification.",
+    "Raw logs, private paths, environments, full packets, binaries and binary archives are excluded."
+  ],
+  "outcome": "FAILED_EXPECTED_NEGATIVE_CONTROL",
+  "retention": {
+    "actual_failed_terminal_sha256": "f8e0454d98c2e68bd69d07e696244895033ff4ee841acbd8a8dc66f24c982872",
+    "actual_object_backing_files": 0,
+    "clone_manifest_entries": 0,
+    "clone_manifest_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "debug_map_object_entries": 0,
+    "debug_map_sha256": "7de3df2564c52ad2a11c831311800df377d266a214760f9e0967970e26ea3fa9",
+    "dsymutil_exit": 0,
+    "empty_manifest_was_observed_not_assumed": true,
+    "independent_MachO_N_OSO_entries": 0,
+    "independent_failed_copy": {
+      "bytes": 83704712,
+      "mode": "0600",
+      "published": false,
+      "sha256": "ad88c7d44eeac83409996c9017eaba1c2f282ecd08b1512c2ef3d6b0c352453c"
+    },
+    "original_case_exit_remains": 101,
+    "owned_closure_recorded": true,
+    "retention_exit": 0,
+    "retention_terminal_sha256": "4a8d1bcc452d585d81cc01e116ef4260fbeb0f6fc5af759c506101ffce657980",
+    "source_stable": true
+  },
+  "schema_version": 1,
+  "scope": "Selected evidence of one stale-close negative control, not repaired-source qualification.",
+  "source": {
+    "camera_authority_counterfactual_sha256": "00f58552a9f163da0a56fefccdbe031af537407fa000b093af0015f3a2cf47a3",
+    "candidate_repair_patch_sha256": "4fc62164e9b8ee34e5c52ba7e81831ecee2c0b5974f759cf5aaff0bc4b64a4a6",
+    "candidate_repair_runtime_qualification": false,
+    "candidate_repair_source_sha256": "4990dacb3a1791d3d26daf484644299cd37d0a9ef6543e572b1795379607e0bd",
+    "changed_paths": [
+      "lampOS/crates/eyes/src/camera_authority.rs",
+      "lampOS/docs/eyes.md"
+    ],
+    "counterfactual_delta": "Only the stale mismatch branch changes Ok(false) to Ok(true) under the new completion API.",
+    "counterfactual_index_tree": "89617df059a856fe5250a8b31bbe48ec306a8ca7",
+    "head": "ed9aff39b609676535343f8979631c909e2a430a",
+    "old_behavior_counterfactual_patch_sha256": "85136d77b520aec023a412f33598068bae1cb42cd7cf5ab55227e3872780434d",
+    "prior_source_tree": "dc2147074f643275f32f82f239e85dbce8d95d26"
+  }
+}
