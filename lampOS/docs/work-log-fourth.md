@@ -1,3 +1,9 @@
+## 2026-10-28 03:19 ICT — Caller-bound consent fix pushed; current-base gates continue
+
+[Host qualification](verification/consent-ab92-host-20261028/README.md): #3472 is pushed as one commit, 2ced256ff, with 4,563 unique passes, all 56 named controls and four separate doctests. Formatting, metadata, strict workspace Clippy and build passed. Earlier failures remain recorded. This qualifies the stated frozen source; no count transfers to a new base.
+
+The local current rebase onto Main dadacc1bc is clean at bc06a6eff/tree43da54b09; its fresh compiler gate is running. Original Linux Clippy 40575097494 passed on merge d2b33e18b, whose whole tree equals the current rebase; ARM 40575097415 is still pending. #3544 remains open/ready and requires its current carry gates; #3577 retains its original failed N13 run until its fresh carry qualifies. Common has a private current carry and minimal Linux None-guard correction, both unrun; its stricter original-receipt yawn integration waits for delivered #3898. No lamp or activation action.
+
 ## 2026-10-28 02:32 ICT — Consent test compilation fixes continue; diagnostic native failure retained
 
 Ready for lamp-voice: no.

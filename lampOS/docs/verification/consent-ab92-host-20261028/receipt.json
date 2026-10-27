@@ -1,0 +1,68 @@
+{
+  "status": "HOST_QUALIFIED_NATIVE_AND_PHYSICAL_GATES_REMAIN",
+  "tested_tree": "ab92a0a49c5eb642a848ce53454f9856ecf1eee3",
+  "frozen_main": "f903659bba298cdee290ee4285038a8f46af930b",
+  "compiler": {
+    "native": 85009,
+    "exit": 0,
+    "stages": 4
+  },
+  "runtime": {
+    "native": 14191,
+    "exit": 0,
+    "selected_unique": 4563,
+    "passed_unique": 4563,
+    "failed": 0,
+    "selected_unrun": 0,
+    "new_production_first": 29,
+    "disjoint_remainder": 4534,
+    "repeated_selected_cases": 0,
+    "named_coverage": {
+      "new_Voice": 29,
+      "retained_Voice": 16,
+      "Eyes": 11
+    },
+    "groups": {
+      "Voice-all": 4198,
+      "Eyes-all": 357,
+      "Update-install": 3,
+      "Update-ci_paths": 2,
+      "Skills-format": 3
+    },
+    "input_guard_boundary": "full captured input metadata and bytes before/after each runtime partition; after-doc identity not claimed"
+  },
+  "discovery": {
+    "listed": 5045,
+    "natural_ignored_declarations": 27,
+    "filter_mismatches": 482,
+    "ignore_and_filter_counts_may_overlap": true,
+    "not_added_to_passes": true
+  },
+  "docs": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "separate_from_runtime": true
+  },
+  "prior_runtime_stop": {
+    "native": 30734,
+    "exit": 125,
+    "commands": 0,
+    "test_bodies": 0,
+    "source_final_guard_claimed": false
+  },
+  "prior_compiler_history": "https://github.com/autonomous-ai/lampOS/blob/ed883cb1cf09d54bde283e7d3484523d3826a332/lampOS/docs/verification/onboarding-consent-compiler-history-20261028/README.md",
+  "remaining_gates": [
+    "native ARM/Linux on final pushed head",
+    "intended person within two tries in normal light",
+    "two-person/cancel/privacy lamp trial"
+  ],
+  "evidence_sha256": {
+    "compiler_actual_release": "a08aaf59741ad08f6a223845540ed644f4f4cd44e15e34c1d061680d2da39cb1",
+    "runtime_actual_release": "9c785f427e1d13c3befbe1651caff93770e1bd0434446d754714e8d1598aa49f",
+    "unique_union_ledger": "f086814e14258b4837bd5bc69bbc03af020815c2a9f0df091fc7284360954404",
+    "named_coverage_ledger": "ffb0479014c764f92bb411b97e97b6bad80fca54f18866cd12a4a8f70435852f",
+    "source_identity_registry": "49c09d7f40e13713ec79ea904298775d0cc3f0a78a06049fa419be0545b16fa4",
+    "prior_zero_operation_stop": "51a980863c7a6a81852e7fd821273539c408e98c908de49dca3cd0d66b089062"
+  }
+}
