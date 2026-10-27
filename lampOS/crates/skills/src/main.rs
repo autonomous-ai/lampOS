@@ -38,7 +38,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      [--zone system|NAME | --utc-offset-minutes N] [--trust-clock]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
-                     lamp-skills remove [--dir DIR] NAME\n       \
+                     lamp-skills remove [--dir DIR] [--state-dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
                      lamp-skills pack [--out DIR] [--key-file PRIVATE [--author]] SKILL_DIR\n       \
                      lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH]";
@@ -326,7 +326,8 @@ fn test(dirs: &[String]) -> ExitCode {
 fn manage(command: &str, given: &[String]) -> ExitCode {
     let mut dir = PathBuf::from(SKILLS_DIR);
     let mut out = PathBuf::from(".");
-    // `asked`: the running program's `--state-dir`, for the app's off and on.
+    // `asked` and `remove`: the running program's `--state-dir`, for the
+    // app's off and on, and the camera yes a remove takes back.
     let mut state = PathBuf::from(package::STATE_DIR);
     // `asked`: the Store's public key a package must be
     // signed with. `pack`: the private key it is signed with, if any.
@@ -340,7 +341,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         let flag = match word.as_str() {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
-            "--state-dir" if command == "asked" => &mut state,
+            "--state-dir" if matches!(command, "asked" | "remove") => &mut state,
             "--author" if command == "pack" => {
                 author = true;
                 continue;
@@ -370,7 +371,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
     }
     let done = match (command, named.as_slice()) {
         ("install", [from]) => package::install(&dir, Path::new(from)),
-        ("remove", [name]) => package::remove(&dir, name),
+        ("remove", [name]) => package::remove(&dir, Some(&state), name),
         ("list", []) => package::list(&dir).map(|listed| listed.trim_end().to_owned()),
         // The manage helper (#1722): one request on the standard input, its
         // answer on the standard output, as systemd hands it a connection
@@ -2605,6 +2606,20 @@ fn tool_call(
         }
         return;
     }
+    // A skill that hands the model the camera's picture runs only with the
+    // owner's yes, read at each call (#3504's piece C): without it the
+    // whole call is refused before it is a run, so nothing moves, no look
+    // is counted and the model is told no note of a picture it won't get.
+    if let Some(skill) = engine
+        .skills()
+        .iter()
+        .find(|skill| skill.tool.as_deref() == Some(name.as_str()))
+        .filter(|skill| skill.looks())
+        && let Some(why) = engine.picture_refused(&skill.name)
+    {
+        eprintln!("lamp-skills: skill:{}: refused {name}: {why}", skill.name);
+        return refuse(lamp_skills::CAMERA_NOT_ALLOWED);
+    }
     // A run with no pose to hold, under way: refused before it is a run,
     // so nothing moves, the line is not said again, and `[again]`'s while
     // still runs from the run under way (#999: "again!" mid-dance).
@@ -2659,15 +2674,6 @@ fn tool_call(
     };
     // The look's picture goes to the model only for a skill that may see it.
     let sockets = runner.sockets_for(&run.skill);
-    // And, its grant given, only with the owner's yes, read at each call
-    // (#3504's piece C): a skill not core without it gets no picture.
-    if run.calls.contains(&Call::Look)
-        && sockets.may.refuses(&Call::Look).is_none()
-        && let Some(why) = engine.picture_refused(&run.skill)
-    {
-        let _ = sockets.may.refused("look", why);
-        run.calls.retain(|call| *call != Call::Look);
-    }
     if run
         .calls
         .iter()
