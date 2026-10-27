@@ -168,7 +168,7 @@ it) or `if_choice` (the tool's values it runs for).
 | `say` | `say = "a note the model speaks from"`, `say = { note = "…" }`, or `say = { text = "said as it is" }`, each with `priority` (0 to 8) and `expires` (1 s to 1 h) | `speak` |
 | `sound` | `sound = "NAME"`: `sounds/NAME.wav`; not with a tool | `speak` |
 | (none) | `cue = "hum"`: the lamp's own hum; not with a tool | `speak` |
-| (none) | `look = true`: the full look's picture to the model; tool only | today's `look` (see the gaps) |
+| (none) | `look = true`: the full look's picture to the model; tool only | `camera` (format 1's `look` still gives it: "The camera", below) |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,
@@ -227,7 +227,8 @@ topics = ["humans/faces/tracked"] # every topic its triggers and conditions read
 | `body` | `body = true` | "moves the lamp's body" | yes: at load for every body and rest step, and at the body's sockets |
 | `light` | `light = true` | "changes the light" | yes: at load, at `light/request` and the actions part's light functions |
 | `speak` | `speak = true` | "speaks" | yes: at load for say, sound and cue, and at the say service |
-| `look` | presence topics in `topics` (`humans/faces/tracked`, `room/stood_up`) | "knows when someone arrives" | yes, as topics: a trigger or condition on a topic not listed doesn't load |
+| `look` | `look = true`, with the presence topics in `topics` (`humans/faces/tracked`, `room/stood_up`) | "knows when someone arrives" | yes, as topics: a trigger or condition on a topic not listed doesn't load |
+| (none: never through lamp-control) | `camera = true` | "can see a picture of your room through the lamp's camera when it runs", apart, with a strong warning | yes: at load for every `look = true` step, and at each call (`Call::Look`) |
 | `hear` | `voice/heard` or `name/heard` in `topics` | "hears its phrases" | partly: the topic is checked, the phrases aren't (see the gaps) |
 | `sound` | `ears/classes` in `topics` | "hears knocks, music…" | partly: the topic is checked, the classes aren't (see the gaps) |
 
@@ -240,17 +241,47 @@ Format 1 also has, beyond the protocol's six:
 - `propose`: an add-on's acts;
 - `core`: `onboarding`, `prepare_unplug`, `sleep` and `startle`, for core skills only.
 
+### The camera
+
+`look` and `camera` are two grants (#3822's gap 1; the helper's decision
+for the first builder on #3504, 27 Oct, from Ten's proposal there):
+
+- **`look`** is presence and face position only: whether someone is
+  there, how near, which way they face. This is the protocol's `look`
+  (control.md), and it is never the picture.
+- **`camera`** is the picture: the model may see what the lamp's camera
+  sees when the skill runs (a `look = true` step). It is its own grant.
+  - The app and the Store show it apart, with a strong warning.
+  - It is never given by default, and the owner can take it back.
+  - lamp-control has no such grant: a client never gets a frame.
+- **Format 1 keeps working.** A skill written before `camera` that says
+  `look = true` for the picture still loads and runs. Its `look` is read
+  as the camera too (`Permissions::sees_picture`), and it is shown to the
+  person as the camera, never as presence. Format 2 drops that reading
+  (gap 7): there, `look` is presence alone.
+- **The repo's skills** say what they really use:
+
+  | skill | what it uses | `[permissions]` |
+  |---|---|---|
+  | desk-tutor | the full look's still of the page, to read handwriting | `camera = true`, `body = true`, `light = true`, `speak = true` |
+  | point-light | the look's picture, to aim the light at what was asked | `camera = true`, `body = true`, `light = true`, `speak = true` |
+  | look-for-things | each look's picture, to find what the person lost | `camera = true`, `body = true`, `light = true`, `speak = true` |
+
+  None of them reads presence through `look`, so none asks it. Every
+  other repo skill asks neither: the ones that notice faces read
+  `humans/faces/tracked` through `topics`, as the table above says.
+- **An add-on** may ask neither `look` nor `camera`, as it may ask no
+  other grant but `propose`.
+
 ### The gaps
 
 What the protocol's grants say that format 1 doesn't yet enforce. Each
 gap's code change is its own follow-up PR.
 
-1. **`look` means two things.** Here, `look = true` gives the model the
-   full look's picture (`do.look`). The protocol's `look` is presence
-   only, "positions, never who". A public format must not name a camera
-   picture with the word the protocol uses for presence. Format 2 should
-   rename today's key (to `picture`, say) and make `look` the presence
-   grant over the presence topics.
+1. **`look` meant two things**, and it's now split ("The camera", above):
+   `camera` is the picture, and `look` is presence. What remains for
+   format 2 is to stop reading format 1's `look` as the camera too, and
+   to map `look` onto the presence topics, so a skill needn't list them.
 2. **`hear` is a topic, not phrases.** A skill granted `voice/heard`
    could match any phrase. The protocol's `hear` grants only the
    package's own listed phrases (`hear = ["good night lamp"]`), matched on

@@ -22,7 +22,7 @@ tool = "look_for"
 speak = true
 light = true
 body = true
-look = true
+camera = true
 
 [choice]
 name = "place"

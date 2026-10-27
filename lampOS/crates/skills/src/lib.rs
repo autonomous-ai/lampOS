@@ -1114,10 +1114,19 @@ pub struct Permissions {
     /// It may move the body: look at a face, a gesture, a move, a pose.
     #[serde(default)]
     pub body: bool,
-    /// The model may see the voice's full look, the camera's picture of
-    /// what is in front of the lamp (`look`).
+    /// Presence and face position only, the protocol's `look`
+    /// (docs/control.md): who is there, how near, which way they face,
+    /// never the picture. In format 1 it also still gives the picture, as
+    /// `camera` does ([`Permissions::sees_picture`]), so a skill written
+    /// before `camera` keeps working; the app shows it as the camera.
     #[serde(default)]
     pub look: bool,
+    /// The model may see a picture through the lamp's camera: the voice's
+    /// full look of what is in front of the lamp (a `look = true` step).
+    /// Its own grant, shown apart with a strong warning, never given by
+    /// default (#3822's gap 1, the helper's decision on #3504).
+    #[serde(default)]
+    pub camera: bool,
     /// It may send a short text for the person's phone, unasked
     /// (`messages/out`, a watch's news: [`watch`]).
     #[serde(default)]
@@ -1214,7 +1223,7 @@ impl Permissions {
             | Call::Sound { .. }
             | Call::Cue
             | Call::RequestedAudio(_) => ("speak", self.speak),
-            Call::Look => ("look", self.look),
+            Call::Look => ("camera", self.sees_picture()),
             Call::Text(_) => ("messages", self.messages),
             Call::Propose(proposal) => {
                 return (!self.propose.contains(&proposal.act)).then(|| {
@@ -1233,6 +1242,12 @@ impl Permissions {
                 call.named().0
             )
         })
+    }
+
+    /// Whether the model may see the camera's picture: `camera`, or format
+    /// 1's `look`, which gave it before `camera` was its own grant.
+    pub fn sees_picture(&self) -> bool {
+        self.camera || self.look
     }
 
     /// Whether it lists the core-only grant `grant` ([`CORE_GRANTS`]).
@@ -1323,7 +1338,7 @@ impl Permissions {
             ("speak", self.speak),
             ("light", self.light),
             ("body", self.body),
-            ("look", self.look),
+            ("camera", self.sees_picture()),
             ("messages", self.messages),
             ("known faces", self.known_faces),
             ("who is at the lamp", self.who),
@@ -1449,6 +1464,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
         (p.light, "light"),
         (p.body, "body"),
         (p.look, "look"),
+        (p.camera, "camera"),
         (p.messages, "messages"),
         (p.known_faces, "known_faces"),
         (p.who, "who"),

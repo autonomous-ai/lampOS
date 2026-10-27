@@ -566,6 +566,11 @@
           "type": "boolean"
         },
         "look": {
+          "description": "Presence and face position only, the protocol's look. In format 1 it still also gives the camera's picture, as camera does.",
+          "type": "boolean"
+        },
+        "camera": {
+          "description": "The model may see a picture through the lamp's camera (a look = true step). Its own grant, shown apart with a strong warning, never given by default.",
           "type": "boolean"
         },
         "topics": {

@@ -134,6 +134,16 @@ fn the_loader_refuses_an_add_on_anything_but_proposing() {
             "propose = [\"mood\"]\nknown_faces = true",
             "known_faces in [permissions]",
         ),
+        (
+            "propose = [\"mood\"]",
+            "propose = [\"mood\"]\nlook = true",
+            "look in [permissions]",
+        ),
+        (
+            "propose = [\"mood\"]",
+            "propose = [\"mood\"]\ncamera = true",
+            "camera in [permissions]",
+        ),
         ("propose = [\"mood\"]\n", "", "lists what it may propose"),
         (
             "topics = [\"ears/classes\", \"voice/state\"]",

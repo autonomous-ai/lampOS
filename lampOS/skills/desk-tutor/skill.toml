@@ -18,7 +18,7 @@ tool = "check_my_work"
 speak = true
 light = true
 body = true
-look = true
+camera = true
 
 [[do]]
 # The page lit bright and white while they work through the hint; their

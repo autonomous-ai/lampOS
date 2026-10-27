@@ -552,18 +552,20 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
             "",
             "not permitted: say needs speak = true",
         ),
-        // The camera's picture for the model.
+        // The camera's picture for the model: `camera`, its own grant.
         (
             "desk-tutor",
-            "look = true\n",
+            "camera = true\n",
             "",
-            "not permitted: look needs look = true",
+            "not permitted: look needs camera = true",
         ),
+        // Presence alone is not the picture: format 1's `look` still gives
+        // it (`a_format_1_look_still_gives_the_picture_and_camera_is_its_own_grant`).
         (
             "desk-tutor",
-            "look = true\n",
-            "look = true\ncamera = true\n",
-            "unknown field `camera`",
+            "camera = true\n",
+            "camera = true\npicture = true\n",
+            "unknown field `picture`",
         ),
         (
             "welcome-back",
@@ -607,6 +609,48 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
     );
     let engine = Engine::new(vec![load(&skill).unwrap()], true);
     assert_eq!(engine.topics(), ["humans/faces/tracked", "voice/state"]);
+}
+
+/// The camera's picture is its own grant, `camera` (#3822's gap 1, the
+/// helper's decision on #3504, 27 Oct): `look` is presence and face
+/// position only, as the protocol's. A format 1 skill that said `look = true`
+/// for the picture still loads and runs, and is said as the camera's
+/// picture, never as presence; an add-on may ask neither.
+#[test]
+fn a_format_1_look_still_gives_the_picture_and_camera_is_its_own_grant() {
+    let dir = tempfile::tempdir().unwrap();
+    // The three repo skills that hand the model the picture ask `camera`.
+    for name in ["desk-tutor", "point-light", "look-for-things"] {
+        let skill = load(&skills_root().join(name)).unwrap();
+        assert!(skill.permissions.camera, "{name}");
+        assert!(
+            !skill.permissions.look,
+            "{name}: presence is not what it reads"
+        );
+        assert!(skill.permissions.said().contains("camera"), "{name}");
+        assert_eq!(skill.permissions.refuses(&Call::Look), None, "{name}");
+    }
+    // Written before `camera`: `look = true` still gives the picture.
+    let older = repo_skill_with(
+        &dir.path().join("older"),
+        "desk-tutor",
+        "camera = true\n",
+        "look = true\n",
+    );
+    let skill = load(&older).unwrap();
+    assert!(skill.permissions.look && !skill.permissions.camera);
+    assert!(skill.permissions.sees_picture());
+    assert_eq!(skill.permissions.refuses(&Call::Look), None);
+    assert!(skill.permissions.said().contains("camera"));
+    assert!(!skill.permissions.said().contains("look"));
+    // Neither: no picture, and the refusal names the grant to ask.
+    let none = Permissions::default();
+    assert!(
+        none.refuses(&Call::Look)
+            .unwrap()
+            .contains("needs camera = true")
+    );
+    assert!(!none.sees_picture());
 }
 
 /// A skill that has the voice say the person's reminder or the news of
@@ -810,7 +854,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             },
             "speak",
         ),
-        (Call::Look, "look"),
+        (Call::Look, "camera"),
         (
             Call::Rest(lamp_skills::routine::Rest {
                 op: lamp_msgs::ExpressionRestOp::Rest,
@@ -843,7 +887,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             speak: *key == "speak",
             light: *key == "light",
             body: *key == "body",
-            look: *key == "look",
+            camera: *key == "camera",
             ..Permissions::default()
         };
         assert_eq!(given.refuses(call), None, "{call:?}");
@@ -11161,7 +11205,12 @@ fn onboarding_request_names_invitation_and_has_no_extra_tool_or_authority() {
         [lamp_msgs::OnboardingPending::TOPIC]
     );
     assert!(skill.permissions.speak);
-    assert!(!skill.permissions.body && !skill.permissions.light && !skill.permissions.look);
+    assert!(
+        !skill.permissions.body
+            && !skill.permissions.light
+            && !skill.permissions.look
+            && !skill.permissions.camera
+    );
     assert!(skill.permissions.actions.is_empty());
     let call = Call::SayFrom(lamp_skills::Source::Onboarding, Some(81));
     assert_eq!(
