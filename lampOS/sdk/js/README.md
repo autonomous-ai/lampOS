@@ -83,7 +83,7 @@ await lamp.closed();
   | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
-  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours`, `lease` | none |
+  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet) | none |
 
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. Each resolves when the lamp has taken it;
