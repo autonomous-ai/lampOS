@@ -5,15 +5,22 @@
 //   lamp hello [LAMP_ID]
 //   lamp fake [--every 10] [--cycles N]
 //   lamp skill push FOLDER [LAMP_ID] | lamp skill list [LAMP_ID] | lamp skill remove NAME [LAMP_ID]
+//   lamp skill keygen | lamp skill pack FOLDER [--sign] [--out DIR] | lamp skill check PACKAGE.tar
+import { createPublicKey } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { Lamp } from './client.js';
 import { find } from './discovery.js';
 import { PORT } from './schema.js';
 import { fake } from './fake.js';
+import { LampError } from './errors.js';
+import { Keyring } from './keys.js';
+import { fingerprint, openPackage, pack } from './push.js';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' } },
+  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, sign: { type: 'boolean' }, out: { type: 'string' } },
 });
 const [command, arg, third, fourth] = positionals;
 
@@ -53,6 +60,29 @@ async function main() {
     } finally {
       await lamp.close();
     }
+  } else if (command === 'skill' && arg === 'keygen') {
+    const ring = new Keyring();
+    const made = !ring.authorKey();
+    const spki = createPublicKey(ring.authorKey({ make: true })).export({ type: 'spki', format: 'der' });
+    console.log(`author key ${fingerprint(spki.subarray(spki.length - 32))} ${made ? 'made' : 'already there'}: ${join(ring.folder, 'author.pem')}`);
+  } else if (command === 'skill' && arg === 'pack' && third) {
+    let author;
+    if (values.sign) {
+      author = new Keyring().authorKey();
+      if (!author) throw new LampError('no author key: make one with `lamp skill keygen`', { code: 'bad_request' });
+    }
+    const made = pack(third, { author });
+    const out = values.out ?? '.';
+    mkdirSync(out, { recursive: true });
+    const path = join(out, `${made.name}-${made.version}.tar`);
+    writeFileSync(path, made.data);
+    console.log(`${path} ${made.sha256}${author ? ' signed' : ''}`);
+  } else if (command === 'skill' && arg === 'check' && third) {
+    // The package's signature and files; the skill itself is checked by the
+    // Python SDK's `lamp skill check`, and by the lamp again.
+    const opened = openPackage(readFileSync(third));
+    // Integrity, not trust: anyone can make a key (Fourteen, #3504).
+    console.log(`${opened.name}: package ok${opened.author ? `, signed by key ${opened.author}, not the Store` : ', not signed'}`);
   } else if (command === 'skill' && arg === 'list') {
     const lamp = await Lamp.connect(third);
     try {

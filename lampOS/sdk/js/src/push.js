@@ -9,11 +9,17 @@
 // loader passes them over. The lamp checks the bytes against `sha256`, then
 // each file against the manifest, and checks the skill itself as a load
 // does; the Python SDK's `lamp skill check` mirrors that check before a push.
-import { createHash } from 'node:crypto';
+import { createHash, createPublicKey, sign, verify } from 'node:crypto';
 import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { LampError } from './errors.js';
 
+export const MANIFEST = 'lamp-skill.json';
+// The author's signature, the package's second entry (lamp-skills'
+// package.rs): {"key": FPR16, "public": B64, "signature": B64} over the
+// manifest's exact bytes.
+export const SIGNATURE = 'lamp-skill.sig';
+const SIGNATURE_MAX = 1024;
 export const PACKAGE_MAX = 1 << 20;
 // A part's bytes, so its base64 is at most 48 KiB and a frame stays under 64 KiB.
 export const PART_BYTES = 36 * 1024;
@@ -50,6 +56,104 @@ function files(folder) {
   };
   walk(folder, '');
   return new Map([...found].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
+// A key's fingerprint, as the lamp shows it: the first 16 hex of the SHA-256
+// of its 32 bytes (lamp-update's `manifest::fingerprint`).
+export const fingerprint = (publicBytes) => sha256(publicBytes).slice(0, 16);
+
+const rawPublic = (key) => {
+  const der = createPublicKey(key).export({ type: 'spki', format: 'der' });
+  return der.subarray(der.length - 32);
+};
+
+// `lamp-skill.sig` for these manifest bytes, compact JSON and a newline, as
+// lamp-skills writes it, with the author's `public` beside `key`.
+export function signatureFor(manifest, author) {
+  const publicBytes = rawPublic(author);
+  const signed = {
+    key: fingerprint(publicBytes),
+    public: publicBytes.toString('base64'),
+    signature: sign(null, manifest, author).toString('base64'),
+  };
+  return Buffer.from(`${JSON.stringify(signed)}\n`);
+}
+
+const bad = (why) => new LampError(`not a skill package: ${why}`, { code: 'bad_request' });
+
+// The entries of a ustar tar, in order: { name, type, data }.
+function entries(data) {
+  const found = [];
+  for (let at = 0; at + 512 <= data.length;) {
+    const header = data.subarray(at, at + 512);
+    if (header.every((byte) => byte === 0)) break;
+    const text = (from, length) => header.subarray(from, from + length).toString('utf8').replace(/\0.*$/s, '');
+    const size = parseInt(text(124, 12).trim() || '0', 8);
+    const prefix = text(345, 155);
+    const name = prefix ? `${prefix}/${text(0, 100)}` : text(0, 100);
+    const type = text(156, 1) || '0';
+    if (Number.isNaN(size) || at + 512 + size > data.length) throw bad('a tar cut short');
+    found.push({ name, type, data: data.subarray(at + 512, at + 512 + size) });
+    at += 512 + Math.ceil(size / 512) * 512;
+  }
+  return found;
+}
+
+// Check a package as the lamp does before anything is written: the manifest
+// first, the signature (if any) over its exact bytes by the key it names, then
+// every file against the manifest, no more and no fewer. Returns
+// { name, version, author, files } with `author` the key's fingerprint, or
+// null when it isn't signed.
+export function openPackage(data) {
+  const all = entries(data);
+  if (all[0]?.name !== MANIFEST) throw bad(`${MANIFEST} must come first`);
+  const read = new Map();
+  for (const entry of all) {
+    if (entry.type !== '0') throw bad(`${entry.name}: a package holds only plain files`);
+    if (read.has(entry.name)) throw bad(`${entry.name} twice`);
+    read.set(entry.name, entry.data);
+  }
+  const manifestBytes = read.get(MANIFEST);
+  read.delete(MANIFEST);
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestBytes.toString('utf8'));
+  } catch (error) {
+    throw bad(`${MANIFEST}: ${error.message}`);
+  }
+  const { name, version, files: listed } = manifest;
+  if (typeof name !== 'string' || typeof version !== 'string' || !Array.isArray(listed)) throw bad(`${MANIFEST}: name, version and files`);
+  let author = null;
+  const signed = read.get(SIGNATURE);
+  if (signed) {
+    read.delete(SIGNATURE);
+    if (all[1].name !== SIGNATURE) throw bad(`${SIGNATURE} must come second`);
+    if (signed.length > SIGNATURE_MAX) throw bad(`${SIGNATURE} is too large to be a signature`);
+    let fields;
+    try {
+      fields = JSON.parse(signed.toString('utf8'));
+    } catch {
+      throw bad(`${SIGNATURE}: an author's signature is {"key", "public", "signature"}`);
+    }
+    const publicBytes = Buffer.from(fields.public ?? '', 'base64');
+    if (publicBytes.length !== 32 || fingerprint(publicBytes) !== fields.key) throw bad(`${SIGNATURE}: key is not the fingerprint of public`);
+    // An Ed25519 public key as SPKI DER: a fixed 12-byte prefix, then its 32 bytes.
+    const key = createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), publicBytes]), format: 'der', type: 'spki' });
+    if (!verify(null, manifestBytes, key, Buffer.from(fields.signature ?? '', 'base64'))) {
+      throw bad(`${SIGNATURE} does not match ${MANIFEST}: the package was changed after it was signed`);
+    }
+    author = fields.key;
+  }
+  const files = new Map();
+  for (const entry of listed) {
+    const body = read.get(`${name}/${entry.path}`);
+    if (!body) throw bad(`${entry.path} is in ${MANIFEST} but not in the package`);
+    if (body.length !== entry.size || sha256(body) !== entry.sha256) throw bad(`${entry.path} does not match ${MANIFEST}`);
+    files.set(entry.path, body);
+    read.delete(`${name}/${entry.path}`);
+  }
+  if (read.size) throw bad(`${[...read.keys()].sort()[0]} is in the package but not in ${MANIFEST}`);
+  return { name, version, author, files };
 }
 
 // A top-level string key of skill.toml (before its first table), basic or
@@ -102,7 +206,9 @@ function entry(path, data) {
 
 // The skill folder as a package. Its name is the folder's, and skill.toml
 // must say a top-level `version`; a core or add-on skill is never pushed.
-export function pack(folder) {
+// With `author` (a private key), the package carries that author's
+// signature, to share it.
+export function pack(folder, { author } = {}) {
   const dir = resolve(folder);
   const name = basename(dir);
   let toml;
@@ -122,8 +228,10 @@ export function pack(folder) {
     version,
     files: [...all].map(([path, data]) => ({ path, size: data.length, sha256: sha256(data) })),
   };
+  const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
   const data = Buffer.concat([
-    entry('lamp-skill.json', Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`)),
+    entry(MANIFEST, manifestBytes),
+    ...(author ? [entry(SIGNATURE, signatureFor(manifestBytes, author))] : []),
     ...[...all].map(([path, bytes]) => entry(`${name}/${path}`, bytes)),
     Buffer.alloc(1024),
   ]);

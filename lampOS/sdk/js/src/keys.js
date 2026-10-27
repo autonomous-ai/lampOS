@@ -47,9 +47,17 @@ export class Keyring {
     chmodSync(this.folder, 0o700);
   }
 
-  key() {
-    const path = join(this.folder, 'key');
+  key() { return this.keyFile('key', true); }
+
+  // The key this person signs their skills with (`lamp skill keygen`), kept
+  // apart from the pairing key: revoking a pairing never changes who wrote a
+  // skill. Undefined if it hasn't been made.
+  authorKey({ make = false } = {}) { return this.keyFile('author.pem', make); }
+
+  keyFile(name, make) {
+    const path = join(this.folder, name);
     if (existsSync(path)) return createPrivateKey(readFileSync(path));
+    if (!make) return undefined;
     const { privateKey } = generateKeyPairSync('ed25519');
     this.ownFolder();
     writeFileSync(path, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600, flag: 'wx' });

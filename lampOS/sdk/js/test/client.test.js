@@ -536,6 +536,47 @@ test('lamp skill push, list and remove run as the Python CLI\'s do', async () =>
   } finally { await fake.stop(); }
 });
 
+test('a signed package names its author, and any change is refused', async () => {
+  const { pack, openPackage, SIGNATURE } = await import('../src/push.js');
+  const dir = skillFolder('desk-wave');
+  assert.equal(openPackage(pack(dir).data).author, null);
+  const ring = new Keyring(folder());
+  assert.equal(ring.authorKey(), undefined);
+  const key = ring.authorKey({ make: true });
+  assert.equal(statSync(join(ring.folder, 'author.pem')).mode & 0o777, 0o600);
+  const { data } = pack(dir, { author: key });
+  const file = join(folder(), 'signed.tar');
+  writeFileSync(file, data);
+  // The signature is the second entry, as lamp-skills writes it.
+  assert.deepEqual(execFileSync('tar', ['-tf', file], { encoding: 'utf8' }).trim().split('\n').slice(0, 2), ['lamp-skill.json', SIGNATURE]);
+  const signed = JSON.parse(execFileSync('tar', ['-xOf', file, SIGNATURE], { encoding: 'utf8' }));
+  const opened = openPackage(data);
+  assert.equal(opened.author, signed.key);
+  assert.equal(signed.key.length, 16);
+  assert.deepEqual([...opened.files.keys()].sort(), ['SKILL.md', 'moves/wave.json', 'skill.toml']);
+  const changed = Buffer.from(data.toString('latin1').replace('light = true', 'light = TRUE'), 'latin1');
+  assert.throws(() => openPackage(changed), (error) => /does not match lamp-skill.json/.test(error.why));
+  const swapped = Buffer.from(data.toString('latin1').replace(signed.key, '0'.repeat(16)), 'latin1');
+  assert.throws(() => openPackage(swapped), (error) => /not the fingerprint of public/.test(error.why));
+});
+
+test('lamp skill keygen, pack --sign and check run as the Python CLI\'s do', async () => {
+  const home = folder();
+  const out = folder();
+  const lamp = (...args) => new Promise((done) => {
+    execFile(process.execPath, [new URL('../src/cli.js', import.meta.url).pathname, ...args], { env: { ...process.env, LAMPOS_HOME: home } },
+      (error, stdout, stderr) => done({ code: error?.code ?? 0, said: `${stdout}${stderr}`.trim() }));
+  });
+  const dir = skillFolder('desk-wave');
+  assert.deepEqual(await lamp('skill', 'pack', dir, '--sign', '--out', out), { code: 1, said: 'lamp: bad_request: no author key: make one with `lamp skill keygen`' });
+  const made = await lamp('skill', 'keygen');
+  const fpr = made.said.split(' ')[2];
+  assert.ok(made.code === 0 && made.said.endsWith('author.pem') && fpr.length === 16, made.said);
+  assert.ok((await lamp('skill', 'keygen')).said.startsWith(`author key ${fpr} already there`));
+  assert.ok((await lamp('skill', 'pack', dir, '--sign', '--out', out)).said.endsWith(' signed'));
+  assert.deepEqual(await lamp('skill', 'check', join(out, 'desk-wave-0.1.0.tar')), { code: 0, said: `desk-wave: package ok, signed by key ${fpr}, not the Store` });
+});
+
 test('a push without the skills grant, or of a core skill, sends nothing', async () => {
   await withLamp({ grants: ['light'] }, async (lamp, fake) => {
     await assert.rejects(lamp.pushSkill(skillFolder('lit')), byCode.no_grant);

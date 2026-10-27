@@ -128,3 +128,12 @@ resolves with the lamp's answer (on, or held for the owner's yes);
 `lamp skill push FOLDER`, `lamp skill list` and `lamp skill remove NAME`. It refuses a
 folder without a `version`, or a `core` or add-on skill. The fuller check is
 the Python SDK's `lamp skill check`, and the lamp checks everything again.
+
+To share a skill, sign it with a key of your own, kept apart from the
+pairing key: `lamp skill keygen` once (`author.pem` in `LAMPOS_HOME`), then
+`lamp skill pack FOLDER --sign` writes `NAME-VERSION.tar`, the shape
+`lamp-skills pack --key-file` makes. `lamp skill check NAME-VERSION.tar`
+checks its signature and every file. In code, `pack(folder, { author })` and
+`openPackage(bytes)` from `lampos/push`. A signature says the bytes are that
+key's, not who is behind the key, so `check` says "signed by key FPR16, not
+the Store".
