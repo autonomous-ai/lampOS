@@ -1,0 +1,330 @@
+{
+  "status": "VERIFIED_SELECTED_REMINDER_SCOPE",
+  "head": "9435830d39a6a943f12857f492c0964479a1f344",
+  "base": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+  "tree": "6750016027c4bb44913ff2ae3daedaeb773d0a5e",
+  "holds": [],
+  "limits": [
+    "Selected Skills/Update plus seven switch and one Welcome cases, and twelve-package docs; not current full twelve-package runtime.",
+    "Historical b490 full-suite privacy failure remains failed and separate.",
+    "No native, device or latency qualification."
+  ],
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 133,
+    "raw_entries": 8725,
+    "source_files": 7264
+  },
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 11,
+    "passed": 701
+  },
+  "controller_sha256": "f0f3ecb462dc1d36b2f00a1c89f945e73eaf9762df7907e2359dc41f3c5c7b08",
+  "helper_sha256": "ea50e77905d8b5a2b75ea3f152f19b90c0181e95e89bb7f3e500ba81be1c3dca",
+  "doc_headings": [
+    "lamp_body",
+    "lamp_cloud",
+    "lamp_expression",
+    "lamp_keeper",
+    "lamp_lean",
+    "lamp_memory",
+    "lamp_peek",
+    "lamp_setup",
+    "lamp_skills",
+    "lamp_update",
+    "lamp_voice",
+    "lamp_voice_eval"
+  ],
+  "full_private_receipt_sha256": "3d00866c24c7bef344bec6410625d4a4d073800dcf4f51f1a094e20c88c64e70",
+  "required_host_witnesses": 32,
+  "panic_hooks": {
+    "expected_occurrences": 2,
+    "unknown": 0
+  },
+  "commands": [
+    {
+      "label": "skills-lib",
+      "package": "lamp-skills",
+      "target": "lamp_skills",
+      "returncode": 0,
+      "log_sha256": "6d1b730387f78693d06b6b5bdd1941822abad5906baf3ecf6ea2900a52087018",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 429,
+          "measured": 0,
+          "passed": 160,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-bin",
+      "package": "lamp-skills",
+      "target": "lamp-skills",
+      "returncode": 0,
+      "log_sha256": "4fe2d699e9c810e7243df62725d47cff568fcf4d628bf032ace10bcda1b57453",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 63,
+          "measured": 0,
+          "passed": 20,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-it",
+      "package": "lamp-skills",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "ea394aaffe5640854dde215866951d259895f72bab96ff6e4aca1fdc0881e08d",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 1052,
+          "measured": 0,
+          "passed": 332,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-release-pair",
+      "package": "lamp-skills",
+      "target": "release_pair",
+      "returncode": 0,
+      "log_sha256": "a44132d59b7b063598f46cfbfeb47adc88746e55946b030ea5c688967a3da139",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 8,
+          "line": 14,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-requested-audio",
+      "package": "lamp-skills",
+      "target": "requested_audio",
+      "returncode": 0,
+      "log_sha256": "eeac97cb0276be624b23192f3066a1fcbc303c49a7ffa75fc8502e9bcf02b78d",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 38,
+          "measured": 0,
+          "passed": 31,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "update-lib",
+      "package": "lamp-update",
+      "target": "lamp_update",
+      "returncode": 0,
+      "log_sha256": "7937c04b9dbb21d26f06cca1998a7f5e46122b2a1e042a3b470a1ab0c0b25016",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 2,
+          "line": 141,
+          "measured": 0,
+          "passed": 135,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "update-it",
+      "package": "lamp-update",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "35c5b019d5594820df583981cd1bb0f8e8e36cb1e2eec22fbbfb2439054006ec",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 19,
+          "measured": 0,
+          "passed": 13,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "voice-switch-census",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "116b82704be0b3e2debc690a5035bb6e24d45d08b7cee44ae6833c358398a2a8",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3825,
+          "ignored": 0,
+          "line": 11,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "voice-welcome-source",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "619977b3ee0d0bfb76167c41f8433d5ce9e71306d12ed3cb1824b781102eb784",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3831,
+          "ignored": 0,
+          "line": 5,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "doctests-12",
+      "package": null,
+      "target": null,
+      "returncode": 0,
+      "log_sha256": "ac9ac98530ac90438470924f96008549d559556f701488a7f7cdca56e558e548",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 12,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 18,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 24,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 30,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 36,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 42,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 48,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 54,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 60,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 66,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 72,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    }
+  ]
+}

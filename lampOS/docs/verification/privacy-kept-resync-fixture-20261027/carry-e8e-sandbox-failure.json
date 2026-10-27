@@ -1,0 +1,84 @@
+{
+  "status": "MANUAL_HOLD",
+  "head": "94b1278eb9dedcdb078cedddf84ea46352b78030",
+  "base": "e8e7ac36a74062f567b4afb3d64beef6002d1f5c",
+  "tree": "7acceb5a0b84fe8dfcc47ced113fa547bc654fd7",
+  "holds": [
+    "incomplete selected execution",
+    "command failed/cleanup: voice-privacy-carry",
+    "required witness not once passed: privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+    "required witness not once passed: privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+    "required witness not once passed: privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+    "required witness not once passed: privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+    "failed test summary: selected-01-voice-privacy-carry",
+    "missing/excess expected hook: publish::guarded_tests::partial_encoding_errors_are_scrubbed_and_never_touch_reusable_storage",
+    "missing/excess expected hook: publish::guarded_tests::owned_encoded_buffer_is_scrubbed_on_error_and_unwind",
+    "unexpected/unparsed panic hooks require explicit review",
+    "required current host witness absent: privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+    "required current host witness absent: privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+    "required current host witness absent: privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+    "required current host witness absent: privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+    "required current host witness absent: privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+    "required current host witness absent: privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+    "required current host witness absent: privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+    "required current host witness absent: privacy::topic_is_additive_and_json_roundtrips",
+    "required current host witness absent: privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+    "required current host witness absent: bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+    "required current host witness absent: bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+    "terminal guard false: all_selected_commands_completed",
+    "terminal guard false: selected_scope_qualified"
+  ],
+  "selected_direct_counts": {
+    "failed": 4,
+    "ignored": 0,
+    "passed": 5
+  },
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 65,
+    "raw_entries": 8703,
+    "source_files": 7243
+  },
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "limits": [
+    "Focused host privacy carry on 94b1278eb/e8e7ac36a only; no current full host Voice claim.",
+    "Historical full Voice selection belongs to4bff; not reattributed.",
+    "Fresh original current native full Voice remains required before readiness; later base drift needs a separate carry.",
+    "Existing native642 Reader failure remains unresolved; this selected host carry does not establish its cause or waive it.",
+    "No historical cause/device/physical-latency claim."
+  ],
+  "full_private_receipt_sha256": "fed8d0a59aa9948a9ceea20d5dca6931b721e68a6c3eba4ea40fc38ebfe3d035",
+  "execution_context": "Default sandbox; original runtime omitted sandbox_permissions.",
+  "failures": {
+    "count": 4,
+    "class": "Unix datagram bind PermissionDenied, OS error 1",
+    "source_lines": [
+      1171,
+      1284,
+      1344,
+      1497
+    ]
+  },
+  "minimal_bind_probes": {
+    "default": {
+      "bound": false,
+      "cleanup_complete": true,
+      "errno": 1,
+      "error": "[Errno 1] Operation not permitted",
+      "operation": "AF_UNIX SOCK_DGRAM bind only; no product binary or tests",
+      "receipt_sha256": "6630e6689fa33971579c7f02bacf5355938f6ea2ba2df9a9f2dac9cde82d4993"
+    },
+    "escalated": {
+      "bound": true,
+      "cleanup_complete": true,
+      "errno": null,
+      "error": null,
+      "operation": "AF_UNIX SOCK_DGRAM bind only; no product binary or tests",
+      "receipt_sha256": "6dc1a2934730bc282991f4c26eaca323435ab008a42d163162a43be9d6d1478e"
+    }
+  },
+  "disposition": "Original remains failed; separately authorized corrected-context run intentionally repeats Voice selection, without combining counts or claiming historical product cause."
+}

@@ -1,0 +1,64 @@
+{
+  "head": "5227f3c323ae102de2209dc27e66d5ab5d389dae",
+  "tree": "48d074f7d2d440d39d55478ee42bcca2e3cae79c",
+  "source_before": {
+    "lampOS/crates/voice/src/made_skill.rs": "9359d16aa2b36ed6d9d725d798ae3bd93766f0d0bfe587c512d42a4753642d49",
+    "lampOS/docs/skills.md": "c4df4781f9c57346f9548da1a1970e4374ecde445128668a07bd6fcca90cdfca"
+  },
+  "source_after": {
+    "lampOS/crates/voice/src/made_skill.rs": "9359d16aa2b36ed6d9d725d798ae3bd93766f0d0bfe587c512d42a4753642d49",
+    "lampOS/docs/skills.md": "c4df4781f9c57346f9548da1a1970e4374ecde445128668a07bd6fcca90cdfca"
+  },
+  "clean_after": true,
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 13.126,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "made_skill::tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 517.219,
+      "log_sha256": "c707eebaf42797ef06ee2c897402af92e174de326328e7047f47da7a3cd57275"
+    }
+  ],
+  "scope": "Independent focused host read; no full Voice/native/device acceptance.",
+  "counts": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0
+  },
+  "source_review": {
+    "head": "5227f3c323ae102de2209dc27e66d5ab5d389dae",
+    "max_normalized_request_bytes": 180,
+    "independently_reconstructed_max_brief_bytes": 990,
+    "remaining_bytes_to1000": 10,
+    "no_name_key_clause_count": 1,
+    "parser_SkillFile_deny_unknown_fields": true,
+    "parser_SkillFile_has_name_field": false,
+    "source_review": "Only prompt text, focused regression assertion and documentation change. Existing permissions/topics/confirmation and installed package validation remain unchanged. Historical #3227 fold had the same clause; this PR restores that missing portion."
+  }
+}
