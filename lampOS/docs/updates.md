@@ -639,8 +639,10 @@ workflow change.
     (`_SYSTEMD_UNIT`, so not systemd's, systemd-coredump's or journald's
     lines about it), not its main process from before the restart (the old
     build's last words as it stopped), control characters gone, at most 200
-    characters, and within 5 s (`JOURNAL_WITHIN`: killed after, and then no
-    line, so a put-back never waits on the journal). "build 812 put back:
+    characters. The query uses a 5 s budget (`JOURNAL_WITHIN`) and a 1 MiB
+    response cap. It supplies no line if the command fails, the budget
+    expires, or the response is invalid UTF-8 or exceeds the cap.
+    "build 812 put back:
     lamp-tasks.service ended and systemd is starting it again (systemd
     started it again once; its last line: "tasks: storage: Tasks storage is
     unavailable; …")". **Only in the outcome as printed**, to `lamp-update`'s
@@ -938,12 +940,26 @@ switch off there is no recovery query. The check observes the selected
 systemd properties at handover; it does not verify the service fragment's
 storage location, certify arbitrary unit overrides or protect against an
 administrator changing recovery afterward. The `systemctl show` query uses
-`output_within` with the existing 5 s `JOURNAL_WITHIN` command deadline. A
-failed or timed-out query defers self-update just as unavailable recovery
+`output_within` with the existing 5 s `JOURNAL_WITHIN` query budget and a
+1 MiB stdout limit. A failed, timed-out, invalid UTF-8 or oversized query
+defers self-update just as unavailable recovery
 does. It does not enable or start the recovery timer. With the switch on in
 `lamp-cloud`'s environment as well, a health report says lamp-update waits
 while the timer is not armed (`waits`, `cloud.md`, "Health and crash
 reports").
+
+The same output reader serves effective Setup identity, pre-restart MainPID
+and last-journal-line queries. It returns the complete UTF-8 response or none,
+never a truncated response read as successful state. Output is read
+nonblocking; the leader remains unreaped while a descendant holds stdout or
+a failed exit needs group cleanup. An unsuccessful group is stopped before
+the leader is reaped, including descendants that closed their output. If
+ownership can no longer be proved because another reaper consumed the child,
+the query fails without signalling that identity. Successful completion does
+not claim cleanup of detached descendants or descendants closing output.
+The budget does not establish a hard bound on kernel spawn/reap or filesystem
+I/O, cancel systemd jobs, or change stop/restart allowances. The separate
+`Systemctl::states` read keeps its existing behavior in this change.
 
 **Restarting after a partial self-switch** (#2810). The host fixtures in
 `tests/round/self_cuts.rs` stop at five logical persisted prefixes: the
