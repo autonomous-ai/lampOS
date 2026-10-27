@@ -1,3 +1,16 @@
+## 2026-10-27 11:30 UTC — Common 3e9 native run fails in Linux fixture setup
+
+Ready for lamp-voice: no
+
+[Native failure receipt](verification/common-3e9-native-failure-20261027/receipt.json):
+Clippy is green on head `3e9b721257` / tree `8cfcb464b`. ARM64 nextest exits 100;
+watcher 50000 exits 1. It records 2,780 passes / one failure, with 8,961 selected
+cases unrun after fail-fast. Docs, both own harnesses and export are skipped;
+artifacts are empty. The Linux-only setup reads missing source before its eight
+assertions. A private unrun repair preserves all eight and adds one ticket-denial
+assertion; it covers untrusted stale-source cleanup, with no valid V3 revocation
+claim or Mac case coverage. Maps and device/privacy/physical holds remain.
+
 ## 2026-10-27 10:56 UTC — Common local gates complete with original artifact failure preserved
 
 Ready for lamp-voice: no

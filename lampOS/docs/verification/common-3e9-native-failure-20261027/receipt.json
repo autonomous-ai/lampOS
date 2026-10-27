@@ -1,0 +1,196 @@
+{
+  "status": "ARM64_RUNTIME_FAILED_PARTIAL_NOT_READY",
+  "ready_for_lamp_voice": false,
+  "source": {
+    "head": "3e9b72125709d6da16daf15c8a9ec548ad66eaf1",
+    "tree": "8cfcb464b38b74a83eac86438f4bf36a725e6ad5",
+    "binding": "GitHub run headSha plus local immutable Git commit tree object",
+    "results_do_not_apply_to_changed_current_source": true
+  },
+  "clippy": {
+    "run_id": 40492828615,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40492828615",
+    "status": "completed",
+    "conclusion": "success",
+    "platform": "Linux x86_64",
+    "workspace_all_targets_warnings_as_errors": true,
+    "whole_workspace_pinned_Rust_formatting": "success"
+  },
+  "ARM64": {
+    "run_id": 40492822862,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40492822862",
+    "job_id": 122150758616,
+    "status": "completed",
+    "conclusion": "failure",
+    "platform": "Ubuntu22.04 Linux ARM64",
+    "release_workspace_build": "success",
+    "package_classification": "success",
+    "selected_examples_build": "success",
+    "runtime_step": 17,
+    "runtime_process_exit": 100,
+    "watcher_actual_exit": 1,
+    "native_jobs_completed_does_not_mean_owned_process_census_locally_observed": true
+  },
+  "actual_supported_watcher": {
+    "tool_session": 50000,
+    "actual_exit": 1,
+    "completion_observed": true,
+    "run_id": 40492822862,
+    "run_dispatched_or_cancelled_by_this_audit": false
+  },
+  "runtime": {
+    "profile": "pr",
+    "profile_default_filter": "all()",
+    "realtime_group_included": true,
+    "stale_workflow_comments_not_used_for_scope": true,
+    "workspace_release": true,
+    "cores_reported": 4,
+    "partition": "hash:1/1",
+    "selected_tests_reported": 11742,
+    "binaries_reported": 184,
+    "executed_unique_human_terminals": 2781,
+    "passed": 2780,
+    "failed": 1,
+    "duplicate_execution_pairs_before_summary": 0,
+    "fail_fast_selected_not_executed": 8961,
+    "skip_count_reported": 106,
+    "skipped_binaries_reported": 2,
+    "skipped_natural_or_filtered_identity_census": "UNAVAILABLE_NO_MACHINE_DISCOVERY",
+    "all_selected_terminal": false,
+    "human_terminal_boundary": "Starting line1489 through first Summary line4291; later repeated final statuses are not additional executions",
+    "leak_or_timeout_terminal_rows_observed": 0,
+    "summary_raw_line_one_based": 4291,
+    "starting_raw_line_one_based": 1489
+  },
+  "failure": {
+    "binary": "lamp-eyes::bin/lamp-eyes",
+    "test": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+    "duration_seconds_displayed": 0.004,
+    "source_path": "lampOS/crates/eyes/src/main.rs",
+    "source_line": 3517,
+    "operation": "initial std::fs::read(source).unwrap before original assertions",
+    "error_kind": "NotFound",
+    "errno": 2,
+    "outer_terminal_raw_line_one_based": 4267,
+    "human_terminal_ordinal_one_based": 2778,
+    "other_nested_panic_hooks_not_promoted_to_failures": true
+  },
+  "observed_named_controls": {
+    "required112": {
+      "requested": 112,
+      "observed_clean_passes": 27,
+      "unobserved_no_native_credit": 85,
+      "observed_failures": 0
+    },
+    "historical525": {
+      "requested": 525,
+      "observed_clean_passes": 0,
+      "unobserved_no_native_credit": 525,
+      "observed_failures": 0
+    },
+    "native_results_not_transferred_from_local_gates": true,
+    "unobserved_not_classified_as_failed": true
+  },
+  "separate_stages": {
+    "workspace_doctests": "SKIPPED_UNRUN",
+    "relay_signals": "SKIPPED_UNRUN",
+    "turn_end_process": "SKIPPED_UNRUN",
+    "counts_not_inferred_from_prior_local_results": true
+  },
+  "binary_export": {
+    "export_step": "SKIPPED",
+    "upload_step": "SKIPPED",
+    "artifact_count": 0,
+    "binary_manifest_or_SHA256SUMS_available": false,
+    "individual_executable_digests_available": false,
+    "archive_digest": null,
+    "failed_executable_or_backings_preserved_by_this_evidence": false,
+    "raw_API_and_log_evidence_retained_by_hash": true,
+    "binary_downloads": 0
+  },
+  "source_diagnosis": {
+    "test_platform": "Linux only",
+    "Mac_case_coverage": 0,
+    "functions": [
+      "KnownSpeakerFile::new",
+      "KnownSpeakerPublisher::require_camera_ticket",
+      "KnownSpeakerPublisher::seen",
+      "KnownSpeakerPublisher::write"
+    ],
+    "finding": "The fixture directly publishes after enabling the mandatory camera-ticket fence but provides no ticket. Publication correctly refuses/removes the source, and the initial file read fails before the eight original assertions.",
+    "compared_current_index_main_and_who_files_equal_old_source": true,
+    "upstream_fix_in_compared_current_files": false,
+    "production_disclosure_bug_proven": false
+  },
+  "private_fixture_repair": {
+    "status": "SOURCE_ONLY_UNRUN",
+    "path": "lampOS/crates/eyes/src/main.rs",
+    "test": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+    "patch_sha256": "0eb598e047733a530eb5ddc47559b4d6bfd03737f2eea47aca28b655d370e58a",
+    "original_assertions_preserved_in_order": 8,
+    "new_missing_ticket_denial_assertions": 1,
+    "total_assertions": 9,
+    "all_original_downstream_assertions_and_deadlines_byte_exact": true,
+    "runtime_path_or_ticket_guards_changed": false,
+    "coverage": "Removal of untrusted preexisting stale source on an unsafe temporary path while preserving independent enrollment authority.",
+    "valid_live_V3_authority_revocation_coverage": false,
+    "valid_V3_ticket_or_Ready_manufactured": false,
+    "native_required_repair_control_separate_from_existing_maps": true,
+    "required112_map_changed": false,
+    "historical_or_current525_maps_changed": false,
+    "Mac_case_coverage": 0
+  },
+  "limits": [
+    "No nextest JSON or full discovery catalog was exported; human terminal accounting cannot identify all ignored or filtered cases.",
+    "Fail-fast prevented most selected tests, both own harnesses, doctests and artifact export from running.",
+    "No failed executable or debug-backing inputs were exported; no binary preservation claim.",
+    "No CI pass, runtime repair result, ready transition, lamp/device or physical-latency acceptance."
+  ],
+  "remaining_holds": [
+    "Full affected ARM64/Linux qualification",
+    "Required reader review",
+    "Privacy acceptance",
+    "Lamp/device and physical latency checks"
+  ],
+  "failure_preserved": true,
+  "evidence_sha256": {
+    "arm-terminal-API": "7fc2f54fe4bdc7a8a57a0024d514b3382eba3717a489b24630441e24df2b49de",
+    "clippy-terminal-API": "115d079f10b7802d0aee90d7b9af79ebe086ef16586ef24f5cb0c26c0a7837e2",
+    "arm-raw-log": "3e929e7fc4a2b33abd6d68626bc0261272d7fc1341edd839f23c941c3c4ea93a",
+    "clippy-raw-log": "215b44fd1d1dccc9d62ff92afd447fd112ac37c28ca60c12a66dcf5d68a9deab",
+    "arm-watch-actual-terminal": "2500df446662ee28d1f0bdcafbbf7ae8886405a2d641c14dc7a3742d70a7482d",
+    "final-artifacts-API": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c",
+    "runtime-human-accounting": "1851239ad65826c15c8e42580f60873eb23964216a092c1e7a79a786e6b20331",
+    "all-observed-unique-terminal-ledger": "d444d7a612664f3dc483d0909cb230861c7228823092b193cedc879c455cdc6b",
+    "required112-observed-ledger": "8a27c5d1b84a39e58cf9cd26ab9707e184936e4cae10374e1006772fab1bd096",
+    "historical525-observed-ledger": "f73d506030b7096605a435a6b50be1d5b5efdf2d6b5bc9c60d10bfd283d185ea",
+    "current-source-byte-bridge": "e7ca2d6ec42d93d0c33dceb83424d3246f47f8811a9815433ab6f5b45cdae8db",
+    "pinned-arm-workflow": "43a7eef7907d272904f975d7ee65b456ec3bc4eba63505bee596d1bf196a6e74",
+    "pinned-nextest-config": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+    "private-source-scoped-receipt": "ffc5e1102cb6da52252874e623bb912693607a81327cba67a8f9c08d86df4f34"
+  },
+  "public_terminal_ledgers": {
+    "observed-terminal-ledger.json": {
+      "rows": 2781,
+      "sha256": "d444d7a612664f3dc483d0909cb230861c7228823092b193cedc879c455cdc6b",
+      "positions": "Original raw CI log line and human terminal ordinal, bounded before the first Summary."
+    },
+    "required112-terminal-ledger.json": {
+      "rows": 112,
+      "sha256": "b3f62eb974c6ce56ae0c21d0b27a3d3fa772e1f8dac8c7aaae81c0f45eb15d67",
+      "positions": "Original raw CI log line and human terminal ordinal, bounded before the first Summary."
+    },
+    "historical525-terminal-ledger.json": {
+      "rows": 525,
+      "sha256": "88d5b15eef9c2f5e179057cc2942e642e38d05737d30a0f2189d1a6c4b9d66b5",
+      "positions": "Original raw CI log line and human terminal ordinal, bounded before the first Summary."
+    }
+  },
+  "publication": {
+    "raw_logs_published": false,
+    "private_utterances_published": false,
+    "binary_data_published": false,
+    "human_handles_published": false,
+    "readiness_transition": false
+  }
+}

@@ -1,0 +1,17 @@
+# Common 3e9 native failure, 27 October 2026
+
+Ready for lamp-voice: no
+
+[ARM64 run 40492822862](https://github.com/autonomous-ai/lampOS/actions/runs/40492822862) failed on head `3e9b72125709d6da16daf15c8a9ec548ad66eaf1`, tree `8cfcb464b38b74a83eac86438f4bf36a725e6ad5`. [Clippy run 40492828615](https://github.com/autonomous-ai/lampOS/actions/runs/40492828615) passed strict workspace/all-targets Clippy and pinned formatting on that head. The [receipt](receipt.json) preserves the failed result and binds the private raw evidence by hashes.
+
+Native release build and package checks passed. Nextest exited 100; the supported watcher, session 50000, exited 1. Before its first Summary, the log contains **2,781 unique outer terminals: 2,780 passes and one failure**, with no duplicate pairs. Fail-fast left **8,961 of 11,742 selected tests unrun**. The starting census reported 184 binaries, 106 skipped tests and two skipped binaries. No machine discovery catalog was exported, so those skips cannot be split into natural/filter identities. Profile `pr` actually selects `all()`, including realtime; stale workflow comments were not used for scope.
+
+The failing case is `lamp-eyes::bin/lamp-eyes` / `tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard`. Its initial source-file read at `lampOS/crates/eyes/src/main.rs:3517` returns ENOENT (2), before the eight original assertions. `KnownSpeakerFile::new` enables the required camera-ticket fence; the fixture then calls `KnownSpeakerPublisher::seen` without a ticket. The publisher correctly refuses/removes that source. The compared current staged Eyes main/publisher files retain the same bytes. This source diagnosis does not prove a production disclosure bug or a result on changed source.
+
+The [observed ledger](observed-terminal-ledger.json) retains code identities, raw log lines and human terminal ordinals. Only **27 of the [112 required identities](required112-terminal-ledger.json)** have observed clean passes; 85 are unobserved. All **525 [historical contract identities](historical525-terminal-ledger.json)** are unobserved before fail-fast. Unobserved cases receive no native credit and are not counted as failures. Later repeated final status lines and nested panic hooks are not extra executions.
+
+Doctests, relay-signals, turn-end process, artifact export and upload were all skipped. The final artifact inventory is empty. No binary manifest, SHA256SUMS, archive digest, failed executable or debug backings were available to retain. No binaries or raw logs are published here.
+
+A private fixture repair remains **unrun**. It keeps all eight original assertions and adds one missing-ticket denial, then seeds only an explicitly untrusted stale-source fixture: nine assertions total. Its coverage is stale-source cleanup on an unsafe temporary path and preservation of the separate enrollment guard. This fixture does not exercise a valid live V3 grant; existing camera-authority/observer tests keep their separate source-scoped results. No ticket or Ready state is manufactured. This Linux-only case is a separate native-required control outside both maps; Mac coverage is zero. Runtime path/ticket guards and existing maps are unchanged.
+
+Full affected native qualification, required readers, privacy acceptance, and lamp/device/physical checks remain holds. Results from the earlier local gates are not transferred into this failed native run.

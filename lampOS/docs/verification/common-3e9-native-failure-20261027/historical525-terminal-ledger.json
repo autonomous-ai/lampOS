@@ -1,0 +1,3152 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::original_admission_distinguishes_room_from_narrowed_private_and_revocation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::cache_uses_latest_face_never_sticky_session_owner_and_expires",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::refreshed_observation_is_hashed_off_path_and_uses_its_original_expiry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::contention_is_unknown_instead_of_waiting_or_reusing_an_old_person",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::invalidation_never_waits_for_a_refresh_lock_and_retires_inflight_reads",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_narrowed_lease_reads_the_room_at_every_later_boundary",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::owner_drop_revokes_every_task_lease_without_revoking_a_new_request",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::revocation_after_borrow_requires_a_fresh_boundary_check",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::looking_later_keeps_one_recorder_and_never_upgrades_room_disclosure",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_recorder_is_issued_once_and_seals_only_its_request",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_proof_rejects_wrong_worker_session_and_request_without_transfer",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_proof_requires_exactly_one_well_formed_boot_qualified_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::room_speaker_proof_keeps_old_and_new_boots_distinct_for_pending_photos",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_expiry_stays_anchored_to_audio_end_and_has_strict_bounds",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::held_narrowed_and_revoked_requests_never_expose_speaker_proof",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::dropping_the_request_owner_revokes_unsealed_and_sealed_speaker_proofs",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_known_face_lost_with_no_face_in_view_keeps_its_scope_through_the_gap",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::lamp_c0a4s_timeline_a_line_decided_4_to_6_s_after_the_answer_is_held",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::lamp_c0a4s_question_9_s_after_the_answer_is_held_past_a_sound_of_no_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_face_in_view_or_no_look_or_the_switch_off_holds_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_gap_is_held_only_for_someone_the_lamp_was_just_talking_with",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::an_unproved_private_read_check_does_not_poison_a_later_actual_proof",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::private_read_loss_is_shared_by_clones_and_cannot_be_reproved",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_new_request_has_fresh_private_read_state_after_the_previous_lost_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::private_read_loss_does_not_revoke_narrow_or_destroy_the_original_speaker",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::concurrent_true_and_false_after_private_proof_always_finish_lost",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::checking_can_only_pause_a_pinned_grant_and_never_wins_over_loss",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_face_first_named_after_the_lines_end_and_the_wait_is_not_the_keeper",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_late_look_is_armed_only_while_the_cache_is_cold",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_cache_gone_cold_during_the_line_arms_its_late_look_at_the_end",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_line_begun_cold_keeps_only_for_a_face_seen_or_named_at_its_start",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_change_in_the_eyes_known_file_makes_the_cache_cold",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::reviewer_second_owner_name_does_not_follow_sticky_person_to_unknown_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_empty_rooms_turn_then_an_unknown_faces_carry_no_typed_name",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_skills_look_needs_the_switch_on_and_a_full_look",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_airs_note_is_given_once_when_due",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_heard_as_nothing_the_conversation_means_is_held_as_unclear",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_routes_lines_are_one_sessions_and_eight_held_renew_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_room_never_holds_a_line_that_calls_the_lamp",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_rooms_fifteen_seconds_count_from_the_end_of_the_lamps_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_just_after_a_long_answer_is_in_a_conversation_going_on",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_rooms_conversation_goes_on_fifteen_seconds",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_journal_names_the_sign_that_let_a_line_out",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_face_alone_lets_no_line_out_in_a_busy_room_on_this_route",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_begun_while_the_answer_plays_goes_on",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_another_voice_makes_the_room_busy_before_its_own_verdict",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_colleague_off_camera_is_answered_while_the_person_faces_the_lamp",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_two_faces_in_view_make_the_room_busy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_two_faces_must_stay",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::another_voice_going_on_is_held_and_the_conversations_own_goes_on",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_window_keeps_the_same_voice_sign_for_going_on_same_one",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_same_speaker_goes_on_five_turns_in_a_busy_room_only_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleagues_line_is_held_and_two_in_a_row_end_the_carry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owners_five_turns_go_on_past_one_colleague_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_sure_other_voice_is_one_colleague_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_a_held_colleague_the_owners_voice_alone_must_be_nearer_theirs",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::two_held_colleagues_keep_the_older_voice_constraint",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::held_voice_constraints_close_with_the_carry_and_reject_old_callbacks",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_full_held_voice_bound_keeps_the_owner_by_face_until_a_fresh_call",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_fresh_call_clears_the_previous_callers_held_voice_constraints",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_calling_the_lamp_becomes_the_caller",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_with_no_sure_sign_is_held_and_ends_no_carry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owner_turned_to_a_colleague_is_held_and_ends_the_carry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleagues_face_is_held_in_a_room_not_busy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_carry_ends_twenty_seconds_after_the_lamps_words_by_the_lines_start",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_stop_a_privacy_change_or_a_forgetting_ends_the_carry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_unsure_print_of_a_carried_line_ends_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owners_line_seven_seconds_after_an_answer_with_a_short_print_is_carried",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_within_the_eight_seconds_is_held_and_two_end_the_carry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_unsure_print_with_no_face_decides_nothing_whenever_it_comes",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_unknown_voice_let_out_in_the_eight_seconds_is_no_identity_past_them",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_sure_other_voice_within_the_eight_seconds_is_held",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_low_print_without_spoken_to_keeps_the_conversation_going",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_trusted_session_does_not_carry_to_another_voice",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_holds_only_for_the_one_the_lamp_answered",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::same_voice_starts_for_the_rules_that_read_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_same_one_holds_without_spoken_to",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_same_one_plays_the_conversations_voice_and_holds_another",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_caller_let_in_by_a_turned_face_takes_the_conversations_voice",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_unanswered_carries_the_next_lines_for_fifteen_seconds",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::someone_else_by_voice_only_under_0_30",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_let_out_carries_the_next_line_though_the_lamp_said_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamp_just_asked_only_with_its_question_in_a_conversation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_facts_are_the_live_routes_own",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_holds_nothing_without_a_sign_of_someone_else",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_holds_the_talk_without_spoken_to",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_plays_the_callers_speaking_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_takes_a_face_turned_to_the_lamp_for_the_callers",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_callers_face_goes_with_privacy_the_window_and_the_eyes_boot",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_without_voice_or_face_plays_one_persons_follow_ups",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_plays_the_callers_voice",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_request_going_on_keeps_only_the_one_just_before_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_carried_over_call_keeps_the_space_between_its_halves",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_rule_holds_office_talk_and_lets_a_call_or_a_follow_up_through",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_answer_ends_when_its_sound_has_all_been_played",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_spoken_turn_is_given_its_few_functions_and_the_rest_behind_one",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_call_for_the_rest_is_answered_by_the_route",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_production_audio_runner_keeps_skills_identity_and_private_offers",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_audio_runner_keeps_more_and_the_requests_early_search",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_audio_runner_refuses_a_changed_or_retired_capability_before_dispatch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::stop_during_music_rpc_and_warm_stt_opening_finishes_without_waiting",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::authority_that_lapsed_in_the_queue_during_a_stall_is_skipped",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_camera_close_and_a_mute_are_told_as_a_privacy_change",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_new_owner_retires_the_old_turn_and_its_late_input",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turns_end_holds_its_hand_on_to_memory_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_sends_a_sign_ins_words_as_one_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_written_request_goes_to_the_chat_as_a_note_and_silence_as_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_quoted_line_is_never_kept_for_a_later_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_reads_who_work_can_go_to_as_live_does",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_takes_the_task_switches_as_live_does",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_memory_days_the_note_is_asked_once_a_session_and_kept_for_its_turns",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_note_asked_as_the_turn_is_told_is_waited_for_longer_than_one_asked_ahead",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_attention_near_the_rooms_rise_on_the_bus_makes_a_line_near",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_the_name_signal_a_spoken_turn_is_offered_heard_my_name_and_its_call_does_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_health_fact_is_empty_with_the_switch_off_and_when_nothing_is_known",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_takes_the_live_workers_flags_but_keep_link",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turn_of_the_known_persons_own_is_told_their_name",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turn_is_kept_and_told_to_the_next",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_narrowed_lines_exchange_is_the_rooms_not_the_known_persons",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_sentence_is_kept_nowhere_and_the_next_line_carries_none_of_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_texts_system_message_never_has_the_rooms_spoken_conversation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_worker_answers_a_text_without_the_rooms_spoken_conversation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_known_person_long_after_another_has_their_own_turns_at_once",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_persons_first_turn_is_matched_against_their_own_kept_things",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_is_the_callers_alone_only_with_their_one_face_speaking",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turns_hits_are_asked_in_its_leases_scope",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_rule_judges_in_the_room_the_route_keeps",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_day_and_the_night_bars_are_read_as_on_live",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_heard_only_in_the_rooms_sound_opens_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_heard_in_the_rooms_sound_counts_with_one",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_the_second_sign_drops_earns_no_name_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_heard_in_the_line_before_does_not_play_the_next",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_hearing_come_two_lines_late_stays_with_its_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_at_a_lines_start_goes_on_and_a_kept_hearing_is_used_up",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_the_name_at_a_lines_start_counts",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_the_lamp_named_in_passing_stays_dropped",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_said_late_is_dated_from_when_it_began",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_a_line_begun_with_the_name_to_a_face_is_answered_in_a_busy_room",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_office_talk_that_opens_like_the_name_is_not_named",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_an_unclear_line_named_to_a_face_stays_held",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_busy_called_strict_office_lines_are_no_call_in_a_busy_room",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_busy_called_strict_a_call_set_off_or_backed_still_counts",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_rule_s_switches_each_turn_on_only_their_own_part",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_speaking_a_silent_face_turned_to_the_lamp_is_nobody_turned_to_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_desk_talk_past_a_still_face_is_held_and_makes_the_room_busy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_the_conversations_voice_still_counts_with_a_still_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_the_same_speaker_still_goes_on_five_turns",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::one_person_said_both_lines_by_voice_or_by_one_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_chain_with_two_faces_seen_speaking_in_it_breaks_before_the_second",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turned_face_counts_for_a_first_word_only_when_it_speaks_the_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_near_check_reads_the_eyes_through_addressed_when_it_runs",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_close_face_turned_over_the_line_counts_for_a_first_word_through_the_eyes",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_near_hearing_counts_only_around_the_lines_start",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_kept_unjudged_is_read_for_one_speaker_as_a_judged_one",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_request_with_a_pause_and_one_face_in_view_is_asked_whole",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_begins_with_the_name_only_when_it_is_set_off_as_a_call",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_name_heard_as_a_line_began_earns_the_live_routes_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_the_live_route_would_hold_is_said_as_run_for_the_battery",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_actions_and_a_line_going_on_read_one_reader_of_the_policy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_policy_holds_this_routes_actions_only_with_the_bus_and_the_rule",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_a_remark_to_the_room_is_held_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_lines_said_over_the_lamp_are_not_talk_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_an_answer_ends_a_busy_room_a_minute_later_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_days_bars_hold_a_name_heard_close_by_day",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::in_a_busy_room_a_line_going_on_waits_for_the_policy_and_goes_as_it_says",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_judged_in_a_busy_room_is_known_as_judged_busy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_a_tool_turn_or_the_lamps_news_a_line_105_s_later_is_judged_as_live_judges_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_let_out_only_as_the_conversation_going_on_earns_the_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_begun_over_the_lamps_answer_is_not_told_it_may_be_peoples_talk",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_reply_to_nothing_the_lamp_asked_said_over_its_answer_is_someone_elses",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_hearing_hook_is_installed_with_the_switch_alone",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::spoken_turns_are_told_to_answer_the_likeliest_meaning",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_plain_ask_for_something_new_is_searched_from_its_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_search_begun_early_is_taken_once_by_its_request",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_models_query_adding_a_place_is_not_answered_by_the_early_search",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_requests_first_search_takes_the_one_begun_early",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_routes_bound_is_past_lives_and_within_the_chat_models_own",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_spoken_turns_look_is_never_the_one_the_bound_cuts",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_name_heard_as_lynn_is_its_call_not_someone_elses",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_said_by_name_is_told_to_answer_and_a_face_only_line_may_decline",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_hearing_counts_from_its_time_and_score",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_is_fetched_only_when_a_call_asks",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_switch_off_declares_and_fetches_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_is_cut_after_the_skills_and_before_the_search",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_place_follows_its_time",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_room_the_route_keeps_is_told_on_the_bus",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::gemini_is_called_with_the_units_key_or_the_live_routes_google_key_never_a_relays",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_hosted_chats_and_searches_take_the_units_credentials",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::through_the_relay_deepseek_takes_the_relay_key_and_needs_no_deepseek_key",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_refused_own_key_sends_that_request_through_the_relay",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_removed_own_key_leaves_voice_keys_reporting",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::own_keys_turned_off_or_the_worker_dropped_says_voice_keys_is_stopping",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_bound_cuts_the_fetch_then_the_time_and_never_a_core_skill",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_time_is_given_only_for_another_places_time",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_switches::with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_named_ask_makes_the_first_round_call_start_agent_task_and_nothing_else_changes",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::an_ask_to_remember_a_face_with_a_name_makes_the_first_round_call_remember_my_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::the_first_force_that_names_a_function_is_the_one_kept",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_named_ask_tells_the_forced_round_only_the_agent_its_words_name",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_slow_second_speech_piece_keeps_order_until_release_or_retirement",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_spoken_turn_is_heard_then_said_sentence_by_sentence_in_order",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_written_turn_is_answered_without_listening",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_tool_call_is_run_and_its_result_answered",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_forget_nobody_asked_for_is_not_run",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_yes_alone_forgets_nothing_and_one_that_says_it_does",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_words_that_ask_to_forget_let_a_forget_run",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::news_asked_by_voice_through_this_route_is_put_on_the_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_said_before_a_call_are_told_to_the_next_round_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::not_for_me_ends_the_turn_in_silence",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_decline_of_a_line_named_to_a_face_is_not_taken_once",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_holding_only_answer_is_told_so_the_route_is_asked_to_go_on",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_lost_on_the_network_is_asked_once_more_when_the_link_is_back",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_is_not_asked_again_after_words_a_call_a_refusal_or_a_newer_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_the_heed_holds_end_the_turn_unanswered",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_the_heed_holds_is_told_held_back",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_the_model_declines_is_told_held_back",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_declined_after_a_tool_ran_is_not_told_held_back",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_verdict_is_told_before_its_words_are_taken",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_the_heed_lets_out_is_told_answered_and_one_not_judged_is_not_told",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_held_as_unclear_is_told_and_a_misheard_cut_in_is_noted_next",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_decline_keeps_an_executed_scoped_requested_audio_call",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::an_unacted_mixed_requested_audio_and_decline_is_held_back",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::lines_the_route_gave_up_are_no_talk_past_the_lamp",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_begun_on_the_early_words_is_kept_when_they_are_the_lines",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turns_tools_are_journalled_by_name_and_count_never_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_resumed_turn_drops_the_chat_begun_on_its_early_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::memory_told_on_the_early_words_keeps_the_prepared_round",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_piece_waits_for_four_words_with_the_configured_voice",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::early_words_stand_only_for_the_same_line_asked_the_same_way",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_round_after_a_tool_ran_is_not_given_up",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_pause_asks_the_lines_listener_for_its_words_so_far",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_slow_first_round_makes_one_soft_sound_and_waits_longer",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_request_sends_its_times_before_its_end",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sound_comes_when_it_is_told",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_wait_sound_preserves_the_answer_window",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_wait_sound_does_not_delay_cancellation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sounds_time_is_milliseconds_in_its_bounds",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sounds_take_turns",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::not_for_me_written_as_words_ends_the_turn_in_silence",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_without_a_picture_tells_the_model_it_saw_nothing",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_sends_the_eyes_picture_or_says_there_is_none",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_s_picture_goes_once_and_never_otherwise",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::nothing_heard_is_a_quiet_complete_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_announcement_is_said_once_per_quiet_spell",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_words_end_with_a_finished_piece_as_the_live_routes_do",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_only_voice_never_says_it_sounds_different",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::bedtime_words_use_the_second_routes_written_path_independently_of_reminders",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_spoken_over_stops_its_chat_and_speech_and_sends_nothing_more",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_failing_service_fails_the_turn_at_its_stage",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_speech_to_text_stream_lost_mid_line_fails_that_turn_and_the_next_is_answered",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_reminder_is_deferred_as_the_fixture_does",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::every_turn_begun_settles_the_routes_once",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_only_voice_says_a_due_reminder_with_the_live_routes_note_and_no_tools",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_chat_is_given_the_exchanges_it_is_told_between_the_system_and_the_question",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::what_changes_is_told_after_the_exchanges_and_before_the_notes_and_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_tool_call_is_heard_only_in_a_spoken_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::with_its_switch_a_written_turn_waits_seven_seconds_to_begin",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_waits_five_seconds_and_then_says_it_could_not_look",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_full_look_without_its_still_still_says_it_could_not_look",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_sentence_is_heard_for_its_count_and_never_asked_of_the_model",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_sentences_sound_is_not_carried_into_the_next_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_from_one_given_up_begins_with_its_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_takes_only_the_words_of_the_one_just_before_it_in_its_session",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_request_after_a_stop_is_told_of_it_beside_its_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_whose_request_is_never_asked_is_told_with_the_next_one",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_goes_with_a_request_going_on_and_never_past_two_minutes",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_that_never_begins_says_the_down_line_at_most_once_a_minute",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_turn_after_a_start_says_the_down_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_names_the_one_begun_before_it_in_its_session",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::lines_left_unanswered_make_the_routes_room_busy_and_an_answer_is_speaking",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_the_name_began_is_asked_with_the_name_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_yes_after_a_hand_over_on_this_route_starts_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_spoken_request_is_told_the_air_and_a_written_turn_is_not",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_work_and_its_own_turns_are_told_to_the_rule",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_stop_tells_the_rule_of_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_end_of_the_lamps_words_is_told_as_they_are_sent",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_let_out_only_as_the_conversation_is_asked_with_its_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_voice_makes_ready_as_a_line_begins",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_call_is_not_run_and_the_model_is_told_so",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_words_are_said_before_the_first_sentence_ends",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_words_heard_are_told_before_the_chat_begins",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_asked_by_its_call_goes_to_the_coordinator_and_ends_the_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skill_answer_with_a_look_asks_the_coordinator_for_the_turns_look",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_note_for_its_picture_goes_once_with_its_look_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_note_for_its_picture_is_read_from_its_answer",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_look_dropped_in_a_written_turn_goes_on_to_the_next_round",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_a_turn_the_lamp_answered_aloud_marks_whom_it_was_talking_with",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_of_no_words_neither_starts_nor_uses_up_a_held_gap",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_dated_follow_up_s_line_goes_last_in_its_turn_s_notes",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_cold_first_greeting_gets_the_dated_follow_up_s_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_cold_first_request_tells_the_model_nothing_of_the_event",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_one_word_first_request_then_a_greeting_tells_nothing_of_the_event",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_dated_follow_up_s_line_comes_after_the_note_read_at_the_turn_or_ahead",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_note_read_ahead_withholds_its_dated_follow_up_after_a_first_request",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_memory_call_on_a_gap_held_line_runs_for_no_one",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_call",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::memory_scope_is_bound_before_answer_and_revoked_with_the_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::dropping_engine_revokes_memory_scope_even_when_task_holds_a_lease",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::revoked_tool_result_is_not_sent_to_another_chat_round",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_cut_short_by_a_held_line_are_answered_in_its_place",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_cut_short_by_a_line_let_out_are_let_go",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_broken_into_four_pieces_is_asked_as_one_line",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_cut_before_it_was_asked_stays_in_the_chain",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_already_answered_is_never_chained_into_the_next",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_cut_while_its_verdict_waits_is_chained_only_in_a_room_not_busy",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_cut_while_its_verdict_waits_clears_the_chain_in_any_room",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_folded_into_the_next_by_its_sound_keeps_the_chain",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::stopped_words_are_never_joined_nor_answered_in_a_later_lines_place",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_let_out_with_no_sign_of_a_second_person_is_asked_with_the_words_it_cut_short",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_second_half_of_the_same_persons_request_is_answered_with_the_first",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_carried_through_a_held_line_are_never_joined",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_print_still_to_come_is_waited_for_before_the_lines_are_joined",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_while_a_join_waits_for_a_print_still_carries_the_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_going_on_from_one_unanswered_hears_its_sound_first",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_spoken_line_is_asked_with_its_call_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_a_wordless_piece_carries_and_only_its_last_moments",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_name_cut_off_by_a_pause_begins_the_next_line_with_the_listener_kept_ready",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_over_the_lamps_answer_is_told_it_cut_in",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_soon_after_the_lamp_spoke_is_told_it_may_follow_on",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_called_line_with_more_words_than_the_name_is_not_told_it_was_only_the_name",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_begun_on_a_cut_ins_early_words_carries_its_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::b_first_line_after_a_reaches_the_memory_as_bs",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::without_the_switch_a_line_another_face_spoke_stays_the_known_persons",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::seeing_who_speaks_needs_the_scoped_context",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_waits_for_the_policy_goes_as_it_decides",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_next_lines_listener_is_kept_ready_and_one_closed_since_is_not_used",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_kept_listener_goes_after_its_time_or_when_listening_stops",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_start_goes_to_a_socket_opened_before_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::no_listener_is_opened_before_a_line_outside_a_runtime",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_ending_before_its_name_waits_for_it",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_lines_words_are_counted_against_the_line_before_and_the_lamps_answer",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_whose_words_line_says_its_counts_in_its_own_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_latest_answers_words_are_kept_for_the_count",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_cuts_the_story_is_asked_with_the_story_as_heard",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_call_written_in_the_answer_is_left_out_of_what_was_heard",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_answer_asks_for_its_speech_socket_as_it_begins",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_written_turn_waits_longer_only_with_its_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_named_asks_call_goes_to_the_agent_its_words_name",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_named_asks_journal_line_says_what_became_of_it_and_no_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_asks_two_of_the_staff_gives_each_task_to_its_own",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_lines_named_ask_is_said_in_the_journal",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_searchs_own_written_turn_takes_the_skills_next_look",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_push_mid_search_holds_its_looks_until_the_person_asks_again",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_walked_search_past_two_minutes_since_its_own_look_still_takes_a_push",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_looks_answer_with_no_call_is_told_to_the_coordinator",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::an_add_ons_quoted_line_is_asked_with_no_functions_and_runs_no_call",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::called_fallback_does_not_supply_words_for_a_music_identity",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::requested_music_through_the_installed_runner_keeps_its_offer_private",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::prepared_music_calls_wait_for_final_admission_and_survive_only_matching_words",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_words_answered_for_a_held_request_have_no_new_music_identity",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_sound_alone_does_not_authorize_music_for_the_successor",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::more_then_decline_remains_unanswered_with_requested_audio_off_or_on",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::skipped_music_confirmation_has_no_audio_but_a_later_sentence_can_still_speak",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::warm_listeners_keep_exact_words_and_distinct_music_request_identities",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::replaced_warm_listeners_hear_current_words_and_current_music_identity",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::written_and_say_turns_neither_open_nor_consume_a_warm_music_listener",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::warm_prepared_music_waits_for_final_raw_words_and_admission",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::prepared_music_held_as_unclear_cannot_offer_and_written_sorry_has_no_grant",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::misheard_hum_note_replaces_same_words_prepared_music_with_fresh_context",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_music_after_unclear_handoff_cancels_pending_call_without_another_unclear",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::speech_tags_reach_only_the_voice_and_only_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_words_so_far_are_told_only_with_the_switch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_ending_on_a_filler_is_told_and_the_filler_never_reaches_the_model",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::expired_private_system_never_calls_chat_or_speech",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_hits_are_guarded_even_with_neutral_system",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_held_forget_policy_expiry_sends_no_chat_or_tool",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_tool_completion_expiry_cannot_start_another_round",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::expired_prepared_private_events_never_reach_speech",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::positive_private_and_public_room_contexts_still_dispatch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::empty_packets_preserve_legacy_current_and_carried_read_bounds",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::authority_lost_while_chat_waits_sends_no_private_speech",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_authority_loss_completes_the_live_engine_turn_once",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_complete_a_revoked_or_different_request",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::cached_private_hit_cannot_be_downgraded_by_neutral_final_system",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_output_rechecks_authority_after_queue_backpressure",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_held_forget_tool_completion_expiry_sends_no_first_chat",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_resume_on_a_later_positive_read",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::buffered_private_output_expires_at_both_receiver_boundaries_without_blocking_public_output",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_words_waiting_for_announcement_capacity_are_never_retained_or_sent_to_tts",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_rechecks_before_first_poll_with_positive_room_and_public_controls",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_packet_returning_after_expiry_is_not_enqueued",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_piece_initialisation_preserves_queue_call_order",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_words_expiring_between_announcement_check_and_retained_words_lock_are_not_kept",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::event_note_private_provenance_survives_neutral_told_and_async_expiry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::queued_private_event_callback_rechecks_proof_before_read",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_request_before_told_keeps_public_completion_without_private_services",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::short_done_after_a_private_tool_keeps_fresh_speaker_permission",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_waits_without_rereading_then_resumes_or_ends",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::days_event_lock_pending_is_retried_without_replaying_its_decision",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_pending_obeys_the_original_response_ceiling",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::carried_speaker::carried_old_speech_requires_positive_evidence_on_the_actual_current_piece",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::short_line::a_short_current_piece_requires_two_unambiguous_positive_frames",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_note_ahead_abandoned_refresh_keeps_the_confirmed_fact",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_refresh_read_on_past_its_cancelled_line_is_the_next_lines",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_refresh_let_go_untold_gives_the_keep_back",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_keep_survives_privacy_void_while_the_refresh_is_reading",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_an_invalid_resume_read_never_returns_the_forgotten_cached_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_room_keep_reaches_the_next_context_without_a_person_change",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::legacy_keeps_update_the_callback_without_a_days_marker",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_start_waits_for_sealed_proof_and_room_is_distinct_from_held",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_queued_reader_checks_real_permission_before_any_socket",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_slow_real_read_cannot_spend_offer_or_disclose_after_proof_loss",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_blocking_follow_up_rechecks_after_queue_and_consumes_once",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_session_lock_wait_rechecks_proof_before_read_entry",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::staged_private_note_cannot_cross_person_or_reused_face_from_another_boot",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_same_request_cannot_revive_after_ready_observed_proof_loss",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::lost_private_read_permission_does_not_revoke_an_ordinary_remember_write",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::completed_private_read_needs_new_request_proof_after_ready_observed_loss",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::new_request_already_waiting_retries_after_the_old_reader_actually_denies",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::prepared_private_context_is_neutral_and_final_proof_discloses_both_layouts",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::unproved_mismatched_expired_and_legacy_private_requests_never_read_memory_or_history",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::genuine_room_context_keeps_room_notes_and_history_without_speaker_proof",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::slow_note_read_rechecks_revocation_expiry_and_fresh_known_identity",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::actual_hits_rpc_requires_positive_current_matching_proof_and_rechecks_its_reply",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::identity_changed_during_history_composition_discards_the_private_told",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::by_presence_context_never_adopts_a_different_sticky_person",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::typed_setup_name_uses_final_speaker_proof_and_marks_disclosure",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::missing_private_source_is_reported_once_without_granting_context",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_never_heals_loss_or_downgrades_errors_and_legacy_sources",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::repeated_explicit_absence_does_not_extend_the_original_audio_deadline",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::actual_engine_sealed_microphone_request_finishes_through_explicit_lookaway",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::actual_http_fallback_retains_only_explicit_same_epoch_lookaway",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_lookaway_retains_credited_output_only_for_same_request_epoch",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_source_envelopes_reject_malformed_or_mixed_continuation_tokens",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_same_name_never_erases_changed_stable_identity",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_credited_ipc",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_unbound_and_legacy_requests_still_need_the_original_audio_face",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_never_extends_original_audio_deadline",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_never_hides_terminal_source_or_identity_loss",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_ends_at_the_original_audio_deadline",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_holds_real_credited_ipc_until_completed_recognition",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::event_selection_keeps_checking_distinct_from_room_and_lost",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_expiry_blocks_first_private_grant_at_the_final_boundary",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_reader_checks_completion_and_all_nonterminal_states",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::renewed_permission_cannot_refresh_an_old_absent_or_checking_observation",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_timeout",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_refusal",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_an_invalid_snapshot",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_missing_own_snapshot",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_busy_client",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_no_client",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_incomplete_note_retries_on_the_next_turn_and_then_stays_cached",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::repeated_failures_after_the_next_turn_get_one_attempt_per_interval",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_valid_empty_note_is_cached_without_retries",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_explicit_refresh_does_not_wait_for_failed_read_backoff",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_person_change_cannot_leave_the_previous_persons_note_cached",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::unchanged_authority_keeps_the_note_and_unleased_behavior",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_is_checked_after_waiting_for_an_older_context",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_kept_name_recovers_after_a_failed_refresh_without_another_keep",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_timed_out_note_retries_and_recovers_without_a_keep",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_non_held_person_change_bypasses_the_failed_persons_backoff",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_eligible_retry_shares_one_budget_between_room_and_person",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_note_asked_as_the_line_begins_is_in_by_its_end_and_the_loop_never_waits",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::lines_never_answered_open_and_close_no_session_and_spend_no_follow_up",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_follow_up_is_read_only_once_its_turn_is_answered",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_late_note_is_the_next_turns_and_a_failed_one_is_asked_again_on_the_next_turn",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_person_change_during_the_line_asks_again_for_whoever_it_is_at_its_end",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_line_and_a_revoked_scope_never_get_another_scopes_note",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::pending_note_adoption_preserves_the_completed_read_and_original_ask",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_completed_old_note_reads_its_follow_up_once_after_recognition_is_ready",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::pending_composition_rebuilds_cached_note_history_and_name_before_one_final_chat",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::pending_prepared_composition_never_freezes_reduced_messages",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::permission_expiry_after_composition_sends_no_private_chat",
+    "terminals": [],
+    "classification": "UNOBSERVED_NO_NATIVE_CREDIT"
+  }
+]
