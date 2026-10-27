@@ -1,0 +1,460 @@
+{
+  "P3": {
+    "classification": "Nonblocking defensive protocol hardening and wording precision, per Root primary-contract review.",
+    "limits": "No real systemd/service/writer-failure scenario or blockingP2 inferred from the syntheticunexpected17 pair. Newer systemd versions and device acceptance were not tested.",
+    "normal_contract": "For systemd252, the one exact unit is queried before its state is printed. Query errors return before printing; validinactive/failed are printed with expectednormal3. Nonzero3 must not be mistaken for a queryfailure.",
+    "preserved_observation": "The earlier two injected88 subjects with inactive stdout and unexpected17 restored/deleted temporary backup and returned0. Those observations remain exact, but do not show actualsystemd emits that result. Multiline acceptance is source-only and was not tested.",
+    "primary_refs": [
+      {
+        "support": "is-active reports state unless quiet and returns nonzero when notactive; state interpretation is distinct from blanket nonzero-as-queryerror.",
+        "title": "systemctl252 manual \u2014 is-active/state and exit-code contract",
+        "url": "https://www.freedesktop.org/software/systemd/man/252/systemctl.html"
+      },
+      {
+        "source_lines": [
+          16,
+          17,
+          18,
+          20,
+          21,
+          22,
+          25,
+          26,
+          27,
+          28,
+          29,
+          38,
+          46,
+          47
+        ],
+        "support": "Acquisition/name/state-query failures return before puts. Validstates outside active/reloading return code3.",
+        "title": "systemd v252 systemctl-is-active.c",
+        "url": "https://raw.githubusercontent.com/systemd/systemd/v252/src/systemctl/systemctl-is-active.c"
+      }
+    ]
+  },
+  "api_target_base_at_read": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "authored_parent": "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+  "current_coverage": [
+    "Main failed-stop and still-active refusal retain original data/backup, return8, and attempt restart/out cleanup.",
+    "Main unknown4 and empty1 query output are refused, whereas inactive with normal3 permits normal restore.",
+    "Generated guard failed-stop/unknown/empty/copy-difference outcomes keep the backup and exitnonzero after cleanup/restart; successful restore matches original bytes, removes backup and exits0.",
+    "Failed/incomplete skill-list preflight, failed verification/corrupted copy, digest failures, missing empty directory, dangling/file-link preflight, link-at-restore, leftover complete/.part backup, cut-save and lost-Mac guard assertions.",
+    "No separate new find/sort fault injection or arm-playing/full-suite execution is claimed; those code paths retain source guards."
+  ],
+  "disposition": "SCOPED_READ_OK_NONBLOCKING_P3",
+  "evidence_sha256": {
+    "generate-exact-restore.sh": "87c76e9f16c2d02f3d1fa7ab8a4378dc31a5ac487e7a2fcaac81908ec1437c6a",
+    "generate-restore-for-syntax.started.json": "38a5bdf9dec531ee27045c4a624e54fceaf7b8378421fd2bf717262437aaa16b",
+    "generate-restore-for-syntax.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "generate-restore-for-syntax.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "generate-restore-for-syntax.terminal.json": "deaaafaf77630c8bda16de29c204bfa417e513b6d1ff61a8653bc49dd7900a3e",
+    "index-after.bin": "6c271ef0d2f15f72fcaf27be19b21d4c4c7214695b05e4314dfee65d55c714b0",
+    "index-before.bin": "6c271ef0d2f15f72fcaf27be19b21d4c4c7214695b05e4314dfee65d55c714b0",
+    "mock-and-control-inventory.json": "3412823f93710df54dcfd400429ad382b9d0968d05ea4abec0db26997a17372a",
+    "official-focused.started.json": "84d4f9ff1c500fee83d814125b14e1ff45287783e093290380260f093358e5eb",
+    "official-focused.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "official-focused.stdout": "3d82800a43a2ba84fd2c9a326d0946d3b2721ff7045976aa1110a874f7f7d2b6",
+    "official-focused.terminal.json": "22cd39a91e2ee50d0c7f2949711d853d5496787b400300a9ac75eebbd34c1108",
+    "official-standin56.sanitized.stdout": "27ae3654ead7e7b42c4bcae3072046e6d189db20442ed7763ce3d9425b59ddce",
+    "official-standin56.started.json": "8017935430a4da66ff1d27ac5a5b71b88c8931d6a78f5dc6ef0444535699960c",
+    "official-standin56.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "official-standin56.stdout": "ce20cf42c2030facc7474b28ca087d7a9679cf2be702437873b58ac5b4766e85",
+    "official-standin56.terminal.json": "31c708b780b72c84adc3697a22762f52d57e3df93048076425bdf87c1f162d75",
+    "postguards.json": "79145b07afee4a92d6024b04e01074f8bc7a0793e0ef14076abb9a34dbfc7c74",
+    "preguards.json": "39ed758df873b2728dc68b5a9d86db49fed454f17805c439e274addb04d28c39",
+    "prior-proof-before.json": "e49bab1a8d4a6cd13f3c29fbec12f3931329729671c00c0f7ddc1bdc6416893a",
+    "qualified-official-focused.json": "0dffb510e1564bf23e7b2d76adf06ff57f0f3cb7affa03961cdfffa1adb69f81",
+    "run-official.py": "76eb8d6fdd1a8bc82f73d34071f69b3bf4147af8277a82ea59e48485c5b351ca",
+    "source-after.json": "b7db333100201cbfa914afcb35650c230bf38899ee63466901850381ea9e0881",
+    "source-before.json": "b7db333100201cbfa914afcb35650c230bf38899ee63466901850381ea9e0881",
+    "syntax-generated-restore.sh": "03aada318e893cee41f5d3db205570827876c9a61ef4f7ed99727204d4b3332c",
+    "syntax-generated-restore.started.json": "b10367d62ac7c3bf8e6c72e88002ab5476de9b53f20f2be7f76a45232d8e5d53",
+    "syntax-generated-restore.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-generated-restore.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-generated-restore.terminal.json": "216d222cd7b6d89918ece5788daafb3a9c5a6e3f69033ee91701e7537c304607",
+    "syntax-make-skill-test.sh.started.json": "60bcd503a9fddc6a3ecd0627ce5c4d87a553a4f61a82811768412b9b53fece74",
+    "syntax-make-skill-test.sh.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-make-skill-test.sh.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-make-skill-test.sh.terminal.json": "a57101de27634f8e72eb3b3ffca791c80b603f0e77f52cf3d26f963de9e156cd",
+    "syntax-make-skill.sh.started.json": "c3dcd9128ef40a912eae84e746de499691f8d2f6c990211061fe38713ca908b1",
+    "syntax-make-skill.sh.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-make-skill.sh.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-make-skill.sh.terminal.json": "f74cfd381134ba639c2c7e9d1cb9d8e7c875be22ac63f27b9de5242ede3934b5",
+    "syntax-stand-in-test.sh.started.json": "ce9c56f1c586927bbd90bc3079ecfeecd4bc1988ae23ab8937f3f12ddce84f50",
+    "syntax-stand-in-test.sh.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-stand-in-test.sh.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-stand-in-test.sh.terminal.json": "b5fdbfc25ff81e10ba26ea14294e0c6711a110c20229aa94edd106528020dece",
+    "syntax-stand-in.sh.started.json": "b6669cd712acaeb597b1de2ed5e17e5912d957ec3dd04553a81045a5be4ad270",
+    "syntax-stand-in.sh.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-stand-in.sh.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntax-stand-in.sh.terminal.json": "ff6e3288d34d0495b524b7eb1c49498fa575a97a7a62ac794c19720e96d7eae7"
+  },
+  "gates": {
+    "official_focused": {
+      "argv": [
+        "/bin/bash",
+        "lampOS/tools/played/make-skill-test.sh",
+        "focused"
+      ],
+      "case_inventory_basis": "17 source-based main fixture calls plus5 generated-guard outcomes inside the one committed suite. These are not independent Rust/libtest counts and do not get added to stand-in56.",
+      "elapsed_seconds": 9.5178,
+      "exit": 0,
+      "invocations": 1,
+      "result": "make-skill-test: all passed"
+    },
+    "stage_records": [
+      {
+        "argv": [
+          "/bin/bash",
+          "-n",
+          "W/lampOS/tools/played/make-skill.sh"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 0.0067,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 23386,
+        "pid": 23386,
+        "stage": "syntax-make-skill.sh",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "-n",
+          "W/lampOS/tools/played/make-skill-test.sh"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 0.0067,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 23387,
+        "pid": 23387,
+        "stage": "syntax-make-skill-test.sh",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "-n",
+          "W/lampOS/tools/played/stand-in.sh"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 0.0106,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 23388,
+        "pid": 23388,
+        "stage": "syntax-stand-in.sh",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "-n",
+          "W/lampOS/tools/played/stand-in-test.sh"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 0.0118,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 23389,
+        "pid": 23389,
+        "stage": "syntax-stand-in-test.sh",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "E/official-focused-gate/generate-exact-restore.sh"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 0.0106,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 23390,
+        "pid": 23390,
+        "stage": "generate-restore-for-syntax",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "-n",
+          "E/official-focused-gate/syntax-generated-restore.sh"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 0.0102,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 23396,
+        "pid": 23396,
+        "stage": "syntax-generated-restore",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "lampOS/tools/played/make-skill-test.sh",
+          "focused"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 9.5178,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 23397,
+        "pid": 23397,
+        "stage": "official-focused",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "3d82800a43a2ba84fd2c9a326d0946d3b2721ff7045976aa1110a874f7f7d2b6",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "lampOS/tools/played/stand-in-test.sh"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 2.8831,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 25495,
+        "pid": 25495,
+        "stage": "official-standin56",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "ce20cf42c2030facc7474b28ca087d7a9679cf2be702437873b58ac5b4766e85",
+        "timed_out": false
+      }
+    ],
+    "standin": {
+      "FAIL": 0,
+      "argv": [
+        "/bin/sh",
+        "lampOS/tools/played/stand-in-test.sh"
+      ],
+      "assertion_checks_ok": 56,
+      "elapsed_seconds": 2.8831,
+      "exit": 0,
+      "invocations": 1
+    },
+    "syntax": {
+      "generated_restore": 1,
+      "generator_exit": 0,
+      "source_scripts": 4
+    }
+  },
+  "head": "88ca52a2aeeef92b9a58ea4c7c02cbdc7c542a38",
+  "isolation": "Committed scripts use local lamp_ssh/say/afplay/quiet overrides, MAKE_SAVED/VOICE paths under their private mktemp root, temp systemctl/systemd-run paths, temp task/remote/unit files. Focused selector skips all arm-playing cases. Outer PATH blocks real service/SSH/audio/network commands; TMPDIR isolated; no product script/timing/assertion edits.",
+  "native_handle": {
+    "all_eight_groups_absent": true,
+    "cleanup_signals": 0,
+    "exit": 0,
+    "retries": 0,
+    "session_id": 36430,
+    "timeouts": 0
+  },
+  "not_run": [
+    "Full792-second suite or arm-playing tests",
+    "Olda896/b2 subject reruns",
+    "Cargo/shared bank/CI actions",
+    "Actual SSH,sudo,systemctl,systemd-run,audio,network,device or service operation"
+  ],
+  "preserved_source_triage_sha256": "5d9c410b4b00107c8c794a96fc71846533a201385fe1c248a8a97a2e697f4ac3",
+  "preserved_synthetic_observation_sha256": "9f36b171d0446bb2ce515e4e0149bd1d92d673a4e17a4c285592978715ddf4be",
+  "publication_actions": "No product edits, comments, commits or push.",
+  "qualification": "The current88 source and official focused assertions close the previously demonstrated stop-failure, unknown/empty-state restore and guard-status blockers in this script scope. Olda896/b2 failures remain failed on those sources; they are not relabeled.",
+  "source_and_tool_guards": {
+    "all_source_index_tools_helpers_prior_proofs_unchanged": true,
+    "blocked_actual_command_attempts": 0,
+    "helper_sha256": {
+      "blocked-tools/afplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/aplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/curl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/ffplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/gh": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/git": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/launchctl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/nc": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/ncat": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/open": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/osascript": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/play": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/rsync": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/say": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/scp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sftp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/socat": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/ssh": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sshpass": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sudo": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemctl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemd-run": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/wget": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "generate-exact-restore.sh": "87c76e9f16c2d02f3d1fa7ab8a4378dc31a5ac487e7a2fcaac81908ec1437c6a",
+      "mock-and-control-inventory.json": "3412823f93710df54dcfd400429ad382b9d0968d05ea4abec0db26997a17372a",
+      "run-official.py": "76eb8d6fdd1a8bc82f73d34071f69b3bf4147af8277a82ea59e48485c5b351ca",
+      "syntax-generated-restore.sh": "03aada318e893cee41f5d3db205570827876c9a61ef4f7ed99727204d4b3332c"
+    },
+    "post_guard_sha256": "79145b07afee4a92d6024b04e01074f8bc7a0793e0ef14076abb9a34dbfc7c74",
+    "pre_guard_sha256": "39ed758df873b2728dc68b5a9d86db49fed454f17805c439e274addb04d28c39",
+    "prior_proofs_sha256": {
+      "REPO/.claude/worktrees/third-played-p3-read-3936-evidence/publication-stop-failure-HOLD.json": "0a074b3463d453c92f8d4db13ca08ebfeee56972023e30a8faaf1869233c9a9c",
+      "REPO/.claude/worktrees/third-played-p3-repair-read-3936-b2-evidence/publication-query-failure-HOLD.json": "7678dcfdcb80d6e183c03b84d3133e81a708e14bd1ce44f056ab5656e6439c66",
+      "W-evidence/publication-unexpected-query-observation.json": "9f36b171d0446bb2ce515e4e0149bd1d92d673a4e17a4c285592978715ddf4be",
+      "W-evidence/source-triage-and-proposal.json": "5d9c410b4b00107c8c794a96fc71846533a201385fe1c248a8a97a2e697f4ac3"
+    },
+    "remaining_private_tmp_entries": [],
+    "source_after_sha256": "b7db333100201cbfa914afcb35650c230bf38899ee63466901850381ea9e0881",
+    "source_before_sha256": "b7db333100201cbfa914afcb35650c230bf38899ee63466901850381ea9e0881",
+    "tool_versions": {
+      "bash": "GNU bash, version 3.2.57(1)-release (x86_64-apple-darwin25)",
+      "python3": "Python 3.9.1",
+      "sh": "GNU bash, version 3.2.57(1)-release (x86_64-apple-darwin25)"
+    },
+    "tools": {
+      "awk": {
+        "path": "/usr/bin/awk",
+        "sha256": "74eca1b2aa59d4af94ad0ba8294ddb544f7db9f1a68d4b0ade2a70ea6c533940"
+      },
+      "bash": {
+        "path": "/bin/bash",
+        "sha256": "16303dedab719ddb63efd9dd68092a0da37b397bfd4fcb856d5f1c86c5ee414b"
+      },
+      "cat": {
+        "path": "/bin/cat",
+        "sha256": "2b6e8f3f90c42a9d8d1e5471efb4173ad3499fc8ca4039b39327b394616cf39e"
+      },
+      "chmod": {
+        "path": "/bin/chmod",
+        "sha256": "b0451fa7b5995805519855783cc208a2ade4925b30735258639bc0cca68da10d"
+      },
+      "chown": {
+        "path": "/usr/sbin/chown",
+        "sha256": "e2970091ee40ee88be84d249e6fd02b2e46df3e0363cd1f3781b7d7455c4eba0"
+      },
+      "cksum": {
+        "path": "/usr/bin/cksum",
+        "sha256": "48a6871e7b036fb79246fea90593c25e4461d712d8cf8eb951fa6dada6cdd3cb"
+      },
+      "cp": {
+        "path": "/bin/cp",
+        "sha256": "f0629f462c6535f7b1a19f559b7093638e714961bea9228cfb2ae7896f8557f4"
+      },
+      "cut": {
+        "path": "/usr/bin/cut",
+        "sha256": "18333d7eacc3e7d01c891957ff48cebda01b4362778c2fcd3da77c5129b4a936"
+      },
+      "date": {
+        "path": "/bin/date",
+        "sha256": "0c7f77e19bc79013bc5bc4e67beea3b9d546d6d09a36799c2eed2693967af8c6"
+      },
+      "find": {
+        "path": "/usr/bin/find",
+        "sha256": "9cd3b4bbb80ac290fd188172e5fcbc48a6fe10ff3374313e4f01efea0101be1b"
+      },
+      "grep": {
+        "path": "/usr/bin/grep",
+        "sha256": "e70a05960005b01d94abb0715bddafe20473e5854a6ef461ea12915801596550"
+      },
+      "head": {
+        "path": "/usr/bin/head",
+        "sha256": "189b01920af37ff1defbc26fdf2ba4696fdf735f5894a0b1fc6ea3343c782dad"
+      },
+      "id": {
+        "path": "/usr/bin/id",
+        "sha256": "77c738fb7a80a8a3198d3c544d3d0342cb387989c88f6166f1b5dedc7eb5d6b3"
+      },
+      "ls": {
+        "path": "/bin/ls",
+        "sha256": "24752389e1d97c9555dd153b644902fadd460dfbe1a166251876c67bbacb0810"
+      },
+      "mkdir": {
+        "path": "/bin/mkdir",
+        "sha256": "a84382b7827e7bfb285321413f9a89b7d2805fa6afd0369a8f32f4f0241e18cd"
+      },
+      "mv": {
+        "path": "/bin/mv",
+        "sha256": "5a5698e1f729facb24f6a810a63940ac51b9d57c35bf114903bcf2dda1f74a97"
+      },
+      "python3": {
+        "path": "/Library/Frameworks/Python.framework/Versions/3.9/bin/python3",
+        "sha256": "3a717f69a4bfc12c373da8489a8fc88d53e9117723e00490fbe5e84e153125a6"
+      },
+      "readlink": {
+        "path": "/usr/bin/readlink",
+        "sha256": "7a0f851abf47184dc85a859e17f276608f41b77259729a91829a0bce20d3b54f"
+      },
+      "rm": {
+        "path": "/bin/rm",
+        "sha256": "4faf0408bb0c5dcb8ea47c08ff03cb44aedfe2712220111586b71cb93cd1d43f"
+      },
+      "sed": {
+        "path": "/usr/bin/sed",
+        "sha256": "6ac57d91d32dda62f954dbcfe29e43dd55e69946821092b542dbbbe7dca86997"
+      },
+      "seq": {
+        "path": "/usr/bin/seq",
+        "sha256": "c784acaf932b5348fcc557965a4d78e36f62da0172e330438ea14ea2cb2310ad"
+      },
+      "sh": {
+        "path": "/bin/sh",
+        "sha256": "c0eaf44f9242d5bbc2e14f4e8b7dccc1eff7f2976d64dc18914d5ef9f373e100"
+      },
+      "shasum": {
+        "path": "/usr/local/bin/shasum",
+        "sha256": "7b4a2ceaa5ba5d712b056b6415ca641f5516e58116eafd33b4467768fbf1b4b0"
+      },
+      "sort": {
+        "path": "/usr/bin/sort",
+        "sha256": "54c29f342722dffb3413a3a628f9bb37efccf4b26dd1ea5598e10edb82b4c33d"
+      },
+      "stat": {
+        "path": "/usr/bin/stat",
+        "sha256": "7a0f851abf47184dc85a859e17f276608f41b77259729a91829a0bce20d3b54f"
+      },
+      "tail": {
+        "path": "/usr/bin/tail",
+        "sha256": "0820e3b855044a4c3d92701a14cb30c14515cc5329bb723b04cda680afb0dd2a"
+      },
+      "tee": {
+        "path": "/usr/bin/tee",
+        "sha256": "2cf19c854bae9f465ac8b3244b3448316d08f525dc63c0a9ac0c69cc2e7e1105"
+      },
+      "touch": {
+        "path": "/usr/bin/touch",
+        "sha256": "f63b07192f180955fe1566ff2d7c24db044b28aa38a6df4b714330f6ddc5eb83"
+      },
+      "tr": {
+        "path": "/usr/bin/tr",
+        "sha256": "b8ac76bef7c61d9a462e6054d7887108ea632d250049aa5a2abee0ab906aefb4"
+      },
+      "xargs": {
+        "path": "/usr/bin/xargs",
+        "sha256": "e1e710ff1f15f067b1ec0ba47a0d0f14a11ae1010be0dcc84df5459eead2dba9"
+      }
+    },
+    "tracked_played_source_count": 35
+  },
+  "tree": "47da6d6b2e346a4a7d3f95acf7fbf2ce5aa6c656"
+}
