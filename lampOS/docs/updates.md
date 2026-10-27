@@ -2353,3 +2353,16 @@ This remains unwired data preparation. It adds no storage or durability receipt,
 authentication, path authority, executable plan, writer grant, helper refresh or
 restore. Ordinary reader policy and native capture equality are unchanged;
 current source/native evidence and physical acceptance remain separate.
+
+### Cap projected pins output for the future saved plan (#3689)
+
+A separate private [plan-output path](head-touch-plan-output.md) reuses the
+ordinary head-pair evaluator with capped streaming pretty serialization.
+New derived pins text is at most 1 MiB including its newline. An owned staged
+step vector is returned only on success; serialization or late provider errors
+return a fixed refusal and no partial vector. This is a bound on newly derived
+output, not on parsing, preexisting text or a complete authenticated plan.
+
+Ordinary callers retain their formatter, read order, diagnostics and bytes.
+The new path is unwired and introduces no storage, path authority, writer grant,
+helper refresh or restoration. Native/device acceptance remains separate.
