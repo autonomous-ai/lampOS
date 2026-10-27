@@ -1,0 +1,10 @@
+{
+  "entries_checked": 55,
+  "all_bytes_SHA256_match": true,
+  "manifest_sha256": "a5dba2b3cab2dfef856a9d967dd9ca928dd8fa2e1a2251cd64aad3ef60bdb28f",
+  "mismatches": [],
+  "unlisted_nonexcluded": [],
+  "both_originals_terminal_before_collection": true,
+  "watcher_started": false,
+  "archive_or_binary_downloaded": false
+}

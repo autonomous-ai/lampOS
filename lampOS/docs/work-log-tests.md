@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 04:09 — current Reader original native passes on exact authored tree
+
+Ready for lamp-voice: no (current independent reads and additional full context remain).
+
+[Reader92 original native audit](verification/tests-reader-92fe-native-20261028/) binds ARM40580786734/Linux40580786883 SUCCESS: **7,804 unique PASS, zero bad or selected unrun**,54 skips; all15 ordinary Reader and seven Trace pass once, DAC ignored/unrun. Actual preview76ed5477c has ordered parents82/92 and tree dbd8c4c9f exactly equals authored92: zero tracked or bound CI-input deltas, all ten fetched inputs and both owned blobs/modes equal. Thirty-four configured reprints and auxiliary promoter25/docs4/process13/relay/Python49,12,7 remain separate. Warning records ARM10/Linux2 are retained with raw logs; no archive/payload download. All55 complete private entries are independently hash/byte verified.
+
+Its exact current Mac4+6/546+3 remains a separate closed scope. The additional full Voice library run is now active on this same frozen92/82; no outcome yet. Skills6c93 originals are both green and being audited. Moodbc8/82 has freshly passed341/0/0 once, all four drivers/docs, strict/workspace/source/172sealed/eightactual guards and fourteen direct command closures; its qualified own push is in progress. Old matched Main3882/1/15 and every earlier failure remain unchanged. No device access.
+
 ## 2026-10-28 04:02 — current Skills full package passes and is pushed
 
 Ready for lamp-voice: no (current ARM audit/read/latest-base conditions remain).

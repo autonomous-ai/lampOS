@@ -1,0 +1,784 @@
+[
+  {
+    "original": {
+      "line": 1543,
+      "timestamp": "2026-10-27T20:52:48.5473793Z",
+      "status": "PASS",
+      "seconds": 3.623,
+      "ordinal": 697,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go"
+    },
+    "reprint": {
+      "line": 8653,
+      "timestamp": "2026-10-27T20:55:36.6850732Z",
+      "status": "PASS",
+      "seconds": 3.623,
+      "ordinal": 697,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 1557,
+      "timestamp": "2026-10-27T20:52:49.6990633Z",
+      "status": "PASS",
+      "seconds": 1.152,
+      "ordinal": 711,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::asking_the_policy_a_hello_made_and_not_noticed_rests"
+    },
+    "reprint": {
+      "line": 8669,
+      "timestamp": "2026-10-27T20:55:36.6857437Z",
+      "status": "PASS",
+      "seconds": 1.152,
+      "ordinal": 711,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::asking_the_policy_a_hello_made_and_not_noticed_rests"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 1629,
+      "timestamp": "2026-10-27T20:52:54.2191360Z",
+      "status": "PASS",
+      "seconds": 4.52,
+      "ordinal": 783,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait"
+    },
+    "reprint": {
+      "line": 8695,
+      "timestamp": "2026-10-27T20:55:36.6867340Z",
+      "status": "PASS",
+      "seconds": 4.52,
+      "ordinal": 783,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 1633,
+      "timestamp": "2026-10-27T20:52:55.1421218Z",
+      "status": "PASS",
+      "seconds": 0.923,
+      "ordinal": 787,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::the_program_forgets_a_snooze_at_a_restart"
+    },
+    "reprint": {
+      "line": 8710,
+      "timestamp": "2026-10-27T20:55:36.6879417Z",
+      "status": "PASS",
+      "seconds": 0.923,
+      "ordinal": 787,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::the_program_forgets_a_snooze_at_a_restart"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 1639,
+      "timestamp": "2026-10-27T20:52:56.8852423Z",
+      "status": "PASS",
+      "seconds": 1.743,
+      "ordinal": 793,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::the_program_keeps_a_skill_off_across_a_restart"
+    },
+    "reprint": {
+      "line": 8732,
+      "timestamp": "2026-10-27T20:55:36.6888005Z",
+      "status": "PASS",
+      "seconds": 1.743,
+      "ordinal": 793,
+      "total": 7804,
+      "binary": "lamp-skills::it",
+      "test": "skills::the_program_keeps_a_skill_off_across_a_restart"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 1647,
+      "timestamp": "2026-10-27T20:52:59.9048415Z",
+      "status": "PASS",
+      "seconds": 3.019,
+      "ordinal": 801,
+      "total": 7804,
+      "binary": "lamp-voice",
+      "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+    },
+    "reprint": {
+      "line": 8757,
+      "timestamp": "2026-10-27T20:55:36.6897627Z",
+      "status": "PASS",
+      "seconds": 3.019,
+      "ordinal": 801,
+      "total": 7804,
+      "binary": "lamp-voice",
+      "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 1915,
+      "timestamp": "2026-10-27T20:53:02.6375280Z",
+      "status": "PASS",
+      "seconds": 2.732,
+      "ordinal": 1069,
+      "total": 7804,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+    },
+    "reprint": {
+      "line": 8774,
+      "timestamp": "2026-10-27T20:55:36.6904144Z",
+      "status": "PASS",
+      "seconds": 2.732,
+      "ordinal": 1069,
+      "total": 7804,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2043,
+      "timestamp": "2026-10-27T20:53:03.9464671Z",
+      "status": "PASS",
+      "seconds": 1.309,
+      "ordinal": 1197,
+      "total": 7804,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump"
+    },
+    "reprint": {
+      "line": 8783,
+      "timestamp": "2026-10-27T20:55:36.6906621Z",
+      "status": "PASS",
+      "seconds": 1.309,
+      "ordinal": 1197,
+      "total": 7804,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2168,
+      "timestamp": "2026-10-27T20:53:04.9078459Z",
+      "status": "PASS",
+      "seconds": 0.961,
+      "ordinal": 1322,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free"
+    },
+    "reprint": {
+      "line": 8792,
+      "timestamp": "2026-10-27T20:55:36.6909005Z",
+      "status": "PASS",
+      "seconds": 0.961,
+      "ordinal": 1322,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2245,
+      "timestamp": "2026-10-27T20:53:06.4846356Z",
+      "status": "PASS",
+      "seconds": 1.577,
+      "ordinal": 1399,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back"
+    },
+    "reprint": {
+      "line": 8805,
+      "timestamp": "2026-10-27T20:55:36.6913477Z",
+      "status": "PASS",
+      "seconds": 1.577,
+      "ordinal": 1399,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2314,
+      "timestamp": "2026-10-27T20:53:07.3603221Z",
+      "status": "PASS",
+      "seconds": 0.876,
+      "ordinal": 1468,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing"
+    },
+    "reprint": {
+      "line": 8817,
+      "timestamp": "2026-10-27T20:55:36.6917238Z",
+      "status": "PASS",
+      "seconds": 0.876,
+      "ordinal": 1468,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2342,
+      "timestamp": "2026-10-27T20:53:08.3755077Z",
+      "status": "PASS",
+      "seconds": 1.015,
+      "ordinal": 1496,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing"
+    },
+    "reprint": {
+      "line": 8829,
+      "timestamp": "2026-10-27T20:55:36.6921035Z",
+      "status": "PASS",
+      "seconds": 1.015,
+      "ordinal": 1496,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2445,
+      "timestamp": "2026-10-27T20:53:10.6325501Z",
+      "status": "PASS",
+      "seconds": 2.257,
+      "ordinal": 1599,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded"
+    },
+    "reprint": {
+      "line": 8840,
+      "timestamp": "2026-10-27T20:55:36.6924243Z",
+      "status": "PASS",
+      "seconds": 2.257,
+      "ordinal": 1599,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2453,
+      "timestamp": "2026-10-27T20:53:11.4396531Z",
+      "status": "PASS",
+      "seconds": 0.807,
+      "ordinal": 1607,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due"
+    },
+    "reprint": {
+      "line": 8852,
+      "timestamp": "2026-10-27T20:55:36.6927340Z",
+      "status": "PASS",
+      "seconds": 0.807,
+      "ordinal": 1607,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2531,
+      "timestamp": "2026-10-27T20:53:14.2472083Z",
+      "status": "PASS",
+      "seconds": 2.807,
+      "ordinal": 1685,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for"
+    },
+    "reprint": {
+      "line": 8863,
+      "timestamp": "2026-10-27T20:55:36.6930217Z",
+      "status": "PASS",
+      "seconds": 2.807,
+      "ordinal": 1685,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2553,
+      "timestamp": "2026-10-27T20:53:17.0553533Z",
+      "status": "PASS",
+      "seconds": 2.808,
+      "ordinal": 1707,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held"
+    },
+    "reprint": {
+      "line": 8875,
+      "timestamp": "2026-10-27T20:55:36.6935060Z",
+      "status": "PASS",
+      "seconds": 2.808,
+      "ordinal": 1707,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2555,
+      "timestamp": "2026-10-27T20:53:18.3622028Z",
+      "status": "PASS",
+      "seconds": 1.307,
+      "ordinal": 1709,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on"
+    },
+    "reprint": {
+      "line": 8887,
+      "timestamp": "2026-10-27T20:55:36.6939456Z",
+      "status": "PASS",
+      "seconds": 1.307,
+      "ordinal": 1709,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2642,
+      "timestamp": "2026-10-27T20:53:20.6768045Z",
+      "status": "PASS",
+      "seconds": 2.315,
+      "ordinal": 1796,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block"
+    },
+    "reprint": {
+      "line": 8898,
+      "timestamp": "2026-10-27T20:55:36.6942368Z",
+      "status": "PASS",
+      "seconds": 2.315,
+      "ordinal": 1796,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2733,
+      "timestamp": "2026-10-27T20:53:24.1839790Z",
+      "status": "PASS",
+      "seconds": 3.507,
+      "ordinal": 1887,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on"
+    },
+    "reprint": {
+      "line": 8909,
+      "timestamp": "2026-10-27T20:55:36.6945256Z",
+      "status": "PASS",
+      "seconds": 3.507,
+      "ordinal": 1887,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2977,
+      "timestamp": "2026-10-27T20:53:32.1000580Z",
+      "status": "PASS",
+      "seconds": 7.916,
+      "ordinal": 2131,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked"
+    },
+    "reprint": {
+      "line": 8920,
+      "timestamp": "2026-10-27T20:55:36.6948076Z",
+      "status": "PASS",
+      "seconds": 7.916,
+      "ordinal": 2131,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 2987,
+      "timestamp": "2026-10-27T20:53:33.7011043Z",
+      "status": "PASS",
+      "seconds": 1.601,
+      "ordinal": 2141,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch"
+    },
+    "reprint": {
+      "line": 8932,
+      "timestamp": "2026-10-27T20:55:36.6951819Z",
+      "status": "PASS",
+      "seconds": 1.601,
+      "ordinal": 2141,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 3023,
+      "timestamp": "2026-10-27T20:53:36.2174968Z",
+      "status": "PASS",
+      "seconds": 2.516,
+      "ordinal": 2177,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms"
+    },
+    "reprint": {
+      "line": 8946,
+      "timestamp": "2026-10-27T20:55:36.6957359Z",
+      "status": "PASS",
+      "seconds": 2.516,
+      "ordinal": 2177,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7904,
+      "timestamp": "2026-10-27T20:55:25.7861740Z",
+      "status": "PASS",
+      "seconds": 0.004,
+      "ordinal": 7058,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::a_producer_kept_up_only_if_its_samples_span_the_scenario"
+    },
+    "reprint": {
+      "line": 8959,
+      "timestamp": "2026-10-27T20:55:36.6961572Z",
+      "status": "PASS",
+      "seconds": 0.004,
+      "ordinal": 7058,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::a_producer_kept_up_only_if_its_samples_span_the_scenario"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7905,
+      "timestamp": "2026-10-27T20:55:25.8654524Z",
+      "status": "PASS",
+      "seconds": 0.079,
+      "ordinal": 7059,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::after_its_first_datagram_a_gap_ends_the_worker_as_discontinuous"
+    },
+    "reprint": {
+      "line": 8968,
+      "timestamp": "2026-10-27T20:55:36.6964024Z",
+      "status": "PASS",
+      "seconds": 0.079,
+      "ordinal": 7059,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::after_its_first_datagram_a_gap_ends_the_worker_as_discontinuous"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7906,
+      "timestamp": "2026-10-27T20:55:25.9244866Z",
+      "status": "PASS",
+      "seconds": 0.059,
+      "ordinal": 7060,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::allowed_authority_without_a_first_observation_cannot_start_a_gap_ride"
+    },
+    "reprint": {
+      "line": 8977,
+      "timestamp": "2026-10-27T20:55:36.6966608Z",
+      "status": "PASS",
+      "seconds": 0.059,
+      "ordinal": 7060,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::allowed_authority_without_a_first_observation_cannot_start_a_gap_ride"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7908,
+      "timestamp": "2026-10-27T20:55:26.1748307Z",
+      "status": "PASS",
+      "seconds": 0.4,
+      "ordinal": 7062,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::a_gap_ride_survives_controls_late_and_restabilizes_before_reopening"
+    },
+    "reprint": {
+      "line": 8986,
+      "timestamp": "2026-10-27T20:55:36.6969052Z",
+      "status": "PASS",
+      "seconds": 0.4,
+      "ordinal": 7062,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::a_gap_ride_survives_controls_late_and_restabilizes_before_reopening"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7909,
+      "timestamp": "2026-10-27T20:55:26.2915083Z",
+      "status": "PASS",
+      "seconds": 0.217,
+      "ordinal": 7063,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late"
+    },
+    "reprint": {
+      "line": 8995,
+      "timestamp": "2026-10-27T20:55:36.6971668Z",
+      "status": "PASS",
+      "seconds": 0.217,
+      "ordinal": 7063,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7910,
+      "timestamp": "2026-10-27T20:55:26.3636577Z",
+      "status": "PASS",
+      "seconds": 0.654,
+      "ordinal": 7064,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker"
+    },
+    "reprint": {
+      "line": 9004,
+      "timestamp": "2026-10-27T20:55:36.6974612Z",
+      "status": "PASS",
+      "seconds": 0.654,
+      "ordinal": 7064,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7911,
+      "timestamp": "2026-10-27T20:55:26.3796721Z",
+      "status": "PASS",
+      "seconds": 0.205,
+      "ordinal": 7065,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker"
+    },
+    "reprint": {
+      "line": 9013,
+      "timestamp": "2026-10-27T20:55:36.6977040Z",
+      "status": "PASS",
+      "seconds": 0.205,
+      "ordinal": 7065,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7912,
+      "timestamp": "2026-10-27T20:55:26.4919491Z",
+      "status": "PASS",
+      "seconds": 0.128,
+      "ordinal": 7066,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease"
+    },
+    "reprint": {
+      "line": 9022,
+      "timestamp": "2026-10-27T20:55:36.6979450Z",
+      "status": "PASS",
+      "seconds": 0.128,
+      "ordinal": 7066,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7913,
+      "timestamp": "2026-10-27T20:55:26.5357682Z",
+      "status": "PASS",
+      "seconds": 0.244,
+      "ordinal": 7067,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::fresh_low_during_a_gap_ride_never_grants_the_same_worker_again"
+    },
+    "reprint": {
+      "line": 9031,
+      "timestamp": "2026-10-27T20:55:36.6981838Z",
+      "status": "PASS",
+      "seconds": 0.244,
+      "ordinal": 7067,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::fresh_low_during_a_gap_ride_never_grants_the_same_worker_again"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7915,
+      "timestamp": "2026-10-27T20:55:26.6092588Z",
+      "status": "PASS",
+      "seconds": 0.117,
+      "ordinal": 7069,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::the_real_worker_with_no_slide_grants_from_its_controller_alone"
+    },
+    "reprint": {
+      "line": 9040,
+      "timestamp": "2026-10-27T20:55:36.6984715Z",
+      "status": "PASS",
+      "seconds": 0.117,
+      "ordinal": 7069,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::the_real_worker_with_no_slide_grants_from_its_controller_alone"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7920,
+      "timestamp": "2026-10-27T20:55:26.7043785Z",
+      "status": "PASS",
+      "seconds": 0.325,
+      "ordinal": 7074,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop"
+    },
+    "reprint": {
+      "line": 9049,
+      "timestamp": "2026-10-27T20:55:36.6987137Z",
+      "status": "PASS",
+      "seconds": 0.325,
+      "ordinal": 7074,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  },
+  {
+    "original": {
+      "line": 7922,
+      "timestamp": "2026-10-27T20:55:27.0536660Z",
+      "status": "PASS",
+      "seconds": 1.129,
+      "ordinal": 7076,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride"
+    },
+    "reprint": {
+      "line": 9060,
+      "timestamp": "2026-10-27T20:55:36.6991028Z",
+      "status": "PASS",
+      "seconds": 1.129,
+      "ordinal": 7076,
+      "total": 7804,
+      "binary": "lamp-voice::it",
+      "test": "privacy_worker::an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride"
+    },
+    "classification": "success-output=final exact immutable source rule"
+  }
+]

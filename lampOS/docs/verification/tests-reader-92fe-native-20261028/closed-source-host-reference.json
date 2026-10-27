@@ -1,0 +1,55 @@
+{
+  "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "terminal_status": "PASS",
+  "protected_count": 546,
+  "actual_count": 3,
+  "source_unchanged": true,
+  "scope": "Once complete actual Mac session_reader::tests:: module and once complete actual service_trace::tests:: module, disjoint; no full Voice runtime claim",
+  "receipt_bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/terminal.json",
+      "bytes": 9850,
+      "sha256": "39536829e26540867d64bf384e78667b1ea0cef5d70fdb73da14b872f55e789c"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/native-controller-result.json",
+      "bytes": 472,
+      "sha256": "a2c6028097820ad9d57d208924bd1fcfc5a56a63debd53a8289ac5df0ce9e85f"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/source-before.json",
+      "bytes": 2458073,
+      "sha256": "67a68739efc846f94e924719966a7d3483eab977fcdb1ded9225633ca2e754f3"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/source-after.json",
+      "bytes": 2458073,
+      "sha256": "67a68739efc846f94e924719966a7d3483eab977fcdb1ded9225633ca2e754f3"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/protected-after.json",
+      "bytes": 224877,
+      "sha256": "397152b25d12e5ed3284d3b15803b9ab401ff9c5cf3c6c64f4110a69b974119a"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/actual-after.json",
+      "bytes": 5976,
+      "sha256": "e67187b6986940f72e29b8432a5852744229042be702f60de1b3ddd5671b21ae"
+    }
+  ],
+  "no_binary_or_target_rehash_in_this_audit": true,
+  "module_counts": {
+    "session_reader::tests::": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "service_trace::tests::": {
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "full_Voice_runtime_claim": false
+}

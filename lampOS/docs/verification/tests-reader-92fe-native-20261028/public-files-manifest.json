@@ -1,0 +1,81 @@
+{
+  "scope": "Exact text audit, original logs and selected projections; full private collection manifest separately preserved; no collector code/binary copied.",
+  "files": {
+    "audit.json": {
+      "sha256": "68235980fc6587e3caa1e712a1cec79fc8c99b39fc6c9e79561e00c71ce398e2",
+      "bytes": 24432
+    },
+    "retained-failure-and-control-scope.json": {
+      "sha256": "5e021d0e51cc627b2f3c99a3798c3803a33312dfa19bd48df15d2badf3b6011d",
+      "bytes": 1590
+    },
+    "subject-case-audit.json": {
+      "sha256": "1473bdcd44f22dced7fb217d594f7703a2e4b9ebd38845959d64b0f8dbbb068f",
+      "bytes": 483
+    },
+    "execution-window.json": {
+      "sha256": "0c0f0780d2274a85b296f707f41b9c9bb36d4a4bc9ce426d3b93679397e30c57",
+      "bytes": 1307
+    },
+    "all-tracked-CI-input-bindings.json": {
+      "sha256": "7dcb9da8f7b2fc27ed6dd23e8fad9e66b4cfa61a1d55cd7fd39d85b522c49bdc",
+      "bytes": 158124
+    },
+    "final-reprints.json": {
+      "sha256": "b9d325d2b06f90fa842cc2069350655391f6503100aa2b48c5892b1536ae4cf3",
+      "bytes": 24561
+    },
+    "current-platform-source-reference.json": {
+      "sha256": "2544606cd2bbbf3d554b975762232abbc629bff172037e5afeaa5a5675d59747",
+      "bytes": 8669
+    },
+    "actual-selection-and-profile.json": {
+      "sha256": "db96197457a5f0973ebaa73a230923ac944462d9b11e9278fba43b7383044e08",
+      "bytes": 4699
+    },
+    "Trace-platform-audit.json": {
+      "sha256": "6bb964274aeba3fbd50808798d31b7d9a7a42c74a13d43c618f34fc2e828debb",
+      "bytes": 5037
+    },
+    "Linux-clippy-job-122459274840.log": {
+      "sha256": "16fe0830c519f66f2dcfd161f5c80d174eff51a607da60d2d161be0a2d863a5a",
+      "bytes": 46848
+    },
+    "README.md": {
+      "sha256": "e764bb03774ab6388aaea984099502a22eb74f6776bbb0b12226a91f3ca18955",
+      "bytes": 3272
+    },
+    "closed-source-host-reference.json": {
+      "sha256": "e20b581bb5f4fd56c0f6334413782682a126313174d778c3959417127d1054b5",
+      "bytes": 2647
+    },
+    "auxiliary-stage-audit.json": {
+      "sha256": "f677baaf427825e8c0f85db4c03bc75536aa28f74a48d85b4fcf8e6012db5cef",
+      "bytes": 8199
+    },
+    "collection-manifest-verification.json": {
+      "sha256": "2819c577d6cc5362e1cfcec83f34d751617b7b639c0c760cd0a38f802eed413b",
+      "bytes": 323
+    },
+    "ARM64-job-122459274294.log": {
+      "sha256": "68b15d079e5b7a3ce6d72dd0d9a46ffe0b796b0640883e02aab00aec2baed5e4",
+      "bytes": 1376852
+    },
+    "Reader-platform-audit.json": {
+      "sha256": "af00452119169f044616187bab8eafc07d3be8b7db7bd76b1fd228c309d93a14",
+      "bytes": 10681
+    },
+    "Linux-clippy-full-tree-delta.json": {
+      "sha256": "e5d502ce98b8d5c788bc6cde54e1fd65f64156cf380924d9583f5fa66a339bc9",
+      "bytes": 161
+    },
+    "ARM64-full-tree-delta.json": {
+      "sha256": "e5d502ce98b8d5c788bc6cde54e1fd65f64156cf380924d9583f5fa66a339bc9",
+      "bytes": 161
+    },
+    "collection-manifest.json": {
+      "sha256": "a5dba2b3cab2dfef856a9d967dd9ca928dd8fa2e1a2251cd64aad3ef60bdb28f",
+      "bytes": 8481
+    }
+  }
+}

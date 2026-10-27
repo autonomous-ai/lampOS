@@ -1,0 +1,9 @@
+{
+  "required_Reader_ordinary": 15,
+  "Reader_all_once": true,
+  "required_Trace_ordinary": 7,
+  "Trace_all_once": true,
+  "boundary_case": "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+  "completion_case": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+  "immutable_stalled_control": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining"
+}
