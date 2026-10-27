@@ -38,6 +38,19 @@ Diễn ra như sau:
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
    cài. Một kỹ năng làm nhiều hơn những gì nó khai báo bị từ chối ở đó.
+   - **Sửa một lần** (#2813 phần 2). Khi bước kiểm tra từ chối câu trả lời
+     đầu tiên, việc được giao thêm một lần nữa cho cùng nơi nhận, trước khi
+     nói gì. Bản giao lại là bản yêu cầu cũ, kèm các dòng của bước kiểm tra
+     (thư mục được thay bằng `<folder>`, tối đa 600 byte) trước lời yêu cầu
+     của người dùng, nên vẫn nằm trong 2.000 byte của phần việc. Chỉ khi
+     yêu cầu từ ứng dụng (nếu có) vẫn đang được làm. Câu trả lời của lần
+     sửa được kiểm tra một lần: giữ và nói ra, hoặc nói là không giữ. Không
+     bao giờ sửa lần thứ hai (`repairs.json`, giữ trước khi giao, dưới một
+     khóa, nên dù hai tiến trình cùng đọc cũng chỉ một lần được gửi). Nếu
+     việc giao lại không thành, câu trả lời đầu tiên được nói là không giữ
+     ngay. Chỉ lỗi của bước kiểm tra
+     được sửa; sai định dạng hay xin dùng nhiều hơn đèn và đầu thì được nói
+     là không giữ ngay.
 5. **Giữ lại, không cài.** Gói nằm trong thư mục riêng của giọng nói,
    `/var/lib/lampOS/voice/made-skills` (0700, người dùng của giọng nói):
    - giữ tối đa 5, cái cũ nhất bị bỏ cùng gói của nó;

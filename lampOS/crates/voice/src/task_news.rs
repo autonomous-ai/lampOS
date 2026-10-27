@@ -1327,6 +1327,9 @@ fn read_once_with(
             // person's request; done, its files are kept and it is told
             // what it would do, alone, never with other news.
             let making = crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default());
+            // A first answer may be repaired once; a repair's never is.
+            let repairable =
+                !crate::made_skill::is_repair(task["text"].as_str().unwrap_or_default());
             let task = if making {
                 let mut asked = task.clone();
                 asked["text"] = json!(crate::made_skill::request_of(
@@ -1336,11 +1339,13 @@ fn read_once_with(
             } else {
                 task
             };
-            let made_note = made
-                .filter(|_| making)
-                .and_then(|keeping| made_note(&words, &task, &data, age_ms, &key, keeping));
+            let made_note = made.filter(|_| making).and_then(|keeping| {
+                made_note(
+                    &words, &task, &data, age_ms, &key, keeping, socket, repairable,
+                )
+            });
             let (note, finished) = match made_note {
-                Some(note) => (Some(note), None),
+                Some(note) => (note, None),
                 None => (
                     note(&words, &task, &data, age_ms),
                     finished(&task, &data, age_ms),
@@ -1473,8 +1478,19 @@ pub(crate) fn unprompted(words: &str) -> String {
     format!("(Nobody has spoken. {words})")
 }
 
+/// How long a repair's hand-over may take, the news waiting for it: the
+/// tasks part answered in 35 ms on lamp-4ace (`docs/tasks.md`).
+const REPAIR_WAIT: Duration = Duration::from_secs(5);
+
 /// The news of a skill made by voice that came back done: kept, or why
-/// not, as [`crate::made_skill::note`] tells it.
+/// not, as [`crate::made_skill::note`] tells it; `Some(None)`, nothing yet,
+/// while its repair is out. When the lamp's check refuses a first answer
+/// (`repairable`), while its app's ask, if any, is still being made, it is
+/// handed over once more to the same target through `socket`'s tasks part,
+/// with the check's lines (#2813 piece 2, the first builder on #3126, 23
+/// Oct 13:07); the first session closes as any. Only if that hand-over
+/// fails is the first answer told not kept.
+#[allow(clippy::too_many_arguments)]
 fn made_note(
     words: &NewsWords,
     task: &Value,
@@ -1482,14 +1498,67 @@ fn made_note(
     age_ms: u64,
     key: &str,
     keeping: &crate::made_skill::Keeping,
-) -> Option<String> {
+    socket: &Path,
+    repairable: bool,
+) -> Option<Option<String>> {
     let answer = data["answer"]
         .as_str()
         .filter(|answer| !answer.is_empty())?;
     if data["state"] != "idle" {
         return None;
     }
+    // Its repair is claimed or out: the repair's own answer is the news.
+    // One whose hand-over failed is told not kept, as with none.
+    if crate::made_skill::repair_of(&keeping.directory, key)
+        && !crate::made_skill::repair_not_sent(&keeping.directory, key)
+    {
+        return Some(None);
+    }
     let made = crate::made_skill::keep(answer, data["truncated"] == json!(true), key, keeping);
+    // Claimed before it is handed over, under the repairs' lock, so of two
+    // readers only one sends it (the reviewer-lead's P2 on #3662), and a
+    // voice stopped mid-hand-over never sends it again. The reader that
+    // finds it claimed says nothing either, unless it wasn't sent.
+    if let Err(crate::made_skill::Refused(_, Some(lines))) = &made
+        && repairable
+        && crate::app_make::still_making(&keeping.directory, key, unix_ms())
+        && let Some(target) = task["target_alias"].as_str()
+        && let Ok(repair) =
+            crate::made_skill::repair_brief(task["text"].as_str().unwrap_or_default(), lines)
+    {
+        if !crate::made_skill::claim_repair(&keeping.directory, key) {
+            if crate::made_skill::repair_of(&keeping.directory, key)
+                && !crate::made_skill::repair_not_sent(&keeping.directory, key)
+            {
+                return Some(None);
+            }
+        } else {
+            let handed = crate::agent_tasks::hand_over(
+                socket.parent().unwrap_or(Path::new("/")),
+                target,
+                false,
+                &repair,
+                "voice-repair",
+                REPAIR_WAIT,
+            );
+            if let Err(error) = crate::made_skill::repaired(&keeping.directory, key, handed.is_ok())
+            {
+                eprintln!("lamp-voice: a made skill's repair was not remembered: {error}");
+            }
+            match handed {
+                Ok((store, id)) => {
+                    eprintln!(
+                        "lamp-voice: a skill made by voice did not pass the lamp's check: handed over once more to fix it, task {store}:{id}"
+                    );
+                    crate::app_make::repaired(&keeping.directory, key, &format!("{store}:{id}"));
+                    return Some(None);
+                }
+                Err(why) => {
+                    eprintln!("lamp-voice: a made skill's repair was not handed over: {why}");
+                }
+            }
+        }
+    }
     match &made {
         Ok(made) => {
             eprintln!(
@@ -1508,13 +1577,13 @@ fn made_note(
     } else {
         &words.while_ago
     };
-    Some(crate::made_skill::note(
+    Some(Some(crate::made_skill::note(
         words,
         who(task),
         when,
         &their_computer(task),
         &made,
-    ))
+    )))
 }
 
 /// Who the work went to, as the person calls them.
@@ -2312,7 +2381,7 @@ mod tests {
                     made.description,
                     made.uses.spoken()
                 ),
-                Err(Refused(why)) => format!(
+                Err(Refused(why, _)) => format!(
                     "{opening} {who} {when} made a skill for them, but the lamp can't keep it: {why}. \
                      Tell them so in one short sentence, and that the rest is on {computer}. No question.)"
                 ),
@@ -2402,7 +2471,10 @@ mod tests {
                     },
                     package: PathBuf::from("/x"),
                 };
-                let not_kept = Err(crate::made_skill::Refused("its name isn't one".into()));
+                let not_kept = Err(crate::made_skill::Refused(
+                    "its name isn't one".into(),
+                    None,
+                ));
                 for when in [&words.just, &words.while_ago] {
                     for made in [Ok(made.clone()), not_kept.clone()] {
                         let computer = their_computer(&task);
@@ -2956,6 +3028,221 @@ mod tests {
             plain[0].note
         );
         assert!(!plain[0].note.contains(crate::made_skill::BRIEF_HEAD));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #2813 piece 2 (the first builder on #3126, 23 Oct 13:07): a skill
+    /// made by voice that the lamp's check refuses is handed over once
+    /// more to the same target, its brief again with the check's lines and
+    /// the folder replaced, and nothing is said of the first answer. Fixed
+    /// on the retry, it is kept and told; not fixed, it is told not kept
+    /// once. Never more than one retry: read again, or its repair refused,
+    /// nothing is handed over again. An app's ask follows the repair.
+    #[test]
+    fn a_made_skill_the_check_refuses_is_repaired_once() {
+        for fixed in [true, false] {
+            repaired_once(fixed);
+        }
+    }
+
+    fn repaired_once(fixed: bool) {
+        use std::os::unix::fs::PermissionsExt;
+        use std::sync::{Arc, Mutex};
+        let root = std::env::temp_dir().join(format!("task-repair-{fixed}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // `lamp-skills pack`, as a stand-in: a skill named broken-dim fails
+        // its check, saying where; any other is packed.
+        let program = root.join("pack");
+        std::fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\nif [ \"$name\" = broken-dim ]; then echo \"lamp-skills: not packed: $4/skill.toml: unknown field \\`when\\`\" >&2; exit 1; fi\nprintf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let answer = |name: &str| {
+            format!(
+                "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\ntopics = [\"voice/state\"]\nlight = true\n```\n```SKILL.md\n---\nname: {name}\ndescription: Dims the light a shade at 10 pm.\n---\n# Evening dim\n```\n"
+            )
+        };
+        let request = "make me a skill that dims the light at 10 pm";
+        let brief = crate::made_skill::brief(request).unwrap();
+        // The tasks part: task 1, the first answer, refused by the check;
+        // task 7, the repair, once it is confirmed, with the text it was
+        // prepared with.
+        let prepared: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let confirmed: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":1,"summary":{"session_id":"sess"}});
+        let target = json!({"engine":"claude","machine_id":"c533fbfda3de5f8f1fdb6619ae2e30b5","project":"lamp-tasks"});
+        let request_socket = root.join("request.sock");
+        let listener = UnixListener::bind(&request_socket).unwrap();
+        let (seen_prepare, seen_confirm) = (Arc::clone(&prepared), Arc::clone(&confirmed));
+        let (first, again) = (
+            answer("broken-dim"),
+            answer(if fixed { "evening-dim" } else { "broken-dim" }),
+        );
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let repair = || seen_prepare.lock().unwrap().first().cloned();
+                let confirmed = !seen_confirm.lock().unwrap().is_empty();
+                let id = asked["id"].as_u64();
+                let reply = match asked["op"].as_str().unwrap() {
+                    "status" => status.clone(),
+                    "prepare" => {
+                        seen_prepare.lock().unwrap().push(asked.clone());
+                        json!({"ok":true,"id":7,"prepared_digest":"abc","revision":2})
+                    }
+                    "list" => {
+                        let mut items = vec![json!({"id":1,"observations":1})];
+                        if confirmed {
+                            items.push(json!({"id":7,"observations":1}));
+                        }
+                        json!({"ok":true,"store_id":"s1","items":items})
+                    }
+                    "get_task" if id == Some(1) => {
+                        json!({"ok":true,"text":brief,"target":target,"target_alias":"office",
+                        "observations":[seen(1, "idle", "boot-a", NOW - 2_000)]})
+                    }
+                    "get_task" => {
+                        json!({"ok":true,"text":repair().unwrap()["text"],"target":target,"target_alias":"office",
+                        "observations":[seen(1, "idle", "boot-a", NOW - 1_000)]})
+                    }
+                    "get_observation" => {
+                        let answer = if id == Some(1) { &first } else { &again };
+                        json!({"ok":true,"data":{"state":"idle","answer":answer,"truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{reply}").unwrap();
+            }
+        });
+        let voice = UnixListener::bind(root.join("voice.sock")).unwrap();
+        let seen_confirm = Arc::clone(&confirmed);
+        std::thread::spawn(move || {
+            for stream in voice.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                seen_confirm
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::from_str(&line).unwrap());
+                writeln!(
+                    stream,
+                    "{}",
+                    json!({"ok":true,"id":7,"queued":true,"revision":3})
+                )
+                .unwrap();
+            }
+        });
+        let keeping = crate::made_skill::Keeping {
+            directory: root.join("made"),
+            program,
+        };
+        // An app's ask that became task 1.
+        crate::made_skill::ensure_private(&keeping.directory).unwrap();
+        crate::app_make::begin(&keeping.directory, request, "r1", unix_ms()).unwrap();
+        crate::app_make::handed(&keeping.directory, "r1", Ok(("s1".into(), 1)));
+        let app = || crate::app_make::status(&keeping.directory, Some("r1"), unix_ms());
+        let none = BTreeSet::new();
+        // The first answer: refused, nothing said, handed over once more,
+        // once, by two readers at the same time (the coordinator's and the
+        // texts worker's: the reviewer-lead's P2 on #3662).
+        let both: Vec<Vec<News>> = std::thread::scope(|scope| {
+            let readers: Vec<_> = (0..2)
+                .map(|_| {
+                    scope.spawn(|| {
+                        read_once_with(&request_socket, &now(), &none, &none, Some(&keeping))
+                    })
+                })
+                .collect();
+            readers
+                .into_iter()
+                .map(|reader| reader.join().unwrap())
+                .collect()
+        });
+        for news in &both {
+            assert!(
+                news.is_empty(),
+                "nothing of the first answer: {:?}",
+                news.iter().map(|news| &news.note).collect::<Vec<_>>()
+            );
+        }
+        let sent = prepared.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        let text = sent[0]["text"].as_str().unwrap();
+        assert_eq!(sent[0]["target"], "office", "the same target");
+        assert!(crate::made_skill::is_repair(text), "{text}");
+        assert!(
+            text.contains("<folder>/skill.toml: unknown field `when`"),
+            "{text}"
+        );
+        assert!(!text.contains(".making-"), "{text}");
+        assert_eq!(crate::made_skill::request_of(text), request);
+        assert_eq!(confirmed.lock().unwrap().len(), 1);
+        assert_eq!(app()["state"], "making", "{}", app());
+        // The repair's answer: kept and told, or told not kept, once; the
+        // first answer is never handed over again.
+        let news = read_once_with(&request_socket, &now(), &none, &none, Some(&keeping));
+        assert_eq!(
+            news.len(),
+            1,
+            "{:?}",
+            news.iter().map(|news| &news.note).collect::<Vec<_>>()
+        );
+        assert!(news[0].key.starts_with("s1:7:"), "{}", news[0].key);
+        let told = &news[0].note;
+        if fixed {
+            assert!(told.contains("\"evening-dim\""), "{told}");
+            assert!(told.contains(crate::made_skill::ASK_TO_PUT_ON), "{told}");
+            assert_eq!(app()["state"], "kept", "{}", app());
+        } else {
+            assert!(told.contains("it doesn't pass the lamp's check"), "{told}");
+            assert!(
+                !told.contains("unknown field"),
+                "never the check's lines: {told}"
+            );
+            assert_eq!(app()["state"], "not_kept", "{}", app());
+        }
+        let again = read_once_with(&request_socket, &now(), &none, &none, Some(&keeping));
+        assert_eq!(again.len(), 1, "only the repair's news");
+        assert_eq!(
+            prepared.lock().unwrap().len(),
+            1,
+            "never more than one retry"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A repair whose hand-over fails tells the first answer not kept, and
+    /// is never tried again; a claim already there sends nothing.
+    #[test]
+    fn a_repair_not_handed_over_tells_the_first_answer_not_kept() {
+        let root = std::env::temp_dir().join(format!("task-repair-claim-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(!crate::made_skill::repair_of(&root, "s1:1:1"));
+        assert!(crate::made_skill::claim_repair(&root, "s1:1:1"));
+        assert!(
+            !crate::made_skill::claim_repair(&root, "s1:1:1"),
+            "claimed once only"
+        );
+        assert!(crate::made_skill::repair_of(&root, "s1:1:1"));
+        assert!(!crate::made_skill::repair_not_sent(&root, "s1:1:1"));
+        crate::made_skill::repaired(&root, "s1:1:1", false).unwrap();
+        assert!(crate::made_skill::repair_not_sent(&root, "s1:1:1"));
+        assert!(
+            !crate::made_skill::claim_repair(&root, "s1:1:1"),
+            "never tried again"
+        );
+        assert!(
+            crate::made_skill::claim_repair(&root, "s1:12:1"),
+            "another answer is its own"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
