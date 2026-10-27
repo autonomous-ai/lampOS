@@ -3413,6 +3413,9 @@ pub fn serve(
                 }
             })
         });
+        // The first turn after a start finds the chat's connection open
+        // (#3754).
+        engine.warm_ahead();
         let result = run(channels, boots.coordinator, engine, thread, probe_targets).await;
         if let Some(refresh) = refresh {
             refresh.abort();

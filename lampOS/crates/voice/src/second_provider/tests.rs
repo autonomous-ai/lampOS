@@ -5746,6 +5746,20 @@ async fn the_voice_makes_ready_as_a_line_begins() {
     assert_eq!(script.warmed.load(Ordering::Relaxed), 1);
 }
 
+/// #3754: the voice is asked to make ready as the route starts, before any
+/// line or written turn, so the first turn after a start (an onboarding
+/// invitation 3 s after the second route started over, on lamp-29e7) does
+/// not open the chat's connection inside its first round's bound.
+#[tokio::test]
+async fn the_voice_makes_ready_as_the_route_starts() {
+    let script = Arc::new(Script::default());
+    let (engine, _, _) = scripted(script.clone());
+    assert_eq!(script.warmed.load(Ordering::Relaxed), 0);
+    engine.warm_ahead();
+    tokio::task::yield_now().await;
+    assert_eq!(script.warmed.load(Ordering::Relaxed), 1);
+}
+
 /// #1712: a call the hold names is not run; the model is told it was not
 /// done, as the Live route tells it, and says nothing more of it.
 #[tokio::test]
