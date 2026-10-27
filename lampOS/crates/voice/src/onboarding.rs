@@ -240,6 +240,33 @@ impl Outcome {
     }
 }
 
+/// How an invitation's turn ended, as the coordinator saw it (#3754).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Delivery {
+    /// Played whole and heard: only this opens a try.
+    Whole,
+    /// Some of it played, then cut (someone spoke over it, a gap).
+    Cut,
+    /// Nothing of it played (`no_audio_answer`, a provider that never
+    /// began): the person was never asked, so it is no try of theirs.
+    Unsaid,
+}
+
+impl Delivery {
+    /// A bound invitation's turn that ended without settling: cut if any
+    /// of it played, else never said.
+    pub(crate) fn unsettled(had_audio: bool) -> Self {
+        if had_audio { Self::Cut } else { Self::Unsaid }
+    }
+}
+
+/// A step's invitation the voice never said is offered again this many
+/// times at most (#3754); past them the step is `not_available`, offered
+/// again later as any step that was, and never failed.
+const MOST_UNSAID: u8 = 2;
+/// Why a step was left unasked, on its record.
+const NOT_SAID: &str = "invitation not said";
+
 /// Where the near face is: its height as a share of the picture's, and its
 /// centre from the middle, -1 to 1 across and down.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -385,6 +412,8 @@ struct Led {
     /// "Touch": a touch on the head felt since the ask, kept until the step
     /// is looked at (#3756).
     touched: bool,
+    /// Asked again after its conversation ended unanswered ([`MOST_UNSAID`]).
+    asked_again: u8,
 }
 
 /// "Who you are"'s fallback: the name heard, asked back once.
@@ -435,6 +464,8 @@ struct PrivacyFlow {
     generation: u64,
     offered: u64,
     failures: u8,
+    /// Invitations the voice never said, offered again ([`MOST_UNSAID`]).
+    unsaid: u8,
     retry_after_us: u64,
     pending_result: Option<(Outcome, Option<BootId>)>,
     erase_pending: bool,
@@ -1153,14 +1184,14 @@ impl Onboarding {
         &mut self,
         voice_boot: BootId,
         turn: u64,
-        delivered_whole: bool,
+        delivery: Delivery,
         now_us: u64,
     ) {
         if self.privacy_invitation_binding() != Some((voice_boot, turn)) {
             return;
         }
-        self.privacy_flow.offer = None;
-        if !delivered_whole {
+        let attempt = self.privacy_flow.offer.take().map(|offer| offer.attempt);
+        if delivery != Delivery::Whole {
             // Nothing of an armed attempt was persisted: dropping it is enough.
             if self
                 .privacy_flow
@@ -1171,7 +1202,36 @@ impl Onboarding {
                 self.privacy_flow.attempt = None;
                 self.privacy_flow.camera_token = None;
             }
-            self.retry_privacy(now_us);
+            if delivery == Delivery::Unsaid {
+                self.privacy_unsaid(attempt, now_us);
+            } else {
+                self.retry_privacy(now_us);
+            }
+        }
+    }
+
+    /// Never said, never asked (#3754): offered again without spending a
+    /// try, [`MOST_UNSAID`] times at most, then `not_available`.
+    fn privacy_unsaid(&mut self, attempt: Option<u64>, now_us: u64) {
+        if let Some(attempt) = attempt
+            && u64::from(self.desired.privacy_invitation_tries) == attempt
+        {
+            self.desired.privacy_invitation_tries =
+                u8::try_from(attempt.saturating_sub(1)).unwrap_or(0);
+            self.save();
+        }
+        let flow = &mut self.privacy_flow;
+        flow.offer = None;
+        flow.unsaid = flow.unsaid.saturating_add(1);
+        let again = flow.unsaid <= MOST_UNSAID;
+        if again {
+            flow.retry_after_us = now_us.saturating_add(1_000_000);
+        }
+        self.records.push(json!({"kind":"onboarding_privacy_try",
+            "why":NOT_SAID,"offered_again":again,"at_us":now_us}));
+        if !again {
+            self.invalidate_privacy(privacy::Invalidation::FenceFailure);
+            self.finish(Step::Privacy, Outcome::NotAvailable, None, now_us);
         }
     }
 
@@ -1542,12 +1602,12 @@ impl Onboarding {
         &mut self,
         voice_boot: BootId,
         turn: u64,
-        delivered_whole: bool,
+        delivery: Delivery,
         now_us: u64,
     ) {
-        self.near_invitation_finished(voice_boot, turn, delivered_whole, now_us);
-        self.giving_invitation_finished(voice_boot, turn, delivered_whole, now_us);
-        self.privacy_invitation_finished(voice_boot, turn, delivered_whole, now_us);
+        self.near_invitation_finished(voice_boot, turn, delivery, now_us);
+        self.giving_invitation_finished(voice_boot, turn, delivery, now_us);
+        self.privacy_invitation_finished(voice_boot, turn, delivery, now_us);
     }
 
     pub fn kept(&self) -> &Progress {
@@ -1986,16 +2046,35 @@ impl Onboarding {
                 // A name heard and never taken back is known, call or not.
                 // The name's words are not kept: the record says so.
                 let named = step == Step::WhoYouAre && led.heard.name;
+                let asked_again = led.asked_again;
                 self.nudge_record(false, now_us);
-                let outcome = if named {
+                if named {
                     self.records
                         .push(json!({"kind":"onboarding_heard","step":step.name(),
                         "name_kept":false,"at_us":now_us}));
-                    Outcome::Done
+                    self.finish(step, Outcome::Done, None, now_us);
+                    return None;
+                }
+                // Timed out only after `TIMED_OUT_QUIET_US` of quiet, past
+                // the lamp's own 20 s of conversation: nobody is in one with
+                // it, so it is no answer of the person's (lamp-29e7, 27 Oct
+                // 14:22:20, `preferences: failed` 100 s after the last line
+                // answered, #3754). Asked again once someone is there, as a
+                // dropped invitation is, [`MOST_UNSAID`] times; only then,
+                // asked and given its time each time, it fails.
+                let again = asked_again < MOST_UNSAID;
+                self.records.push(json!({"kind":"onboarding_stopped",
+                    "why":"no conversation","step":step.name(),
+                    "asked_again":again,"at_us":now_us}));
+                if again {
+                    self.led = Some(Led {
+                        step,
+                        asked_again: asked_again + 1,
+                        ..Led::default()
+                    });
                 } else {
-                    Outcome::Failed
-                };
-                self.finish(step, outcome, None, now_us);
+                    self.finish(step, Outcome::Failed, None, now_us);
+                }
                 return None;
             }
             let (nudge, answers) = self.definition.nudge(step).filter(|_| self.nudge)?;
@@ -2206,6 +2285,7 @@ impl Onboarding {
                 self.privacy_flow.loaded = true;
                 self.privacy_flow.maintenance_failed = false;
                 self.privacy_flow.failures = 0;
+                self.privacy_flow.unsaid = 0;
                 self.privacy_flow.no_receipt_since = None;
                 self.privacy_flow.waited_out = false;
                 self.privacy_flow.generation = 0;
@@ -3666,6 +3746,10 @@ mod tests {
         // A name taken back by a no is not known either.
         room.walk.heard("Call me Marie.", room.at);
         room.walk.heard("No.", room.at);
+        // Its conversation over, asked twice more (#3754), then failed.
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
         assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Failed));
     }
@@ -3791,6 +3875,49 @@ mod tests {
     }
 
     #[test]
+    fn a_step_whose_conversation_ended_is_asked_again_not_failed() {
+        // lamp-29e7, 27 Oct: `preferences: failed` at 14:22:20, 100 s after
+        // the last answered line, the conversation under it over (#3754).
+        let mut room = Room::new("conversation-ended");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk
+            .heard("Please stay quiet after ten at night.", room.at);
+        // Nothing more: the conversation ends, the step's time runs out.
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::Preferences), None, "not failed");
+        assert!(
+            room.walk
+                .take_records()
+                .iter()
+                .any(|row| row["why"] == "no conversation" && row["asked_again"] == true)
+        );
+        // Asked again, it ends on the person's answers.
+        room.walk
+            .heard("Please stay quiet after ten at night.", room.at);
+        room.walk
+            .heard("Yes, you can say hello in the morning.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+    }
+
+    #[test]
+    fn a_turn_gone_before_its_first_audio_is_no_ask_and_a_redo_forgets_the_count() {
+        // The route failed, the service stopped or a privacy gap came
+        // before any of the invitation played: never said (#3754).
+        assert_eq!(Delivery::unsettled(false), Delivery::Unsaid);
+        assert_eq!(Delivery::unsettled(true), Delivery::Cut);
+        let mut room = Room::new("unsaid-redo");
+        room.walk.privacy_flow.unsaid = MOST_UNSAID;
+        room.walk.privacy_flow.failures = 1;
+        room.walk.apply_mailbox("{\"redo\":true}\n", room.at);
+        assert_eq!(room.walk.privacy_flow.unsaid, 0);
+        assert_eq!(room.walk.privacy_flow.failures, 0);
+    }
+
+    #[test]
     fn where_you_sit_guides_only_once() {
         let mut room = Room::new("once");
         room.still = false;
@@ -3816,7 +3943,10 @@ mod tests {
         room.still = true;
         assert_eq!(room.walk.kept().steps["where_you_sit"].framing, Some(far));
         assert_eq!(room.wait(4 * S, Some(far)), [WHO_NOTE]);
-        // Never reported: failed after ninety seconds and a quiet room.
+        // Never reported: asked twice more once its conversation is over
+        // (#3754), then failed after ninety seconds and a quiet room.
+        assert_eq!(room.wait(95 * S, Some(far)), [WHO_NOTE]);
+        assert_eq!(room.wait(95 * S, Some(far)), [WHO_NOTE]);
         assert_eq!(room.wait(95 * S, Some(far)), [PREFERENCES_NOTE]);
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Failed));
     }
@@ -4135,6 +4265,8 @@ mod tests {
         assert!(!room_sounds_file(&room).exists());
         // Silence: failed after ninety seconds and a quiet room.
         let mut room = asked_room_sounds("room-sounds-silence");
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [ROOM_SOUNDS_NOTE]);
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [ROOM_SOUNDS_NOTE]);
         assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::Failed));
         assert!(!room_sounds_file(&room).exists());
@@ -4228,6 +4360,14 @@ mod tests {
         assert_eq!(room.outcome(Step::FaceExpressions), Some(Outcome::Skipped));
         assert!(!face_expressions_file(&room).exists());
         let mut room = asked_face_expressions("face-expressions-silence");
+        assert_eq!(
+            room.wait(95 * S, Some(NEAR_MIDDLE)),
+            [FACE_EXPRESSIONS_NOTE]
+        );
+        assert_eq!(
+            room.wait(95 * S, Some(NEAR_MIDDLE)),
+            [FACE_EXPRESSIONS_NOTE]
+        );
         assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         assert_eq!(room.outcome(Step::FaceExpressions), Some(Outcome::Failed));
         assert!(!face_expressions_file(&room).exists());

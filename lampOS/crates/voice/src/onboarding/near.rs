@@ -40,8 +40,8 @@ pub use super::legacy_words::{
 };
 
 use super::{
-    FRESH_MS, GONE_US, Onboarding, Outcome, START_QUIET_US, STEP_GIVE_UP_US, Step,
-    TIMED_OUT_QUIET_US, fresh_token, storage,
+    Delivery, FRESH_MS, GONE_US, MOST_UNSAID, NOT_SAID, Onboarding, Outcome, START_QUIET_US,
+    STEP_GIVE_UP_US, Step, TIMED_OUT_QUIET_US, fresh_token, storage,
 };
 use lamp_near_call::{
     Calibrated, Hearing, Level, MOST_PROMPTS, RISE_MS, SCORE, Spoke, Try, WINDOW_MS, asks_again,
@@ -242,6 +242,8 @@ pub(crate) struct NearFlow {
     short: Option<Short>,
     /// Prompts offered again after being cut ([`MOST_REOFFERS`]).
     reoffered: u8,
+    /// Prompts the voice never said, offered again ([`MOST_UNSAID`]).
+    unsaid: u8,
 }
 
 impl NearFlow {
@@ -532,10 +534,11 @@ impl Onboarding {
         }
         // The name part's stored bar stands: the sentence part goes on. The
         // prompts offered again stay counted, so absence can't renew them.
-        let (named, reoffered) = (self.near.named, self.near.reoffered);
+        let (named, reoffered, unsaid) = (self.near.named, self.near.reoffered, self.near.unsaid);
         self.forget_near();
         self.near.named = named;
         self.near.reoffered = reoffered;
+        self.near.unsaid = unsaid;
     }
 
     /// The committed-to-be prompt count of a part.
@@ -560,6 +563,7 @@ impl Onboarding {
         self.near.line = None;
         self.near.short = None;
         self.near.reoffered = 0;
+        self.near.unsaid = 0;
     }
 
     pub(super) fn near_pending(&self) -> Option<lamp_msgs::OnboardingInvitation> {
@@ -661,7 +665,7 @@ impl Onboarding {
         &mut self,
         voice_boot: BootId,
         turn: u64,
-        delivered_whole: bool,
+        delivery: Delivery,
         now_us: u64,
     ) {
         if self.near_binding() != Some((voice_boot, turn)) {
@@ -672,10 +676,38 @@ impl Onboarding {
         eprintln!(
             "lamp-voice onboarding: how_you_sound prompt {} played {} ({})",
             offer.prompt,
-            if delivered_whole { "whole" } else { "cut" },
+            match delivery {
+                Delivery::Whole => "whole",
+                Delivery::Cut => "cut",
+                Delivery::Unsaid => "not said",
+            },
             if offer.sentence { "sentence" } else { "call" }
         );
-        if !delivered_whole {
+        if delivery == Delivery::Unsaid {
+            // Never said, never asked: its prompt is given back, and none of
+            // the cut prompts' budget is spent (#3754).
+            if *self.prompts(offer.sentence) == offer.prompt {
+                *self.prompts(offer.sentence) = offer.prompt - 1;
+                self.save();
+            }
+            self.near.unsaid = self.near.unsaid.saturating_add(1);
+            let again = self.near.unsaid <= MOST_UNSAID;
+            let kind = if offer.sentence {
+                "onboarding_sentence_try"
+            } else {
+                "onboarding_near_try"
+            };
+            self.records.push(json!({"kind":kind,"prompt":offer.prompt,
+                "accepted":false,"why":NOT_SAID,"offered_again":again,"at_us":now_us}));
+            if again {
+                self.near.retry_after_us = now_us.saturating_add(1_000_000);
+            } else {
+                self.invalidate_near();
+                self.finish(Step::HowYouSound, Outcome::NotAvailable, None, now_us);
+            }
+            return;
+        }
+        if delivery != Delivery::Whole {
             self.near.retry_after_us = now_us.saturating_add(1_000_000);
             let kind = if offer.sentence {
                 "onboarding_sentence_try"

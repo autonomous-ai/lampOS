@@ -139,7 +139,7 @@ fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
         speaking: true,
     });
     set_clock(unix_ms);
-    walk.invitation_finished(boot, turn, true, now);
+    walk.invitation_finished(boot, turn, Delivery::Whole, now);
     walk.near_seen(Seen::Speaking {
         at_ms: unix_ms + 20,
         speaking: false,
@@ -421,7 +421,7 @@ fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
         let attempt = walk.pending().invitations[0].attempt;
         walk.take_invitation(token, at).unwrap();
         assert!(walk.bind_invitation(token, boot, turn));
-        walk.invitation_finished(boot, turn, false, at);
+        walk.invitation_finished(boot, turn, Delivery::Cut, at);
         walk.drain_storage_for_test(at);
         let row = walk
             .take_records()
@@ -880,7 +880,7 @@ fn ask(walk: &mut Onboarding, at: u64, turn: u64) -> String {
     let words = walk.take_invitation(token, at).unwrap();
     let boot = BootId::new([3; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
-    walk.invitation_finished(boot, turn, true, at);
+    walk.invitation_finished(boot, turn, Delivery::Whole, at);
     words
 }
 
