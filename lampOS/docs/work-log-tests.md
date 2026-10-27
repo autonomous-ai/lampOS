@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 01:30 — Mood original native green; current carries continue
+
+Ready for lamp-voice: no (current-base qualification and current readers remain).
+
+[Mood original native audit](verification/tests-mood-d168-native-20261028/) records ARM40558310755 and Linux40558310729 success, attempt one: **7,794 unique passes, zero bad or selected unrun**,53 aggregate skips. All341 current Expression identities and both repaired cases pass once. Actual3a1bdf208 [409236242,d168fa939] preserves both owned blobs and all bound workflow/configuration inputs, with12 explicit other upstream paths; this is not later Maina17 or a whole authored-tree match. Promoter/docs/process/relay/Python scopes remain separate; artifacts metadata only, no archive or device access. Old failures remain recorded.
+
+Restart4deeae914 on Maina17 is now in fresh strict/workspace/full Voice library gates. Reader's exact latest-base ecc34ddf5 carry is local, both blobs and patch unchanged, and draft until refreshed qualification. Skills' first admission stopped before launch on a stale controller hash; zero Cargo/runtime attempts, correction pending. The reported parallel Memory fixture conflict is taken for process isolation, with all original assertions retained.
+
 ## 2026-10-28 01:19 — full current Mood package passes; next Skills gate
 
 Ready for lamp-voice: no (#3623 fresh native checks and current reads remain; #3543 ready).
