@@ -33,6 +33,23 @@ pub trait Parts {
     fn stop(&mut self, client: &str, now_us: u64);
 }
 
+/// The parts before actions are routed to them: every action is refused
+/// with a why, and state is not known yet.
+pub struct Unrouted;
+
+impl Parts for Unrouted {
+    fn act(&mut self, _: &str, _: &Op, _: u64) -> Result<Value, Error> {
+        Err(Error::new(
+            ErrorCode::Refused,
+            "not routed to the lamp's parts yet",
+        ))
+    }
+    fn state(&self, _: StateKind) -> Value {
+        Value::Null
+    }
+    fn stop(&mut self, _: &str, _: u64) {}
+}
+
 /// One connection's own state.
 #[derive(Debug)]
 pub struct Session {
@@ -162,6 +179,11 @@ impl Door {
             return self.leases.client_gone(client, LeaseWhy::Released, now_us);
         }
         Vec::new()
+    }
+
+    /// The paired computers.
+    pub fn clients(&self) -> &Clients {
+        &self.clients
     }
 
     /// The lamp's own events for every lease: a conversation began or ended,
