@@ -2096,3 +2096,28 @@ restores skill files before restarting the old binary; crash recovery requires
 Update to run again. Voice's existing ten-second fallback is an eligible-offer
 wait, not guaranteed end-to-end delivery or proof of mixed-version parity.
 Keep these crossings explicit in validation; no atomic-update claim is made.
+
+## Cloud manager query ownership and complete output (2026-10-27)
+
+Cloud's report reader joined a stdout thread after reaping a successful
+leader, so a descendant retaining the pipe could bypass the two-second query
+budget. Its 256 KiB `take` also accepted a truncated successful prefix and
+ignored read/UTF-8 errors. Source review found three callers: exit-note
+metadata, cached unit health, and the independent recovery timer report.
+
+V1's nearest health query, `readHALUptime` in
+`system/server/health/delivery/http/handler.go`, uses an unbounded
+`exec.Command(...).Output()` and returns zero on failure. It supplies no
+bounded group or complete-output safeguard to port. Keep Cloud's existing
+two seconds, 256 KiB, null stdin/stderr, `Option<String>` API and each caller's
+failure policy; reject incomplete, oversized or invalid UTF-8 responses.
+
+Reuse the corrected private Setup/Update query ownership mechanics: Rustix's
+pinned nonblocking descriptor and process APIs, `waitid` with `NOWAIT`, a
+retained leader through validation, and cleanup before reaping on failure.
+Cloud declares its own Rustix features explicitly. No service, shared public
+executor, new dependency version, systemctl state parser or stop policy is
+introduced. Direct controls exercise Cloud's public wrapper and its own
+256 KiB boundary. Mac, original ARM64 and installed-lamp acceptance remain
+separate evidence; successful detached-descendant cleanup and hard kernel
+spawn/reap bounds are outside this contract.
