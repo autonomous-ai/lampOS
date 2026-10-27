@@ -101,6 +101,7 @@ fn proposal(text: &str, sources: &[u64], supersedes: Option<u64>) -> Proposal {
         category: Category::Preference,
         source_ids: sources.to_vec(),
         supersedes,
+        replaces: None,
         on: None,
     }
 }
@@ -3593,4 +3594,89 @@ fn a_question_is_never_kept_as_a_fact() {
         assert_eq!(kept.len(), kept_count, "{heard} / {proposed}");
     }
     assert!(found(&mut store, &room, "asked").is_empty());
+}
+
+/// Finding N11 on #3504 (lamp-06c1, 27 Oct): the pass's "Works at a
+/// library now, not the bakery." was kept beside "works at a bakery",
+/// which stayed current. With the voice's `replaces` the kept thing is
+/// retired by a replacement edge, as a `remember` correction retires it;
+/// one no longer current is left as it is and the observation kept beside;
+/// two observations, or one with a supersession too, are refused.
+#[test]
+fn an_observation_replacing_a_kept_thing_retires_it() {
+    let scratch = Scratch::new("observation-replaces");
+    let mut store = scratch.open(30, NOW);
+    let olivia = person("p-olivia");
+    let bakery = store.remember(&olivia, NOW, "works at a bakery").unwrap();
+    let line = store
+        .append(
+            &olivia,
+            NOW,
+            "I work at a library now. Not the bakery.",
+            "That's a change",
+            &[],
+        )
+        .unwrap();
+    let job = store.conversation_end(&olivia, "library", &[line]).unwrap();
+    let mut correction = proposal("Works at a library now, not the bakery.", &[line], None);
+    correction.replaces = Some(bakery);
+    let ids = store
+        .tidy_apply(
+            &olivia,
+            &job.job,
+            &Output {
+                observations: vec![correction.clone()],
+            },
+        )
+        .unwrap();
+    assert_eq!(ids.len(), 1);
+    let old = store.record(&olivia, bakery).unwrap().unwrap();
+    assert!(!old.active, "{old:?}");
+    let new = store.record(&olivia, ids[0]).unwrap().unwrap();
+    assert!(new.active && new.supersedes == Some(bakery), "{new:?}");
+    assert!(!found(&mut store, &olivia, "bakery").contains(&bakery));
+
+    // Already replaced: kept plainly beside, nothing else changes.
+    let again = store
+        .append(&olivia, NOW, "The library, not the bakery", "Right", &[])
+        .unwrap();
+    let job = store.conversation_end(&olivia, "again", &[again]).unwrap();
+    let mut late = proposal("Library job now, not the bakery", &[again], None);
+    late.replaces = Some(bakery);
+    let ids = store
+        .tidy_apply(
+            &olivia,
+            &job.job,
+            &Output {
+                observations: vec![late],
+            },
+        )
+        .unwrap();
+    let plain = store.record(&olivia, ids[0]).unwrap().unwrap();
+    assert!(plain.active && plain.supersedes.is_none(), "{plain:?}");
+
+    // Two naming one kept thing, or a supersession beside it: refused.
+    let tea = store.remember(&olivia, NOW, "likes tea").unwrap();
+    let line = store
+        .append(&olivia, NOW, "Coffee now, not tea", "Ok", &[])
+        .unwrap();
+    let job = store.conversation_end(&olivia, "two", &[line]).unwrap();
+    let mut first = proposal("Drinks coffee now, not tea", &[line], None);
+    first.replaces = Some(tea);
+    let second = Proposal {
+        text: "No longer drinks tea".into(),
+        ..first.clone()
+    };
+    assert!(
+        store
+            .tidy_apply(
+                &olivia,
+                &job.job,
+                &Output {
+                    observations: vec![first, second],
+                },
+            )
+            .is_err()
+    );
+    assert!(store.record(&olivia, tea).unwrap().unwrap().active);
 }

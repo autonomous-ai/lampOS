@@ -738,6 +738,21 @@ adapter obligations. This state machine cannot interrupt an arbitrary
 blocking callback. Cancellation must also happen when the caller's
 conversation or memory context is discarded.
 
+A proposal may carry `"replaces"`: the id of a kept thing of the same
+scope it clearly corrects, which the voice found with its correction
+matcher, never one the model wrote (finding N11 on #3504; `LAMP_MEMORY_REPLACES` with
+`LAMP_MEMORY_OBSERVE`, [memory.md](memory.md)). `tidy_apply` retires it in
+the same transaction: a `replacements(newer, older)` edge from the new
+observation, the kept thing made inactive and its event day gone, as a
+`remember` with `replaces` does, so forgetting either removes both. One
+that is not this scope's active kept thing, or is newer than the
+observation's evidence, is left as it is and the observation is kept
+plainly beside it (the log says so, without words). Two proposals naming
+the same id, or one with `supersedes` as well, are refused as invalid
+output. An older memory refuses the field (`deny_unknown_fields`), so the
+job closes with nothing kept. Test:
+`it::days::an_observation_replacing_a_kept_thing_retires_it`.
+
 The real model would be instructed along these lines, with `Input` sent
 as quoted data rather than instructions:
 

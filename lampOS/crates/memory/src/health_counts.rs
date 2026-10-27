@@ -347,6 +347,7 @@ mod tests {
                         category: Category::Preference,
                         source_ids: vec![source],
                         supersedes: None,
+                        replaces: None,
                         on: None,
                     }],
                 },

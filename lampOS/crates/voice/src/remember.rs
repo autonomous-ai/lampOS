@@ -1534,7 +1534,11 @@ pub type Observer = Box<dyn Fn(&Value) -> Option<Value> + Send + Sync>;
 static OBSERVER: OnceLock<Observer> = OnceLock::new();
 /// The jobs waiting for the model, one at a time ([`observe_jobs`]), each
 /// with [`OBSERVE_FORGETS`] as it was at its conversation's first exchange.
-static OBSERVING: OnceLock<SyncSender<(Option<String>, Value, u64)>> = OnceLock::new();
+static OBSERVING: OnceLock<SyncSender<ObserveJob>> = OnceLock::new();
+/// A job for the observation pass: whose, the frozen job, [`OBSERVE_FORGETS`]
+/// as its conversation began, and that person's kept things the session was
+/// shown, by id ([`observations_replacing`]).
+type ObserveJob = (Option<String>, Value, u64, Vec<(u64, String)>);
 /// Forgets asked of this process's memory (`forget`, `forget_everything`,
 /// named or not, kept or refused), counted as each is asked. A job waiting for the model, or with it, from
 /// before a forget is closed with nothing kept: its words are never sent,
@@ -1616,9 +1620,15 @@ fn observe_input(input: &Value, events: bool, now: u64, zone: Option<&LocalTime>
 /// What the model proposed, as it goes to the memory (`tidy_apply`): with
 /// `events`, a thread's or promise's `"on"` day is kept and any other
 /// `"on"` dropped; without, every `"on"` is dropped, so a memory that does
-/// not know it never sees it.
+/// not know it never sees it. A `"replaces"` the model gave is always
+/// dropped: only the voice's own matcher sets one
+/// ([`observations_replacing`]; the reviewer-lead's P2 on #3853, a model or
+/// a steered line naming any kept id would retire it).
 fn observations_for_memory(mut observations: Vec<Value>, events: bool) -> Vec<Value> {
     for observation in &mut observations {
+        if let Some(observation) = observation.as_object_mut() {
+            observation.remove("replaces");
+        }
         let dated = events
             && matches!(observation["category"].as_str(), Some("thread" | "promise"))
             && observation["on"].is_string();
@@ -4925,6 +4935,10 @@ struct HandOns {
     held: Mutex<VecDeque<Held>>,
     /// Whether the room's lines go with who said them (#2849).
     room_speaker: RoomSpeaker,
+    /// The provider's context, whose kept things shown a conversation's
+    /// observation pass holds its proposals against
+    /// ([`observations_replacing`], finding N11 on #3504).
+    context: Arc<Mutex<DaysContext>>,
 }
 
 /// At most this many answers held at once.
@@ -5442,6 +5456,15 @@ impl DaysContext {
         }
         self.texts
             .push((person.map(str::to_owned), id, text.to_owned()));
+    }
+
+    /// Every kept thing of this person's shown, by id, with its text.
+    fn shown_texts(&self, person: Option<&str>) -> Vec<(u64, String)> {
+        self.texts
+            .iter()
+            .filter(|(whose, _, _)| whose.as_deref() == person)
+            .map(|(_, id, text)| (*id, text.clone()))
+            .collect()
     }
 
     /// The text kept thing `id` of this person's was shown as.
@@ -5979,6 +6002,52 @@ fn correction_candidates(
         .collect()
 }
 
+/// The observation pass's proposals, each that clearly corrects one kept
+/// thing of `person`'s in `shown` given its id as `"replaces"` (finding N11
+/// on #3504: lamp-06c1, 27 Oct, "Works at a library now, not the bakery."
+/// kept beside "works at a bakery", which stayed current). The same matcher
+/// as a `remember` in their words ([`correction_candidates`]), on the
+/// proposal's text: a change word, and after its "not", "no longer" or
+/// "instead of" words all of which the old thing has; "not just tea"
+/// denies nothing. More than one candidate, or two proposals naming the
+/// same old thing, give none. One superseding an observation is left as it
+/// is. The memory retires it (`tidy_apply`).
+fn observations_replacing(
+    mut observations: Vec<Value>,
+    person: Option<&str>,
+    shown: &[(u64, String)],
+) -> Vec<Value> {
+    if shown.is_empty() {
+        return observations;
+    }
+    let mut context = DaysContext::default();
+    for (id, text) in shown {
+        context.shown_as(person, *id, text);
+    }
+    let ids: Vec<u64> = shown.iter().map(|(id, _)| *id).collect();
+    let found: Vec<Option<u64>> = observations
+        .iter()
+        .map(|observation| {
+            let text = observation["text"].as_str()?;
+            if !observation["supersedes"].is_null() {
+                return None;
+            }
+            match correction_candidates(&context, person, text, &ids)[..] {
+                [old] => Some(old),
+                _ => None,
+            }
+        })
+        .collect();
+    for (observation, old) in observations.iter_mut().zip(&found) {
+        if let Some(old) = old
+            && found.iter().filter(|other| *other == &Some(*old)).count() == 1
+        {
+            observation["replaces"] = json!(old);
+        }
+    }
+    observations
+}
+
 /// A word as [`content_words`] gives it: a plural's `s` taken off.
 fn plural_off(word: &str) -> &str {
     word.strip_suffix('s')
@@ -6419,13 +6488,16 @@ impl DaysClient {
         let name = prefix.clone();
         let current = Arc::new(Mutex::new(Current::default()));
         let writing = Arc::clone(&current);
-        let hand_ons = Arc::new(HandOns::default());
+        let context = Arc::new(Mutex::new(DaysContext::default()));
+        let hand_ons = Arc::new(HandOns {
+            context: Arc::clone(&context),
+            ..HandOns::default()
+        });
         hand_ons
             .room_speaker
             .on
             .store(room_speaker_on(), Ordering::Release);
         let handing = Arc::clone(&hand_ons);
-        let context = Arc::new(Mutex::new(DaysContext::default()));
         let (words, follows) = (crate::early_words::on(), crate::follows_face::on());
         let early = words || follows;
         let moving = Arc::clone(&context);
@@ -9017,8 +9089,14 @@ impl Conversation {
 /// the first; with it busy, the job is closed with nothing kept, so the
 /// memory's bounded queue never fills with jobs nobody will finish.
 /// `forgets` is [`OBSERVE_FORGETS`] as the conversation's first exchange
-/// was added.
-fn observe(socket: &Path, person: Option<String>, input: Value, forgets: u64) {
+/// was added; `shown`, that person's kept things the session was shown.
+fn observe(
+    socket: &Path,
+    person: Option<String>,
+    input: Value,
+    forgets: u64,
+    shown: Vec<(u64, String)>,
+) {
     let jobs = OBSERVING.get_or_init(|| {
         let (jobs, work) = sync_channel(OBSERVE_QUEUE);
         let path = socket.to_owned();
@@ -9031,9 +9109,9 @@ fn observe(socket: &Path, person: Option<String>, input: Value, forgets: u64) {
         jobs
     });
     if let Err(
-        std::sync::mpsc::TrySendError::Full((person, input, _))
-        | std::sync::mpsc::TrySendError::Disconnected((person, input, _)),
-    ) = jobs.try_send((person, input, forgets))
+        std::sync::mpsc::TrySendError::Full((person, input, _, _))
+        | std::sync::mpsc::TrySendError::Disconnected((person, input, _, _)),
+    ) = jobs.try_send((person, input, forgets, shown))
     {
         let job = input["job"].as_str().unwrap_or_default();
         let closed = close_job(socket, person.as_deref(), job);
@@ -9061,13 +9139,14 @@ fn close_job(socket: &Path, person: Option<&str>, job: &str) -> bool {
 /// proposes given to the memory, which checks it as it checks any pass
 /// (`tidy_apply`). A proposal the memory refuses, or a model that fails,
 /// closes the job with nothing kept. The journal has counts only.
-fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value, u64)>) {
+fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
     let events = events_on();
     let needs_face = needs_face::on();
     // A forget since the conversation ended: the job is closed unsent, or
     // its proposals are not given (`OBSERVE_FORGETS`).
     let forgotten = |forgets: u64| OBSERVE_FORGETS.load(Ordering::Acquire) != forgets;
-    for (person, input, forgets) in jobs {
+    let replaces = replaces_on();
+    for (person, input, forgets, shown) in jobs {
         let Some(job) = input["job"].as_str().map(str::to_owned) else {
             continue;
         };
@@ -9108,6 +9187,13 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value, u64)>) {
         if dropped > 0 {
             eprintln!("{}", needs_face::dropped_line(dropped));
         }
+        // With `LAMP_MEMORY_REPLACES`, one that clearly corrects a kept
+        // thing of theirs retires it (finding N11 on #3504).
+        let observations = if replaces {
+            observations_replacing(observations, person.as_deref(), &shown)
+        } else {
+            observations
+        };
         let answer = bounded_exchange(
             socket,
             &for_person(
@@ -9534,7 +9620,16 @@ fn days_writer(
                     let closed = close_job(socket, None, job);
                     eprintln!("{} (closed={closed})", needs_face::ROOM_NOT_OBSERVED);
                 }
-                Some(input) => observe(socket, ended.person, input, forgets),
+                Some(input) => {
+                    // The kept things of theirs the session was shown, for a
+                    // correction the pass proposes (finding N11 on #3504).
+                    let shown = hand_ons
+                        .context
+                        .lock()
+                        .map(|context| context.shown_texts(ended.person.as_deref()))
+                        .unwrap_or_default();
+                    observe(socket, ended.person, input, forgets, shown);
+                }
                 None => eprintln!(
                     "lamp-voice provider: memory conversation end gave no job; no observation pass"
                 ),
@@ -10193,6 +10288,78 @@ mod tests {
         io::{BufRead, BufReader, Write},
         os::unix::net::UnixListener,
     };
+
+    /// Finding N11 on #3504 (lamp-06c1, 27 Oct): the pass's "Works at a
+    /// library now, not the bakery." retires the one shown "works at a
+    /// bakery"; "not just tea" retires nothing; two bakery things, or two
+    /// proposals naming one, retire nothing; another person's never.
+    #[test]
+    fn an_observation_correcting_one_shown_kept_thing_replaces_it() {
+        let proposal = |text: &str| json!({"text":text,"category":"preference","source_ids":[1],"supersedes":null});
+        let olivia = Some("p-olivia");
+        let shown = vec![
+            (590, "works at a bakery".to_owned()),
+            (591, "likes tea".to_owned()),
+        ];
+        let replaced = |observations: Vec<Value>, shown: &[(u64, String)]| {
+            observations_replacing(observations, olivia, shown)
+                .iter()
+                .map(|observation| observation["replaces"].as_u64())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            replaced(
+                vec![proposal("Works at a library now, not the bakery.")],
+                &shown
+            ),
+            vec![Some(590)]
+        );
+        assert_eq!(
+            replaced(
+                vec![
+                    proposal("Drinks coffee now, not just tea."),
+                    proposal("Likes the bakery's bread"),
+                ],
+                &shown
+            ),
+            vec![None, None]
+        );
+        let two = vec![
+            (590, "works at a bakery".to_owned()),
+            (592, "bakery is on Main Street".to_owned()),
+        ];
+        assert_eq!(
+            replaced(
+                vec![proposal("Works at a library now, not the bakery.")],
+                &two
+            ),
+            vec![None]
+        );
+        assert_eq!(
+            replaced(
+                vec![
+                    proposal("Works at a library now, not the bakery."),
+                    proposal("No longer at the bakery"),
+                ],
+                &shown
+            ),
+            vec![None, None]
+        );
+        // A supersession of an observation stays one.
+        let mut superseding = proposal("Works at a library now, not the bakery.");
+        superseding["supersedes"] = json!(7);
+        assert_eq!(replaced(vec![superseding], &shown), vec![None]);
+        // Only the person's own kept things are held against it.
+        let mut context = DaysContext::default();
+        context.shown_as(olivia, 590, "works at a bakery");
+        context.shown_as(Some("p-tom"), 600, "works at a bakery");
+        context.shown_as(None, 610, "the bakery opens at seven");
+        assert_eq!(
+            context.shown_texts(olivia),
+            vec![(590, "works at a bakery".to_owned())]
+        );
+        assert!(context.shown_texts(Some("p-mai")).is_empty());
+    }
 
     /// lamp-06c1, 26 Oct: "I work at a library now, not the bakery" with no
     /// `replaces` picks the one shown kept thing it denies, and nothing when
@@ -13474,6 +13641,21 @@ mod tests {
         assert!(on[2].get("on").is_none(), "a preference has no day");
         assert!(on[3].get("on").is_none(), "a null day is left out");
         assert_eq!(on[4], proposed[4]);
+        // The reviewer-lead's P2 on #3853: the model's own `replaces` never
+        // reaches the memory, with the events switch or without.
+        let steered = vec![
+            json!({"text":"Works at a library","category":"preference","source_ids":[5],"supersedes":null,"replaces":3}),
+        ];
+        for events in [false, true] {
+            let sent = observations_for_memory(steered.clone(), events);
+            assert!(sent[0].get("replaces").is_none(), "{sent:?}");
+            assert_eq!(sent[0]["text"], "Works at a library");
+            // Off (`LAMP_MEMORY_REPLACES`), nothing adds one back; on, only
+            // a correction of a shown kept thing does.
+            let shown = [(3, "allergic to peanuts".to_owned())];
+            let matched = observations_replacing(sent, Some("p-olivia"), &shown);
+            assert!(matched[0].get("replaces").is_none(), "{matched:?}");
+        }
     }
 
     /// #1693, `LAMP_MEMORY_EVENTS`: with the switch the `follow_up` asks
