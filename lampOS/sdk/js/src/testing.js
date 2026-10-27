@@ -221,9 +221,14 @@ export class FakeLamp {
         // As lamp-control routes them: the body takes them, and no `done`
         // follows.
         return this.ok(ws, id, { to: 'body' });
+      case 'say':
+        // As lamp-control: the voice takes it, and its `done` follows.
+        this.ok(ws, id, { to: 'voice' });
+        if (this.autoDone) this.done(id);
+        return undefined;
       default:
         this.ok(ws, id);
-        if (['play', 'say'].includes(op) && this.autoDone) this.done(id);
+        if (op === 'play' && this.autoDone) this.done(id);
         return undefined;
     }
   }

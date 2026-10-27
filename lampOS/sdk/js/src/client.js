@@ -11,6 +11,11 @@ import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
 
+// The actions lamp-control answers `{"to":"body"}` with no `done` after
+// (docs/control.md): a wait for them ends at that answer. `say` answers
+// `{"to":"voice"}` and its `done` does follow.
+export const ENDS_AT_REPLY = new Set(['gesture', 'move']);
+
 // One connection: its frames as they come, and the first frame, which must be
 // the lamp's welcome. The certificate is checked against `pin` before any
 // frame is sent.
@@ -219,35 +224,48 @@ export class Lamp {
 
   // Send a checked request under its own id.
   send(id, op, fields) {
+    // A socket no longer open drops a frame without a word, and its reply
+    // would never come: so a request after the lamp has gone is refused here.
+    if (this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new LampError('the connection to the lamp closed', { code: 'closed' }));
+    }
     return new Promise((resolve, reject) => {
       this.waiting.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, op, ...fields }));
+      this.ws.send(JSON.stringify({ id, op, ...fields }), (error) => {
+        if (error && this.waiting.get(id)?.reject === reject) {
+          this.waiting.delete(id);
+          reject(new LampError(`the connection to the lamp closed: ${error.message}`, { code: 'closed' }));
+        }
+      });
     }).then((reply) => {
       if (!reply.ok) throw fromReply(reply.error);
       return reply;
     });
   }
 
-  // An action: its reply when taken, or with `wait` its `done` event, unless
-  // the reply says which part took it (`to`) and no `done` follows.
+  // An action: its reply when taken, or with `wait` its `done` event; for the
+  // actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
   act(op, fields, wait = false) {
     const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
     // Checked before an id is taken, so an action refused here has no id,
     // and every id is this call's own.
     try { check(op, clean); } catch (error) { return Promise.reject(error); }
     const id = this.nextId++;
-    const done = wait ? new Promise((resolve, reject) => this.done.set(id, { resolve, reject })) : null;
+    // Handed to the body, which says nothing back, `gesture` and `move` get
+    // no `done` (docs/control.md): their wait ends at the answer, so none is
+    // kept for them.
+    const done = wait && !ENDS_AT_REPLY.has(op)
+      ? new Promise((resolve, reject) => this.done.set(id, { resolve, reject }))
+      : null;
+    // A close rejects every `done`; when it comes before the reply, `taken`
+    // carries the rejection to the caller and this one has no listener, which
+    // Node would end the program for.
+    done?.catch(() => {});
     const taken = this.send(id, op, clean);
-    if (!wait) return taken;
+    if (!done) return taken;
     // A refused action takes its `done` back, so nothing is left to reject,
     // unheard, when the connection closes.
-    return taken.then((reply) => {
-      // Handed to a part that says nothing back, as lamp-control does with
-      // `gesture` and `move` (`{"to":"body"}`, docs/control.md): no `done`
-      // follows, so the wait ends at the answer.
-      if ('to' in reply) { this.done.delete(id); return reply; }
-      return done;
-    }, (error) => { this.done.delete(id); throw error; });
+    return taken.then(() => done, (error) => { this.done.delete(id); throw error; });
   }
 
   frame(frame) {
@@ -278,7 +296,11 @@ export class Lamp {
     // A refused subscription takes its handler back off, so a later `on()`
     // for the event, once granted, doesn't call both.
     return this.subscribe([event]).catch((error) => {
-      const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler);
+      // Only the copy this call added: the same function may be there
+      // already for a granted subscription.
+      const left = [...(this.handlers.get(event) ?? [])];
+      const at = left.lastIndexOf(handler);
+      if (at >= 0) left.splice(at, 1);
       if (left.length) this.handlers.set(event, left);
       else this.handlers.delete(event);
       throw error;
