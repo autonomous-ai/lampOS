@@ -993,7 +993,9 @@ this room" until someone asks to be recognised.
     `NOT_KNOWN_SOME_KEPT_APART`).
   - The hello for someone known is by name. With no known face, it is by
     the name typed at setup, when `LAMP_PERSON_NAME` gives one
-    ([speaking-first.md](speaking-first.md), #806).
+    ([speaking-first.md](speaking-first.md), #806), but not with
+    `LAMP_PERSON_NAME_OWNER_ONLY=on` (the product, #3884): that name is
+    told only to the owner's own known face.
   - What a known person says is told their name once a session ("The person
     at the lamp now is Minh: you know their face.").
   - With a memory, what a known person asks it to keep and what they say

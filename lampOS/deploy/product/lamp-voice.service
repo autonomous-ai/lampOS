@@ -313,6 +313,10 @@ Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 # The name typed at setup (lamp-setup writes it; a reset wipes it), told to the model with its character
 # so Welcome back can greet by it when no face is known (docs/setup.md, #806). No file, no name.
 Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name
+# That name is told only when the owner's own known face is alone in view, never to a visitor or an empty room:
+# with it off, the typed name was put to unknown faces 60 times in 80 (#3014's probe) and still said after "forget
+# everything about me" (52e6, 27 Oct) (#2602, #3884).
+Environment=LAMP_PERSON_NAME_OWNER_ONLY=on
 Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg
 # What the lamp sees, when asked, from the eyes' full look (lamp-eyes --full-look), not the 320 working frame.
 Environment=LAMP_LOOK_FULL=on

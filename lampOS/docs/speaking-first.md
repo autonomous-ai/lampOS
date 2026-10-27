@@ -114,7 +114,7 @@ without the name: `the person's name from /etc/lampOS/person/name is used
 (12 characters)`. The first five minutes (#841) run in the same session, so
 their notes come after the same instruction.
 
-**Owner only (#2602, `LAMP_PERSON_NAME_OWNER_ONLY=on`, off unless set).**
+**Owner only (#2602, `LAMP_PERSON_NAME_OWNER_ONLY=on`, on in the product unit since #3884).**
 Told in the instruction, the name reached unknown faces: in Friday's probe
 on #3014 the model put it to a stranger asking "what's my name?" in 60 of
 80 runs, mostly as "are you …?". With the switch the instruction has no

@@ -1101,7 +1101,10 @@ fn time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set() {
 /// `remember` the memory socket gives the voice. And what the room did keep
 /// is never told as the asker's (`LAMP_MEMORY_ROOM_NOT_ASKER`, #3593: on
 /// lamp-4ace on 26 Oct, "Black, no sugar, that's how you've had it" from
-/// the room's talk, in 3 of 3 rounds without it).
+/// the room's talk, in 3 of 3 rounds without it). Nor is the name typed at
+/// setup told to anyone but the owner's own known face
+/// (`LAMP_PERSON_NAME_OWNER_ONLY`, #3884: Friday's probe on #3014 put it to
+/// unknown faces in 60 of 80 runs).
 #[test]
 fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     let voice = install::PRODUCT
@@ -1115,6 +1118,7 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
         "Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
         "Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on",
         "Environment=LAMP_MEMORY_FORGET_ASKS=on",
+        "Environment=LAMP_PERSON_NAME_OWNER_ONLY=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
