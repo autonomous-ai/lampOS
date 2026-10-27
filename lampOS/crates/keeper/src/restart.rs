@@ -1,52 +1,102 @@
-//! A restart of the lamp asked from outside it (#2193): `lamp-cloud` asks
-//! for the app's `system.reboot` on [`SOCKET`], and `lamp-keeper
-//! restart-asked`, root's helper started for that one connection, answers
-//! with [`answer`]. Refused while an update installs; otherwise answered
-//! first and then, once the lamp is quiet, `lampos.target` is restarted
-//! (never the machine). `docs/keeper.md`, "A restart asked from the app".
+//! The lamp restarted or turned off from outside it (#2193, #3697): the
+//! requests, their answers and the update lock they are refused under, one
+//! copy for every root helper that takes them. `lamp-setup change` (the
+//! change helper every lamp has) takes both from `lamp-cloud`; `lamp-keeper
+//! restart-asked`, root's helper on [`SOCKET`] where a keeper runs, takes
+//! the restart. Refused while an update installs; otherwise answered first
+//! and then acted on: `lampos.target` restarted once the lamp is quiet
+//! (never the machine), or `lamp-setup shutdown` started.
+//! `docs/keeper.md`, "A restart asked from the app"; `docs/cloud.md`.
 use serde_json::{Value, json};
 
-/// The helper's socket (`deploy/product/lamp-keeper-restart.socket`).
+/// The keeper's helper socket (`deploy/product/lamp-keeper-restart.socket`).
 pub const SOCKET: &str = "/run/lampos-keeper-restart/restart.sock";
 
-/// The one request taken, as one line.
+/// The restart request, as one line.
 pub const REQUEST: &str = r#"{"restart":"lamp"}"#;
 
-/// Why a restart is refused while lamp-update holds its lock.
+/// The shutdown request, as one line (#3697).
+pub const SHUTDOWN_REQUEST: &str = r#"{"shutdown":"lamp"}"#;
+
+/// Why either is refused while lamp-update holds its lock.
 pub const INSTALLING: &str = "an update is being installed: try again once it is done";
 
-/// The reply line to `line`, and whether the lamp is then restarted.
-/// `update` is `Err(why)` while an update installs or its lock could not be
-/// checked: refused either way, never a restart under an update.
-pub fn answer(line: &str, update: Result<(), String>) -> (String, bool) {
-    let refused = |why: &str| (json!({ "refused": why }).to_string(), false);
-    let asked = serde_json::from_str::<Value>(line.trim()).ok();
-    if asked != serde_json::from_str::<Value>(REQUEST).ok() {
-        return refused("not a restart request");
-    }
-    if let Err(why) = update {
-        return refused(&why);
-    }
-    (json!({"done": {"restarting": true}}).to_string(), true)
+/// What is asked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Power {
+    /// `lampos.target` restarted (`system.reboot`).
+    Restart,
+    /// `lamp-setup shutdown` (`system.shutdown`).
+    Shutdown,
 }
 
-/// The helper's answer to `line`, read against lamp-update's lock in
-/// `records`, taken without waiting: the reply line, and the lock to hold
-/// through the restart when there is one. Refused with [`INSTALLING`] while
-/// another holder has the lock, and refused too when it can't be checked.
-/// Only with `prepare`: lamp-cloud takes the library without lamp-update.
+impl Power {
+    /// Which one `line` asks, exactly; `None` for anything else.
+    pub fn of(line: &str) -> Option<Self> {
+        let asked = serde_json::from_str::<Value>(line.trim()).ok()?;
+        [(REQUEST, Self::Restart), (SHUTDOWN_REQUEST, Self::Shutdown)]
+            .into_iter()
+            .find(|(request, _)| {
+                serde_json::from_str::<Value>(request).ok().as_ref() == Some(&asked)
+            })
+            .map(|(_, power)| power)
+    }
+
+    /// The reply, and whether to act. `update` is `Err(why)` while an
+    /// update installs or its lock could not be checked: refused either
+    /// way, never under an update.
+    pub fn reply(self, update: Result<(), String>) -> (Value, bool) {
+        match update {
+            Err(why) => (json!({ "refused": why }), false),
+            Ok(()) => match self {
+                Self::Restart => (json!({"done": {"restarting": true}}), true),
+                Self::Shutdown => (json!({"done": {"shutting_down": true}}), true),
+            },
+        }
+    }
+}
+
+/// The keeper's reply line to `line`, and whether the lamp is then
+/// restarted: the restart only.
+pub fn answer(line: &str, update: Result<(), String>) -> (String, bool) {
+    match Power::of(line) {
+        Some(Power::Restart) => {
+            let (reply, go) = Power::Restart.reply(update);
+            (reply.to_string(), go)
+        }
+        _ => (
+            json!({ "refused": "not a restart request" }).to_string(),
+            false,
+        ),
+    }
+}
+
+/// lamp-update's lock in `records`, taken without waiting, for the caller
+/// to hold while it acts. Refused with [`INSTALLING`] while another holder
+/// has it, and refused too when it can't be checked. Only with `prepare`:
+/// lamp-cloud takes the library without lamp-update.
 #[cfg(feature = "prepare")]
-pub fn asked(
-    line: &str,
+pub fn update_lock(
     records: &lamp_update::records::Records,
-) -> (String, Option<lamp_update::records::Lock>) {
-    let lock = records.lock().map_err(|why| {
+) -> Result<lamp_update::records::Lock, String> {
+    records.lock().map_err(|why| {
         if why.kind() == std::io::ErrorKind::WouldBlock {
             INSTALLING.to_owned()
         } else {
             format!("the update's state could not be checked: {why}")
         }
-    });
+    })
+}
+
+/// The keeper's answer to `line`, read against lamp-update's lock in
+/// `records`: the reply line, and the lock to hold through the restart
+/// when there is one.
+#[cfg(feature = "prepare")]
+pub fn asked(
+    line: &str,
+    records: &lamp_update::records::Records,
+) -> (String, Option<lamp_update::records::Lock>) {
+    let lock = update_lock(records);
     let update = lock.as_ref().map(|_| ()).map_err(Clone::clone);
     let (reply, go) = answer(line, update);
     (reply, lock.ok().filter(|_| go))
@@ -64,9 +114,40 @@ mod tests {
         let (reply, go) = answer(REQUEST, Err(INSTALLING.into()));
         assert!(!go);
         assert_eq!(reply, json!({ "refused": INSTALLING }).to_string());
-        for line in ["", "{}", r#"{"restart":"machine"}"#, "reboot"] {
+        // The keeper takes the restart only.
+        for line in [
+            "",
+            "{}",
+            r#"{"restart":"machine"}"#,
+            "reboot",
+            SHUTDOWN_REQUEST,
+        ] {
             assert!(!answer(line, Ok(())).1, "{line}");
         }
+    }
+
+    #[test]
+    fn each_request_is_known_exactly_and_answered_first() {
+        assert_eq!(Power::of(REQUEST), Some(Power::Restart));
+        assert_eq!(
+            Power::of(&format!(" {SHUTDOWN_REQUEST}\n")),
+            Some(Power::Shutdown)
+        );
+        for line in [
+            r#"{"shutdown":"machine"}"#,
+            r#"{"shutdown":"lamp","x":1}"#,
+            "{}",
+        ] {
+            assert_eq!(Power::of(line), None, "{line}");
+        }
+        assert_eq!(
+            Power::Shutdown.reply(Ok(())),
+            (json!({"done": {"shutting_down": true}}), true)
+        );
+        assert_eq!(
+            Power::Shutdown.reply(Err(INSTALLING.into())),
+            (json!({ "refused": INSTALLING }), false)
+        );
     }
 
     /// The helper's own lock read: refused while another lamp-update holds

@@ -49,6 +49,9 @@ usage: lamp-setup COMMAND [OPTIONS]
       standard input from lamp-cloud, a name or the time zone, checked and
       written with setup's own writers; one reply line on standard output.
       A zone change then restarts lamp-schedule once the lamp is quiet.
+      The app's restart and shutdown too (#2193, #3697), refused while an
+      update installs: answered first, then lampos.target is restarted once
+      the voice rests (45 s at most), or `shutdown` is started.
       Without --enable every request is refused.
   wifi --config FILE [--enable]
       Root's helper for the Wi-Fi changed after setup (#1959): one request
@@ -552,6 +555,47 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         .lock()
         .take(change::LINE_MOST as u64 + 1)
         .read_line(&mut line)?;
+    let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
+    if let Some((power, reply, lock)) = change::power(&line, enabled, &records) {
+        {
+            let mut out = io::stdout().lock();
+            writeln!(out, "{reply}")?;
+            out.flush()?;
+        }
+        eprintln!("lamp-setup: change: {power:?} asked: {reply}");
+        let Some(lock) = lock else {
+            return Ok(true);
+        };
+        return match power {
+            change::Power::Shutdown => {
+                // The runner takes the update's lock itself.
+                drop(lock);
+                start_shutdown(false)
+            }
+            change::Power::Restart => {
+                // Held to the end, so no update starts under the restart.
+                let _lock = lock;
+                let bus = match bus_root {
+                    Some(root) => Bus::new(root)?,
+                    None => Bus::from_environment()?,
+                };
+                let mut ears =
+                    change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: change: {line}"));
+                let said = change::restart_when_rested(&mut ears, || {
+                    match std::process::Command::new("/usr/bin/systemctl")
+                        .args(["restart", "lampos.target"])
+                        .status()
+                    {
+                        Ok(status) if status.success() => Ok(()),
+                        Ok(status) => Err(status.to_string()),
+                        Err(error) => Err(error.to_string()),
+                    }
+                });
+                eprintln!("lamp-setup: change: {said}");
+                Ok(true)
+            }
+        };
+    }
     let (reply, done) = change::answer(&line, &config, enabled);
     {
         let mut out = io::stdout().lock();

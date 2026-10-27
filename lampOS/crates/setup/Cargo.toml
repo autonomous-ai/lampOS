@@ -24,6 +24,10 @@ lamp-local-time = { path = "../local-time" }
 # The quiet an update waits for before it restarts the voice: a zone changed
 # after setup restarts lamp-schedule only then (src/change.rs, #1959).
 lamp-update = { path = "../update" }
+# The app's restart and shutdown (src/change.rs, #3697): their requests,
+# answers and the update lock they are refused under, one copy with the
+# keeper's.
+lamp-keeper = { path = "../keeper" }
 serde.workspace = true
 serde_json.workspace = true
 # `net`: the keys helper's peer, by SO_PEERCRED (src/keys.rs, #2094).

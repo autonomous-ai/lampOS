@@ -31,8 +31,8 @@ lamp-skills = { path = "../skills" }
 # A photo from the app, base64 in its JSON (`faces.add_photo`, #1968), as the
 # voice decodes a look's picture.
 base64 = "=0.22.1"
-# The app's `system.reboot` (#2193): the keeper's restart request, its socket
-# and its answer, without lamp-update (the library only).
+# The app's `system.reboot` and `system.shutdown` (#2193, #3697): the
+# requests setup's change helper takes, without lamp-update (the library only).
 lamp-keeper = { path = "../keeper", default-features = false }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 # Own the query's process group and drain stdout without a waiting reader thread.

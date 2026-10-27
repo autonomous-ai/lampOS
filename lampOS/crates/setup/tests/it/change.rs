@@ -319,6 +319,87 @@ fn schedule_waits_for_the_quiet_an_update_waits_for() {
     assert!(why.contains("cannot be judged"), "{why}");
 }
 
+/// The app's restart and shutdown (#2193, #3697): off, refused as every
+/// change is; on, answered first, holding lamp-update's lock to act on;
+/// refused with why while an update holds it, and nothing to act on. A
+/// line that asks neither is a change, not a power request.
+#[test]
+fn a_restart_or_shutdown_is_answered_first_and_refused_under_an_update() {
+    use lamp_keeper::restart::{INSTALLING, REQUEST, SHUTDOWN_REQUEST};
+    let folder = std::env::temp_dir().join(format!(
+        "lsc-power-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let records = lamp_update::records::Records::new(folder.clone());
+    assert!(change::power(r#"{"person_name":"Lan"}"#, true, &records).is_none());
+    assert!(change::power(r#"{"shutdown":"machine"}"#, true, &records).is_none());
+    for (line, power, done) in [
+        (REQUEST, change::Power::Restart, json!({"restarting": true})),
+        (
+            SHUTDOWN_REQUEST,
+            change::Power::Shutdown,
+            json!({"shutting_down": true}),
+        ),
+    ] {
+        let (asked, reply, lock) = change::power(line, false, &records).unwrap();
+        assert_eq!(asked, power);
+        assert_eq!(reply, json!({"refused": change::OFF}));
+        assert!(lock.is_none());
+        let held = records.lock().unwrap();
+        let (_, reply, lock) = change::power(line, true, &records).unwrap();
+        assert_eq!(reply, json!({ "refused": INSTALLING }), "{line}");
+        assert!(lock.is_none());
+        drop(held);
+        let (_, reply, lock) = change::power(line, true, &records).unwrap();
+        assert_eq!(reply, json!({ "done": done }), "{line}");
+        // Held while it acts: an update that starts meanwhile can't have it.
+        assert!(lock.is_some());
+        assert!(records.lock().is_err());
+    }
+    let _ = fs::remove_dir_all(folder);
+}
+
+/// A restart from the app waits for the voice to rest between turns (5 s),
+/// never cutting a turn, and restarts all the same after 45 s.
+#[test]
+fn a_restart_from_the_app_waits_for_the_voice_to_rest() {
+    // A turn until 20 s: restarted 5 s after it ends.
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|now| {
+            if now <= 20 * S {
+                vec![Heard::State(Voice::Speaking), Heard::Speech]
+            } else {
+                vec![Heard::State(Voice::Resting)]
+            }
+        }),
+    };
+    let mut at = None;
+    let said = change::restart_when_rested(&mut ears, || {
+        at = Some(());
+        Ok(())
+    });
+    assert!(at.is_some());
+    assert_eq!(ears.now, 25 * S);
+    assert_eq!(said, "the voice rested; lampos.target restarted");
+    // A turn that never ends: restarted at 45 s all the same, and said so.
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| vec![Heard::State(Voice::Listening)]),
+    };
+    let said = change::restart_when_rested(&mut ears, || Err("exit status: 1".into()));
+    assert_eq!(ears.now, 45 * S);
+    assert!(
+        said.starts_with("the voice did not rest within 45 s (the voice is"),
+        "{said}"
+    );
+    assert!(
+        said.ends_with("; lampos.target could not be restarted: exit status: 1"),
+        "{said}"
+    );
+}
+
 /// The binary as its unit runs it: one line in on standard input, one
 /// line out, a journal line that never holds the name.
 fn run(config: &Config, enable: bool, line: &str) -> (Value, String) {
