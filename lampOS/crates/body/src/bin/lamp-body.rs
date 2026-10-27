@@ -876,6 +876,14 @@ impl Minutely {
     }
 }
 
+/// Whether the body can't be moved by a holder now, for its lease: let go
+/// (torque off after a slump), or let go and waiting for a hand to set its
+/// pose right (`--refused-let-go`, the reviewer-lead's P3 on #3820).
+#[cfg(target_os = "linux")]
+fn slumped_now(glimpse: &lamp_body::body::Glimpse) -> bool {
+    glimpse.limp || glimpse.waiting.is_some()
+}
+
 /// Who may hold the body by `--lease-socket`: `lamp-control.service` run
 /// as `lampos`, or root, as the kernel names them (#3504, phase 0).
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
@@ -937,6 +945,22 @@ impl LeaseDoor {
 
     /// One step: a new holder let in or refused, its lines answered and a
     /// change said; whether the body is held now. Never waits.
+    /// The run is over: a holder still connected is told the lease is
+    /// lost and why, before the socket closes (an overload a second time
+    /// within ten minutes ends the run, the reviewer-lead's P3 on #3820).
+    fn ended(&mut self, why: Option<&'static str>) {
+        use std::io::Write;
+        // Only a lease still taken, held or suspended: one already lost,
+        // let go or lapsed was told so then (Third on #3828).
+        if let (Some((stream, _)), Some(why), true) =
+            (self.holder.as_mut(), why, self.lease.taken())
+        {
+            let _ = stream.write_all(lamp_body::lease::Said::lost(why).line().as_bytes());
+        }
+        self.holder = None;
+        self.lease.end();
+    }
+
     fn turn(&mut self, around: lamp_body::lease::Around, now: std::time::Instant) -> bool {
         use lamp_body::lease::Said;
         use std::io::Write;
@@ -1600,7 +1624,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let watch = |glimpse: &lamp_body::body::Glimpse| {
         lease_mood.set(glimpse.mood);
         lease_hand.set(glimpse.hand);
-        lease_slumped.set(glimpse.limp);
+        lease_slumped.set(slumped_now(glimpse));
         step_said(&notify, &ready);
         if glimpse.waiting != waiting_said {
             waiting_said = glimpse.waiting;
@@ -2098,6 +2122,15 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     }
     // Again for a body that stopped by itself; a second time is harmless.
     notify.stopping();
+    // A holder is told why its lease ended with the run, when it was the
+    // body that gave out.
+    if let Some(door) = lease_door.as_mut() {
+        let why = result.body.as_ref().and_then(|body| match body.stop {
+            lamp_body::body::Stop::Overload { .. } => Some("slumped"),
+            _ => None,
+        });
+        door.ended(why);
+    }
     if let Some(woke) = result.body.as_ref().and_then(|body| body.woke.as_ref()) {
         eprintln!(
             "lamp-body: woke {:?} from {:?} to {:?} in {:.1} s",
@@ -3195,6 +3228,87 @@ mod tests {
             assert!(steps < 10);
         }
         drop(holder);
+    }
+
+    /// The lease ends `slumped` while the body is let go, and while it is
+    /// let go waiting for a hand to set its pose right (#3820's P3).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_let_go_or_waiting_body_is_slumped_for_its_lease() {
+        use lamp_body::body::Glimpse;
+        assert!(!slumped_now(&Glimpse::default()));
+        assert!(slumped_now(&Glimpse {
+            limp: true,
+            ..Glimpse::default()
+        }));
+        assert!(slumped_now(&Glimpse {
+            waiting: Some("My head is tipped too far..."),
+            ..Glimpse::default()
+        }));
+    }
+
+    /// A run that ends with a holder connected tells it why, when the body
+    /// gave out, and lets it go either way.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_run_that_ends_tells_its_holder_why() {
+        use lamp_body::lease::Around;
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixStream;
+        let directory =
+            std::env::temp_dir().join(format!("lamp-body-ended-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("lease.sock");
+        let mut door = LeaseDoor::bind(&path, Box::new(|caller| caller.is_some())).unwrap();
+        let mut holder = UnixStream::connect(&path).unwrap();
+        holder.write_all(b"{\"hold\":{\"for_ms\":5000}}\n").unwrap();
+        assert!(door.turn(Around::default(), std::time::Instant::now()));
+        let mut heard = BufReader::new(holder.try_clone().unwrap());
+        let mut line = String::new();
+        heard.read_line(&mut line).unwrap();
+        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        door.ended(Some("slumped"));
+        line.clear();
+        heard.read_line(&mut line).unwrap();
+        assert_eq!(line, "{\"lease\":\"lost\",\"why\":\"slumped\"}\n");
+        assert!(door.holder.is_none());
+        // Its socket is closed after.
+        line.clear();
+        assert_eq!(heard.read_line(&mut line).unwrap(), 0);
+        // A lease already lost, or let go, is told nothing more at the end
+        // (Third on #3828: no second `lost`).
+        for (asked, then) in [
+            (
+                &b"{\"hold\":{\"for_ms\":5000}}\n"[..],
+                Around {
+                    hand: true,
+                    ..Around::default()
+                },
+            ),
+            (b"{\"let_go\":true}\n", Around::default()),
+        ] {
+            let mut holder = UnixStream::connect(&path).unwrap();
+            holder.write_all(asked).unwrap();
+            door.turn(Around::default(), std::time::Instant::now());
+            door.turn(then, std::time::Instant::now());
+            let mut heard = BufReader::new(holder.try_clone().unwrap());
+            let mut told = Vec::new();
+            door.ended(Some("slumped"));
+            loop {
+                let mut line = String::new();
+                if heard.read_line(&mut line).unwrap() == 0 {
+                    break;
+                }
+                told.push(line);
+            }
+            assert!(
+                told.iter().filter(|line| line.contains("slumped")).count() == 0,
+                "{told:?}"
+            );
+            assert!(door.holder.is_none());
+        }
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// Arbitration (#940) is on or off, and off unless given.
