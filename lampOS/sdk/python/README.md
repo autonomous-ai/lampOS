@@ -67,6 +67,8 @@ asyncio.run(main())
   coroutine) subscribes, and raises the lamp's refusal, `NoGrantError`
   without the event's grant: `person.*` needs `look`, `phrase.heard` needs
   `hear`. Not awaited, the refusal comes out of `wait_closed()` instead.
+  `on()` returns an awaitable `Subscription`, not a future: to wait on
+  several, `await asyncio.gather(lamp.on(...), lamp.on(...))`.
   `lamp.off(name, handler)`. Each needs its grant:
 
   | event | fields | grant |
@@ -84,7 +86,9 @@ asyncio.run(main())
 
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. Each returns when the lamp has taken it;
-  `wait=True` on a gesture, move or play returns when it has finished.
+  `wait=True` on a gesture, move or play returns when it has finished, or,
+  where the lamp hands it on and says no more (today `gesture` and `move`,
+  answered `{"to": "body"}`), at that answer.
 - **Leases:** `async with lamp.lease("body"):` holds the body for looks,
   moves and joints, renewed for you, until the block ends or the lamp takes
   it back (a hand on its head, a conversation): `lease.state`,

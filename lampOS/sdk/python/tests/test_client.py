@@ -165,8 +165,8 @@ def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
                 await lamp.light("warm", 3, 10_000, pattern="breathe")
                 await lamp.say("Build passed.")
                 await lamp.express("glad")
-                done = await lamp.gesture("nod", wait=True)
-                assert done["how"] == "finished"
+                taken = await lamp.gesture("nod", wait=True)
+                assert taken["to"] == "body"
                 await lamp.stop()
             assert fake.asked("light") == [{"colour": "warm", "level": 3, "pattern": "breathe", "for_ms": 10000}]
             assert fake.asked("say") == [{"text": "Build passed."}]
@@ -302,8 +302,8 @@ def test_the_fake_says_done_and_lease_changes_to_whoever_they_are_for(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000) as lease:
-                    waiting = asyncio.ensure_future(lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 40, wait=True))
-                    while not fake.asked("move"):
+                    waiting = asyncio.ensure_future(lamp.play("wave", wait=True))
+                    while not fake.asked("play"):
                         await asyncio.sleep(0.01)
                     await fake.lease_event(lease.id, "suspended", "conversation")
                     while lease.state != "suspended":
@@ -438,7 +438,7 @@ def test_a_subscription_cut_by_a_closed_connection_is_no_refusal(tmp_path):
                 cut = asyncio.get_running_loop().create_future()
                 cut.set_exception(LampError("the connection to the lamp closed", code="closed"))
                 lamp._subscribed(Subscription(cut), "touch", lambda event: None)
-                assert not lamp._refused.done()
+                assert lamp._refusals == []
 
     run(go())
 
@@ -469,5 +469,154 @@ def test_a_cancelled_wait_closed_leaves_no_wait_running(tmp_path):
                         await waiting
                 await asyncio.sleep(0)
                 assert len(asyncio.all_tasks()) == before
+
+    run(go())
+
+
+def test_a_refusal_awaited_after_it_came_is_the_callers_alone(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                subscription = lamp.on("person.arrived", lambda event: None)
+                # The refusal comes, and is kept for wait_closed, before the await.
+                for _ in range(200):
+                    if lamp._refusals:
+                        break
+                    await asyncio.sleep(0.01)
+                assert subscription.done() and lamp._refusals
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await subscription
+                with pytest.raises(asyncio.TimeoutError):
+                    await asyncio.wait_for(lamp.wait_closed(), timeout=0.5)
+
+    run(go())
+
+
+def test_a_waiting_gesture_or_move_returns_at_the_bodys_answer(tmp_path):
+    async def go():
+        # lamp-control's reply shape: `{"re":N,"ok":true,"to":"body"}` and no
+        # `done` after it; auto_done off, so nothing else ever comes.
+        async with FakeLamp(auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000):
+                    nod = await asyncio.wait_for(lamp.gesture("nod", wait=True), timeout=2)
+                    move = await asyncio.wait_for(lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0]], 40, wait=True), timeout=2)
+                assert (nod["ok"], nod["to"]) == (True, "body")
+                assert (move["ok"], move["to"]) == (True, "body")
+                assert lamp._done == {}
+
+    run(go())
+
+
+def test_every_refusal_nobody_awaited_reaches_wait_closed_in_turn(tmp_path):
+    async def go():
+        # The reviewer-lead's case on #3829: two refused, one awaited and
+        # handled; the other still comes out of wait_closed, never lost.
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                a = lamp.on("person.arrived", lambda event: None)
+                b = lamp.on("sound.heard", lambda event: None)
+                for _ in range(200):
+                    if len(lamp._refusals) == 2:
+                        break
+                    await asyncio.sleep(0.01)
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await a
+                with pytest.raises(errors.BY_CODE["no_grant"]) as raised:
+                    await asyncio.wait_for(lamp.wait_closed(), timeout=2)
+                assert raised.value is b.task.exception()
+                # Both are spent: now it waits for the close.
+                with pytest.raises(asyncio.TimeoutError):
+                    await asyncio.wait_for(lamp.wait_closed(), timeout=0.3)
+
+    run(go())
+
+
+def test_wait_closed_woken_by_a_refusal_taken_elsewhere_keeps_waiting(tmp_path):
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                waiting = asyncio.ensure_future(lamp.wait_closed())
+                await asyncio.sleep(0.01)
+                # A refusal is kept, waking wait_closed; in the same turn an
+                # await takes it back, before wait_closed runs again (the
+                # reviewer-lead's P3 on #3829). The list says, not the wake.
+                lamp._refusals.append(LampError("not granted", code="no_grant"))
+                lamp._refused.set()
+                lamp._refusals.clear()
+                await asyncio.sleep(0.2)
+                assert not waiting.done(), "wait_closed returned as if the lamp had closed"
+                waiting.cancel()
+
+    run(go())
+
+
+def test_a_waiting_gesture_keeps_no_done(tmp_path):
+    async def go():
+        async with FakeLamp(auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                pending = asyncio.ensure_future(lamp.gesture("nod", wait=True))
+                await asyncio.sleep(0)
+                assert lamp._done == {}, "a done kept for an action that gets none"
+                await pending
+
+    run(go())
+
+
+def test_a_request_after_the_lamp_has_gone_raises_closed(tmp_path):
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            lamp = await Lamp.connect(keyring=ring)
+            await lamp._ws.close()
+            with pytest.raises(LampError) as raised:
+                await asyncio.wait_for(lamp.get("light"), timeout=2)
+            assert raised.value.code == "closed"
+            assert lamp._waiting == {}
+
+    run(go())
+
+
+def test_a_send_cut_after_the_reader_failed_its_future_leaves_nothing_unread(tmp_path):
+    async def go():
+        # Reviewer-two's P3 on #3829: the reader ends during send and fails
+        # the waiting future first; the send then raises ConnectionClosed.
+        from websockets.exceptions import ConnectionClosedOK
+
+        unread = []
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(lambda loop, context: unread.append(context.get("message")))
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            lamp = await Lamp.connect(keyring=ring)
+
+            async def send(_text):
+                for future in lamp._waiting.values():
+                    future.set_exception(LampError("the connection to the lamp closed", code="closed"))
+                raise ConnectionClosedOK(None, None)
+
+            lamp._ws.send = send
+
+            async def ask() -> str:
+                try:
+                    await lamp.get("light")
+                except LampError as error:
+                    return error.code
+                return "answered"
+
+            assert await ask() == "closed"
+            await lamp._ws.close()
+        import gc
+
+        # The future is gone with the request's frame; asyncio reports an
+        # unread exception only when it is collected.
+        gc.collect()
+        await asyncio.sleep(0)
+        assert not [m for m in unread if m and "never retrieved" in m], unread
 
     run(go())

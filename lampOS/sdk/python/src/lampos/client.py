@@ -31,6 +31,10 @@ Handler = Callable[[dict], Any]
 # A ping this often keeps a connection that only listens open: the lamp
 # closes one quiet for 2 minutes (lamp-control's QUIET_MAX, #3778).
 KEEPALIVE_S = 20.0
+# The actions lamp-control answers `{"to":"body"}` with no `done` after
+# (docs/control.md): a wait for them ends at that answer. `say` answers
+# `{"to":"voice"}` and its `done` does follow.
+ENDS_AT_REPLY = frozenset({"gesture", "move"})
 
 
 def _tls() -> ssl.SSLContext:
@@ -92,15 +96,24 @@ def _check(op: str, fields: dict) -> None:
 
 
 class Subscription:
-    """What `Lamp.on` returns. Awaited, it raises the lamp's refusal; one
-    nobody awaits is raised by `Lamp.wait_closed` instead, never lost."""
+    """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
+    the lamp's refusal; one nobody awaits is raised by `Lamp.wait_closed`
+    instead, never lost."""
 
-    def __init__(self, task: asyncio.Future):
+    def __init__(self, task: asyncio.Future, lamp: "Lamp | None" = None):
         self.task = task
         self.awaited = False
+        self._lamp = lamp
 
     def __await__(self):
         self.awaited = True
+        # A refusal that came before this await was kept for `wait_closed`;
+        # it is the caller's now, and only it leaves the list.
+        lamp = self._lamp
+        if lamp is not None and self.task.done() and not self.task.cancelled():
+            error = self.task.exception()
+            if error is not None:
+                lamp._refusals = [kept for kept in lamp._refusals if kept is not error]
         return self.task.__await__()
 
     def done(self) -> bool:
@@ -190,7 +203,10 @@ class Lamp:
         # The first refusal of a subscription nobody awaited: `wait_closed`
         # raises it, so a listener the lamp refused never waits in silence
         # (harness-reviewer's P2 on #3760).
-        self._refused: asyncio.Future = asyncio.get_running_loop().create_future()
+        # Refusals of subscriptions nobody awaited, oldest first, for
+        # `wait_closed`; `_refused` is set when one is added.
+        self._refusals: list[BaseException] = []
+        self._refused = asyncio.Event()
         self._reader = asyncio.create_task(self._read())
 
     # Pairing and connecting.
@@ -291,11 +307,20 @@ class Lamp:
         say)."""
         closed = asyncio.ensure_future(self._ws.wait_closed())
         try:
-            done, _ = await asyncio.wait({closed, self._refused}, return_when=asyncio.FIRST_COMPLETED)
+            # Checked again after every wake: an await elsewhere may have
+            # taken the refusal that woke this, so the list says, not the wake.
+            while not self._refusals:
+                self._refused.clear()
+                refused = asyncio.ensure_future(self._refused.wait())
+                try:
+                    done, _ = await asyncio.wait({closed, refused}, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    refused.cancel()
+                if closed in done and not self._refusals:
+                    return
+            raise self._refusals.pop(0)
         finally:
             closed.cancel()
-        if self._refused in done:
-            raise self._refused.result()
 
     # Requests.
 
@@ -306,17 +331,33 @@ class Lamp:
         self._next_id += 1
         future = asyncio.get_running_loop().create_future()
         self._waiting[id_] = future
-        await self._ws.send(json.dumps({"id": id_, "op": op, **fields}))
+        try:
+            await self._ws.send(json.dumps({"id": id_, "op": op, **fields}))
+        except ConnectionClosed as error:
+            # The lamp has gone: the same typed `closed` as a request the
+            # close cut short, not the socket library's own error. The reader
+            # may have failed the future already; it is read here, so asyncio
+            # has nothing left to report about it.
+            self._waiting.pop(id_, None)
+            if future.done():
+                future.exception()
+            else:
+                future.cancel()
+            raise LampError("the connection to the lamp closed", code="closed") from error
         reply = await future
         if not reply.get("ok"):
             raise from_reply(reply.get("error", {}))
         return reply
 
     async def _act(self, op: str, wait: bool, **fields: Any) -> dict:
-        """An action: its reply when taken, or with `wait` its `done` event.
+        """An action: its reply when taken, or with `wait` its `done` event;
+        for the actions no `done` follows yet (`ENDS_AT_REPLY`), the reply.
         `request` takes the next id before it first yields, so this is it."""
         id_ = self._next_id
-        done = asyncio.get_running_loop().create_future() if wait else None
+        # Handed to the body, which says nothing back, `gesture` and `move`
+        # get no `done` (docs/control.md): their wait ends at the answer, so
+        # none is kept for them.
+        done = asyncio.get_running_loop().create_future() if wait and op not in ENDS_AT_REPLY else None
         if done is not None:
             self._done[id_] = done
         try:
@@ -325,7 +366,7 @@ class Lamp:
             if done is not None:
                 self._done.pop(id_, None)
             raise
-        return await done if done is not None else reply
+        return reply if done is None else await done
 
     # The reader.
 
@@ -389,7 +430,7 @@ class Lamp:
         task = asyncio.ensure_future(self.subscribe([event]))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
-        subscription = Subscription(task)
+        subscription = Subscription(task, self)
         task.add_done_callback(lambda task: self._subscribed(subscription, event, handler))
         return subscription
 
@@ -411,8 +452,8 @@ class Lamp:
         # connection is `wait_closed` returning, not a refusal.
         if subscription.awaited or getattr(error, "code", None) == "closed":
             return
-        if not self._refused.done():
-            self._refused.set_result(error)
+        self._refusals.append(error)
+        self._refused.set()
 
     def off(self, event: str, handler: Handler) -> None:
         """Stop calling `handler` for `event`. With no handler left for an

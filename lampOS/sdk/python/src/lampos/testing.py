@@ -316,7 +316,16 @@ class FakeLamp:
         elif op == "lease.release":
             self.leases.pop(request["lease"], None)
             await self._ok(ws, id_)
+        elif op in ("gesture", "move"):
+            # As lamp-control routes them: the body takes them, and no
+            # `done` follows.
+            await self._ok(ws, id_, to="body")
+        elif op == "say":
+            # As lamp-control: the voice takes it, and its `done` follows.
+            await self._ok(ws, id_, to="voice")
+            if self.auto_done:
+                await self.done(id_)
         else:
             await self._ok(ws, id_)
-            if op in ("gesture", "move", "play") and self.auto_done:
+            if op == "play" and self.auto_done:
                 await self.done(id_)
