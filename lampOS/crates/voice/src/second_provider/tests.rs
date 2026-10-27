@@ -14,6 +14,7 @@ mod person_scope_seen;
 mod remember_speaker;
 mod short_done;
 mod unplayed_join;
+mod wake_not_name;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;
