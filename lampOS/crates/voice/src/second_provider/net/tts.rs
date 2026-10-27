@@ -2,9 +2,10 @@
 //! V1's `hal/drivers/voice/tts/{openai,elevenlabs}.py` ask for it.
 use super::{
     CONNECT, Error, Result, STALL, chunk, http_client, keeps_its_connection, local_socket,
-    openai_base, post, warm_get,
+    openai_base, post_guarded, warm_get,
 };
 use crate::second_config::{SecondConfig, TtsProvider};
+use crate::second_provider::services::{ChatPermission, permitted_result, permitted_until};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
 use std::{
@@ -556,6 +557,12 @@ pub struct Tts {
     /// Until when no socket is opened: the dialogue sessions were all held
     /// ([`TOO_MANY`], [`SOCKET_BUSY_PAUSE`]).
     paused_until: Mutex<Option<Instant>>,
+    #[cfg(test)]
+    send_polls: Option<Arc<std::sync::atomic::AtomicUsize>>,
+    #[cfg(test)]
+    after_socket_attempt: Option<Arc<dyn Fn() + Send + Sync>>,
+    #[cfg(test)]
+    after_socket_message: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 /// A speech socket, ElevenLabs' `stream-input` or its dialogue one.
@@ -628,7 +635,22 @@ impl Tts {
             socketed: Mutex::new(None),
             refused: Mutex::new(None),
             paused_until: Mutex::new(None),
+            #[cfg(test)]
+            send_polls: None,
+            #[cfg(test)]
+            after_socket_attempt: None,
+            #[cfg(test)]
+            after_socket_message: None,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn counting_send_polls(
+        mut self,
+        polls: Arc<std::sync::atomic::AtomicUsize>,
+    ) -> Self {
+        self.send_polls = Some(polls);
+        self
     }
 
     /// Whether a socket is opened for an answer: ElevenLabs only, not for a
@@ -811,17 +833,41 @@ impl Tts {
     /// `turn`'s piece on its speech socket: the one opened ahead, or the
     /// dialogue socket opened now. `None` when it has none, so it goes over
     /// HTTP; `Some(Ok(None))` when nothing in it would be spoken.
-    async fn on_socket(&self, text: &str, turn: Turn) -> Option<Result<Option<TtsStream>>> {
+    async fn on_socket(
+        &self,
+        text: &str,
+        turn: Turn,
+        permitted: Option<&ChatPermission>,
+    ) -> Option<Result<Option<TtsStream>>> {
         if let Some((socket, opened)) = self.take_ahead(turn.request) {
             let Some(piece) = socket_piece(text) else {
                 return Some(Ok(None));
             };
             let messages = vec![piece, socket_end()];
-            return Some(self.speak_on(socket, opened, messages, text, turn).await);
+            return Some(
+                self.speak_on(socket, opened, messages, text, turn, permitted)
+                    .await,
+            );
         }
         let (request, messages) = self.take_on_reply(turn.request, text)?;
         let from = Instant::now();
-        let socket = match open_socket(&request, DIALOGUE_OPEN_WITHIN).await {
+        let until = tokio::time::Instant::now() + DIALOGUE_OPEN_WITHIN;
+        let Some(opened) = permitted_until(
+            open_socket(&request, DIALOGUE_OPEN_WITHIN),
+            permitted,
+            until,
+        )
+        .await
+        else {
+            // An exhausted recognition wait is not "no socket available":
+            // terminate quietly rather than starting a fresh HTTP attempt.
+            return Some(Ok(None));
+        };
+        let opened = match opened {
+            Ok(opened) => opened,
+            Err(()) => return Some(Err(Error::Timeout("dialogue speech socket open"))),
+        };
+        let socket = match opened {
             Ok(socket) => socket,
             Err(error) => {
                 if matches!(error, Error::Timeout(_)) {
@@ -839,7 +885,10 @@ impl Tts {
             turn.request,
             from.elapsed().as_millis()
         );
-        Some(self.speak_on(socket, from, messages, text, turn).await)
+        Some(
+            self.speak_on(socket, from, messages, text, turn, permitted)
+                .await,
+        )
     }
 
     /// `text` as `turn`'s piece on `socket`, opened at `opened`, sent as
@@ -853,18 +902,35 @@ impl Tts {
         messages: Vec<Value>,
         text: &str,
         turn: Turn,
+        permitted: Option<&ChatPermission>,
     ) -> Result<Option<TtsStream>> {
         let sent = Instant::now();
         for message in messages {
-            if socket
-                .send(Frame::Text(message.to_string().into()))
-                .await
-                .is_err()
+            let Some(sent) = permitted_result(
+                socket.send(Frame::Text(message.to_string().into())),
+                permitted,
+            )
+            .await
+            else {
+                return Ok(None);
+            };
+            #[cfg(test)]
+            if sent.is_ok()
+                && let Some(after) = &self.after_socket_message
             {
+                after();
+            }
+            if sent.is_err() {
                 // Closed before the piece went: its close, if it came, says
                 // why (a refused model closes within a second of the open).
-                return Err(closed_why(&mut socket)
-                    .await
+                let until = tokio::time::Instant::now() + Duration::from_millis(200);
+                let Some(why) = permitted_until(closed_why(&mut socket), permitted, until).await
+                else {
+                    return Ok(None);
+                };
+                return Err(why
+                    .ok()
+                    .flatten()
                     .unwrap_or(Error::Transport("speech socket")));
             }
         }
@@ -886,11 +952,15 @@ impl Tts {
             }),
             ..TtsStream::default()
         };
-        match tokio::time::timeout(SOCKET_FIRST_AUDIO_WITHIN, stream.first_audio()).await {
+        let until = tokio::time::Instant::now() + SOCKET_FIRST_AUDIO_WITHIN;
+        let Some(first) = permitted_until(stream.first_audio(), permitted, until).await else {
+            return Ok(None);
+        };
+        match first {
             Ok(Ok(true)) => Ok(Some(stream)),
             Ok(Ok(false)) => Err(Error::Transport("speech socket closed before its audio")),
             Ok(Err(error)) => Err(error),
-            Err(_) => Err(Error::Timeout("speech socket's first audio")),
+            Err(()) => Err(Error::Timeout("speech socket's first audio")),
         }
     }
 
@@ -989,13 +1059,41 @@ impl Tts {
     }
 
     async fn speak_in(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
-        if let Some(turn) = turn
-            && let Some(spoken) = self.on_socket(text, turn).await
-        {
+        Ok(self
+            .speak_permitted(text, turn, None)
+            .await?
+            .unwrap_or_default())
+    }
+
+    /// One exact request permission follows every socket/HTTP text attempt.
+    /// None denotes terminal denial, never a transport failure to retry.
+    pub(crate) async fn speak_permitted(
+        &self,
+        text: &str,
+        turn: Option<Turn>,
+        permitted: Option<&ChatPermission>,
+    ) -> Result<Option<TtsStream>> {
+        // Do not put this clock-owning operation behind a generic Pending
+        // wrapper: each socket stage must keep polling its original timer.
+        let spoken = match turn {
+            Some(turn) => {
+                let answer = self.on_socket(text, turn, permitted).await;
+                #[cfg(test)]
+                if answer.is_some()
+                    && let Some(after) = &self.after_socket_attempt
+                {
+                    after();
+                }
+                answer
+            }
+            None => None,
+        };
+        if let Some(spoken) = spoken {
             match spoken {
-                Ok(Some(stream)) => return Ok(stream),
-                Ok(None) => return Ok(TtsStream::default()),
+                Ok(Some(stream)) => return Ok(Some(stream)),
+                Ok(None) => return Ok(None),
                 Err(error) => {
+                    let turn = turn.expect("socket result belongs to a turn");
                     eprintln!(
                         "lamp-voice second: request {}: the speech socket failed before its first audio ({error}); the piece goes over HTTP",
                         turn.request
@@ -1023,20 +1121,32 @@ impl Tts {
             text,
         )?
         else {
-            return Ok(TtsStream::default());
+            return Ok(Some(TtsStream::default()));
         };
         let sent = Instant::now();
         if let Ok(mut used) = self.used.lock() {
             *used = Some(sent);
         }
         let index = turn.map(|turn| self.asked(turn.request));
-        let response = post(
-            &self.client,
-            &request.url,
-            (request.header, &request.value),
-            &request.body,
+        let Some(response) = permitted_result(
+            post_guarded(
+                &self.client,
+                &request.url,
+                (request.header, &request.value),
+                &request.body,
+                permitted,
+                #[cfg(test)]
+                self.send_polls.as_deref(),
+            ),
+            permitted,
         )
-        .await?;
+        .await
+        else {
+            return Ok(None);
+        };
+        let Some(response) = response? else {
+            return Ok(None);
+        };
         let socket = local_socket(&response);
         let reused = self.seen(socket);
         let lease = self.lease(socket, keeps_its_connection(&response));
@@ -1051,12 +1161,12 @@ impl Tts {
             ahead_ms: None,
             chars: text.chars().count(),
         });
-        Ok(TtsStream {
+        Ok(Some(TtsStream {
             source: Some(Source::Http(response)),
             piece,
             lease,
             ..TtsStream::default()
-        })
+        }))
     }
 
     /// One more piece asked for `request`: its number in the turn.
@@ -2579,3 +2689,7 @@ mod tests {
         assert_eq!(packets.finish(), Some(vec![1]));
     }
 }
+
+#[cfg(test)]
+#[path = "tts/authority_tests.rs"]
+mod authority_tests;

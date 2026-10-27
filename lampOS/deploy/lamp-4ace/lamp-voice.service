@@ -188,6 +188,10 @@ Environment=LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery
 Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
 # The voice uses what memory across days adds (#698, #743).
 Environment=LAMP_MEMORY_DAYS=on
+# Request-owned private context needs external-camera authority and positive speaker evidence.
+Environment=LAMP_SECOND_SCOPED_CONTEXT=on
+Environment=LAMP_CAMERA_FOLLOWS_EYES=on
+Environment=LAMP_EYES_SPEAKING=on
 Environment=LAMP_FAINT_HOLD_MS=400
 Environment=LAMP_BUS=on
 # What the microphone hears also goes on the bus (mic2/audio), for the part that hears the lamp's name

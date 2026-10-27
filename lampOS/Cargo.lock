@@ -1966,7 +1966,9 @@ dependencies = [
  "lamp-turn-end",
  "lamp-turn-owner",
  "libc",
+ "nix 0.29.0",
  "ort",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
@@ -2429,6 +2431,7 @@ dependencies = [
  "lamp-controls",
  "lamp-ears",
  "lamp-expression",
+ "lamp-eyes",
  "lamp-gemini",
  "lamp-health",
  "lamp-ipc",
@@ -2736,6 +2739,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases 0.2.2",
  "libc",
+ "memoffset",
 ]
 
 [[package]]

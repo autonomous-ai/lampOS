@@ -9,9 +9,10 @@
 use super::{
     Error, Result,
     chat::Lines,
-    chunk, http_client, post,
+    chunk, http_client, post_guarded,
     tts::{Packets, without_tags},
 };
+use crate::second_provider::services::{ChatPermission, permitted_result};
 use serde_json::{Value, json};
 use std::{
     collections::VecDeque,
@@ -114,23 +115,43 @@ impl GeminiTts {
     /// Start speaking `text`; its samples come from the stream as they
     /// arrive. Dropping the stream stops the download.
     pub async fn speak(&self, text: &str) -> Result<GeminiSpeech> {
+        Ok(self.speak_permitted(text, None).await?.unwrap_or_default())
+    }
+
+    pub(crate) async fn speak_permitted(
+        &self,
+        text: &str,
+        permitted: Option<&ChatPermission>,
+    ) -> Result<Option<GeminiSpeech>> {
         let Some(body) = body(&self.voice, text) else {
-            return Ok(GeminiSpeech::default());
+            return Ok(Some(GeminiSpeech::default()));
         };
         if let Ok(mut used) = self.used.lock() {
             *used = Some(Instant::now());
         }
-        let response = post(
-            &self.client,
-            &self.url,
-            ("x-goog-api-key", &self.key),
-            &body,
+        let Some(response) = permitted_result(
+            post_guarded(
+                &self.client,
+                &self.url,
+                ("x-goog-api-key", &self.key),
+                &body,
+                permitted,
+                #[cfg(test)]
+                None,
+            ),
+            permitted,
         )
-        .await?;
-        Ok(GeminiSpeech {
+        .await
+        else {
+            return Ok(None);
+        };
+        let Some(response) = response? else {
+            return Ok(None);
+        };
+        Ok(Some(GeminiSpeech {
             response: Some(response),
             ..GeminiSpeech::default()
-        })
+        }))
     }
 }
 

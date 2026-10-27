@@ -46,6 +46,28 @@ What the ring shows:
 - After a restart of the lamp: voice comes back by itself; the body and the eyes do not. Start the body, then the eyes.
 - Read the servos without moving anything: `L 'cd ~/.local/share/lampOS-voice && ./motor-inspect-50e8de4e/lamp-body-inspect --device /dev/ttyACM0 --unit-id lamp-4ace --lock-directory ~/.local/share/lampOS-voice/motor-locks --status-faults report'` (only while the body is stopped: one owner of the servo port at a time)
 
+## Prepared private-memory configuration (#3064)
+
+The repository's Voice unit prepares `LAMP_SECOND_SCOPED_CONTEXT=on`,
+`LAMP_CAMERA_FOLLOWS_EYES=on` and `LAMP_EYES_SPEAKING=on`; Eyes prepares
+`LAMP_EYES_SPEAKING=on` and `--steady-rate off`. The exact retained Eyes
+pin's emulated CLI accepts all 16 unit flags, including the on/off cadence
+syntax ([receipt](../../docs/verification/common-checking-20261023/README.md)). These are source settings,
+not a claim that the running lamp or its drop-ins have changed. Compatible
+qualified Voice/Eyes artifacts and exact executable pins must be selected
+before installation; a flag added to source does not upgrade an old binary.
+The new known-person lamp run, with its exact builds/settings and counts/times,
+remains outstanding. No lamp installation accompanies this source preparation.
+
+Both context modes retain the request's final positive speaker proof for name
+and history. Scoped context also gives private Days reads their lease; a name
+or history reply with it off does not demonstrate Days recall. Regular Eyes
+cadence avoids starving the five-look still-face speaking window in source;
+its unit contract must pass with the rest of the current-source gate. Its extra CPU/temperature and effect on voice
+responsiveness are unmeasured on this setup.
+No FACE_NAME, Photo or repair setting is enabled. Product and binary defaults
+are unchanged, and the historical records below are not this gate's evidence.
+
 ## Switches added on 2026-10-13
 
 All in `lamp-voice.service` in this folder unless said otherwise; install a change with `./deploy.sh releases/<current sha>/lamp-voice <label>` (a silent restart of about five seconds; the conversation is kept across it).

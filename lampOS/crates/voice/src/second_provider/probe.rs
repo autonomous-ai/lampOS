@@ -216,7 +216,7 @@ fn chat_stream(
 }
 
 enum Voice {
-    Configured(Tts),
+    Configured(Box<Tts>),
     Gemini(GeminiTts),
 }
 
@@ -499,7 +499,9 @@ pub async fn run(
     at.tts_base_url = speech.url().to_owned();
     let mut voices: Vec<(String, Arc<Voice>, Option<Relay>)> = vec![(
         format!("speech={}", config.tts_provider.name().replace(' ', "_")),
-        Arc::new(Voice::Configured(Tts::new(&at).map_err(io::Error::other)?)),
+        Arc::new(Voice::Configured(Box::new(
+            Tts::new(&at).map_err(io::Error::other)?,
+        ))),
         Some(speech),
     )];
     match super::worker::gemini_key(&provider, credentials.as_deref()) {

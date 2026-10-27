@@ -24,9 +24,11 @@ StateDirectoryMode=0700
 # Looking is never worth a late word: below the voice service.
 Nice=10
 Environment=LAMP_BUS=on
+# Publish speaking observations for the voice's request-owned private context.
+Environment=LAMP_EYES_SPEAKING=on
 # --sight-from-look on (#2748) returns when an eyes binary that takes it (13974e69a or later) is pinned:
 # the pinned bee4cb54 is from 19 Oct and refuses it (units/README.md, "A pin takes its unit's flags").
-ExecStart=/opt/lampOS/eyes/bee4cb54e005008073cbcb1bd575e63674d6286120e55368f3aa0fd917d69658/lamp-eyes --device /dev/video0 --lock-directory /home/orangepi/.local/share/lampOS-voice/camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --full-look 1280x960 --full-look-file /run/lampos-eyes/look.jpg --recogniser /opt/lampOS/eyes/face_recognition_sface_2021dec.onnx --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --leave-still-faces on --steady-rate on
+ExecStart=/opt/lampOS/eyes/bee4cb54e005008073cbcb1bd575e63674d6286120e55368f3aa0fd917d69658/lamp-eyes --device /dev/video0 --lock-directory /home/orangepi/.local/share/lampOS-voice/camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --full-look 1280x960 --full-look-file /run/lampos-eyes/look.jpg --recogniser /opt/lampOS/eyes/face_recognition_sface_2021dec.onnx --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --leave-still-faces on --steady-rate off
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

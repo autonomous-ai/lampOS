@@ -71,8 +71,9 @@ pub mod speech_tags;
 pub mod worker;
 
 pub use services::{
-    CHAT_WARM_ENVIRONMENT, Listener, Net, RELAY_ROUTES_ENVIRONMENT, Routable,
-    SPEECH_SOCKET_ENVIRONMENT, SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
+    CHAT_WARM_ENVIRONMENT, ChatFunctions, ChatPermission, Listener, Net, PermissionState,
+    RELAY_ROUTES_ENVIRONMENT, Routable, SPEECH_SOCKET_ENVIRONMENT, SPEECH_SOCKET_MODEL_ENVIRONMENT,
+    SPEECH_WARM_ENVIRONMENT, Services,
 };
 
 #[cfg(test)]
@@ -369,6 +370,13 @@ pub struct Told {
     /// the exchanges, so `text` keeps only what stays. `None`: all in `text`.
     pub after: Option<String>,
     pub history: Vec<Message>,
+    /// This context contains private facts or history. It must keep the
+    /// admitted speaker's authority at every subsequent dispatch boundary.
+    pub requires_speaker: bool,
+    /// Selection or adoption saw a temporarily unresolved private speaker.
+    /// This composition must be rebuilt, even if proof becomes ready before
+    /// the caller checks its guard. It is never a reduced model context.
+    pub pending_private_context: bool,
 }
 impl From<String> for Told {
     /// With no exchanges before it.
@@ -377,10 +385,20 @@ impl From<String> for Told {
             text,
             after: None,
             history: Vec::new(),
+            requires_speaker: false,
+            pending_private_context: false,
         }
     }
 }
 impl Told {
+    fn pending_private_context() -> Self {
+        Self {
+            requires_speaker: true,
+            pending_private_context: true,
+            ..Self::default()
+        }
+    }
+
     /// The chat's messages before a turn's notes and words: the system
     /// message, the exchanges, then [`Self::after`]. What stays from one
     /// request to the next comes first, as a service's prompt cache holds
@@ -730,6 +748,18 @@ pub type StaffNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 pub type Remembered = Arc<
     dyn Fn(u64, &str, Option<&crate::memory_scope::ScopeLease>) -> Option<String> + Send + Sync,
 >;
+/// The event decision, retaining temporary denial before any state is consumed.
+/// The deadline is the original answer ceiling, also checked after Days locks.
+pub(crate) type EventTurn = Arc<
+    dyn Fn(
+            u64,
+            &str,
+            Option<&crate::memory_scope::ScopeLease>,
+            tokio::time::Instant,
+        ) -> crate::remember::EventNote
+        + Send
+        + Sync,
+>;
 /// The note a spoken request earns when the lamp's name was heard as it
 /// began (`worker::Heeding::telling_the_name`, `crate::called`): asked
 /// after the request is judged, with its request.
@@ -832,8 +862,10 @@ struct Shared {
     requested_audio: Option<(String, RequestedAudioRunner)>,
     system: System,
     scoped_system: Option<ScopedSystem>,
-    /// Without scoped context, the turn's `system` given its line's lease,
-    /// read only for the typed name (#2602, [`Engine::reading_the_lease_for_the_name`]).
+    private_context_current: Option<PrivateContextCurrent>,
+    /// Without scoped context, the turn's system receives the actual lease
+    /// for its typed name and independent private-disclosure checks. Context
+    /// selection still follows presence ([`Engine::reading_the_lease_for_the_name`]).
     lease_system: Option<ScopedSystem>,
     clock: Clock,
     /// When answer audio was last sent.
@@ -850,7 +882,7 @@ struct Shared {
     )>,
     /// Audio packets sent by this process.
     sequence: AtomicU64,
-    out: mpsc::Sender<ProviderOutput>,
+    out: mpsc::Sender<QueuedOutput>,
     heed: Option<Heed>,
     /// Where each judged turn's verdict is said, when it is.
     verdicts: Option<Verdicts>,
@@ -922,7 +954,7 @@ struct Shared {
     /// With `LAMP_MEMORY_EVENTS`: the line a session's first turn, a
     /// greeting alone, is given for a dated follow-up
     /// ([`Engine::asking_after_events`], #2805, #2602 22 Oct 22:17).
-    event_turn: Option<Remembered>,
+    event_turn: Option<EventTurn>,
     /// The note's section to cut for a withheld dated follow-up
     /// ([`Engine::asking_after_events`]).
     event_withheld: Option<EventWithheld>,
@@ -1370,6 +1402,8 @@ struct KeptSound {
     samples: VecDeque<i16>,
     /// When the line's first sound was read, by this process's clock.
     said_from: u64,
+    /// First nonempty microphone read, solely for speaker evidence.
+    speaker_from: u64,
     /// When it ended, by the engine's clock; `None` while it goes on.
     ended: Option<Instant>,
     /// The line before it in this session and how long after that one's
@@ -1712,6 +1746,8 @@ enum LinePart {
     Pause,
 }
 
+type ReadBounds = Arc<Mutex<(u64, u64)>>;
+
 struct Turn {
     request: u64,
     /// Open until the request's End; `None` after it.
@@ -1720,7 +1756,11 @@ struct Turn {
     /// audio queue closes, read by the turn's task after.
     sound: Arc<AtomicBool>,
     /// When its first and last packets were read from the microphone.
-    said: Arc<Mutex<(u64, u64)>>,
+    said: ReadBounds,
+    /// Nonempty reads only; never changes legacy heed/echo/carry timing.
+    speaker_reads: ReadBounds,
+    /// This request's own nonempty reads, never an older carried beginning.
+    current_speaker_reads: ReadBounds,
     /// What the coordinator marked it with, told beside its words.
     marks: Arc<Marks>,
     task: JoinHandle<()>,
@@ -1891,10 +1931,13 @@ impl Drop for Turn {
 /// The second route's protocol state: at most one turn at a time.
 pub struct Engine {
     shared: Arc<Shared>,
-    output: mpsc::Receiver<ProviderOutput>,
+    output: mpsc::Receiver<QueuedOutput>,
     /// Events the engine itself says (`Started`, refusals); before any of
     /// the turn task's, so `Started` always precedes the turn's output.
     urgent: VecDeque<ProviderOutput>,
+    /// One private queue head whose existing proof is being checked again.
+    /// Later task output cannot overtake it; retirement still discards it.
+    waiting_output: Option<QueuedOutput>,
     turn: Option<Turn>,
     retired_through: u64,
     /// The request begun last, with its session.
@@ -1970,6 +2013,7 @@ impl Engine {
                 requested_audio: None,
                 system,
                 scoped_system: None,
+                private_context_current: None,
                 lease_system: None,
                 clock,
                 answered_at: Mutex::new(None),
@@ -2062,6 +2106,7 @@ impl Engine {
             }),
             output,
             urgent: VecDeque::new(),
+            waiting_output: None,
             turn: None,
             retired_through: 0,
             begun_last: None,
@@ -2125,10 +2170,10 @@ impl Engine {
         self
     }
 
-    /// Without scoped context, a turn is still told for the person counted
-    /// at the lamp, but through `system`, which reads the line's own lease
-    /// for the typed name alone (#2602, the reviewer's P2 on #3050): the
-    /// counted person stays the owner's for 30 s after they go.
+    /// Without scoped context, selection still follows the person counted
+    /// at the lamp. The actual line lease independently guards private
+    /// disclosure and the typed name: sticky presence alone grants neither
+    /// (#2602, the reviewer's P2 on #3050).
     pub fn reading_the_lease_for_the_name(mut self, system: Option<ScopedSystem>) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.lease_system = system;
@@ -2250,7 +2295,7 @@ impl Engine {
             if late {
                 crate::memory_scope::RequestScope::looking_later(key, scope, cache.clone())
             } else {
-                crate::memory_scope::RequestScope::new(key, scope)
+                crate::memory_scope::RequestScope::in_cache(key, scope, cache)
             }
         })
     }
@@ -2775,6 +2820,15 @@ impl Engine {
         self
     }
 
+    /// Revalidate private context at dispatch, including after policy/tool
+    /// waits and when reusing a prepared response. Before any turn only.
+    pub fn guarding_private_context(mut self, current: PrivateContextCurrent) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.private_context_current = Some(current);
+        }
+        self
+    }
+
     /// A spoken request is asked with what memory holds that may fit its
     /// words (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c,
     /// `crate::remember::hits_note`), computed as its notes are, within a
@@ -2797,7 +2851,20 @@ impl Engine {
     /// it that `withheld` gives (`crate::remember::event_withheld`): before
     /// that line, and for the rest of a session whose first line asked
     /// something (reviewer-two's P2 on #3059). Before any turn only.
-    pub fn asking_after_events(mut self, note: Remembered, withheld: EventWithheld) -> Self {
+    pub fn asking_after_events(self, note: Remembered, withheld: EventWithheld) -> Self {
+        self.asking_after_events_permitted(
+            Arc::new(move |request, words, lease, _| {
+                crate::remember::EventNote::Ready(note(request, words, lease))
+            }),
+            withheld,
+        )
+    }
+
+    pub(crate) fn asking_after_events_permitted(
+        mut self,
+        note: EventTurn,
+        withheld: EventWithheld,
+    ) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.event_turn = Some(note);
             shared.event_withheld = Some(withheld);
@@ -3442,6 +3509,8 @@ impl Engine {
                     name_carried: AtomicBool::new(false),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
+                let speaker_reads = Arc::new(Mutex::new((0, 0)));
+                let current_speaker_reads = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
                     Some(kept) => {
                         // The name heard in the piece counts by its time
@@ -3480,6 +3549,9 @@ impl Engine {
                         if let Ok(mut said) = said.lock() {
                             *said = (kept.said_from, kept.said_from);
                         }
+                        if let Ok(mut reads) = speaker_reads.lock() {
+                            *reads = (kept.speaker_from, kept.speaker_from);
+                        }
                         KeptSound {
                             request,
                             ended: None,
@@ -3493,17 +3565,20 @@ impl Engine {
                         session,
                         samples: VecDeque::new(),
                         said_from: 0,
+                        speaker_from: 0,
                         ended: None,
                         link,
                         began,
                     },
                 });
-                let memory_scope = self.memory_scope(request, session, true);
+                let mut memory_scope = self.memory_scope(request, session, true);
+                let speaker_recorder = memory_scope
+                    .as_mut()
+                    .and_then(crate::memory_scope::RequestScope::speaker_recorder);
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
-                // The memory's note, asked now while the person speaks, off
-                // the loop, so it is in by the line's end (lamp-4ace, 22 Oct
-                // 17:45: asked at the end, it held the loop 300 ms and came
-                // 60 ms too late).
+                // A genuine Room note may be asked while this line begins,
+                // off the loop. Private reads wait for the final sealed
+                // request speaker proof and matching fresh Eyes source.
                 if let Some(ahead) = &self.shared.note_ahead {
                     (ahead.begin)(told_scope(&self.shared, lease.as_ref()));
                 }
@@ -3518,11 +3593,16 @@ impl Engine {
                             enrollment_generation: crate::remember_speaker::generation(),
                         },
                         lease,
+                        speaker_recorder,
                         marks.clone(),
                     ),
                     heard,
                     checked,
-                    said.clone(),
+                    (
+                        said.clone(),
+                        speaker_reads.clone(),
+                        current_speaker_reads.clone(),
+                    ),
                     before,
                     continues
                         .then_some(previous)
@@ -3535,6 +3615,8 @@ impl Engine {
                     audio: Some(audio),
                     sound,
                     said,
+                    speaker_reads,
+                    current_speaker_reads,
                     marks,
                     task,
                     memory_scope,
@@ -3563,9 +3645,22 @@ impl Engine {
                     }
                     said.1 = read_completed_at_us;
                 }
+                if !samples.is_empty() {
+                    for bounds in [&turn.speaker_reads, &turn.current_speaker_reads] {
+                        if let Ok(mut reads) = bounds.lock() {
+                            if reads.0 == 0 {
+                                reads.0 = read_completed_at_us;
+                            }
+                            reads.1 = read_completed_at_us;
+                        }
+                    }
+                }
                 if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
                     if kept.said_from == 0 {
                         kept.said_from = read_completed_at_us;
+                    }
+                    if kept.speaker_from == 0 && !samples.is_empty() {
+                        kept.speaker_from = read_completed_at_us;
                     }
                     kept.samples.extend(samples.iter().copied());
                     let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
@@ -3775,6 +3870,7 @@ impl Engine {
                         None,
                         picture,
                         Vec::new(),
+                        false,
                         Times::new(begun),
                         None,
                         None,
@@ -3786,6 +3882,8 @@ impl Engine {
                     audio: None,
                     sound: Arc::default(),
                     said: Arc::default(),
+                    speaker_reads: Arc::default(),
+                    current_speaker_reads: Arc::default(),
                     marks: Arc::default(),
                     task,
                     memory_scope,
@@ -3837,6 +3935,7 @@ impl Engine {
                         None,
                         None,
                         Vec::new(),
+                        false,
                         Times::new(Instant::now()),
                         None,
                         None,
@@ -3848,6 +3947,8 @@ impl Engine {
                     audio: None,
                     sound: Arc::default(),
                     said: Arc::default(),
+                    speaker_reads: Arc::default(),
+                    current_speaker_reads: Arc::default(),
                     marks: Arc::default(),
                     task,
                     memory_scope,
@@ -4195,13 +4296,30 @@ impl Engine {
 
     /// The next output ready now, if any.
     pub fn try_output(&mut self) -> Option<ProviderOutput> {
+        self.try_guarded_output().map(|queued| queued.event)
+    }
+
+    /// Keep authority attached while the worker waits for IPC capacity.
+    fn try_guarded_output(&mut self) -> Option<QueuedOutput> {
         loop {
-            let event = match self.urgent.pop_front() {
-                Some(event) => event,
-                None => self.output.try_recv().ok()?,
+            let queued = match self.urgent.pop_front() {
+                Some(event) => event.into(),
+                None => self
+                    .waiting_output
+                    .take()
+                    .or_else(|| self.output.try_recv().ok())?,
             };
-            if self.current_output(&event) {
-                return Some(event);
+            // A paused old owner cannot hold a new owner or its public terminal.
+            if !self.current_output(&queued.event) {
+                continue;
+            }
+            match queued.state() {
+                PermissionState::Ready => return Some(queued),
+                PermissionState::Pending => {
+                    self.waiting_output = Some(queued);
+                    return None;
+                }
+                PermissionState::Lost => {}
             }
         }
     }
@@ -4213,16 +4331,18 @@ impl Engine {
         self.urgent.push_back(event);
     }
 
-    /// The next output, waiting for it.
+    /// The next output, waiting for it through the same guarded queue as IPC.
     #[cfg(test)]
     async fn next(&mut self) -> ProviderOutput {
         loop {
-            let event = match self.urgent.pop_front() {
-                Some(event) => event,
-                None => self.output.recv().await.expect("the engine holds a sender"),
-            };
-            if self.current_output(&event) {
-                return event;
+            if let Some(queued) = self.try_guarded_output() {
+                return queued.event;
+            }
+            if self.waiting_output.is_some() {
+                tokio::time::sleep(services::PERMISSION_POLL).await;
+            } else {
+                self.waiting_output =
+                    Some(self.output.recv().await.expect("the engine holds a sender"));
             }
         }
     }
@@ -4328,7 +4448,12 @@ const LINK_BACK_EVERY: Duration = Duration::from_millis(250);
 /// Whether the link is back (`back`) within `resend::RESEND_WITHIN_US` of
 /// now, with no newer line begun meanwhile (`begun` no longer `request`):
 /// asked every [`LINK_BACK_EVERY`], each ask bounded by what is left.
-async fn link_back_in_time(shared: &Shared, request: u64, back: &LinkBack) -> bool {
+async fn link_back_in_time(
+    shared: &Shared,
+    request: u64,
+    back: &LinkBack,
+    guard: &PrivateContext,
+) -> bool {
     let until =
         tokio::time::Instant::now() + Duration::from_micros(crate::resend::RESEND_WITHIN_US);
     let newer = || {
@@ -4347,7 +4472,12 @@ async fn link_back_in_time(shared: &Shared, request: u64, back: &LinkBack) -> bo
             return false;
         }
         if tokio::time::timeout_at(until, back()).await == Ok(true) {
-            return !newer();
+            return tokio::time::timeout_at(until, guard.wait_ready()).await == Ok(true)
+                && tokio::time::Instant::now() < until
+                && !newer();
+        }
+        if guard.state() == PermissionState::Lost {
+            return false;
         }
         if tokio::time::Instant::now() + LINK_BACK_EVERY >= until {
             eprintln!(
@@ -4378,7 +4508,24 @@ pub fn fault(error: &net::Error) -> Fault {
 impl Shared {
     /// False once the engine is gone; the task then just ends.
     async fn emit(&self, event: ProviderOutput) -> bool {
-        self.out.send(event).await.is_ok()
+        self.out.send(event.into()).await.is_ok()
+    }
+
+    async fn emit_private(&self, guard: &PrivateContext, event: ProviderOutput) -> bool {
+        if !guard.wait_ready().await {
+            return false;
+        }
+        let Ok(permit) = self.out.reserve().await else {
+            return false;
+        };
+        if !guard.wait_ready().await {
+            return false;
+        }
+        permit.send(QueuedOutput {
+            event,
+            private_context: Some(guard.clone()),
+        });
+        true
     }
 
     /// `then` with the search a push may end ([`Engine::stopping_searches_by_hand`]),
@@ -4469,6 +4616,49 @@ impl Shared {
     }
 }
 
+/// A conservative conversion from microphone read times to the local
+/// observation clock. The inner interval is certainly inside the audio;
+/// the outer interval includes it even if sampling the clocks was delayed.
+struct SpeakerAudioInterval {
+    inner: (Instant, Instant),
+    outer: (Instant, Instant),
+    valid_until: Instant,
+}
+
+fn speaker_audio_interval(
+    (first, last): (u64, u64),
+    now_us: u64,
+    before_clock: Instant,
+    after_clock: Instant,
+) -> Option<SpeakerAudioInterval> {
+    if first == 0 || last < first || last > now_us || after_clock < before_clock {
+        return None;
+    }
+    // Capture is delivered in lamp-audio's fixed 10 ms blocks. Include the
+    // first block, not just the instant when that block finished reading.
+    let first = first.checked_sub(u64::from(lamp_audio::BLOCK_MS) * 1_000)?;
+    let from = Duration::from_micros(now_us.checked_sub(first)?);
+    let to = Duration::from_micros(now_us.checked_sub(last)?);
+    let outer = (
+        before_clock.checked_sub(from)?,
+        after_clock.checked_sub(to)?,
+    );
+    let inner = (
+        after_clock.checked_sub(from)?,
+        before_clock.checked_sub(to)?,
+    );
+    if inner.0 >= inner.1 || after_clock.duration_since(outer.0) >= crate::speaking_faces::KEPT {
+        return None;
+    }
+    Some(SpeakerAudioInterval {
+        valid_until: inner
+            .1
+            .checked_add(crate::memory_scope::SPEAKER_PROOF_MAX_AGE)?,
+        inner,
+        outer,
+    })
+}
+
 /// A spoken turn: listen until the queue closes, then answer the words.
 /// With `checked` (the sound mark, when sounds are checked), a short sound
 /// not heard as a short word is not answered; with a [`Heed`], words it
@@ -4478,15 +4668,16 @@ async fn spoken(
     context: (
         SpokenTurn,
         Option<crate::memory_scope::ScopeLease>,
+        Option<crate::memory_scope::SpeakerRecorder>,
         Arc<Marks>,
     ),
     mut heard: mpsc::Receiver<LinePart>,
     checked: Option<Arc<AtomicBool>>,
-    said: Arc<Mutex<(u64, u64)>>,
+    (said, speaker_reads, current_speaker_reads): (ReadBounds, ReadBounds, ReadBounds),
     before: Option<String>,
     continues_from: Option<u64>,
 ) {
-    let (mut turn, scope, marks) = context;
+    let (mut turn, scope, speaker_recorder, marks) = context;
     let request = turn.request;
     // Known from its start, so a chat begun on its early words is asked
     // with it too.
@@ -4714,6 +4905,59 @@ async fn spoken(
                 .await;
         }
     };
+    // Only the request owner seals positive evidence. Use the microphone
+    // reads, including any carried beginning, and independently this piece's
+    // own reads; never a delayed listener/task start or transcription completion.
+    // Empty input cannot lend a proof to an older carried answer. These are
+    // host reads, not acoustic timestamps.
+    if let (Some(recorder), Some(scope)) = (speaker_recorder, scope.as_ref()) {
+        let reads = speaker_reads.lock().map_or((0, 0), |reads| *reads);
+        let current_reads = current_speaker_reads.lock().map_or((0, 0), |reads| *reads);
+        let before_clock = Instant::now();
+        let now_us = monotonic_us();
+        let after_clock = Instant::now();
+        let interval = speaker_audio_interval(reads, now_us, before_clock, after_clock);
+        let current_interval =
+            speaker_audio_interval(current_reads, now_us, before_clock, after_clock);
+        let speakers = if turn.captured && !text.trim().is_empty() {
+            interval
+                .as_ref()
+                .zip(current_interval.as_ref())
+                .and_then(|(interval, current)| {
+                    shared
+                        .speaking
+                        .as_ref()
+                        .or(shared.forget_sight.as_ref())
+                        .map(|(eyes, _)| {
+                            let positive = |interval: &SpeakerAudioInterval| {
+                                let inner =
+                                    eyes.positive_speaker(interval.inner.0, interval.inner.1);
+                                let outer =
+                                    eyes.positive_speaker(interval.outer.0, interval.outer.1);
+                                if inner == outer { inner } else { Vec::new() }
+                            };
+                            let combined = positive(interval);
+                            let current = positive(current);
+                            // An older speaker may dominate a carried window.
+                            // The new piece must independently prove that same
+                            // sole speaker; any unseen/different piece refuses.
+                            if matches!(combined.as_slice(), [_]) && current == combined {
+                                combined
+                            } else {
+                                Vec::new()
+                            }
+                        })
+                })
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        recorder.seal(
+            scope.key(),
+            &speakers,
+            interval.map_or(finishing, |interval| interval.valid_until),
+        );
+    }
     // Snapshot the actual line before name carries or older words are
     // joined. Those may belong to someone else and never prove this name.
     let enrollment_allowed = shared.remember_speaker
@@ -5370,6 +5614,7 @@ async fn spoken(
                     None,
                     None,
                     notes,
+                    false,
                     times,
                     None,
                     Some(owner),
@@ -5484,6 +5729,13 @@ async fn spoken(
     // What memory holds for these words: the prepared chat's, when it was
     // begun on them (so its round still stands), else asked now, off the
     // runtime's thread (Fourth's P3 on #2229).
+    let remembered_private = prepared
+        .as_ref()
+        .filter(|prepared| plain_words(&prepared.words) == plain_words(&text))
+        .map_or_else(
+            || originally_private(scope.as_ref()),
+            |prepared| prepared.remembered_requires_speaker,
+        );
     let remembered = match prepared
         .as_ref()
         .filter(|prepared| plain_words(&prepared.words) == plain_words(&text))
@@ -5503,6 +5755,7 @@ async fn spoken(
             None => None,
         },
     };
+    let remembered_private = remembered_private && remembered.is_some();
     // Its name heard as it began: told as the Live route tells it (#1712:
     // without it this route missed two calls this morning).
     let named = shared
@@ -5618,6 +5871,7 @@ async fn spoken(
         Some(turn),
         None,
         notes,
+        remembered_private,
         times,
         prepared,
         Some(memory_write_owner),
@@ -6165,6 +6419,201 @@ pub const OWN_ECHO_ENVIRONMENT: &str = "LAMP_SECOND_OWN_ECHO";
 /// tells it (#2539, the forgotten name): `on`, and nothing else.
 pub const FACE_NAME_ENVIRONMENT: &str = "LAMP_SECOND_FACE_NAME";
 
+/// Authority travels with buffered output, so waiting in the bounded queue
+/// cannot outlive the permission under which private words were generated.
+struct QueuedOutput {
+    event: ProviderOutput,
+    private_context: Option<PrivateContext>,
+}
+impl std::fmt::Debug for QueuedOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QueuedOutput")
+            .field("event", &self.event)
+            .field("private", &self.private_context.is_some())
+            .finish()
+    }
+}
+impl From<ProviderOutput> for QueuedOutput {
+    fn from(event: ProviderOutput) -> Self {
+        Self {
+            event,
+            private_context: None,
+        }
+    }
+}
+impl QueuedOutput {
+    fn state(&self) -> PermissionState {
+        self.private_context
+            .as_ref()
+            .map_or(PermissionState::Ready, PrivateContext::state)
+    }
+}
+
+/// The worker's current proof state for the request's original private scope.
+pub type PrivateContextCurrent =
+    Arc<dyn Fn(&crate::memory_scope::ScopeLease) -> PermissionState + Send + Sync>;
+
+/// Shared by the writer and speech consumer. Once private context has entered
+/// a request, losing authority ends it; no later neutral context can downgrade it.
+#[derive(Clone)]
+struct PrivateContext {
+    scope: Option<crate::memory_scope::ScopeLease>,
+    validate: Option<PrivateContextCurrent>,
+    required: Arc<AtomicBool>,
+    lost: Arc<AtomicBool>,
+    /// A separately minted fixed face-operation receipt; never model text.
+    public_face_receipt: bool,
+}
+impl PrivateContext {
+    fn new(
+        shared: &Shared,
+        scope: Option<&crate::memory_scope::ScopeLease>,
+        required: bool,
+    ) -> Self {
+        Self {
+            scope: scope.cloned(),
+            validate: shared.private_context_current.clone(),
+            required: Arc::new(AtomicBool::new(required)),
+            lost: Arc::new(AtomicBool::new(false)),
+            public_face_receipt: false,
+        }
+    }
+    fn require(&self, required: bool) {
+        if required {
+            self.required.store(true, Ordering::Release);
+        }
+    }
+    fn permission(&self) -> ChatPermission {
+        let guard = self.clone();
+        Arc::new(move || guard.state())
+    }
+    fn state(&self) -> PermissionState {
+        if self.lost.load(Ordering::Acquire) {
+            return PermissionState::Lost;
+        }
+        let state = match &self.scope {
+            Some(scope) if self.public_face_receipt => {
+                // The private grant remains lost. Only the original still-live,
+                // non-held/non-narrowed microphone owner may hear fixed bytes.
+                if scope.is_current() && scope.speaker().is_some() {
+                    PermissionState::Ready
+                } else {
+                    PermissionState::Lost
+                }
+            }
+            Some(scope) if !scope.is_current() || scope.private_context_lost() => {
+                PermissionState::Lost
+            }
+            Some(scope)
+                if self.required.load(Ordering::Acquire) || scope.private_context_waiting() =>
+            {
+                let state = self
+                    .validate
+                    .as_ref()
+                    .map_or(PermissionState::Lost, |validate| validate(scope));
+                if scope.is_current() && !scope.private_context_lost() {
+                    state
+                } else {
+                    PermissionState::Lost
+                }
+            }
+            None if self.required.load(Ordering::Acquire) => PermissionState::Lost,
+            _ => PermissionState::Ready,
+        };
+        if state == PermissionState::Lost {
+            self.lost.store(true, Ordering::Release);
+        }
+        state
+    }
+    fn current_for_fixed_receipt(&self) -> bool {
+        self.public_face_receipt && self.state() == PermissionState::Ready
+    }
+
+    /// Retire private work before an admitted ordinary face mutation is dispatched.
+    /// Its separate guard can carry only a fixed, verified public outcome.
+    /// Already observed loss, replacement, privacy or expired audio cannot mint it.
+    fn face_operation_receipt(&self, shared: &Shared, request: u64) -> Option<Self> {
+        let scope = self.scope.as_ref()?;
+        let key = scope.key();
+        if self.public_face_receipt
+            || !self.required.load(Ordering::Acquire)
+            || self.lost.load(Ordering::Acquire)
+            || scope.private_context_lost()
+            || !scope.is_current()
+            || scope.scope().and_then(|scope| scope.person()).is_none()
+            || scope.speaker().is_none()
+            || key.request != request
+            || !shared
+                .begun
+                .lock()
+                .is_ok_and(|begun| *begun == Some((request, key.session)))
+        {
+            return None;
+        }
+        let receipt = Self {
+            scope: Some(scope.clone()),
+            validate: None,
+            required: Arc::new(AtomicBool::new(false)),
+            lost: Arc::new(AtomicBool::new(false)),
+            public_face_receipt: true,
+        };
+        // Every outstanding private clone/output stays permanently unusable.
+        if self.lost.swap(true, Ordering::AcqRel) || !scope.retire_private_for_face_receipt() {
+            return None;
+        }
+        Some(receipt)
+    }
+
+    #[cfg(test)]
+    fn current(&self) -> bool {
+        self.state() == PermissionState::Ready
+    }
+    async fn wait_ready(&self) -> bool {
+        loop {
+            match self.state() {
+                PermissionState::Ready => return true,
+                PermissionState::Lost => return false,
+                PermissionState::Pending => tokio::time::sleep(services::PERMISSION_POLL).await,
+            }
+        }
+    }
+
+    /// Before the first backend poll, temporary recognition still spends
+    /// this answer's original response budget, never a renewed speaker wait.
+    async fn ready_before(&self, until: tokio::time::Instant) -> Result<(), Stop> {
+        if tokio::time::Instant::now() >= until {
+            return Err(Stop::GaveUp);
+        }
+        match tokio::time::timeout_at(until, self.wait_ready()).await {
+            Ok(true) if tokio::time::Instant::now() < until => Ok(()),
+            Ok(false) => Err(Stop::Gone),
+            Ok(true) | Err(_) => Err(Stop::GaveUp),
+        }
+    }
+
+    /// Losing private disclosure permission does not retire the microphone
+    /// owner. Its still-current turn needs a public terminal, without any of
+    /// the private answer. Revoked, replaced, and unowned requests get none.
+    fn lost_while_owned(&self, shared: &Shared, request: u64) -> bool {
+        self.lost.load(Ordering::Acquire)
+            && self.scope.as_ref().is_some_and(|scope| {
+                let key = scope.key();
+                scope.is_current()
+                    && key.request == request
+                    && shared
+                        .begun
+                        .lock()
+                        .is_ok_and(|begun| *begun == Some((key.request, key.session)))
+            })
+    }
+}
+
+fn originally_private(scope: Option<&crate::memory_scope::ScopeLease>) -> bool {
+    scope
+        .and_then(crate::memory_scope::ScopeLease::admitted_scope)
+        .is_some_and(|scope| scope.person().is_some())
+}
+
 /// Round 1 of a spoken turn's chat begun on the line's early words
 /// (`LAMP_SECOND_PREPARED`, #1712, the first builder at 17:02: the route's
 /// first word came about 3.4 s after a line, Live's 2.4 s). Its events are
@@ -6182,6 +6631,8 @@ struct Prepared {
     /// began, so the final words, when they are its own, aren't asked again
     /// and its round still stands (Fourth's P2 on #2229).
     remembered: Option<String>,
+    remembered_requires_speaker: bool,
+    private_context: PrivateContext,
     messages: Vec<Message>,
     events: mpsc::UnboundedReceiver<net::Result<ChatEvent>>,
     at: Instant,
@@ -6200,35 +6651,79 @@ impl Prepared {
     /// The chat asked on `words`, as round 1 would be asked: the turn's
     /// system message and history, the `notes` known so far, then the
     /// words.
+    fn try_begin(
+        shared: &Shared,
+        scope: Option<&crate::memory_scope::ScopeLease>,
+        words: String,
+        notes: &[String],
+        remembered: Option<String>,
+        remembered_requires_speaker: bool,
+    ) -> Option<Self> {
+        let told = told(shared, scope);
+        if told.pending_private_context {
+            // No speculative chat may freeze an incomplete context. Final
+            // words will compose it again after the original proof resumes.
+            return None;
+        }
+        let notes: Vec<String> = notes.iter().cloned().chain(remembered.clone()).collect();
+        let private_context = PrivateContext::new(
+            shared,
+            scope,
+            told.requires_speaker || remembered_requires_speaker,
+        );
+        let mut messages = told.messages();
+        messages.extend(notes.iter().cloned().map(Message::system));
+        messages.push(Message::user(words.clone()));
+        let mut chat = if private_context.state() != PermissionState::Lost {
+            chat_for(
+                shared,
+                scope,
+                messages.clone(),
+                private_context.permission(),
+            )
+        } else {
+            futures_util::stream::empty().boxed()
+        };
+        let (kept, events) = mpsc::unbounded_channel();
+        let guard = private_context.clone();
+        let task = tokio::spawn(async move {
+            while let Some(event) = chat.next().await {
+                if !guard.wait_ready().await || kept.send(event).is_err() {
+                    break;
+                }
+            }
+        });
+        Some(Self {
+            words,
+            notes,
+            remembered,
+            remembered_requires_speaker,
+            private_context,
+            messages,
+            events,
+            at: Instant::now(),
+            task: Some(task),
+        })
+    }
+
+    #[cfg(test)]
     fn begin(
         shared: &Shared,
         scope: Option<&crate::memory_scope::ScopeLease>,
         words: String,
         notes: &[String],
         remembered: Option<String>,
+        remembered_requires_speaker: bool,
     ) -> Self {
-        let notes: Vec<String> = notes.iter().cloned().chain(remembered.clone()).collect();
-        let mut messages = told(shared, scope).messages();
-        messages.extend(notes.iter().cloned().map(Message::system));
-        messages.push(Message::user(words.clone()));
-        let mut chat = chat_for(shared, scope, messages.clone());
-        let (kept, events) = mpsc::unbounded_channel();
-        let task = tokio::spawn(async move {
-            while let Some(event) = chat.next().await {
-                if kept.send(event).is_err() {
-                    break;
-                }
-            }
-        });
-        Self {
+        Self::try_begin(
+            shared,
+            scope,
             words,
             notes,
             remembered,
-            messages,
-            events,
-            at: Instant::now(),
-            task: Some(task),
-        }
+            remembered_requires_speaker,
+        )
+        .expect("the test starts with a completed context")
     }
 
     /// Why it can't stand for round 1 asked with `messages`: `base`, its
@@ -6260,9 +6755,17 @@ impl Prepared {
         let events = std::mem::replace(&mut self.events, mpsc::unbounded_channel().1);
         // The task goes with the stream: dropping it stops the chat.
         let task = AbortOnDrop(self.task.take());
-        futures_util::stream::unfold((events, task), |(mut events, task)| async move {
-            events.recv().await.map(|event| (event, (events, task)))
-        })
+        let guard = self.private_context.clone();
+        futures_util::stream::unfold(
+            (events, task, guard),
+            |(mut events, task, guard)| async move {
+                let event = events.recv().await?;
+                guard
+                    .wait_ready()
+                    .await
+                    .then_some((event, (events, task, guard)))
+            },
+        )
         .boxed()
     }
 }
@@ -6451,6 +6954,50 @@ fn told_whole(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) 
     }
 }
 
+/// Compose only after proof is ready, and discard any composition that
+/// itself observed Checking. The callback returns before any asynchronous
+/// wait: no Sessions, Days or note lock is held here. Retrying this selection
+/// does not restart the note RPC or the original first-response deadline.
+async fn told_whole_ready(
+    shared: &Shared,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    guard: &PrivateContext,
+    until: tokio::time::Instant,
+) -> Result<Told, Stop> {
+    let mut rebuilding = false;
+    loop {
+        if rebuilding {
+            if tokio::time::Instant::now() >= until {
+                return Err(Stop::GaveUp);
+            }
+            match tokio::time::timeout_at(until, guard.wait_ready()).await {
+                Ok(true) => {}
+                Ok(false) => return Err(Stop::Gone),
+                Err(_) => return Err(Stop::GaveUp),
+            }
+        }
+        let told = told_whole(shared, scope);
+        guard.require(told.requires_speaker);
+        if !told.pending_private_context {
+            if !guard.required.load(Ordering::Acquire) {
+                return guard.wait_ready().await.then_some(told).ok_or(Stop::Gone);
+            }
+            return match tokio::time::timeout_at(until, guard.wait_ready()).await {
+                Ok(true) => Ok(told),
+                Ok(false) => Err(Stop::Gone),
+                Err(_) => Err(Stop::GaveUp),
+            };
+        }
+        rebuilding = true;
+        // A same-Seen check elsewhere may already have cleared Pending. The
+        // receipt still requires a new composition, with bounded wakeups.
+        tokio::time::sleep_until(
+            until.min(tokio::time::Instant::now() + services::PERMISSION_POLL),
+        )
+        .await;
+    }
+}
+
 /// `told` without the note's section for a dated follow-up that is
 /// withheld now ([`Engine::asking_after_events`], `remember::event_withheld`):
 /// before the person's first line decided it, and after a first line that
@@ -6528,12 +7075,14 @@ fn prepared_on(
             );
             // Memory is asked here, on the early words, off the final
             // words' path; the final words reuse it when they are these.
+            let private = originally_private(scope);
             let remembered = shared
                 .remembered
                 .as_ref()
                 .filter(|_| !held_by_gap(scope))
                 .and_then(|note| note(request, &words, scope));
-            Some(Prepared::begin(shared, scope, words, notes, remembered))
+            let private = private && remembered.is_some();
+            Prepared::try_begin(shared, scope, words, notes, remembered, private)
         }
         net::Early::Resumed => {
             if prepared.is_some() {
@@ -6849,27 +7398,34 @@ async fn done_though_held(
     said: &str,
 ) {
     let (request, scope) = context;
-    let gone = || scope.is_some_and(|scope| !scope.is_current());
+    let guard = PrivateContext::new(shared, scope, false);
     let began = Instant::now();
+    let until = tokio::time::Instant::now() + HELD_WITHIN;
     let asking = async {
-        if gone() {
+        if !guard.wait_ready().await {
             return None;
         }
         note_ready(shared, scope).await;
-        if gone() {
+        if !guard.wait_ready().await {
             return None;
         }
-        let mut messages = told(shared, scope).messages();
-        if gone() {
+        let told = told_whole_ready(shared, scope, &guard, until).await.ok()?;
+        let mut messages = cut_event(shared, told).messages();
+        if !guard.wait_ready().await {
             return None;
         }
         messages.push(Message::system(HELD_NOTE));
         messages.push(Message::user(said.to_owned()));
-        let mut stream = shared
-            .services
-            .chat_only(messages, crate::attention::DONE_THOUGH_HELD);
+        let mut stream = shared.services.chat_guarded(
+            messages,
+            ChatFunctions::Only(crate::attention::DONE_THOUGH_HELD),
+            guard.permission(),
+        );
         let mut calls = Vec::new();
         while let Some(event) = stream.next().await {
+            if !guard.wait_ready().await {
+                return None;
+            }
             match event {
                 Ok(ChatEvent::ToolCalls(asked)) => calls = asked,
                 Ok(ChatEvent::Done) => break,
@@ -6887,7 +7443,7 @@ async fn done_though_held(
             .iter()
             .filter(|call| crate::attention::done_though_held(&call.name))
         {
-            if gone() {
+            if !guard.wait_ready().await {
                 return None;
             }
             let told = run_tool(shared, request, true, call, scope).await;
@@ -6955,6 +7511,7 @@ async fn ask_look(
     heard: bool,
     (name, args): (&str, Value),
     note: Option<String>,
+    guard: &PrivateContext,
 ) -> Result<bool, Stop> {
     // A skill's look is a search's, which may go on in the lamp's own
     // turns; the route's own look call is not.
@@ -7004,7 +7561,7 @@ async fn ask_look(
             args,
         }),
     };
-    if !shared.emit(asked_look).await {
+    if !shared.emit_private(guard, asked_look).await {
         return Err(Stop::Gone);
     }
     Ok(dropped.is_none())
@@ -7115,9 +7672,9 @@ const HELD_MEMORY_CALL: &str = "I can't see who is talking just now, so I can't 
 
 /// Whether this turn's scope is a known face's kept only by its held gap
 /// (`LAMP_FACE_GAP_HOLD`): someone who left within 12 s of the lamp's last
-/// answer to them may not be the one speaking, so the line is answered from
-/// the conversation as it stood: no recall or search, no memory hits, and no
-/// held forget run on it (the first builder's 22:10 and 01:43 on #2265).
+/// answer to them may not be the one speaking. Its context is neutral:
+/// private history is withheld, with no recall or search, no memory hits,
+/// and no held forget run on it (the first builder's 22:10 and 01:43 on #2265).
 fn held_by_gap(scope: Option<&crate::memory_scope::ScopeLease>) -> bool {
     scope
         .and_then(crate::memory_scope::ScopeLease::scope)
@@ -7135,17 +7692,105 @@ async fn event_line(
     request: u64,
     words: &str,
     scope: Option<&crate::memory_scope::ScopeLease>,
-) -> Option<String> {
-    let note = shared.event_turn.clone().filter(|_| !held_by_gap(scope))?;
+    answer_guard: &PrivateContext,
+    until: tokio::time::Instant,
+) -> Result<Option<String>, Stop> {
+    use crate::remember::EventNote;
+    let Some(note) = shared.event_turn.clone().filter(|_| !held_by_gap(scope)) else {
+        return Ok(None);
+    };
+    // A dated follow-up is private context too. Check before scheduling and
+    // again when the blocking callback starts, not only after its RPC returns.
+    let private = originally_private(scope);
+    let guard = PrivateContext::new(shared, scope, private);
     let (words, lease) = (words.to_owned(), scope.cloned());
-    let line = tokio::task::spawn_blocking(move || note(request, &words, lease.as_ref()))
-        .await
-        .ok()
-        .flatten()?;
-    eprintln!(
-        "lamp-voice second: request {request}: they only greeted, and the model is told to ask now how their dated follow-up went"
-    );
-    Some(line)
+    let mut pending = false;
+    loop {
+        if tokio::time::Instant::now() >= until {
+            return Err(Stop::GaveUp);
+        }
+        match tokio::time::timeout_at(until, guard.wait_ready()).await {
+            Ok(true) => {}
+            Ok(false) if !pending => return Ok(None),
+            Ok(false) => {
+                answer_guard.lost.store(true, Ordering::Release);
+                return Err(Stop::Gone);
+            }
+            Err(_) => return Err(Stop::GaveUp),
+        }
+        let (note, words, lease, check) =
+            (note.clone(), words.clone(), lease.clone(), guard.clone());
+        let mut task = tokio::task::spawn_blocking(move || {
+            if tokio::time::Instant::now() >= until {
+                return EventNote::Lost;
+            }
+            match check.state() {
+                PermissionState::Ready => note(request, &words, lease.as_ref(), until),
+                PermissionState::Pending => EventNote::Pending,
+                PermissionState::Lost if pending => EventNote::Lost,
+                PermissionState::Lost => EventNote::Ready(None),
+            }
+        });
+        let read = match tokio::time::timeout_at(until, &mut task).await {
+            Ok(Ok(read)) => read,
+            Ok(Err(_)) => return Ok(None),
+            Err(_) => {
+                // Cancels a queued callback. A running callback also receives
+                // until, so its post-lock fence cannot consume a late event.
+                task.abort();
+                return Err(Stop::GaveUp);
+            }
+        };
+        match read {
+            EventNote::Ready(line) => {
+                // Preserve a returned private line until answer tags its persistent
+                // guard, then validates it before any message or backend send.
+                // Dropping it here on expiry would erase its private provenance
+                // and let a neutral Told continue under an unrequired guard.
+                if line.is_some() {
+                    eprintln!(
+                        "lamp-voice second: request {request}: they only greeted, and the model is told to ask now how their dated follow-up went"
+                    );
+                }
+                return Ok(line);
+            }
+            EventNote::Lost => {
+                answer_guard.require(private);
+                answer_guard.lost.store(true, Ordering::Release);
+                return Err(Stop::Gone);
+            }
+            EventNote::Pending => {
+                pending = true;
+                answer_guard.require(private);
+                // The callback and its Days lock have ended. Retry only this
+                // explicit unfinished decision, never a completed Ready(None).
+                tokio::time::sleep_until(
+                    until.min(tokio::time::Instant::now() + services::PERMISSION_POLL),
+                )
+                .await;
+            }
+        }
+    }
+}
+
+/// Private response resumption also checks the original deadline before polling
+/// a lazy send. Public/room responses keep their existing timeout behavior.
+async fn chat_next_before(
+    stream: &mut futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>,
+    until: tokio::time::Instant,
+    guard: &PrivateContext,
+) -> Result<Option<net::Result<ChatEvent>>, tokio::time::error::Elapsed> {
+    tokio::time::timeout_at(
+        until,
+        std::future::poll_fn(|cx| {
+            if guard.required.load(Ordering::Acquire) && tokio::time::Instant::now() >= until {
+                std::task::Poll::Pending
+            } else {
+                futures_util::Stream::poll_next(stream.as_mut(), cx)
+            }
+        }),
+    )
+    .await
 }
 
 /// The turn's chat: every function, or none of memory's for a line held
@@ -7154,12 +7799,14 @@ fn chat_for(
     shared: &Shared,
     scope: Option<&crate::memory_scope::ScopeLease>,
     messages: Vec<Message>,
+    permitted: ChatPermission,
 ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
-    if held_by_gap(scope) {
-        shared.services.chat_without(messages, MEMORY_CALLS)
+    let functions = if held_by_gap(scope) {
+        ChatFunctions::Without(MEMORY_CALLS)
     } else {
-        shared.services.chat(messages)
-    }
+        ChatFunctions::All
+    };
+    shared.services.chat_guarded(messages, functions, permitted)
 }
 
 /// The functions [`chat_for`] leaves out for this scope.
@@ -7415,6 +8062,15 @@ async fn run_tool(
     }
 }
 
+/// An admitted face call, detached from every private stream and answer.
+/// Remaining calls from its old model batch are never run.
+struct FaceOperation {
+    call: net::ToolCall,
+    receipt: PrivateContext,
+    remaining_calls: bool,
+    policy_silent: bool,
+}
+
 /// How an answer stopped short.
 enum Stop {
     /// The first round had not begun within its bound ([`BEGIN_WITHIN`]):
@@ -7429,6 +8085,8 @@ enum Stop {
     /// no other verdict.
     Held,
     Failed(Fault),
+    /// Private work is retired before this ordinary face mutation.
+    FaceOperation(Box<FaceOperation>),
     /// The engine is gone.
     Gone,
 }
@@ -7473,11 +8131,18 @@ async fn answer(
     spoken: Option<SpokenTurn>,
     picture: Option<Vec<u8>>,
     notes: Vec<String>,
+    notes_require_speaker: bool,
     times: Arc<Mutex<Times>>,
     prepared: Option<Prepared>,
     memory_write_owner: Option<WriteOwner>,
 ) {
     let (request, scope) = context;
+    let private_context = prepared.as_ref().map_or_else(
+        || PrivateContext::new(shared, scope.as_ref(), false),
+        |prepared| prepared.private_context.clone(),
+    );
+    private_context.require(notes_require_speaker);
+    let writing_guard = private_context.clone();
     let heard = asked == Asker::Spoken;
     let looking = matches!(asked, Asker::Written { looking: true, .. });
     let searching = matches!(asked, Asker::Written { search: true, .. });
@@ -7499,6 +8164,7 @@ async fn answer(
             &mut speech,
             ANNOUNCEMENT.to_owned(),
             net::Turn { request, heard_at },
+            None,
         )
     });
     let (sentences, mut queued) = mpsc::channel(SENTENCES_AHEAD);
@@ -7517,6 +8183,7 @@ async fn answer(
     let acted = AtomicBool::new(false);
     let dispatched = &acted;
     let mut queue = Queue {
+        private_context: private_context.clone(),
         shared,
         speech: &mut speech,
         announcement,
@@ -7622,21 +8289,26 @@ async fn answer(
         && notes.iter().any(|note| note == worker::CONVERSATION_ALONE))
     .then(String::new);
     let writing = async move {
-        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
-            return Err(Stop::Gone);
-        }
+        // This is the existing outer first-response ceiling, measured from
+        // the final words. The later stream poll keeps its original, possibly
+        // shorter cue/no-cue deadline as well; no retry renews either bound.
+        let context_within = if heard && shared.cues.is_some() {
+            (shared.cue_after + BEGIN_WITHIN_AFTER_CUE).max(BEGIN_WITHIN)
+        } else if looking {
+            LOOK_BEGIN_WITHIN
+        } else {
+            begin_within(heard, shared.written_wait)
+        };
+        let context_until = begun + context_within;
+        writing_guard.ready_before(context_until).await?;
         // The memory's note asked as the line began, waited for here, never
-        // on the loop: building the context below reads nothing.
-        note_ready(shared, scope.as_ref()).await;
-        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
-            return Err(Stop::Gone);
-        }
-        let told = told_whole(shared, scope.as_ref());
-        // Building it can wait on the memory service: a request revoked
-        // meanwhile is not asked with what was read for it.
-        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
-            return Err(Stop::Gone);
-        }
+        // on the loop: building the context below reads nothing. Its own
+        // read budget and this original answer ceiling both remain in force.
+        tokio::time::timeout_at(context_until, note_ready(shared, scope.as_ref()))
+            .await
+            .map_err(|_| Stop::GaveUp)?;
+        writing_guard.ready_before(context_until).await?;
+        let told = told_whole_ready(shared, scope.as_ref(), &writing_guard, context_until).await?;
         // A dated follow-up's line, last among the notes: asked only now,
         // once the session's note is in (read as the line began or as the
         // turn is told, its follow-up read for this answered turn, and
@@ -7645,10 +8317,24 @@ async fn answer(
         // section for it is cut unless that line only greeted
         // (reviewer-two's P2 on #3059).
         let mut notes = notes;
-        if heard && let Some(line) = event_line(shared, request, &event_words, scope.as_ref()).await
+        // Preserve admission provenance across the callback: a private note
+        // cannot become neutral because its proof expired while being read.
+        let event_private = originally_private(scope.as_ref());
+        if heard
+            && let Some(line) = event_line(
+                shared,
+                request,
+                &event_words,
+                scope.as_ref(),
+                &writing_guard,
+                context_until,
+            )
+            .await?
         {
+            writing_guard.require(event_private);
             notes.push(line);
         }
+        writing_guard.ready_before(context_until).await?;
         let mut messages = cut_event(shared, told).messages();
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
@@ -7684,9 +8370,7 @@ async fn answer(
                 Some(gate) if !by_rule => gate(request, call.name.clone()).await,
                 _ => Policed::Run,
             };
-            if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
-                return Err(Stop::Gone);
-            }
+            writing_guard.ready_before(context_until).await?;
             if by_rule || policed == Policed::Held {
                 eprintln!(
                     "lamp-voice second: request {request}: dropped a held forget ({}): the line is held",
@@ -7705,12 +8389,25 @@ async fn answer(
                     call.name
                 );
             } else {
+                if call.name == crate::known_faces::FORGET
+                    && call.args.get("photo_reply").is_none()
+                    && writing_guard.required.load(Ordering::Acquire)
+                {
+                    let Some(receipt) = writing_guard.face_operation_receipt(shared, request)
+                    else {
+                        return Err(Stop::Gone);
+                    };
+                    return Err(Stop::FaceOperation(Box::new(FaceOperation {
+                        call,
+                        receipt,
+                        remaining_calls: false,
+                        policy_silent: false,
+                    })));
+                }
                 ran_tool.store(true, Ordering::Relaxed);
                 dispatched.store(true, Ordering::Relaxed);
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
-                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
-                    return Err(Stop::Gone);
-                }
+                writing_guard.ready_before(context_until).await?;
                 eprintln!(
                     "lamp-voice second: request {request}: ran a held forget ({})",
                     call.name
@@ -7751,14 +8448,18 @@ async fn answer(
         let mut short_line: Option<String> = None;
         let mut round = 0;
         while round < MAX_ROUNDS {
-            if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+            if writing_guard.state() == PermissionState::Lost {
                 return Err(Stop::Gone);
             }
             round += 1;
             let mut refused = false;
             let mut stream = match prepared.take() {
                 // A quoted line's every round declares no function at all.
-                _ if quoted => shared.services.chat_only(messages.clone(), &[]),
+                _ if quoted => shared.services.chat_guarded(
+                    messages.clone(),
+                    ChatFunctions::Only(&[]),
+                    writing_guard.permission(),
+                ),
                 Some(prepared) if round == 1 => {
                     if let Some(noted) = tools_noted
                         && let Ok(mut noted) = noted.lock()
@@ -7767,7 +8468,12 @@ async fn answer(
                     }
                     prepared.into_events()
                 }
-                _ => chat_for(shared, scope.as_ref(), messages.clone()),
+                _ => chat_for(
+                    shared,
+                    scope.as_ref(),
+                    messages.clone(),
+                    writing_guard.permission(),
+                ),
             };
             let mut first = true;
             let mut split = Sentences::default();
@@ -7786,7 +8492,11 @@ async fn answer(
                     } else {
                         begin_within(heard, shared.written_wait)
                     };
-                    let mut next = tokio::time::timeout_at(at(first_wait), stream.next()).await;
+                    let mut next =
+                        chat_next_before(&mut stream, at(first_wait), &writing_guard).await;
+                    if writing_guard.state() == PermissionState::Lost {
+                        return Err(Stop::Gone);
+                    }
                     if next.is_err()
                         && let Some(cues) = cues
                     {
@@ -7812,7 +8522,15 @@ async fn answer(
                             // 4.5 s, while its chat was coldest).
                             None => shared.cue_after + BEGIN_WITHIN_AFTER_CUE,
                         };
-                        next = tokio::time::timeout_at(at(bound), stream.next()).await;
+                        next = chat_next_before(&mut stream, at(bound), &writing_guard).await;
+                    }
+                    if writing_guard.state() == PermissionState::Lost {
+                        return Err(Stop::Gone);
+                    }
+                    // Checking spends the same first-response budget. Its
+                    // timeout is a public completion, not a renewed wait.
+                    if next.is_err() && writing_guard.state() == PermissionState::Pending {
+                        return Err(Stop::GaveUp);
                     }
                     match next {
                         Ok(next) => next,
@@ -7836,6 +8554,9 @@ async fn answer(
                 } else {
                     stream.next().await
                 };
+                if !writing_guard.wait_ready().await {
+                    return Err(Stop::Gone);
+                }
                 let Some(event) = next else { break };
                 let event = match event {
                     // A picture the chat refuses is no failure of the look:
@@ -7866,15 +8587,20 @@ async fn answer(
                             && link::lost(&fault(&error))
                         {
                             resent = true;
-                            if link_back_in_time(shared, request, back).await {
-                                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                            if link_back_in_time(shared, request, back, &writing_guard).await {
+                                if writing_guard.state() == PermissionState::Lost {
                                     return Err(Stop::Gone);
                                 }
                                 eprintln!(
                                     "lamp-voice second: request {request} lost on the network ({error}): the link is back, asked once more"
                                 );
                                 from = tokio::time::Instant::now();
-                                stream = chat_for(shared, scope.as_ref(), messages.clone());
+                                stream = chat_for(
+                                    shared,
+                                    scope.as_ref(),
+                                    messages.clone(),
+                                    writing_guard.permission(),
+                                );
                                 continue;
                             }
                         }
@@ -8050,7 +8776,15 @@ async fn answer(
                 if let Some(rest) = split.finish() {
                     queue.push(rest).await?;
                 }
-                if ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?
+                if ask_look(
+                    shared,
+                    request,
+                    heard,
+                    (LOOK_CALL, Value::Null),
+                    None,
+                    &writing_guard,
+                )
+                .await?
                     && !queue.started
                 {
                     queue.push(LOOKING.to_owned()).await?;
@@ -8180,14 +8914,22 @@ async fn answer(
                         }
                     });
                     let policed = futures_util::future::join_all(waits).await;
-                    if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                    if !writing_guard.wait_ready().await {
                         return Err(Stop::Gone);
                     }
                     policed
                 }
                 _ => vec![Policed::Run; calls.len()],
             };
-            for ((call, held), policed) in calls.iter().zip(held_by_rule).zip(policed) {
+            // A held call anywhere in this already-policed batch makes its
+            // ending silent, even when an allowed face mutation retires it early.
+            let round_policy_held = policed.contains(&Policed::Held);
+            for (call_index, ((call, held), policed)) in
+                calls.iter().zip(held_by_rule).zip(policed).enumerate()
+            {
+                if !writing_guard.wait_ready().await {
+                    return Err(Stop::Gone);
+                }
                 if held {
                     eprintln!(
                         "lamp-voice second: request {request} asked for {}: held, nothing shows it was said to the lamp",
@@ -8340,6 +9082,25 @@ async fn answer(
                     ));
                     continue;
                 }
+                if heard
+                    && matches!(
+                        call.name.as_str(),
+                        crate::known_faces::FORGET | crate::known_faces::REMEMBER
+                    )
+                    && call.args.get("photo_reply").is_none()
+                    && writing_guard.required.load(Ordering::Acquire)
+                {
+                    let Some(receipt) = writing_guard.face_operation_receipt(shared, request)
+                    else {
+                        return Err(Stop::Gone);
+                    };
+                    return Err(Stop::FaceOperation(Box::new(FaceOperation {
+                        call: call.clone(),
+                        receipt,
+                        remaining_calls: call_index + 1 < calls.len(),
+                        policy_silent: round_policy_held,
+                    })));
+                }
                 ran_tool.store(true, Ordering::Relaxed);
                 let mut answer = match (&shared.requested_audio, spoken) {
                     (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
@@ -8382,7 +9143,7 @@ async fn answer(
                         run_tool(shared, request, heard, call, scope.as_ref()).await,
                     ),
                 };
-                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                if !writing_guard.wait_ready().await {
                     return Err(Stop::Gone);
                 }
                 // A finished task's news asked about (`check_agent_task`):
@@ -8396,7 +9157,10 @@ async fn answer(
                         "lamp-voice second: request {request} was answered the news ({key}); it rides on the turn"
                     );
                     if !shared
-                        .emit(ProviderOutput::NewsAnswered { request, key })
+                        .emit_private(
+                            &writing_guard,
+                            ProviderOutput::NewsAnswered { request, key },
+                        )
                         .await
                     {
                         return Err(Stop::Gone);
@@ -8421,11 +9185,14 @@ async fn answer(
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {
                     if !shared
-                        .emit(ProviderOutput::RequestedAudio {
-                            request,
-                            session: offer.context.provider_session,
-                            offer,
-                        })
+                        .emit_private(
+                            &writing_guard,
+                            ProviderOutput::RequestedAudio {
+                                request,
+                                session: offer.context.provider_session,
+                                offer,
+                            },
+                        )
                         .await
                     {
                         return Err(Stop::Gone);
@@ -8457,7 +9224,15 @@ async fn answer(
             // its last look. Every other turn the lamp wrote takes none
             // (#1146: pictures never chain with nobody speaking).
             if let Some((name, args, note)) = skill_looked
-                && ask_look(shared, request, heard || searching, (&name, args), note).await?
+                && ask_look(
+                    shared,
+                    request,
+                    heard || searching,
+                    (&name, args),
+                    note,
+                    &writing_guard,
+                )
+                .await?
             {
                 if !queue.started {
                     queue.push(LOOKING.to_owned()).await?;
@@ -8498,6 +9273,9 @@ async fn answer(
         // The answer's words, for a holding answer's check.
         let mut whole = String::new();
         while let Some((text, mut packets)) = queued.recv().await {
+            if !private_context.wait_ready().await {
+                return Err(Stop::Gone);
+            }
             // The announcement is heard, not written: the coordinator reads
             // an answer's opening words for its look ("Let me look.") and
             // for the body's gesture, and they are the model's (#1075 on
@@ -8521,13 +9299,19 @@ async fn answer(
                     },
                     finished: false,
                 };
-                if !shared.emit(words).await {
+                if !shared.emit_private(&private_context, words).await {
                     return Err(Stop::Gone);
                 }
             }
             while let Some(packet) = packets.recv().await {
+                if !private_context.wait_ready().await {
+                    return Err(Stop::Gone);
+                }
                 let samples = packet.map_err(|error| Stop::Failed(fault(&error)))?;
                 for part in samples.chunks(PACKET_SAMPLES) {
+                    if !private_context.wait_ready().await {
+                        return Err(Stop::Gone);
+                    }
                     let audio = ProviderOutput::Audio {
                         request,
                         sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
@@ -8547,7 +9331,7 @@ async fn answer(
                     {
                         in_flight.take_if(|carried| carried.request == request);
                     }
-                    if !shared.emit(audio).await {
+                    if !shared.emit_private(&private_context, audio).await {
                         return Err(Stop::Gone);
                     }
                     shared.said_samples(request, part.len());
@@ -8610,18 +9394,79 @@ async fn answer(
         // records, `voice/said`) never had a line from this route (the
         // first builder, 19 Oct, lamp-4ace).
         if after {
+            if !private_context.wait_ready().await {
+                return Err(Stop::Gone);
+            }
             let done = ProviderOutput::Transcript {
                 request: Some(request),
                 text: String::new(),
                 finished: true,
             };
-            if !shared.emit(done).await {
+            if !shared.emit_private(&private_context, done).await {
                 return Err(Stop::Gone);
             }
         }
         Ok(whole)
     };
     let ended = tokio::try_join!(writing, saying);
+    let ended = match ended {
+        Err(Stop::FaceOperation(operation)) => {
+            // try_join dropped both private futures/streams/queues. Abort and
+            // join any private speech before creating the fixed public output.
+            speech.abort_all();
+            while speech.join_next().await.is_some() {}
+            if let Ok(mut in_flight) = shared.in_flight.lock() {
+                in_flight.take_if(|carried| carried.request == request);
+            }
+            let FaceOperation {
+                call,
+                receipt,
+                remaining_calls,
+                policy_silent,
+            } = *operation;
+            let delivered = if receipt.current_for_fixed_receipt() {
+                // Keep the actual scoped write path and its request/speaker
+                // authority. Retiring disclosure never authorizes a new write.
+                ran_tool.store(true, Ordering::Relaxed);
+                Some(run_tool(shared, request, heard, &call, receipt.scope.as_ref()).await)
+            } else {
+                None
+            };
+            // Face execution happens after private work has been retired. Keep
+            // its single feedback line after that actual invocation returns.
+            if shared.note_tools
+                && let Ok(noted) = turn_tools.lock()
+            {
+                shared.turn_tools_said(noted.line(request));
+            }
+            let delivered = if let Some(told) = delivered.filter(|_| !policy_silent) {
+                let line = fixed_face_outcome(&call.name, &told);
+                let line = if remaining_calls {
+                    format!("Please ask again for the other part. {line}")
+                } else {
+                    line
+                };
+                fixed_face_receipt(shared, request, heard_at, &receipt, &times, &line).await
+            } else {
+                false
+            };
+            if !delivered && private_context.lost_while_owned(shared, request) {
+                // Permission expiry may suppress the fixed speech too. The
+                // still-owned request nevertheless receives a public terminal.
+                shared
+                    .emit(ProviderOutput::TurnComplete {
+                        request,
+                        idle: true,
+                    })
+                    .await;
+            }
+            if let Some(down) = &shared.down {
+                down.render(&shared.services);
+            }
+            return;
+        }
+        other => other,
+    };
     if shared.note_tools
         && let Ok(noted) = turn_tools.lock()
     {
@@ -8692,7 +9537,13 @@ async fn answer(
             },
             reason,
         },
-        Err(Stop::Gone) => return,
+        Err(Stop::Gone) if private_context.lost_while_owned(shared, request) => {
+            ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            }
+        }
+        Err(Stop::Gone | Stop::FaceOperation(_)) => return,
     };
     // Its turn over: nothing of it is carried.
     if let Ok(mut in_flight) = shared.in_flight.lock() {
@@ -8764,6 +9615,240 @@ async fn answer(
     }
 }
 
+/// Translate only known production result shapes into name-free public words.
+/// An error or unknown persistence outcome never becomes a claim of no write.
+fn fixed_face_outcome(tool: &str, told: &Value) -> String {
+    const UNCERTAIN: &str = "I couldn't confirm whether that face request was completed.";
+    const SET_ASIDE: &str = "A few old face records I couldn't read are kept apart. If yours are among them, your face will be forgotten from them if they return. A factory reset clears them.";
+    const VISITS: &str = "I'll notice how often you come by, so I can greet you more warmly.";
+    const CONSENT: &str = "Unless you agree, I'd only say someone I know was here. May I tell anyone who asks when you've been at the desk, by name?";
+    let Some(fields) = told.as_object() else {
+        return UNCERTAIN.into();
+    };
+    if tool == crate::known_faces::REMEMBER {
+        if told["ok"] != true
+            || told["remembered"].as_str().is_none_or(str::is_empty)
+            || fields
+                .keys()
+                .any(|key| !matches!(key.as_str(), "ok" | "remembered" | "also_say"))
+        {
+            return UNCERTAIN.into();
+        }
+        let extra = match told.get("also_say") {
+            None => "",
+            Some(Value::String(note)) if note == crate::known_faces::VISITS_LINE => VISITS,
+            Some(Value::String(note)) if note == crate::known_faces::ASK_TO_NAME => CONSENT,
+            Some(Value::String(note))
+                if note
+                    == &format!(
+                        "{} {}",
+                        crate::known_faces::VISITS_LINE,
+                        crate::known_faces::ASK_TO_NAME
+                    ) =>
+            {
+                return format!("I've remembered your face. {VISITS} {CONSENT}");
+            }
+            _ => return UNCERTAIN.into(),
+        };
+        return if extra.is_empty() {
+            "I've remembered your face.".into()
+        } else {
+            format!("I've remembered your face. {extra}")
+        };
+    }
+    if tool != crate::known_faces::FORGET {
+        return UNCERTAIN.into();
+    }
+    if told["ok"] == true
+        && fields
+            .keys()
+            .all(|key| matches!(key.as_str(), "ok" | "note" | "memory"))
+    {
+        let mut line = "I've forgotten your face.".to_owned();
+        match told.get("note") {
+            None => {}
+            Some(Value::String(note)) if note == crate::known_faces::FORGOTTEN_SOME_KEPT_APART => {
+                line.push(' ');
+                line.push_str(SET_ASIDE);
+            }
+            _ => return UNCERTAIN.into(),
+        }
+        match told.get("memory") {
+            None => {}
+            Some(Value::String(note)) if note == "forgotten too" => {
+                line.push_str(" I've also forgotten what you told me.");
+            }
+            Some(Value::String(note)) if note == crate::remember::FACE_MEMORY_KEPT => {
+                line.push_str(" What you told me couldn't be forgotten just now. You can ask me to forget everything.");
+            }
+            _ => return UNCERTAIN.into(),
+        }
+        return line;
+    }
+    if fields.len() == 1 {
+        match told["error"].as_str() {
+            Some("I did not know a face by that name.") => {
+                return "I couldn't find a matching face to forget.".into();
+            }
+            Some(crate::known_faces::NOT_KNOWN_SOME_KEPT_APART) => {
+                return format!("I couldn't find a matching face to forget. {SET_ASIDE}");
+            }
+            _ => {}
+        }
+    }
+    UNCERTAIN.into()
+}
+
+/// No chat restart: only fixed public words, with the separate guard attached
+/// through TTS, queues, normal thread bookkeeping and final IPC.
+async fn fixed_face_receipt(
+    shared: &Shared,
+    request: u64,
+    heard_at: Instant,
+    guard: &PrivateContext,
+    times: &Mutex<Times>,
+    line: &str,
+) -> bool {
+    if !guard.wait_ready().await {
+        return false;
+    }
+    if let Ok(mut said) = shared.lamp_said.lock() {
+        if !guard.current_for_fixed_receipt() {
+            return false;
+        }
+        *said = (request, line.to_owned());
+    }
+    let mut speech = JoinSet::new();
+    let mut packets = start_speech(
+        shared,
+        &mut speech,
+        line.to_owned(),
+        net::Turn { request, heard_at },
+        Some(guard.clone()),
+    );
+    let mut sounded = false;
+    let mut failed = None;
+    let delivered = async {
+        if !guard.wait_ready().await {
+            return false;
+        }
+        // Public words follow the same piece/sample accounting as the normal
+        // speech queue; no private prompt or previous answer is recorded.
+        shared.said_piece(request, Some(line));
+        if !shared
+            .emit_private(
+                guard,
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: line.to_owned(),
+                    finished: false,
+                },
+            )
+            .await
+        {
+            return false;
+        }
+        while let Some(packet) = packets.recv().await {
+            if !guard.wait_ready().await {
+                return false;
+            }
+            let samples = match packet {
+                Ok(samples) => samples,
+                Err(error) => {
+                    failed = Some(fault(&error));
+                    return false;
+                }
+            };
+            for part in samples.chunks(PACKET_SAMPLES) {
+                if !shared
+                    .emit_private(
+                        guard,
+                        ProviderOutput::Audio {
+                            request,
+                            sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
+                            provider_event_at_us: monotonic_us(),
+                            source_frames: part.len(),
+                            source_offset: 0,
+                            samples: part.to_vec(),
+                        },
+                    )
+                    .await
+                {
+                    return false;
+                }
+                shared.said_samples(request, part.len());
+                if !sounded {
+                    sounded = true;
+                    if let Ok(mut last) = shared.answered_request.lock() {
+                        *last = Some(request);
+                    }
+                    if let Some((_, heard)) = &shared.air {
+                        heard(request);
+                    }
+                    if let Some((_, heard)) = &shared.seems {
+                        heard(request);
+                    }
+                    room(|room| room.spoke(request, monotonic_us()));
+                    reached(times, |times| &mut times.audio);
+                    worker::name_sounded(request);
+                }
+                if let Ok(mut at) = shared.answered_at.lock() {
+                    *at = Some((shared.clock)());
+                }
+            }
+            if shared.did.is_some() || shared.own_echo {
+                let until = shared.said_through(samples.len(), monotonic_us());
+                if let Some(did) = &shared.did {
+                    did(Did::Said(request, until));
+                }
+            }
+        }
+        shared.services.spoken(request);
+        if !guard.wait_ready().await || !shared.stages(request, times).await {
+            return false;
+        }
+        for event in [
+            ProviderOutput::Transcript {
+                request: Some(request),
+                text: String::new(),
+                finished: true,
+            },
+            ProviderOutput::GenerationComplete { request },
+            ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            },
+        ] {
+            if !shared.emit_private(guard, event).await {
+                return false;
+            }
+        }
+        true
+    }
+    .await;
+    if !delivered {
+        speech.abort_all();
+    }
+    while speech.join_next().await.is_some() {}
+    if let Some(reason) = failed {
+        shared.services.spoken(request);
+        return shared
+            .emit_private(
+                guard,
+                ProviderOutput::TurnFailed {
+                    request,
+                    stage: if sounded {
+                        FailedStage::Responding
+                    } else {
+                        FailedStage::AwaitingResponse
+                    },
+                    reason,
+                },
+            )
+            .await;
+    }
+    delivered
+}
 type Packets = mpsc::Receiver<net::Result<Vec<i16>>>;
 
 /// Speech of `text` downloading into its own queue, in the turn's set so
@@ -8773,13 +9858,39 @@ fn start_speech(
     speech: &mut JoinSet<()>,
     text: String,
     turn: net::Turn,
+    private_context: Option<PrivateContext>,
 ) -> Packets {
     let (packets, queued) = mpsc::channel(SENTENCE_PACKETS);
-    let mut stream = shared.services.speak_for(text, turn);
+    let permitted: ChatPermission = Arc::new(move || {
+        private_context
+            .as_ref()
+            .map_or(PermissionState::Ready, PrivateContext::state)
+    });
+    if permitted() == PermissionState::Lost {
+        return queued;
+    }
+    // Keep service construction synchronous: shared speech sockets initialise
+    // pieces in Queue::push order (#2691). Their network futures are lazy.
+    // The guarded service owns its first-attempt clock even while permission
+    // is Pending. An opaque outer gate would hide that clock. Keep all packet,
+    // reserve/send and final output checks below as independent boundaries.
+    let mut stream = shared
+        .services
+        .speak_for_guarded(text, turn, permitted.clone());
     speech.spawn(async move {
         while let Some(packet) = stream.next().await {
+            if !services::wait_permitted(&permitted).await {
+                break;
+            }
             let failed = packet.is_err();
-            if packets.send(packet).await.is_err() || failed {
+            let Ok(permit) = packets.reserve().await else {
+                break;
+            };
+            if !services::wait_permitted(&permitted).await {
+                break;
+            }
+            permit.send(packet);
+            if failed {
                 break;
             }
         }
@@ -8789,6 +9900,7 @@ fn start_speech(
 
 /// Sentences on their way to being said, each with its speech started.
 struct Queue<'a> {
+    private_context: PrivateContext,
     shared: &'a Shared,
     speech: &'a mut JoinSet<()>,
     /// Said before the first sentence of the answer, if due.
@@ -8829,6 +9941,9 @@ impl Queue<'_> {
     }
 
     async fn push(&mut self, text: String) -> Result<(), Stop> {
+        if !self.private_context.wait_ready().await {
+            return Err(Stop::Gone);
+        }
         // With tags (`LAMP_SECOND_SPEECH_TAGS`), the voice is given `spoken`
         // and everything else the lamp's words, which carry none.
         let (spoken, text) = match &mut self.tags {
@@ -8850,6 +9965,9 @@ impl Queue<'_> {
             return Ok(());
         }
         self.announce().await?;
+        if !self.private_context.wait_ready().await {
+            return Err(Stop::Gone);
+        }
         if !self.started {
             eprintln!(
                 "lamp-voice second: request {} first piece to the voice {} ms after the words were heard, {} words",
@@ -8858,28 +9976,61 @@ impl Queue<'_> {
                 text.split_whitespace().count()
             );
         }
-        self.started = true;
-        if let Ok(mut said) = self.shared.lamp_said.lock() {
-            if said.0 != self.request {
-                *said = (self.request, String::new());
+        loop {
+            if !self.private_context.wait_ready().await {
+                return Err(Stop::Gone);
             }
-            said.1.push(' ');
-            said.1.push_str(&text);
+            let retained = {
+                match self.shared.lamp_said.lock() {
+                    Ok(mut said) => match self.private_context.state() {
+                        PermissionState::Lost => return Err(Stop::Gone),
+                        PermissionState::Pending => false,
+                        PermissionState::Ready => {
+                            if said.0 != self.request {
+                                *said = (self.request, String::new());
+                            }
+                            said.1.push(' ');
+                            said.1.push_str(&text);
+                            true
+                        }
+                    },
+                    Err(_) => true,
+                }
+            };
+            if retained {
+                break;
+            }
         }
+        self.started = true;
         let turn = net::Turn {
             request: self.request,
             heard_at: self.heard_at,
         };
-        let packets = start_speech(self.shared, self.speech, spoken, turn);
+        if !self.private_context.wait_ready().await {
+            return Err(Stop::Gone);
+        }
+        let packets = start_speech(
+            self.shared,
+            self.speech,
+            spoken,
+            turn,
+            Some(self.private_context.clone()),
+        );
         self.send(text, packets).await
     }
 
     async fn send(&mut self, text: String, packets: Packets) -> Result<(), Stop> {
-        // Closed only when the saying half stopped; its error is the one kept.
-        self.sentences
-            .send((text, packets))
-            .await
-            .map_err(|_| Stop::Gone)
+        if !self.private_context.wait_ready().await {
+            return Err(Stop::Gone);
+        }
+        // Hold one bounded queue reservation, never a synchronous mutex, while
+        // Checking finishes. Nothing later can overtake this sentence.
+        let permit = self.sentences.reserve().await.map_err(|_| Stop::Gone)?;
+        if !self.private_context.wait_ready().await {
+            return Err(Stop::Gone);
+        }
+        permit.send((text, packets));
+        Ok(())
     }
 }
 
@@ -9017,6 +10168,8 @@ mod requested_audio_tests {
                     Arc::new(|lease: &crate::memory_scope::ScopeLease| {
                         let scope = lease.scope().unwrap();
                         Told {
+                            requires_speaker: false,
+                            pending_private_context: false,
                             text: format!("context {:?}", scope.person()),
                             history: vec![Message::assistant(format!(
                                 "history {:?}",
@@ -9451,12 +10604,12 @@ mod requested_audio_tests {
                 };
                 // Generation completion does not drop the request's owner. A
                 // still-queued offer can be delivered until that owner is revoked.
-                engine.shared.out.try_send(event()).unwrap();
+                engine.shared.out.try_send(event().into()).unwrap();
                 assert!(matches!(
                     engine.try_output(),
                     Some(ProviderOutput::RequestedAudio { .. })
                 ));
-                engine.shared.out.try_send(event()).unwrap();
+                engine.shared.out.try_send(event().into()).unwrap();
                 engine
                     .turn
                     .as_ref()
@@ -9492,23 +10645,652 @@ mod requested_audio_tests {
         };
         engine.begin(7, 3);
         engine.urgent.clear();
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         assert!(matches!(
             engine.try_output(),
             Some(ProviderOutput::RequestedAudio { .. })
         ));
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         engine.begin(8, 3);
         engine.urgent.clear();
         assert!(engine.try_output().is_none());
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         engine.begin(7, 4);
         engine.urgent.clear();
         assert!(engine.try_output().is_none());
         engine.begin(7, 3);
         engine.urgent.clear();
-        engine.shared.out.try_send(event()).unwrap();
+        engine.shared.out.try_send(event().into()).unwrap();
         engine.retire_through(7);
         assert!(engine.try_output().is_none());
+    }
+
+    /// Microphone reads bracket actual audio, including its first block;
+    /// neither clock uncertainty nor delayed STT may renew speaker evidence.
+    #[test]
+    fn speaker_audio_interval_uses_capture_boundaries_and_actual_end_expiry() {
+        let clock = Instant::now() + Duration::from_secs(60);
+        let after = clock + Duration::from_millis(2);
+        let interval = speaker_audio_interval((900_000, 950_000), 1_000_000, clock, after)
+            .expect("a bounded actual microphone interval");
+        assert_eq!(
+            interval.outer,
+            (
+                clock - Duration::from_millis(110),
+                clock - Duration::from_millis(48)
+            )
+        );
+        assert_eq!(
+            interval.inner,
+            (
+                clock - Duration::from_millis(108),
+                clock - Duration::from_millis(50)
+            )
+        );
+        assert_eq!(
+            interval.valid_until,
+            clock - Duration::from_millis(50) + crate::memory_scope::SPEAKER_PROOF_MAX_AGE
+        );
+        // The first read includes the 10 ms capture block before it. Its
+        // exact lower boundary is valid; subtracting before zero is not.
+        let first_block = speaker_audio_interval((10_000, 20_000), 30_000, clock, clock).unwrap();
+        assert_eq!(
+            first_block.inner,
+            (
+                clock - Duration::from_millis(30),
+                clock - Duration::from_millis(10)
+            )
+        );
+        for (reads, now) in [
+            ((0, 950_000), 1_000_000),
+            ((950_000, 949_999), 1_000_000),
+            ((900_000, 1_000_001), 1_000_000),
+            ((9_999, 950_000), 1_000_000),
+            // Exactly 30 s and older are outside the retained looks.
+            ((30_010_000, 59_000_000), 60_000_000),
+            ((30_000_000, 59_000_000), 60_000_000),
+        ] {
+            assert!(
+                speaker_audio_interval(reads, now, clock, clock).is_none(),
+                "{reads:?}, {now}"
+            );
+        }
+        assert!(speaker_audio_interval((900_000, 950_000), 1_000_000, after, clock).is_none());
+        // A clock-read bracket as long as the whole first block leaves no
+        // interval in which any frame is certainly part of actual audio.
+        for uncertainty in [10, 11] {
+            assert!(
+                speaker_audio_interval(
+                    (1_000_000, 1_000_000),
+                    1_000_000,
+                    clock,
+                    clock + Duration::from_millis(uncertainty)
+                )
+                .is_none()
+            );
+        }
+    }
+
+    /// The actual Services boundary: early context has no name even when its
+    /// response has already produced text and a tool call. A final positive
+    /// speaker proof changes both ordinary and steady-first context, so that
+    /// prepared response cannot stand. No speaker, no fresh mic and written
+    /// words never acquire a name from the inherited memory person.
+    #[tokio::test]
+    async fn prepared_name_context_waits_for_final_request_owned_speaker_evidence() {
+        use crate::memory_scope::{FaceCache, ScopeLease};
+        use crate::speaking_faces::SpeakingFaces;
+        use std::sync::atomic::AtomicUsize;
+
+        const NAME: &str = "Fixture Person";
+        const SPEAKER: &str = "0123456789abcdef/f7";
+        const WORDS: &str = "What is my name?";
+
+        fn look(eyes: &SpeakingFaces, seq: u64, face: &str, state: lamp_msgs::SpeakingState) {
+            let faces = lamp_msgs::Faces {
+                faces: vec![lamp_msgs::Face {
+                    id: face.into(),
+                    xmin: 0.1,
+                    ymin: 0.1,
+                    xmax: 0.3,
+                    ymax: 0.4,
+                    confidence: 1.0,
+                    yaw: None,
+                    facing: None,
+                    speaking: Some(lamp_msgs::Speaking {
+                        state,
+                        score: 0.9,
+                        from: None,
+                    }),
+                }],
+            };
+            eyes.look(Instant::now(), Some((("0123456789abcdef", seq), &faces)));
+        }
+
+        struct EarlyWords {
+            early: Option<mpsc::UnboundedReceiver<net::Early>>,
+        }
+        impl Listener for EarlyWords {
+            fn send(&self, _samples: &[i16]) -> net::Result<()> {
+                Ok(())
+            }
+            fn finish(self: Box<Self>, _: u64) -> BoxFuture<'static, net::Result<String>> {
+                Box::pin(async { Ok(WORDS.into()) })
+            }
+            fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
+                self.early.take()
+            }
+        }
+        struct EarlyServices {
+            recorded: Arc<RecordingScript>,
+            buffered: Arc<tokio::sync::Notify>,
+            speech: AtomicUsize,
+        }
+        impl Services for EarlyServices {
+            fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+                let (send, early) = mpsc::unbounded_channel();
+                send.send(net::Early::Words(WORDS.into())).unwrap();
+                Box::pin(async move {
+                    Ok(Box::new(EarlyWords { early: Some(early) }) as Box<dyn Listener>)
+                })
+            }
+            fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
+                let buffered = self.buffered.clone();
+                self.recorded
+                    .chat(messages)
+                    .inspect(move |event| {
+                        if matches!(event, Ok(ChatEvent::Done)) {
+                            buffered.notify_one();
+                        }
+                    })
+                    .boxed()
+            }
+            fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+                self.speech.fetch_add(1, Ordering::Relaxed);
+                self.recorded.speak(text)
+            }
+        }
+
+        for steady_first in [false, true] {
+            for case in [
+                "positive",
+                "no-speaker",
+                "other-speaker",
+                "empty-mic",
+                "after-audio",
+                "written",
+            ] {
+                let positive = case == "positive";
+                let directory = crate::process::SessionDirectory::create().unwrap();
+                let known = directory.path.join("known");
+                std::fs::write(&known, NAME).unwrap();
+                let cache = Arc::new(FaceCache::default());
+                let text = |words: &str| Ok(ChatEvent::Text(words.to_owned()));
+                let first = if positive {
+                    vec![
+                        text("Early answer must stay buffered."),
+                        Ok(ChatEvent::ToolCalls(vec![net::ToolCall {
+                            extra: None,
+                            id: "early-trap".into(),
+                            name: "remember".into(),
+                            args: json!({"text": "must never run"}),
+                        }])),
+                        Ok(ChatEvent::Done),
+                    ]
+                } else {
+                    vec![text("No verified speaker."), Ok(ChatEvent::Done)]
+                };
+                let recorded =
+                    Arc::new(RecordingScript {
+                        chats: Mutex::new(
+                            std::iter::once(first)
+                                .chain(positive.then(|| {
+                                    vec![text("Final verified answer."), Ok(ChatEvent::Done)]
+                                }))
+                                .collect(),
+                        ),
+                        messages: Mutex::default(),
+                    });
+                let services = Arc::new(EarlyServices {
+                    recorded: recorded.clone(),
+                    buffered: Arc::default(),
+                    speech: AtomicUsize::new(0),
+                });
+                let calls = Arc::new(AtomicUsize::new(0));
+                let counted = calls.clone();
+                let eyes = Arc::new(SpeakingFaces::default());
+                let expected_person = crate::known_faces::memory_person(NAME);
+                let mut engine = Engine::new(
+                    services.clone(),
+                    Told::default,
+                    Arc::new(|_, _, _, _| panic!("the request keeps its scoped runner")),
+                )
+                .with_memory_scope(
+                    lamp_turn_owner::BootId::new([19; 16]).unwrap(),
+                    cache.clone(),
+                    Arc::new(move |_, _, _, _, _| {
+                        counted.fetch_add(1, Ordering::Relaxed);
+                        Box::pin(async { json!({"ok": true}) })
+                    }),
+                    Some(Arc::new(move |lease: &ScopeLease| {
+                        let note = if lease.speaker() == Some(SPEAKER)
+                            && lease.scope().and_then(|scope| scope.person())
+                                == Some(expected_person.as_str())
+                        {
+                            format!("Known name: {NAME}.")
+                        } else {
+                            String::new()
+                        };
+                        Told {
+                            requires_speaker: false,
+                            pending_private_context: false,
+                            text: if steady_first {
+                                "CHARACTER".into()
+                            } else {
+                                format!("CHARACTER\n{note}")
+                            },
+                            after: steady_first.then_some(note),
+                            history: Vec::new(),
+                        }
+                    })),
+                )
+                // Exercise the shared recorder's configured eyes without
+                // depending on the known-face file's changing wire format.
+                .confirming_forgets_by_sight(eyes.clone(), known.clone())
+                .preparing(true)
+                .announcing(false);
+                engine.memory_camera(true, 1);
+                assert!(cache.replace(
+                    cache.begin_refresh(),
+                    crate::known_faces::FaceObservation::read(&known)
+                ));
+                if case == "written" {
+                    for seq in 1..=3 {
+                        look(&eyes, seq, "f7", lamp_msgs::SpeakingState::Yes);
+                    }
+                    engine.submit(ProviderInput::Written {
+                        search: false,
+                        request: 7,
+                        session: 3,
+                        privacy_generation: 5,
+                        text: WORDS.into(),
+                        look: false,
+                        quoted: false,
+                    });
+                } else {
+                    engine.submit(ProviderInput::Start {
+                        request: 7,
+                        session: 3,
+                        privacy_generation: 5,
+                        continues: false,
+                        continues_cut_off: false,
+                        over_the_lamp: false,
+                        after_stop: false,
+                        follows_on: false,
+                        over_the_lamps_voice: false,
+                        heard_of_cut: None,
+                    });
+                    engine.submit(ProviderInput::Audio {
+                        request: 7,
+                        privacy_generation: 5,
+                        sequence: 1,
+                        read_completed_at_us: monotonic_us(),
+                        samples: if case == "empty-mic" {
+                            vec![]
+                        } else {
+                            vec![1; 160]
+                        },
+                    });
+                    tokio::time::timeout(Duration::from_secs(2), services.buffered.notified())
+                        .await
+                        .expect("the early response was actually buffered before final input");
+                    assert_eq!(recorded.messages.lock().unwrap().len(), 1);
+                    assert_eq!(services.speech.load(Ordering::Relaxed), 0);
+                    assert_eq!(calls.load(Ordering::Relaxed), 0);
+                    assert!(
+                        recorded.messages.lock().unwrap()[0]
+                            .iter()
+                            .all(|message| !message
+                                .words()
+                                .is_some_and(|words| words.contains(NAME)))
+                    );
+                    for seq in 1..=3 {
+                        look(
+                            &eyes,
+                            seq,
+                            if case == "other-speaker" { "f8" } else { "f7" },
+                            if case == "no-speaker" {
+                                lamp_msgs::SpeakingState::No
+                            } else {
+                                lamp_msgs::SpeakingState::Yes
+                            },
+                        );
+                        if case != "after-audio" {
+                            engine.submit(ProviderInput::Audio {
+                                request: 7,
+                                privacy_generation: 5,
+                                sequence: seq + 1,
+                                read_completed_at_us: monotonic_us(),
+                                samples: if case == "empty-mic" {
+                                    vec![]
+                                } else {
+                                    vec![1; 160]
+                                },
+                            });
+                        }
+                    }
+                    engine.submit(ProviderInput::End {
+                        request: 7,
+                        privacy_generation: 5,
+                        sound: false,
+                        cut_in: false,
+                    });
+                }
+                let mut said = Vec::new();
+                loop {
+                    match tokio::time::timeout(Duration::from_secs(2), engine.next())
+                        .await
+                        .expect("the scripted turn finishes")
+                    {
+                        ProviderOutput::Transcript {
+                            request: Some(_),
+                            text,
+                            ..
+                        } if !text.is_empty() => said.push(text),
+                        ProviderOutput::TurnComplete { .. } => break,
+                        ProviderOutput::TurnFailed { .. } => panic!("the scripted turn failed"),
+                        _ => (),
+                    }
+                }
+                let messages = recorded.messages.lock().unwrap();
+                assert_eq!(messages.len(), if positive { 2 } else { 1 }, "{case}");
+                assert!(
+                    messages[0]
+                        .iter()
+                        .all(|message| !message.words().is_some_and(|words| words.contains(NAME)))
+                );
+                assert_eq!(
+                    messages
+                        .last()
+                        .unwrap()
+                        .iter()
+                        .any(|message| message.words().is_some_and(|words| words.contains(NAME))),
+                    positive,
+                    "{case}, steady_first={steady_first}"
+                );
+                assert_eq!(calls.load(Ordering::Relaxed), 0, "early tools never run");
+                assert_eq!(
+                    said.join(" "),
+                    if positive {
+                        "Final verified answer."
+                    } else {
+                        "No verified speaker."
+                    },
+                    "the discarded early answer never speaks"
+                );
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod pending_permission_tests {
+    use super::*;
+    use std::sync::atomic::AtomicU8;
+
+    fn state(value: &AtomicU8) -> PermissionState {
+        match value.load(Ordering::Acquire) {
+            0 => PermissionState::Ready,
+            1 => PermissionState::Pending,
+            _ => PermissionState::Lost,
+        }
+    }
+
+    #[derive(Default)]
+    struct SpeechFixture {
+        constructed: Mutex<Vec<String>>,
+        polled: Arc<AtomicUsize>,
+    }
+    impl Services for SpeechFixture {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            Box::pin(async { panic!("output-only fixture") })
+        }
+        fn chat(
+            &self,
+            _: Vec<Message>,
+        ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+            panic!("output-only fixture")
+        }
+        fn speak(
+            &self,
+            text: String,
+        ) -> futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>> {
+            self.constructed.lock().unwrap().push(text);
+            let polled = self.polled.clone();
+            let mut sent = false;
+            futures_util::stream::poll_fn(move |_| {
+                polled.fetch_add(1, Ordering::Relaxed);
+                std::task::Poll::Ready((!std::mem::replace(&mut sent, true)).then(|| Ok(vec![7])))
+            })
+            .boxed()
+        }
+    }
+
+    fn fixture() -> (
+        Engine,
+        crate::memory_scope::RequestScope,
+        PrivateContext,
+        Arc<AtomicU8>,
+        Arc<SpeechFixture>,
+    ) {
+        let service = Arc::new(SpeechFixture::default());
+        let value = Arc::new(AtomicU8::new(0));
+        let observed = value.clone();
+        let engine = Engine::new(
+            service.clone(),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { panic!("no fixture tools") })),
+        )
+        .guarding_private_context(Arc::new(move |_| state(&observed)));
+        let owner = crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([83; 16]).unwrap(),
+                session: 3,
+                request: 7,
+            },
+            crate::memory_scope::ScopeSnapshot::of("Fixture owner"),
+        );
+        let guard = PrivateContext::new(&engine.shared, Some(&owner.lease()), true);
+        (engine, owner, guard, value, service)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn pending_output_retains_one_head_and_never_overtakes_or_revives_loss() {
+        for resume in [true, false] {
+            let (mut engine, _owner, guard, value, _) = fixture();
+            assert_eq!(guard.state(), PermissionState::Ready);
+            for text in ["first", "second"] {
+                engine
+                    .shared
+                    .out
+                    .try_send(QueuedOutput {
+                        event: ProviderOutput::Transcript {
+                            request: Some(7),
+                            text: text.into(),
+                            finished: false,
+                        },
+                        private_context: Some(guard.clone()),
+                    })
+                    .unwrap();
+            }
+            engine
+                .shared
+                .out
+                .try_send(
+                    ProviderOutput::TurnComplete {
+                        request: 7,
+                        idle: true,
+                    }
+                    .into(),
+                )
+                .unwrap();
+            value.store(1, Ordering::Release);
+            assert!(engine.try_guarded_output().is_none());
+            assert!(engine.waiting_output.is_some());
+            assert_eq!(
+                engine.output.len(),
+                2,
+                "only the head is retained outside the queue"
+            );
+            assert!(engine.try_guarded_output().is_none());
+            assert_eq!(engine.output.len(), 2);
+            assert!(!guard.lost.load(Ordering::Acquire));
+            value.store(if resume { 0 } else { 2 }, Ordering::Release);
+            if resume {
+                for expected in ["first", "second"] {
+                    let ProviderOutput::Transcript { text, .. } = engine.try_output().unwrap()
+                    else {
+                        panic!("ordered transcript");
+                    };
+                    assert_eq!(text, expected);
+                }
+            }
+            assert!(matches!(
+                engine.try_output(),
+                Some(ProviderOutput::TurnComplete { request: 7, .. })
+            ));
+            value.store(0, Ordering::Release);
+            assert!(engine.try_output().is_none());
+            assert_eq!(
+                guard.state(),
+                if resume {
+                    PermissionState::Ready
+                } else {
+                    PermissionState::Lost
+                }
+            );
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn pending_output_does_not_hold_a_retired_owner_or_its_successor() {
+        let (mut engine, _owner, guard, value, _) = fixture();
+        value.store(1, Ordering::Release);
+        engine
+            .shared
+            .out
+            .try_send(QueuedOutput {
+                event: ProviderOutput::Transcript {
+                    request: Some(7),
+                    text: "old".into(),
+                    finished: false,
+                },
+                private_context: Some(guard),
+            })
+            .unwrap();
+        assert!(engine.try_guarded_output().is_none());
+        engine.retire_through(7);
+        engine
+            .shared
+            .out
+            .try_send(
+                ProviderOutput::TurnComplete {
+                    request: 8,
+                    idle: true,
+                }
+                .into(),
+            )
+            .unwrap();
+        assert!(matches!(
+            engine.try_output(),
+            Some(ProviderOutput::TurnComplete { request: 8, .. })
+        ));
+        assert!(engine.waiting_output.is_none());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn pending_speech_preserves_synchronous_construction_and_ordered_packets() {
+        let (engine, _owner, guard, value, service) = fixture();
+        let mut tasks = JoinSet::new();
+        value.store(1, Ordering::Release);
+        let turn = net::Turn {
+            request: 7,
+            heard_at: Instant::now(),
+        };
+        let mut first = start_speech(
+            &engine.shared,
+            &mut tasks,
+            "first".into(),
+            turn,
+            Some(guard.clone()),
+        );
+        let mut second = start_speech(
+            &engine.shared,
+            &mut tasks,
+            "second".into(),
+            turn,
+            Some(guard),
+        );
+        assert_eq!(*service.constructed.lock().unwrap(), ["first", "second"]);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(60), first.recv())
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            service.polled.load(Ordering::Relaxed),
+            0,
+            "Pending never polls lazy TTS"
+        );
+        assert!(second.try_recv().is_err());
+        value.store(0, Ordering::Release);
+        assert_eq!(
+            tokio::time::timeout(Duration::from_millis(60), first.recv())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap(),
+            [7]
+        );
+        assert_eq!(
+            tokio::time::timeout(Duration::from_millis(60), second.recv())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap(),
+            [7]
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(60), first.recv())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(60), second.recv())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        while let Some(result) = tasks.join_next().await {
+            result.unwrap();
+        }
+        assert_eq!(service.polled.load(Ordering::Relaxed), 4);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_elapsed_first_response_budget_never_polls_a_newly_ready_stream() {
+        let polled = Arc::new(AtomicUsize::new(0));
+        let observed = polled.clone();
+        let mut chat = futures_util::stream::poll_fn(move |_| {
+            observed.fetch_add(1, Ordering::Relaxed);
+            std::task::Poll::Ready(Some(Ok(ChatEvent::Done)))
+        })
+        .boxed();
+        let until = tokio::time::Instant::now() + Duration::from_millis(30);
+        tokio::time::advance(Duration::from_millis(31)).await;
+        let (_engine, _owner, guard, _, _) = fixture();
+        assert!(chat_next_before(&mut chat, until, &guard).await.is_err());
+        assert_eq!(polled.load(Ordering::Relaxed), 0);
     }
 }

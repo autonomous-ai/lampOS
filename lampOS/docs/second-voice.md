@@ -1575,21 +1575,28 @@ order is kept. A written turn is the same from the chat on.
   - **Asked as the line begins, never on the worker's loop** (lamp-4ace,
     22 Oct 17:45: asked as the line ended, the note held the worker's one
     thread about 300 ms, missed its turn by 60 ms, and none was asked again
-    for 30 s). A line begins (the engine's `Start`) before the lamp knows
-    it is for it, so the note is asked then only for the scope the last
-    answered turn was told in, and only when it is due: a new run
-    (`opens_anew`), a failed note that may be asked again, a quiet, or
-    something kept. Someone else's talk in the room while the person talks
-    to the lamp asks nothing. An answered line whose scope is another (the
-    first turn, a person change, the line narrowed to the room when another
-    face was seen speaking it) asks for its own scope as the turn is told,
-    and a turn with no line (the lamp's own written ones) asks there too.
+    for 30 s). A genuine original Room admission may ask its due note as
+    the engine's `Start` begins, only when the last answered turn was also
+    Room-scoped. Private notes wait until this request's final audio has
+    a sealed positive speaker: current piece and combined carried window
+    must agree on one boot-qualified face, and the fresh atomic Eyes
+    known-speaker record must match that face and private person. The
+    previous turn's identity, a visible face alone, an unsealed Start, a
+    held gap, or a private admission narrowed to Room grants no read. A
+    final proved private turn asks when its note is due (new run, eligible
+    retry, quiet or keep), or reuses a current same-person read only under
+    its own fresh proof. Unknown original Room remains distinct from held
+    or unproved private. The queued reader checks the same authority
+    immediately before calling the real Days client; losing permission
+    there spends no keep mark and is not a memory failure.
     The read runs on a thread of its own and may take up to 2 s
     (`NOTE_AHEAD_WITHIN`). At the line's end the turn waits for it off the
     loop, never longer than what is left of 300 ms
     (`remember::FIRST_READ`) from the ask, not 300 ms more from the end.
-    A note asked as the turn is told waits up to 900 ms from that ask
-    (`NOTE_TOLD_WITHIN`): it has no line's time to read in, and on
+    A note asked as the turn is told waits up to 900 ms from the turn's
+    wait entry (`NOTE_TOLD_WITHIN`); initial speaker proof remains bounded
+    by 300 ms and consumes part of that same 900 ms. The fresh note has
+    no line's time to read in, and on
     lamp-4ace (48 h to 25 Oct) all 56 came late against 300 ms, in a
     median 443 ms and at most 610 ms, so a fresh session's first question
     was answered without what the lamp keeps.
@@ -1617,9 +1624,12 @@ order is kept. A written turn is the same from the chat on.
     one, and the last of a thread's three offers records it as given, so
     a read as a line begins asks none. The answered turn that takes the
     read asks it as it waits for the note, off the loop, within 300 ms
-    more (`FOLLOW_UP_WITHIN`, `NoteRead::follow_up`), and a read begun as
-    the turn is told asks it with the note. A line never answered spends
-    no offer of anyone's. An answered turn whose read is then refused (a
+    more (`FOLLOW_UP_WITHIN`, `NoteRead::follow_up`). A private read begun
+    as the turn is told also stages its follow-up separately: fresh request
+    proof is checked after the note wait and again when its blocking worker
+    actually starts, before an offer is spent. The read must still belong
+    to the nonvoid ask. No socket work waits under the Sessions lock. A
+    line never answered spends no offer of anyone's. An answered turn whose read is then refused (a
     forget in those few ms) has had its offer counted, unless it is dated
     (`LAMP_MEMORY_EVENTS`): a read given a dated follow-up and let go
     untold takes it back (`follow_up_unoffered`), as a session that gives
@@ -1859,8 +1869,9 @@ When the coordinator switches (below):
   same words after "lamp-voice second:", ending "the answer was sent".
 - `LAMP_MEMORY_DAYS=on` reaches this worker as it reaches the Gemini one
   (`process.rs`).
-- **The known person's name** (#2539, `LAMP_SECOND_FACE_NAME=on`, off by
-  default): a turn whose person is the face the eyes know now is told
+- **The known person's name** (#2539, `LAMP_SECOND_FACE_NAME=on`, off in
+  the binary by default): a turn whose person is the face the eyes know now
+  is told
   "(The person at the lamp now is X: you know their face.)", as the Live
   route tells it (`known_faces::note`), after the memory note
   (`worker::known_name_told`).
@@ -1869,18 +1880,195 @@ When the coordinator switches (below):
     the eyes, is recognised but never said back. That's Fourth's replay of
     the forgotten name (`memory/tests/it/voice_name.rs`, #1722, 21 Oct
     15:28).
-  - **Never told:** for the room's turn, another person's turn, or a face
-    gone, since the known file is fresh only 3 s.
-  - **A line another face spoke** is narrowed to the room, and told none, only
-    with `LAMP_SECOND_SCOPED_CONTEXT` and `LAMP_SECOND_SPEAKING_FACE` on.
-    Without them the turn is the session's person, read from the same known
-    file. So a voice off camera, with the known person in view, is told
-    their name, as on the Live route (the reviewer-lead's P3 on #2559).
-  - **Right after `forget_my_face`,** a round within the known file's 3 s
-    can still carry the name, as on the Live route.
+  - **Positive speaker evidence is required:** after final speech to text,
+    the request owner seals one boot-qualified face seen speaking during
+    that request's original nonempty microphone reads, from the first
+    10 ms block through the last read, including a carried beginning.
+    The current piece also needs its own nonempty-read interval, never
+    seeded from the carried beginning. Both intervals must have the same
+    sole positive boot-qualified speaking face, with inner and outer clock
+    bounds agreeing for each. Three or more distinct looks keep the existing
+    majority rule and reject any second speaking face. Exactly two looks can
+    qualify only when both original frames contain the same sole face,
+    positively speaking; a second unknown or silent face also refuses this
+    short-line exception. One frame or a repeated frame cannot qualify.
+    Legacy face narrowing keeps its three-look minimum. Earlier speech by a visible person cannot
+    authorize a new piece spoken by someone unseen. Task startup,
+    transcription and later empty packets cannot extend either interval.
+    These are host read boundaries, not measured acoustic acquisition times;
+    legacy carry, heed and echo bounds are unchanged. Its lease must still
+    name the same person as the fresh known-face observation.
+    Inherited scope alone is insufficient: no speaking face, multiple
+    speakers, too few distinct Eyes frames, another boot, a typed request,
+    internally carried-only input, an empty raw transcript, expired proof,
+    held/narrowed scope or cancellation
+    gives no name. Input older than the 30 s observation history is refused.
+    The proof lasts at most 30 s after the last nonempty microphone read and
+    never outlives its request owner. Incoming audio has no independent
+    replay flag: preserved timestamps prevent rebasing it onto current
+    faces, but this is not a general replay detector. This is visual speaker evidence,
+    not protection against a face on a screen or other liveness attacks.
+  - **Prepared chats contain no name:** they begin before this proof is
+    sealed. A final positive match changes the messages, so the prepared
+    chat is discarded and the final chat is asked with the name; its early
+    tool calls and speech are never dispatched. No artificial wait or
+    network call is added, but this case loses the prepared round's latency
+    benefit. Device latency remains unmeasured.
+  - **Private memory disclosure uses the same proof (#3064):** independently
+    of this name switch, the worker's private memory note, recalled thread,
+    history messages, dated follow-up notes and automatic memory hits require
+    the active request's
+    positive speaker proof and a fresh atomic known-speaker observation with
+    the exact same Eyes boot, face and person. Preparation, typed input or an
+    inherited private scope alone gets the character, time, skills and neutral
+    facts, with neither private nor room memory/history. A private request
+    narrowed to room remains neutral; an originally admitted room request
+    keeps its existing room context. Held and revoked requests get no context.
+    A legacy sticky-person session without a proof-carrying lease reads no
+    private context. Dated follow-up callbacks check fresh proof before the
+    private read; a returned note retains its private provenance across expiry.
+    If event selection or the Days post-lock fence observes Checking before
+    deciding an offer, it returns explicit Pending even if Seen is already
+    Ready when the callback ends. The Engine retries that unconsumed decision
+    outside locks and the blocking worker, within the original response and
+    speaker deadlines. It never retries a completed no-note decision or an
+    already returned line. All pre-chat permission waits, including before
+    and after the note read, after a returned event and around held-tool
+    checks, share that original response deadline. The note await is bounded
+    by it too. A late Ready cannot restart the timed-out answer. The same
+    deadline is checked after the Days lock so a timed-out read cannot
+    decide the event later.
+    The request owner's disclosure-only state starts unproved, becomes proved
+    after the complete face/person match, and permanently becomes lost on
+    invalidation. The request pins that initial subject plus the Eyes publisher
+    lifecycle and revocation generation. Only an explicit fresh `absent` record
+    from a successful empty detection, at that exact lifecycle/boot/generation,
+    may continue an already pinned request. Missing files are never absence.
+    This does not arm a new request, change its person or extend its original
+    audio-end-plus-30-second proof deadline. A fresh matching `seen` record may
+    continue it too, including completed re-recognition under a new passing
+    face ID when name, optional raw stable ID, boot, publisher and generation
+    are unchanged. The sealed original speaker, scope and deadline stay fixed.
+    Before recognition, a returning candidate publishes identity-free
+    `checking`; that state grants no disclosure. The producer runs recognition
+    then, without waiting for its ordinary 2 s refresh. Only an already pinned
+    v2 request at the exact same epoch and person can become `Pending`; matching
+    completed `seen` returns it to `Ready` and resumes held work without duplicate
+    delivery. Initial or legacy Checking never grants or pauses authority. A
+    terminal `Lost` request cannot revive; a new ask needs its own positive proof.
+    Older positive-only records lack permission expiry and cannot grant initial
+    private authority or continuation.
+    Visible unaligned/unmatched faces, another person or epoch,
+    forget, privacy, camera/model errors, restart, stale/missing/invalid source
+    and cancellation deny. The producer's generation persists across a later
+    positive observation, so a missed revocation cannot revive an old request.
+    A geometric passing face ID alone does not prove identity continuity.
+    Restoring the same file cannot revive the same request. Initial neutral preparation is not poisoned, and a new
+    request can independently prove its speaker. Scope, speaker, tool and write
+    authorization are unchanged by this disclosure latch.
+    `Pending` suppresses private bytes, memory RPC dispatch, HTTP fallback
+    sends and speech IPC. Async waits and off-loop memory readers recheck at
+    most 20 ms apart; the existing 2 ms worker ticker retries queued output.
+    No recognition wait holds a Sessions or Days lock. The original proof
+    lasts at most 30 s from audio end and the source stays fresh for only 3 s;
+    neither is renewed by waiting or returning. Existing read/RPC deadlines
+    remain in force. Fresh explicit absence still continues an already pinned
+    request under its existing exact-epoch rule.
+    With `LAMP_SECOND_SCOPED_CONTEXT` off, `lease_system` still supplies the
+    actual request lease for presence-selected name and history: the chosen
+    person must match its final positive proof and fresh source. Sticky presence
+    alone cannot grant that context. Private Days notes still need the switch
+    on, because the existing ahead-reader receives no lease while it is off.
+    A name/history success with it off does not prove private Days recall.
+    The actual Days reader carries the same permission through Room, personal
+    snapshot, rules and follow-up exchanges, checking before connect, every
+    resumed read/write and each at-most-20 ms poll. Hits use those same socket
+    checks; event notes check again after their context lock. The legacy Second
+    note loader checks after the room-note lock and at its personal exchange.
+    Denial drops a partial staged read, restores its keep mark and closes its
+    sessions without counting a memory failure. A completed personal read may
+    be reused by a new proved request; an interrupted response is discarded and
+    reread. If an older denied reader ends while a new turn waits, that turn may
+    reconsider once within its once-selected ceiling: 300 ms for an ahead
+    read, or at most 900 ms from wait entry for a fresh read. Initial proof
+    keeps its 300 ms bound, each read keeps its own earlier deadline, and
+    retry or later pending proof never renews the ceiling or overlaps readers. If it is
+    still unfinished, this turn has no fresh note. The 2 s background-read,
+    300 ms follow-up and 60 ms hits ceilings are unchanged. No bytes already
+    sent or offer already counted by the store can be retracted.
+    The worker rechecks after note/history composition and
+    the hits RPC, including cached notes, and discards output if proof expires,
+    the known observation changes or the request is retired. The guard travels
+    with queued speech through credit waits and is checked immediately before
+    IPC. If private authority is lost while the same request remains active,
+    it ends without more speech and sends a public idle completion; a retired
+    or revoked request is not revived. No extra memory RPC is added. Fresh,
+    bounded runtime-file reads also run at the private chat, synthesis and IPC
+    guards; they do not wait on a network service. Every Engine chat carries
+    that same sticky permission into Services, including preparation, quoted
+    and held turns, later rounds and reconnects. Net rechecks immediately before
+    each near, own-endpoint or own-key-refusal relay request; losing permission
+    during the first HTTP wait prevents resending its captured private context.
+    Function selection is unchanged, including the Without path's existing
+    near-to-own fallback without an added own-key relay fallback. Legacy Services
+    implementations get entry and before/after-poll checks; a backend with
+    internal deferred sends must also check each send. A denied stream cannot
+    revive. These chat checks do not prove cancellation of a request body already
+    handed to the network or the separate synthesis fallback path. The
+    300 ms ahead-note, 900 ms fresh-note and 60 ms hits bounds remain.
+    Camera capture is in its independent process.
+    This closes
+    this context disclosure path, not memory tool/write policy or Live behavior;
+    host controls and device latency still require validation on this head.
+  - **Live limitation (unchanged):** the Gemini Live worker still uses
+    `known_faces::known_now` and its counted session person for the name
+    note (`provider_worker.rs`), not this request-owned speaker proof. A
+    voice off camera, with the known person in view, can still be told
+    their name, as the reviewer-lead noted on #2559. The fresh known file
+    proves that a known face is present, not that it spoke the admitted
+    microphone line. This Second-route correction does not fix that Live
+    behavior or remove a name already sent to a Live session.
+  - **When Eyes handles `forget_my_face`,** it invalidates the atomic speaker
+    observation before storage work, advancing its revocation generation.
+    Private context and queued speech fail their next check;
+    the old legacy known file's 3 s lifetime does not grant name disclosure.
   - **The name switch, not to be confused:** `LAMP_SECOND_KNOWN_NAMES` is the
     speech to text's listening for names; this one tells the model the face's
     name.
+  - **Lamp-4ace private-memory source configuration (#3064):** its repository
+    Voice unit prepares scoped context, camera-following and Eyes speaking;
+    Eyes prepares speaking with `--steady-rate off` for the regular five-look
+    speaking window. The exact retained Eyes pin's CLI accepts all unit flags
+    ([receipt](verification/common-checking-20261023/README.md)); compatible
+    new source-protocol pins are still required. Additional detector, thermal
+    and voice-latency cost is unmeasured on this setup.
+    This is not installation or a physical result: compatible qualified
+    Voice/Eyes artifact pins and the new known-person lamp run remain owed.
+    It adds no `LAMP_SECOND_FACE_NAME`, Photo or repair setting, and does not
+    replace the separate name-activation gate below.
+  - **Product activation remains separate (#3014), draft and not ready.**
+    This source change does not enable `LAMP_SECOND_FACE_NAME` in the
+    product unit; the unit has no setting for it and the binary default
+    stays off. Its existing memory socket and
+    eyes who socket are prerequisites: the worker derives the known file
+    beside the eyes socket only when a memory socket is configured. No
+    separate core-memory switch is needed. The product also already sets
+    scoped context, speaking-face tracking, the bus and camera-following;
+    the eyes must publish fresh known-face and speaking observations.
+    First's review and #2539's lamp-4ace run are still required: the known
+    person with the switch on and off, looking away and returning, plus
+    room, off-camera and second-person controls. A controlled model probe
+    on #3014 used the old head with synthetic known/memory fixtures: known
+    name on 38/40, off 0/40; no-speaker inherited-scope wrong-person answers
+    36/40. That result motivated this correction. It is neither a probe of
+    the corrected head nor a full-product/provider or lamp acceptance run.
+  - **Host timing boundary:** the existing
+    `a_turn_of_the_known_persons_own_is_told_their_name` test prints counts
+    and microseconds for the first and repeated `known_name_told` call,
+    including the fresh local file read, person comparison and note. The
+    target is under 5 ms for this synthetic host path, without a wall-time
+    assertion; the file was just written, so this is not a cold filesystem
+    measurement or end-to-end response time.
 
 ## What the rest of the lamp sees
 
@@ -4954,3 +5142,91 @@ times and boots differ from run to run.
 Not shown on the host: the real second worker behind the switch (the
 tests' second route is a peer). On a lamp: a switch mid-line and Gemini's
 return, and the latency targets, which lamp-52e6 did not meet (above).
+
+
+### Private speaker permission expiry (source preparation)
+
+The typed private speaker source carries `permission_until_us` in the host
+monotonic clock domain and `observed_us` from the original camera
+frame. Private disclosure checks both at the final source-read boundary: camera
+permission expires at equality with its 1.5-second receipt deadline; identity
+expires at three seconds. Publication mtime is still bounded, but cannot renew
+identity age. Old producers without this evidence fail closed for private
+context; older consumers reject the added fields. No switch is activated.
+
+Empty and unresolved visible observations retain their capture time too.
+A delayed frame cannot become fresh `Absent` or `Checking` just because the
+camera permission was renewed while detection ran. Zero, future and
+three-second-old captures revoke disclosure; the reader independently checks
+observation age, including its first read after a delay.
+
+A successful same-track raw look in the same camera hold may refresh only the
+permission deadline, preserving the recognized frame time, identity and epoch.
+This allows the normal two-second recognition cadence without manufacturing a
+new recognition on each raw look. Skipped, failed, filtered, changed-track or
+camera-loss observations cannot refresh the old identity. An expired publication
+requires recognition again; a request that lost authority never revives.
+
+The permit listener performs no filesystem or network work. The publishing loop
+computes a conservative monotonic deadline under the receipt lock: monotonic time
+is sampled before measuring receipt age, then only the remaining lease is added
+with overflow checks. Waiting for that lock never restamps the receipt.
+
+This closes timeout expiry while the Eyes loop is blocked. It does **not** close
+the separate interval after an explicit `camera:false` received before that
+deadline while the loop is blocked. That requires independently observable
+revocation and remains HOLD. Current-base and later review-repair gates are
+reported separately in the verification note; physical privacy acceptance
+remains unshown.
+
+Qualification as of 27 October 2026: the earlier d9f10adf3/2a827 host
+checkpoint passed 8,440 cases with 58 declared ignores and all 33 boundaries;
+the b7195bfce/e672 affected-source gate passed 2,083 cases with all 33 boundaries.
+These counts belong to those source trees. Later review repairs and their
+current native checks remain separate, with original native failures retained.
+
+
+### Camera hold ticket for private Second context (source preparation)
+
+Private names, notes and memory on the Second route now require typed V3 Eyes
+evidence plus the same hold's SCM_RIGHTS kernel observer. A separate immutable
+request slot binds publisher, camera hold and capture floor; recognition
+generation, original audio ownership, source age and original response bounds
+remain independent. V1/V2/mixed/missing sources have no private fallback.
+
+One startup-owned worker authenticates the derived private control socket to
+the trusted configured known-parent owner, coalesces one current-hold request,
+and caches only that hold's ticket. Grant acquisition uses the minimum of its
+original300ms, source and audio deadlines. Connect/handshake happen off capture
+and output; final private permission polls add only a nonblocking observer
+PEEK to the existing source/ownership checks. Client drop closes its descriptor
+without shutdown or observer flag changes. Old holds, cancellation and observed
+loss cannot revive by rereading a file or delayed grant completion.
+
+This source is UNRUN. Existing Engine/HTTP/TTS/Memory/credited IPC guard paths
+are being migrated to real V3/grant fixtures; primitive/Eyes exec evidence alone
+does not prove Voice outputs0. Live and other legacy file readers have not been
+wired to this private ticket API; no Live session/device/latency proof is claimed.
+
+
+The authored camera-ticket composition control now uses an actual Eyes
+Service/Permit in an exec child and two exec-separated Voice consumers, paired
+positive local HTTP/TTS/Memory/creditedIPC dispatch followed by kernel-only loss
+with Eyes' publication lock held and source unexpired/unchanged. It remains
+UNRUN and does not replace the separate per-send TTS fallback repair, physical
+origin checks or latency measurements. The lamp-eyes edge is dev-only.
+
+The exec producer is the native Voice UNIT-TEST DRIVER hosting production Eyes
+library APIs, not the shipping lamp-eyes binary/main or deployed units. The two
+auxiliary test identities are entrypoints for one composed scenario, not two
+additional independent scenarios. The consumers likewise host actual Voice
+Engine/Net/guards in that driver. Whole-device bootstrap, physical policy and
+installation/credential/account proof remain outside this test. Proxy exclusion
+is set only in owned child environments; HTTP stays on local fixture targets.
+
+
+Current source also carries permission into each TTS send/retry/fallback.
+Pending cannot hide the initial construction-anchored first-result clock;
+Engine keeps packet/output fences while polling the guarded service directly.
+These transport/exec/fixture controls are authored but UNRUN. Legacy/Live and
+actual device/audio-origin/latency coverage remain separate holds.

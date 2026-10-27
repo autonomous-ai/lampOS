@@ -17,7 +17,7 @@ use lamp_turn_owner::BootId;
 use std::{
     sync::{
         Arc, Mutex, OnceLock,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -130,6 +130,7 @@ pub const COLD_FOR: Duration = Duration::from_secs(5);
 /// lifetime. Snapshot and invalidation never wait on the refresh mutex.
 #[derive(Default)]
 pub struct FaceCache {
+    camera_client: OnceLock<Arc<crate::camera_authority::Client>>,
     generation: AtomicU64,
     face: Mutex<Option<CachedFace>>,
     /// [`GAP`], when held ([`GAP_ENVIRONMENT`]).
@@ -154,6 +155,11 @@ pub struct FaceCache {
     known_mark: Mutex<Option<KnownMark>>,
 }
 impl FaceCache {
+    /// Startup only: one bounded private-disclosure client, never on capture.
+    pub(crate) fn set_camera_client(&self, client: Arc<crate::camera_authority::Client>) -> bool {
+        self.camera_client.set(client).is_ok()
+    }
+
     /// The lamp has answered a turn of `scope`'s at `at`: a gap is held only
     /// for someone known the lamp answered within it, so mid-conversation
     /// (the reviewer's P2 on #2265). Someone who has left the picture and
@@ -447,6 +453,16 @@ pub struct RequestKey {
     pub request: u64,
 }
 
+/// A caller may use a shorter deadline, anchored to the accepted audio's end.
+/// Sealing never extends it; a late transcription consumes that same window.
+pub(crate) const SPEAKER_PROOF_MAX_AGE: Duration = Duration::from_secs(30);
+
+struct SpeakerProof {
+    /// A passing face under the eyes publisher's boot, not a known-person ID.
+    speaker: Box<str>,
+    valid_until: Instant,
+}
+
 struct RequestContext {
     key: RequestKey,
     scope: ScopeSnapshot,
@@ -455,6 +471,18 @@ struct RequestContext {
     narrowed: AtomicBool,
     room: ScopeSnapshot,
     active: AtomicBool,
+    /// Unset until the one audio owner seals; `None` is a final refusal.
+    speaker: OnceLock<Option<SpeakerProof>>,
+    /// Disclosure only: 0 unproved, 1 matched, 2 permanently lost, 3 checking.
+    /// This never changes speaker, scope, tool or write authority.
+    private_context: AtomicU8,
+    /// A composition must be retried if any clone observed Checking while it
+    /// was built, even when another clone already resumed the same grant.
+    private_context_checks: AtomicU64,
+    /// Initial validated typed subject, bounded by this request's original proof.
+    private_speaker: OnceLock<crate::speaking_faces::KnownSpeaker>,
+    camera_client: Option<Arc<crate::camera_authority::Client>>,
+    camera_binding: OnceLock<crate::camera_authority::RequestBinding>,
     /// A line admitted as the room's with the camera allowed: its late look
     /// (#2807), armed only if the face cache was cold at its start or went
     /// cold before its end plus [`KEEPER_WAIT`] ([`LateLook::armed`]).
@@ -510,6 +538,7 @@ const KEEPER_POLL: Duration = Duration::from_millis(50);
 /// hold immutable data but cannot keep authorization alive after owner drop.
 pub struct RequestScope {
     context: Arc<RequestContext>,
+    speaker_recorder_issued: bool,
 }
 impl RequestScope {
     pub fn new(key: RequestKey, scope: ScopeSnapshot) -> Self {
@@ -520,10 +549,26 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
+                speaker: OnceLock::new(),
+                private_context: AtomicU8::new(0),
+                private_context_checks: AtomicU64::new(0),
+                private_speaker: OnceLock::new(),
+                camera_client: None,
+                camera_binding: OnceLock::new(),
                 late: None,
                 cache: None,
             }),
+            speaker_recorder_issued: false,
         }
+    }
+    /// Same ordinary admission, carrying only the startup disclosure client.
+    /// This must not arm late-look/cache keeper authority when that mode is off.
+    pub(crate) fn in_cache(key: RequestKey, scope: ScopeSnapshot, cache: &FaceCache) -> Self {
+        let mut request = Self::new(key, scope);
+        Arc::get_mut(&mut request.context)
+            .expect("new request has one context owner")
+            .camera_client = cache.camera_client.get().cloned();
+        request
     }
     /// A line admitted while the camera was allowed. Only one admitted as
     /// the room's while `cache` is cold ([`FaceCache::is_cold`]: within
@@ -562,9 +607,16 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
+                speaker: OnceLock::new(),
+                private_context: AtomicU8::new(0),
+                private_context_checks: AtomicU64::new(0),
+                private_speaker: OnceLock::new(),
+                camera_client: cache.camera_client.get().cloned(),
+                camera_binding: OnceLock::new(),
                 late,
                 cache: Some(cache),
             }),
+            speaker_recorder_issued: false,
         }
     }
     pub fn lease(&self) -> ScopeLease {
@@ -576,6 +628,19 @@ impl RequestScope {
         self.context.active.store(false, Ordering::Release);
         crate::speaking_faces::cancel_enrollment(self.context.key.request);
     }
+
+    /// Move the only writer into this request's spoken task. Read-only leases
+    /// cannot issue one, and dropping it does not permit a second recorder.
+    pub(crate) fn speaker_recorder(&mut self) -> Option<SpeakerRecorder> {
+        if std::mem::replace(&mut self.speaker_recorder_issued, true)
+            || !self.context.active.load(Ordering::Acquire)
+        {
+            return None;
+        }
+        Some(SpeakerRecorder {
+            context: self.context.clone(),
+        })
+    }
 }
 impl Drop for RequestScope {
     fn drop(&mut self) {
@@ -583,14 +648,205 @@ impl Drop for RequestScope {
     }
 }
 
+/// Non-cloneable, request-bound write authority. Only the spoken task that
+/// accepted final audio may seal it with the actual interval's passing faces.
+/// A positive identity is visual evidence of that interval, not liveness proof.
+pub(crate) struct SpeakerRecorder {
+    context: Arc<RequestContext>,
+}
+
+impl SpeakerRecorder {
+    /// Consume the one recording attempt even for a wrong key, absent or
+    /// ambiguous face, expired deadline, or revoked/held/narrowed request.
+    /// `speakers_with_boot` comes from the accepted audio interval; this type
+    /// does not infer a speaker, read Eyes, or authorize an operation by itself.
+    pub(crate) fn seal(
+        self,
+        key: RequestKey,
+        speakers_with_boot: &[String],
+        valid_until: Instant,
+    ) -> bool {
+        self.seal_at(key, speakers_with_boot, valid_until, Instant::now())
+    }
+
+    fn seal_at(
+        self,
+        key: RequestKey,
+        speakers_with_boot: &[String],
+        valid_until: Instant,
+        now: Instant,
+    ) -> bool {
+        let permitted = || {
+            self.context.active.load(Ordering::Acquire)
+                && !self.context.narrowed.load(Ordering::Acquire)
+                && !self.context.scope.held()
+        };
+        let proof = match speakers_with_boot {
+            [speaker]
+                if key == self.context.key
+                    && permitted()
+                    && valid_until > now
+                    && valid_until.duration_since(now) <= SPEAKER_PROOF_MAX_AGE
+                    && qualified_speaker(speaker) =>
+            {
+                Some(SpeakerProof {
+                    speaker: speaker.clone().into_boxed_str(),
+                    valid_until,
+                })
+            }
+            _ => None,
+        };
+        let accepted = proof.is_some();
+        self.context.speaker.set(proof).is_ok() && accepted && permitted()
+    }
+}
+
+/// Match the bus's 16 lowercase hex boot and the passing face reader's fN
+/// contract. Keep the whole qualified ID: a new boot's f1 is a different face.
+pub(crate) fn qualified_speaker(speaker: &str) -> bool {
+    if !(19..=28).contains(&speaker.len()) {
+        return false;
+    }
+    let Some((boot, face)) = speaker.split_once('/') else {
+        return false;
+    };
+    let Some(digits) = face.strip_prefix('f') else {
+        return false;
+    };
+    boot.len() == 16
+        && boot
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && (1..=10).contains(&digits.len())
+        && digits.bytes().all(|byte| byte.is_ascii_digit())
+        && digits.parse::<u32>().is_ok_and(|id| id > 0)
+}
+
 #[derive(Clone)]
 pub struct ScopeLease {
     context: Arc<RequestContext>,
 }
 impl ScopeLease {
+    pub(crate) fn camera_client(&self) -> Option<&Arc<crate::camera_authority::Client>> {
+        self.context.camera_client.as_ref()
+    }
+    pub(crate) fn camera_binding(&self) -> Option<&crate::camera_authority::RequestBinding> {
+        self.context.camera_binding.get()
+    }
+    pub(crate) fn pin_camera_binding(
+        &self,
+        binding: crate::camera_authority::RequestBinding,
+    ) -> &crate::camera_authority::RequestBinding {
+        self.context.camera_binding.get_or_init(|| binding)
+    }
+    pub(crate) fn speaker_deadline(&self) -> Option<Instant> {
+        self.speaker()?;
+        Some(self.context.speaker.get()?.as_ref()?.valid_until)
+    }
+    /// Initial ticket acquisition is unresolved disclosure, never readiness.
+    /// Increment the same composition counter before publishing Pending.
+    pub(crate) fn pending_camera_context(&self) -> bool {
+        if self
+            .context
+            .private_context_checks
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_add(1))
+            .is_err()
+        {
+            self.private_context_permitted(false);
+            return false;
+        }
+        self.context
+            .private_context
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |state| {
+                matches!(state, 0 | 1 | 3).then_some(3)
+            })
+            .is_ok()
+    }
+
     pub fn key(&self) -> RequestKey {
         self.context.key
     }
+    /// Record actual private-source validation, never model arguments. Initial
+    /// unproved input stays neutral; observed loss after proof cannot revive.
+    pub(crate) fn private_context_permitted(&self, proved: bool) -> bool {
+        let previous = self
+            .context
+            .private_context
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |state| {
+                Some(match (state, proved) {
+                    (0 | 3, true) => 1,
+                    (1 | 3, false) => 2,
+                    _ => state,
+                })
+            })
+            .expect("disclosure transition always updates");
+        proved && previous != 2
+    }
+
+    /// Retire disclosure before an admitted ordinary face mutation runs.
+    /// Only its later fixed public receipt may use the separate request guard.
+    /// Only a still-proved private request can transfer; an observed loss or
+    /// unresolved/unproved state wins instead. Private disclosure stays Lost.
+    pub(crate) fn retire_private_for_face_receipt(&self) -> bool {
+        self.context
+            .private_context
+            .compare_exchange(1, 2, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    pub(crate) fn private_context_lost(&self) -> bool {
+        self.context.private_context.load(Ordering::Acquire) == 2
+    }
+
+    /// A fresh matching Checking publication can suspend only an already
+    /// validated typed grant. It grants no disclosure and never resets the audio
+    /// proof's deadline; a concurrent terminal loss stays terminal.
+    pub(crate) fn pause_private_context(&self) -> bool {
+        if self.context.private_speaker.get().is_none() {
+            return false;
+        }
+        // Publish the observation before Pending can be visible. A failed
+        // pause may cause a conservative rebuild, never a missed observation.
+        if self
+            .context
+            .private_context_checks
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |seen| {
+                seen.checked_add(1)
+            })
+            .is_err()
+        {
+            self.private_context_permitted(false);
+            return false;
+        }
+        self.context
+            .private_context
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |state| {
+                matches!(state, 1 | 3).then_some(3)
+            })
+            .is_ok()
+    }
+
+    pub(crate) fn private_context_checks(&self) -> u64 {
+        self.context.private_context_checks.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn private_context_waiting(&self) -> bool {
+        self.context.private_context.load(Ordering::Acquire) == 3
+    }
+
+    /// Only the actual private-source matcher may pin a validated typed subject.
+    /// No file I/O occurs under initialization; clones share this one grant.
+    pub(crate) fn pin_private_speaker(
+        &self,
+        known: crate::speaking_faces::KnownSpeaker,
+    ) -> &crate::speaking_faces::KnownSpeaker {
+        self.context.private_speaker.get_or_init(|| known)
+    }
+
+    pub(crate) fn private_speaker(&self) -> Option<&crate::speaking_faces::KnownSpeaker> {
+        self.context.private_speaker.get()
+    }
+
     pub fn is_current(&self) -> bool {
         self.context.active.load(Ordering::Acquire)
     }
@@ -604,6 +860,28 @@ impl ScopeLease {
                 &self.context.scope
             }
         })
+    }
+    /// The immutable original admission, distinct from a private request
+    /// narrowed to room. Read-only disclosure checks must not treat narrowing
+    /// as permission to disclose the room instead. Revocation grants nothing.
+    pub(crate) fn admitted_scope(&self) -> Option<&ScopeSnapshot> {
+        self.is_current().then_some(&self.context.scope)
+    }
+    /// The accepted audio's one passing face, including for a pending photo
+    /// subject whose memory scope is still the room. A held or narrowed scope
+    /// never qualifies. Like `scope`, a borrow is not ongoing authority: call
+    /// again at the final boundary after any slow work, and compare the whole ID.
+    pub(crate) fn speaker(&self) -> Option<&str> {
+        self.speaker_at(Instant::now())
+    }
+
+    fn speaker_at(&self, now: Instant) -> Option<&str> {
+        let proof = self.context.speaker.get()?.as_ref()?;
+        (now < proof.valid_until
+            && self.is_current()
+            && !self.context.narrowed.load(Ordering::Acquire)
+            && !self.context.scope.held())
+        .then_some(proof.speaker.as_ref())
     }
     /// The line turned out to be someone else's (a face seen speaking
     /// through it that is not the known person's, `crate::speaking_faces`):
@@ -804,6 +1082,21 @@ mod tests {
             .named_at = at;
     }
     #[test]
+    fn original_admission_distinguishes_room_from_narrowed_private_and_revocation() {
+        let person = RequestScope::new(key(1), ScopeSnapshot::of("Synthetic owner"));
+        let room = RequestScope::new(key(2), ScopeSnapshot::room());
+        let private = person.lease();
+        private.narrow_to_room();
+        assert_eq!(private.scope(), room.lease().scope());
+        assert!(private.admitted_scope().unwrap().person().is_some());
+        assert_eq!(room.lease().admitted_scope(), Some(&ScopeSnapshot::room()));
+        person.revoke();
+        room.revoke();
+        assert!(private.admitted_scope().is_none());
+        assert!(room.lease().admitted_scope().is_none());
+    }
+
+    #[test]
     fn cache_uses_latest_face_never_sticky_session_owner_and_expires() {
         let now = Instant::now();
         let cache = FaceCache::default();
@@ -935,6 +1228,418 @@ mod tests {
         assert_eq!(snapshot.person(), None);
         assert!(!task.is_current());
         assert!(task.scope().is_none());
+    }
+
+    const SPEAKER: &str = "0123456789abcdef/f1";
+    const OTHER_BOOT_SPEAKER: &str = "fedcba9876543210/f1";
+
+    fn speakers(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|id| (*id).to_owned()).collect()
+    }
+
+    /// The late keeper chooses only where a Room line keeps something. It
+    /// cannot manufacture the separate, single-use audio proof or turn that
+    /// original Room admission into authority to disclose a person's context.
+    #[test]
+    fn looking_later_keeps_one_recorder_and_never_upgrades_room_disclosure() {
+        let mut directory = crate::process::SessionDirectory::create().unwrap();
+        directory.path = directory.path.canonicalize().unwrap();
+        let known = directory.path.join("known");
+        let name = "Fixture owner";
+        let person = crate::remember::person_id(name);
+        std::fs::write(&known, name).unwrap();
+        std::fs::write(
+            crate::speaking_faces::known_speaker_of(&known),
+            serde_json::json!({"version":3,"camera_hold":1,"camera_began_us":1,"state":"seen", "name":name, "id":null,
+                "boot":"0123456789abcdef", "face":"f1",
+                "publisher":"0123456789abcdef0123456789abcdef", "generation":1,
+                "observed_us":lamp_ipc::monotonic_us(),
+                "permission_until_us":lamp_ipc::monotonic_us().checked_add(1_500_000).unwrap()})
+            .to_string(),
+        )
+        .unwrap();
+        let name_told = |lease: &ScopeLease| {
+            crate::second_provider::worker::known_name_told(true, Some(&known), Some(lease))
+        };
+        let fixture = crate::camera_authority::fixture::Fixture::start(
+            known.clone(),
+            [
+                0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+                0xcd, 0xef,
+            ],
+            1,
+        );
+        let cache = fixture.cache();
+        // Cache only the hold FD; every tested Room/private request below
+        // still seals and matches its own original authority independently.
+        let mut warm = RequestScope::in_cache(key(66), ScopeSnapshot::of(name), &cache);
+        let warm_key = warm.lease().key();
+        assert!(warm.speaker_recorder().unwrap().seal(
+            warm_key,
+            &speakers(&[SPEAKER]),
+            Instant::now() + Duration::from_secs(5)
+        ));
+        assert_eq!(
+            fixture.ready(&warm.lease()),
+            crate::second_provider::PermissionState::Ready
+        );
+        let mut room = RequestScope::looking_later(key(61), ScopeSnapshot::room(), cache.clone());
+        let lease = room.lease();
+        let admitted = lease.admitted_scope().unwrap().clone();
+        let started = room.context.late.as_ref().unwrap().started;
+        let recorder = room.speaker_recorder().unwrap();
+        assert!(room.speaker_recorder().is_none());
+        assert!(name_told(&lease).is_empty(), "no audio proof yet");
+        assert!(lease.speaker().is_none());
+        cached(&cache, name, Instant::now() + Duration::from_secs(5));
+        // The keeper's caller supplies visibility, not positive speech. Pin
+        // this fixture to the exact admitted subject and original line start.
+        let in_view = |seen: &str, at: Instant| seen == person && at == started;
+        lease.record_keeper(lease.face_at_end_seen(Instant::now(), Some(&in_view)));
+        assert_eq!(lease.keeper_within(Duration::ZERO), Some(person.clone()));
+        assert_eq!(lease.admitted_scope(), Some(&admitted));
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        assert!(
+            lease.speaker().is_none(),
+            "a selected keeper is not a speaker"
+        );
+        assert!(lease.private_speaker().is_none());
+        assert!(!lease.private_context_lost());
+        assert!(name_told(&lease).is_empty());
+        let now = Instant::now();
+        assert!(recorder.seal_at(
+            key(61),
+            &speakers(&[SPEAKER]),
+            now + Duration::from_secs(5),
+            now
+        ));
+        assert_eq!(lease.speaker_at(now), Some(SPEAKER));
+        assert!(room.speaker_recorder().is_none());
+        assert!(
+            name_told(&lease).is_empty(),
+            "positive audio cannot upgrade the original Room admission"
+        );
+        assert_eq!(lease.admitted_scope(), Some(&admitted));
+        assert!(
+            lease.private_speaker().is_none(),
+            "no private grant was pinned"
+        );
+
+        // The same constructor also admits an already known person. Only
+        // its actual sole-positive seal, not visibility or the late keeper,
+        // makes the real private-source matcher accept that request.
+        for (index, ids, positive) in [
+            (62, speakers(&[]), false),
+            (63, speakers(&[SPEAKER, OTHER_BOOT_SPEAKER]), false),
+            (64, speakers(&[SPEAKER]), true),
+        ] {
+            let private = ScopeSnapshot::of(name);
+            let mut owner = RequestScope::looking_later(key(index), private.clone(), cache.clone());
+            let lease = owner.lease();
+            assert!(
+                !lease.may_look_later(),
+                "a personal admission takes no late look"
+            );
+            assert!(name_told(&lease).is_empty());
+            let recorder = owner.speaker_recorder().unwrap();
+            assert!(owner.speaker_recorder().is_none());
+            let now = Instant::now();
+            assert_eq!(
+                recorder.seal_at(key(index), &ids, now + Duration::from_secs(5), now),
+                positive
+            );
+            assert_eq!(lease.speaker_at(now).is_some(), positive);
+            assert_eq!(!name_told(&lease).is_empty(), positive);
+            assert_eq!(lease.private_speaker().is_some(), positive);
+            assert_eq!(lease.admitted_scope(), Some(&private));
+            assert_eq!(lease.scope(), Some(&private));
+            assert!(owner.speaker_recorder().is_none());
+        }
+        drop(warm);
+        drop(room);
+        drop(cache);
+        drop(fixture);
+        std::fs::remove_dir_all(&directory.path).unwrap();
+    }
+
+    #[test]
+    fn speaker_recorder_is_issued_once_and_seals_only_its_request() {
+        let now = Instant::now();
+        let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+        let lease = owner.lease();
+        assert_eq!(lease.speaker_at(now), None);
+        let recorder = owner.speaker_recorder().unwrap();
+        assert!(owner.speaker_recorder().is_none());
+        // Moving the non-cloneable recorder to the spoken task does not move
+        // the owner: its leases still share exactly this request's context.
+        assert!(
+            std::thread::spawn(move || {
+                recorder.seal_at(
+                    key(1),
+                    &speakers(&[SPEAKER]),
+                    now + Duration::from_secs(5),
+                    now,
+                )
+            })
+            .join()
+            .unwrap()
+        );
+        assert_eq!(lease.speaker_at(now), Some(SPEAKER));
+        assert_eq!(owner.lease().speaker_at(now), Some(SPEAKER));
+        assert!(owner.speaker_recorder().is_none());
+        // Defence in depth: even an internal duplicate cannot overwrite the
+        // seal. Production cannot construct one outside this module.
+        assert!(
+            !SpeakerRecorder {
+                context: owner.context.clone()
+            }
+            .seal_at(
+                key(1),
+                &speakers(&[OTHER_BOOT_SPEAKER]),
+                now + Duration::from_secs(5),
+                now,
+            )
+        );
+        assert_eq!(lease.speaker_at(now), Some(SPEAKER));
+
+        let mut abandoned = RequestScope::new(key(2), ScopeSnapshot::room());
+        drop(abandoned.speaker_recorder().unwrap());
+        assert!(abandoned.speaker_recorder().is_none());
+        assert_eq!(abandoned.lease().speaker_at(now), None);
+    }
+
+    #[test]
+    fn speaker_proof_rejects_wrong_worker_session_and_request_without_transfer() {
+        let now = Instant::now();
+        let deadline = now + Duration::from_secs(5);
+        for wrong in [
+            key(2),
+            RequestKey {
+                session: 2,
+                ..key(1)
+            },
+            RequestKey {
+                request: 8,
+                ..key(1)
+            },
+        ] {
+            let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+            assert!(!owner.speaker_recorder().unwrap().seal_at(
+                wrong,
+                &speakers(&[SPEAKER]),
+                deadline,
+                now,
+            ));
+            assert!(owner.speaker_recorder().is_none());
+            assert_eq!(owner.lease().speaker_at(now), None);
+            assert!(matches!(owner.context.speaker.get(), Some(None)));
+            assert!(
+                !SpeakerRecorder {
+                    context: owner.context.clone()
+                }
+                .seal_at(key(1), &speakers(&[SPEAKER]), deadline, now,)
+            );
+        }
+        let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+        assert!(owner.speaker_recorder().unwrap().seal_at(
+            key(1),
+            &speakers(&[SPEAKER]),
+            deadline,
+            now,
+        ));
+        // Even identical numeric keys are not a shared registry or transferable
+        // proof. A new owner gets a new context and an unset seal.
+        for other_key in [
+            key(1),
+            key(2),
+            RequestKey {
+                session: 2,
+                ..key(1)
+            },
+            RequestKey {
+                request: 8,
+                ..key(1)
+            },
+        ] {
+            let other = RequestScope::new(other_key, ScopeSnapshot::room());
+            assert_eq!(other.lease().speaker_at(now), None);
+            assert_eq!(owner.lease().speaker_at(now), Some(SPEAKER));
+        }
+    }
+
+    #[test]
+    fn speaker_proof_requires_exactly_one_well_formed_boot_qualified_face() {
+        let now = Instant::now();
+        let invalid = [
+            vec![],
+            vec![""],
+            vec!["f1"],
+            vec!["/f1"],
+            vec!["boot/f1"],
+            vec!["0123456789ABCDEF/f1"],
+            vec!["0123456789abcdef/f"],
+            vec!["0123456789abcdef/f12345678901"],
+            vec!["0123456789abcdef/f-1"],
+            vec!["0123456789abcdef/f0"],
+            vec!["0123456789abcdef/f4294967296"],
+            vec!["0123456789abcdef/f1/extra"],
+            vec!["0123456789abcdef/p-0123456789abcdef"],
+            vec!["0123456789abcdef/f1\n"],
+            vec!["0123456789abcdef/f１"],
+            vec![SPEAKER, SPEAKER],
+            vec![SPEAKER, "0123456789abcdef/f2"],
+            vec![SPEAKER, OTHER_BOOT_SPEAKER],
+        ];
+        for ids in invalid {
+            let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+            assert!(
+                !owner.speaker_recorder().unwrap().seal_at(
+                    key(1),
+                    &speakers(&ids),
+                    now + Duration::from_secs(5),
+                    now,
+                ),
+                "accepted {ids:?}"
+            );
+            assert_eq!(owner.lease().speaker_at(now), None);
+            assert!(matches!(owner.context.speaker.get(), Some(None)));
+        }
+    }
+
+    #[test]
+    fn room_speaker_proof_keeps_old_and_new_boots_distinct_for_pending_photos() {
+        let now = Instant::now();
+        for id in [SPEAKER, OTHER_BOOT_SPEAKER] {
+            let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+            assert!(owner.speaker_recorder().unwrap().seal_at(
+                key(1),
+                &speakers(&[id]),
+                now + Duration::from_secs(5),
+                now,
+            ));
+            let lease = owner.lease();
+            assert_eq!(lease.scope().and_then(ScopeSnapshot::person), None);
+            assert_eq!(lease.speaker_at(now), Some(id));
+            assert_ne!(lease.speaker_at(now), Some("f1"));
+            assert_ne!(
+                lease.speaker_at(now),
+                Some(if id == SPEAKER {
+                    OTHER_BOOT_SPEAKER
+                } else {
+                    SPEAKER
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn speaker_expiry_stays_anchored_to_audio_end_and_has_strict_bounds() {
+        let ended = Instant::now();
+        let sealed = ended + Duration::from_secs(5);
+        let deadline = ended + SPEAKER_PROOF_MAX_AGE;
+        let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+        assert!(owner.speaker_recorder().unwrap().seal_at(
+            key(1),
+            &speakers(&[SPEAKER]),
+            deadline,
+            sealed,
+        ));
+        let lease = owner.lease();
+        assert_eq!(
+            lease.speaker_at(deadline - Duration::from_nanos(1)),
+            Some(SPEAKER)
+        );
+        assert_eq!(lease.speaker_at(deadline), None);
+        assert_eq!(lease.speaker_at(deadline + Duration::from_secs(1)), None);
+        for invalid in [
+            sealed - Duration::from_nanos(1),
+            sealed,
+            sealed + SPEAKER_PROOF_MAX_AGE + Duration::from_nanos(1),
+        ] {
+            let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+            assert!(!owner.speaker_recorder().unwrap().seal_at(
+                key(1),
+                &speakers(&[SPEAKER]),
+                invalid,
+                sealed,
+            ));
+            assert_eq!(owner.lease().speaker_at(sealed), None);
+        }
+    }
+
+    #[test]
+    fn held_narrowed_and_revoked_requests_never_expose_speaker_proof() {
+        let now = Instant::now();
+        let deadline = now + Duration::from_secs(5);
+        let mut held = RequestScope::new(
+            key(1),
+            ScopeSnapshot {
+                person: Some(Arc::from("p-0123456789abcdef")),
+                held: true,
+            },
+        );
+        assert!(!held.speaker_recorder().unwrap().seal_at(
+            key(1),
+            &speakers(&[SPEAKER]),
+            deadline,
+            now,
+        ));
+        assert_eq!(held.lease().speaker_at(now), None);
+
+        for revoke in [false, true] {
+            for before_seal in [false, true] {
+                let mut owner = RequestScope::new(key(1), ScopeSnapshot::of("Synthetic"));
+                let lease = owner.lease();
+                let recorder = owner.speaker_recorder().unwrap();
+                let invalidate = || {
+                    if revoke {
+                        owner.revoke();
+                    } else {
+                        lease.narrow_to_room();
+                    }
+                };
+                if before_seal {
+                    invalidate();
+                }
+                assert_eq!(
+                    recorder.seal_at(key(1), &speakers(&[SPEAKER]), deadline, now),
+                    !before_seal
+                );
+                if !before_seal {
+                    assert_eq!(lease.speaker_at(now), Some(SPEAKER));
+                    invalidate();
+                }
+                assert_eq!(lease.speaker_at(now), None);
+                assert_eq!(lease.clone().speaker_at(now), None);
+            }
+        }
+        let mut revoked = RequestScope::new(key(1), ScopeSnapshot::room());
+        revoked.revoke();
+        assert!(revoked.speaker_recorder().is_none());
+    }
+
+    #[test]
+    fn dropping_the_request_owner_revokes_unsealed_and_sealed_speaker_proofs() {
+        let now = Instant::now();
+        let deadline = now + Duration::from_secs(5);
+        let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+        let lease = owner.lease();
+        let recorder = owner.speaker_recorder().unwrap();
+        drop(owner);
+        assert!(!recorder.seal_at(key(1), &speakers(&[SPEAKER]), deadline, now));
+        assert_eq!(lease.speaker_at(now), None);
+
+        let mut owner = RequestScope::new(key(1), ScopeSnapshot::room());
+        let lease = owner.lease();
+        assert!(owner.speaker_recorder().unwrap().seal_at(
+            key(1),
+            &speakers(&[SPEAKER]),
+            deadline,
+            now,
+        ));
+        assert_eq!(lease.speaker_at(now), Some(SPEAKER));
+        drop(owner);
+        assert_eq!(lease.speaker_at(now), None);
     }
 
     /// The known face as the eyes' file gives it, and its last fresh moment.
@@ -1143,6 +1848,150 @@ mod tests {
         lost(&cache, Some(0));
         assert_eq!(whose(&cache, until + Duration::from_secs(1)), known);
         assert_eq!(whose(&cache, until + Duration::from_secs(2)), None);
+    }
+
+    fn disclosure_owner(request: u8) -> RequestScope {
+        let mut owner = RequestScope::new(key(request), ScopeSnapshot::of("Fixture owner"));
+        let now = Instant::now();
+        assert!(owner.speaker_recorder().unwrap().seal_at(
+            key(request),
+            &speakers(&[SPEAKER]),
+            now + Duration::from_secs(5),
+            now,
+        ));
+        owner
+    }
+
+    #[test]
+    fn an_unproved_private_read_check_does_not_poison_a_later_actual_proof() {
+        let owner = disclosure_owner(41);
+        let lease = owner.lease();
+        assert!(!lease.private_context_permitted(false));
+        assert!(!lease.private_context_lost());
+        assert!(!lease.clone().private_context_permitted(false));
+        assert!(lease.private_context_permitted(true));
+        assert!(!lease.private_context_lost());
+    }
+
+    #[test]
+    fn private_read_loss_is_shared_by_clones_and_cannot_be_reproved() {
+        let owner = disclosure_owner(42);
+        let first = owner.lease();
+        let second = first.clone();
+        assert!(first.private_context_permitted(true));
+        assert!(!second.private_context_permitted(false));
+        assert!(first.private_context_lost());
+        assert!(second.private_context_lost());
+        assert!(!first.private_context_permitted(true));
+        assert!(!owner.lease().private_context_permitted(true));
+    }
+
+    #[test]
+    fn a_new_request_has_fresh_private_read_state_after_the_previous_lost_it() {
+        let old = disclosure_owner(43);
+        assert!(old.lease().private_context_permitted(true));
+        assert!(!old.lease().private_context_permitted(false));
+        let next = disclosure_owner(44);
+        assert_ne!(old.lease().key(), next.lease().key());
+        assert!(!next.lease().private_context_lost());
+        assert!(next.lease().private_context_permitted(true));
+        assert!(!old.lease().private_context_permitted(true));
+    }
+
+    #[test]
+    fn private_read_loss_does_not_revoke_narrow_or_destroy_the_original_speaker() {
+        let owner = disclosure_owner(45);
+        let lease = owner.lease();
+        let before = lease.scope().unwrap().clone();
+        let admitted = lease.admitted_scope().unwrap().clone();
+        assert!(lease.private_context_permitted(true));
+        assert!(!lease.private_context_permitted(false));
+        assert!(lease.private_context_lost());
+        assert!(lease.is_current());
+        assert_eq!(lease.scope(), Some(&before));
+        assert_eq!(lease.admitted_scope(), Some(&admitted));
+        assert_eq!(lease.speaker(), Some(SPEAKER));
+        assert!(!lease.scope().unwrap().held());
+        // Existing non-read authority stays independently revocable.
+        owner.revoke();
+        assert!(!lease.is_current());
+        assert!(lease.scope().is_none());
+        assert!(lease.speaker().is_none());
+    }
+
+    #[test]
+    fn concurrent_true_and_false_after_private_proof_always_finish_lost() {
+        for _ in 0..32 {
+            let owner = disclosure_owner(46);
+            let lease = owner.lease();
+            assert!(lease.private_context_permitted(true));
+            let gate = std::sync::Barrier::new(2);
+            std::thread::scope(|threads| {
+                let yes = &lease;
+                let no = lease.clone();
+                let gate = &gate;
+                let proving = threads.spawn(move || {
+                    gate.wait();
+                    yes.private_context_permitted(true)
+                });
+                let losing = threads.spawn(move || {
+                    gate.wait();
+                    no.private_context_permitted(false)
+                });
+                let _ = proving.join().unwrap();
+                assert!(!losing.join().unwrap());
+            });
+            assert!(lease.private_context_lost());
+            assert!(!lease.private_context_permitted(true));
+            assert!(lease.is_current());
+            assert_eq!(lease.speaker(), Some(SPEAKER));
+        }
+    }
+
+    #[test]
+    fn checking_can_only_pause_a_pinned_grant_and_never_wins_over_loss() {
+        for _ in 0..32 {
+            let owner = disclosure_owner(47);
+            let lease = owner.lease();
+            assert!(!lease.pause_private_context(), "unproved cannot wait");
+            assert!(lease.private_context_permitted(true));
+            assert!(!lease.pause_private_context(), "legacy proof cannot wait");
+            lease.pin_private_speaker(crate::speaking_faces::KnownSpeaker {
+                name: "Fixture owner".into(),
+                person: crate::remember::person_id("Fixture owner"),
+                id: None,
+                face: SPEAKER.into(),
+                epoch: Some(crate::speaking_faces::KnownSpeakerEpoch {
+                    boot: "0123456789abcdef".into(),
+                    publisher: "0123456789abcdef0123456789abcdef".into(),
+                    generation: 1,
+                }),
+            });
+            assert!(lease.pause_private_context());
+            assert!(lease.clone().private_context_waiting());
+            assert!(!lease.private_context_lost());
+            assert!(lease.private_context_permitted(true));
+            assert!(!lease.private_context_waiting());
+            let barrier = std::sync::Barrier::new(2);
+            std::thread::scope(|threads| {
+                let waiting = threads.spawn(|| {
+                    barrier.wait();
+                    lease.pause_private_context()
+                });
+                let losing = threads.spawn(|| {
+                    barrier.wait();
+                    lease.private_context_permitted(false)
+                });
+                let _ = waiting.join().unwrap();
+                assert!(!losing.join().unwrap());
+            });
+            assert!(lease.private_context_lost());
+            assert!(!lease.private_context_waiting());
+            assert!(!lease.pause_private_context());
+            assert!(!lease.private_context_permitted(true));
+            assert!(lease.is_current());
+            assert_eq!(lease.speaker(), Some(SPEAKER));
+        }
     }
 
     /// #2807: right after a voice restart, a remembered face's first line

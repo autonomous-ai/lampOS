@@ -487,6 +487,285 @@ fn diagnostic_requirements(enabled: bool, bus: bool, speaking: bool) -> Result<(
     Ok(())
 }
 
+/// The new name-bearing observation stays in the existing private runtime
+/// folder. A configured persistent known file still serves legacy readers,
+/// but never produces this source. The Linux runtime verifies tmpfs too.
+#[cfg(any(target_os = "linux", test))]
+fn private_runtime_source(
+    parent: &Path,
+    volatile: bool,
+    mode: u32,
+    owner: u32,
+    writer: u32,
+) -> bool {
+    parent.starts_with("/run")
+        && !parent
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+        && volatile
+        && mode & 0o700 == 0o700
+        && mode & 0o022 == 0
+        && owner == writer
+}
+
+#[cfg(target_os = "linux")]
+fn may_publish_known_speaker(known: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let Some(parent) = known.parent().and_then(|parent| parent.canonicalize().ok()) else {
+        return false;
+    };
+    let Ok(metadata) = std::fs::metadata(&parent) else {
+        return false;
+    };
+    if !metadata.is_dir() {
+        return false;
+    }
+    let volatile = rustix::fs::statfs(&parent)
+        .is_ok_and(|stats| i128::from(stats.f_type) == i128::from(libc::TMPFS_MAGIC));
+    let writer = rustix::process::geteuid().as_raw();
+    if !private_runtime_source(&parent, volatile, metadata.mode(), metadata.uid(), writer) {
+        return false;
+    }
+    // Product's runtime directory is 0755, owned by this writer and not
+    // writable by anyone else. The source is independently created 0600.
+    // A normal absence removes legacy known; that alone must not forbid status.
+    match std::fs::symlink_metadata(known) {
+        Ok(known) => known.is_file() && known.mode() & 0o7777 == 0o600 && known.uid() == writer,
+        Err(error) => error.kind() == std::io::ErrorKind::NotFound,
+    }
+}
+
+/// A prior process or an early startup failure must leave no speaker proof.
+/// Camera and observation invalidation also clear it before blocking teardown.
+struct KnownSpeakerFile(
+    Option<(PathBuf, lamp_eyes::who::KnownSpeakerPublisher)>,
+    #[cfg(target_os = "linux")] std::cell::RefCell<lamp_eyes::who::DisclosureHold>,
+    #[cfg(target_os = "linux")] Option<lamp_eyes::camera_authority::Service>,
+);
+
+impl KnownSpeakerFile {
+    fn new(path: Option<PathBuf>) -> Self {
+        let source = path.map(|path| {
+            let publisher = lamp_eyes::who::KnownSpeakerPublisher::new(path.clone());
+            publisher.require_camera_ticket();
+            (path, publisher)
+        });
+        #[cfg(target_os = "linux")]
+        let service = source.as_ref().and_then(|(path, publisher)| {
+            if !may_publish_known_speaker(path) {
+                return None;
+            }
+            publisher
+                .publisher_id()
+                .and_then(|id| lamp_eyes::camera_authority::Service::start(path, id).ok())
+        });
+        Self(
+            source,
+            #[cfg(target_os = "linux")]
+            std::cell::RefCell::default(),
+            #[cfg(target_os = "linux")]
+            service,
+        )
+    }
+
+    fn safe(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            self.0
+                .as_ref()
+                .is_some_and(|(path, _)| may_publish_known_speaker(path))
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
+    }
+
+    fn clear(&self) {
+        if let Some((_, publisher)) = &self.0 {
+            if self.safe() {
+                publisher.revoke();
+            } else {
+                publisher.disable();
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn hold_boundary(
+        &self,
+        current: Option<u64>,
+        valid: bool,
+        known: &mut Option<(String, f32, std::time::Instant)>,
+        held: &mut lamp_eyes::who::Held,
+    ) -> bool {
+        let publisher = self.0.as_ref().and_then(|(_, publisher)| {
+            if self.safe() {
+                Some(publisher)
+            } else {
+                publisher.disable();
+                None
+            }
+        });
+        self.1.borrow_mut().frame(
+            valid,
+            current,
+            publisher,
+            self.0.as_ref().map(|(path, _)| path.as_path()),
+            known,
+            held,
+        )
+    }
+
+    #[cfg(target_os = "linux")]
+    fn with_frame<T>(
+        &self,
+        permit: &lamp_eyes::permit::Permit,
+        captured: (Option<u64>, u64),
+        known: &mut Option<(String, f32, std::time::Instant)>,
+        held: &mut lamp_eyes::who::Held,
+        publish: impl FnOnce() -> T,
+    ) -> Option<T> {
+        permit.with_frame_authority(captured.0, captured.1, |current, valid, until| {
+            if let Some((_, publisher)) = &self.0 {
+                publisher.permission_until(until);
+                publisher.camera_ticket(
+                    self.2
+                        .as_ref()
+                        .and_then(|service| service.authority().frame(current, captured.1)),
+                );
+            }
+            self.hold_boundary(current, valid, known, held)
+                .then(publish)
+        })
+    }
+
+    /// A guarded save still changes whose face is kept. Withdraw any private
+    /// disclosure grant before capture, independently of enrollment authority.
+    #[cfg(target_os = "linux")]
+    fn speaker_capture(
+        &self,
+        name: String,
+        request: &lamp_eyes::remember_speaker::Request,
+        guard: lamp_eyes::remember_speaker::Guard,
+        now_us: u64,
+    ) -> lamp_eyes::who::Taking {
+        self.clear();
+        let mut taking = lamp_eyes::who::Taking::new(name, now_us);
+        taking.one_face = Some(request.replace);
+        taking.apart = request.apart;
+        taking.speaker = Some(guard);
+        taking
+    }
+
+    /// The existing empty-room optimizer may skip a detector for 3 s, longer
+    /// than its source freshness. A usable source still needs a real look at
+    /// the existing recognition cadence; a disabled source adds no work.
+    #[cfg(any(target_os = "linux", test))]
+    fn needs_refresh(
+        &self,
+        last: Option<std::time::Instant>,
+        now: std::time::Instant,
+        every: std::time::Duration,
+    ) -> bool {
+        self.0
+            .as_ref()
+            .is_some_and(|(_, publisher)| publisher.enabled())
+            && last.is_none_or(|last| now.saturating_duration_since(last) >= every)
+    }
+
+    #[cfg(any(target_os = "linux", test))]
+    fn seen(
+        &self,
+        name: Option<&str>,
+        id: Option<&str>,
+        boot: Option<&str>,
+        face: Option<&str>,
+        frame_us: u64,
+    ) {
+        if let Some((_, publisher)) = &self.0 {
+            if !self.safe() {
+                publisher.disable();
+                return;
+            }
+            match (name, boot, face) {
+                (Some(name), Some(boot), Some(face)) => {
+                    publisher.seen_frame(name, id, boot, face, frame_us)
+                }
+                _ => publisher.revoke(),
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn no_detection(&self, boot: Option<&str>) {
+        if let Some((_, publisher)) = &self.0 {
+            if !self.safe() {
+                publisher.disable();
+                return;
+            }
+            match boot {
+                Some(boot) => publisher.no_detection(boot),
+                None => publisher.revoke(),
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn begin_look(
+        &self,
+        permit: &lamp_eyes::permit::Permit,
+        captured: (Option<u64>, u64),
+        known: &mut Option<(String, f32, std::time::Instant)>,
+        held: &mut lamp_eyes::who::Held,
+        look: lamp_eyes::who::RecognitionLook<'_>,
+    ) -> bool {
+        permit.with_frame_authority(captured.0, captured.1, |current, valid, until| {
+            if !self.hold_boundary(current, valid, known, held) {
+                return false;
+            }
+            let publisher = self.0.as_ref().and_then(|(_, publisher)| {
+                if self.safe() {
+                    Some(publisher)
+                } else {
+                    publisher.disable();
+                    None
+                }
+            });
+            if let Some(publisher) = publisher {
+                publisher.permission_until(until);
+                publisher.camera_ticket(
+                    self.2
+                        .as_ref()
+                        .and_then(|service| service.authority().frame(current, captured.1)),
+                );
+            }
+            let may_refresh = matches!(
+                look.observation,
+                lamp_eyes::who::RecognitionObservation::Visible
+            ) && !look.taking;
+            let recognise = lamp_eyes::who::begin_recognition_look(
+                publisher,
+                self.0.as_ref().map(|(path, _)| path.as_path()),
+                known,
+                held,
+                look,
+            );
+            recognise
+                || (may_refresh
+                    && publisher.is_some_and(|publisher| {
+                        !publisher.refresh_authority(lamp_ipc::monotonic_us())
+                    }))
+        })
+    }
+}
+
+impl Drop for KnownSpeakerFile {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
 fn main() -> std::process::ExitCode {
     // Its log lines never block it or end it, and its last ones reach the
     // journal (`lamp_ipc::log_relay`).
@@ -507,6 +786,7 @@ fn main() -> std::process::ExitCode {
             return std::process::ExitCode::from(2);
         }
     };
+    let known_speaker = KnownSpeakerFile::new(arguments.known_file.clone());
     if let Err(error) = diagnostic_requirements(
         arguments.mouth_diagnostics,
         std::env::var("LAMP_BUS").ok().as_deref() == Some("on"),
@@ -515,7 +795,7 @@ fn main() -> std::process::ExitCode {
         eprintln!("{error}");
         return std::process::ExitCode::from(2);
     }
-    match run(arguments) {
+    match run(arguments, known_speaker) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("lamp-eyes failed: {error}");
@@ -607,13 +887,19 @@ fn ask_helper(helper: Option<&Path>, failed: u32, asked: &mut Option<u64>) {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let _ = arguments;
+fn run(
+    arguments: Arguments,
+    known_speaker: KnownSpeakerFile,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let _ = (arguments, known_speaker);
     Err("the eyes require Linux; no camera was opened".into())
 }
 
 #[cfg(target_os = "linux")]
-fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn run(
+    arguments: Arguments,
+    known_speaker: KnownSpeakerFile,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // An explicitly requested diagnostic must have a usable judge and bus
     // before loading models or opening sockets/camera. Off keeps the old order.
     let diagnostic_bus = if arguments.mouth_diagnostics {
@@ -1173,7 +1459,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut still = arguments.leave_still.then(lamp_eyes::still::Still::default);
     let mut epoch = 0u64;
     let mut port: Option<LinuxPort> = None;
-    let permit = lamp_eyes::permit::Permit::listen(permits)?;
+    let permit = lamp_eyes::permit::Permit::listen_with_authority(
+        permits,
+        known_speaker.2.as_ref().map(|service| service.authority()),
+    )?;
     // The receipt the voice asked for a close, said once the camera is shut.
     let mut receipt = lamp_eyes::permit::CloseReceipt::default();
     let mut retry_at = Instant::now();
@@ -1183,6 +1472,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // When that frame was captured, monotonic µs: a photo yes is looked at
     // only on a frame from after it (#2856).
     let mut latest_us = 0u64;
+    // Captured when bytes leave the driver, not when a queued look is used.
+    let mut latest_hold = None;
     let mut looked_at = Instant::now();
     let mut face_at: Option<Instant> = None;
     // When any face was last found, even one too small to follow: with
@@ -1236,6 +1527,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut aside_counted: Option<Instant> = None;
     eprintln!("lamp-eyes: ready; the camera stays closed until it is permitted");
     loop {
+        // No old observation is usable while permission or the camera is absent,
+        // including before any request socket work on this turn of the loop.
+        let current_hold = port.as_ref().and(permit.held());
+        if let Some(who) = who.as_mut() {
+            known_speaker.hold_boundary(
+                current_hold,
+                current_hold.is_some(),
+                &mut who.known,
+                &mut who.held,
+            );
+        } else if current_hold.is_none() {
+            known_speaker.clear();
+        }
         // A still is there for the one request it was taken for, and no
         // longer: first on every turn, before anything that skips the rest.
         if still_at
@@ -1362,6 +1666,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             .unwrap_or_default(),
                     }),
                     Some(Ask::Forget(name)) => {
+                        known_speaker.clear();
                         if who.remember_speaker {
                             who.speaker_anchors.clear();
                             if who
@@ -1538,6 +1843,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     // asked; with `LAMP_PHOTO_SPEAKER=on`, only with the id
                     // of the face that matched the photo (#2856).
                     Some(Ask::PhotoYes { name, face }) => {
+                        known_speaker.clear();
                         let here = lamp_eyes::photo::is_here(
                             who.photo_here
                                 .as_ref()
@@ -1625,10 +1931,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             match who.speaker_anchors.begin(&request, now, permit.held()) {
                                 Err(error) => serde_json::json!({"error": error}),
                                 Ok(guard) => {
-                                    let mut taking = Taking::new(name, now);
-                                    taking.one_face = Some(request.replace);
-                                    taking.apart = request.apart;
-                                    taking.speaker = Some(guard);
+                                    let taking =
+                                        known_speaker.speaker_capture(name, &request, guard, now);
                                     who.taking = Some((taking, stream));
                                     continue;
                                 }
@@ -1644,6 +1948,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     Some(Ask::Remember(name)) => match plain_name(&name) {
                         Some(name) => {
                             eprintln!("lamp-eyes: asked to remember a face");
+                            known_speaker.clear();
                             who.taking =
                                 Some((Taking::new(name, lamp_ipc::monotonic_us()), stream));
                             continue;
@@ -1663,6 +1968,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             let mut taking = Taking::new(name, lamp_ipc::monotonic_us());
                             taking.one_face = Some(replace);
                             taking.apart = apart;
+                            known_speaker.clear();
                             who.taking = Some((taking, stream));
                             continue;
                         }
@@ -1745,6 +2051,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             taking.apart,
                         ),
                     };
+                    known_speaker.clear();
                     lamp_eyes::who::after_remembering(&mut who.looked_for, kept.is_ok());
                     let reply = kept_reply(kept, who.visits, who.people.names().len());
                     answer(&mut stream, reply);
@@ -1791,6 +2098,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             }
         }
         if !permit.holds() {
+            known_speaker.clear();
             if let Some(mut open) = port.take() {
                 receipt.stopped(open.stop(budget(STOP)));
                 eprintln!("lamp-eyes: camera closed: not permitted");
@@ -1831,6 +2139,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             continue;
         }
         if port.is_none() {
+            known_speaker.clear();
             if Instant::now() < retry_at {
                 std::thread::sleep(Duration::from_millis(50));
                 continue;
@@ -2036,6 +2345,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         newest = got.bytes_used.min(frame.len());
                         latest = Some(newest);
                         latest_us = lamp_eyes::photo::frame_us(got.timestamp);
+                        latest_hold = permit.frame_hold(latest_us);
                     }
                     Ok(None) => break,
                     Err(error) => {
@@ -2046,6 +2356,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             }
         }
         if let Some(error) = failed {
+            known_speaker.clear();
             eprintln!("lamp-eyes: camera failed: {error:?}; closing it");
             camera = lamp_eyes::bus_out::Camera::Failed;
             if let Some(mut open) = port.take() {
@@ -2130,6 +2441,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             )
             && let Some(mut open) = port.take()
         {
+            known_speaker.clear();
             let tries = upgrade.tried();
             eprintln!(
                 "lamp-eyes: closing the camera to try the full size again (try {tries}); at the working size if it does not open"
@@ -2171,7 +2483,22 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         {
             latest = None;
             let frame_us = latest_us;
-            let frame_hold = permit.held();
+            let frame_hold = latest_hold;
+            if let Some(who) = who.as_mut()
+                && known_speaker
+                    .with_frame(
+                        &permit,
+                        (frame_hold, frame_us),
+                        &mut who.known,
+                        &mut who.held,
+                        || (),
+                    )
+                    .is_none()
+            {
+                // Neither bytes queued before regrant nor a stale held token
+                // may start inference or seed a new private disclosure epoch.
+                continue;
+            }
             looked_at = Instant::now();
             let mut stage_at = looked_at;
             let stage = |at: &mut Instant, into: &mut Duration| {
@@ -2245,6 +2572,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     &picture,
                     busy,
                     lamp_ipc::monotonic_us(),
+                ) || known_speaker.needs_refresh(
+                    who.as_ref().and_then(|who| who.looked_for), Instant::now(), lamp_eyes::who::RECOGNISE_EVERY,
                 );
                 stage(&mut stage_at, &mut stages[2]);
                 // A frame like the last one the detector ran on, with
@@ -2259,6 +2588,48 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 };
                 faces
                     .map(|mut faces| {
+                        if let Some(who) = who.as_mut()
+                            && known_speaker.with_frame(
+                                &permit,
+                                (frame_hold, frame_us),
+                                &mut who.known,
+                                &mut who.held,
+                                || (),
+                            ).is_none()
+                        {
+                            return None;
+                        }
+                        // A skipped detector is not a fresh no-detection
+                        // observation, even if its grid looked unchanged.
+                        let observation = lamp_eyes::who::RecognitionObservation::detected(
+                            detect,
+                            faces.len(),
+                        );
+                        let no_detection =
+                            observation == lamp_eyes::who::RecognitionObservation::Empty;
+                        // Real raw absence revokes legacy and held identity
+                        // before filtering, mesh work or the recognition timer.
+                        let empty_recognise = no_detection.then(|| {
+                            who.as_mut().is_some_and(|who| {
+                                known_speaker.begin_look(
+                                    &permit,
+                                    (frame_hold, frame_us),
+                                    &mut who.known,
+                                    &mut who.held,
+                                    lamp_eyes::who::RecognitionLook {
+                                        frame_us,
+                                        now_us: lamp_ipc::monotonic_us(),
+                                        observation,
+                                        camera_open: permit.holds() && port.is_some(),
+                                        boot: bus_out.as_ref().and_then(|bus| bus.speaking_boot()),
+                                        face: None,
+                                        looked_for: who.looked_for,
+                                        taking: who.taking.is_some(),
+                                        now: Instant::now(),
+                                    },
+                                )
+                            })
+                        });
                         if let Some(still) = still.as_mut() {
                             let now_us = lamp_ipc::monotonic_us();
                             faces.retain(|face| {
@@ -2347,17 +2718,80 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         }
                                     }
                                     Ok(None) => {}
-                                    Err(error) => eprintln!("lamp-eyes: mouth not read: {error}"),
+                                    Err(error) => {
+                                        known_speaker.clear();
+                                        eprintln!("lamp-eyes: mouth not read: {error}");
+                                    }
                                 }
                             }
                         }
+                        let now = lamp_ipc::monotonic_us();
+                        // Mesh work can outlast this frame's camera hold.
+                        // Revoke its identity before publishing any fresh bus
+                        // evidence, under the listener's same permission lock.
+                        permit.publish_observation(
+                            frame_hold,
+                            frame_us,
+                            |current, valid| {
+                                who.as_mut().map_or(valid, |who| {
+                                    known_speaker.hold_boundary(
+                                        current, valid, &mut who.known, &mut who.held,
+                                    )
+                                })
+                            },
+                            || {
+                                if let Some(bus) = bus_out.as_mut() {
+                                    bus.set_mesh_scale(mesh_scale);
+                                    bus.saw(&faces, &opens, picture.filled, now);
+                                    if let Some(answered) = answered.as_mut() {
+                                        answered.looked(now, bus.talking());
+                                    }
+                                }
+                            },
+                        )?;
+                        let tall = picture.filled.1.max(1) as f32;
+                        let heights: Vec<f32> =
+                            faces.iter().map(|face| face.height / tall).collect();
+                        let near = faces
+                            .iter()
+                            .zip(&heights)
+                            .enumerate()
+                            .filter(|(_, (_, height))| **height >= NEAR_ENOUGH)
+                            .max_by(|a, b| a.1.1.total_cmp(b.1.1));
+                        // That face's passing id, while speaking is
+                        // judged: whose mouth the known name goes with.
+                        let near_id = near.and_then(|(index, _)| {
+                            bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
+                        });
+                        let near_boot = bus_out
+                            .as_ref()
+                            .and_then(|bus| bus.speaking_boot())
+                            .map(str::to_owned);
+                        // Every real raw empty look withdraws identity now,
+                        // outside the recognition cadence. A return writes
+                        // Checking before activity or recognition print work.
+                        let recognise = empty_recognise.unwrap_or_else(|| {
+                            who.as_mut().is_some_and(|who| {
+                                known_speaker.begin_look(
+                                    &permit,
+                                    (frame_hold, frame_us),
+                                    &mut who.known,
+                                    &mut who.held,
+                                    lamp_eyes::who::RecognitionLook {
+                                        frame_us,
+                                        now_us: lamp_ipc::monotonic_us(),
+                                        observation,
+                                        camera_open: permit.holds() && port.is_some(),
+                                        boot: near_boot.as_deref(),
+                                        face: near_id.as_deref(),
+                                        looked_for: who.looked_for,
+                                        taking: who.taking.is_some(),
+                                        now: Instant::now(),
+                                    },
+                                )
+                            })
+                        });
                         if let Some(bus) = bus_out.as_mut() {
-                            let now = lamp_ipc::monotonic_us();
-                            bus.set_mesh_scale(mesh_scale);
-                            bus.saw(&faces, &opens, picture.filled, now);
-                            if let Some(answered) = answered.as_mut() {
-                                answered.looked(now, bus.talking());
-                            }
                             // The sitter told from others by face (#1678's
                             // (d)): a print held in memory only.
                             if let Some(who) = who.as_ref()
@@ -2366,42 +2800,30 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 let print = faces
                                     .get(index)
                                     .and_then(|face| align(&picture, &face.marks))
-                                    .and_then(|aligned| who.recogniser.print(&aligned).ok());
+                                    .and_then(|aligned| match who.recogniser.print(&aligned) {
+                                        Ok(print) => Some(print),
+                                        Err(_) => { known_speaker.clear(); None }
+                                    });
                                 bus.activity_printed(now, print.as_deref());
                             }
                         }
                         // Whose the near face is, when it is time to ask or
                         // someone is being remembered.
                         if let Some(who) = who.as_mut()
-                            && lamp_eyes::who::recognise_due(
-                                who.looked_for,
-                                who.taking.is_some(),
-                                Instant::now(),
-                            )
+                            && recognise
                         {
                             who.looked_for = Some(Instant::now());
-                            let tall = picture.filled.1.max(1) as f32;
-                            let heights: Vec<f32> =
-                                faces.iter().map(|face| face.height / tall).collect();
-                            let near = faces
-                                .iter()
-                                .zip(&heights)
-                                .enumerate()
-                                .filter(|(_, (_, height))| **height >= NEAR_ENOUGH)
-                                .max_by(|a, b| a.1.1.total_cmp(b.1.1));
-                            // That face's passing id, while speaking is
-                            // judged: whose mouth the known name goes with.
-                            let near_id = near.and_then(|(index, _)| {
-                                bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
-                            });
                             let print = near
                                 .and_then(|(_, (face, _))| match full_frame.as_ref().filter(|_| full_crop) {
                                     Some(full) => lamp_eyes::who::align_full(full, &face.marks),
                                     None => align(&picture, &face.marks),
                                 })
-                                .and_then(|aligned| who.recogniser.print(&aligned).ok());
-                            // Each check with a face in view, at most every
-                            // two seconds: the best likeness and the largest
+                                .and_then(|aligned| match who.recogniser.print(&aligned) {
+                                    Ok(print) => Some(print),
+                                    Err(_) => { known_speaker.clear(); None }
+                                });
+                            // Each recognition check with a face in view:
+                            // the best likeness and the largest
                             // face's height, never a name.
                             if who.taking.is_none()
                                 && let Some(tallest) = heights.iter().copied().reduce(f32::max)
@@ -2414,6 +2836,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     "lamp-eyes: recognition best {best} height {tallest:.3} (near at {NEAR_ENOUGH}, same at {})",
                                     lamp_eyes::who::SAME_PERSON
                                 );
+                            }
+                            if print.is_none() && !no_detection {
+                                // Raw absence was already handled before this
+                                // cadence gate. Failed or unprintable visible
+                                // faces cannot inherit the held name's proof.
+                                known_speaker.clear();
                             }
                             let near_face = near_id
                                 .as_ref()
@@ -2442,6 +2870,20 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     .people
                                     .who(&print)
                                     .map(|(name, likeness)| (name, likeness, now));
+                                // Speaker proof uses this completed match, never
+                                // the visual name retained by the crop hold below.
+                                // Revoke before slower photo/visit/store work.
+                                let name = found.as_ref().map(|known| known.0.as_str());
+                                let id = name.and_then(|name| who.people.id_of(name));
+                                // A result across expiry/regrant is discarded;
+                                // only a new capture can identify again.
+                                known_speaker.with_frame(
+                                    &permit,
+                                    (frame_hold, frame_us),
+                                    &mut who.known,
+                                    &mut who.held,
+                                    || known_speaker.seen(name, id.as_deref(), near_boot.as_deref(), near_id.as_deref(), frame_us),
+                                )?;
                                 // Nobody who asked: a face from a photo, maybe,
                                 // never named, only noted so the voice can ask.
                                 if found.is_none() {
@@ -2502,14 +2944,20 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     }
                                 }
                                 if let Some(path) = arguments.known_file.as_ref().filter(|_| !held) {
-                                    let name = who.known.as_ref().map(|known| known.0.as_str());
-                                    let id = name.and_then(|name| who.people.id_of(name));
-                                    lamp_eyes::who::keep_known(
-                                        path,
-                                        name,
-                                        id.as_deref(),
-                                        near_id.as_deref(),
-                                    );
+                                    let name = who.known.as_ref().map(|known| known.0.clone());
+                                    let id = name.as_deref().and_then(|name| who.people.id_of(name));
+                                    known_speaker.with_frame(
+                                        &permit,
+                                        (frame_hold, frame_us),
+                                        &mut who.known,
+                                        &mut who.held,
+                                        || lamp_eyes::who::keep_known_legacy(
+                                            path,
+                                            name.as_deref(),
+                                            id.as_deref(),
+                                            near_id.as_deref(),
+                                        ),
+                                    )?;
                                 }
                             } else if who.known.is_some()
                                 && who.held.keeps_unprinted(
@@ -2533,7 +2981,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     who.known = None;
                                 }
                                 if let Some(path) = &arguments.known_file {
-                                    lamp_eyes::who::keep_known(path, None, None, None);
+                                    lamp_eyes::who::keep_known_legacy(path, None, None, None);
                                 }
                                 if who.visits
                                     && let Some(bus) = bus_out.as_mut()
@@ -2792,6 +3240,27 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     }
                 }
                 Err(_) => {
+                    if let Some(who) = who.as_mut() {
+                        known_speaker.begin_look(
+                            &permit,
+                            (frame_hold, frame_us),
+                            &mut who.known,
+                            &mut who.held,
+                            lamp_eyes::who::RecognitionLook {
+                                frame_us,
+                                now_us: lamp_ipc::monotonic_us(),
+                                observation: lamp_eyes::who::RecognitionObservation::Failed,
+                                camera_open: permit.holds() && port.is_some(),
+                                boot: None,
+                                face: None,
+                                looked_for: who.looked_for,
+                                taking: who.taking.is_some(),
+                                now: Instant::now(),
+                            },
+                        );
+                    } else {
+                        known_speaker.clear();
+                    }
                     unreadable += 1;
                     if let Some((taking, _)) = who.as_mut().and_then(|who| who.taking.as_mut())
                         && taking.speaker.is_some()
@@ -2938,6 +3407,209 @@ mod tests {
                 .is_some()
         );
         assert!(parse(args(&[&FULL[..], &runtime[..]].concat())).is_err());
+    }
+
+    #[test]
+    fn speaker_observation_requires_private_volatile_runtime_storage() {
+        assert!(private_runtime_source(
+            Path::new("/run/lampos-eyes"),
+            true,
+            0o755,
+            7,
+            7
+        ));
+        for (parent, volatile, mode, owner, writer) in [
+            ("/var/lib/lampos-eyes", true, 0o755, 7, 7),
+            ("/run/../var/lib/lampos-eyes", true, 0o755, 7, 7),
+            ("/run/lampos-eyes", false, 0o755, 7, 7),
+            ("/run/lampos-eyes", true, 0o777, 7, 7),
+            ("/run/lampos-eyes", true, 0o755, 7, 8),
+        ] {
+            assert!(!private_runtime_source(
+                Path::new(parent),
+                volatile,
+                mode,
+                owner,
+                writer
+            ));
+        }
+    }
+
+    #[test]
+    fn a_live_known_source_requires_real_refresh_before_its_freshness_expires() {
+        use std::time::{Duration, Instant};
+        let root = std::env::temp_dir().join(format!("eyes-source-refresh-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir(&root).unwrap();
+        let source = KnownSpeakerFile::new(Some(root.join("known")));
+        let now = Instant::now();
+        let cadence = Duration::from_secs(2);
+        assert!(source.needs_refresh(None, now, cadence));
+        assert!(!source.needs_refresh(Some(now), now + Duration::from_millis(1999), cadence));
+        assert!(source.needs_refresh(Some(now), now + cadence, cadence));
+        // Skipped looks never change this deadline; only the real recognition
+        // path updates looked_for. A failed/disabled source retains optimization.
+        assert!(source.needs_refresh(Some(now), now + Duration::from_secs(3), cadence));
+        source.clear(); // Synthetic non-/run storage fails closed.
+        assert!(!source.needs_refresh(None, now + cadence, cadence));
+        assert!(!KnownSpeakerFile::new(None).needs_refresh(None, now + cadence, cadence));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn speaker_runtime_allows_product_0755_but_never_shared_write_or_persistent_storage() {
+        for mode in [0o700, 0o755] {
+            assert!(private_runtime_source(
+                Path::new("/run/lampos-eyes"),
+                true,
+                mode,
+                7,
+                7
+            ));
+        }
+        for mode in [0o777, 0o775, 0o757, 0o600] {
+            assert!(!private_runtime_source(
+                Path::new("/run/lampos-eyes"),
+                true,
+                mode,
+                7,
+                7
+            ));
+        }
+        let root = std::env::temp_dir().join(format!("eyes-unsafe-source-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir(&root).unwrap();
+        let known = root.join("known");
+        let source = KnownSpeakerFile::new(Some(known.clone()));
+        source.seen(
+            Some("Alpha"),
+            None,
+            Some("0123456789abcdef"),
+            Some("f3"),
+            lamp_ipc::monotonic_us(),
+        );
+        source.no_detection(Some("0123456789abcdef"));
+        assert!(
+            !lamp_eyes::who::known_speaker_of(&known).exists(),
+            "an unsafe parent cannot enable absence after legacy known is missing"
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard() {
+        use std::os::unix::fs::PermissionsExt;
+        let root =
+            std::env::temp_dir().join(format!("eyes-guarded-disclosure-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let known = root.join("known");
+        let source = lamp_eyes::who::known_speaker_of(&known);
+        let file = KnownSpeakerFile::new(Some(known));
+        const BOOT: &str = "0123456789abcdef";
+        // A synthetic temp path cannot hold a runtime camera ticket. Keep
+        // this denied publication as a negative control, then model an
+        // untrusted stale source that capture admission must remove.
+        file.0.as_ref().unwrap().1.seen("Alpha", None, BOOT, "f3");
+        assert!(
+            !source.exists(),
+            "ticket-required runtime publication cannot create authority without a live ticket"
+        );
+        // This opaque legacy fixture is not valid V3 proof or live authority.
+        std::fs::write(&source, br#"{"state":"seen"}"#).unwrap();
+        let before: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&source).unwrap()).unwrap();
+        assert_eq!(before["state"], "seen");
+        let mut anchors = lamp_eyes::remember_speaker::Anchors::default();
+        let mut print = vec![0.0; 128];
+        print[0] = 1.0;
+        anchors.refresh(1_000_000, Some(1));
+        anchors.observe(
+            &format!("{BOOT}/f3"),
+            &print,
+            2_000_000,
+            2_010_000,
+            Some(1),
+            Some(1),
+        );
+        let request = lamp_eyes::remember_speaker::Request {
+            name: "Beta".into(),
+            face: format!("{BOOT}/f3"),
+            began_us: 1_000_000,
+            ended_us: 3_000_000,
+            replace: true,
+            apart: true,
+        };
+        let guard = anchors.begin(&request, 3_100_000, Some(1)).unwrap();
+        let mut taking = file.speaker_capture("Beta".into(), &request, guard, 3_100_000);
+        assert!(
+            !source.exists(),
+            "capture admission must remove unsafe-path proof before collecting prints"
+        );
+        assert!(!file.0.as_ref().unwrap().1.enabled());
+        assert_eq!(taking.one_face, Some(true));
+        assert!(taking.apart && taking.taken().is_none());
+        assert!(
+            taking
+                .speaker
+                .as_ref()
+                .unwrap()
+                .checked(3_100_000, Some(1), false)
+                .is_ok()
+        );
+        // The disclosure-only revocation must not change the valid capture's
+        // own permission, subject or five-fresh-print requirement.
+        for frame in 0..5 {
+            let at = 3_200_000 + frame * 100_000;
+            taking.look_seen(
+                &[0.3],
+                Some(print.clone()),
+                Some(&request.face),
+                at,
+                at,
+                Some(1),
+            );
+        }
+        assert_eq!(taking.taken().unwrap().len(), 5);
+        assert!(
+            !source.exists(),
+            "capture permission does not restore disclosure authority"
+        );
+        drop(file);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn known_speaker_proof_is_cleared_at_startup_invalidation_and_exit() {
+        let root = std::env::temp_dir().join(format!("eyes-proof-clear-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let known = root.join("known");
+        let path = lamp_eyes::who::known_speaker_of(&known);
+        let publish = || {
+            lamp_eyes::who::keep_known_speaker(
+                &known,
+                Some("Alpha"),
+                None,
+                Some("0123456789abcdef"),
+                Some("f3"),
+            )
+        };
+        publish();
+        assert!(path.exists());
+        {
+            let file = KnownSpeakerFile::new(Some(known.clone()));
+            assert!(!path.exists(), "startup kept a prior process's proof");
+            publish();
+            file.clear();
+            assert!(!path.exists(), "invalidation kept a proof");
+            publish();
+            assert!(path.exists());
+        }
+        assert!(!path.exists(), "exit kept a proof");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

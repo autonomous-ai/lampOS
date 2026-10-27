@@ -27,6 +27,7 @@ pub mod answered;
 pub mod away;
 pub mod blendshapes;
 pub mod bus_out;
+pub mod camera_authority;
 pub mod camera_helper;
 pub mod change;
 pub mod face_repair;

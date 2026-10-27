@@ -507,3 +507,21 @@ that control setup must leave unchanged. Darwin descriptor garbage collection
 can change its internal FMARK bit while unrelated rights close, so whole-status
 flag equality is not an application invariant. The original seventeen controls,
 fixed deadlines and exact-once frame/descriptor assertions remain.
+
+Camera grant CONTROL framing and OBSERVER authority have separate validation.
+The caller authenticates the connected control peer before the challenge; each
+transfer still requires a native UNIX STREAM. Both control write halves may
+already be closed before queued bytes/rights are consumed: Darwin can return
+EINVAL from getpeername at that point despite a valid queued reply and EOF.
+Control parsing therefore does not require a still-connected peer. The received
+observer keeps strict connected-UNIX/type/CLOEXEC and post-handshake silent-open
+checks; source/capture/request/expiry guards remain independent. No generic
+EINVAL acceptance or deadline extension. The named-socket/two-observer control covers queued rights and EOF after both
+control write halves close; source-scoped gate results are tracked on
+[#3064](https://github.com/autonomous-ai/lampOS/pull/3064).
+
+The Eyes opaque-name fixture preserves exact byte-path checks. Linux must bind
+that actual opaque name; macOS uses it too when supported. Only a native EILSEQ
+refusal allows a separate real ASCII endpoint for every existing-server and
+replacement-inode check; every other startup error still fails the fixture.
+This adapts a host filesystem fixture without changing production path policy.
