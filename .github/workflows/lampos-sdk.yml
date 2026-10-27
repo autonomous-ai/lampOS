@@ -1,0 +1,71 @@
+name: lampOS SDKs
+
+# The developer SDKs (lampOS/sdk/python, lampOS/sdk/js, #3504): they run on a
+# developer's computer, never on a lamp, so the Rust workflows don't reach
+# them. Their tests run against each SDK's own fake lamp; each checks its
+# copy of docs/control.schema.json against the repository's, and the
+# `copies` job fails at once if the three differ: a schema change that missed
+# a copy broke #3759 and #3805 on 27 Oct, with no job to catch it (the
+# coordinator's decision, with blue's person, on #3504).
+on:
+  pull_request:
+    branches: [lamp-voice]
+    paths:
+      - 'lampOS/sdk/**'
+      - 'lampOS/docs/control*'
+      - '.github/workflows/lampos-sdk.yml'
+  push:
+    branches: [lamp-voice]
+    paths:
+      - 'lampOS/sdk/**'
+      - 'lampOS/docs/control*'
+      - '.github/workflows/lampos-sdk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  copies:
+    name: lampOS SDK — schema copies equal docs/control.schema.json
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Each SDK's copy is the doc's, byte for byte
+        run: |
+          status=0
+          for copy in lampOS/sdk/python/src/lampos/control.schema.json lampOS/sdk/js/src/control.schema.json; do
+            if ! cmp -s lampOS/docs/control.schema.json "$copy"; then
+              echo "::error file=$copy::differs from lampOS/docs/control.schema.json: cp lampOS/docs/control.schema.json $copy"
+              status=1
+            fi
+          done
+          exit $status
+
+  python:
+    name: lampOS SDK — Python (pytest)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: lampOS/sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[test]'
+      - run: python -m pytest -q tests
+
+  js:
+    name: lampOS SDK — JavaScript (node --test)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: lampOS/sdk/js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund --omit=optional
+      - run: npm test
