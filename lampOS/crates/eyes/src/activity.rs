@@ -188,6 +188,11 @@ pub struct Judge {
     lost_said_for: Option<u64>,
     /// With the recogniser: the sitter's prints, and what is asked for.
     prints: Option<Prints>,
+    /// This sitting's yawns (`yawn`, #3709): a count, nothing else.
+    yawns: u32,
+    /// The face-expressions yes is not kept: no yawn counts, and the count
+    /// is 0 ([`Judge::yawns_allowed`]).
+    yawns_refused: bool,
 }
 
 /// The sitter's prints, for this sitting only, and the print asked for.
@@ -321,6 +326,7 @@ impl Judge {
         });
         if new_sitting {
             self.sitting_from = Some(now_us);
+            self.yawns = 0;
             self.samples.clear();
             self.baseline = None;
             self.recent.clear();
@@ -398,6 +404,19 @@ impl Judge {
     pub fn forget_prints(&mut self) {
         if let Some(prints) = self.prints.as_mut() {
             *prints = Prints::default();
+        }
+        // The camera closed, or the sitting's gap passed: what the face gave
+        // goes with the prints (Reviewer-three on #3842).
+        self.yawns = 0;
+    }
+
+    /// Whether the face-expressions yes is kept, as the eyes last read it:
+    /// without it the sitting's yawns are forgotten at once and none counts
+    /// until it is back (Fourteen and the reviewer-lead on #3842).
+    pub fn yawns_allowed(&mut self, yes: bool) {
+        self.yawns_refused = !yes;
+        if !yes {
+            self.yawns = 0;
         }
     }
 
@@ -498,6 +517,18 @@ impl Judge {
         (lost_at < u64::MAX / 2).then_some(StoodUp { sitting_s, side })
     }
 
+    /// A yawn seen at `now_us` (`yawn::Yawns`): counted in the sitting, if
+    /// someone is at the desk.
+    pub fn yawned(&mut self, now_us: u64) {
+        if !self.yawns_refused
+            && self
+                .last_face
+                .is_some_and(|last| now_us.saturating_sub(last) < AWAY_AFTER_US)
+        {
+            self.yawns = self.yawns.saturating_add(1);
+        }
+    }
+
     /// What the face at the desk shows at `now_us`, while the eyes look.
     pub fn now(&mut self, now_us: u64) -> Option<RoomActivity> {
         // Before anything else, so the prints go with the sitting whether or
@@ -534,6 +565,11 @@ impl Judge {
             for_s: (now_us.saturating_sub(since) / 1_000_000) as u32,
             sitting_s,
             baseline: self.baseline.is_some() && state != Activity::Away,
+            yawns: if state == Activity::Away {
+                0
+            } else {
+                self.yawns
+            },
         })
     }
 
@@ -598,6 +634,52 @@ mod tests {
         let mut judge = Judge::default();
         looks(&mut judge, 0, 125, Some(SEATED));
         judge
+    }
+
+    /// A sitting's yawns (#3709): counted while someone sits, none while
+    /// away, and a new sitting begins at none.
+    #[test]
+    fn yawns_are_the_sittings_and_go_with_it() {
+        let mut judge = Judge::default();
+        judge.yawned(0);
+        looks(&mut judge, 0, 10, Some(SEATED));
+        assert_eq!(judge.now(10 * S).unwrap().yawns, 0, "none before a face");
+        judge.yawned(10 * S);
+        judge.yawned(10 * S);
+        assert_eq!(judge.now(10 * S).unwrap().yawns, 2);
+        // Away: none said, and a yawn then is nobody's.
+        looks(&mut judge, 10, 40, None);
+        let away = judge.now(40 * S).unwrap();
+        assert_eq!((away.state, away.yawns), (Activity::Away, 0));
+        judge.yawned(40 * S);
+        // Back within the gap: the same sitting, its two yawns.
+        looks(&mut judge, 40, 50, Some(SEATED));
+        assert_eq!(judge.now(50 * S).unwrap().yawns, 2);
+        // Gone past the gap: a new sitting, with none.
+        looks(&mut judge, 50, 200, None);
+        looks(&mut judge, 200, 210, Some(SEATED));
+        assert_eq!(judge.now(210 * S).unwrap().yawns, 0);
+    }
+
+    /// The face-expressions yes withdrawn mid-sitting: the count is 0 at
+    /// once, a yawn then counts nothing, and with the yes back they count
+    /// again from 0. A camera close forgets it too (#3842).
+    #[test]
+    fn yawns_go_with_the_yes_and_with_the_camera() {
+        let mut judge = Judge::default();
+        looks(&mut judge, 0, 10, Some(SEATED));
+        judge.yawned(10 * S);
+        judge.yawned(10 * S);
+        assert_eq!(judge.now(10 * S).unwrap().yawns, 2);
+        judge.yawns_allowed(false);
+        assert_eq!(judge.now(10 * S).unwrap().yawns, 0);
+        judge.yawned(11 * S);
+        assert_eq!(judge.now(11 * S).unwrap().yawns, 0, "not while withdrawn");
+        judge.yawns_allowed(true);
+        judge.yawned(12 * S);
+        assert_eq!(judge.now(12 * S).unwrap().yawns, 1);
+        judge.forget_prints();
+        assert_eq!(judge.now(12 * S).unwrap().yawns, 0, "the camera closed");
     }
 
     #[test]

@@ -2258,6 +2258,49 @@ few prints above, on frames the eyes already have: no model or frame is
 added. Its cost on a lamp is #1678's CPU run; how well the states are told
 apart is its scripted sitting.
 
+#### A sitting's yawns (`LAMP_EYES_YAWN=on`, #3709)
+
+With `LAMP_EYES_YAWN=on`, `--mouth-model` and `--seems-blendshapes` (as
+the product runs), the eyes count the largest face's yawns into the
+sitting, said as `yawns` on `room/activity` (left out at 0). This is the
+largest face's count, whoever that is: a visitor's yawn goes into the
+sitting's count too. It is a guess at a yawn from the mouth's shape, not a
+reading of how tired anyone is.
+
+**The yes:** they count only while the face-expressions yes that gates
+`humans/seems` is kept, checked at most every 2 s. When the yes is
+withdrawn, the sitting's count goes to 0 at once, and no yawn counts until
+the yes is back. A closed camera forgets the count too, as it forgets the
+sitter's prints. Without either model the journal says so, and no yawn is
+counted.
+
+**What counts as a yawn** (`yawn.rs`): the mouth held at `mouth_open`
+0.08 or wider for 1.5 s, over at least four looks with no more than one
+misread. On those looks the smiles' mean must be under 0.3 and the inner
+brows raised under 0.5. Once a yawn is counted, the next can count only
+after the mouth has closed (under 0.03), the face has gone, or a second has
+passed with no look.
+
+**How the blendshapes are read:** from the look's own mesh points of that
+face, only while its mouth is open that wide. The read runs on a thread of
+its own, `eyes-yawn`, fed through a one-item slot as the seems read is
+(`latest.rs`), so the look never waits for it. A look it hasn't taken yet
+is replaced by a newer one. No mesh is added, and the seems thread's 2 s
+pace is untouched. Its cost on a lamp's small core is not measured yet.
+
+**Why not the gap alone:** on the screen man's generated clips, at four
+looks a second, a broad open smile held 0.18 to 0.20 for 5 s, and surprise
+held 0.10 to 0.14. Of the looks open 0.08 or wider, 29 of his yawn's 30
+passed both scores, and none of the smile's 61, the surprise's 30 or his
+talk's 3 did. His yawns stayed open only 1 to 1.5 s, shorter than a
+person's. These lines come from one generated face on a screen. Real faces
+laugh, sing, eat and say "oh" with the mouth wide open, and a camera with a
+different look pace changes what four looks mean. So the lines are to be
+measured on a few people at a lamp before any unit turns this on.
+
+**What is kept:** a count only. No picture, score or time is kept, and
+nothing goes to the journal for each look.
+
 ### Whether a face is speaking (`LAMP_EYES_SPEAKING=on`, #720)
 
 Off unless `LAMP_EYES_SPEAKING=on` is in the eyes' unit beside `LAMP_BUS=on`.

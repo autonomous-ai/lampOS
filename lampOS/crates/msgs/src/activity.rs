@@ -37,6 +37,15 @@ pub struct RoomActivity {
     /// Whether the sitting's baseline is in, so that leaning in and head
     /// down can be said at all.
     pub baseline: bool,
+    /// This sitting's yawns, as the eyes count them (`LAMP_EYES_YAWN`,
+    /// #3709); 0 while away, or when they are not counted. Left out at 0,
+    /// so an eyes that counts none says what it said before.
+    #[serde(default, skip_serializing_if = "no_yawns")]
+    pub yawns: u32,
+}
+
+fn no_yawns(yawns: &u32) -> bool {
+    *yawns == 0
 }
 
 impl RoomActivity {
@@ -61,6 +70,12 @@ impl RoomActivity {
             return Err(Invalid(format!(
                 "away, and sitting_s is {}: 0 while away",
                 self.sitting_s
+            )));
+        }
+        if self.state == Activity::Away && self.yawns != 0 {
+            return Err(Invalid(format!(
+                "away, and yawns is {}: 0 while away",
+                self.yawns
             )));
         }
         if !self.baseline && !matches!(self.state, Activity::Away | Activity::AtDesk) {
