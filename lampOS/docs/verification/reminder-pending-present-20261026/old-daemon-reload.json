@@ -22,7 +22,7 @@
   "success": true,
   "limits": "Retained native Mac Skills daemon with private bus and no publishers. No updater, Voice, provider, speaker, device, or physical activity.",
   "command": [
-    "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/old-parser/lamp-skills",
+    "<OLD_DAEMON>",
     "--dir",
     "/tmp/r38wdfmwt8/skills",
     "--bus-root",
