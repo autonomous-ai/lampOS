@@ -14,8 +14,10 @@
 //!
 //! Out, for each product unit: `same`, `missing` (the lamp printed none), or
 //! each line that differs. Then every drop-in (a `.d/` file: on a product
-//! lamp each one is a finding), every unit the lamp printed that the product
-//! has no file for, and every product unit read from somewhere other than
+//! lamp each one is a finding, and one that turns a switch its unit sets
+//! `on` off says so, as install does: crate::switches), every unit the lamp
+//! printed that the product has no file for, and every product unit read
+//! from somewhere other than
 //! `/etc/systemd/system/`. All the same and nothing else is a pass.
 //!
 //! A unit of the image's own that updates carry (`manifest::IMAGE_FILES`,
@@ -164,6 +166,9 @@ pub struct Report {
     pub units: BTreeMap<String, Verdict>,
     /// Drop-ins, with their text.
     pub drop_ins: Vec<Printed>,
+    /// For a drop-in of a product unit that turns one of its switches off
+    /// (crate::switches): its path, and how.
+    pub switches_off: Vec<(String, String)>,
     /// Units the lamp printed that the product has no file for.
     pub extra: Vec<String>,
     /// Product units the lamp read from another place than install's.
@@ -208,6 +213,12 @@ impl Report {
             out.push_str(&format!("drop-in: {}\n", drop_in.path));
             for line in drop_in.text.lines() {
                 out.push_str(&format!("  {line}\n"));
+            }
+            for (_, how) in self.switches_off.iter().filter(|(p, _)| *p == drop_in.path) {
+                out.push_str(&format!(
+                    "{}\n",
+                    crate::switches::said(&format!("drop-in {}", drop_in.path), how)
+                ));
             }
         }
         for (name, verdict) in &self.image {
@@ -291,6 +302,19 @@ fn name_of(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
+/// The product's unit `name`, or for an instance (`lamp-x@1.service`) its
+/// template's (`lamp-x@.service`).
+fn product_unit<'a>(product: &'a BTreeMap<String, String>, name: &str) -> Option<&'a str> {
+    if let Some(text) = product.get(name) {
+        return Some(text);
+    }
+    let (head, rest) = name.split_once('@')?;
+    let suffix = rest.rsplit_once('.')?.1;
+    product
+        .get(&format!("{head}@.{suffix}"))
+        .map(String::as_str)
+}
+
 /// The image's own units a build carries, by name.
 pub fn image_unit_names() -> Vec<&'static str> {
     manifest::IMAGE_FILES
@@ -338,7 +362,16 @@ pub fn check_with_image(
     let mut seen: BTreeMap<&str, &Printed> = BTreeMap::new();
     for file in &parsed.files {
         let parent = file.path.rsplit('/').nth(1).unwrap_or_default();
-        if parent.ends_with(".d") {
+        if let Some(unit) = parent.strip_suffix(".d") {
+            if let Some(text) = product_unit(product, unit) {
+                let switches = crate::switches::switches(text);
+                for how in crate::switches::turned_off(
+                    &switches,
+                    &crate::switches::environment(&file.text),
+                ) {
+                    report.switches_off.push((file.path.clone(), how));
+                }
+            }
             report.drop_ins.push(file.clone());
             continue;
         }
@@ -597,6 +630,70 @@ ExecStart=/opt/x
         assert!(report.passes(), "{}", report.said());
         assert_eq!(report.units.len(), units.len());
     }
+    /// A drop-in that turns its unit's `on` switch off says so in its
+    /// finding, by name and value; one that sets the switch on, or another
+    /// variable, does not. The real product's lamp-cloud, and a template's
+    /// instance, too.
+    #[test]
+    fn a_drop_in_that_turns_a_product_switch_off_says_so() {
+        let units = product();
+        let mut printed: String = units
+            .iter()
+            .map(|(name, text)| format!("# /etc/systemd/system/{name}\n{text}\n"))
+            .collect();
+        printed.push_str(
+            "# /etc/systemd/system/lamp-b.service.d/old.conf\n[Service]\nEnvironment=LAMP_OFFICE=on \"LAMP_X=off\"\n\n\
+             # /etc/systemd/system/lamp-b.service.d/on.conf\n[Service]\nEnvironment=LAMP_X=on LAMP_Y=off\n",
+        );
+        let report = check(&units, &parse(&printed));
+        assert_eq!(
+            report.switches_off,
+            [(
+                "/etc/systemd/system/lamp-b.service.d/old.conf".to_owned(),
+                r#"turns LAMP_X off ("off")"#.to_owned()
+            )]
+        );
+        let said = report.said();
+        let line = r#"drop-in /etc/systemd/system/lamp-b.service.d/old.conf turns LAMP_X off ("off"); the product sets it on"#;
+        assert_eq!(
+            said.lines().filter(|said| *said == line).count(),
+            1,
+            "{said}"
+        );
+        assert_eq!(said.matches("the product sets it on").count(), 1, "{said}");
+        assert!(!report.passes());
+        // The office extras (PRINTED's office.conf) turn nothing off.
+        assert!(check(&units, &parse(PRINTED)).switches_off.is_empty());
+
+        let units = embedded();
+        let printed = "\
+# /etc/systemd/system/lamp-cloud.service.d/old.conf
+[Service]
+Environment=LAMP_CLOUD=off
+";
+        let said = check(&units, &parse(printed)).said();
+        assert!(
+            said.contains("drop-in /etc/systemd/system/lamp-cloud.service.d/old.conf turns LAMP_CLOUD off (\"off\"); the product sets it on\n"),
+            "{said}"
+        );
+
+        // An instance's drop-in is read against its template; an empty
+        // `Environment=` clears the template's switch.
+        let units = BTreeMap::from([(
+            "lamp-t@.service".to_owned(),
+            "[Service]\nEnvironment=LAMP_T=on\n".to_owned(),
+        )]);
+        let printed =
+            "# /etc/systemd/system/lamp-t@one.service.d/x.conf\n[Service]\nEnvironment=\n";
+        assert_eq!(
+            check(&units, &parse(printed)).switches_off,
+            [(
+                "/etc/systemd/system/lamp-t@one.service.d/x.conf".to_owned(),
+                "turns LAMP_T off (an empty Environment= clears it)".to_owned()
+            )]
+        );
+    }
+
     const SPEAKER_PRINTED: &str = "\
 # /etc/systemd/system/lamp-cmedia-speaker.service
 [Service]

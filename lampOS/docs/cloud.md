@@ -229,7 +229,10 @@ is the same light. Two differences from V1 the page should know:
   setup's marker is there (`lampos-setup-done.path`). Setup writes
   `backend.json` before the marker. So a Lamp 2 set up from the app shows
   online straight away, and again after a reboot, with no `cloud-on.sh`.
-  To keep it off on a lamp, mask it (`systemctl mask lamp-cloud`).
+  To keep it off on a lamp, mask it (`systemctl mask lamp-cloud`). A kept
+  drop-in or edited `store.env` that sets `LAMP_CLOUD` to anything but `on`
+  leaves it saying `off: LAMP_CLOUD is not on`; install and `check-units`
+  name such a file ([install.md](install.md), step 5).
 - **The lamp's name in the app**, `/etc/lampOS/setup/display-name`, root's,
   0644, one line, written only by root's helper after a `device.rename`
   (#1959). `system.info`'s `host.device_name` is it, else the host's name as

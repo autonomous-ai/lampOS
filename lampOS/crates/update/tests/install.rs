@@ -671,6 +671,119 @@ fn install_places_every_exit_note_hook_and_keeps_other_drop_ins() {
     );
 }
 
+/// Every line install said that names a file turning a switch off.
+fn switches_said(lamp: &Lamp) -> Vec<&str> {
+    lamp.said
+        .iter()
+        .map(String::as_str)
+        .filter(|line| line.ends_with("; the product sets it on"))
+        .collect()
+}
+
+/// A lamp from its builder days with an old `LAMP_CLOUD=off` drop-in: the
+/// install to stable keeps it, as it keeps every drop-in but its own, and
+/// names it, at every run. A drop-in that sets the switch on, or other
+/// variables, is not named.
+#[test]
+fn a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept() {
+    let mut lamp = Lamp::new(188, &[]);
+    let old = "/etc/systemd/system/lamp-cloud.service.d/old.conf";
+    let kept = [
+        (
+            old,
+            "[Service]\nEnvironment=LAMP_CLOUD_OFFLINE_WILL=on \"LAMP_CLOUD=off\"\n",
+        ),
+        (
+            "/etc/systemd/system/lamp-cloud.service.d/on.conf",
+            "[Service]\nEnvironment=LAMP_CLOUD=on LAMP_OFFICE=off\n",
+        ),
+        (
+            "/etc/systemd/system/lamp-voice.service.d/30-local.conf",
+            "[Service]\nEnvironment=LAMP_OFFICE=on\n",
+        ),
+    ];
+    for (path, text) in kept {
+        fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
+        fs::write(lamp.on(path), text).unwrap();
+    }
+    lamp.install().unwrap();
+    let line = format!("kept drop-in {old} turns LAMP_CLOUD off (\"off\"); the product sets it on");
+    assert_eq!(switches_said(&lamp), [line.as_str()], "{:?}", lamp.said);
+    for (path, text) in kept {
+        assert_eq!(fs::read_to_string(lamp.on(path)).unwrap(), text, "{path}");
+    }
+    lamp.said.clear();
+    assert!(lamp.install().unwrap().changed.is_empty());
+    assert_eq!(switches_said(&lamp), [line.as_str()], "said again");
+    // Taken back on, it is said no more.
+    fs::write(lamp.on(old), "[Service]\nEnvironment=LAMP_CLOUD=on\n").unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert!(switches_said(&lamp).is_empty(), "{:?}", lamp.said);
+}
+
+/// A clean install, and the next, name nothing: no product setting or
+/// unit of the product's own turns a switch of it off.
+#[test]
+fn a_clean_install_names_no_switch_off() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert!(switches_said(&lamp).is_empty(), "{:?}", lamp.said);
+    lamp.install().unwrap();
+    assert!(switches_said(&lamp).is_empty(), "{:?}", lamp.said);
+    let mut setup = Lamp::new(188, &[]);
+    setup.config.setup = true;
+    setup.install().unwrap();
+    assert!(switches_said(&setup).is_empty(), "{:?}", setup.said);
+}
+
+/// An edited setting that turns a switch off: `store.env`, kept as the
+/// lamp's own Store choice, is lamp-cloud's `EnvironmentFile=`, which
+/// systemd reads over the unit's `Environment=`. An environment file a kept
+/// drop-in names is read too. The Store's own switch, off in the product, is
+/// no switch of install's to guard.
+#[test]
+fn an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let env = "/etc/lampOS/skills/store.env";
+    fs::write(lamp.on(env), "LAMP_SKILLS_STORE=on\n").unwrap();
+    lamp.install().unwrap();
+    assert!(switches_said(&lamp).is_empty(), "{:?}", lamp.said);
+    fs::write(lamp.on(env), "LAMP_SKILLS_STORE=off\nLAMP_CLOUD=off\n").unwrap();
+    let drop_in = "/etc/systemd/system/lamp-cloud.service.d/old.conf";
+    let file = "/etc/lampOS/cloud/old.env";
+    fs::create_dir_all(lamp.on(drop_in).parent().unwrap()).unwrap();
+    fs::create_dir_all(lamp.on(file).parent().unwrap()).unwrap();
+    fs::write(
+        lamp.on(drop_in),
+        format!(
+            "[Service]\nEnvironmentFile=-{file}\nEnvironmentFile=-/etc/lampOS/cloud/none.env\n"
+        ),
+    )
+    .unwrap();
+    fs::write(lamp.on(file), "LAMP_SKILLS_PAGE=\"\"\nLAMP_OFFICE=off\n").unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert_eq!(
+        switches_said(&lamp),
+        [
+            format!(
+                "edited setting {env}, read by lamp-cloud.service, turns LAMP_CLOUD off (\"off\"); the product sets it on"
+            ),
+            format!(
+                "environment file {file}, read by lamp-cloud.service, turns LAMP_SKILLS_PAGE off (\"\"); the product sets it on"
+            ),
+        ],
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.on(env)).unwrap(),
+        "LAMP_SKILLS_STORE=off\nLAMP_CLOUD=off\n"
+    );
+}
+
 #[test]
 fn a_failed_exit_note_write_keeps_reload_debt_for_the_next_install() {
     let mut lamp = Lamp::new(188, &[]);
