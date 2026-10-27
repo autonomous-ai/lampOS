@@ -1,0 +1,106 @@
+{
+  "all_handles_terminal_reaped_group_absent": true,
+  "clean_worktree": true,
+  "evidence": {
+    "consent-finding.json": "ff6ab55fed2d311da0083ad0932f65ba7be45b4a385870decaea550016d4623f",
+    "consent-probe-extraction.json": "052dfe7f80165dab560b56b8ae26e298b47605ee4d13e90a5c0cdd5a7af6d7dd",
+    "consent-probe-run.log": "fdb4019e3ec929cb422a4f876fbb1e5bde2e26f298e79a7bb1f1575551a021ab",
+    "consent-probe.rs": "3cd774c12bca82825834a916b043aeed87e9f5df03948b1d138bbbc7973c8562",
+    "eyes-prior-source-binding.json": "b2acdfb5a57d2c6f3005676a707202bf5e73d64d506645c2b219eff860dca5f0",
+    "pr-current.json": "392e91ffb1f78f65ee27569a69b681c99506b03e7ec17a0b5a2f40a0fff83822",
+    "scope.json": "6f9ca073d2ef155d3992c2df723227cf423a0adfe0d10e46eddd6e2230758a0a",
+    "source-review.json": "95ab7be07d013a59128557c3bfe7f188465372c0c4b3a55347e820fa9498ff37"
+  },
+  "handles": {
+    "clippy": 91088,
+    "fmt": 52726,
+    "known-faces": 35127,
+    "probe-compile": 58863,
+    "probe-run": 19493
+  },
+  "head": "e691fcb012a7e66d0635137fd7e04c563d50eb77",
+  "limits": [
+    "No fullEyes/fullVoice, real model, TTS/device, Memory implementation or composed-main execution.",
+    "No socket/Eyes-store integration; acceptance by helpers executed and subsequent apart consequence source-traced.",
+    "New current intended guards plus remaining nonliteral-context false positives checked; not a claim of exhaustive language recognition."
+  ],
+  "prior_eyes_result": {
+    "Eyes_who_blobs": {
+      "165f44f88d72f0e0fdbc3e041d32a041cdf08971": "b3e97e912617d569a0f63201a9033f45a3f066ce",
+      "e691fcb012a7e66d0635137fd7e04c563d50eb77": "b3e97e912617d569a0f63201a9033f45a3f066ce"
+    },
+    "all_Eyes_crate_files_identical": true,
+    "current_head": "e691fcb012a7e66d0635137fd7e04c563d50eb77",
+    "files_identical": {
+      "lampOS/crates/eyes/src/main.rs": true,
+      "lampOS/crates/eyes/src/who.rs": true
+    },
+    "new_who_execution": false,
+    "prior_evidence": "../eyes-who.terminal.json",
+    "prior_head": "165f44f88d72f0e0fdbc3e041d32a041cdf08971",
+    "prior_who_result": {
+      "failed": 0,
+      "ignored": 1,
+      "passed": 61
+    }
+  },
+  "result": "Remaining P2 HOLD: nonliteral context still authorizes apart; Root posted6440275870",
+  "source_hashes_unchanged": 7282,
+  "stages": {
+    "consent-probe-compile": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 1.509230939,
+      "log_sha256": "2b1146810b52642534dd97ff24d40a620b360ab832e5eb32c872870714aedf6b",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "consent-probe-run": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 1.6645493210000002,
+      "log_sha256": "fdb4019e3ec929cb422a4f876fbb1e5bde2e26f298e79a7bb1f1575551a021ab",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "eyes-voice-clippy": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 91.59171488000001,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "fmt": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 13.102094920999999,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "voice-known-faces": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 127.90748302700001,
+      "log_sha256": "bbae12f189772e7c56846404058fb2037a5d0bc378af34c3a6ff37350793c0ff",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    }
+  }
+}

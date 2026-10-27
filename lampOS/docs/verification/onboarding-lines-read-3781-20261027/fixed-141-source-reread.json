@@ -1,0 +1,32 @@
+{
+  "head": "141c557ba838b0dc47f7a8e74c888b089879b9f7",
+  "kind": "independent source reread, no new Cargo or runtime execution",
+  "old_fixture_bytes": 10629,
+  "old_fixture_sha256": "61f0144725c03e015ea155eee723b331ae09a6912bfae42a66f4692a8bf07c6f",
+  "old_fixture_exact": true,
+  "checked": [
+    "three new fields optional; supplied values still checked",
+    "missing touch completion/failure clears owed",
+    "second giving-way missing optional word uses original note",
+    "actual service read_installed loader remains same",
+    "old-file test parses two shapes; walk test swaps definition after new-file touch invitation"
+  ],
+  "source_sha256": {
+    "crates/voice/src/onboarding/skill.rs": "e819c3fc11d44a588bd888e33881d1191d1c8c61c6713cb1a07feec423af4abd",
+    "crates/voice/src/onboarding/skill/tests.rs": "39740c3fc76c8a40450b9ebd68d7936dc44e3e1c61679bec2f6be91851ab1905",
+    "crates/voice/src/onboarding/skill/before_3769.toml": "61f0144725c03e015ea155eee723b331ae09a6912bfae42a66f4692a8bf07c6f",
+    "crates/voice/src/onboarding.rs": "be01042c1cf09a4bd8f9e35798da3e0461bd781ceef189d47cdd78587b98d75d",
+    "crates/voice/src/onboarding/giving_way.rs": "d37460d4a56dd319b1f108581245d95bece745d0ae7f37d2ab587b6563f1035e",
+    "crates/voice/src/coordinator/service.rs": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa",
+    "docs/onboarding.md": "566909dbe1887f92ce5d8ed1d25c7e1590271c0a3a0e5db8d0f3d249bf5ba67e"
+  },
+  "decision": "original older-installer P2 closed on source; current-base integration gate remains HOLD",
+  "limits": [
+    "No new host/native tests run by Third on141",
+    "Peer exact host144 Voice+5 Skills result attributed to Reviewer-two6440739634, not Third",
+    "Walk test is not full old-definition startup/timeout/retry proof",
+    "Author full Skills530/2 failures not waived",
+    "No physical install, reboot, new-person or played test",
+    "Current Main3b9bfb628 newer; preserve no-sleep, Unsaid refunds and face provenance during carry"
+  ]
+}

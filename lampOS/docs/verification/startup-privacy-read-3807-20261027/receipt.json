@@ -1,0 +1,389 @@
+{
+  "artifacts": [
+    {
+      "compiler_fresh": false,
+      "features": [],
+      "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "post_execution_sha256": "2511f4b92fd32e7ab00476109b4e710235b192f9f2d16620ebb133c52086365c",
+      "scope": "Cargo compiler record and standard Cargo invocation; hash observed after execution, no pre-execution preimage claim.",
+      "src_path": "<WORKSPACE>/.claude/worktrees/third-read-3807/lampOS/crates/voice/src/lib.rs",
+      "stage": "test-voice",
+      "target": "lamp_voice"
+    },
+    {
+      "compiler_fresh": false,
+      "features": [],
+      "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+      "post_execution_sha256": "12db2a07d672d96e42c4626231768fd0c0b8b441786107c0e24401672f4ebd2e",
+      "scope": "Cargo compiler record and standard Cargo invocation; hash observed after execution, no pre-execution preimage claim.",
+      "src_path": "<WORKSPACE>/.claude/worktrees/third-read-3807/lampOS/crates/update/src/lib.rs",
+      "stage": "test-update",
+      "target": "lamp_update"
+    }
+  ],
+  "base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 36
+  },
+  "findings": {
+    "early_error_cleanup": "run_source early ? after Says::start can bypass Says::stop; known Lead P3 remains.",
+    "known_Lead_P3_parked_lock": "Both assignments to *parked() can drop an existing parks=true Says while holding PARKED; its Drop reacquires PARKED. Existing empty handoff test does not cover replacement.",
+    "new_P1_P2": [],
+    "privacy": "Controls refusal is unavailable, not microphone permission. Actual exits still verified within 300ms userspace cleanup; nonzero/forced remain faults; non-Controls route retains ordinary errors.",
+    "queued_reply_correction": "Waiting answer sender destruction reaches socket handler Disconnected fallback: typed dropped(the voice has gone), not bare EOF. It differs from Ticket dropped(ended); no new run-boundary regression case."
+  },
+  "hashes": {
+    "audit-gates.py": "c92d1e96ac374ac8ee0b50b5213f4d456d69eafd2c3c9673db26e515dcbff366",
+    "final-plan.json": "2ae3fabd449e88980d96b68e1c3cf3f3e91c6f60547c5c4b504148fe859b51b0",
+    "final.terminal.json": "0fbb26676e192b3baa2ebd4c40cb9126514869a14e9f7273e18d399c6682ba50",
+    "pr-before-gates.json": "b7d04bb9d32b2068470e728d0b83df3bd68342ff8c2d611079c3609ab003b921",
+    "pr-current.json": "764f3b28951063e11d2f2e31efed09f3af898eb0caef95f8c3383b4c9f47a5ff",
+    "run-gates.py": "35b667c5350ee090358f1115f971cbd82a268e1dc126c04d8818e966b01e74f2",
+    "source-after-gate.json": "15c4c25d462fb033be76a6139a174f884327768b77024138058c34e6efe7738e",
+    "source-before-gate.json": "15c4c25d462fb033be76a6139a174f884327768b77024138058c34e6efe7738e",
+    "source-plan.json": "432f05c1e27f20407057c2cc9778581eee2253be8af19a0b87683e47f06abc1c"
+  },
+  "head": "8c8eb6e9a6db296d3ea45026c51532bf94ba1b11",
+  "holds": [],
+  "limits": [
+    "Exact head on e362 base; no latest Main composition inference.",
+    "Only named28Voice+8Update runtime cases; no full suite/native/device/reboot/unit-order execution acceptance.",
+    "Owner reports physical Controls restart3 on8c; holder still owns full reboot/unit ordering.",
+    "Passing cases do not clear known parked-lock/early-error cleanup concerns."
+  ],
+  "source_pins": {
+    "crates/update/src/unit/restart_order.rs": "022ab4b3735ef1dbe3c9e24943aef328a2c963e714ed8d351a34dfdcf09dda8a",
+    "crates/voice/src/coordinator.rs": "ae1274c987a25295778f0347b3f7591b2ee67fdede0049b8f2a4254bc82b02cd",
+    "crates/voice/src/coordinator/tests/service_mute.rs": "f44b6c1be818247d5a4c5ff51735000fc618fd376f0b0f8e8df29d5dbae44c1b",
+    "crates/voice/src/process.rs": "519054c638da10fb1fca4bdc3ddc566bf1635171e05ab591cc8121f12f8bb94e",
+    "crates/voice/src/say.rs": "d58b74188076b26ecffae6ef1e47d185da4f46f0037ca0f2f0de652d17ed02e3",
+    "crates/voice/src/service_privacy_controls.rs": "20e1cfa06201d5263f55a5e8989a88dcba695dfbaee9959d2405106049d7487d"
+  },
+  "source_unchanged": true,
+  "stages": [
+    {
+      "cleanup": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "fmt",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "log_sha256": "ec557ae21cbb2e52bb1e8d212cbcfd0ee273f1b5d4c646b405673dc2c832c879",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "clippy",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "log_sha256": "ef57aa3e0a65ce134e112f8707f009c5f73c4b57b081f1afa267efa4b7fd2987",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "test-voice",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "log_sha256": "19dbb5ec36d16ea14ae10bef21134ec354aa214ab5325a59204306a52afe47bd",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "test-update",
+      "timed_out": false
+    }
+  ],
+  "status": "VERIFIED_EXACT_3807_VOICE28_UPDATE8",
+  "test_results": [
+    {
+      "cases": {
+        "coordinator::tests::service_mute::a_privacy_worker_whose_exit_comes_after_its_socket_closed_is_no_fault": [
+          {
+            "line": 358,
+            "outcome": "ok"
+          }
+        ],
+        "coordinator::tests::service_mute::a_queued_unreadable_fault_with_a_clean_exit_is_no_failed_shutdown": [
+          {
+            "line": 359,
+            "outcome": "ok"
+          }
+        ],
+        "coordinator::tests::service_mute::active_physical_mute_cancels_owned_reply_then_reaps_without_completion": [
+          {
+            "line": 360,
+            "outcome": "ok"
+          }
+        ],
+        "coordinator::tests::service_mute::cleanup_failure_cannot_leave_a_restartable_physical_mute": [
+          {
+            "line": 361,
+            "outcome": "ok"
+          }
+        ],
+        "coordinator::tests::service_mute::repeated_verified_mute_cycles_keep_one_logger_and_never_open_audio_while_waiting": [
+          {
+            "line": 362,
+            "outcome": "ok"
+          }
+        ],
+        "coordinator::tests::service_mute::stale_switch_during_active_run_is_never_a_restartable_mute": [
+          {
+            "line": 363,
+            "outcome": "ok"
+          }
+        ],
+        "coordinator::tests::service_mute::the_persons_light_is_said_and_taken_while_the_switch_is_closed": [
+          {
+            "line": 365,
+            "outcome": "ok"
+          }
+        ],
+        "coordinator::tests::service_mute::unavailable_startup_or_failed_cleanup_never_calls_next_runtime": [
+          {
+            "line": 366,
+            "outcome": "ok"
+          }
+        ],
+        "process::tests::a_peer_gone_at_startup_is_told_as_the_workers_own_end": [
+          {
+            "line": 367,
+            "outcome": "ok"
+          }
+        ],
+        "process::tests::shutdown_kills_and_reaps_a_hung_child_but_never_reports_success": [
+          {
+            "line": 368,
+            "outcome": "ok"
+          }
+        ],
+        "process::tests::shutdown_reports_an_already_exited_nonzero_child": [
+          {
+            "line": 369,
+            "outcome": "ok"
+          }
+        ],
+        "process::tests::signal_only_termination_leaves_reaping_to_final_shutdown": [
+          {
+            "line": 370,
+            "outcome": "ok"
+          }
+        ],
+        "say::tests::a_queued_sound_cannot_be_taken_at_or_after_its_original_deadline": [
+          {
+            "line": 371,
+            "outcome": "ok"
+          }
+        ],
+        "say::tests::a_ticket_dropped_unanswered_is_dropped_and_a_client_gone_is_nothing": [
+          {
+            "line": 372,
+            "outcome": "ok"
+          }
+        ],
+        "say::tests::bound_at_start_the_say_socket_answers_through_the_privacy_wait": [
+          {
+            "line": 373,
+            "outcome": "ok"
+          }
+        ],
+        "say::tests::through_the_socket_an_ask_is_answered_when_the_voice_says_what_became_of_it": [
+          {
+            "line": 374,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::a_publisher_not_up_yet_keeps_the_microphones_closed_until_it_reads_open": [
+          {
+            "line": 375,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::a_ring_that_never_started_leaves_the_wait_to_open_without_its_light": [
+          {
+            "line": 377,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::a_started_ring_that_failed_still_needs_its_black_write_and_exit": [
+          {
+            "line": 379,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::a_stop_while_it_waits_to_read_again_ends_the_wait_and_other_errors_still_end_it": [
+          {
+            "line": 382,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::a_worker_that_ended_cleanly_before_its_stop_is_verified_cleanup": [
+          {
+            "line": 384,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::an_unreadable_switch_is_read_again_and_never_ends_the_service": [
+          {
+            "line": 385,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::next_writer_needs_one_black_receipt_and_both_verified_exits": [
+          {
+            "line": 388,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch": [
+          {
+            "line": 389,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::receipt_after_sender_exit_is_still_read_and_duplicate_is_rejected": [
+          {
+            "line": 391,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::selected_wait_never_substitutes_software_clear_for_missing_or_bad_switch": [
+          {
+            "line": 392,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::selected_wait_observes_while_software_muted_without_granting": [
+          {
+            "line": 393,
+            "outcome": "ok"
+          }
+        ],
+        "service_privacy_controls::tests::with_no_slide_the_wait_never_starts_the_muted_indicator": [
+          {
+            "line": 394,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "log_sha256": "ef57aa3e0a65ce134e112f8707f009c5f73c4b57b081f1afa267efa4b7fd2987",
+      "stage": "test-voice",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 28,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "cases": {
+        "unit::restart_order::tests::a_declared_socket_precedes_its_service": [
+          {
+            "line": 262,
+            "outcome": "ok"
+          }
+        ],
+        "unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends": [
+          {
+            "line": 263,
+            "outcome": "ok"
+          }
+        ],
+        "unit::restart_order::tests::cycles_including_self_edges_are_refused": [
+          {
+            "line": 264,
+            "outcome": "ok"
+          }
+        ],
+        "unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge": [
+          {
+            "line": 265,
+            "outcome": "ok"
+          }
+        ],
+        "unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units": [
+          {
+            "line": 266,
+            "outcome": "ok"
+          }
+        ],
+        "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph": [
+          {
+            "line": 267,
+            "outcome": "ok"
+          }
+        ],
+        "unit::restart_order::tests::the_voice_starts_after_controls_so_it_stops_first": [
+          {
+            "line": 268,
+            "outcome": "ok"
+          }
+        ],
+        "unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency": [
+          {
+            "line": 269,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "log_sha256": "19dbb5ec36d16ea14ae10bef21134ec354aa214ab5325a59204306a52afe47bd",
+      "stage": "test-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 8,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "tree": "9f1e80c983b5e848424e7df43035bbf90d3f4fcb",
+  "witnesses": {
+    "coordinator::tests::service_mute::a_privacy_worker_whose_exit_comes_after_its_socket_closed_is_no_fault": true,
+    "coordinator::tests::service_mute::a_queued_unreadable_fault_with_a_clean_exit_is_no_failed_shutdown": true,
+    "coordinator::tests::service_mute::active_physical_mute_cancels_owned_reply_then_reaps_without_completion": true,
+    "coordinator::tests::service_mute::cleanup_failure_cannot_leave_a_restartable_physical_mute": true,
+    "coordinator::tests::service_mute::repeated_verified_mute_cycles_keep_one_logger_and_never_open_audio_while_waiting": true,
+    "coordinator::tests::service_mute::stale_switch_during_active_run_is_never_a_restartable_mute": true,
+    "coordinator::tests::service_mute::the_persons_light_is_said_and_taken_while_the_switch_is_closed": true,
+    "coordinator::tests::service_mute::unavailable_startup_or_failed_cleanup_never_calls_next_runtime": true,
+    "process::tests::a_peer_gone_at_startup_is_told_as_the_workers_own_end": true,
+    "process::tests::shutdown_kills_and_reaps_a_hung_child_but_never_reports_success": true,
+    "process::tests::shutdown_reports_an_already_exited_nonzero_child": true,
+    "process::tests::signal_only_termination_leaves_reaping_to_final_shutdown": true,
+    "say::tests::a_queued_sound_cannot_be_taken_at_or_after_its_original_deadline": true,
+    "say::tests::a_ticket_dropped_unanswered_is_dropped_and_a_client_gone_is_nothing": true,
+    "say::tests::bound_at_start_the_say_socket_answers_through_the_privacy_wait": true,
+    "say::tests::through_the_socket_an_ask_is_answered_when_the_voice_says_what_became_of_it": true,
+    "service_privacy_controls::tests::a_publisher_not_up_yet_keeps_the_microphones_closed_until_it_reads_open": true,
+    "service_privacy_controls::tests::a_ring_that_never_started_leaves_the_wait_to_open_without_its_light": true,
+    "service_privacy_controls::tests::a_started_ring_that_failed_still_needs_its_black_write_and_exit": true,
+    "service_privacy_controls::tests::a_stop_while_it_waits_to_read_again_ends_the_wait_and_other_errors_still_end_it": true,
+    "service_privacy_controls::tests::a_worker_that_ended_cleanly_before_its_stop_is_verified_cleanup": true,
+    "service_privacy_controls::tests::an_unreadable_switch_is_read_again_and_never_ends_the_service": true,
+    "service_privacy_controls::tests::next_writer_needs_one_black_receipt_and_both_verified_exits": true,
+    "service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch": true,
+    "service_privacy_controls::tests::receipt_after_sender_exit_is_still_read_and_duplicate_is_rejected": true,
+    "service_privacy_controls::tests::selected_wait_never_substitutes_software_clear_for_missing_or_bad_switch": true,
+    "service_privacy_controls::tests::selected_wait_observes_while_software_muted_without_granting": true,
+    "service_privacy_controls::tests::with_no_slide_the_wait_never_starts_the_muted_indicator": true,
+    "unit::restart_order::tests::a_declared_socket_precedes_its_service": true,
+    "unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends": true,
+    "unit::restart_order::tests::cycles_including_self_edges_are_refused": true,
+    "unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge": true,
+    "unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units": true,
+    "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph": true,
+    "unit::restart_order::tests::the_voice_starts_after_controls_so_it_stops_first": true,
+    "unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency": true
+  }
+}

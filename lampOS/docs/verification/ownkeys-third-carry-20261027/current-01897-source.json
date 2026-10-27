@@ -1,0 +1,41 @@
+{
+  "DRAFT_broker_and_old_failure_hold_unchanged": true,
+  "all7_authors_messages_and_added_deleted_payloads_exact": true,
+  "base": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+  "current_build_tests_executed": false,
+  "hashes": {
+    "after-proof.json": "cfab60aa14b44f3acce6d8ec138b153ddc8a8dd236d35b9fc5cc9019acddacb0",
+    "audit-source.py": "a8498ba2bae3c54a20272b652a1acac671767fcf0167d2309d53f23e4d792d50",
+    "before-proof.json": "f58acfc3fdcb18cfc0f9902f8f9b63a9a739f857716ab3f53068a22e27e0ad95",
+    "current-retained-census.json": "478d02ffb774d6a73eb09a4a8fd237c40c50ba3ee6363daa24d03c2079664de6",
+    "dependency-impact.json": "b4445f7508374512a85f06e2f35378badd65c85c81391a038f4bfffab00e1d28",
+    "metadata-after.json": "d12dd8f60f48382e652af197a5355ce5a94a31bb0e88a17496454fa2f38a8113",
+    "metadata-before.json": "b53ebe4c6f1a34d0b80fc264fb10d4fae818791dd0d682ce6f11611ebc8ca354",
+    "proposed-current-gates.json": "b1538e8efedec17a393968b960bd15cb1b91c0e47e3e5ae1f28ab1e3c3050c6c",
+    "range-diff.txt": "7c81a53ca351146a45416168a80716550e79b37ce5f15b3dd888920e0b404193"
+  },
+  "head": "01897b09143ebffc99fb2d108f8dc7b4150c2236",
+  "holds": [],
+  "integrated_owned_paths": [
+    "lampOS/crates/update/src/install.rs",
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/cloud.md",
+    "lampOS/docs/install.md",
+    "lampOS/docs/setup.md",
+    "lampOS/docs/switches.md"
+  ],
+  "owned_blob_exact": 31,
+  "proposed_additional_host": 16,
+  "proposed_host_total": 222,
+  "retained_current_source_census": {
+    "active_union": 212,
+    "host": 206,
+    "ignored": 1,
+    "linux_only": 6,
+    "own_host": 65
+  },
+  "seven_range_equal": true,
+  "status": "VERIFIED_SOURCE_ONLY_CARRY",
+  "tree": "f005b3cda07b9a08ca9ba71b2196d3075c073047"
+}

@@ -1,3 +1,13 @@
+## 2026-10-27 18:30 — consent replacement and current draft gates
+
+#3792 e691 remains a historical [consent HOLD](verification/face-apart-consent-read-3792-20261027/held-e691.json): exact helpers accepted quoted/hypothetical identity assertions after clause splitting or with substantive suffixes. Five observational passes establish the unwanted behavior, not product acceptance; no socket/store persistence was executed. The author removed the shortcut on 6819; the fresh read and scoped gates are in progress, with no approval transferred from e691.
+
+READ-OK #3807 8c8eb6e9a after [exact scoped checks](verification/startup-privacy-read-3807-20261027/receipt.json): pinned fmt, strict Voice/Update all-target Clippy and 28 Voice plus eight restart-order cases pass 36/0/0. Controls refusal stays unavailable, not microphone permission; cleanup still verifies actual worker exit. Source guards and process groups are closed. Known parked-lock replacement and early-error cleanup P3s remain; the queued socket answer is typed dropped on sender disappearance, not bare EOF. No full suite/native/reboot/unit-order or current-Main composition acceptance.
+
+#3781 141's [independent source reread](verification/onboarding-lines-read-3781-20261027/fixed-141-source-reread.json) closes my older-installer P2: optional words preserve the prior behavior, validation remains for supplied values, and the old embedded fixture is byte-identical. No new Cargo execution by Third on 141; Reviewer-two's exact host result is separately attributed. The walk test swaps definitions after a new-file invitation, not full old-file startup/timeout/retry proof. Current-base integration remains HOLD; author full Skills failures and physical/new-person checks are not waived.
+
+#3646 has a clean local [source-only carry](verification/ownkeys-third-carry-20261027/current-01897-source.json) at 01897b091 on frozen 11a1c867e: seven equal range entries, exact commit authors/messages/change payloads; 31 of 38 owned blobs exact and seven integrate Main. Current fmt, compiler and focused runtime gates are starting, with no new PASS claim. Broker prerequisite and the original 539 ARM Reader failure keep activation draft. No device action or Main push.
+
 ## 2026-10-27 17:55 — reminder delivery verified
 
 #3525 merged by the reviewer as 410faf618 (three commits). [Exact delivery proof](verification/reminder-pending-present-20261026/delivery-410faf.json): all three qualified-to-landed range entries equal, all thirty-two owned blobs/modes equal, authors/messages preserved. The landed tree also contains intervening Control changes, so original5a native remains its own exact-tree result and no new whole-Main or physical acceptance is inferred. Third did not merge or push Main.
