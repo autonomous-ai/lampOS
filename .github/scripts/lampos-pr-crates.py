@@ -32,6 +32,7 @@ SHARED_CRATES = {"msgs", "bus", "ipc"}
 # The docs code or tests read (also named in the workflow's paths).
 READ_DOCS = {
     "lampOS/docs/brain-build.md",
+    "lampOS/docs/control.md",
     "lampOS/docs/endpoint-detection.md",
     "lampOS/docs/endpoint-pilot.md",
     "lampOS/docs/install.md",
