@@ -24,6 +24,13 @@ BOOTSTRAP = "LAMPOS_UPDATE_BOOTSTRAP"
 SECRET = "LAMPOS_UPDATE_KEY"
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 BINARY = re.compile(r"lamp-[a-z0-9-]{1,39}\Z")
+DIAGNOSTIC_LIMIT = 320
+ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|$))")
+KEY_SHAPED = re.compile(
+    r"eyJ[A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]*){2,4}|"
+    r"github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+|"
+    r"(?:sk|pk|rk)[-_][A-Za-z0-9_-]{12,}|[A-Za-z0-9_+/=-]{32,}"
+)
 
 
 class Refused(Exception):
@@ -89,9 +96,46 @@ def tree_info(root):
 class Commands:
     def __init__(self, environ):
         self.environ = {key: value for key, value in environ.items() if key != SECRET}
+        self.redactions = sorted({
+            part for key, value in environ.items()
+            if re.search(r"(?:^|_)(?:TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL)(?:_|$)", key.upper())
+            and isinstance(value, str)
+            for part in value.splitlines() if part
+        }, key=len, reverse=True)
+
+    @staticmethod
+    def name(words):
+        program = Path(str(words[0])).name
+        # Only fixed subcommand names are safe to echo, never arbitrary argv.
+        if program == "gh" and len(words) > 1:
+            if words[1] == "api":
+                return "gh api"
+            if len(words) > 2 and words[1] == "release" and words[2] in ("create", "upload"):
+                return f"gh release {words[2]}"
+        return program
+
+    def diagnostic(self, stderr):
+        lines = stderr.decode("utf-8", errors="replace").splitlines() if stderr else []
+        if not lines:
+            return "no stderr"
+        line = "".join(char for char in ANSI.sub("", lines[0]) if char.isprintable())
+        # Redact before truncating, including short configured secret values.
+        for value in self.redactions:
+            line = line.replace(value, "<redacted>")
+        line = re.sub(r"(?i)(https?://)[^/\s@]+@", r"\1<redacted>@", line)
+        line = re.sub(r"(?i)(https?://[^\s?]+)\?\S+", r"\1?<redacted>", line)
+        line = re.sub(r"(?i)(\bauthorization\s*[:=]\s*).*", r"\1<redacted>", line)
+        line = re.sub(r"(?i)(\b(?:bearer|basic)\s+)[^\s,;]+", r"\1<redacted>", line)
+        line = re.sub(
+            r"(?i)(\b(?:authorization|(?:access[_-]?)?token|(?:api[_-]?)?key|secret|password)\s*[:=]\s*)"
+            r"(?:bearer\s+|token\s+)?(?:\"[^\"]*\"|'[^']*'|[^\s,;&]+)",
+            r"\1<redacted>", line,
+        )
+        line = KEY_SHAPED.sub("<redacted>", line)
+        return line[:DIAGNOSTIC_LIMIT] or "empty stderr line"
 
     def run(self, words, output=None):
-        # No shell, no secret in argv or child environments, and no echoed command output.
+        # No shell or signing key in children. Only gh's redacted first error line is echoed.
         try:
             result = subprocess.run(
                 [str(word) for word in words], env=self.environ, stdin=subprocess.DEVNULL,
@@ -99,8 +143,14 @@ class Commands:
                 timeout=600, check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as error:
-            raise Refused(f"{Path(str(words[0])).name} did not complete") from error
-        require(result.returncode == 0, f"{Path(str(words[0])).name} failed (exit {result.returncode})")
+            raise Refused(f"{self.name(words)} did not complete") from error
+        if result.returncode:
+            message = f"{self.name(words)} failed (exit {result.returncode})"
+            if Path(str(words[0])).name == "gh":
+                message += f": {self.diagnostic(result.stderr)}"
+                # Promotion recovery can wrap the exception; retain its cause now.
+                print(message, file=sys.stderr)
+            raise Refused(message)
         return result.stdout if output is None else b""
 
 
