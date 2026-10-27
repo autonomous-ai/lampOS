@@ -1,0 +1,15 @@
+{
+  "actual_and_preserved_outputs_depfiles_verified_before_compiler": true,
+  "actual_executables_verified_before_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/switches.md"
+  ],
+  "note": "Same owned worktree/target; old full Update runtime remains bound to431/4bff. Current runtime is lib plus one exact round reader only.",
+  "previous_closure_sha256": "4f5f79d682ef7b390692c6e39a9ba842ae30bf5a5208df3941e7aa055b0d8b03",
+  "previous_complete_sha256": "58c93f7ede0486f576d2aa2b6156cd3a7f7ed92a8d5adb8f8a0d6a2ecccaff6a",
+  "previous_head": "99422939fa848bd2b4bc7923ac610981df4adf57",
+  "previous_source_inventory_sha256": "321fba2bb3bef0110e125a254bbf17c8472109112f97995c58b1d4e92ad65184"
+}

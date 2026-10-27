@@ -1,0 +1,6 @@
+{
+  "actual_paths": "Not reasserted after later round compilation; prior closure retained.",
+  "closure_sha256": "accaa75f7264d317e5bebec10773928564c5bc19cd754da3b1c24617a8a012d7",
+  "head": "99422939fa848bd2b4bc7923ac610981df4adf57",
+  "preserved_outputs_and_depfiles_verified": true
+}

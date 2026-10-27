@@ -1,0 +1,10 @@
+{
+  "checksums_sha256": "a3e3c7c4fbfe35e6cf4d74eff2f26de349fb0143cbf5c8e745ddca96d5d5b502",
+  "counts": {
+    "failed": 73,
+    "ignored": 4,
+    "passed": 131
+  },
+  "packet": "second-cloud-query-gate-20261027/failure-packet",
+  "reason": "Default sandbox denied local socket operations; corrected execution explicitly authorized."
+}

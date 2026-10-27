@@ -1,0 +1,14 @@
+{
+  "oldbase": "737331535d0cab813170d288110fc44ff5d41a68",
+  "newbase": "0811b553b76823fd19fa018d7af0137007204b32",
+  "oldhead": "99422939fa848bd2b4bc7923ac610981df4adf57",
+  "newhead": "14981c5ffdeb2dd0b37ef13935564915b6d9679d",
+  "authored": {
+    "lampOS/crates/update/Cargo.toml": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4\tlampOS/crates/update/Cargo.toml",
+    "lampOS/crates/update/src/world.rs": "100644 blob 050f58329711fe057cd288a16b7046b9e00cbf80\tlampOS/crates/update/src/world.rs",
+    "lampOS/crates/update/src/world/query.rs": "100644 blob 9c9eb8d54a4f33f6ef1d414c20977af6eb42bfee\tlampOS/crates/update/src/world/query.rs",
+    "lampOS/crates/update/src/world/query_tests.rs": "100644 blob 3be364978da1514979976da700120291984e2041\tlampOS/crates/update/src/world/query_tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob 33f102347fcaf09b6937d5018699f57672bd56e6\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md": "100644 blob 7fb7d871e17ddde58f85828c67d086ce8d85c02d\tlampOS/docs/updates.md"
+  }
+}

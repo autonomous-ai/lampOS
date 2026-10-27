@@ -1,0 +1,13 @@
+{
+  "direct_readers": [
+    "reports::bounded_output",
+    "reports::Lamp::unit_states",
+    "reports::Lamp::waits",
+    "main::exit_note"
+  ],
+  "external_readers": [],
+  "note": "Controls bounded_output_queue is a homonym, not an API reader. Prior unfiltered offline metadata preparation requested an unavailable foreign-platform dependency; host-filtered metadata is used and no test failure is inferred.",
+  "packages": [
+    "lamp-cloud"
+  ]
+}
