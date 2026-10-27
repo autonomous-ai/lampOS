@@ -677,3 +677,102 @@ fn a_head_pet_is_checked_for_its_times_swaps_and_intensity() {
     off.enabled = false;
     assert!(off.check().is_ok() && !off.fresh_at("boot", 2_300_000));
 }
+
+/// #3697: the primary button's hold asks for the mute from 2 s, or, with the
+/// shutdown switch on (Controls' choice), for the shutdown from 5 s to 15 s
+/// only; a Shutdown is never retained in the state.
+#[test]
+fn a_primary_hold_is_a_mute_or_a_shutdown_in_its_window() {
+    use lamp_msgs::{ClockStamp, TouchEvent, TouchGesture, TouchIntent, TouchSource};
+    let hold = |held_us: u64, intent: TouchIntent| TouchEvent {
+        stamp: ClockStamp {
+            clock_id: "boot".into(),
+            at_us: 30_000_000,
+            sequence: 1,
+        },
+        session_id: "controls".into(),
+        reader_session_id: "gpio".into(),
+        enabled: true,
+        source: TouchSource::Primary,
+        name: "primary".into(),
+        contact_id: 1,
+        gesture: TouchGesture::Hold,
+        when_speaking: intent,
+        when_quiet: intent,
+        when_asleep: Some(intent),
+        began_us: 30_000_000 - held_us,
+        observed_us: 30_000_000,
+        released_us: Some(30_000_000),
+        active_mask: 0,
+        active_names: vec![],
+        position: None,
+        toward_pad: None,
+        distance: 0.0,
+        speed: 0.0,
+    };
+    for (held, mute, shutdown) in [
+        (1_999_999, false, false),
+        (2_000_000, true, false),
+        (4_999_999, true, false),
+        (5_000_000, true, true),
+        (15_000_000, true, true),
+        (15_000_001, true, false),
+    ] {
+        assert_eq!(
+            hold(held, TouchIntent::SoftwareMute).check().is_ok(),
+            mute,
+            "{held}"
+        );
+        assert_eq!(
+            hold(held, TouchIntent::Shutdown).check().is_ok(),
+            shutdown,
+            "{held}"
+        );
+    }
+    let mut mixed = hold(6_000_000, TouchIntent::Shutdown);
+    mixed.when_asleep = Some(TouchIntent::SoftwareMute);
+    assert!(mixed.check().is_err());
+    assert!(!hold(6_000_000, TouchIntent::Shutdown).retained());
+}
+
+/// #3697: a shutdown request is taken from any source the same way, only
+/// from that source's own publisher, on this boot's clock, fresh.
+#[test]
+fn a_shutdown_request_is_accepted_only_from_its_sources_publisher_fresh() {
+    use lamp_msgs::{ClockStamp, SHUTDOWN_REQUEST_TTL_US, ShutdownRequest, ShutdownSource};
+    let request = |source| ShutdownRequest {
+        stamp: ClockStamp {
+            clock_id: "boot".into(),
+            at_us: 10_000_000,
+            sequence: 1,
+        },
+        source,
+        reason: "primary button held 6000 ms".into(),
+    };
+    let button = request(ShutdownSource::Button);
+    assert_eq!(button.accept("controls", "boot", 10_000_000), Ok(()));
+    assert!(button.accept("cloud", "boot", 10_000_000).is_err());
+    assert_eq!(
+        button.accept("controls", "other", 10_000_000),
+        Err("another boot's clock")
+    );
+    assert_eq!(
+        button.accept("controls", "boot", 9_999_999),
+        Err("from the future")
+    );
+    assert_eq!(
+        button.accept("controls", "boot", 10_000_000 + SHUTDOWN_REQUEST_TTL_US),
+        Err("stale")
+    );
+    let mut empty = button.clone();
+    empty.reason.clear();
+    assert!(empty.accept("controls", "boot", 10_000_000).is_err());
+    // The wire names, and a source this build does not know never parses.
+    let json = serde_json::to_value(&button).unwrap();
+    assert_eq!(json["source"], "button");
+    let mut unknown = json.clone();
+    for source in ["voice", "app"] {
+        unknown["source"] = source.into();
+        assert!(serde_json::from_value::<ShutdownRequest>(unknown.clone()).is_err());
+    }
+}
