@@ -1,0 +1,541 @@
+{
+  "status": "PASS_COMPILER_ONLY_PHASE",
+  "head": "63a2a9579f1434ee9c4f323209c89073d918c614",
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "scope": {
+    "ordinary_Update_runtime_in_this_phase": 0,
+    "prior_Update_ordinary_coverage": {
+      "unique_identities": 448,
+      "counts": {
+        "passed": 442,
+        "failed": 0,
+        "ignored": 6
+      },
+      "separate_commands": true,
+      "binding_sha256": "b48d2bbd1374e1357cdc63d3469ee50dfe26da96195ec5eec0e9456382e28736"
+    },
+    "Update_doc_tests": [
+      {
+        "target": "lamp_update",
+        "status": "ok",
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      }
+    ],
+    "standalone_promoter_runtime_attempts": 1,
+    "standalone_promoter_counts": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "standalone_promoter_docs": [
+      {
+        "target": "lampos_promote",
+        "status": "ok",
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      }
+    ],
+    "current_rebased_4fd_qualification": false,
+    "current_native_CI": false,
+    "device_acceptance": false,
+    "performance_claim": false
+  },
+  "promoter_gates": {
+    "fmt": true,
+    "metadata_actual": true,
+    "strict_all_targets": true,
+    "no_run_json_compile": true,
+    "actual_test_targets": [
+      {
+        "target": "lampos_promote",
+        "kind": [
+          "lib"
+        ],
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        },
+        "cases": [
+          {
+            "case": "github::tests::stream_hash_is_bounded_and_matches_bytes",
+            "outcome": "PASS"
+          },
+          {
+            "case": "github::tests::unrelated_release_notes_may_be_null_but_selected_notes_still_refuse",
+            "outcome": "PASS"
+          }
+        ]
+      },
+      {
+        "target": "lampos-promote",
+        "kind": [
+          "bin"
+        ],
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        "cases": []
+      },
+      {
+        "target": "promotion",
+        "kind": [
+          "test"
+        ],
+        "counts": {
+          "passed": 22,
+          "failed": 0,
+          "ignored": 0
+        },
+        "cases": [
+          {
+            "case": "bootstrap_copies_only_envelope",
+            "outcome": "PASS"
+          },
+          {
+            "case": "bootstrap_lost_rename_response_removes_canonical_and_keeps_stage",
+            "outcome": "PASS"
+          },
+          {
+            "case": "changed_downloaded_payload_refuses_before_writes",
+            "outcome": "PASS"
+          },
+          {
+            "case": "context_requires_exact_switch_and_trusted_public_key",
+            "outcome": "PASS"
+          },
+          {
+            "case": "equal_identical_is_noop_and_older_is_refused",
+            "outcome": "PASS"
+          },
+          {
+            "case": "equal_sequence_different_valid_envelope_refuses",
+            "outcome": "PASS"
+          },
+          {
+            "case": "external_models_are_explicitly_unsupported",
+            "outcome": "PASS"
+          },
+          {
+            "case": "failures_before_and_after_each_rename_restore_exact_old_bytes",
+            "outcome": "PASS"
+          },
+          {
+            "case": "final_verification_failure_restores_old_bytes",
+            "outcome": "PASS"
+          },
+          {
+            "case": "foreign_canonical_during_recovery_is_untouched",
+            "outcome": "PASS"
+          },
+          {
+            "case": "missing_canonical_or_orphan_tag_never_bootstraps_over_existing_state",
+            "outcome": "PASS"
+          },
+          {
+            "case": "promotion_preserves_signed_bytes_and_old_backup",
+            "outcome": "PASS"
+          },
+          {
+            "case": "restoration_failure_reports_retained_asset_ids",
+            "outcome": "PASS"
+          },
+          {
+            "case": "signature_valid_future_updater_requirement_refuses_before_writes",
+            "outcome": "PASS"
+          },
+          {
+            "case": "signed_identity_must_match_source_and_fixed_url",
+            "outcome": "PASS"
+          },
+          {
+            "case": "source_provenance_must_match_original_successful_attempt",
+            "outcome": "PASS"
+          },
+          {
+            "case": "stable_changed_while_staging_is_not_overwritten",
+            "outcome": "PASS"
+          },
+          {
+            "case": "staged_corruption_leaves_old_canonical_intact",
+            "outcome": "PASS"
+          },
+          {
+            "case": "staging_and_backup_names_are_never_overwritten",
+            "outcome": "PASS"
+          },
+          {
+            "case": "uncertain_or_duplicate_inventories_refuse",
+            "outcome": "PASS"
+          },
+          {
+            "case": "upload_failure_before_or_after_remote_write_preserves_old_canonical",
+            "outcome": "PASS"
+          },
+          {
+            "case": "wrong_trusted_key_refuses_before_writes",
+            "outcome": "PASS"
+          }
+        ]
+      },
+      {
+        "target": "workflow",
+        "kind": [
+          "test"
+        ],
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        "cases": [
+          {
+            "case": "promotion_is_manual_separate_and_branch_protected",
+            "outcome": "PASS"
+          }
+        ]
+      }
+    ],
+    "actual_executable_bindings": [
+      {
+        "target": "promotion",
+        "kind": [
+          "test"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "509d033d97320eb30d2899b1931a357b725ea197d318d0f5f5893bc0c23cd931",
+        "bytes": 2936524,
+        "bound_attributes": [
+          "bytes",
+          "mode",
+          "mtime_ns",
+          "sha256"
+        ]
+      },
+      {
+        "target": "lampos-promote",
+        "kind": [
+          "bin"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "cd1342401c70e490d3d9752dd10540b8d5123c5d42d659ab3ea6d9976e18b116",
+        "bytes": 941840,
+        "bound_attributes": [
+          "bytes",
+          "mode",
+          "mtime_ns",
+          "sha256"
+        ]
+      },
+      {
+        "target": "lampos-promote",
+        "kind": [
+          "bin"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "0e2e95767f7db4024b03ba341d8a9aac6c22f504992e43215a3e14dcaeed9f6b",
+        "bytes": 2765068,
+        "bound_attributes": [
+          "bytes",
+          "mode",
+          "mtime_ns",
+          "sha256"
+        ]
+      },
+      {
+        "target": "workflow",
+        "kind": [
+          "test"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "5d7933f70fb1a2c39beff6b7d52e24189595bb8906d2af00a6d307fd20073f72",
+        "bytes": 1003704,
+        "bound_attributes": [
+          "bytes",
+          "mode",
+          "mtime_ns",
+          "sha256"
+        ]
+      },
+      {
+        "target": "lampos_promote",
+        "kind": [
+          "lib"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "fac18b18a0474955b2446cff9a37f185034e2d78e8fffa131423f9e5bd942076",
+        "bytes": 1442820,
+        "bound_attributes": [
+          "bytes",
+          "mode",
+          "mtime_ns",
+          "sha256"
+        ]
+      }
+    ],
+    "actual_test_target_count": 4,
+    "actual_executable_count": 5,
+    "inventories_observed_before_single_runtime": true,
+    "all_ignored_inventory_count": 0
+  },
+  "integrity": {
+    "tracked_source_files": 10676,
+    "source_before_equals_after": true,
+    "source_bytes_modes_index_unchanged": true,
+    "inherited_sealed_copies": 258,
+    "new_promoter_sealed_copies": 5,
+    "final_sealed_copies": 263,
+    "active_actual_executables": 15,
+    "original_Update_actuals": 10,
+    "new_promoter_actuals": 5,
+    "all_original_bound_attributes_strict": true,
+    "actual_executable_policy": "SHA/bytes/mode/mtime from capture; no actual inode waiver",
+    "independent_frozen_policy": "SHA/bytes/mode/mtime/device/inode strict",
+    "all_owned_groups_closed": true,
+    "lease_held": false,
+    "unresolved_owned_processes": 0,
+    "retries": 0
+  },
+  "preserved_history": {
+    "reserve_abort": "FAIL/-15",
+    "interrupted_install": "INTERRUPTED_INCONCLUSIVE",
+    "separate_recovery": "PASS once",
+    "runtime_continuation_parser": "FAIL/native1; read-only disposition, no Rust failure or replay",
+    "one_full_Cargo_command_claim": false
+  },
+  "native_controller": {
+    "controller_exit": 0,
+    "exit_code": 0,
+    "elapsed_s": 268.64609488198766,
+    "terminal_status": "PASS_COMPILER_ONLY_PHASE",
+    "Update_ordinary_runtime_forbidden": true
+  },
+  "stages": [
+    {
+      "stage": "cmd-promotion-compile",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "86add07a765d27a699134da408be4cd142d2557895cb78fb4c73bffbfac79e21",
+      "stdout_sha256": "77139411000a4d7261f84d3cf84f48d475cf81f449409c557627da7f7c20cf19",
+      "stderr_sha256": "2df373007c71e9a98dde4988f381baee3e532ba5fdfcf7f1a810c8ff60be765a"
+    },
+    {
+      "stage": "cmd-promotion-fmt",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "4bb568875ac36ec2b154d1f0189bdfcd2dd9ed06641b41778b09bcee8120dca8",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-0-all",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "0af9b832b55c12b3de1e6c3dd22d641e824c77fd1f129d37051dab5e31e764ac",
+      "stdout_sha256": "b6edab726a1fd58b5cfaedadf851783aed005dc060469638f903e29433bd026f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-0-ignored",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "5713a2e60d3ca88fff412edafa25228376774c064cfb41bc478b2fbe7c028502",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-1-all",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "37ec8f7a31bdd664ef0a990337f0f1bf451c7a5ded1f99b9ee81ff1a2bbcaa24",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-1-ignored",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "b456d069c62acce0d25b792d6d917007d6d55cdd2e78ed4cb87c7c489d91cfec",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-2-all",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "e16411fcf4b2e112509bb02825b22ddaa42c1cddb9629e639ddfa77ca2508e89",
+      "stdout_sha256": "22069bb3aef6f5c29546532dd27626f571ced0f3bcc0ade2dd8ca1b713dd2066",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-2-ignored",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "f728a66c56cbb0e3f1e1b4ac140eef6f38e6a6f4668d26152687938f8b637a24",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-3-all",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "ea577abb25af79ddd7d1383ff892db9e11c7c1133a489b4e07e63e385301af39",
+      "stdout_sha256": "c2896ae2cc1816c0186819c1760411ecfdc05b820d5e2e34dfda107d1529ba7a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-list-3-ignored",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "692a609d8d3cd61980370cb8b9acaf4ec39647f60f628d4d59120a6a1afa30b7",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-metadata",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "e1cff5f99a69d8b881c566d90ab32a26958c0d647f47e6d25943f35de15a4bb2",
+      "stdout_sha256": "c0a07e8651cfb9f74ec7ea71ba0befadff55f0d19104a398a4ba8f690597df37",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "cmd-promotion-strict",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "2b21774e3e939aa782a6b5909e33634076ae4ccd3d02e32065f10570bf91b312",
+      "stdout_sha256": "c3635ab191e20568de07c556afcada44e889dd43b458e3df3baf1ec324ad025e",
+      "stderr_sha256": "9f93777898c95d1490f341426ab5914bb6a16109acf05695fb130446da099c75"
+    },
+    {
+      "stage": "cmd-promotion-tests",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "867fc1280c62c919ede71596c2205bd294eb5870bcc2162e07af09f2294b9f61",
+      "stdout_sha256": "57d8c9110aeca7ab1bcb708f425d1be415b22c0e2e068618305c89f491a9e6b8",
+      "stderr_sha256": "465eb7d5007e42f3e94502bd5fe5c1e20e4e343840172b84897356f55d8427ff"
+    },
+    {
+      "stage": "cmd-update-docs",
+      "exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "reserve_breached": false,
+      "receipt_sha256": "de17d1b8b3b3acc0a321ff229c27795b83d74196f32bd32ad64d72ba4cdc7828",
+      "stdout_sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+      "stderr_sha256": "f44f25266c67498cbff98f9397c3e83913ccc4174a4e0b167772f5ff28d30bfd"
+    }
+  ],
+  "receipt_sha256": {
+    "terminal.json": "2e9254577f04111d3b327f7ab6d220267c577c5fb57148ab99df0e39768c6c8c",
+    "native-controller-result.json": "85b0bd641e0dc86211af3b32e5cc1e6114fd45addb360406a595d2edfccc3664",
+    "semantic-source-before.json": "b345bd8e3eb69ada8756c3fad4348e5504a3a0aca75e73c9a053654b462a6b2a",
+    "semantic-source-after.json": "b345bd8e3eb69ada8756c3fad4348e5504a3a0aca75e73c9a053654b462a6b2a",
+    "semantic-protected-before.json": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+    "semantic-protected-after.json": "6ec5bc34b8b241b9b184a2639cfb0dd4a236c9b72493d6afb22e6e0905e0655b",
+    "semantic-actuals-after.json": "2cba1beda969caaabef94a3fc816d10581a768de4c05f082a6da52faf02c9430",
+    "semantic-update-docs.json": "3a0c0ea36167b55400af722cd849cdf7d1a84eaef7c46a1eeb751275a3b33922",
+    "semantic-promotion-census.json": "d5f0b477d3428528c11532929718c4214826bc9afbf49b588874d358944f60a9",
+    "semantic-promotion-compiler-artifacts.json": "8ded54b9c344bb533c1c7dd45ce05ca6062343184f38ac28d78c78ee2e251e01",
+    "semantic-promotion-inventory.json": "3241c984ce6fceb2fad1a8d09aba748e716c32d4b4570b02a746a8910117f76a",
+    "semantic-environment.json": "254240b5cb374c53890df30f3c77a7ab5f24f52dbced6dd3caa9a5312b46079b",
+    "plan.json": "b8aeb1d7edd4d490e261673ed40da7baa5ba39de68f58617377eff4fca324413",
+    "launch.json": "795dba33540d4d683f70cac66f6ffadaba008b90942419fba5d1bdac5e2cd11d",
+    "run.py": "fb394a8eb2aaf8cface85f0c02d515e67eda4e9d596d0d1f3813a897477165f9"
+  },
+  "related_proofs": [
+    "../tests-carrier-a3b-reserve-failure-20261027/",
+    "../tests-carrier-a3b-parser-disposition-20261027/",
+    "../tests-carrier-a3b-observations-complete-20261027/"
+  ],
+  "preparation": "Offline receipt parsing only; no current source/target reads, compiler, runtime or binary copies."
+}

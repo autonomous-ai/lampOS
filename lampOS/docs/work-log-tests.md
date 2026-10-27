@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 07:12 — Carrier docs/promoter proof published; latest checks prepare
+
+Ready for lamp-voice: no (latest-base current checks pending)
+
+[Carrier 63a/a3b docs/promoter proof](verification/tests-carrier-a3b-compiler-complete-20261027/) records separate Update docs **0/0/0** and full promoter **25/0/0**, plus zero-case promoter docs. Formatting, strict promoter checks, actual metadata/no-run/inventories, all source and **263** final witnesses / **15** executable bindings passed, controller/native exit 0, groups closed. No ordinary Update tests ran in this phase. [Ordinary 442/0/6 coverage](verification/tests-carrier-a3b-observations-complete-20261027/) remains a separate-command result; original abort/interruption and parser failure remain preserved.
+
+Clean Carrier `4fd14a8ed/4bff` has six equal patches and 14 unchanged authored final blobs. The disabled current compile/compare gate will measure actual artifact/input differences before any current runtime decision; it does not authorize transferring old 442 outcomes. The new normal/build Update closure is only Update/Bus/Msgs, while its test closure reaches changed Voice code and the recursive source readers see Main’s Memory/Expression changes.
+
+Mood `0bd3f854c/4bff` is now running current compile/compare checks with original f441 runtime evidence and the 02485 zero-runtime handoff kept separate. Full hashes are checked at initial/pre-consumption/final, strict source/witness metadata and actual hashes at other boundaries under exclusive ownership; exact guard scopes are recorded. Current Sentinel/Restart/Skills source carries are on 4bff and their next gates are preparing. No device action.
+
 ## 2026-10-27 07:07 — Carrier ordinary coverage and parser disposition published
 
 Ready for lamp-voice: no (latest-base qualification remains separate)
