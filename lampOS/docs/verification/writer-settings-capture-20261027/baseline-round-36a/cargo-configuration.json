@@ -1,0 +1,23 @@
+{
+  "paths": {
+    "<baseline-tree>/lampOS/.cargo/config": null,
+    "<baseline-tree>/lampOS/.cargo/config.toml": {
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "bytes": 210
+    },
+    "<baseline-tree>/.cargo/config": null,
+    "<baseline-tree>/.cargo/config.toml": null,
+    "<private-path>": null,
+    "<private-path>": null,
+    "/private/.cargo/config": null,
+    "/private/.cargo/config.toml": null,
+    "/.cargo/config": null,
+    "/.cargo/config.toml": null,
+    "<cargo-home>/config": null,
+    "<cargo-home>/config.toml": null
+  },
+  "inherited_compiler_variable_names": [],
+  "build_jobs": 1,
+  "incremental": false,
+  "registry": "normal locked"
+}

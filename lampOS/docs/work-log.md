@@ -1,3 +1,9 @@
+## 27 October 2026, 20:03 +07 — baseline lock control is inconclusive
+
+[Unmodified Main36a baseline](verification/writer-settings-capture-20261027/baseline-round-36a/README.md): exactly one complete round cohort at four threads, 198 passed / 0 failed / 0 ignored, 314.202 seconds. All source, configuration, driver and preserved-executable guards close. The target case passes in this execution; that does not establish the cause of, waive or relabel Root raw4f25/3f4's retained509/1/6 failure. Its failed preserved driver was rehashed unchanged and never executed again. No production or fixture patch was made for this control.
+
+The repository-preferred Nextest tool is staged in a private temporary directory from its verified official universal macOS release, with no global/project installation. First HeadInputs compilation/discovery is starting on Main36a plus five owned files; future runtime uses four isolated processes, no retries or assertion/deadline changes, with separate doctest/custom-harness accounting. This is a distinct runner/version/execution, not a fix claim for the old libtest failure. No local workspace/ARM/device action.
+
 ## 27 October 2026, 19:35 +07 — raw capture evidence and a routed lock failure
 
 [Raw capture historical packets](verification/writer-settings-capture-20261027/README.md) are now published with exact compile failure, first488/1/6 fixture failure, corrected491/0/6 and carry509/0/6 scopes. Empty-file ownership behavior was preserved; both owned and unowned cases are explicit after the fixture correction. No negative source was rerun to green.

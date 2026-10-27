@@ -1,0 +1,30 @@
+{
+  "classification": "INCONCLUSIVE: one baseline pass cannot establish a sporadic cause or waive the failed gate",
+  "observed_round_cohort": {
+    "passed": 198,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "threads": 4,
+    "runtime_invocations": 1
+  },
+  "earlier_failed_raw_scope": {
+    "head": "4f25de19abc3d98780a5796cf6cf96539b3863d6",
+    "base": "3f4b87969113a89795c814051501c4ba581418e9",
+    "passed": 509,
+    "failed": 1,
+    "ignored": 6,
+    "cause": "not established",
+    "preserved_driver_sha256": "22bcce49ece2bd6059f496ce2579d064331f97948a3d731174ee86ed4645b3a9",
+    "copy_still_intact_after_baseline": true,
+    "not_executed_again": true
+  },
+  "baseline_source_count": 7391,
+  "raw_source_snapshot_sha256": {
+    "before": "a754fbe403ac6a28e523d4cc3463104395af91f96229f55e36fecc817f00601c",
+    "after": "a754fbe403ac6a28e523d4cc3463104395af91f96229f55e36fecc817f00601c"
+  },
+  "fixture_and_Records_files_equal": 13,
+  "baseline_has_no_Raw_or_Receipt_patch": true,
+  "no_waiver_no_cause_assignment": true
+}

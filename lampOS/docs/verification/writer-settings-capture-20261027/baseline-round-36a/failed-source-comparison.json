@@ -1,0 +1,93 @@
+{
+  "failed_head": "4f25de19abc3d98780a5796cf6cf96539b3863d6",
+  "failed_base": "3f4b87969113a89795c814051501c4ba581418e9",
+  "baseline_head": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+  "fixture_and_records": {
+    "lampOS/crates/update/src/records.rs": {
+      "sha256": "8d561cb9619f6bee959ab666409043672cf71766e868c5b1f2f285f9137735f3",
+      "failed_entry": "100644 blob 4edb3438e36d4528f4dec707eda6735b4743dfd2\tlampOS/crates/update/src/records.rs",
+      "baseline_entry": "100644 blob 4edb3438e36d4528f4dec707eda6735b4743dfd2\tlampOS/crates/update/src/records.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round.rs": {
+      "sha256": "c52595c943d50b63e78e26f8d6242679b79e4e3652014834495c040c4773efd4",
+      "failed_entry": "100644 blob 489e82d23b48b8a70b3d2d7c997c48cd364e4230\tlampOS/crates/update/tests/round.rs",
+      "baseline_entry": "100644 blob 489e82d23b48b8a70b3d2d7c997c48cd364e4230\tlampOS/crates/update/tests/round.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/asleep_quiet.rs": {
+      "sha256": "92e96323d0d8d3516efb28857c09e77db3e7d67986a23d6f107b7d671e769615",
+      "failed_entry": "100644 blob f24bce8aabeb748ec367cc876259b0e08de10149\tlampOS/crates/update/tests/round/asleep_quiet.rs",
+      "baseline_entry": "100644 blob f24bce8aabeb748ec367cc876259b0e08de10149\tlampOS/crates/update/tests/round/asleep_quiet.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/head_touch.rs": {
+      "sha256": "d077b778efaacc4d6115d19f46d6944104b525cdf38443d34fa06a82a6dc5638",
+      "failed_entry": "100644 blob b9cef3a8b165f64b563cd44e56afb1609e25db08\tlampOS/crates/update/tests/round/head_touch.rs",
+      "baseline_entry": "100644 blob b9cef3a8b165f64b563cd44e56afb1609e25db08\tlampOS/crates/update/tests/round/head_touch.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/process_cuts.rs": {
+      "sha256": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c",
+      "failed_entry": "100644 blob 392156ef65d52fb0289867664ded4e6d75bba2f0\tlampOS/crates/update/tests/round/process_cuts.rs",
+      "baseline_entry": "100644 blob 392156ef65d52fb0289867664ded4e6d75bba2f0\tlampOS/crates/update/tests/round/process_cuts.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/product_carrier.rs": {
+      "sha256": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+      "failed_entry": "100644 blob c8d9e7b455b91e68e4a5741e8b580703d3201dd1\tlampOS/crates/update/tests/round/product_carrier.rs",
+      "baseline_entry": "100644 blob c8d9e7b455b91e68e4a5741e8b580703d3201dd1\tlampOS/crates/update/tests/round/product_carrier.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/restart_order.rs": {
+      "sha256": "a5ccc9f79612fbf2edb547e70910b17adc9dd0d01b3e21150ac7477c8ecf8acc",
+      "failed_entry": "100644 blob ad97da1bbb47f6924227930374e47df82d733de0\tlampOS/crates/update/tests/round/restart_order.rs",
+      "baseline_entry": "100644 blob ad97da1bbb47f6924227930374e47df82d733de0\tlampOS/crates/update/tests/round/restart_order.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/restart_quiet.rs": {
+      "sha256": "29b5404b6b61cfa8b44199dc06a7781bd18748d756e7b5a253d5c943993e9c73",
+      "failed_entry": "100644 blob 07dba33b317f8b789678a323a95aa11697c85d12\tlampOS/crates/update/tests/round/restart_quiet.rs",
+      "baseline_entry": "100644 blob 07dba33b317f8b789678a323a95aa11697c85d12\tlampOS/crates/update/tests/round/restart_quiet.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs": {
+      "sha256": "a6fbd54021a7e89acd0b0b012a3d6b9df21035554ebf00792303b4f48ed5c0ac",
+      "failed_entry": "100644 blob 357756e28b0fe397a2c46310eded0bc3e27b8566\tlampOS/crates/update/tests/round/runnable_event_controls.rs",
+      "baseline_entry": "100644 blob 357756e28b0fe397a2c46310eded0bc3e27b8566\tlampOS/crates/update/tests/round/runnable_event_controls.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/runnable_events.rs": {
+      "sha256": "c9c7efcb0e758eae4d8f6c6f6ab36b80de57419dd0bc5719b2f9faf46d3a1fee",
+      "failed_entry": "100644 blob 8f1d99ba24dc7f2aa807c018e519909351944139\tlampOS/crates/update/tests/round/runnable_events.rs",
+      "baseline_entry": "100644 blob 8f1d99ba24dc7f2aa807c018e519909351944139\tlampOS/crates/update/tests/round/runnable_events.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/self_cuts.rs": {
+      "sha256": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06",
+      "failed_entry": "100644 blob 876279be733d86116c59be4cfb1f13c2bf144792\tlampOS/crates/update/tests/round/self_cuts.rs",
+      "baseline_entry": "100644 blob 876279be733d86116c59be4cfb1f13c2bf144792\tlampOS/crates/update/tests/round/self_cuts.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/self_recovery.rs": {
+      "sha256": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+      "failed_entry": "100644 blob 78407621c2df0cd92acfb1b3cfa7314e0b045dce\tlampOS/crates/update/tests/round/self_recovery.rs",
+      "baseline_entry": "100644 blob 78407621c2df0cd92acfb1b3cfa7314e0b045dce\tlampOS/crates/update/tests/round/self_recovery.rs",
+      "bytes_equal": true
+    },
+    "lampOS/crates/update/tests/round/setup_lifecycle.rs": {
+      "sha256": "73a24b6d78c7e3ee9a2b3ca9f30e62d330b0f4d499817968e5415046b2d7da7b",
+      "failed_entry": "100644 blob 85cbbc6c2ab53ae5898c24712409e6a6d01eaa20\tlampOS/crates/update/tests/round/setup_lifecycle.rs",
+      "baseline_entry": "100644 blob 85cbbc6c2ab53ae5898c24712409e6a6d01eaa20\tlampOS/crates/update/tests/round/setup_lifecycle.rs",
+      "bytes_equal": true
+    }
+  },
+  "all_fixture_and_records_bytes_modes_equal": true,
+  "preserved_failed_driver": {
+    "path": "<private-path>",
+    "sha256": "22bcce49ece2bd6059f496ce2579d064331f97948a3d731174ee86ed4645b3a9",
+    "size": 20685960
+  },
+  "original_failure_not_executed_again": true,
+  "raw_Receipt_patches_absent_in_baseline": true
+}

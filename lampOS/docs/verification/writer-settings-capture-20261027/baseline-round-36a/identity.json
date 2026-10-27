@@ -1,0 +1,11 @@
+{
+  "head": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+  "tree": "191995496d67ff83817227b759eba95b734d61a1",
+  "branch": "second/raw-lock-baseline-20261027",
+  "unmodified_Main": true,
+  "no_raw_or_receipt_patch": true,
+  "source_count": 7391,
+  "controller_sha256": "8c2da2a7b80ee9623d4919043a15dc75122102a24c19f5f1334d9acec28032ef",
+  "cohort": "complete Update round integration target, four libtest workers, no filter",
+  "purpose": "One baseline control, not a retry of failed 4f25 source; a baseline pass cannot establish a sporadic cause or waive the retained failure."
+}

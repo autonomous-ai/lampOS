@@ -1,0 +1,30 @@
+{
+  "path": "<owned-target>/debug/deps/round-42e77f9cbb014d5a",
+  "sha256": "f401f403f33f8d31ecc2231c8846a1271ba53c494d9b1bf678354cfd6846d163",
+  "size": 20778552,
+  "package_id": "path+file://<baseline-tree>/lampOS/crates/update#lamp-update@0.1.0",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "round",
+    "src_path": "<baseline-tree>/lampOS/crates/update/tests/round.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "profile": {
+    "opt_level": "0",
+    "debuginfo": 2,
+    "debug_assertions": true,
+    "overflow_checks": true,
+    "test": true
+  },
+  "fresh": false,
+  "preserved": "<baseline-evidence>/round-driver",
+  "preserved_sha256": "f401f403f33f8d31ecc2231c8846a1271ba53c494d9b1bf678354cfd6846d163"
+}

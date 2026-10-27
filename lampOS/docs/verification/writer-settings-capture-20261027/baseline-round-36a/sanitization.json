@@ -1,0 +1,164 @@
+[
+  {
+    "file": "identity.json",
+    "raw_sha256": "0d723636c4bebf54c34be05176da7137dd15eab1e5b953c41b3cc06dc3470c95",
+    "sanitized_sha256": "0d723636c4bebf54c34be05176da7137dd15eab1e5b953c41b3cc06dc3470c95",
+    "published_sha256": "0d723636c4bebf54c34be05176da7137dd15eab1e5b953c41b3cc06dc3470c95",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "public-Main-before.json",
+    "raw_sha256": "154b47b0d201df8810b9550f4ba73e84f71fc6bee07979739c3f479c840928b7",
+    "sanitized_sha256": "154b47b0d201df8810b9550f4ba73e84f71fc6bee07979739c3f479c840928b7",
+    "published_sha256": "154b47b0d201df8810b9550f4ba73e84f71fc6bee07979739c3f479c840928b7",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "public-Main-after.txt",
+    "raw_sha256": "45bc3c9fd8f714e8de43e70da6dfc838e33abec1555c6cc1ce85ffe56005f819",
+    "sanitized_sha256": "45bc3c9fd8f714e8de43e70da6dfc838e33abec1555c6cc1ce85ffe56005f819",
+    "published_sha256": "45bc3c9fd8f714e8de43e70da6dfc838e33abec1555c6cc1ce85ffe56005f819",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "failed-source-comparison.json",
+    "raw_sha256": "8ff4580835c6dc9d5d524c0a94a65d88bffd512fb7198dbb79f4f963e951bb5b",
+    "sanitized_sha256": "218b0bdba6e78ffe0292b2db02d853675ec8cf8a477a4f884c77ebfce9cd1586",
+    "published_sha256": "218b0bdba6e78ffe0292b2db02d853675ec8cf8a477a4f884c77ebfce9cd1586",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "results.json",
+    "raw_sha256": "61bf654f04bef7e5a35e9e48b48266c60eabf024f42d38ae8fb079f35520637a",
+    "sanitized_sha256": "2b3d5e451ec57bf2a0768357f689f879cc09f19fccc4c4dc0cae42eae1c7d279",
+    "published_sha256": "2b3d5e451ec57bf2a0768357f689f879cc09f19fccc4c4dc0cae42eae1c7d279",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "census.json",
+    "raw_sha256": "4f5ace1b4d13d3d444eaa23f0cdba2601d9fb0c31313058451c97d70cf965c50",
+    "sanitized_sha256": "4f5ace1b4d13d3d444eaa23f0cdba2601d9fb0c31313058451c97d70cf965c50",
+    "published_sha256": "4f5ace1b4d13d3d444eaa23f0cdba2601d9fb0c31313058451c97d70cf965c50",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "closure.json",
+    "raw_sha256": "4192164af2400659cf33811e572261e9eab4cb394c15031e16ee075ee08dc79e",
+    "sanitized_sha256": "4192164af2400659cf33811e572261e9eab4cb394c15031e16ee075ee08dc79e",
+    "published_sha256": "4192164af2400659cf33811e572261e9eab4cb394c15031e16ee075ee08dc79e",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "driver-before.json",
+    "raw_sha256": "799dd7c615b9b63593c440cc1750de082d9aba8f222b04fef2cf6b8a65434585",
+    "sanitized_sha256": "1b719e9e2e8072f0f3a6caafa9e34d6e21113e24c2da34b3ca043c1f5c266958",
+    "published_sha256": "1b719e9e2e8072f0f3a6caafa9e34d6e21113e24c2da34b3ca043c1f5c266958",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "driver-final.json",
+    "raw_sha256": "6314d6f13702decf9fe35e4062dc5e75a150cfec39b1ac06ab677835cb13743c",
+    "sanitized_sha256": "cf922950bb2f3a5fa6a4b3a163f8210debe25fbb891499d4f0ab77cff1814dc8",
+    "published_sha256": "cf922950bb2f3a5fa6a4b3a163f8210debe25fbb891499d4f0ab77cff1814dc8",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "compile-artifacts.json",
+    "raw_sha256": "2e6b12d16d18f1752c0bb27adeb09e6eb9e38d40b380f4e9e6a4dafdc5a9050a",
+    "sanitized_sha256": "9f63f3de13bfab92b696ca0836173ada7f3d6f7d11d21705b27eff6af0e5efcc",
+    "published_sha256": "9f63f3de13bfab92b696ca0836173ada7f3d6f7d11d21705b27eff6af0e5efcc",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "target-reuse.json",
+    "raw_sha256": "b35bd8f48c83f5590726d6152011677a8a87d8925980d82bc7e87659624948ea",
+    "sanitized_sha256": "b35bd8f48c83f5590726d6152011677a8a87d8925980d82bc7e87659624948ea",
+    "published_sha256": "b35bd8f48c83f5590726d6152011677a8a87d8925980d82bc7e87659624948ea",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "cargo-configuration.json",
+    "raw_sha256": "340ec8fb0d3b99a36bd06bf1862b31760d5a236a720c6af38e551b3bb1d5dd15",
+    "sanitized_sha256": "9b08ed6ab43acbef367ee93818966f67562453b1cd61ef562ef05e31f9089a54",
+    "published_sha256": "9b08ed6ab43acbef367ee93818966f67562453b1cd61ef562ef05e31f9089a54",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "metadata-binding.json",
+    "raw_sha256": "3f2ef0ca2de61c69c156438917f80997ab244eae591073126a080e5b433d4e21",
+    "sanitized_sha256": "32403c88b5e58e5d3cf36881e80af2392701f4c33867e0778c5ec2c6a6625141",
+    "published_sha256": "32403c88b5e58e5d3cf36881e80af2392701f4c33867e0778c5ec2c6a6625141",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "tests.stdout",
+    "raw_sha256": "ad30a769cab77e8a6def9f1c706119cbda87ca62f7d5cd1950ee3611b620e0f0",
+    "sanitized_sha256": "ad30a769cab77e8a6def9f1c706119cbda87ca62f7d5cd1950ee3611b620e0f0",
+    "published_sha256": "2d990cb8e5e07fa018b9c78a51801d8d181281054d07e7d7cb62d7264a2c7426",
+    "prior_sanitized_trailing_lf": 2,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "tests.stderr",
+    "raw_sha256": "ab03cc7c2634cc7ab3bd5811aad208a1cb48d5ed6a44bc925da307b724634890",
+    "sanitized_sha256": "e1cbe7ad87a7218b1e31d90fb7c3f4f5a0fc2d0be7ce33ac539a3d3beade7d1f",
+    "published_sha256": "e1cbe7ad87a7218b1e31d90fb7c3f4f5a0fc2d0be7ce33ac539a3d3beade7d1f",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "compile.stderr",
+    "raw_sha256": "fb7661473029da92e412ce657749b5ca54b0718247bb9ed12352f1d4cca1d755",
+    "sanitized_sha256": "9d5784a8b0bbf7014d8d951630c1aa25512d53babb18739e4c2cc936d71b20b6",
+    "published_sha256": "9d5784a8b0bbf7014d8d951630c1aa25512d53babb18739e4c2cc936d71b20b6",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "rustc-version.txt",
+    "raw_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "sanitized_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "published_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  },
+  {
+    "file": "source-audit.md",
+    "raw_sha256": "623dd87eba2e3a6657ce0841e7ff7fd2b5560a1d23091207f5b5e3be687c968a",
+    "sanitized_sha256": "44a406063e153b66a7b479d3dcf0c005f8dc55df2bed8461ef00ae6ba1b49f6c",
+    "published_sha256": "44a406063e153b66a7b479d3dcf0c005f8dc55df2bed8461ef00ae6ba1b49f6c",
+    "prior_sanitized_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+  }
+]

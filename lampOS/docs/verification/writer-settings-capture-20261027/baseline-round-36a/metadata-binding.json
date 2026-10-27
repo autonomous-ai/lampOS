@@ -1,0 +1,250 @@
+{
+  "sha256": "a055ecbb1994470461c72e6383cb2d0d5ea6870b18ecc6ac22e587948075de2f",
+  "local_packages": [
+    {
+      "name": "lamp-actions",
+      "id": "path+file://<baseline-tree>/lampOS/crates/actions#lamp-actions@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/actions/Cargo.toml"
+    },
+    {
+      "name": "lamp-addons",
+      "id": "path+file://<baseline-tree>/lampOS/crates/addons#lamp-addons@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/addons/Cargo.toml"
+    },
+    {
+      "name": "lamp-air",
+      "id": "path+file://<baseline-tree>/lampOS/crates/air#lamp-air@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/air/Cargo.toml"
+    },
+    {
+      "name": "lamp-audio",
+      "id": "path+file://<baseline-tree>/lampOS/crates/audio#lamp-audio@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/audio/Cargo.toml"
+    },
+    {
+      "name": "lamp-body",
+      "id": "path+file://<baseline-tree>/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/body/Cargo.toml"
+    },
+    {
+      "name": "lamp-bus",
+      "id": "path+file://<baseline-tree>/lampOS/crates/bus#lamp-bus@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/bus/Cargo.toml"
+    },
+    {
+      "name": "lamp-camera",
+      "id": "path+file://<baseline-tree>/lampOS/crates/camera#lamp-camera@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/camera/Cargo.toml"
+    },
+    {
+      "name": "lamp-cloud",
+      "id": "path+file://<baseline-tree>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/cloud/Cargo.toml"
+    },
+    {
+      "name": "lamp-control",
+      "id": "path+file://<baseline-tree>/lampOS/crates/control#lamp-control@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/control/Cargo.toml"
+    },
+    {
+      "name": "lamp-controls",
+      "id": "path+file://<baseline-tree>/lampOS/crates/controls#lamp-controls@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/controls/Cargo.toml"
+    },
+    {
+      "name": "lamp-ears",
+      "id": "path+file://<baseline-tree>/lampOS/crates/ears#lamp-ears@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/ears/Cargo.toml"
+    },
+    {
+      "name": "lamp-environment",
+      "id": "path+file://<baseline-tree>/lampOS/crates/environment#lamp-environment@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/environment/Cargo.toml"
+    },
+    {
+      "name": "lamp-expression",
+      "id": "path+file://<baseline-tree>/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/expression/Cargo.toml"
+    },
+    {
+      "name": "lamp-eyes",
+      "id": "path+file://<baseline-tree>/lampOS/crates/eyes#lamp-eyes@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/eyes/Cargo.toml"
+    },
+    {
+      "name": "lamp-gemini",
+      "id": "path+file://<baseline-tree>/lampOS/crates/gemini#lamp-gemini@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/gemini/Cargo.toml"
+    },
+    {
+      "name": "lamp-health",
+      "id": "path+file://<baseline-tree>/lampOS/crates/health#lamp-health@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/health/Cargo.toml"
+    },
+    {
+      "name": "lamp-ipc",
+      "id": "path+file://<baseline-tree>/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/ipc/Cargo.toml"
+    },
+    {
+      "name": "lamp-keeper",
+      "id": "path+file://<baseline-tree>/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/keeper/Cargo.toml"
+    },
+    {
+      "name": "lamp-lean",
+      "id": "path+file://<baseline-tree>/lampOS/crates/lean#lamp-lean@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/lean/Cargo.toml"
+    },
+    {
+      "name": "lamp-local-time",
+      "id": "path+file://<baseline-tree>/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/local-time/Cargo.toml"
+    },
+    {
+      "name": "lamp-memory",
+      "id": "path+file://<baseline-tree>/lampOS/crates/memory#lamp-memory@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/memory/Cargo.toml"
+    },
+    {
+      "name": "lamp-mood",
+      "id": "path+file://<baseline-tree>/lampOS/crates/mood#lamp-mood@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/mood/Cargo.toml"
+    },
+    {
+      "name": "lamp-msgs",
+      "id": "path+file://<baseline-tree>/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/msgs/Cargo.toml"
+    },
+    {
+      "name": "lamp-name",
+      "id": "path+file://<baseline-tree>/lampOS/crates/name#lamp-name@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/name/Cargo.toml"
+    },
+    {
+      "name": "lamp-near-call",
+      "id": "path+file://<baseline-tree>/lampOS/crates/near-call#lamp-near-call@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/near-call/Cargo.toml"
+    },
+    {
+      "name": "lamp-observer",
+      "id": "path+file://<baseline-tree>/lampOS/crates/observer#lamp-observer@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/observer/Cargo.toml"
+    },
+    {
+      "name": "lamp-peek",
+      "id": "path+file://<baseline-tree>/lampOS/crates/peek#lamp-peek@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/peek/Cargo.toml"
+    },
+    {
+      "name": "lamp-policy",
+      "id": "path+file://<baseline-tree>/lampOS/crates/policy#lamp-policy@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/policy/Cargo.toml"
+    },
+    {
+      "name": "lamp-records",
+      "id": "path+file://<baseline-tree>/lampOS/crates/records#lamp-records@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/records/Cargo.toml"
+    },
+    {
+      "name": "lamp-ring",
+      "id": "path+file://<baseline-tree>/lampOS/crates/ring#lamp-ring@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/ring/Cargo.toml"
+    },
+    {
+      "name": "lamp-same-voice",
+      "id": "path+file://<baseline-tree>/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/same-voice/Cargo.toml"
+    },
+    {
+      "name": "lamp-schedule",
+      "id": "path+file://<baseline-tree>/lampOS/crates/schedule#lamp-schedule@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/schedule/Cargo.toml"
+    },
+    {
+      "name": "lamp-selftest",
+      "id": "path+file://<baseline-tree>/lampOS/crates/selftest#lamp-selftest@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/selftest/Cargo.toml"
+    },
+    {
+      "name": "lamp-settings",
+      "id": "path+file://<baseline-tree>/lampOS/crates/settings#lamp-settings@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/settings/Cargo.toml"
+    },
+    {
+      "name": "lamp-setup",
+      "id": "path+file://<baseline-tree>/lampOS/crates/setup#lamp-setup@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/setup/Cargo.toml"
+    },
+    {
+      "name": "lamp-skills",
+      "id": "path+file://<baseline-tree>/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/skills/Cargo.toml"
+    },
+    {
+      "name": "lamp-sound-fixtures",
+      "id": "path+file://<baseline-tree>/lampOS/crates/sound-fixtures#lamp-sound-fixtures@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/sound-fixtures/Cargo.toml"
+    },
+    {
+      "name": "lamp-station",
+      "id": "path+file://<baseline-tree>/lampOS/crates/station#lamp-station@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/station/Cargo.toml"
+    },
+    {
+      "name": "lamp-surround",
+      "id": "path+file://<baseline-tree>/lampOS/crates/surround#lamp-surround@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/surround/Cargo.toml"
+    },
+    {
+      "name": "lamp-tasks",
+      "id": "path+file://<baseline-tree>/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/tasks/Cargo.toml"
+    },
+    {
+      "name": "lamp-turn-end",
+      "id": "path+file://<baseline-tree>/lampOS/crates/turn-end#lamp-turn-end@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/turn-end/Cargo.toml"
+    },
+    {
+      "name": "lamp-turn-end-wire",
+      "id": "path+file://<baseline-tree>/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/turn-end-wire/Cargo.toml"
+    },
+    {
+      "name": "lamp-turn-owner",
+      "id": "path+file://<baseline-tree>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/turn-owner/Cargo.toml"
+    },
+    {
+      "name": "lamp-update",
+      "id": "path+file://<baseline-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/update/Cargo.toml"
+    },
+    {
+      "name": "lamp-voice",
+      "id": "path+file://<baseline-tree>/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "name": "lamp-voice-eval",
+      "id": "path+file://<baseline-tree>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/voice-eval/Cargo.toml"
+    },
+    {
+      "name": "lamp-voice-processes",
+      "id": "path+file://<baseline-tree>/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+      "manifest_path": "<baseline-tree>/lampOS/crates/voice-processes/Cargo.toml"
+    },
+    {
+      "name": "sonora",
+      "id": "path+file://<baseline-tree>/lampOS/third_party/sonora#0.2.0",
+      "manifest_path": "<baseline-tree>/lampOS/third_party/sonora/Cargo.toml"
+    },
+    {
+      "name": "tough",
+      "id": "path+file://<baseline-tree>/lampOS/vendor/tough#0.24.0",
+      "manifest_path": "<baseline-tree>/lampOS/vendor/tough/Cargo.toml"
+    }
+  ]
+}
