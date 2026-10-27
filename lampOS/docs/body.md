@@ -2009,7 +2009,10 @@ the factory's stands and the seated template unit all do; neither file says
 one is refused). A run with `--wake off` still refuses a head on its stop
 under the range. `lamp-body-measure` writes the file only with `--write`, never over one
 already there, and refuses a read taken with torque on (install.md, "At the
-factory, once per lamp").
+factory, once per lamp"). A read that stops short says why in its refusal:
+the port's preparation first (its lock folder must be the running user's or
+root's, mode 0700, with no group- or world-writable folder above it), then
+the plan's fault, then the port's cleanup.
 
 With `--seated` (#2163) the same read makes a seated file: `--home` as found,
 the default `--pitch-window` (checked the same way) and `--torque on`, and

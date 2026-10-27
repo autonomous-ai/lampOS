@@ -602,10 +602,25 @@ units stopped:
    folded and its head down as it lies when switched off:
 
    ```sh
+   # as an unprivileged user in the servo port's group (dialout), never root
+   install -d -m 0700 ~/measure-lock
    lamp-body-measure --device /dev/ttyACM0 --unit-id <this lamp> \
-     --lock-directory <the body's motor-lock folder> \
-     --write /etc/lampOS/body/lamp.env
+     --lock-directory ~/measure-lock --write ~/lamp.env
+   # then root installs the file it wrote
+   sudo install -o root -g root -m 0644 ~/lamp.env /etc/lampOS/body/lamp.env
    ```
+
+   `lamp-body-measure` runs **unprivileged**. As root it refuses by design:
+   a process with `CAP_SYS_ADMIN` could bypass the servo port's exclusive
+   lock (`preflight: CAP_SYS_ADMIN bypasses tty exclusivity; use an
+   unprivileged worker`). Its lock folder must be the running user's,
+   mode 0700, with no group- or world-writable folder above it, so neither
+   `/tmp` nor the body's own `/run/lampos-locks/motor` (owned by `lampos`)
+   will do for another user. The product's factory unit,
+   `deploy/units/lamp-body-measure.service`, runs it as the body's user for
+   the same reason. On lamp-75c9 (28 Oct) the root run and a `/tmp` lock
+   folder each refused with only "did not complete" until #3919 made it say
+   why.
 
    It reads the five joints once at rest with torque off
    (`lamp-body-inspect`'s read-only plan: no register writes, no torque, no
