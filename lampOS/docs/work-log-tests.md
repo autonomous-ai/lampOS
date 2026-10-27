@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 02:24 — current Reader module gates pass; carry pushed
+
+Ready for lamp-voice: no (fresh native checks and current reads pending).
+
+[Reader ecc qualification](verification/tests-reader-ecc-modules-20261028/) passes Reader4/0/0 plus trace6/0/0 once each on ecc34ddf5 / Maina17. Formatting, twelve-package strict Clippy, workspace/fresh compilation and all source,142 witness/three actual guards pass, groups closed. This is module scope, not full Voice. Both full owned blobs/patch remain identical to495. Exact-lease push closed0; original ARM40567455672/Linux40567455600 run now.
+
+The released Body cache moves to Moodbc0c03ef5 for one fresh full Expression package, without runtime reuse. Warm runs one matched full Maina17 control without Restart; candidate3882/1/15 remains failed. Skills555/0/9 and native7798/558Skills are separately green for current reads. Updater installed acceptance remains with its holder; no device access.
+
 ## 2026-10-28 02:13 — Skills original native green; current reads pending
 
 Ready for lamp-voice: no (current independent reads and latest-base disposition remain).

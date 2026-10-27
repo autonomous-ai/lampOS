@@ -1,0 +1,18 @@
+{"event": "start", "label": "cmd-fmt", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-fmt", "exit_code": 0, "wall_seconds": 13.100052}
+{"event": "start", "label": "cmd-metadata", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-metadata", "exit_code": 0, "wall_seconds": 0.994678}
+{"event": "start", "label": "cmd-strict", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-strict", "exit_code": 0, "wall_seconds": 75.322539}
+{"event": "start", "label": "cmd-workspace", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-workspace", "exit_code": 0, "wall_seconds": 0.931381}
+{"event": "start", "label": "cmd-Voice-lib-compile", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-Voice-lib-compile", "exit_code": 0, "wall_seconds": 273.920076}
+{"event": "start", "label": "cmd-inventory-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-all", "exit_code": 0, "wall_seconds": 2.174172}
+{"event": "start", "label": "cmd-inventory-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-ignored", "exit_code": 0, "wall_seconds": 0.100051}
+{"event": "start", "label": "cmd-module-session_reader", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-module-session_reader", "exit_code": 0, "wall_seconds": 0.205505}
+{"event": "start", "label": "cmd-module-service_trace", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-module-service_trace", "exit_code": 0, "wall_seconds": 0.343515}

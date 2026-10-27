@@ -1,0 +1,62 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-skills-canonical-20261028/lampOS",
+  "started_at": "2026-10-27T19:08:22.281864+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-Voice-lib-compile.stdout.txt",
+  "stderr": "cmd-Voice-lib-compile.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 97792,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 271,
+  "disk_last_available_bytes": 5030735872,
+  "disk_minimum_available_bytes": 5030735872,
+  "available_bytes_before_Cargo": 5509287936,
+  "owned_pid": 97792,
+  "owned_process_group": 97792,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 273.920076,
+  "finished_at": "2026-10-27T19:12:56.194544+00:00",
+  "stdout_sha256": "1301617cbd7864ca3a0a7fec85396ca3cde3d46337b30a767febc3fe57cd64ff",
+  "stdout_bytes": 253967,
+  "stderr_sha256": "7164b1030baac6ecc82714dca35c3b37d96746ce440ff17aa403ee857bd1ca3c",
+  "stderr_bytes": 2844
+}

@@ -1,0 +1,215 @@
+{
+  "status": "ROOT_REVIEWED_CLOSED_RELEASE_FOR_READER",
+  "released_for_head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+  "parent_terminal": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/terminal.json",
+    "sha256": "9885485e359dcd49995cd818b6a00d885b7bf2d4b40126d396cae1c77a896e53",
+    "bytes": 1613
+  },
+  "parent_native": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/native-controller-result.json",
+    "sha256": "d8d986f3cabdda4f234c91ebbfb8315923964b8dbb9f9a851818e594ce10480b",
+    "bytes": 472
+  },
+  "native_exit_field": "exit_code",
+  "retained_parent_outcome": {
+    "status": "PASS",
+    "native_exit": 0,
+    "scope": "One full Skills555PASS/0FAIL/9ignored only; no Voice runtime transfer"
+  },
+  "parent_source_before": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/source-before.json",
+    "sha256": "64cc0978139701be39bdbb481c0b9d39423c61030d4da76f228c59fe533b5da1",
+    "bytes": 2457860
+  },
+  "parent_source_after": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/source-after.json",
+    "sha256": "64cc0978139701be39bdbb481c0b9d39423c61030d4da76f228c59fe533b5da1",
+    "bytes": 2457860
+  },
+  "parent_files_key": "files",
+  "parent_command_receipts": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-fmt.json",
+      "sha256": "721fc6742755152aac1772e7e47bd939220fcd56c4a9733c2d7c102d9f8f5989",
+      "bytes": 1849
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-full-skills.json",
+      "sha256": "ce5eeb4cb3ee2e1d9a07d78acf5d5d5ce16518a029d8c8f37863f4d7b3130e6f",
+      "bytes": 1990
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-0-all.json",
+      "sha256": "08e5255719359d2e2505d583c5d0c36a351471bcae5a125d33e0452db7cbe358",
+      "bytes": 1918
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-0-ignored.json",
+      "sha256": "0ac45499956f880129e79eb0972247fa1914187df7823fb5e46e3d9ea30e2a24",
+      "bytes": 1940
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-1-all.json",
+      "sha256": "11cf85af6eb46c5a816198b53e1dd5bd93748eb92f68fdbcc6f8d76a772124d5",
+      "bytes": 1914
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-1-ignored.json",
+      "sha256": "c6f7572a8c792a6340f59aab3e48ece22b8ce99a9f3f67f66056f6fab77fe1e7",
+      "bytes": 1936
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-2-all.json",
+      "sha256": "45f703dec75e41e333bc50ca76e380184b8831c081177044c8bfacd316640b38",
+      "bytes": 1914
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-2-ignored.json",
+      "sha256": "1d74150bafcd2047f3287bd0e8e82b2072779ed0f2cd07721ee1e982b2d6c36b",
+      "bytes": 1939
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-3-all.json",
+      "sha256": "79ca832f9708401116b50d6e082331be1b896eaad709dd6a5b7c0aad6dae45e6",
+      "bytes": 1906
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-3-ignored.json",
+      "sha256": "a46fbceb281832dc9ebf79d7701846ec51dfdb2bd43be8aa2fe47a8cbb5314a2",
+      "bytes": 1927
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-4-all.json",
+      "sha256": "90053527170bcecc6739d7c24e5fdc00e8d80364ad4378048917568e11d8b64c",
+      "bytes": 1913
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-inventory-4-ignored.json",
+      "sha256": "4ba71690ba0231f21e01ea6eb12dfcde9fb4b20be874d14313559a04e3b63b2d",
+      "bytes": 1936
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-metadata.json",
+      "sha256": "2b648537fa04b14f1596def120745aa18228f15d58dc43b827a8d02052104f5b",
+      "bytes": 1906
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-strict.json",
+      "sha256": "95ff1a96df87943fc90fcd37bae1406122038f3151d9aeb9fd7ed9f6f1564611",
+      "bytes": 2329
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-test-compile.json",
+      "sha256": "adbff3971f7fc5ea095df6ddbcbaa48decbd2088b3e8b39e3977863329eed9d7",
+      "bytes": 1981
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/cmd-workspace.json",
+      "sha256": "eea8414313f76285d83699ae3985050f30d0b9bf4dec8ced7c1500b00cf2259d",
+      "bytes": 1950
+    }
+  ],
+  "parent_command_expected_exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "source_guard_fields": [
+    "source_unchanged",
+    "official_owner_unchanged",
+    "sealed_and_actual_guards"
+  ],
+  "parent_protected_count_field": "protected_count",
+  "sealed_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/protected-after.json",
+    "sha256": "0cf67f07a928ed5d4ef01b334c3ff60d25ae5df30be67ab8ce15f09bd54f3006",
+    "bytes": 58643
+  },
+  "retired_mutable_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/actual-after.json",
+    "sha256": "68f5ceb2ece375f7feb12f52e091f1cfe27034a85d0af44d714461d75dea0295",
+    "bytes": 11370
+  },
+  "mutable_schema": "direct",
+  "release_verified_bindings": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-skills-to-reader-20261028/verified-bindings.json",
+    "sha256": "d92a85f0543356a71b4052b209ae670bba51047f6ab26ca068b5f6d4ea0212ba",
+    "bytes": 62411
+  },
+  "sealed_count": 139,
+  "retired_mutable_count": 7,
+  "release_receipt": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-skills-to-reader-20261028/release.json",
+    "sha256": "ec3d13acec8ee5767edb2940a7d4038c13c70873cf060d05d91dbd4283245af7",
+    "bytes": 970
+  },
+  "raw_release_status": "CLOSED_VERIFIED_SKILLS_RELEASE",
+  "raw_release_count_fields": {
+    "sealed": "protected_count",
+    "actual": "actual_count"
+  },
+  "raw_release_true_fields": {
+    "sealed_verified": "full_hash_metadata_verified",
+    "actual_verified": "full_hash_metadata_verified",
+    "actual_retired": "actual_bindings_retired",
+    "lsof_closed": "lsof_no_open_target_file",
+    "groups_closed": "owned_groups_previously_closed",
+    "no_failure_waiver": "no_historical_failure_waived"
+  },
+  "release_lsof_stdout": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-skills-to-reader-20261028/lsof.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "release_lsof_stderr": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-skills-to-reader-20261028/lsof.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ],
+  "retained_prior_receipts": {
+    "b7_original_native_failure": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-original-ci-20261027/audit.json",
+      "sha256": "0ef0404dd8c92047d9c5f2d9c0b4b550ad43299b248d1cb712d682ec66b7400e",
+      "bytes": 11773
+    },
+    "candidate_full_Mac_failure": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep/terminal.json",
+      "sha256": "e203a26a29fe09b2dfcdf0cad65d3d89f6d8488c206f9dda6f656477401d2656",
+      "bytes": 874
+    },
+    "isolated_Main_control_inconclusive": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep/terminal.json",
+      "sha256": "710c8436fb713d9128225175904d77857838ebc5e05dd30a16f768c10997e766",
+      "bytes": 1748
+    },
+    "Main_full_context_failure": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-full-context-control-prep/terminal.json",
+      "sha256": "5d307b18ad6ec652e0bc75fb99f12a8b3b451c6ec433c14e8855d0b338e307d1",
+      "bytes": 1233
+    },
+    "old_b7_Reader4_Trace6_only": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep/terminal.json",
+      "sha256": "807a05559145d2c7ad73c1e29c20eab214455f1e4924de7c63b9d39884bafa82",
+      "bytes": 1924
+    }
+  },
+  "source_handoff_only_no_compiler_allocation": true
+}

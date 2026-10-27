@@ -1,0 +1,33 @@
+{
+  "require_escalated": true,
+  "root_review_approved": true,
+  "exclusive_target": true,
+  "exclusive_canonical_source": true,
+  "exclusive_official_source": true,
+  "parent_closed_and_target_released": true,
+  "independent_gate_after_failed_parent_authorized": true,
+  "controller_sha256": "caaea2f1f43ba48d8afdd691f7df6602de2e2682fe1018de180c862857fa6937",
+  "plan_sha256": "2c2ac4a7ade121539bea115cb6f32ed521422a5e764704a9decb449728997187",
+  "compiler_lease": "root-reader-a17-first-released-cache",
+  "allocation": {
+    "head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+    "worktree": "/private/tmp/tests-skills-canonical-20261028",
+    "target": "/private/tmp/tests-body-holder-cargo-20261027",
+    "target_dev_ino": [
+      16777222,
+      487951267
+    ],
+    "gate": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028"
+  },
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "declared_other_activity": "Reader on the separate Body cache; warm cache reserved for matched Main control after failed Restart release; current Skills native CI audit. Each local compiler jobs1, distinct canonical/official sources and targets. No shared target/source writer."
+  },
+  "execution": "ROOT_APPROVED",
+  "exclusive_source": true,
+  "parent_closed_and_released": true,
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ]
+}

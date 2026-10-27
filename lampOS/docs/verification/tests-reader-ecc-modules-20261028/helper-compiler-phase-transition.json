@@ -1,0 +1,46 @@
+{
+  "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-same-voice": {
+    "before": {
+      "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+      "bytes": 74262104,
+      "mode": 493,
+      "mtime_ns": 1793126261622137167,
+      "device": 16777222,
+      "inode": 489498839,
+      "kind": "file"
+    },
+    "after": {
+      "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+      "bytes": 74262104,
+      "mode": 493,
+      "mtime_ns": 1793126261622137167,
+      "device": 16777222,
+      "inode": 489498839,
+      "kind": "file"
+    },
+    "metadata_derived_normal_alias": true,
+    "only_prospectively_allowed_change": "inode for this unconsumed compiler-phase alias; active guards begin after compile"
+  },
+  "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-voice": {
+    "before": {
+      "sha256": "6d5bd1b06f4060cb520562674fd73467a44e5dd7d207baa83618d752854fadb2",
+      "bytes": 42707024,
+      "mode": 493,
+      "mtime_ns": 1793126298788194482,
+      "device": 16777222,
+      "inode": 489498870,
+      "kind": "file"
+    },
+    "after": {
+      "sha256": "6d5bd1b06f4060cb520562674fd73467a44e5dd7d207baa83618d752854fadb2",
+      "bytes": 42707024,
+      "mode": 493,
+      "mtime_ns": 1793126298788194482,
+      "device": 16777222,
+      "inode": 489498870,
+      "kind": "file"
+    },
+    "metadata_derived_normal_alias": true,
+    "only_prospectively_allowed_change": "inode for this unconsumed compiler-phase alias; active guards begin after compile"
+  }
+}

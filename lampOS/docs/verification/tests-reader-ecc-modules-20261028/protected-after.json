@@ -1,0 +1,1176 @@
+{
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-control-20261027/baseline-BodyBIN-frozen": {
+    "sha256": "38d409a772e9b539a1b2bb6629e2b0653718131cba2d15e204a8be686e5d0542",
+    "bytes": 2374176,
+    "mode": 493,
+    "mtime_ns": 1793105557201623780,
+    "device": 16777222,
+    "inode": 487956825
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-green-20261027/focused-BodyBIN-frozen": {
+    "sha256": "2a8fb87d2e6a5a359ad15b1db255158b729335f48c00e0d55bbe7fa0d23ebc63",
+    "bytes": 2374008,
+    "mode": 493,
+    "mtime_ns": 1793105810721955121,
+    "device": 16777222,
+    "inode": 487968616
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/00-4e04cc62ae71087b-head_plan": {
+    "sha256": "4e04cc62ae71087be8655981d7126aa21427646d697ceffaaec15664e9eaf70f",
+    "bytes": 1276904,
+    "mode": 493,
+    "mtime_ns": 1793107332436051910,
+    "device": 16777222,
+    "inode": 488130950,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/01-01e8d2f04da71c57-it-07706637f0b19898": {
+    "sha256": "01e8d2f04da71c572c4758d0f92ad514cbc62c31f8a09628be15c4f63e7a9358",
+    "bytes": 5460808,
+    "mode": 493,
+    "mtime_ns": 1793107336023080492,
+    "device": 16777222,
+    "inode": 488130956,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/02-32c676439c347af3-lamp-body-measure": {
+    "sha256": "32c676439c347af3c985aeb880c6b2bbf29b061e90953fbc20e34d124c680e21",
+    "bytes": 651192,
+    "mode": 493,
+    "mtime_ns": 1793107336818075074,
+    "device": 16777222,
+    "inode": 488130962,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/03-5b1320818c7c37ef-expression_ask": {
+    "sha256": "5b1320818c7c37ef9ccd7da09247bc74e69dc5ec942e88955cd380be2ec4356b",
+    "bytes": 1240440,
+    "mode": 493,
+    "mtime_ns": 1793107337401436757,
+    "device": 16777222,
+    "inode": 488130966,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/04-81c38c2646d2b140-lamp-body-inspect": {
+    "sha256": "81c38c2646d2b1404b52a6b4a2f712a32bd97f315105e42893e4678d3e06680e",
+    "bytes": 467312,
+    "mode": 493,
+    "mtime_ns": 1793107337903014977,
+    "device": 16777222,
+    "inode": 488130971,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/05-4fee4e8791b5e925-lamp-body": {
+    "sha256": "4fee4e8791b5e92570a8755fed55bba74e2989b252f288cd36e2b1716f879eb9",
+    "bytes": 768888,
+    "mode": 493,
+    "mtime_ns": 1793107338594947824,
+    "device": 16777222,
+    "inode": 488130974,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/06-2a8fb87d2e6a5a35-lamp_body-10bead6294e486b1": {
+    "sha256": "2a8fb87d2e6a5a359ad15b1db255158b729335f48c00e0d55bbe7fa0d23ebc63",
+    "bytes": 2374008,
+    "mode": 493,
+    "mtime_ns": 1793105810721955121,
+    "device": 16777222,
+    "inode": 488130979,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/07-8ea0f40024a3cc4a-lamp_body_inspect-6de20c32d43c0976": {
+    "sha256": "8ea0f40024a3cc4a3dac4e419e0acc6f64c5b90cf0920c4b5fd9c3e677d08ea1",
+    "bytes": 1021360,
+    "mode": 493,
+    "mtime_ns": 1793107339063278340,
+    "device": 16777222,
+    "inode": 488130981,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/08-2937de09ad6c7d90-lamp_body_worker-e85c6897f314c8e1": {
+    "sha256": "2937de09ad6c7d904e0aa2da9489250e0c396fc91ccd9f5d3e1161e2ce81fca5",
+    "bytes": 1043496,
+    "mode": 493,
+    "mtime_ns": 1793107339559156387,
+    "device": 16777222,
+    "inode": 488130982,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/09-1efb87f4020e82a8-lamp-body-worker": {
+    "sha256": "1efb87f4020e82a8641aad99b4a9ce0a2d7e1b9278c2616eabbebdcbda932fb5",
+    "bytes": 490408,
+    "mode": 493,
+    "mtime_ns": 1793107340062191525,
+    "device": 16777222,
+    "inode": 488130985,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/10-8b7251e6c7d79948-lamp_body_measure-c40175aaddd4dd7e": {
+    "sha256": "8b7251e6c7d799480df4da2e8f2a3a184771143ee051de7866a43ef6e57edad6",
+    "bytes": 1282296,
+    "mode": 493,
+    "mtime_ns": 1793107340834596135,
+    "device": 16777222,
+    "inode": 488130990,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/11-d1ce72808da30c91-lamp_body_mood-7a4f3a098dd77b80": {
+    "sha256": "d1ce72808da30c91365dba3c853dcc17ccd70c4bf859a1f1e3f786f37c78f2e8",
+    "bytes": 1031272,
+    "mode": 493,
+    "mtime_ns": 1793107341312897203,
+    "device": 16777222,
+    "inode": 488130993,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/12-cf321d7530c74515-lamp-body-mood": {
+    "sha256": "cf321d7530c745151102df38543eaf436acc24ba6478ea9b50f71c985077ac65",
+    "bytes": 473720,
+    "mode": 493,
+    "mtime_ns": 1793107341740511263,
+    "device": 16777222,
+    "inode": 488130996,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-full-gates-v2-20261027/frozen/13-e7427d25f1237654-lamp_body-b26cec69ce4d8acd": {
+    "sha256": "e7427d25f123765462b2f15fb42037fa661e15573ffaa91906fbcf0ce7e1267d",
+    "bytes": 17494080,
+    "mode": 493,
+    "mtime_ns": 1793107360245269383,
+    "device": 16777222,
+    "inode": 488130998,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/00-1efb87f4020e82a8-lamp-body-worker": {
+    "sha256": "1efb87f4020e82a8641aad99b4a9ce0a2d7e1b9278c2616eabbebdcbda932fb5",
+    "bytes": 490408,
+    "mode": 493,
+    "mtime_ns": 1793107340062191525,
+    "device": 16777222,
+    "inode": 488160110,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/01-01e8d2f04da71c57-it-07706637f0b19898": {
+    "sha256": "01e8d2f04da71c572c4758d0f92ad514cbc62c31f8a09628be15c4f63e7a9358",
+    "bytes": 5460808,
+    "mode": 493,
+    "mtime_ns": 1793107336023080492,
+    "device": 16777222,
+    "inode": 488160111,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/02-8b7251e6c7d79948-lamp_body_measure-c40175aaddd4dd7e": {
+    "sha256": "8b7251e6c7d799480df4da2e8f2a3a184771143ee051de7866a43ef6e57edad6",
+    "bytes": 1282296,
+    "mode": 493,
+    "mtime_ns": 1793107340834596135,
+    "device": 16777222,
+    "inode": 488160112,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/03-81c38c2646d2b140-lamp-body-inspect": {
+    "sha256": "81c38c2646d2b1404b52a6b4a2f712a32bd97f315105e42893e4678d3e06680e",
+    "bytes": 467312,
+    "mode": 493,
+    "mtime_ns": 1793107337903014977,
+    "device": 16777222,
+    "inode": 488160113,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/04-d1ce72808da30c91-lamp_body_mood-7a4f3a098dd77b80": {
+    "sha256": "d1ce72808da30c91365dba3c853dcc17ccd70c4bf859a1f1e3f786f37c78f2e8",
+    "bytes": 1031272,
+    "mode": 493,
+    "mtime_ns": 1793107341312897203,
+    "device": 16777222,
+    "inode": 488160114,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/05-8ea0f40024a3cc4a-lamp_body_inspect-6de20c32d43c0976": {
+    "sha256": "8ea0f40024a3cc4a3dac4e419e0acc6f64c5b90cf0920c4b5fd9c3e677d08ea1",
+    "bytes": 1021360,
+    "mode": 493,
+    "mtime_ns": 1793107339063278340,
+    "device": 16777222,
+    "inode": 488160115,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/06-2a8fb87d2e6a5a35-lamp_body-10bead6294e486b1": {
+    "sha256": "2a8fb87d2e6a5a359ad15b1db255158b729335f48c00e0d55bbe7fa0d23ebc63",
+    "bytes": 2374008,
+    "mode": 493,
+    "mtime_ns": 1793107759451111538,
+    "device": 16777222,
+    "inode": 488160116,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/07-5b1320818c7c37ef-expression_ask": {
+    "sha256": "5b1320818c7c37ef9ccd7da09247bc74e69dc5ec942e88955cd380be2ec4356b",
+    "bytes": 1240440,
+    "mode": 493,
+    "mtime_ns": 1793107337401436757,
+    "device": 16777222,
+    "inode": 488160117,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/08-cf321d7530c74515-lamp-body-mood": {
+    "sha256": "cf321d7530c745151102df38543eaf436acc24ba6478ea9b50f71c985077ac65",
+    "bytes": 473720,
+    "mode": 493,
+    "mtime_ns": 1793107341740511263,
+    "device": 16777222,
+    "inode": 488160118,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/09-2937de09ad6c7d90-lamp_body_worker-e85c6897f314c8e1": {
+    "sha256": "2937de09ad6c7d904e0aa2da9489250e0c396fc91ccd9f5d3e1161e2ce81fca5",
+    "bytes": 1043496,
+    "mode": 493,
+    "mtime_ns": 1793107339559156387,
+    "device": 16777222,
+    "inode": 488160119,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/10-4e04cc62ae71087b-head_plan": {
+    "sha256": "4e04cc62ae71087be8655981d7126aa21427646d697ceffaaec15664e9eaf70f",
+    "bytes": 1276904,
+    "mode": 493,
+    "mtime_ns": 1793107332436051910,
+    "device": 16777222,
+    "inode": 488160120,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/11-4fee4e8791b5e925-lamp-body": {
+    "sha256": "4fee4e8791b5e92570a8755fed55bba74e2989b252f288cd36e2b1716f879eb9",
+    "bytes": 768888,
+    "mode": 493,
+    "mtime_ns": 1793107759911655083,
+    "device": 16777222,
+    "inode": 488160121,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/12-32c676439c347af3-lamp-body-measure": {
+    "sha256": "32c676439c347af3c985aeb880c6b2bbf29b061e90953fbc20e34d124c680e21",
+    "bytes": 651192,
+    "mode": 493,
+    "mtime_ns": 1793107336818075074,
+    "device": 16777222,
+    "inode": 488160122,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-holder-buffer-026-current-gates-20261027/frozen/13-e7427d25f1237654-lamp_body-b26cec69ce4d8acd": {
+    "sha256": "e7427d25f123765462b2f15fb42037fa661e15573ffaa91906fbcf0ce7e1267d",
+    "bytes": 17494080,
+    "mode": 493,
+    "mtime_ns": 1793107360245269383,
+    "device": 16777222,
+    "inode": 488160123,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/1-peek-dd79617fbcee49da": {
+    "sha256": "0bb6d823e9bc3a7c2aed9b685777e60035fcc6ada7ff6edd992ff37099cbca64",
+    "bytes": 6819248,
+    "mode": 493,
+    "mtime_ns": 1793116761880108528,
+    "device": 16777222,
+    "inode": 488784301
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/2-lamp-peek": {
+    "sha256": "225f1555a2f9245a44f92cae630082c37b7458c4fdc23a9ffb396c3fd92421cb",
+    "bytes": 5946120,
+    "mode": 493,
+    "mtime_ns": 1793116762796452735,
+    "device": 16777222,
+    "inode": 488784302
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/3-lamp_peek-85e82104b44dcbfe": {
+    "sha256": "c1c4ed3067597b36f3ef572129e8ae7f1dd13bb69597c408c94fe6f650a6937f",
+    "bytes": 941832,
+    "mode": 493,
+    "mtime_ns": 1793116763072078632,
+    "device": 16777222,
+    "inode": 488784304
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/4-release_pair-9c7cffaf09346c26": {
+    "sha256": "30f0aed6d8972d240eb7b3b975bd85af52b4cfe3dec0e943649905ff2ba7d381",
+    "bytes": 2522508,
+    "mode": 493,
+    "mtime_ns": 1793116764005288953,
+    "device": 16777222,
+    "inode": 488784305
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/5-it-c47260ba6f38d90d": {
+    "sha256": "1ccdb507fab935c81bbfa8610c2d96d3ddc60b2185eb5390d9cac967cd16989d",
+    "bytes": 15643124,
+    "mode": 493,
+    "mtime_ns": 1793116766598084111,
+    "device": 16777222,
+    "inode": 488784306
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/6-lamp-cloud": {
+    "sha256": "65fb2430a71b83d1be18e02d5489fbe0a49b109381f271faa818e7aeb48bced3",
+    "bytes": 23712752,
+    "mode": 493,
+    "mtime_ns": 1793116767939285543,
+    "device": 16777222,
+    "inode": 488784307
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/7-lamp_cloud-c6fb04859c0e9773": {
+    "sha256": "57cfbc8677e86d42f17cbebcf9d4194700d2f5ae325156e547bbadbfa0991090",
+    "bytes": 941832,
+    "mode": 493,
+    "mtime_ns": 1793116768570594729,
+    "device": 16777222,
+    "inode": 488784308
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/8-lamp_voice_eval-950f5ab79bd5b913": {
+    "sha256": "ba3bf13692f83c2c35153483e4b1c30376d7e458ffa75f9eb97d2be82fc71139",
+    "bytes": 24709292,
+    "mode": 493,
+    "mtime_ns": 1793116785722013828,
+    "device": 16777222,
+    "inode": 488784309
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/9-it-917370f90cac6422": {
+    "sha256": "820feca6acc3b4384dc0eeac352701d152cd1136255737c5e06217ed20d31583",
+    "bytes": 15992904,
+    "mode": 493,
+    "mtime_ns": 1793116791746483768,
+    "device": 16777222,
+    "inode": 488784312
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/10-turn_end_replay": {
+    "sha256": "c1fb43642090498860f6b59a8490de3bd0e04e727fc070976119002030a96992",
+    "bytes": 75495896,
+    "mode": 493,
+    "mtime_ns": 1793116793653673029,
+    "device": 16777222,
+    "inode": 488784313
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/11-lamp_voice_eval-8f91f7c6d8f2bad9": {
+    "sha256": "ef55e35bbf5fcd022c14f24e6c97014b5e2348cf92cfdb252a2906669f206f66",
+    "bytes": 6525796,
+    "mode": 493,
+    "mtime_ns": 1793116795234008382,
+    "device": 16777222,
+    "inode": 488784316
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/12-same_voice_pairs": {
+    "sha256": "14eec12c36cfdd10e6a50973d5d310590701ae9cfd546bcdffc005e81969aa14",
+    "bytes": 75589688,
+    "mode": 493,
+    "mtime_ns": 1793116796840495094,
+    "device": 16777222,
+    "inode": 488784318
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/13-lamp-voice-eval": {
+    "sha256": "47c931de104f2020fc6dfa920097248d41f610a17d0240270f4e1c402510f641",
+    "bytes": 29114400,
+    "mode": 493,
+    "mtime_ns": 1793116799943532646,
+    "device": 16777222,
+    "inode": 488784321
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/14-lamp_skills-969365a9cbc4e1d2": {
+    "sha256": "56038a3e7f8a44474a16aca078d5d33b6a63312458810ea926851fa2c7bf1af5",
+    "bytes": 14296388,
+    "mode": 493,
+    "mtime_ns": 1793116810624411714,
+    "device": 16777222,
+    "inode": 488784326
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/15-release_pair-5425c4f10988776f": {
+    "sha256": "287dd7f247e906bb3564a4bd55ef661dacb32999408932193fb849325259579a",
+    "bytes": 3699224,
+    "mode": 493,
+    "mtime_ns": 1793116812458421263,
+    "device": 16777222,
+    "inode": 488784332
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/16-requested_audio-4e2510efa0b31e5e": {
+    "sha256": "45fed7d4112065e23118eea807929c9422570bc76f8487f48db6af58f4277da4",
+    "bytes": 13333252,
+    "mode": 493,
+    "mtime_ns": 1793116813942793432,
+    "device": 16777222,
+    "inode": 488784334
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/17-lamp_skills-084a204c64456106": {
+    "sha256": "6f97eb170e70c113deeb2fb95d2134a973ff0de5c2a3a11299a63a3b9c2214ea",
+    "bytes": 13446540,
+    "mode": 493,
+    "mtime_ns": 1793116816029525685,
+    "device": 16777222,
+    "inode": 488784335
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/18-it-83ee94a025272207": {
+    "sha256": "ea9cafee96aa2ee387e73c77506c4dfbcac843beff2b2729b23d6a7406b77d94",
+    "bytes": 25842468,
+    "mode": 493,
+    "mtime_ns": 1793116826189358043,
+    "device": 16777222,
+    "inode": 488784338
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/19-render_relaxing_music": {
+    "sha256": "522f15f1f13b7746a6540c366aa7800f5d26f86140367504bcbff394ad020f24",
+    "bytes": 548464,
+    "mode": 493,
+    "mtime_ns": 1793116826651817808,
+    "device": 16777222,
+    "inode": 488784339
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/20-lamp_cloud-f829cf86205db7d5": {
+    "sha256": "551bb4852feef6d6fe112f2ed1fba86dd08bad90b0e46e1edae1a9b8259b19e3",
+    "bytes": 29579144,
+    "mode": 493,
+    "mtime_ns": 1793116840967565525,
+    "device": 16777222,
+    "inode": 488784340
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/21-lamp_setup-37b78ede12db928c": {
+    "sha256": "1a6a90f5cd7e071738e27de5003a38b0dd9bdc9b1bd8da06e0a56a26b2444fd5",
+    "bytes": 941832,
+    "mode": 493,
+    "mtime_ns": 1793116841514007215,
+    "device": 16777222,
+    "inode": 488784341
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/22-it-dd5d708f0033e1f2": {
+    "sha256": "218e5bd8c586bdebda2db8a899efe6134ed293dadb4cb3f3ecb07a28137b3939",
+    "bytes": 12712204,
+    "mode": 493,
+    "mtime_ns": 1793116845538079582,
+    "device": 16777222,
+    "inode": 488784342
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/23-lamp-setup": {
+    "sha256": "34df00dc0990d53354dccb341f9fb7423904b956bc469c94588c87df3cbfde8c",
+    "bytes": 15684432,
+    "mode": 493,
+    "mtime_ns": 1793116847327931123,
+    "device": 16777222,
+    "inode": 488784343
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/24-wake-dabb3abe438bd29a": {
+    "sha256": "2e837e6bed052000d12a1af3c25aed178aedd245d0aac7a473a6a91794ac4f68",
+    "bytes": 1480912,
+    "mode": 493,
+    "mtime_ns": 1793116847991568540,
+    "device": 16777222,
+    "inode": 488784345
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/25-lamp_voice-e58141fb20c66240": {
+    "sha256": "1c0a608f560d1763f9edb064391ca27c787baad8109aadd114604d8e5f0d20ea",
+    "bytes": 117172968,
+    "mode": 493,
+    "mtime_ns": 1793116985323570761,
+    "device": 16777222,
+    "inode": 488784348
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/26-hearing_replay": {
+    "sha256": "5e76b51ad4a7c426104dd818bf90ef449ae9e1ec4f3805d4cd7b0e79450a1f2b",
+    "bytes": 1646328,
+    "mode": 493,
+    "mtime_ns": 1793116986862026391,
+    "device": 16777222,
+    "inode": 488784359
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/27-ring_process_probe": {
+    "sha256": "f12291c986da3ed28d19674ef4bcf5b3556023f454f73f1d3a5bce3c18f53086",
+    "bytes": 5729240,
+    "mode": 493,
+    "mtime_ns": 1793116987682261544,
+    "device": 16777222,
+    "inode": 488784360
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/28-render_line_second-c5860a8fe305ff34": {
+    "sha256": "63812f6a4f31d6ca0978d2d8d8f11d6206136e037293deb32ee46dc01a995a3b",
+    "bytes": 1442504,
+    "mode": 493,
+    "mtime_ns": 1793116988413470799,
+    "device": 16777222,
+    "inode": 488784361
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/29-release_pair-769c0ce370dedcf3": {
+    "sha256": "8a78da268f42a6af2c8c7b6416a9b051d6425db8ed0d761a3063d48233e05ed4",
+    "bytes": 4899212,
+    "mode": 493,
+    "mtime_ns": 1793116989377011202,
+    "device": 16777222,
+    "inode": 488784362
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/30-head_qualification_operator": {
+    "sha256": "082c1193338681e1b3147563d662cdf7bddf92f61bdcea82f971d5de49739661",
+    "bytes": 1460704,
+    "mode": 493,
+    "mtime_ns": 1793116990132472557,
+    "device": 16777222,
+    "inode": 488784363
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/31-reference_pace": {
+    "sha256": "b925dfd5b01d1e0317734ecf184728d509db49f9d30a7dcd68140ee4ac5bb40a",
+    "bytes": 3848784,
+    "mode": 493,
+    "mtime_ns": 1793116990923997766,
+    "device": 16777222,
+    "inode": 488784364
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/32-it-45a1046acddcb43e": {
+    "sha256": "14ad791381fbfef42622d3c2274b6d3ff56d9573afad03cbebd8d21e8af43e13",
+    "bytes": 94760508,
+    "mode": 493,
+    "mtime_ns": 1793116997736429368,
+    "device": 16777222,
+    "inode": 488784365
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/33-duplex_lab": {
+    "sha256": "be4c6c15728ed6c60d678e9b4c6aa4f85310bf40ff87404f3d4a8351a18bf6e9",
+    "bytes": 2924024,
+    "mode": 493,
+    "mtime_ns": 1793116998559887933,
+    "device": 16777222,
+    "inode": 488784369
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/34-admission_latency": {
+    "sha256": "b5201947984d583171271240847c20c45d9842a572ffa089d302bac7cbcfb593",
+    "bytes": 895840,
+    "mode": 493,
+    "mtime_ns": 1793116999230964705,
+    "device": 16777222,
+    "inode": 488784370
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/35-probe_handover": {
+    "sha256": "b5635106b48915b36254ad7557164f032d705b0af8258821120dc1066f18923b",
+    "bytes": 12739848,
+    "mode": 493,
+    "mtime_ns": 1793117000002462128,
+    "device": 16777222,
+    "inode": 488784371
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/36-lamp_voice-7b478dca3b6d9aaf": {
+    "sha256": "e19b768745a34d217f4e0d43795e54d672eedbe0afc9f033193cb421c62704a7",
+    "bytes": 1120448,
+    "mode": 493,
+    "mtime_ns": 1793117000888427522,
+    "device": 16777222,
+    "inode": 488784372
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/37-stop_words_stt_replay-2d0e36e5d853a2d4": {
+    "sha256": "d391045cad5c182f6f1f20d60e4177a3a63df3c4c32a506bf5d44fab954f1503",
+    "bytes": 2763048,
+    "mode": 493,
+    "mtime_ns": 1793117002097858351,
+    "device": 16777222,
+    "inode": 488784373
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/38-lamp_peek-2ef69e5ef2913106": {
+    "sha256": "a7b328227be42391e57deb622e07e79ff71bc603de2714a61781607cc28bd2e1",
+    "bytes": 3259696,
+    "mode": 493,
+    "mtime_ns": 1793117003821582782,
+    "device": 16777222,
+    "inode": 488784374
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/39-lamp_setup-d3cdaa1c4f394e26": {
+    "sha256": "41f5c73fa09a9e36c4226a44f29f2c880ceb2b78e4f443dcf9fc9e2afed39022",
+    "bytes": 11148680,
+    "mode": 493,
+    "mtime_ns": 1793117005844318923,
+    "device": 16777222,
+    "inode": 488784375
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/40-self_cli_exec-a3a314412b3d0408": {
+    "sha256": "39bef2a1fe4b85c74e968d83f2cf7530dba0b7e05b4a831a0b2143d9486bb9c0",
+    "bytes": 473952,
+    "mode": 493,
+    "mtime_ns": 1793117006058417434,
+    "device": 16777222,
+    "inode": 488784376
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/41-lamp_update-8cfde8964d02dd84": {
+    "sha256": "e535402fff6d427e1faaee0adc7a29c33b75456925e3d14c02640b860346b288",
+    "bytes": 12608876,
+    "mode": 493,
+    "mtime_ns": 1793117016140235939,
+    "device": 16777222,
+    "inode": 488784377
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/42-release_pair-a2eb61ad5583f4c3": {
+    "sha256": "95786d0673e168553e4ddb21bf505de813dcb00a3b658dbec52ca307efbd7eb7",
+    "bytes": 2799572,
+    "mode": 493,
+    "mtime_ns": 1793117016756156143,
+    "device": 16777222,
+    "inode": 488784378
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/43-round-b56855d52eb918f5": {
+    "sha256": "64219a3d2ae75da2458c343a4c335f18cc14fb6457be18e5855b6a4869828ade",
+    "bytes": 17337356,
+    "mode": 493,
+    "mtime_ns": 1793117021057852002,
+    "device": 16777222,
+    "inode": 488784379
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/44-self_process_cuts-3d0129dfb728f659": {
+    "sha256": "72cf15b10cf66ba04e9d48a00efd4a13e352b1885ccc398dbc4b08bc44842909",
+    "bytes": 473944,
+    "mode": 493,
+    "mtime_ns": 1793117021292558030,
+    "device": 16777222,
+    "inode": 488784380
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/45-install-1ac5cd8688fb5552": {
+    "sha256": "c44f296e237f89d7135c361216d5623beadadc1c272e42289d071eb60f0ca9ce",
+    "bytes": 14468908,
+    "mode": 493,
+    "mtime_ns": 1793117024496588509,
+    "device": 16777222,
+    "inode": 488784381
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/46-functions-5a0d370af5f450e7": {
+    "sha256": "131c965cd341bef240eb3467a6a968541da0ef18600f9abb9c11a532dbee4558",
+    "bytes": 18701968,
+    "mode": 493,
+    "mtime_ns": 1793117025670051340,
+    "device": 16777222,
+    "inode": 488784384
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/47-it-f14d800ac4c692fa": {
+    "sha256": "6d70cacdbaa323921686fe830532ce9d098d6fb334c13f0d42003605db5e9d1f",
+    "bytes": 1655352,
+    "mode": 493,
+    "mtime_ns": 1793117026507068397,
+    "device": 16777222,
+    "inode": 488784385
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/48-lamp_update-8d23626e029fe965": {
+    "sha256": "4d25440a977809a0731761e0fe016aef4c1089c44b5fbad31b847dd8d72d2e6b",
+    "bytes": 1199320,
+    "mode": 493,
+    "mtime_ns": 1793117026888590627,
+    "device": 16777222,
+    "inode": 488784386
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/49-lamp-skills": {
+    "sha256": "9d8c2510eb2b5cc529b8696a612f73f8ddea7fbdff491eb82dbfa637fa7b6f49",
+    "bytes": 20426380,
+    "mode": 493,
+    "mtime_ns": 1793117029480470287,
+    "device": 16777222,
+    "inode": 488784387
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/50-voice_observe_forget-fcb39383d31bbc81": {
+    "sha256": "a34651909325c92b7a756acf10fede2a55fd631399095cc31b8eb80a72bfbd40",
+    "bytes": 9797836,
+    "mode": 493,
+    "mtime_ns": 1793117030520432386,
+    "device": 16777222,
+    "inode": 488784388
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/51-paraphrase_fixture-1ab158fe737ddfa1": {
+    "sha256": "8807534e67ee7203af912b7960f8f6d002f574874f93209848b9a94252b78bee",
+    "bytes": 1480280,
+    "mode": 493,
+    "mtime_ns": 1793117030812257316,
+    "device": 16777222,
+    "inode": 488784390
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/52-lamp-memory": {
+    "sha256": "f71d6483529e1b8888f9ec1855cac521e474173dd712f421b7004ec50b3962ec",
+    "bytes": 7877940,
+    "mode": 493,
+    "mtime_ns": 1793117031179425221,
+    "device": 16777222,
+    "inode": 488784391
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/53-lamp_memory_eval-d99c5dad98adec59": {
+    "sha256": "cd551d1feadd992c4ff736e44b5427dd800cffabbd676fd4d78a5ca2365b75be",
+    "bytes": 1787120,
+    "mode": 493,
+    "mtime_ns": 1793117031867949704,
+    "device": 16777222,
+    "inode": 488784394
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/54-lamp-memory-fixture": {
+    "sha256": "ee83ce7d78e975efc49dcbd666dd67a2b01e0997dca5647a55a435b2a8ac79fb",
+    "bytes": 8136196,
+    "mode": 493,
+    "mtime_ns": 1793117032639802081,
+    "device": 16777222,
+    "inode": 488784395
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/55-forgot-c03399e1f88b611c": {
+    "sha256": "8ee5c6395c375bedd11249cada37ef1f5fad29f2d4a57c25cf4f3d4739e283c2",
+    "bytes": 4147200,
+    "mode": 493,
+    "mtime_ns": 1793117032998763251,
+    "device": 16777222,
+    "inode": 488784397
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/56-lamp-memory-eval": {
+    "sha256": "c41c08bfb65837464fff2bea5a6fa3b71fc0585caa09fec38b064a3493f9f745",
+    "bytes": 4018820,
+    "mode": 493,
+    "mtime_ns": 1793117034031314425,
+    "device": 16777222,
+    "inode": 488784398
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/57-it-cb83294ccc4832ad": {
+    "sha256": "fce9d260ff40eafc4ee2f8563cda0c2aee4491bb15c1732019a52060a0dac45c",
+    "bytes": 15340412,
+    "mode": 493,
+    "mtime_ns": 1793117039917931219,
+    "device": 16777222,
+    "inode": 488784401
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/58-health_control-b4454d213a3bb8e6": {
+    "sha256": "3a7a08fb04774f9efccc92b342dd6ae7736fff9a4e61296c1b16e519ea979756",
+    "bytes": 2012608,
+    "mode": 493,
+    "mtime_ns": 1793117040999728281,
+    "device": 16777222,
+    "inode": 488784402
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/59-voice_follows_face-60853cffd855bd29": {
+    "sha256": "ec5d8826b33a5b4665408a2df5f05b9b761930cc85257bc5a5d49ca3dea6e6cf",
+    "bytes": 9801972,
+    "mode": 493,
+    "mtime_ns": 1793117041931415141,
+    "device": 16777222,
+    "inode": 488784403
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/60-lamp_memory-49555a3a077e26f6": {
+    "sha256": "29c02034f54caf5a12dd0c9fa54b29942e08a7883312d349cae02f71afd4dfa8",
+    "bytes": 8187748,
+    "mode": 493,
+    "mtime_ns": 1793117042427267323,
+    "device": 16777222,
+    "inode": 488784404
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/61-voice_observe-0d58d8932b7b1e0c": {
+    "sha256": "4a4d293b94724cbc3f4f03ed18feddb6c31eb9b74aaa0f9ea421df0f13d66516",
+    "bytes": 8954724,
+    "mode": 493,
+    "mtime_ns": 1793117043284642977,
+    "device": 16777222,
+    "inode": 488784405
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/62-voice_forget_named-940b56ba6fb85449": {
+    "sha256": "574a3004a20146e9c95fe07f7e970dbabb15e071fb5a172d7a0863dd425f11a0",
+    "bytes": 9714796,
+    "mode": 493,
+    "mtime_ns": 1793117044106303690,
+    "device": 16777222,
+    "inode": 488784406
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/63-forget_person-48c3fe3ff9906b32": {
+    "sha256": "730744ec398f969ae6c8f436df9cd0c486ac5b22a0321539e083094c2f8ee203",
+    "bytes": 8317828,
+    "mode": 493,
+    "mtime_ns": 1793117044685832645,
+    "device": 16777222,
+    "inode": 488784407
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/64-voice_link_used-04635e47dc2694ae": {
+    "sha256": "e23550cf3ecb6ba800d1031453afa9fc8bc54fdba01f46427c49887e317dda93",
+    "bytes": 9789556,
+    "mode": 493,
+    "mtime_ns": 1793117045636999116,
+    "device": 16777222,
+    "inode": 488784409
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/65-forget_shared_exchange-ec60dcd1d8a12661": {
+    "sha256": "76310a50b446ef328ef6d2c6a32b188c7c54c924002c5bbe0cd10a13bcdf0879",
+    "bytes": 5929692,
+    "mode": 493,
+    "mtime_ns": 1793117045957825271,
+    "device": 16777222,
+    "inode": 488784410
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/66-voice_observe_named_forget-6694b44535d6bf27": {
+    "sha256": "fb0d14769c17db86292ab8822a0dccd50c0e624a1b912bcff8b3f9740160d1c0",
+    "bytes": 9767548,
+    "mode": 493,
+    "mtime_ns": 1793117046845340643,
+    "device": 16777222,
+    "inode": 488784411
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/67-voice_early_words-03a1719782c5bbcf": {
+    "sha256": "406d8706a8d515e4d4c79e8a611a3af1dba66a9cfa97228ccdaa0801517f0361",
+    "bytes": 9860516,
+    "mode": 493,
+    "mtime_ns": 1793117047951308191,
+    "device": 16777222,
+    "inode": 488784413
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/68-voice_forget_about-6b03356fa90a08a3": {
+    "sha256": "640a0ed36f5c16c2dfae55dd88627a5cc5455f5b4180d83a792e23c9e5628a4b",
+    "bytes": 9629252,
+    "mode": 493,
+    "mtime_ns": 1793117048800713915,
+    "device": 16777222,
+    "inode": 488784414
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/69-voice_since_until-6f91fd9d551f6455": {
+    "sha256": "4c08d1f853552aa93dcbdec8bc2c0ff492360bb95c2fafa799d5cbbde46c634c",
+    "bytes": 9637404,
+    "mode": 493,
+    "mtime_ns": 1793117049643095627,
+    "device": 16777222,
+    "inode": 488784415
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/70-release_pair-98f8d7d4e78ca217": {
+    "sha256": "1380d85e4dfe50bd0b58c2668e1e56a499b53c5c55bc1af5f24f187d953f84b4",
+    "bytes": 3645036,
+    "mode": 493,
+    "mtime_ns": 1793117050298598396,
+    "device": 16777222,
+    "inode": 488784416
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/71-voice_observe_room-2a5c62f5d02360a2": {
+    "sha256": "ba8843fc6e9a82585032eb500f5c594d17b8415b89fc89cae6b578114ed7d0f3",
+    "bytes": 8971660,
+    "mode": 493,
+    "mtime_ns": 1793117051488319337,
+    "device": 16777222,
+    "inode": 488784417
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/72-voice_forget-2c647d569acd794e": {
+    "sha256": "fd62d253abf35dcb8d4ac41b856cceaf21009221733720b81d9e8de6cd13e13a",
+    "bytes": 10052932,
+    "mode": 493,
+    "mtime_ns": 1793117052727490792,
+    "device": 16777222,
+    "inode": 488784418
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/73-it-71b3c4366a177b0c": {
+    "sha256": "5c05bfc4fec5807af0f165d8390be8b1988320020adef98524eac623d557eff0",
+    "bytes": 3125064,
+    "mode": 493,
+    "mtime_ns": 1793117053695807763,
+    "device": 16777222,
+    "inode": 488784419
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/74-check": {
+    "sha256": "f76392b2a595ae57c20a7327dc9c80c047e7e76742a4e41a2ff0d07d76d605dd",
+    "bytes": 2156832,
+    "mode": 493,
+    "mtime_ns": 1793117054179131561,
+    "device": 16777222,
+    "inode": 488784420
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/75-lamp_expression-367629d2b98fd09c": {
+    "sha256": "c76698b1a861bba8b383340fcd50fddedcede50fe0ea0c247c68e6439ba9be0a",
+    "bytes": 2443088,
+    "mode": 493,
+    "mtime_ns": 1793117054621414365,
+    "device": 16777222,
+    "inode": 488784421
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/76-runtime-8ba534de81614d18": {
+    "sha256": "80a0cd1598013e451f49816866c012c390927e410ebc54e2b9871e0ca1d67d21",
+    "bytes": 6681856,
+    "mode": 493,
+    "mtime_ns": 1793117055770583459,
+    "device": 16777222,
+    "inode": 488784422
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/77-lamp_lean-bf9e165f7a87ea41": {
+    "sha256": "1a64767c4003996b90c83b2b3d3ef5400342344d8c19bed4b9b94e70a09f2a1d",
+    "bytes": 1054320,
+    "mode": 493,
+    "mtime_ns": 1793117056387455733,
+    "device": 16777222,
+    "inode": 488784423
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/78-recent_playout_cost": {
+    "sha256": "b610cbfc406434e8d2ed3989b11b65aba8155c459d5803d79eb0bc329dda83ac",
+    "bytes": 3953600,
+    "mode": 493,
+    "mtime_ns": 1793117056921634950,
+    "device": 16777222,
+    "inode": 488784424
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/79-rest_cost": {
+    "sha256": "3fdaa6e8ad6f960ec5a169a98d2aeecd764824c9ce19aa7d371e183473ef9c61",
+    "bytes": 3963456,
+    "mode": 493,
+    "mtime_ns": 1793117057453409864,
+    "device": 16777222,
+    "inode": 488784425
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/80-lamp-expression": {
+    "sha256": "dddff105e38f57763ccffc51cc72de89959f3496f3f220182c694a229427dbc9",
+    "bytes": 8569736,
+    "mode": 493,
+    "mtime_ns": 1793117058435352587,
+    "device": 16777222,
+    "inode": 488784426
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/81-it-d30071be32c9fc43": {
+    "sha256": "fd8795f68ade114a5a98f85166784b024ac1b013fb5255bf9621d896a44fd1aa",
+    "bytes": 13121200,
+    "mode": 493,
+    "mtime_ns": 1793117062933968417,
+    "device": 16777222,
+    "inode": 488784427
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/82-replay_cost": {
+    "sha256": "cadca57c72397ecd082514b9120966d6716fdefe4d2969ed6ab8a35cadb6c570",
+    "bytes": 3940576,
+    "mode": 493,
+    "mtime_ns": 1793117063450638483,
+    "device": 16777222,
+    "inode": 488784428
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/83-lamp-voice": {
+    "sha256": "46cbf5434fa6c1718303391bbf5d0cf1c1690e401a8e92e4a47f7fc829965d1b",
+    "bytes": 40848352,
+    "mode": 493,
+    "mtime_ns": 1793117065456016170,
+    "device": 16777222,
+    "inode": 488784429
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/84-lamp_memory-82fda6e861160c1c": {
+    "sha256": "ec016c26e8f9f74e9af902e1ba20eac085a534755d449f7d66bee69f4bd38551",
+    "bytes": 10438044,
+    "mode": 493,
+    "mtime_ns": 1793117072024355641,
+    "device": 16777222,
+    "inode": 488784430
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/85-lamp_expression-9c5b6f2fc96ff8fb": {
+    "sha256": "c17260b5c7122a343d3956b810f011377219b6e3db798ce2c43c922d33fe22c5",
+    "bytes": 6058152,
+    "mode": 493,
+    "mtime_ns": 1793117075391901320,
+    "device": 16777222,
+    "inode": 488784431
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/86-lamp_body-9ff199928743cc99": {
+    "sha256": "65cb22f35c79ec11240ed7ae000c4787d56fb6574a7ce110a50535a68975b0b3",
+    "bytes": 2590272,
+    "mode": 493,
+    "mtime_ns": 1793117076570626427,
+    "device": 16777222,
+    "inode": 488784432
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/87-expression_ask": {
+    "sha256": "bfef3da2d31de3c9e38b71ba7577d0a83cc8fa9984080b3eb3f3f29780c80679",
+    "bytes": 1255088,
+    "mode": 493,
+    "mtime_ns": 1793117076833493163,
+    "device": 16777222,
+    "inode": 488784433
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/88-lamp_body_worker-29a1b45163b9be85": {
+    "sha256": "402e3e78bfe91aa9bdc5644780d76e81698e8f4aae0bd5bf8457a8d2d3c0c83e",
+    "bytes": 1179192,
+    "mode": 493,
+    "mtime_ns": 1793117077115109278,
+    "device": 16777222,
+    "inode": 488784434
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/89-lamp-body": {
+    "sha256": "291861d63f96c893a19039ba0975ff35498c92bdc5174778486bd344cdcda3b0",
+    "bytes": 916384,
+    "mode": 493,
+    "mtime_ns": 1793117077634381188,
+    "device": 16777222,
+    "inode": 488784435
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/90-head_plan": {
+    "sha256": "52c6fa8ff8d1dc999640db955281c3fec1081a150adcdb0d0c285db5c498436f",
+    "bytes": 1410664,
+    "mode": 493,
+    "mtime_ns": 1793117077912886778,
+    "device": 16777222,
+    "inode": 488784436
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/91-lamp_body_inspect-637ece4159665738": {
+    "sha256": "cf63105c01668170cc3b5cb9d2e2da423178bc63a108eca01f359d153bc50708",
+    "bytes": 1161920,
+    "mode": 493,
+    "mtime_ns": 1793117078220155552,
+    "device": 16777222,
+    "inode": 488784437
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/92-lamp-body-measure": {
+    "sha256": "24a850678f647f3cff1b57da62990c4940d7f9755f0f0a187808d0214299e165",
+    "bytes": 798552,
+    "mode": 493,
+    "mtime_ns": 1793117078562550861,
+    "device": 16777222,
+    "inode": 488784438
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/93-it-8bf4d1aea99732a6": {
+    "sha256": "b1b6a2ce81dc8a0ff5145b14b61d7981aa494364bcfff7f6b2c98a3de4d00acd",
+    "bytes": 5772904,
+    "mode": 493,
+    "mtime_ns": 1793117081579485767,
+    "device": 16777222,
+    "inode": 488784439
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/94-lamp-body-worker": {
+    "sha256": "03dc92f14064f61a5b63c709de37154cd23be3786238ca7be5b3f0046bbf6fec",
+    "bytes": 634840,
+    "mode": 493,
+    "mtime_ns": 1793117081847353641,
+    "device": 16777222,
+    "inode": 488784440
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/95-lamp-body-inspect": {
+    "sha256": "58854b1f0179ca5f3d5c62bd129a1ccf6ef6fd013df0bf0dcde93fff3ebfc525",
+    "bytes": 597368,
+    "mode": 493,
+    "mtime_ns": 1793117082106613463,
+    "device": 16777222,
+    "inode": 488784441
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/96-lamp_body_mood-30267137783a16a9": {
+    "sha256": "00ae69951be577363805fcb11bc35055693003f668525e290557543577b08054",
+    "bytes": 1031256,
+    "mode": 493,
+    "mtime_ns": 1793117082375006133,
+    "device": 16777222,
+    "inode": 488784442
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/97-lamp_body_measure-7f0ba0e9571da263": {
+    "sha256": "e24bc93c56ca260c02d8e0ec706054b437447d9f3e24a9548fa2735a549ddfcf",
+    "bytes": 1437680,
+    "mode": 493,
+    "mtime_ns": 1793117082817310655,
+    "device": 16777222,
+    "inode": 488784444
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/98-lamp-body-mood": {
+    "sha256": "ae2bcf2f7a24926170bcbbe7bb433fc9f5021bd655d1769b7821c3a89ee709eb",
+    "bytes": 473720,
+    "mode": 493,
+    "mtime_ns": 1793117083030443897,
+    "device": 16777222,
+    "inode": 488784445
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/99-lamp_body-3bda0a619327d99b": {
+    "sha256": "23c6dfa292b63417fb8c7084bbc6eb3d4557bb6b9100fe1fc1e1cc26d4c7f562",
+    "bytes": 17805616,
+    "mode": 493,
+    "mtime_ns": 1793117102946980019,
+    "device": 16777222,
+    "inode": 488784446
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/100-lamp_keeper-a9f34008275109b0": {
+    "sha256": "9ad1d60691835588101e51f9f09cf42de6e21233c3f0af41e682b0c1c761f5c0",
+    "bytes": 1706128,
+    "mode": 493,
+    "mtime_ns": 1793117103390057065,
+    "device": 16777222,
+    "inode": 488784447
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/101-lamp_keeper-d493629e7c7f7339": {
+    "sha256": "65f7fe4829ae87a568fc82ab296cb87b48a55b88c13d0ab6fcca9c859ecf4d45",
+    "bytes": 2591552,
+    "mode": 493,
+    "mtime_ns": 1793117105048322258,
+    "device": 16777222,
+    "inode": 488784448
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/frozen/102-lamp-update": {
+    "sha256": "ef203ce30cc4ac75675b29f9cb5f3b168390b98c90dea8ba5a83b0803eb85b4c",
+    "bytes": 11073620,
+    "mode": 493,
+    "mtime_ns": 1793117105747802852,
+    "device": 16777222,
+    "inode": 488784449
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/frozen/0-lamp-skills": {
+    "sha256": "f3cd07b01b9391548c29ac55dc02c3d82f4b3ab92dddab8dfbb20117a9b65900",
+    "bytes": 20472548,
+    "mode": 493,
+    "mtime_ns": 1793126498917281398,
+    "device": 16777222,
+    "inode": 489418187,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/frozen/1-requested_audio-deef722372f12c7e": {
+    "sha256": "bdbee2986d6ec638e6ecc87493bfbd3324335601be0cb37bb63f870e29260160",
+    "bytes": 13331548,
+    "mode": 493,
+    "mtime_ns": 1793126502234516360,
+    "device": 16777222,
+    "inode": 489418199,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/frozen/2-lamp_skills-b6219d16028772de": {
+    "sha256": "ea0af43a029cc7998af157b570db72a606c296c5e3f4e6ac1d8a8e74bbf5e890",
+    "bytes": 13449708,
+    "mode": 493,
+    "mtime_ns": 1793126506655042917,
+    "device": 16777222,
+    "inode": 489418220,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/frozen/3-release_pair-e9612804d54e7498": {
+    "sha256": "8c202ad745f0ef4ac839eae486eedf71dfde70b566e5a57077915392c23822b9",
+    "bytes": 3695280,
+    "mode": 493,
+    "mtime_ns": 1793126510458123586,
+    "device": 16777222,
+    "inode": 489418232,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/frozen/4-it-aabcadd0c6d2694b": {
+    "sha256": "d9dc09c83174ee5843e07595b8b984576f5d8748d8061b4b68c5fd2672fd425c",
+    "bytes": 25955388,
+    "mode": 493,
+    "mtime_ns": 1793126525219387544,
+    "device": 16777222,
+    "inode": 489418238,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/frozen/5-render_relaxing_music": {
+    "sha256": "7e344928394f2657f58e7cbaec879eb452e96fac45857f3b945f345903c649be",
+    "bytes": 548512,
+    "mode": 493,
+    "mtime_ns": 1793126526473392915,
+    "device": 16777222,
+    "inode": 489418251,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/frozen/6-lamp_skills-8299c9194e44862b": {
+    "sha256": "b68b42d9ec72f9a59a880a14e2fb9449b5923e5ffbc96a8418299d47794d4f5d",
+    "bytes": 14333884,
+    "mode": 493,
+    "mtime_ns": 1793126539345987692,
+    "device": 16777222,
+    "inode": 489418255,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/frozen/current-helper-0-c8767d2c2a22f7e7-lamp-same-voice": {
+    "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+    "bytes": 74262104,
+    "mode": 493,
+    "mtime_ns": 1793126261622137167,
+    "device": 16777222,
+    "inode": 489501988,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/frozen/current-helper-1-6d5bd1b06f4060cb-lamp-voice": {
+    "sha256": "6d5bd1b06f4060cb520562674fd73467a44e5dd7d207baa83618d752854fadb2",
+    "bytes": 42707024,
+    "mode": 493,
+    "mtime_ns": 1793126298788194482,
+    "device": 16777222,
+    "inode": 489501995,
+    "kind": "file"
+  },
+  "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/frozen/Voice-lib-e37b21429dd1f487-lamp_voice-6d619bbdd1df3a0d": {
+    "sha256": "e37b21429dd1f487af85d2366e7d9d939c7166ab63cabb1d455ba751e848641c",
+    "bytes": 117367224,
+    "mode": 493,
+    "mtime_ns": 1793128375706648871,
+    "device": 16777222,
+    "inode": 489502000,
+    "kind": "file"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "build",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "--workspace",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-skills-canonical-20261028/lampOS",
+  "started_at": "2026-10-27T19:08:05.989519+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-workspace.stdout.txt",
+  "stderr": "cmd-workspace.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 96623,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 5511995392,
+  "disk_minimum_available_bytes": 5511995392,
+  "available_bytes_before_Cargo": 5511995392,
+  "owned_pid": 96623,
+  "owned_process_group": 96623,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.931381,
+  "finished_at": "2026-10-27T19:08:06.921031+00:00",
+  "stdout_sha256": "8c4888ffbaa969089e336a76d0443666213ba59e3a5e6968ab327660b7fa75a9",
+  "stdout_bytes": 376887,
+  "stderr_sha256": "91cd837c9e043a221e26cfd4f7ab4962866d42fad911bec53d5c2580472719f2",
+  "stderr_bytes": 60
+}

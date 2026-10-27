@@ -1,0 +1,182 @@
+{
+  "handoff-binding.json": {
+    "sha256": "043b23a3b9ffc8c477bde4ecf19b4942d1d546f63a37c4fc2883cad7d5c3cc5f",
+    "bytes": 11685
+  },
+  "root-activation-review-scope-correction.json": {
+    "sha256": "16a17e0d85d008b506a9a2372505c2bca85bcac8824abe98f7545b9dd3dea2cf",
+    "bytes": 756
+  },
+  "cmd-module-service_trace.stderr.txt": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "run.py": {
+    "sha256": "caaea2f1f43ba48d8afdd691f7df6602de2e2682fe1018de180c862857fa6937",
+    "bytes": 23642
+  },
+  "protected-after.json": {
+    "sha256": "717cf9ad8e2346760681912bb03538a5cc724aca07a9f3f23755427f6ab1fabb",
+    "bytes": 60051
+  },
+  "official-source-final.json": {
+    "sha256": "03f97b684e351c24dd9eebfc9ae9d50a6e632adc8b726043280169d41124f38b",
+    "bytes": 2457865
+  },
+  "cmd-workspace.json": {
+    "sha256": "0a15009aa674ce85e751ea5a0e05cfa8705339928d9f3e40b51d6946992be4bf",
+    "bytes": 1950
+  },
+  "helper-compiler-phase-transition.json": {
+    "sha256": "9d1c904042ea0c932986813b988c7f0ec08253e1321d409d60a7dbd6bd2c63be",
+    "bytes": 1544
+  },
+  "support.py": {
+    "sha256": "8910e667094e5511a4311da37ae44c59e8c8ee635641863bf91cc2037676627d",
+    "bytes": 9499
+  },
+  "plan.json": {
+    "sha256": "2c2ac4a7ade121539bea115cb6f32ed521422a5e764704a9decb449728997187",
+    "bytes": 9619
+  },
+  "cmd-inventory-ignored.json": {
+    "sha256": "28de7edf238acf28625a13dac87fc4d7cabb59cd6fa562e50838cb9976017940",
+    "bytes": 1940
+  },
+  "reader-source-reference.json": {
+    "sha256": "e4b1672810046dc8edd3ecbd6ef9d17260aabd73a5c13d2cdab963f1d3dc8694",
+    "bytes": 6491
+  },
+  "cmd-module-session_reader.json": {
+    "sha256": "e8901137a6858e440834dafff15f0e49b9103e3592f0681b966bd310573831c8",
+    "bytes": 1942
+  },
+  "source-before.json": {
+    "sha256": "6f2701dff587717e44718235b0c91b26cc4b2380be9858134883098d10d8dbcd",
+    "bytes": 2457875
+  },
+  "cmd-metadata.json": {
+    "sha256": "62b3f97e83671f4ab4256496be66f8296de5208910506a751af3b36abab7ddb5",
+    "bytes": 1912
+  },
+  "source-after.json": {
+    "sha256": "6f2701dff587717e44718235b0c91b26cc4b2380be9858134883098d10d8dbcd",
+    "bytes": 2457875
+  },
+  "cmd-inventory-all.json": {
+    "sha256": "c8b05bb920894fe59012f5d275fe88cd0f4d5162669e8a312bfd7969e16f18c2",
+    "bytes": 1917
+  },
+  "cmd-fmt.json": {
+    "sha256": "3fb8da55cd1188aaae6e80cd16a9b525403f41df14c909c48d9e8d57ddab3c31",
+    "bytes": 1855
+  },
+  "root-activation-review.json": {
+    "sha256": "73e4c407ad13dc31cd40da6e2b34ae4466ebf6a024613b703e064c6ec7ce84c6",
+    "bytes": 1159
+  },
+  "cmd-module-session_reader.stdout.txt": {
+    "sha256": "252c993d47bf3fb52c297f16b9b97e1fa7b3377308c891a79b6972636f507b00",
+    "bytes": 491
+  },
+  "cmd-Voice-lib-compile.json": {
+    "sha256": "f6d8637b4fc850222d48444a2eb35540250f7c478a928bcc12ac9917705c9c51",
+    "bytes": 2009
+  },
+  "trace-source-reference.json": {
+    "sha256": "dba37582dd51e45a28380022ab67485cbfd0b3b9264ddb16e149e3e22f647a30",
+    "bytes": 2374
+  },
+  "cmd-module-service_trace.json": {
+    "sha256": "c384578f658095ac22e297da65457048f13607465756560a02444ae9e79cdfd7",
+    "bytes": 1939
+  },
+  "cmd-module-service_trace.stdout.txt": {
+    "sha256": "0f21d0ad25e024febc63cd01ab0cd8c257d8bba1aacccf4776a41fe1e5c35983",
+    "bytes": 717
+  },
+  "actual-after.json": {
+    "sha256": "da0ae9d057e69cbaa12169c7735163a7cee802ee82dee0d6f51b2a694d148b5a",
+    "bytes": 5953
+  },
+  "selected-module-inventory.json": {
+    "sha256": "b5cc25c158a7907e5b548189bafb238876b55b400ed2b31985f0617f7d27621e",
+    "bytes": 1190
+  },
+  "actual-executables.json": {
+    "sha256": "0e30dac9373351b9b4ef0dfd5a9142bd6fa2a64bd6374d177908efda77a839c9",
+    "bytes": 4854
+  },
+  "Voice-compiler-artifacts.json": {
+    "sha256": "3bb34398ae185e775e918ea62a293d2434c39f28cfcac65a9adc75d9898c4e4b",
+    "bytes": 314056
+  },
+  "Voice-lib-source-profile-bindings.json": {
+    "sha256": "b9737e30066298dc9fa1a395c2e38e665a04efc9f1ef561bc71d447466179413",
+    "bytes": 249392
+  },
+  "native-controller.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "Voice-actual-depinfo.json": {
+    "sha256": "6752b463492e8c46cbff83be74f485376532446682be4db5e7420398f06502a7",
+    "bytes": 62195
+  },
+  "cmd-module-service_trace-census.json": {
+    "sha256": "e9dc01b9e84d42aa216e30c7e8dd16e526d8c21d9c01d6ee7ec134a254c90fdb",
+    "bytes": 1799
+  },
+  "inventory.json": {
+    "sha256": "39aa22bc76f50df94a2f6c3d59e8fd57e5febbe18142597e9349fafc30d65401",
+    "bytes": 369554
+  },
+  "terminal.json": {
+    "sha256": "d9a7c250433bc6bcde8c9715ea7b025019fb6bec277c0ae67832eb51858bb02a",
+    "bytes": 1915
+  },
+  "cmd-strict.json": {
+    "sha256": "9ef8327fc4799ef727d2bcbe5af4a7813c8becfcb31ffebb7d90e19dbde61d40",
+    "bytes": 2333
+  },
+  "native-controller.stdout": {
+    "sha256": "561704fd547f84ef26661a33de6987de97a5c2991d76c0c0f3f2eeb86f6618b9",
+    "bytes": 2950
+  },
+  "launch.json": {
+    "sha256": "13cd12adfa557ce3abd13def01864c73cb5ee12ac6eafb7e885762cf3565fa22",
+    "bytes": 1462
+  },
+  "native-controller-result.json": {
+    "sha256": "2c272edfdead38569b652149d65329ed2b10f0c1da59c1f0c1a83bc675d92d5d",
+    "bytes": 472
+  },
+  "495-to-ecc-source-carry.json": {
+    "sha256": "3a820d1c1e4af6e81999755d94624ca6feae32cac8a7187b22c09356085a29bf",
+    "bytes": 1700
+  },
+  "cmd-module-session_reader-census.json": {
+    "sha256": "636b38a971b1a1d21ce3115feba32f3ae6b31d1cbc1d83ba725e051fa4f52c9d",
+    "bytes": 1264
+  },
+  "observed-module-censuses.json": {
+    "sha256": "a08a76b803953a62365ee3afb7dd1fd2dcd40992b3b448380fa68455a3a052dd",
+    "bytes": 5305
+  },
+  "official-source-initial.json": {
+    "sha256": "03f97b684e351c24dd9eebfc9ae9d50a6e632adc8b726043280169d41124f38b",
+    "bytes": 2457865
+  },
+  "protected-before.json": {
+    "sha256": "0cf67f07a928ed5d4ef01b334c3ff60d25ae5df30be67ab8ce15f09bd54f3006",
+    "bytes": 58643
+  },
+  "consumed-SHA-checkpoints.json": {
+    "sha256": "180705635743efc9df05deddaaa4c6a75cadc8b218a83a60b67d01a778200048",
+    "bytes": 2077
+  },
+  "cmd-module-session_reader.stderr.txt": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

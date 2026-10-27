@@ -1,0 +1,9 @@
+# Current Reader ecc module qualification
+
+Clean ecc34ddf5a7f274eff1bb5be273a89a15c0c591f / Main a17ec9216e53f6a77931dd9686f83be8244d05a2 passed fresh native macOS Reader **4/0/0** and trace **6/0/0**, once per complete disjoint module. The compiled Voice library has3898 identities; cases outside those modules are deliberately filtered. This is not full Voice runtime. Linux Reader/trace cases and privileged DAC remain unrun here; original ARM40567455672/Linux40567455600 are separate pending checks.
+
+Formatting, twelve-package strict all-target Clippy, workspace build and fresh Voice library compilation passed. All source/owner,142 frozen witness and three executable guards passed; native/controller0, all owned groups closed and lease released. Source/profile/depinfo and actual compiled inventory are bound. Completion, immutable bounded-report stalled-writer and failed-writer controls pass. Both complete owned blobs, modes and patch remain identical to495; one-equal-commit source carry is included. No product code, assertion or500ms production finish budget changed.
+
+The actual parent transfers full Skills555/0/9 integrity,139 witnesses and seven retired outputs only. An inaccurate generic administrative parent label is retained beside its explicit scope correction; controller/H/plan always bind Skills and two module runs. No command, source, artifact or result was reclassified. No filesystem-wide immutability or blanket dependency freshness is claimed.
+
+All historical full failures remain failed. Restart4dee/a17 full Voice3882/1/15 fails the bare Reader health predicate, while its21 Restart cases pass. That failure is not waived here; the matched full Maina17 control without Restart is running separately. No full current Voice host runtime, native result, physical latency, privileged DAC or device acceptance claim. Text receipts only.

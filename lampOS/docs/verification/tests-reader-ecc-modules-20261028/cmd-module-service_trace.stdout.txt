@@ -1,0 +1,11 @@
+
+running 6 tests
+test service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence ... ok
+test service_trace::tests::disk_failure_latches_health_without_an_audio_result_error ... ok
+test service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record ... ok
+test service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state ... ok
+test service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space ... ok
+test service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3892 filtered out; finished in 0.25s
+

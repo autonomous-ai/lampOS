@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-28T02:05:57.560347+07:00",
+  "reviewer": "Tests Root",
+  "kind": "Reader",
+  "controller_sha256": "caaea2f1f43ba48d8afdd691f7df6602de2e2682fe1018de180c862857fa6937",
+  "activated_plan_sha256": "2c2ac4a7ade121539bea115cb6f32ed521422a5e764704a9decb449728997187",
+  "launch_sha256": "13cd12adfa557ce3abd13def01864c73cb5ee12ac6eafb7e885762cf3565fa22",
+  "exact_source_and_target_verified": true,
+  "initial_lsof_exit": 1,
+  "lease": "root-reader-a17-first-released-cache",
+  "reviewed": [
+    "entire controller and minimal parent diff",
+    "actual source and parent integrity release schemas",
+    "one unfiltered serial package/library execution, actual compiled inventory primary",
+    "partial raw/parsed results durable before runtime postguards",
+    "no retries or failure waiver",
+    "source, frozen witness and actual executable hashes/metadata",
+    "bounded subprocess cleanup and retained native continuation handle",
+    "strict actual reverse closure, workspace and current compile bindings"
+  ],
+  "parent_failure_disposition": "Expression341 PASS only; no full Voice runtime credit",
+  "no_device_or_ARM_build_on_Mac": true
+}

@@ -1,0 +1,45 @@
+{
+  "old": "495a476184d65010da0e3656af8488439993c648",
+  "old_base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+  "base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "paths": [
+    "lampOS/crates/voice/src/session_reader/tests.rs",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "before": {
+    "lampOS/crates/voice/src/session_reader/tests.rs": {
+      "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+      "bytes": 40267,
+      "mode": 420,
+      "blob": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7"
+    },
+    "lampOS/docs/realtime-tests.md": {
+      "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708",
+      "bytes": 117703,
+      "mode": 420,
+      "blob": "a896bba9eafb5691c3dc594e865b45a3bc098151"
+    }
+  },
+  "after": {
+    "lampOS/crates/voice/src/session_reader/tests.rs": {
+      "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+      "bytes": 40267,
+      "mode": 420,
+      "blob": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7"
+    },
+    "lampOS/docs/realtime-tests.md": {
+      "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708",
+      "bytes": 117703,
+      "mode": 420,
+      "blob": "a896bba9eafb5691c3dc594e865b45a3bc098151"
+    }
+  },
+  "all_owned_blobs_bytes_modes_equal": true,
+  "patch_equal": true,
+  "range_diff": "1:  495a476184 = 1:  ecc34ddf5a lampOS: wait for reader fixture completion within owned roots",
+  "current_runtime_attempts": 0,
+  "prior_local_runtime": "Reader4+Trace6 on dirtyb7/fold49abc, native495 separate; not new-head execution",
+  "no_old_failure_waived": true,
+  "source_only_carry": true
+}
