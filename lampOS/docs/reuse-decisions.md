@@ -17,13 +17,15 @@ one-shot is a viable bootstrap without changing its own unit. The old
 undo a new setting path after a partial apply. A saved `.prev` alone does
 not solve either recovery problem.
 
-The [settings-writer plan](settings-writer-refresh.md) specifies a frozen
+The [settings-writer design](settings-writer-refresh.md) specifies a frozen
 root-owned guard established before replacing the candidate writer, with
 its own versioned preimages and failure/boot admission. Recovery restores
 partial settings before the old writer and never depends on the broken
-candidate. Unknown recovery semantics block admission. This is a design
-and source audit, not implemented or tested behavior; first-use failure,
-process cuts, real Bookworm systemd and a 7071 lamp rehearsal remain owed.
+candidate. Unknown recovery semantics block admission. The unwired
+`writer_refresh` record/admission foundation has fourteen focused local
+tests; authentication, guard bootstrap and actual restore execution remain
+unimplemented. First-use failure, process cuts, real Bookworm systemd and
+a 7071 lamp rehearsal remain owed.
 
 ## Reuse one kernel socket witness for a camera hold (2026-10-27)
 

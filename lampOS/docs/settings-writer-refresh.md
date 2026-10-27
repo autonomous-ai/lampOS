@@ -1,8 +1,9 @@
 # Refreshing the fixed settings writer over the air
 
-Design for [#3689](https://github.com/autonomous-ai/lampOS/issues/3689),
-27 October 2026. **This is an implementation plan, not shipped behavior or
-test evidence.** The settings writer comes first; adding parts and carrying
+Design and record/admission foundation for
+[#3689](https://github.com/autonomous-ai/lampOS/issues/3689), 27 October 2026.
+**The foundation is unwired; the privileged refresh remains a plan.**
+The settings writer comes first; adding parts and carrying
 templates, sockets and timers follows separately. Store key delivery is
 Seventh's #3692. Harness installation is #3693.
 
@@ -181,6 +182,26 @@ version unable to read its preimages. Test both commit windows separately.
 
 ## Verification before enabling it
 
+`crates/update/src/writer_refresh.rs` now provides the bounded versioned
+record/admission foundation only. It retains exact refresh and first-apply
+identities, permits one live first apply, and requires recovery after
+reopening any unfinished transaction. Qualification retains the writer and
+preimages until the separate product closure. A persistence error poisons
+the live session because rename may precede a failed sync acknowledgment;
+only a fresh disk-state recovery can proceed. Restoration provenance keeps
+the original grant/preimage identities after partial apply. Unknown
+nonsemantic metadata survives; unknown operations/phases/versions and
+malformed or oversized records block admission without deletion.
+
+The module does not authenticate signatures or verify represented artifact
+bytes, install a guard, copy a helper, execute restoration or activate a
+service. Its external-effect acknowledgments require verified caller
+results. An existing private stable store directory is a caller
+precondition; privileged ancestor/ownership confinement belongs to the
+later bootstrap. No CLI or round currently calls this module. Fourteen
+focused tests cover the admission and record boundaries; broader gates and
+original native qualification are recorded separately on the PR.
+
 Implement in reviewable steps: protocol/guard records and restore engine;
 root bootstrap plus failure/boot admission; supervised first use and round
 integration; then the new setting's consumer and installed rehearsal.
@@ -232,7 +253,8 @@ is authorized by this design.
 
 ## What has not been shown
 
-No implementation, compiler gate, process-cut trial, root systemd run,
+Only the unwired record/admission foundation has local implementation and
+test evidence. No privileged refresh, process-cut trial, root systemd run,
 new-path setting acceptance or lamp rehearsal has run for this extension.
 The cited source audit establishes the bootstrap route and the old-helper
 rollback gap; #3466's earlier ordinary-unit GOOD/BAD does not close them.
