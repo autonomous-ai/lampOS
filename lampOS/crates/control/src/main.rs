@@ -178,6 +178,14 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             server::watch_bus(bus, watch, shared.clone())
                 .map_err(|e| format!("bus topics: {e}"))?;
         }
+        // The body's own lease, so the lamp's own life stands back while a
+        // computer holds `body` (lamp-body --lease-socket).
+        if let Some(path) = option(arguments, "--lease-socket") {
+            tokio::spawn(lamp_control::body_lease::hold(
+                PathBuf::from(path),
+                shared.clone(),
+            ));
+        }
         tokio::select! {
             () = server::serve(listener, tls, shared) => {}
             _ = tokio::signal::ctrl_c() => {}

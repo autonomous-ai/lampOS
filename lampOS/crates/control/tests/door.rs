@@ -520,3 +520,55 @@ async fn the_bus_reaches_a_subscriber_as_events_phrases_only_and_lease_signals()
         json!({"ev": "lease", "lease": "l_1", "state": "held"})
     );
 }
+
+/// Part 6: while a computer holds `body`, the door holds the body's own
+/// lease; the body's `lost` ends the computer's lease with the same why
+/// (`lapsed` as `expired`), and releasing `body` lets the body go.
+#[tokio::test]
+async fn a_body_lease_holds_the_body_and_the_bodys_end_is_told() {
+    use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _};
+    let lamp = lamp("body-lease").await;
+    let path = lamp.dir.join("lease.sock");
+    let body = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(lamp_control::body_lease::hold(
+        path.clone(),
+        lamp.shared.clone(),
+    ));
+    let mut socket = paired(&lamp, json!(["body"]), 11).await;
+    let take = send(
+        &mut socket,
+        json!({"id": 3, "op": "lease.take", "parts": ["body"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(take["lease"], "l_1", "{take}");
+    let (stream, _) = tokio::time::timeout(Duration::from_secs(2), body.accept())
+        .await
+        .expect("the door holds the body")
+        .unwrap();
+    let (read, mut write) = stream.into_split();
+    let mut lines = tokio::io::BufReader::new(read).lines();
+    assert_eq!(
+        lines.next_line().await.unwrap().unwrap(),
+        r#"{"hold":{"for_ms":30000}}"#
+    );
+    write.write_all(b"{\"lease\":\"held\"}\n").await.unwrap();
+    // A hand on the head: the body's end is the computer's.
+    write
+        .write_all(b"{\"lease\":\"lost\",\"why\":\"hand\"}\n")
+        .await
+        .unwrap();
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"ev": "lease", "lease": "l_1", "state": "lost", "why": "hand"})
+    );
+    // Nobody holds `body` now: the door lets the body go and closes.
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), lines.next_line())
+            .await
+            .expect("let go in time")
+            .unwrap()
+            .as_deref(),
+        Some(r#"{"let_go":true}"#)
+    );
+    assert_eq!(lines.next_line().await.unwrap(), None);
+}
