@@ -1,0 +1,92 @@
+{
+  "status": "FAILED_COMPILER_INTEGRATION_NO_NEXTEST",
+  "local": {
+    "head": "080925e47f18a41f5fbbfed9b62e901acda3dd4a",
+    "base": "39b4f6adcf3f38b5e3f8efbad4a4f31f094745da",
+    "tree": "6f98995dc0b04ece15975406b3e98776eca7f178",
+    "fmt_exit": 0,
+    "clippy_exit": 101,
+    "compiler_terminal": {
+      "cleanup": [],
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 101,
+      "timed_out": false
+    },
+    "not_started": [
+      "workspace-build",
+      "test-compile",
+      "capture",
+      "selected-runtime",
+      "runtime-audit"
+    ],
+    "tests_executed": 0,
+    "source_unchanged": true,
+    "source_files": 7291,
+    "retries": 0,
+    "source_edits": false,
+    "limits": [
+      "Clean textual rebase preserved inherited+authored changes but compiler found missing enum arms; no current source qualification.",
+      "Prepared38witness selection and8fixture source/input proof are not execution results.",
+      "Prior e70 actual1432/0/12 remains on old identity, not this source.",
+      "Original b490 failed runtime and fixture642 native Reader HOLD unchanged."
+    ]
+  },
+  "local_private_receipt_sha256": "a7ffa551ac6e911610e2c35f67ceed8686e1c28471f808b991e74436de330b2e",
+  "diagnostics": [
+    {
+      "code": "E0004",
+      "message": "non-exhaustive patterns: `&Test::FacesAtMost(_)` not covered",
+      "primary_locations": [
+        {
+          "file": "crates/skills/src/lib.rs",
+          "line": 3243
+        }
+      ]
+    },
+    {
+      "code": "E0004",
+      "message": "non-exhaustive patterns: `&Test::FacesAtMost(_)` not covered",
+      "primary_locations": [
+        {
+          "file": "crates/skills/src/lib.rs",
+          "line": 4544
+        }
+      ]
+    }
+  ],
+  "native": {
+    "arm": {
+      "run": 40447663222,
+      "head": "dc1e3a480119b616565678e5fb1c428c60728818",
+      "attempt": 1,
+      "conclusion": "failure",
+      "E0004_diagnostics": 2,
+      "nextest_started": false,
+      "log_sha256": "d8ee8edd73533c22051a340111833fb4147eb370a5960e4975e8b14db56a935a"
+    },
+    "linux": {
+      "run": 40447663440,
+      "head": "dc1e3a480119b616565678e5fb1c428c60728818",
+      "attempt": 1,
+      "conclusion": "failure",
+      "E0004_diagnostics": 2,
+      "nextest_started": false,
+      "log_sha256": "2988ffc5be6f565603d8e1a6c2984f7784c8d9305d1378fe905a95929e314c7b"
+    }
+  },
+  "skills_blob_equal_local_failed_source": {
+    "git_blob": "445d18a3fa38f2172dd4642475a6e941cf9fcc18",
+    "equal": true
+  },
+  "correction": "Different staged tree a50adb4e117f78615557e5c00d6b663075650dc2 is qualifying; no commit or push yet.",
+  "native_preview": {
+    "sha": "ce12d6c20b8b610af53bf222b7a360e2072fc6bc",
+    "ordered_parents": [
+      "0dd8eb3d81aa0fd8684b1d1ba508dc460850bdef",
+      "dc1e3a480119b616565678e5fb1c428c60728818"
+    ],
+    "tree": "aa6d992754f99a609386f563b7b93e5a82fd7e23"
+  },
+  "full_private_summary_sha256": "b68df321f2071d32401926e1202c245bc4e6de9300741bcf3e4569b2c1e2f640"
+}
