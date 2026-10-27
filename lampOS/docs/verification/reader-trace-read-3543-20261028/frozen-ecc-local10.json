@@ -1,0 +1,541 @@
+{
+  "additional_limits": [
+    "Exactly ten existing Mac cases, separately bounded processes, one thread, zero retries; no observer mirrors or assertion-only duplicate tests.",
+    "No normal Voice/other child executable or provider is needed/claimed. Writer threads are scoped to their exact case process; production finish never promises to join detached workers.",
+    "No fmt/clippy/full Voice/native/Linux ordinary/privileged DAC/device/physical latency qualification.",
+    "The test observer uses the same reviewed writer/report pair and its per-instance completion channel; Report itself is not an identity capability.",
+    "The500ms production finish budget is unchanged. The2/5s test event guard supports eventual-data assertions and cannot rewrite the earlier bounded report.",
+    "Historical full Voice failures and author module results retain their own source/native scopes; no cause or failure waiver follows."
+  ],
+  "artifact": {
+    "emitted_path": "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "features": [],
+    "fresh": false,
+    "profile_test": true,
+    "retained_copy": "retained-current-voice-lib-test",
+    "sha256": "df9ebf9ee9f6468690c48550a4021e604dae3ad604e63ce47f191617cf9ef95d"
+  },
+  "artifact_stat_bookends": {
+    "current_before_and_after": {
+      "dev": 16777222,
+      "inode": 329058506,
+      "links": 1,
+      "mode": 33261,
+      "mtime_ns": 1793131368124948100,
+      "sha256": "df9ebf9ee9f6468690c48550a4021e604dae3ad604e63ce47f191617cf9ef95d",
+      "size": 117363128
+    },
+    "retained_before_and_after": {
+      "dev": 16777222,
+      "inode": 329059420,
+      "links": 1,
+      "mode": 33261,
+      "mtime_ns": 1793131368124948000,
+      "sha256": "df9ebf9ee9f6468690c48550a4021e604dae3ad604e63ce47f191617cf9ef95d",
+      "size": 117363128
+    }
+  },
+  "bank_released": true,
+  "child_scope": "Only ten current exact lib-test processes. No normal Voice/other child executable. Writer threads belong to their case process; each process group closed. Production finish does not join detached workers.",
+  "compiler_artifact": {
+    "executable": "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "features": [],
+    "filenames": [
+      "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "fresh": false,
+    "manifest_path": "<worktree>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<worktree>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "<worktree>/lampOS/crates/voice/src/lib.rs",
+      "test": true
+    }
+  },
+  "counts": {
+    "FAIL": 0,
+    "PASS": 10,
+    "Reader": 4,
+    "Trace": 6,
+    "ignored": 0,
+    "retries": 0,
+    "selected": 10,
+    "unrun": 0
+  },
+  "disposition": "SCOPED_SOURCE_AND_CURRENT_READER4_TRACE6_LOCAL_READ_OK",
+  "evidence_hashes": {
+    "current-artifact.json": "f6c9f6604f9a9f3bd031bddc4006cdf99045e3a451f92fff5c406f357c959cf4",
+    "current-case-01.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-case-01.stdout": "d94145d06d38d0fea0fb96b6756ee0e9ea09032a867ef767ed774d98b47fcc13",
+    "current-case-02.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-case-02.stdout": "d141239c5ab27712d353d06c98df9e3d592072207a71468950acb97dac4c8621",
+    "current-case-03.stderr": "71de6d5f791b1a406e9bdb676e8e19a69d5641e170fa515b24498dbdd3425f55",
+    "current-case-03.stdout": "e970be7f86ec69798665c3a7a7ed16912d8dc9b70169fefe1525942e2010b9a8",
+    "current-case-04.stderr": "71de6d5f791b1a406e9bdb676e8e19a69d5641e170fa515b24498dbdd3425f55",
+    "current-case-04.stdout": "bf85f0da0a014abb21d98df2e0a0c4a51ae8660311c5e1e96fc93fe437caa525",
+    "current-case-05.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-case-05.stdout": "eb0871299cb2b3a7bd038341fd2038a1c455e21e0036afe368b171b95288f87c",
+    "current-case-06.stderr": "17042461d2c3da27d0bb32fd7eddb73a75b6ade8e9fdce24d502da374d6001ac",
+    "current-case-06.stdout": "042ebb9d0df826fe84e2c9d04c5364201451a550fb11c6f79108600ba8244df7",
+    "current-case-07.stderr": "441e18a7068f47d7e5c6ca29e10a000ff5a11a33e5635e51bcd6024727ca87fe",
+    "current-case-07.stdout": "8fadf7f9b0eccf6ff5468cd298a34366f35b6a5b3e5270e6e294212b77e56d23",
+    "current-case-08.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-case-08.stdout": "5ed0d7c2ef7e6c7c62b55607d144bb7543159ab85b4b7abf6abc2d6663895b19",
+    "current-case-09.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-case-09.stdout": "d8e43e08b3ae99aa5f12abe30681d0c8fc77a7f0e1c8854c0046f76c1ecdc43a",
+    "current-case-10.stderr": "71de6d5f791b1a406e9bdb676e8e19a69d5641e170fa515b24498dbdd3425f55",
+    "current-case-10.stdout": "fd7101632de0d5a2219d1df35d634d170de5afa430dfbe923d813894e5bbd99e",
+    "current-compile.stderr": "335c774ae4d6eee040771bd1fc7e764ee24a2130cf73fe966d993d3bea485456",
+    "current-compile.stdout": "d8702e0d038af3dfe9716f1e6a1612aacbde4d311abf69d4166a0d59ad5966ee",
+    "current-discovery.stdout": "c32bb2c0761ce5437e636786c3e3d495c3780bf5cc06d85ed8d5f467c4068bdb",
+    "current-source-after.json": "96d3072ede6058e5606d506b25fb47e08e6fe191851ec91831478be746d5605d",
+    "current-source-before.json": "96d3072ede6058e5606d506b25fb47e08e6fe191851ec91831478be746d5605d",
+    "prior-copies-after.json": "f26e20bb1289c568a9a3c62da5800affa67ebb63c34184b8b9d7a5ea810192f8",
+    "prior-copies-before.json": "f26e20bb1289c568a9a3c62da5800affa67ebb63c34184b8b9d7a5ea810192f8",
+    "prior-saved-copies.json": "27eeac95cfd18cf1c2cc52a548380b7067ae068ff99ef7d41dec57e30fcd2927",
+    "qualified-current-local.json": "d9e663aba1158037248fb0b253eddb4f645c415c128b40d99ca5de586072da81",
+    "retained-current-voice-lib-test": "df9ebf9ee9f6468690c48550a4021e604dae3ad604e63ce47f191617cf9ef95d",
+    "source-review.json": "294f2da0b3f55038745eba2a98208ec60645496f5064567a4b1f3d078b743612"
+  },
+  "exact_env_overrides": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "<approved-exclusive-target>",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_TEST_THREADS": "1"
+  },
+  "head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+  "helper_sha256": {
+    "bank-release.json": "10ae2ce9cc3f6d302d447026d2c442d20fba5cf9d275d7d947d5d4ea8f2c4b2f",
+    "current-ecc-proposal.json": "c50e356809683bcc8cf9ad35e5d52b0e17ca99fca5eb63d7010ed7f1ae139204",
+    "prior-saved-copies.json": "27eeac95cfd18cf1c2cc52a548380b7067ae068ff99ef7d41dec57e30fcd2927",
+    "root-approval.json": "1ec664d1d9471bd03b2368e6caa53da65cc484e0916458be35ca317f9797294e",
+    "run-current-gate.py": "ddd3dc814237b045c00d6e915ce8234f27c0dfc648bd148412efa5775abdd3df"
+  },
+  "limits": [
+    "No fresh fmt/clippy/full Voice/native/DAC/device/latency gate.",
+    "No495 runtime transfer or historical cause/waiver claim.",
+    "Authored parenta17 remains separate from PRbasef0f and actual native preview."
+  ],
+  "parent": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "prior_all_bound_fields_unchanged": true,
+  "prior_bookend_sha256": {
+    "after": "f26e20bb1289c568a9a3c62da5800affa67ebb63c34184b8b9d7a5ea810192f8",
+    "before": "f26e20bb1289c568a9a3c62da5800affa67ebb63c34184b8b9d7a5ea810192f8"
+  },
+  "prior_saved_copy_count": 152,
+  "source_before_after_manifest_sha256": {
+    "after": "96d3072ede6058e5606d506b25fb47e08e6fe191851ec91831478be746d5605d",
+    "before": "96d3072ede6058e5606d506b25fb47e08e6fe191851ec91831478be746d5605d"
+  },
+  "source_guard_count": 1907,
+  "source_review": {
+    "P1_P2_findings": [],
+    "equal_495_files": [
+      {
+        "mode_blob_current_and_495": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7\tlampOS/crates/voice/src/session_reader/tests.rs",
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8"
+      },
+      {
+        "mode_blob_current_and_495": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151\tlampOS/docs/realtime-tests.md",
+        "path": "lampOS/docs/realtime-tests.md",
+        "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708"
+      },
+      {
+        "mode_blob_current_and_495": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864\tlampOS/crates/voice/src/session_reader.rs",
+        "path": "lampOS/crates/voice/src/session_reader.rs",
+        "sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c"
+      },
+      {
+        "mode_blob_current_and_495": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+        "path": "lampOS/crates/voice/src/service_trace.rs",
+        "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+      }
+    ],
+    "equal_range_diff": "1:  495a47618 = 1:  ecc34ddf5 lampOS: wait for reader fixture completion within owned roots\n",
+    "head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+    "limits": [
+      "No Cargo, runtime, target reads or reservation in this source-only stage.",
+      "No Memory implementation/Friday review, full Voice, native or device claim.",
+      "Privileged Linux DAC ignored scope and ordinary Linux boundary controls remain separate."
+    ],
+    "old_failures": "Original539 shared-Reader failure and earlier full Voice/Restart/Main failed cohorts remain recorded with their actual known fields and source scopes. The later bare health conjunctions do not identify an individual failing field. No historical cause, transfer, or waiver follows from this source read.",
+    "parent": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+    "selected_case_source_bindings": [
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 62,
+        "name": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 96,
+        "name": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 118,
+        "name": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 166,
+        "name": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 608,
+        "name": "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+        "path": "lampOS/crates/voice/src/service_trace.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 622,
+        "name": "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+        "path": "lampOS/crates/voice/src/service_trace.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 635,
+        "name": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+        "path": "lampOS/crates/voice/src/service_trace.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 653,
+        "name": "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+        "path": "lampOS/crates/voice/src/service_trace.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 716,
+        "name": "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+        "path": "lampOS/crates/voice/src/service_trace.rs"
+      },
+      {
+        "cfg": "Mac current; unsupported_acl is cfg(not Linux), others selected are common",
+        "line": 744,
+        "name": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+        "path": "lampOS/crates/voice/src/service_trace.rs"
+      }
+    ],
+    "source_review": [
+      "Owned files, modes, patch and complete Reader/ServiceTrace implementations equal495; current read binds this carry, not a full current Voice or native result.",
+      "Completion uses a per-instance mpsc receiver. Each reviewed call passes the bounded report from that same writer/state. Report has no identity token; no general cross-writer identity guarantee is claimed for this test-only helper.",
+      "After observing closed, writer_loop pops again before EOF, drains accepted packets, finishes/syncs the store and drops owned store/files before the completion send. The writer-failure latch remains visible.",
+      "finish and Drop take the producer, store closed with Release and unpark. finish clamps its wait to500ms; Drop never joins or preempts filesystem I/O. The test observer waits2/5s only when bounded finish did not acknowledge, reads final health after the event and never changes the original report.",
+      "Packet encoding completes JSON plus newline inside32KiB before enqueueing. Capacity64, four4MiB segments, oversize counters and disk-failure controls remain. A partial regular-file write may fail and latch health; atomic record writes are not promised.",
+      "Final-data predicates intentionally inspect the completed report; they do not establish a500ms writer-latency guarantee. The stalled control rechecks the immutable degraded/unacknowledged bounded report after completion. The failed-writer control retains writer_failed.",
+      "The Linux test-only pinned root excludes only ancestry above it. Root and downward owner/mode/ACL/component checks remain; the three-way boundary control restores controlled modes before fixture cleanup. These Linux/DAC cases are not selected on Mac.",
+      "The selected ten Mac cases use parsing, private SessionDirectory files and writer threads. SessionDirectory::create does not spawn a child. No normal Voice or external process executable is required. The unrelated process fixture exec-marker protocol is not selected."
+    ],
+    "tree": "9ba0e542e7661d1b4dab1b6fced4de71795999f5"
+  },
+  "source_tool_helper_current_saved_guards_unchanged": true,
+  "stages": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 165.3926,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 41677,
+      "pid": 41677,
+      "stage": "current-compile",
+      "stderr_sha256": "335c774ae4d6eee040771bd1fc7e764ee24a2130cf73fe966d993d3bea485456",
+      "stdout_sha256": "d8702e0d038af3dfe9716f1e6a1612aacbde4d311abf69d4166a0d59ad5966ee",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 2.1845,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 44944,
+      "pid": 44944,
+      "stage": "current-discovery",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c32bb2c0761ce5437e636786c3e3d495c3780bf5cc06d85ed8d5f467c4068bdb",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0391,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 44999,
+      "pid": 44999,
+      "stage": "current-case-01",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d94145d06d38d0fea0fb96b6756ee0e9ea09032a867ef767ed774d98b47fcc13",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0418,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45048,
+      "pid": 45048,
+      "stage": "current-case-02",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d141239c5ab27712d353d06c98df9e3d592072207a71468950acb97dac4c8621",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.2031,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45055,
+      "pid": 45055,
+      "stage": "current-case-03",
+      "stderr_sha256": "71de6d5f791b1a406e9bdb676e8e19a69d5641e170fa515b24498dbdd3425f55",
+      "stdout_sha256": "e970be7f86ec69798665c3a7a7ed16912d8dc9b70169fefe1525942e2010b9a8",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0999,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45063,
+      "pid": 45063,
+      "stage": "current-case-04",
+      "stderr_sha256": "71de6d5f791b1a406e9bdb676e8e19a69d5641e170fa515b24498dbdd3425f55",
+      "stdout_sha256": "bf85f0da0a014abb21d98df2e0a0c4a51ae8660311c5e1e96fc93fe437caa525",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0299,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45089,
+      "pid": 45089,
+      "stage": "current-case-05",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "eb0871299cb2b3a7bd038341fd2038a1c455e21e0036afe368b171b95288f87c",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0302,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45116,
+      "pid": 45116,
+      "stage": "current-case-06",
+      "stderr_sha256": "17042461d2c3da27d0bb32fd7eddb73a75b6ade8e9fdce24d502da374d6001ac",
+      "stdout_sha256": "042ebb9d0df826fe84e2c9d04c5364201451a550fb11c6f79108600ba8244df7",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0407,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45121,
+      "pid": 45121,
+      "stage": "current-case-07",
+      "stderr_sha256": "441e18a7068f47d7e5c6ca29e10a000ff5a11a33e5635e51bcd6024727ca87fe",
+      "stdout_sha256": "8fadf7f9b0eccf6ff5468cd298a34366f35b6a5b3e5270e6e294212b77e56d23",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.0398,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45123,
+      "pid": 45123,
+      "stage": "current-case-08",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5ed0d7c2ef7e6c7c62b55607d144bb7543159ab85b4b7abf6abc2d6663895b19",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.256,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45128,
+      "pid": 45128,
+      "stage": "current-case-09",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d8e43e08b3ae99aa5f12abe30681d0c8fc77a7f0e1c8854c0046f76c1ecdc43a",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.2567,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 45156,
+      "pid": 45156,
+      "stage": "current-case-10",
+      "stderr_sha256": "71de6d5f791b1a406e9bdb676e8e19a69d5641e170fa515b24498dbdd3425f55",
+      "stdout_sha256": "fd7101632de0d5a2219d1df35d634d170de5afa430dfbe923d813894e5bbd99e",
+      "timed_out": false
+    }
+  ],
+  "status": "PASS",
+  "terminals": [
+    [
+      "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "ok"
+    ],
+    [
+      "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "ok"
+    ],
+    [
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "ok"
+    ],
+    [
+      "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "ok"
+    ],
+    [
+      "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+      "ok"
+    ],
+    [
+      "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+      "ok"
+    ],
+    [
+      "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+      "ok"
+    ],
+    [
+      "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+      "ok"
+    ],
+    [
+      "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+      "ok"
+    ],
+    [
+      "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "ok"
+    ]
+  ],
+  "tool_sha256": {
+    "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+    "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+  },
+  "tree": "9ba0e542e7661d1b4dab1b6fced4de71795999f5"
+}

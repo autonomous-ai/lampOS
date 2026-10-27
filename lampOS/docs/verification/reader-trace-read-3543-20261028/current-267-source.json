@@ -1,0 +1,214 @@
+{
+  "body_note": "Snapshot body still names ECC as current and267 as local, while actual published PR head is267. Later comments describe newer local370; those claims are separate from this267 source proof.",
+  "compared_to_runtime_head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+  "current_checks_metadata_only": [
+    {
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40574485135/job/122442403538",
+      "head_sha": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40574485135/job/122442402364",
+      "head_sha": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+      "name": "report-full-run-failure",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40574485135/job/122437125535",
+      "head_sha": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40574485115/job/122437117013",
+      "head_sha": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40574485135/job/122437116402",
+      "head_sha": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "status": "completed"
+    }
+  ],
+  "head": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+  "later_comments": {
+    "R2_current_source_read_no_P1_P2_and_latest_base_HOLD": "6452382467",
+    "Tests_additive_platform_census_correction": "6452577170",
+    "correction_commit": "90ec401e4",
+    "reported_local_fresh_gate_head": "37076c5df on af546143a; not published at this PR metadata snapshot"
+  },
+  "metadata_claim_limits": "Exact267 check status only; no native checkout/source/coverage audit or runtime acceptance transferred. Authored parent2e is not latest Main61c2a7264.",
+  "no_new_execution": [
+    "No Cargo, test, fmt/clippy, target-bank access, artifact execution, device or CI rerun.",
+    "No shared checkout/branch changes; only private additive evidence and git fetch metadata.",
+    "No Memory semantics, full Voice or historical failure cause/waiver claim."
+  ],
+  "owned_files_and_consumed_config_bindings": [
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7\tlampOS/crates/voice/src/session_reader/tests.rs",
+      "old_mode_blob": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7\tlampOS/crates/voice/src/session_reader/tests.rs",
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "same_mode_blob": true,
+      "scope": "owned",
+      "sha256_267": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+      "sha256_ecc": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8"
+    },
+    {
+      "bytes_equal": true,
+      "new_mode_blob": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151\tlampOS/docs/realtime-tests.md",
+      "old_mode_blob": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151\tlampOS/docs/realtime-tests.md",
+      "path": "lampOS/docs/realtime-tests.md",
+      "same_mode_blob": true,
+      "scope": "owned",
+      "sha256_267": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708",
+      "sha256_ecc": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864\tlampOS/crates/voice/src/session_reader.rs",
+      "old_mode_blob": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864\tlampOS/crates/voice/src/session_reader.rs",
+      "path": "lampOS/crates/voice/src/session_reader.rs",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c",
+      "sha256_ecc": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+      "old_mode_blob": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+      "path": "lampOS/crates/voice/src/service_trace.rs",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+      "sha256_ecc": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609\tlampOS/crates/voice/src/session_state.rs",
+      "old_mode_blob": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609\tlampOS/crates/voice/src/session_state.rs",
+      "path": "lampOS/crates/voice/src/session_state.rs",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f",
+      "sha256_ecc": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd\tlampOS/crates/voice/src/process.rs",
+      "old_mode_blob": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd\tlampOS/crates/voice/src/process.rs",
+      "path": "lampOS/crates/voice/src/process.rs",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "6f953350bc4176ec56f697b45a9907db581b4e216bafbc2ed3a74954433e9875",
+      "sha256_ecc": "6f953350bc4176ec56f697b45a9907db581b4e216bafbc2ed3a74954433e9875"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob bb924518301e324ebc1d22fd1407854b09406501\tlampOS/crates/voice/src/lib.rs",
+      "old_mode_blob": "100644 blob bb924518301e324ebc1d22fd1407854b09406501\tlampOS/crates/voice/src/lib.rs",
+      "path": "lampOS/crates/voice/src/lib.rs",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "2030bd46cd3ac00edc7f10e516b14c80058787c2ca6bd43078615b62c04be06f",
+      "sha256_ecc": "2030bd46cd3ac00edc7f10e516b14c80058787c2ca6bd43078615b62c04be06f"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob 654c56da19747b0a1c613a416f8a4a7e02ce8f64\tlampOS/Cargo.lock",
+      "old_mode_blob": "100644 blob 654c56da19747b0a1c613a416f8a4a7e02ce8f64\tlampOS/Cargo.lock",
+      "path": "lampOS/Cargo.lock",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "e4f567679e5b62bf5b1fe5c93b5ce923449b7912d72c2befd8651d0235b09b22",
+      "sha256_ecc": "e4f567679e5b62bf5b1fe5c93b5ce923449b7912d72c2befd8651d0235b09b22"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+      "old_mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+      "path": "lampOS/Cargo.toml",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+      "sha256_ecc": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2\tlampOS/crates/voice/Cargo.toml",
+      "old_mode_blob": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2\tlampOS/crates/voice/Cargo.toml",
+      "path": "lampOS/crates/voice/Cargo.toml",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+      "sha256_ecc": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+      "old_mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+      "path": "lampOS/rust-toolchain.toml",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+      "sha256_ecc": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    },
+    {
+      "bytes_equal": true,
+      "ecc_frozen_source_guard_matches": true,
+      "new_mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+      "old_mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+      "path": "lampOS/.cargo/config.toml",
+      "same_mode_blob": true,
+      "scope": "consumed/config",
+      "sha256_267": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "sha256_ecc": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+    }
+  ],
+  "parent": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "platform_census_additive_note": {
+    "Mac_only_ACL_fallback_pass": 1,
+    "ignored_privileged_DAC_unrun_on_Mac": 1,
+    "limits": "Static source platform labels and author additive correction; no new execution. Original old proof and its terminal rows unchanged.",
+    "ordinary_Linux_exclusive_unrun_on_Mac": 12,
+    "portable_common_Mac_pass": 3,
+    "source_linux_catalog_total": 16
+  },
+  "range_diff": "1:  ecc34ddf5 = 1:  2671aeabd lampOS: wait for reader fixture completion within owned roots\n",
+  "runtime_credit": {
+    "Reader": 4,
+    "Trace": 6,
+    "head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+    "original_receipt_sha256": "14c0bd4de1e9bcc68c8074ce109a3fe6c4a6262624a4dff453dddf3e403b7f86",
+    "selected_pass": 10,
+    "transferred_to_267": false
+  },
+  "status": "SOURCE_READ_CAN_CARRY; no new P1/P2 found",
+  "tree": "d546bc796c8e52f80dc8b48840f203c7afcff4ad",
+  "utc": "2026-10-27T20:31:28.836652+00:00",
+  "workspace_dependency_manifest_or_lock_changes": [],
+  "zero_context_full_index_patch_sha256": {
+    "267": "76b419a2772f5ccedce1667871fe7f456c98e38af7ada6121bd285ff0808917d",
+    "ecc": "76b419a2772f5ccedce1667871fe7f456c98e38af7ada6121bd285ff0808917d"
+  },
+  "zero_context_patch_equal": true
+}

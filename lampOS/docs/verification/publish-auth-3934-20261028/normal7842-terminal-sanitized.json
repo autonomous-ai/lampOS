@@ -1,0 +1,417 @@
+{
+  "schema": "third-first-normal-publish-terminal-v1",
+  "observed_at_utc": "2026-10-27T19:39:31.006169+00:00",
+  "original_run": {
+    "conclusion": "failure",
+    "created_at": "2026-10-27T19:11:58Z",
+    "event": "push",
+    "head_branch": "lamp-voice",
+    "head_sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+    "id": 40566918471,
+    "path": ".github/workflows/lampos-arm64.yml",
+    "run_attempt": 1,
+    "run_number": 7842,
+    "status": "completed",
+    "updated_at": "2026-10-27T19:37:09Z"
+  },
+  "original_jobs": {
+    "jobs": [
+      {
+        "completed_at": "2026-10-27T19:36:15Z",
+        "conclusion": "success",
+        "head_sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+        "id": 122410547257,
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "run_attempt": 1,
+        "run_id": 40566918471,
+        "started_at": "2026-10-27T19:12:04Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completed_at": "2026-10-27T19:12:06Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "started_at": "2026-10-27T19:12:05Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:12:29Z",
+            "conclusion": "success",
+            "name": "system packages",
+            "number": 2,
+            "started_at": "2026-10-27T19:12:06Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:12:35Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 3,
+            "started_at": "2026-10-27T19:12:29Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:12:35Z",
+            "conclusion": "success",
+            "name": "publication failure tests (offline, no signing secret)",
+            "number": 4,
+            "started_at": "2026-10-27T19:12:35Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:12:41Z",
+            "conclusion": "success",
+            "name": "Rust 1.96.0",
+            "number": 5,
+            "started_at": "2026-10-27T19:12:35Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:12:42Z",
+            "conclusion": "success",
+            "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+            "number": 6,
+            "started_at": "2026-10-27T19:12:41Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:13:00Z",
+            "conclusion": "success",
+            "name": "stable promotion tests (offline, disposable test key)",
+            "number": 7,
+            "started_at": "2026-10-27T19:12:42Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:13:00Z",
+            "conclusion": "skipped",
+            "name": "restore the cache",
+            "number": 8,
+            "started_at": "2026-10-27T19:13:00Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:13:00Z",
+            "conclusion": "skipped",
+            "name": "unchanged source files get the cached build's times back",
+            "number": 9,
+            "started_at": "2026-10-27T19:13:00Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:13:01Z",
+            "conclusion": "success",
+            "name": "record fresh source times for a cold publication build",
+            "number": 10,
+            "started_at": "2026-10-27T19:13:00Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:13:02Z",
+            "conclusion": "success",
+            "name": "Run taiki-e/install-action@v2",
+            "number": 11,
+            "started_at": "2026-10-27T19:13:01Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:21:18Z",
+            "conclusion": "success",
+            "name": "build (release, the lamps' binaries)",
+            "number": 12,
+            "started_at": "2026-10-27T19:13:02Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:21:19Z",
+            "conclusion": "success",
+            "name": "every built lamp-* binary is classified for the lamp-os package",
+            "number": 13,
+            "started_at": "2026-10-27T19:21:18Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:22:37Z",
+            "conclusion": "success",
+            "name": "build the two selected artifact examples without filename collisions",
+            "number": 14,
+            "started_at": "2026-10-27T19:21:19Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:22:37Z",
+            "conclusion": "success",
+            "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+            "number": 15,
+            "started_at": "2026-10-27T19:22:37Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:22:37Z",
+            "conclusion": "skipped",
+            "name": "which crates a pull request tests",
+            "number": 16,
+            "started_at": "2026-10-27T19:22:37Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:35:32Z",
+            "conclusion": "success",
+            "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+            "number": 17,
+            "started_at": "2026-10-27T19:22:37Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:35:53Z",
+            "conclusion": "success",
+            "name": "doc tests and the own-harness tests (nextest runs neither)",
+            "number": 18,
+            "started_at": "2026-10-27T19:35:32Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:35:54Z",
+            "conclusion": "success",
+            "name": "export only current Cargo targets and their SHA-256",
+            "number": 19,
+            "started_at": "2026-10-27T19:35:53Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:36:02Z",
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 20,
+            "started_at": "2026-10-27T19:35:54Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:36:02Z",
+            "conclusion": "success",
+            "name": "discard the isolated example target before saving the cache",
+            "number": 21,
+            "started_at": "2026-10-27T19:36:02Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:36:12Z",
+            "conclusion": "success",
+            "name": "save the cache",
+            "number": 22,
+            "started_at": "2026-10-27T19:36:02Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:36:12Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 44,
+            "started_at": "2026-10-27T19:36:12Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:36:12Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 45,
+            "started_at": "2026-10-27T19:36:12Z",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "completed_at": "2026-10-27T19:11:58Z",
+        "conclusion": "skipped",
+        "head_sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+        "id": 122410551108,
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "run_attempt": 1,
+        "run_id": 40566918471,
+        "started_at": "2026-10-27T19:11:59Z",
+        "status": "completed",
+        "steps": []
+      },
+      {
+        "completed_at": "2026-10-27T19:37:08Z",
+        "conclusion": "failure",
+        "head_sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+        "id": 122423443147,
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "run_attempt": 1,
+        "run_id": 40566918471,
+        "started_at": "2026-10-27T19:36:22Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completed_at": "2026-10-27T19:36:24Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "started_at": "2026-10-27T19:36:23Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:36:33Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "started_at": "2026-10-27T19:36:24Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:36:39Z",
+            "conclusion": "success",
+            "name": "Run actions/download-artifact@v4",
+            "number": 3,
+            "started_at": "2026-10-27T19:36:33Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:37:06Z",
+            "conclusion": "failure",
+            "name": "verify, sign, upload, then promote the channel",
+            "number": 4,
+            "started_at": "2026-10-27T19:36:39Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:37:06Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 8,
+            "started_at": "2026-10-27T19:37:06Z",
+            "status": "completed"
+          },
+          {
+            "completed_at": "2026-10-27T19:37:06Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "started_at": "2026-10-27T19:37:06Z",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "completed_at": "2026-10-27T19:36:15Z",
+        "conclusion": "skipped",
+        "head_sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+        "id": 122423444877,
+        "name": "report-full-run-failure",
+        "run_attempt": 1,
+        "run_id": 40566918471,
+        "started_at": "2026-10-27T19:36:16Z",
+        "status": "completed",
+        "steps": []
+      }
+    ],
+    "total_count": 4
+  },
+  "actual_logged_source": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+  "owned_source": "6472ec41cec29c20111ee52617fcd3afb375ac64",
+  "source_proof": {
+    "train_delivery_packet": ".claude/worktrees/third-publish-train259-evidence/delivery-sanitized.json",
+    "train_delivery_packet_sha256": "7f4cb13ce6fdb15924740ea9011216491f3db5587fe445b7c0fd329e104e9a0b",
+    "landed_tree_equals_original_train_tested_tree": "64e8802975af15939b40a8518ff794633897f950",
+    "owned_three_blobs_and_modes_equal": true
+  },
+  "normal_run_owned_python_suite": {
+    "unique_rows": 49,
+    "ok_rows": 49,
+    "bad_rows": 0,
+    "raw_summary": [
+      "2026-10-27T19:12:35.7009076Z Ran 49 tests in 0.279s",
+      "2026-10-27T19:12:35.7009309Z OK"
+    ],
+    "checkout_lines": [
+      "2026-10-27T19:12:35.2718662Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-10-27T19:12:35.2748681Z f0f65dc995e493c0c7fe13e47a84aba21d0381b2"
+    ],
+    "rows_evidence": ".claude/worktrees/third-publish-train259-evidence/normal7842-owned-test-log-evidence.json",
+    "rows_evidence_sha256": "6b9d7c4ec075f96b15ff155a3edd3c9074b527bb9455500bda7c82df92103f80"
+  },
+  "publication_observation": {
+    "job_id": 122423443147,
+    "actual_checkout_lines": [
+      "2026-10-27T19:36:33.8934419Z HEAD is now at f0f65dc lampOS: explain gh publication failures without exposing secrets",
+      "2026-10-27T19:36:33.8980733Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-10-27T19:36:33.9005294Z f0f65dc995e493c0c7fe13e47a84aba21d0381b2"
+    ],
+    "safe_helper_diagnostics": [
+      "gh release create failed (exit 1): HTTP 403: Resource not accessible by integration (https://api.github.<redacted>)",
+      "lampOS publication refused: gh release create failed (exit 1): HTTP 403: Resource not accessible by integration (https://api.github.<redacted>)"
+    ],
+    "publication_receipt_count": 0,
+    "finding": "This run reached publication and failed at gh release create with HTTP403 Resource not accessible by integration.",
+    "interpretation_limit": "The logged response identifies an integration authorization denial for this operation/run; it does not identify which permission or policy denied it, and does not establish all historical gh failures had this cause."
+  },
+  "watch_control": {
+    "all_native_handles_closed": [
+      46241,
+      10654,
+      18839
+    ],
+    "phases": [
+      {
+        "native_handle": 46241,
+        "result": {
+          "run_id": 40566918471,
+          "watch_exit": 1,
+          "timeout": false,
+          "elapsed_seconds": 488.954
+        },
+        "interpretation": "gh transport timeout, not CI outcome"
+      },
+      {
+        "native_handle": 10654,
+        "result": {
+          "run_id": 40566918471,
+          "watch_exit": null,
+          "timeout": true,
+          "elapsed_seconds": 700.01
+        },
+        "interpretation": "bounded watch deadline, not CI outcome"
+      },
+      {
+        "native_handle": 18839,
+        "result": {
+          "run_id": 40566918471,
+          "watch_exit": 1,
+          "timeout": false,
+          "elapsed_seconds": 67.295,
+          "interval_seconds": 60,
+          "phase": 2
+        },
+        "interpretation": "actual original workflow failure; stderr empty, API terminal failure independently confirmed"
+      }
+    ],
+    "additive_watch_elapsed_seconds": 1256.259,
+    "workflow_declared_timeout_minutes": {
+      "arm64": 90,
+      "publish": 30
+    },
+    "workflow_timeout_source_sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2"
+  },
+  "latest_automatic_normal_run": {
+    "conclusion": null,
+    "created_at": "2026-10-27T19:31:52Z",
+    "event": "push",
+    "head_branch": "lamp-voice",
+    "head_sha": "2e66c1aded556f5f688dab729331eacb045eeffc",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40569942842",
+    "id": 40569942842,
+    "run_attempt": 1,
+    "run_number": 7856,
+    "status": "in_progress",
+    "updated_at": "2026-10-27T19:31:59Z"
+  },
+  "limits": [
+    "No CI operation retry, rerun, cancel, dispatch, push, post or publication action was performed. Watch transport continuation did not modify the workflow.",
+    "No environment/key values read; original logs were filtered to checkout, owned unittest rows, helper-safe diagnostics and exact receipt fields.",
+    "No local Cargo, artifact download/execution, release/API asset inspection, signing, device or other-member semantic review.",
+    "No conclusion about latest normal7856; its metadata is a separate in-progress run and has no transferred credit from7842."
+  ],
+  "evidence_root": ".claude/worktrees/third-publish-train259-evidence"
+}

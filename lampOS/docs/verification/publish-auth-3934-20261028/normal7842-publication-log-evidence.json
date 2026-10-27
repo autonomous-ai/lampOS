@@ -1,0 +1,12 @@
+{
+  "checkout_lines": [
+    "2026-10-27T19:36:33.8934419Z HEAD is now at f0f65dc lampOS: explain gh publication failures without exposing secrets",
+    "2026-10-27T19:36:33.8980733Z [command]/usr/bin/git log -1 --format=%H",
+    "2026-10-27T19:36:33.9005294Z f0f65dc995e493c0c7fe13e47a84aba21d0381b2"
+  ],
+  "safe_helper_diagnostics": [
+    "gh release create failed (exit 1): HTTP 403: Resource not accessible by integration (https://api.github.<redacted>)",
+    "lampOS publication refused: gh release create failed (exit 1): HTTP 403: Resource not accessible by integration (https://api.github.<redacted>)"
+  ],
+  "publication_receipts": []
+}

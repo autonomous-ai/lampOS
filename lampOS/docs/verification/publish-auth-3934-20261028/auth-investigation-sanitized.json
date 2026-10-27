@@ -1,0 +1,94 @@
+{
+  "schema": "third-publication-authorization-readonly-evidence-v1",
+  "observed_at_utc": "2026-10-27T19:48:38.487554+00:00",
+  "failed_original": {
+    "run_id": 40566918471,
+    "run_number": 7842,
+    "attempt": 1,
+    "publish_job_id": 122423443147,
+    "sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+    "publish_start_utc": "2026-10-27T19:36:22Z",
+    "publish_end_utc": "2026-10-27T19:37:08Z",
+    "safe_failure": "gh release create failed (exit 1): HTTP 403: Resource not accessible by integration (https://api.github.<redacted>)"
+  },
+  "repository_default": {
+    "name": "main",
+    "observed_sha": "c63e57357b58956b9d66c3d45cd850a6be8c78bb",
+    "workflows_tree": "4bce14fd2844fc516cc9b31e57171d7fc5346f8e"
+  },
+  "failed_workflows_tree": "3a9d78ec0e885fe2bc83d63da2b36f3137ef9d3b",
+  "added_or_modified_workflows_relative_default": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/lampos-arm64.yml",
+    ".github/workflows/lampos-caps-state-pair.yml",
+    ".github/workflows/lampos-clippy.yml",
+    ".github/workflows/lampos-cloud-provenance-pair.yml",
+    ".github/workflows/lampos-controls-pair.yml",
+    ".github/workflows/lampos-records-pair.yml",
+    ".github/workflows/lampos-routine-state-pair.yml",
+    ".github/workflows/lampos-sdk.yml",
+    ".github/workflows/lampos-settings-pair.yml",
+    ".github/workflows/lampos-state-pair.yml",
+    ".github/workflows/lampos-surround-candidate-pair.yml"
+  ],
+  "workflow_metadata_comparison_evidence_sha256": "477be066acb577e543d97a3769c1d40d96a601378df015a169f3a25cc9346a66",
+  "ref_observation": {
+    "branches_where_failed_sha_is_current_head": [],
+    "tag_refs_examined": 204,
+    "annotated_tag_objects_peeled": 14,
+    "direct_or_peeled_tags_at_failed_sha": 0,
+    "snapshot_only": true,
+    "temporal_limit": "These ref/default snapshots were read after failure, not captured at the exact create request. Known newer lamp-voice push 2e66c1ade was created19:31:52UTC, before publish19:36:22UTC; no unseen transient ref absence/presence is reconstructed."
+  },
+  "job_authorization": {
+    "logged_grant": "Contents: write",
+    "logged_grant_time_utc": "2026-10-27T19:36:23.9054675Z",
+    "grant_evidence_sha256": "09cca14dcb524cbb31b834da7aa5c4fb9a223ceeec6bc493e89c6fc14c758f82",
+    "workflow_source": ".github/workflows/lampos-arm64.yml atf0f65dc99 lines295-296 and311",
+    "workflow_binding": "built-in github.token reference; no actual token value inspected"
+  },
+  "primary_sources": [
+    {
+      "url": "https://github.blog/changelog/2023-11-02-github-actions-enforcing-workflow-scope-when-creating-a-release/",
+      "finding": "Release creation has workflow authorization requirements when targeting a workflow-modifying SHA without an existing branch-head/tag ref."
+    },
+    {
+      "url": "https://docs.github.com/en/rest/releases/releases#create-a-release",
+      "finding": "Current endpoint note compares workflows with default branch, describes403integration as one denial manifestation, and says built-in GITHUB_TOKEN cannot receive required Workflowswrite. Contentswrite alone is not enough for this condition."
+    },
+    {
+      "url": "https://docs.github.com/en/rest/git/refs#create-a-reference",
+      "finding": "Create-reference permissions include Contentswrite and Contentswrite plus Workflowswrite variants; this audit did not establish that a late pin creation for an already-unreferenced workflow-differing SHA would be authorized."
+    }
+  ],
+  "interpretation": {
+    "classification": "Strongly supported explanation of7842, not a provider-internal audit determination.",
+    "basis": "Actual releasecreate403 integration denial + builtin token/Contentswrite + workflow differences versus default + no current head/tag refs match documented restricted condition.",
+    "historical_limit": "No claim all earlier generic gh failures had this cause; their stderr was discarded and original failures had more than one boundary."
+  },
+  "safe_remediation_options": [
+    {
+      "option": "Already authorized repository-scoped App installation token or fine-grained token with Contentswrite and Workflowswrite, supplied through the restricted publish environment.",
+      "benefit": "Does not depend on lamp-voice head still equalling the testedSHA after a long build; preserve --target exact testedSHA and all original checksum/signing/immutability checks.",
+      "tradeoff": "Requires administrator-provisioned existing authorization and secret lifecycle outside this agent; broader permission scope must remain confined to trusted publication step. No credential was located/read/created here."
+    },
+    {
+      "option": "Trusted integrator retains a dedicated immutable-per-build source ref to the exact landed/testedSHA before the ordinary branch head advances, retaining it through publication.",
+      "benefit": "Addresses the no-existing-ref condition described by official changelog without retargeting an artifact or asking builtin token for nonexistent permission.",
+      "tradeoff": "Integrator ownership, atomicity/order, ref protection, retention/cleanup and current API behavior need qualification. Creating a new pin only after the SHA lost its lastref is not a proven bootstrap. Pre-build pin jobs can race with rapid branch advancement; do not treat contentswrite as proof of success."
+    }
+  ],
+  "prohibited_shortcuts": [
+    "Do not change release target to current lamp-voice, default branch, or any unverified SHA.",
+    "Do not add an unsupported workflows:write grant to built-in GITHUB_TOKEN or bypass artifact/source identity checks.",
+    "No ref/tag/release write, credential handling, policy change or workflow rerun was performed."
+  ],
+  "terminal_packet_publication_audit": {
+    "path": ".claude/worktrees/third-publish-train259-evidence/normal7842-terminal-sanitized.json",
+    "sha256": "f365c6665a7d8df62efc17688baa395dd7cd92e75280340c30493e5344e8b107",
+    "actor_author_login_email_environment_value_fields": 0,
+    "absolute_user_paths_or_private_ip_values": 0,
+    "manual_scope": "Only selected metadata, owned testcase names, exact source hashes, statuses and helper-safe redacted diagnostic; no human actor handles or environment values found."
+  },
+  "evidence_root": ".claude/worktrees/third-publish-train259-evidence"
+}
