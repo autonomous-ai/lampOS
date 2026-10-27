@@ -6,10 +6,9 @@ use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{Health, Speech, VoiceState};
 use std::{
     collections::BTreeMap,
-    io::{self, Read},
+    io,
     path::Path,
     process::{Command, Stdio},
-    sync::mpsc,
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -77,7 +76,7 @@ impl Default for Systemctl {
 
 impl Systemd for Systemctl {
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
-        let stdout = query_within(
+        let stdout = show_within(
             Command::new("systemctl")
                 .args([
                     "show",
@@ -281,70 +280,24 @@ pub fn output_within(command: &mut Command, within: Duration) -> Option<String> 
 }
 
 /// What `command` printed, if it ended well within `within`, both of its
-/// pipes read to their end by then. Otherwise an error says why: it could
-/// not start, it did not finish (it is killed), a pipe stayed open (a child
-/// it left holds it), or it failed, in its own trimmed words on stderr. A
-/// stalled query never holds its caller past `within`.
-fn query_within(command: &mut Command, within: Duration) -> Result<String, String> {
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("systemctl: {error}"))?;
-    let (sent, read) = mpsc::channel();
-    let pipes: [Option<Box<dyn io::Read + Send>>; 2] = [
-        child.stdout.take().map(|pipe| Box::new(pipe) as _),
-        child.stderr.take().map(|pipe| Box::new(pipe) as _),
-    ];
-    for (which, pipe) in pipes.into_iter().enumerate() {
-        let sent = sent.clone();
-        let Some(mut pipe) = pipe else {
-            let _ = sent.send((which, Vec::new()));
-            continue;
-        };
-        // Left running if a pipe never closes: it ends with the pipe.
-        thread::spawn(move || {
-            let mut bytes = Vec::new();
-            let _ = pipe.read_to_end(&mut bytes);
-            let _ = sent.send((which, bytes));
-        });
-    }
-    let until = Instant::now() + within;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if Instant::now() < until => thread::sleep(Duration::from_millis(20)),
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!(
-                    "systemctl did not finish within {} s",
-                    within.as_secs()
-                ));
-            }
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("systemctl: {error}"));
-            }
-        }
-    };
-    let mut output = [Vec::new(), Vec::new()];
-    for _ in 0..2 {
-        let left = until.saturating_duration_since(Instant::now());
-        let (which, bytes) = read.recv_timeout(left).map_err(|_| {
-            format!(
-                "systemctl's output did not close within {} s",
+/// pipes read to their end by then, its process group owned throughout
+/// (`query::output_and_stderr_within`). Otherwise an error says why: it could
+/// not start, it ran on or a child it left held its pipes (the group is
+/// killed), its output passed 1 MiB, or it failed, in its own trimmed words
+/// on stderr. A stalled query never holds its caller past `within`.
+fn show_within(command: &mut Command, within: Duration) -> Result<String, String> {
+    let stdout = query::output_and_stderr_within(command, Instant::now() + within).map_err(
+        |error| match error.kind() {
+            io::ErrorKind::TimedOut => format!(
+                "systemctl did not answer within {} s: it ran on, or a child it left held its output",
                 within.as_secs()
-            )
-        })?;
-        output[which] = bytes;
-    }
-    if !status.success() {
-        return Err(String::from_utf8_lossy(&output[1]).trim().to_owned());
-    }
-    Ok(String::from_utf8_lossy(&output[0]).into_owned())
+            ),
+            // Its own trimmed stderr, or its exit status.
+            io::ErrorKind::Other => error.to_string(),
+            _ => format!("systemctl: {error}"),
+        },
+    )?;
+    Ok(String::from_utf8_lossy(&stdout).into_owned())
 }
 
 /// The longest line a round's outcome carries of a part's journal.
@@ -601,8 +554,8 @@ mod tests {
     #[test]
     fn a_stalled_systemctl_show_is_an_error_within_its_bound() {
         let at = Instant::now();
-        let why = query_within(&mut sh("sleep 30"), Duration::from_secs(1)).unwrap_err();
-        assert!(why.contains("did not finish within 1 s"), "{why}");
+        let why = show_within(&mut sh("sleep 30"), Duration::from_secs(1)).unwrap_err();
+        assert!(why.contains("did not answer within 1 s"), "{why}");
         assert!(at.elapsed() < Duration::from_secs(3), "{:?}", at.elapsed());
     }
 
@@ -611,37 +564,72 @@ mod tests {
         // The stand-in ends at once, well; the child it leaves keeps both
         // pipes open.
         let at = Instant::now();
-        let why = query_within(
+        let why = show_within(
             &mut sh("sleep 30 & echo Id=lamp-voice.service"),
             Duration::from_secs(1),
         )
         .unwrap_err();
-        assert!(why.contains("output did not close within 1 s"), "{why}");
+        assert!(why.contains("did not answer within 1 s"), "{why}");
         assert!(at.elapsed() < Duration::from_secs(3), "{:?}", at.elapsed());
+    }
+
+    #[test]
+    fn a_child_holding_the_pipe_is_killed_with_the_query() {
+        let root = tempfile::tempdir().unwrap();
+        let beats = root.path().join("beats");
+        // The stand-in ends at once; the child it leaves holds both pipes
+        // and writes a beat every 0.1 s until it is killed.
+        let why = show_within(
+            sh("(while :; do date +%s >> \"$1\"; sleep 0.1; done) & echo Id=x")
+                .arg("pipe-holder")
+                .arg(&beats),
+            Duration::from_secs(1),
+        )
+        .unwrap_err();
+        assert!(why.contains("did not answer within 1 s"), "{why}");
+        let size = || {
+            std::fs::metadata(&beats)
+                .map(|meta| meta.len())
+                .unwrap_or(0)
+        };
+        let before = size();
+        assert!(before > 0, "the pipe-holding child must have run");
+        thread::sleep(Duration::from_millis(500));
+        assert_eq!(size(), before, "the child outlived its query");
     }
 
     #[test]
     fn a_failed_query_says_its_trimmed_stderr_and_a_good_one_its_stdout() {
         assert_eq!(
-            query_within(
+            show_within(
                 &mut sh("echo '  no such unit  ' >&2; exit 1"),
                 JOURNAL_WITHIN
             ),
             Err("no such unit".to_owned())
         );
-        let text = query_within(
+        assert_eq!(
+            show_within(&mut sh("exit 3"), JOURNAL_WITHIN),
+            Err("update query ended with exit status: 3".to_owned())
+        );
+        let text = show_within(
             &mut sh("printf 'Id=a.service\\nActiveState=active\\n'; echo noise >&2"),
             JOURNAL_WITHIN,
         )
         .unwrap();
         assert_eq!(parse_show(&text)[0].active, "active");
         // More than a pipe holds, on both pipes, is read while it runs.
-        let big = query_within(
+        let big = show_within(
             &mut sh("head -c 200000 /dev/zero; head -c 200000 /dev/zero >&2"),
             JOURNAL_WITHIN,
         )
         .unwrap();
         assert_eq!(big.len(), 200000);
+        // Past 1 MiB on stdout is refused, not cut.
+        let why = show_within(&mut sh("head -c 1048577 /dev/zero"), JOURNAL_WITHIN).unwrap_err();
+        assert!(
+            why.starts_with("systemctl: ") && why.contains("1 MiB"),
+            "{why}"
+        );
     }
 
     const BACK_SHOW: &str = "Id=lamp-update-back.service\nLoadState=loaded\nUnitFileState=static\nActiveState=inactive\nSubState=dead\n";

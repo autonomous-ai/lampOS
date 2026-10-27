@@ -213,6 +213,10 @@ struct FakeSystemd {
     /// `systemctl show` fails from the first restart on.
     unreachable_after_restart: bool,
     unreachable: bool,
+    /// From the first restart on, this many `systemctl show` fail, then
+    /// they answer again.
+    failing_after_restart: usize,
+    failing: usize,
     /// What starting lamp-update-apply runs: none, and its start is skipped
     /// (a lamp without it), doing nothing.
     applier: Option<Box<dyn FnMut() -> Result<(), String>>>,
@@ -280,6 +284,10 @@ impl Systemd for FakeSystemd {
         if self.unreachable {
             return Err("Failed to connect to bus".into());
         }
+        if self.failing > 0 {
+            self.failing -= 1;
+            return Err("systemctl did not answer within 5 s".into());
+        }
         Ok(units
             .iter()
             .map(|unit| {
@@ -314,6 +322,7 @@ impl Systemd for FakeSystemd {
         }
         self.restarted_at.push((unit.to_owned(), self.now.get()));
         self.unreachable |= self.unreachable_after_restart;
+        self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
         Ok(())
     }
@@ -478,6 +487,8 @@ impl Lamp {
             remove_setup_marker_on_query: false,
             unreachable_after_restart: false,
             unreachable: false,
+            failing_after_restart: 0,
+            failing: 0,
             applier: None,
             cut_at_reload: false,
             self_recovery: Err("lamp-update-back.timer is not active".into()),
@@ -1077,6 +1088,32 @@ fn no_line_is_asked_when_systemd_itself_cannot_be_asked() {
         lamp.systemd.lines_asked.is_empty(),
         "{:?}",
         lamp.systemd.lines_asked
+    );
+    // It was asked again until the watch's end before putting back.
+    let restarted = lamp.systemd.restarted_at[0].1;
+    assert!(
+        lamp.now.get() >= restarted + 60_000,
+        "{}",
+        lamp.now.get() - restarted
+    );
+}
+
+/// A slow systemd makes the watch late, never a good build put back: a
+/// state query that fails mid-watch is asked again, and the watch passes
+/// once it answers.
+#[test]
+fn a_state_query_failing_mid_watch_is_asked_again_and_puts_nothing_back() {
+    let mut lamp = Lamp::new();
+    lamp.systemd.failing_after_restart = 3;
+    build_two(&mut lamp);
+    let outcome = lamp.round();
+    assert!(matches!(outcome, Outcome::Switched(2)), "{outcome:?}");
+    assert_eq!(lamp.systemd.failing, 0, "the failures were not reached");
+    assert_eq!(
+        lamp.systemd.restarted_at.len(),
+        1,
+        "{:?}",
+        lamp.systemd.restarted_at
     );
 }
 
