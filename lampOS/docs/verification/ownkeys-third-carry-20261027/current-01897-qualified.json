@@ -1,0 +1,2847 @@
+{
+  "all_source_lock_helper_artifact_guards_match": true,
+  "compiler_emission": {
+    "captured_executable_paths": 141,
+    "changed_selected_feature_vectors_from_historical539": 0,
+    "local_path_packages": 49,
+    "selected_Clippy_package_ids": 301,
+    "workspace_members_from_metadata": 47
+  },
+  "compiler_stages": [
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "fmt",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "8be5dffdeba53f039c028876fe5a63b0244f3ab1a9a62b718d4d3ea08ccbbe59",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "clippy",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "09e3427abde1fd98393efeceabaabf4ce2cafc02394ed0a78ed2acd9e4679b56",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "build",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "a8d2cc36e6d29d167f751bbb1c6b426bf15e8f61641b0ad5378bca7154b8c67b",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "test-compile",
+      "timed_out": false
+    }
+  ],
+  "counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 222
+  },
+  "expected_caught_hooks": {
+    "expected": 4,
+    "observed": 4,
+    "unknown": []
+  },
+  "hashes": {
+    "actual-current-artifacts.json": "e603e9acbd9159cd5521002439b8cbc3c3d7b86825f33dd9d88d26d3a5ddf797",
+    "after-proof.json": "cfab60aa14b44f3acce6d8ec138b153ddc8a8dd236d35b9fc5cc9019acddacb0",
+    "audit-current.py": "7509ea10539500d87c0fbeae75e4d328e9b2a9e5c7d82206bb038b4e93ff450a",
+    "capture-current.py": "2c4f4f03fe851d49699c66dd3e7dcb962ef0720cce0880ddb34c6540a7ed45ec",
+    "capture-current.receipt.json": "28800739b1ed08fbde8591c8c94fa9b88dd707be96b1d699c076e5901fb4ac93",
+    "clippy-emitted-feature-comparison.json": "1f00ee2dbc3090343d225773d6b48e3819391f494a47f41441262d19c4b1385b",
+    "common.py": "08a8109ec44c9ab274d040ae91e7a82156006668837d05b1be9b1125eb784559",
+    "compiler-plan.json": "324a64069afde5ca676f439fbb6e0fbce6930a6bf973c33c02294247f787fc1f",
+    "compiler.terminal.json": "082f3d0bfec8ad518183c8dcb125c862c78144dc282ee2928848a2aeacfc9781",
+    "current-runtime-plan.json": "49aa331c4be555e32d8df54f1cc4ed6dc1d1e1525aa008b2ccdb7214ac1fcbc7",
+    "emitted-current-features.json": "ee899223e8b680b36b6f1928dbb9409f755a9a37212d77e9959e160d006e6ad3",
+    "expected-caught-hooks.json": "dff4456589b94b31383f5429edd0e6206fd0fee1962d01021bd05b4b103b3f8d",
+    "range-diff.txt": "7c81a53ca351146a45416168a80716550e79b37ce5f15b3dd888920e0b404193",
+    "run-compiler.py": "47d97312efd0533f24eacb7282372a434d5365db60d1e3a7ec4521b0db2654e2",
+    "run-current-runtime.py": "473fa01853a467a45047cee498158b50338ea242cf6e7cd2a7851ec26f4dc524",
+    "runtime-start-guards.json": "e045f273e4479241d7596ec6b626adda9ca9da9702d74f9f30a7dfbf463f81ff",
+    "runtime.terminal.json": "c57eec35eb7b40655c3ea19a4bbed51bf628ba3f9e455655f6ccc61d9c089675",
+    "source-after-compiler.json": "1b1afa83260d1de46f46937f20a145704e1cfd5cf2a646aa44a435372a3c19cf",
+    "source-after-runtime.json": "1b1afa83260d1de46f46937f20a145704e1cfd5cf2a646aa44a435372a3c19cf",
+    "source-before-compiler.json": "1b1afa83260d1de46f46937f20a145704e1cfd5cf2a646aa44a435372a3c19cf",
+    "source-carry-receipt.json": "78a3c65ba9af41208c69f9b144a270a8e2054ebdd26fc93d7cff2d01d497affb"
+  },
+  "historical_holds": [
+    "PR3646 stays DRAFT broker hold.",
+    "Original539 ARM40474050468 Reader tests.rs788 failure remains separate; this host pass does not repair, explain, or waive it."
+  ],
+  "holds": [],
+  "identity": {
+    "base": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+    "head": "01897b09143ebffc99fb2d108f8dc7b4150c2236",
+    "tree": "f005b3cda07b9a08ca9ba71b2196d3075c073047"
+  },
+  "limits": [
+    "Exact222host including65own and16current composition additions only; no full14 runtime or old1938 case reuse.",
+    "Six Linux-only own cases deferred to current original native CI; ignored inherited case not executed.",
+    "No device/unit restart/reboot or physical behavior acceptance.",
+    "Raw Memory source/input hashes and tests only; no Memory implementation semantic or PR review."
+  ],
+  "no_tests_run_by_auditor": true,
+  "required_witnesses": {
+    "lamp-body::lamp_body::body::tests::a_base_given_way_and_held_still_under_its_bound_is_not_a_hand": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::a_base_turned_by_hand_in_small_steps_under_its_bound_says_a_hand": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_a_hold_of_the_head_near_its_stop_is_written_and_motion_is_not": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_a_home_outside_them_is_refused": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_a_joint_arrived_near_a_stop_rests_there": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-body::lamp_body::body::tests::without_own_ranges_the_servos_limits_change_nothing": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-controls::it::touch_runtime::controls_runs_at_real_time_priority_above_the_voice": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-memory::lamp_memory::days_protocol::tests::every_opt_in_request_shape_in_the_document_parses": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-memory::lamp_memory::days_protocol::tests::search_returns_the_day_attached_to_a_dated_fact": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-memory::lamp_memory::protocol::tests::every_default_request_written_in_the_document_is_read_and_done": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-selftest::lamp_selftest::voice_route::tests::the_product_unit_has_the_own_keys_lines": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::recover::the_product_units_command_line_runs_and_ends_when_recovery_is_off": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-setup::it::reset::a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::reset::a_reset_stops_the_writers_outside_the_target_after_what_starts_them": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::reset::a_reset_waits_for_every_part_of_the_target_before_wiping": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::reset::a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::reset::only_a_systemctl_stop_of_a_target_names_its_parts": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::reset::parts_that_cannot_be_read_reboot_without_wiping": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::reset::the_updaters_way_back_restarts_nothing_after_the_barrier": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-setup::it::wifi_change::the_product_voice_loads_its_recorded_lines_from_the_fixed_folder": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-skills::it::made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::skills::a_comfort_break_never_names_the_bathroom": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::skills::every_skill_folder_passes_its_own_recorded_tests": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::skills::every_skill_folder_says_its_kind_and_version": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::skills::faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::store::a_builds_key_in_the_skills_folder_wins_and_rotates_and_a_damaged_one_refuses": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::store::only_the_store_key_in_its_file_is_taken_and_a_new_file_rotates_it": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::lamp_skills::package::tests::the_askers_cgroups_are_their_product_units_slices": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::install::a_blank_lamp_runs_every_product_skill_as_the_skill": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::a_clean_install_names_no_switch_off": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::install::a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::a_switch_set_back_on_later_is_not_named_and_a_file_named_twice_is_said_once": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::every_skill_folder_is_in_the_product_or_says_why_not": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::harness_on_keeps_a_harness_whose_version_cannot_be_read_in_time": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::install::install_keeps_an_own_keys_off_drop_in_without_reloading": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::install::install_keeps_an_own_keys_symlink_to_the_exact_template": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::install::install_preflight_refuses_a_directory_at_the_retired_own_keys_path": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::install::install_prepares_store_off_and_keeps_the_lamps_store_choice": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::install::the_exit_note_allowlist_is_exactly_clouds_product_services": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::the_product_skills_are_exactly_the_core_skills": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::the_product_takes_a_persons_own_keys": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::lamp-update::product_settings_tests::an_unreadable_apply_value_is_present_and_never_enables_product_settings": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp-update::product_settings_tests::manifest_defaults_follow_the_product_tree_but_explicit_choices_win": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp-update::product_settings_tests::only_an_absent_apply_switch_and_self_switch_allow_the_product_default": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::check_units::tests::a_drop_in_that_turns_a_product_switch_off_says_so": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::install::tests::install_commands_never_wait_past_their_bound": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::install::tests::install_commands_say_their_stderr_or_give_their_stdout": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::install::tests::retired_drop_in_matcher_preserves_a_directory": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::quiet::tests::a_stale_mute_or_one_in_a_turn_is_not_quiet": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::quiet::tests::a_voice_asleep_or_muted_for_privacy_is_quiet_at_once": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::switches::tests::a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::switches::tests::environment_files_and_their_lines": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::switches::tests::several_on_a_line_quoted_continued_and_cleared_are_read_as_systemd_does": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::switches::tests::the_product_switches_are_its_on_lines_and_lamp_cloud_is_one": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::an_endless_writer_is_refused_at_the_cap_and_its_group_killed": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::invalid_utf8_cleans_closed_output_child": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::query_deadline_applies_after_stdout_closes": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::query_refuses_nonzero_exit_and_spawn_failure": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::tests::a_child_holding_the_pipe_is_an_error_within_the_bound": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::tests::a_child_holding_the_pipe_is_killed_with_the_query": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::tests::a_failed_query_says_its_trimmed_stderr_and_a_good_one_its_stdout": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::tests::a_stalled_systemctl_show_is_an_error_within_its_bound": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::lamp_update::world::tests::the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::a_command_is_read_within_its_bound_and_killed_after": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::a_round_keeping_second_json_still_reaches_deepseek_through_the_relay": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::a_state_query_failing_mid_watch_is_asked_again_and_puts_nothing_back": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::asleep_quiet::a_lamp_asleep_or_muted_for_privacy_is_switched_without_waiting": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::asleep_quiet::a_voice_that_says_nothing_is_still_waited_for": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::no_line_is_asked_when_systemd_itself_cannot_be_asked": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::a_comment_only_product_unit_is_an_intended_noop": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::a_corrupt_product_unit_is_refused_before_any_write": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::product_carrier::the_lamps_specific_unit_wins_over_the_product_unit": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::completion_removed_during_the_manager_query_is_not_used": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-update::round::setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice-eval::it::switches::every_switch_says_how_it_is_counted": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice-eval::it::switches::the_counts_by_table_and_in_all": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::agent_tasks::tests::the_named_only_switch_is_on_only_with_who": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::agent_tasks::tests::with_named_only_the_one_named_gets_the_work_or_is_said_not_set_up": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::agent_tasks::tests::with_named_only_the_words_name_an_agent_not_set_up": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::agent_tasks::tests::without_named_only_the_one_there_is_gets_the_work_as_before": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::app_make::tests::an_apps_ask_is_told_making_kept_asked_on_or_left_off": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::app_make::tests::an_ask_not_kept_says_why_and_only_the_apps_own_are_told": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::app_make::tests::asks_are_one_at_a_time_and_bounded": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::app_make::tests::overlapping_writers_never_lose_an_ask": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::app_make::tests::the_socket_answers_a_make_at_once_and_hands_it_over_after": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::app_make::tests::the_socket_is_opened_to_lampos_unless_another_group_is_named": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::app_make::tests::through_the_socket_a_make_is_answered_and_its_outcome_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::hand_controls::tests::a_hand_kept_a_second_wakes_a_mute_left_by_the_restart_guard_but_never_a_persons": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::hand_controls::tests::a_hand_kept_on_a_sleeping_lamp_wakes_it_at_the_stroke_once_saved": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::hand_controls::tests::a_hold_while_onboarding_is_under_way_asks_no_sleep": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::a_check_that_says_a_lot_still_ends": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::a_failed_check_gives_its_lines_with_the_folder_replaced": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::a_made_skill_may_use_only_the_light_and_the_body": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::a_repairs_brief_carries_the_checks_lines_and_still_fits": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::a_spoken_yes_asks_the_helper_for_that_sha256_and_nothing_else": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::an_answer_gives_exactly_its_two_files": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::no_spoken_yes_or_no_ask_puts_nothing_on_and_a_refusal_is_told": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::only_a_package_left_long_ago_is_dropped_as_unfinished": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::only_the_newest_ask_waits_and_only_for_two_minutes": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::the_brief_fits_the_hand_over_and_carries_only_the_request": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::the_card_is_marked_made_here": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::the_checks_reason_is_logged_without_the_skills_words": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::the_keeping_is_the_products_only_with_the_switch": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::the_note_says_what_it_would_do_and_asks_to_put_it_on": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::made_skill::tests::without_the_checker_nothing_is_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::switch_census_tests::a_helper_left_out_loses_its_switches": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::switch_census_tests::the_coordinators_functions_are_still_in_their_files": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::a_clear_correction_without_a_model_id_replaces_one_shown_fact": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::a_dated_search_result_says_whether_its_event_is_still_coming": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::an_explicit_correction_selects_only_one_shown_old_fact": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::asking_about_a_misheard_forget_adds_to_forget_alone": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::session_note_refused_and_malformed_room_reads_can_recover": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::the_note_says_there_is_a_memory_and_lists_what_is_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::the_observation_pass_reads_only_the_models_one_json_object": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::with_events_the_observe_job_has_its_day_and_the_prompt_asks_for_one": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::with_the_switch_recall_asks_a_span_of_days_and_the_second_version": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::remember::tests::without_the_switch_the_note_is_byte_identical": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_config::tests::the_company_relay_reaches_deepseek_through_itself": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_config::tests::the_product_unit_loads_the_own_keys_folder_the_names_here_read": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_provider::probe::tools::tests::each_memory_line_is_asked_with_the_ones_before_it_and_note_names_the_calls": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_provider::tests::a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_provider::tests::a_short_line_that_never_rendered_falls_back_to_the_long_one_never_silence": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_provider::worker::memory_observer::a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::speak_up::tests::only_welcome_back_says_hello_on_an_arrival": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_failed_hand_over_note_fits_one_written_turn_whatever_the_task": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_hand_over_to_a_missing_folder_says_the_folder_is_not_on_that_computer": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_long_result_keeps_enough_for_a_gist_and_asks_for_it_first": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_made_skill_the_check_refuses_is_repaired_once": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_progress_note_says_who_what_how_far_and_fits_in_one_written_turn": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_repair_not_handed_over_tells_the_first_answer_not_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_sign_in_question_heard_is_told_with_its_own_request": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_sign_ins_news_is_put_first": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_sign_ins_question_cut_short_is_offered_again_until_heard_whole": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_stop_or_a_failure_is_told_as_before": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_task_left_out_of_a_turn_keeps_its_place_and_cut_answers_keep_their_gist": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_task_newly_settled_is_read_at_once_and_told_news_reads_nothing": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_task_newly_settled_wakes_the_reader_once": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_task_settled_on_the_bus_wakes_the_reader_once": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::a_told_refused_across_a_restart_of_the_tasks_part_is_sent_again": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::after_the_lamps_own_words_news_waits_for_the_persons_turn": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::an_agent_waiting_with_no_question_is_told_as_waiting_on_their_computer": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::an_answer_that_went_on_is_told_from_where_the_earlier_one_ended": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::an_apps_ask_is_settled_when_its_work_never_reached_or_failed": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::each_piece_of_news_is_offered_once_and_told_news_is_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::every_note_fits_in_one_written_turn": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::long_answers_told_together_each_keep_their_gist": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::news_for_texts_is_read_beside_them_and_kept_told_once_given": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::news_is_told_at_the_first_pause_of_a_second_only_with_the_switch": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::news_keeps_when_it_came_in_while_it_waits": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::news_names_its_task_from_its_key": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::news_names_the_agent_each_engine_is": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::news_waits_once_and_telling_takes_it": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::only_a_fresh_acting_say_now_about_the_newest_change_of_this_store_is_told": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::progress_not_told_in_time_is_let_go": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::task_news_words_are_what_the_voice_said_before_byte_for_byte": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::tasks_finished_together_are_told_in_one_turn": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::tasks_finished_together_are_told_one_by_one_without_the_switch": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::the_newest_finished_look_in_this_boot_is_the_news_and_work_in_progress_is_not": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::the_note_names_the_agent_quotes_safely_and_says_how_fresh_it_is": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::words_that_come_back_past_the_decisions_time_are_let_go": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::task_news::tests::work_said_yes_to_that_never_reached_its_agent_is_told_soon_after": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::transport::tests::initial_capture_prepared_survives_bounded_speaker_startup": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance": {
+      "own": true,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input": {
+      "own": true,
+      "pass_once": true
+    }
+  },
+  "results": [
+    {
+      "captured_executable_sha256": "3d2ef210a3ad83116cdc6322a632522603b82a48d826fac50a244bb7174d7052",
+      "cases": {
+        "body::tests::a_base_given_way_and_held_still_under_its_bound_is_not_a_hand": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::a_base_turned_by_hand_in_small_steps_under_its_bound_says_a_hand": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window": [
+          {
+            "line": 6,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_a_hold_of_the_head_near_its_stop_is_written_and_motion_is_not": [
+          {
+            "line": 7,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_a_home_outside_them_is_refused": [
+          {
+            "line": 8,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_a_joint_arrived_near_a_stop_rests_there": [
+          {
+            "line": 9,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold": [
+          {
+            "line": 10,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start": [
+          {
+            "line": 11,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written": [
+          {
+            "line": 12,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before": [
+          {
+            "line": 13,
+            "outcome": "ok"
+          }
+        ],
+        "body::tests::without_own_ranges_the_servos_limits_change_nothing": [
+          {
+            "line": 14,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "label": "runtime-01-lamp-body-lamp_body",
+      "log_sha256": "efc4f0f6f70f4272768249335de876914fd4ffb7e1f506291a113b945cc79f1f",
+      "package": "lamp-body",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 12,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_body"
+    },
+    {
+      "captured_executable_sha256": "3706acf927c9da386d4a4e5e27a4ab91b0d69acda85275269dd666e7aa851122",
+      "cases": {
+        "touch_runtime::controls_runs_at_real_time_priority_above_the_voice": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "test"
+      ],
+      "label": "runtime-02-lamp-controls-it",
+      "log_sha256": "d243ab40d1c8c71e6404c5a79f19175f786ef55ec962d3affa2904300a258932",
+      "package": "lamp-controls",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "captured_executable_sha256": "4efad37c7500b2d9581006adc803b6a73ed87bf9c979201e27785d8ed875d46f",
+      "cases": {
+        "days_protocol::tests::every_opt_in_request_shape_in_the_document_parses": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "days_protocol::tests::search_returns_the_day_attached_to_a_dated_fact": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "protocol::tests::every_default_request_written_in_the_document_is_read_and_done": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "label": "runtime-03-lamp-memory-lamp_memory",
+      "log_sha256": "f1b82485ddb9d3e4030c0af4be0602164436b1bea45e6f126fc0f9ee5ef2d858",
+      "package": "lamp-memory",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 3,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_memory"
+    },
+    {
+      "captured_executable_sha256": "8b2c08048b2c50ff3be821065509036353491dd4f19c41a7acc9122e7f1377f2",
+      "cases": {
+        "voice_route::tests::the_product_unit_has_the_own_keys_lines": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "label": "runtime-04-lamp-selftest-lamp_selftest",
+      "log_sha256": "a6149b4900e1bbba7172f9b4f7eb31d6352fb6335cb45c9ab41c75617f6df706",
+      "package": "lamp-selftest",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_selftest"
+    },
+    {
+      "captured_executable_sha256": "559c724c0f56032244a4356813cd6a60e7c308e24881eae4842c13c291a899e3",
+      "cases": {
+        "recover::the_product_units_command_line_runs_and_ends_when_recovery_is_off": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "reset::a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "reset::a_reset_stops_the_writers_outside_the_target_after_what_starts_them": [
+          {
+            "line": 9,
+            "outcome": "ok"
+          }
+        ],
+        "reset::a_reset_waits_for_every_part_of_the_target_before_wiping": [
+          {
+            "line": 10,
+            "outcome": "ok"
+          }
+        ],
+        "reset::a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile": [
+          {
+            "line": 11,
+            "outcome": "ok"
+          }
+        ],
+        "reset::only_a_systemctl_stop_of_a_target_names_its_parts": [
+          {
+            "line": 12,
+            "outcome": "ok"
+          }
+        ],
+        "reset::parts_that_cannot_be_read_reboot_without_wiping": [
+          {
+            "line": 13,
+            "outcome": "ok"
+          }
+        ],
+        "reset::the_updaters_way_back_restarts_nothing_after_the_barrier": [
+          {
+            "line": 15,
+            "outcome": "ok"
+          }
+        ],
+        "wifi_change::the_product_voice_loads_its_recorded_lines_from_the_fixed_folder": [
+          {
+            "line": 16,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "test"
+      ],
+      "label": "runtime-05-lamp-setup-it",
+      "log_sha256": "90f97ad5b893ac09e6c075e7f49d7fba822045f5441fe03777071f5744b9040f",
+      "package": "lamp-setup",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 9,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "captured_executable_sha256": "e0ad691a1382e56d66a745238bf1920e8a8f360e8dc0d9da3321b4dd184e1317",
+      "cases": {
+        "made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "skills::a_comfort_break_never_names_the_bathroom": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ],
+        "skills::every_skill_folder_passes_its_own_recorded_tests": [
+          {
+            "line": 6,
+            "outcome": "ok"
+          }
+        ],
+        "skills::every_skill_folder_says_its_kind_and_version": [
+          {
+            "line": 7,
+            "outcome": "ok"
+          }
+        ],
+        "skills::faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere": [
+          {
+            "line": 8,
+            "outcome": "ok"
+          }
+        ],
+        "store::a_builds_key_in_the_skills_folder_wins_and_rotates_and_a_damaged_one_refuses": [
+          {
+            "line": 9,
+            "outcome": "ok"
+          }
+        ],
+        "store::only_the_store_key_in_its_file_is_taken_and_a_new_file_rotates_it": [
+          {
+            "line": 32,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "test"
+      ],
+      "label": "runtime-06-lamp-skills-it",
+      "log_sha256": "5984abe63488eebac057e59d74f8cf39ae2c851edafa80e0d8b075869ed2cb78",
+      "package": "lamp-skills",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 7,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "captured_executable_sha256": "09edc00e6399db567c5bb1834b372cca7567e39dd92c42eb02c9f53c652ad652",
+      "cases": {
+        "package::tests::the_askers_cgroups_are_their_product_units_slices": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "label": "runtime-07-lamp-skills-lamp_skills",
+      "log_sha256": "8f955ce8e55929a99370f3c8c2381e7de4f24b9262311e54228a5cce387f63d3",
+      "package": "lamp-skills",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_skills"
+    },
+    {
+      "captured_executable_sha256": "a5db0abf4753b99f1a5991e22414e74e7c213ec91f9a2bacf555fa32eae036be",
+      "cases": {
+        "a_blank_lamp_runs_every_product_skill_as_the_skill": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "a_clean_install_names_no_switch_off": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ],
+        "a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept": [
+          {
+            "line": 6,
+            "outcome": "ok"
+          }
+        ],
+        "a_switch_set_back_on_later_is_not_named_and_a_file_named_twice_is_said_once": [
+          {
+            "line": 7,
+            "outcome": "ok"
+          }
+        ],
+        "an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named": [
+          {
+            "line": 8,
+            "outcome": "ok"
+          }
+        ],
+        "every_skill_folder_is_in_the_product_or_says_why_not": [
+          {
+            "line": 9,
+            "outcome": "ok"
+          }
+        ],
+        "harness_on_keeps_a_harness_whose_version_cannot_be_read_in_time": [
+          {
+            "line": 10,
+            "outcome": "ok"
+          }
+        ],
+        "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading": [
+          {
+            "line": 11,
+            "outcome": "ok"
+          }
+        ],
+        "install_keeps_an_own_keys_off_drop_in_without_reloading": [
+          {
+            "line": 12,
+            "outcome": "ok"
+          }
+        ],
+        "install_keeps_an_own_keys_symlink_to_the_exact_template": [
+          {
+            "line": 13,
+            "outcome": "ok"
+          }
+        ],
+        "install_preflight_refuses_a_directory_at_the_retired_own_keys_path": [
+          {
+            "line": 14,
+            "outcome": "ok"
+          }
+        ],
+        "install_prepares_store_off_and_keeps_the_lamps_store_choice": [
+          {
+            "line": 15,
+            "outcome": "ok"
+          }
+        ],
+        "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest": [
+          {
+            "line": 16,
+            "outcome": "ok"
+          }
+        ],
+        "the_exit_note_allowlist_is_exactly_clouds_product_services": [
+          {
+            "line": 17,
+            "outcome": "ok"
+          }
+        ],
+        "the_product_skills_are_exactly_the_core_skills": [
+          {
+            "line": 18,
+            "outcome": "ok"
+          }
+        ],
+        "the_product_takes_a_persons_own_keys": [
+          {
+            "line": 19,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "test"
+      ],
+      "label": "runtime-08-lamp-update-install",
+      "log_sha256": "cdf068fe3eb20369c23539aad72a8c330b441755c2ae6589853f6df83de35338",
+      "package": "lamp-update",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 17,
+          "status": "ok"
+        }
+      ],
+      "target": "install"
+    },
+    {
+      "captured_executable_sha256": "6e432a4d918df0c4f499b424d4b12e65865faa7bfe206892a5b02bb467a9599c",
+      "cases": {
+        "product_settings_tests::an_unreadable_apply_value_is_present_and_never_enables_product_settings": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "product_settings_tests::manifest_defaults_follow_the_product_tree_but_explicit_choices_win": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "product_settings_tests::only_an_absent_apply_switch_and_self_switch_allow_the_product_default": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "bin"
+      ],
+      "label": "runtime-09-lamp-update-lamp-update",
+      "log_sha256": "5704d10b4a4b841b42c1e9161849e0e1ec1b38578caeab7d5fff324265763765",
+      "package": "lamp-update",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 3,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-update"
+    },
+    {
+      "captured_executable_sha256": "a28aed2801906011c9bc75af6b43f0a7688e94550aa170461e8853be828bf317",
+      "cases": {
+        "check_units::tests::a_drop_in_that_turns_a_product_switch_off_says_so": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "install::tests::install_commands_never_wait_past_their_bound": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "install::tests::install_commands_say_their_stderr_or_give_their_stdout": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ],
+        "install::tests::retired_drop_in_matcher_preserves_a_directory": [
+          {
+            "line": 6,
+            "outcome": "ok"
+          }
+        ],
+        "install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera": [
+          {
+            "line": 7,
+            "outcome": "ok"
+          }
+        ],
+        "manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them": [
+          {
+            "line": 8,
+            "outcome": "ok"
+          }
+        ],
+        "publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six": [
+          {
+            "line": 9,
+            "outcome": "ok"
+          }
+        ],
+        "publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it": [
+          {
+            "line": 10,
+            "outcome": "ok"
+          }
+        ],
+        "quiet::tests::a_stale_mute_or_one_in_a_turn_is_not_quiet": [
+          {
+            "line": 11,
+            "outcome": "ok"
+          }
+        ],
+        "quiet::tests::a_voice_asleep_or_muted_for_privacy_is_quiet_at_once": [
+          {
+            "line": 12,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown": [
+          {
+            "line": 13,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins": [
+          {
+            "line": 14,
+            "outcome": "ok"
+          }
+        ],
+        "switches::tests::a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on": [
+          {
+            "line": 15,
+            "outcome": "ok"
+          }
+        ],
+        "switches::tests::environment_files_and_their_lines": [
+          {
+            "line": 16,
+            "outcome": "ok"
+          }
+        ],
+        "switches::tests::several_on_a_line_quoted_continued_and_cleared_are_read_as_systemd_does": [
+          {
+            "line": 17,
+            "outcome": "ok"
+          }
+        ],
+        "switches::tests::the_product_switches_are_its_on_lines_and_lamp_cloud_is_one": [
+          {
+            "line": 18,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes": [
+          {
+            "line": 19,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::an_endless_writer_is_refused_at_the_cap_and_its_group_killed": [
+          {
+            "line": 20,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed": [
+          {
+            "line": 21,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::invalid_utf8_cleans_closed_output_child": [
+          {
+            "line": 22,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more": [
+          {
+            "line": 23,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string": [
+          {
+            "line": 24,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::query_deadline_applies_after_stdout_closes": [
+          {
+            "line": 25,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr": [
+          {
+            "line": 26,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::query_refuses_nonzero_exit_and_spawn_failure": [
+          {
+            "line": 27,
+            "outcome": "ok"
+          }
+        ],
+        "world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant": [
+          {
+            "line": 28,
+            "outcome": "ok"
+          }
+        ],
+        "world::tests::a_child_holding_the_pipe_is_an_error_within_the_bound": [
+          {
+            "line": 29,
+            "outcome": "ok"
+          }
+        ],
+        "world::tests::a_child_holding_the_pipe_is_killed_with_the_query": [
+          {
+            "line": 30,
+            "outcome": "ok"
+          }
+        ],
+        "world::tests::a_failed_query_says_its_trimmed_stderr_and_a_good_one_its_stdout": [
+          {
+            "line": 31,
+            "outcome": "ok"
+          }
+        ],
+        "world::tests::a_stalled_systemctl_show_is_an_error_within_its_bound": [
+          {
+            "line": 32,
+            "outcome": "ok"
+          }
+        ],
+        "world::tests::the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read": [
+          {
+            "line": 33,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "label": "runtime-10-lamp-update-lamp_update",
+      "log_sha256": "12e6f381d1897d36319a601ffe8e51db773fbfdddea5d20a858462c3037da42a",
+      "package": "lamp-update",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 31,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_update"
+    },
+    {
+      "captured_executable_sha256": "ae7f3cca11647d593f194f5f8c3d3e76024c36e2fde358b143a3c03a69a8e8be",
+      "cases": {
+        "a_command_is_read_within_its_bound_and_killed_after": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "a_state_query_failing_mid_watch_is_asked_again_and_puts_nothing_back": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ],
+        "asleep_quiet::a_lamp_asleep_or_muted_for_privacy_is_switched_without_waiting": [
+          {
+            "line": 6,
+            "outcome": "ok"
+          }
+        ],
+        "asleep_quiet::a_voice_that_says_nothing_is_still_waited_for": [
+          {
+            "line": 7,
+            "outcome": "ok"
+          }
+        ],
+        "no_line_is_asked_when_systemd_itself_cannot_be_asked": [
+          {
+            "line": 8,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::a_comment_only_product_unit_is_an_intended_noop": [
+          {
+            "line": 9,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::a_corrupt_product_unit_is_refused_before_any_write": [
+          {
+            "line": 10,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper": [
+          {
+            "line": 11,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder": [
+          {
+            "line": 12,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit": [
+          {
+            "line": 13,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone": [
+          {
+            "line": 14,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation": [
+          {
+            "line": 15,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback": [
+          {
+            "line": 16,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link": [
+          {
+            "line": 17,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest": [
+          {
+            "line": 18,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings": [
+          {
+            "line": 19,
+            "outcome": "ok"
+          }
+        ],
+        "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit": [
+          {
+            "line": 20,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup": [
+          {
+            "line": 21,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check": [
+          {
+            "line": 22,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files": [
+          {
+            "line": 23,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback": [
+          {
+            "line": 24,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart": [
+          {
+            "line": 25,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used": [
+          {
+            "line": 26,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules": [
+          {
+            "line": 27,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched": [
+          {
+            "line": 28,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup": [
+          {
+            "line": 29,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit": [
+          {
+            "line": 41,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup": [
+          {
+            "line": 47,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch": [
+          {
+            "line": 53,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception": [
+          {
+            "line": 54,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception": [
+          {
+            "line": 55,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules": [
+          {
+            "line": 56,
+            "outcome": "ok"
+          }
+        ],
+        "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch": [
+          {
+            "line": 57,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "test"
+      ],
+      "label": "runtime-11-lamp-update-round",
+      "log_sha256": "d387ac8e377b7428db16215bdcdb73c10c03e849ba9fea97bcab97bc246032bf",
+      "package": "lamp-update",
+      "panic_hooks": [
+        {
+          "classification": "source_reviewed_caught_fault_injection",
+          "line": 30,
+          "payload": "assertion `left != right` failed: cut after the link moved",
+          "source": "crates/update/tests/round/setup_lifecycle.rs:213",
+          "test": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+          "thread": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup"
+        },
+        {
+          "classification": "source_reviewed_caught_fault_injection",
+          "line": 36,
+          "payload": "assertion `left != right` failed: cut after the link moved",
+          "source": "crates/update/tests/round/setup_lifecycle.rs:213",
+          "test": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+          "thread": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup"
+        },
+        {
+          "classification": "source_reviewed_caught_fault_injection",
+          "line": 42,
+          "payload": "assertion `left != right` failed: cut after the link moved",
+          "source": "crates/update/tests/round/setup_lifecycle.rs:427",
+          "test": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+          "thread": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit"
+        },
+        {
+          "classification": "source_reviewed_caught_fault_injection",
+          "line": 48,
+          "payload": "assertion `left != right` failed: cut after the link moved",
+          "source": "crates/update/tests/round/setup_lifecycle.rs:294",
+          "test": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+          "thread": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup"
+        }
+      ],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 34,
+          "status": "ok"
+        }
+      ],
+      "target": "round"
+    },
+    {
+      "captured_executable_sha256": "b022006ac342f004bedf951b4c6204b6fb375d04a6896c8d97a3535f022f8a7f",
+      "cases": {
+        "agent_tasks::tests::the_named_only_switch_is_on_only_with_who": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "agent_tasks::tests::with_named_only_the_one_named_gets_the_work_or_is_said_not_set_up": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ],
+        "agent_tasks::tests::with_named_only_the_words_name_an_agent_not_set_up": [
+          {
+            "line": 5,
+            "outcome": "ok"
+          }
+        ],
+        "agent_tasks::tests::without_named_only_the_one_there_is_gets_the_work_as_before": [
+          {
+            "line": 6,
+            "outcome": "ok"
+          }
+        ],
+        "app_make::tests::an_apps_ask_is_told_making_kept_asked_on_or_left_off": [
+          {
+            "line": 7,
+            "outcome": "ok"
+          }
+        ],
+        "app_make::tests::an_ask_not_kept_says_why_and_only_the_apps_own_are_told": [
+          {
+            "line": 8,
+            "outcome": "ok"
+          }
+        ],
+        "app_make::tests::asks_are_one_at_a_time_and_bounded": [
+          {
+            "line": 9,
+            "outcome": "ok"
+          }
+        ],
+        "app_make::tests::overlapping_writers_never_lose_an_ask": [
+          {
+            "line": 10,
+            "outcome": "ok"
+          }
+        ],
+        "app_make::tests::the_socket_answers_a_make_at_once_and_hands_it_over_after": [
+          {
+            "line": 11,
+            "outcome": "ok"
+          }
+        ],
+        "app_make::tests::the_socket_is_opened_to_lampos_unless_another_group_is_named": [
+          {
+            "line": 12,
+            "outcome": "ok"
+          }
+        ],
+        "app_make::tests::through_the_socket_a_make_is_answered_and_its_outcome_kept": [
+          {
+            "line": 13,
+            "outcome": "ok"
+          }
+        ],
+        "hand_controls::tests::a_hand_kept_a_second_wakes_a_mute_left_by_the_restart_guard_but_never_a_persons": [
+          {
+            "line": 15,
+            "outcome": "ok"
+          }
+        ],
+        "hand_controls::tests::a_hand_kept_on_a_sleeping_lamp_wakes_it_at_the_stroke_once_saved": [
+          {
+            "line": 16,
+            "outcome": "ok"
+          }
+        ],
+        "hand_controls::tests::a_hold_while_onboarding_is_under_way_asks_no_sleep": [
+          {
+            "line": 17,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::a_check_that_says_a_lot_still_ends": [
+          {
+            "line": 18,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::a_failed_check_gives_its_lines_with_the_folder_replaced": [
+          {
+            "line": 20,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::a_made_skill_may_use_only_the_light_and_the_body": [
+          {
+            "line": 22,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::a_repairs_brief_carries_the_checks_lines_and_still_fits": [
+          {
+            "line": 23,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::a_spoken_yes_asks_the_helper_for_that_sha256_and_nothing_else": [
+          {
+            "line": 24,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::an_answer_gives_exactly_its_two_files": [
+          {
+            "line": 26,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::no_spoken_yes_or_no_ask_puts_nothing_on_and_a_refusal_is_told": [
+          {
+            "line": 27,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::only_a_package_left_long_ago_is_dropped_as_unfinished": [
+          {
+            "line": 32,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::only_the_newest_ask_waits_and_only_for_two_minutes": [
+          {
+            "line": 33,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::the_brief_fits_the_hand_over_and_carries_only_the_request": [
+          {
+            "line": 34,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::the_card_is_marked_made_here": [
+          {
+            "line": 35,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::the_checks_reason_is_logged_without_the_skills_words": [
+          {
+            "line": 36,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::the_keeping_is_the_products_only_with_the_switch": [
+          {
+            "line": 37,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::the_note_says_what_it_would_do_and_asks_to_put_it_on": [
+          {
+            "line": 38,
+            "outcome": "ok"
+          }
+        ],
+        "made_skill::tests::without_the_checker_nothing_is_kept": [
+          {
+            "line": 39,
+            "outcome": "ok"
+          }
+        ],
+        "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types": [
+          {
+            "line": 41,
+            "outcome": "ok"
+          }
+        ],
+        "process::switch_census_tests::a_helper_left_out_loses_its_switches": [
+          {
+            "line": 42,
+            "outcome": "ok"
+          }
+        ],
+        "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not": [
+          {
+            "line": 43,
+            "outcome": "ok"
+          }
+        ],
+        "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments": [
+          {
+            "line": 44,
+            "outcome": "ok"
+          }
+        ],
+        "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker": [
+          {
+            "line": 45,
+            "outcome": "ok"
+          }
+        ],
+        "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches": [
+          {
+            "line": 46,
+            "outcome": "ok"
+          }
+        ],
+        "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files": [
+          {
+            "line": 47,
+            "outcome": "ok"
+          }
+        ],
+        "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else": [
+          {
+            "line": 48,
+            "outcome": "ok"
+          }
+        ],
+        "process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in": [
+          {
+            "line": 49,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::a_clear_correction_without_a_model_id_replaces_one_shown_fact": [
+          {
+            "line": 50,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::a_dated_search_result_says_whether_its_event_is_still_coming": [
+          {
+            "line": 51,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::an_explicit_correction_selects_only_one_shown_old_fact": [
+          {
+            "line": 52,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::asking_about_a_misheard_forget_adds_to_forget_alone": [
+          {
+            "line": 53,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::session_note_refused_and_malformed_room_reads_can_recover": [
+          {
+            "line": 54,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::the_note_says_there_is_a_memory_and_lists_what_is_kept": [
+          {
+            "line": 55,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::the_observation_pass_reads_only_the_models_one_json_object": [
+          {
+            "line": 56,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::with_events_the_observe_job_has_its_day_and_the_prompt_asks_for_one": [
+          {
+            "line": 57,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs": [
+          {
+            "line": 58,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s": [
+          {
+            "line": 60,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::with_the_switch_recall_asks_a_span_of_days_and_the_second_version": [
+          {
+            "line": 62,
+            "outcome": "ok"
+          }
+        ],
+        "remember::tests::without_the_switch_the_note_is_byte_identical": [
+          {
+            "line": 63,
+            "outcome": "ok"
+          }
+        ],
+        "second_config::tests::the_company_relay_reaches_deepseek_through_itself": [
+          {
+            "line": 64,
+            "outcome": "ok"
+          }
+        ],
+        "second_config::tests::the_product_unit_loads_the_own_keys_folder_the_names_here_read": [
+          {
+            "line": 65,
+            "outcome": "ok"
+          }
+        ],
+        "second_provider::probe::tools::tests::each_memory_line_is_asked_with_the_ones_before_it_and_note_names_the_calls": [
+          {
+            "line": 66,
+            "outcome": "ok"
+          }
+        ],
+        "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one": [
+          {
+            "line": 67,
+            "outcome": "ok"
+          }
+        ],
+        "second_provider::tests::a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice": [
+          {
+            "line": 108,
+            "outcome": "ok"
+          }
+        ],
+        "second_provider::tests::a_short_line_that_never_rendered_falls_back_to_the_long_one_never_silence": [
+          {
+            "line": 158,
+            "outcome": "ok"
+          }
+        ],
+        "second_provider::worker::memory_observer::a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json": [
+          {
+            "line": 178,
+            "outcome": "ok"
+          }
+        ],
+        "speak_up::tests::only_welcome_back_says_hello_on_an_arrival": [
+          {
+            "line": 181,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_failed_hand_over_note_fits_one_written_turn_whatever_the_task": [
+          {
+            "line": 182,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_hand_over_to_a_missing_folder_says_the_folder_is_not_on_that_computer": [
+          {
+            "line": 183,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_long_result_keeps_enough_for_a_gist_and_asks_for_it_first": [
+          {
+            "line": 184,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_made_skill_the_check_refuses_is_repaired_once": [
+          {
+            "line": 185,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_progress_note_says_who_what_how_far_and_fits_in_one_written_turn": [
+          {
+            "line": 206,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_repair_not_handed_over_tells_the_first_answer_not_kept": [
+          {
+            "line": 207,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_sign_in_question_heard_is_told_with_its_own_request": [
+          {
+            "line": 208,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_sign_ins_news_is_put_first": [
+          {
+            "line": 209,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_sign_ins_question_cut_short_is_offered_again_until_heard_whole": [
+          {
+            "line": 210,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader": [
+          {
+            "line": 212,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out": [
+          {
+            "line": 216,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_stop_or_a_failure_is_told_as_before": [
+          {
+            "line": 222,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_task_left_out_of_a_turn_keeps_its_place_and_cut_answers_keep_their_gist": [
+          {
+            "line": 223,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_task_newly_settled_is_read_at_once_and_told_news_reads_nothing": [
+          {
+            "line": 227,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_task_newly_settled_wakes_the_reader_once": [
+          {
+            "line": 228,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_task_settled_on_the_bus_wakes_the_reader_once": [
+          {
+            "line": 229,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::a_told_refused_across_a_restart_of_the_tasks_part_is_sent_again": [
+          {
+            "line": 230,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::after_the_lamps_own_words_news_waits_for_the_persons_turn": [
+          {
+            "line": 231,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::an_agent_waiting_with_no_question_is_told_as_waiting_on_their_computer": [
+          {
+            "line": 232,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::an_answer_that_went_on_is_told_from_where_the_earlier_one_ended": [
+          {
+            "line": 233,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::an_apps_ask_is_settled_when_its_work_never_reached_or_failed": [
+          {
+            "line": 234,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::each_piece_of_news_is_offered_once_and_told_news_is_kept": [
+          {
+            "line": 239,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::every_note_fits_in_one_written_turn": [
+          {
+            "line": 241,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::long_answers_told_together_each_keep_their_gist": [
+          {
+            "line": 242,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::news_for_texts_is_read_beside_them_and_kept_told_once_given": [
+          {
+            "line": 245,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::news_is_told_at_the_first_pause_of_a_second_only_with_the_switch": [
+          {
+            "line": 248,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::news_keeps_when_it_came_in_while_it_waits": [
+          {
+            "line": 249,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::news_names_its_task_from_its_key": [
+          {
+            "line": 250,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::news_names_the_agent_each_engine_is": [
+          {
+            "line": 251,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::news_waits_once_and_telling_takes_it": [
+          {
+            "line": 252,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::only_a_fresh_acting_say_now_about_the_newest_change_of_this_store_is_told": [
+          {
+            "line": 253,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::progress_not_told_in_time_is_let_go": [
+          {
+            "line": 254,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::task_news_words_are_what_the_voice_said_before_byte_for_byte": [
+          {
+            "line": 255,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::tasks_finished_together_are_told_in_one_turn": [
+          {
+            "line": 256,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::tasks_finished_together_are_told_one_by_one_without_the_switch": [
+          {
+            "line": 259,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::the_newest_finished_look_in_this_boot_is_the_news_and_work_in_progress_is_not": [
+          {
+            "line": 260,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::the_note_names_the_agent_quotes_safely_and_says_how_fresh_it_is": [
+          {
+            "line": 261,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::words_that_come_back_past_the_decisions_time_are_let_go": [
+          {
+            "line": 262,
+            "outcome": "ok"
+          }
+        ],
+        "task_news::tests::work_said_yes_to_that_never_reached_its_agent_is_told_soon_after": [
+          {
+            "line": 264,
+            "outcome": "ok"
+          }
+        ],
+        "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time": [
+          {
+            "line": 265,
+            "outcome": "ok"
+          }
+        ],
+        "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup": [
+          {
+            "line": 266,
+            "outcome": "ok"
+          }
+        ],
+        "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance": [
+          {
+            "line": 267,
+            "outcome": "ok"
+          }
+        ],
+        "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input": [
+          {
+            "line": 268,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "label": "runtime-12-lamp-voice-lamp_voice",
+      "log_sha256": "ba04ec70cb1148065689defee8801205d6448bfd0e9c673c121c5b25867a2f01",
+      "package": "lamp-voice",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 101,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_voice"
+    },
+    {
+      "captured_executable_sha256": "d0af3a031bc981efca6ccc85d6ab29f98e2231b54e9f9cc9bd56b1ae3aab32e7",
+      "cases": {
+        "switches::every_switch_says_how_it_is_counted": [
+          {
+            "line": 3,
+            "outcome": "ok"
+          }
+        ],
+        "switches::the_counts_by_table_and_in_all": [
+          {
+            "line": 4,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "kind": [
+        "test"
+      ],
+      "label": "runtime-13-lamp-voice-eval-it",
+      "log_sha256": "d39c8200e0096f5e7efa824f816fd3d72233d13303fdbd694ab8f90af19501c6",
+      "package": "lamp-voice-eval",
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    }
+  ],
+  "runtime_terminal": {
+    "all_source_helper_artifact_guards_match": true,
+    "commands": [
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "efc4f0f6f70f4272768249335de876914fd4ffb7e1f506291a113b945cc79f1f",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-01-lamp-body-lamp_body",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "d243ab40d1c8c71e6404c5a79f19175f786ef55ec962d3affa2904300a258932",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-02-lamp-controls-it",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "f1b82485ddb9d3e4030c0af4be0602164436b1bea45e6f126fc0f9ee5ef2d858",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-03-lamp-memory-lamp_memory",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "a6149b4900e1bbba7172f9b4f7eb31d6352fb6335cb45c9ab41c75617f6df706",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-04-lamp-selftest-lamp_selftest",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "90f97ad5b893ac09e6c075e7f49d7fba822045f5441fe03777071f5744b9040f",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-05-lamp-setup-it",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "5984abe63488eebac057e59d74f8cf39ae2c851edafa80e0d8b075869ed2cb78",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-06-lamp-skills-it",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "8f955ce8e55929a99370f3c8c2381e7de4f24b9262311e54228a5cce387f63d3",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-07-lamp-skills-lamp_skills",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "cdf068fe3eb20369c23539aad72a8c330b441755c2ae6589853f6df83de35338",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-08-lamp-update-install",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "5704d10b4a4b841b42c1e9161849e0e1ec1b38578caeab7d5fff324265763765",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-09-lamp-update-lamp-update",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "12e6f381d1897d36319a601ffe8e51db773fbfdddea5d20a858462c3037da42a",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-10-lamp-update-lamp_update",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "d387ac8e377b7428db16215bdcdb73c10c03e849ba9fea97bcab97bc246032bf",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-11-lamp-update-round",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "ba04ec70cb1148065689defee8801205d6448bfd0e9c673c121c5b25867a2f01",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-12-lamp-voice-lamp_voice",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "error": null,
+        "log_sha256": "d39c8200e0096f5e7efa824f816fd3d72233d13303fdbd694ab8f90af19501c6",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-13-lamp-voice-eval-it",
+        "timed_out": false
+      }
+    ],
+    "elapsed_seconds": 329.28931461200006,
+    "error": null,
+    "identity": {
+      "base": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+      "head": "01897b09143ebffc99fb2d108f8dc7b4150c2236",
+      "tree": "f005b3cda07b9a08ca9ba71b2196d3075c073047"
+    },
+    "independent_case_audit_required": true,
+    "ok_commands_only": true
+  },
+  "source_carry": {
+    "Main_integrated_owned_paths": [
+      "lampOS/crates/update/src/install.rs",
+      "lampOS/crates/update/tests/install.rs",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/docs/cloud.md",
+      "lampOS/docs/install.md",
+      "lampOS/docs/setup.md",
+      "lampOS/docs/switches.md"
+    ],
+    "all7_range_equal": true,
+    "authors_messages_payloads_exact": true,
+    "owned_blobs_exact": 31
+  },
+  "status": "VERIFIED_CURRENT_OWNKEYS_CARRY_222"
+}

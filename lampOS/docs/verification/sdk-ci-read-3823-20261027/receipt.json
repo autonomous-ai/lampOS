@@ -1,0 +1,91 @@
+{
+  "head": "f4c6de577d54e18bf0755040a7887f4dc4603e71",
+  "original_run": 40498490112,
+  "event": "pull_request",
+  "attempt": 1,
+  "conclusion": "success",
+  "jobs": [
+    {
+      "conclusion": "success",
+      "id": 122169902149,
+      "name": "lampOS SDK \u2014 Python (pytest)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "id": 122169902345,
+      "name": "lampOS SDK \u2014 JavaScript (node --test)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "id": 122169902463,
+      "name": "lampOS SDK \u2014 schema copies equal docs/control.schema.json",
+      "status": "completed"
+    }
+  ],
+  "actual_preview": {
+    "parents": [
+      "3b9bfb628e1c416926b958fecf56f65c539dc533",
+      "f4c6de577d54e18bf0755040a7887f4dc4603e71"
+    ],
+    "sha": "80c2a16b2b3387bb3dfc7f8eae52b093184865bb",
+    "tree": "1903e94bd0cd19e010b00c7c21235afe1e592741"
+  },
+  "all_three_job_checkouts": [
+    "80c2a16b2b3387bb3dfc7f8eae52b093184865bb",
+    "80c2a16b2b3387bb3dfc7f8eae52b093184865bb",
+    "80c2a16b2b3387bb3dfc7f8eae52b093184865bb"
+  ],
+  "authored_tree_equal_preview": true,
+  "workflow_blob_equal": "26fb931d452856f1d9b3735443add1b9083d225b",
+  "counts": {
+    "Python_pass": 24,
+    "JavaScript_pass": 25,
+    "JavaScript_fail": 0
+  },
+  "copy_shell_controls": {
+    "head": "f4c6de577d54e18bf0755040a7887f4dc4603e71",
+    "exact_workflow_block_sha256": "67b451e820ff10f37b7fa1d2792d7069738f815a562a9de60ffbf6973169efb4",
+    "workflow_blob": "26fb931d452856f1d9b3735443add1b9083d225b",
+    "controls": [
+      {
+        "mismatched_copies": [],
+        "returncode": 0,
+        "error_annotations": 0
+      },
+      {
+        "mismatched_copies": [
+          0
+        ],
+        "returncode": 1,
+        "error_annotations": 1
+      },
+      {
+        "mismatched_copies": [
+          1
+        ],
+        "returncode": 1,
+        "error_annotations": 1
+      },
+      {
+        "mismatched_copies": [
+          0,
+          1
+        ],
+        "returncode": 1,
+        "error_annotations": 2
+      }
+    ],
+    "limit": "Isolated exact cmp-shell block controls; no SDK install or tests repeated locally"
+  },
+  "raw_log_sha256": "7b2706a99454fcaf5e9c40f411d25d4be309a82a389b8afaa3c2d82969329662",
+  "source_scope": [
+    "one new workflow only",
+    "PR and Main push filters SDK/** docs/control* workflow file",
+    "read-only contents permission",
+    "three independent jobs, no Rust build or lamp step"
+  ],
+  "known_P3": "Tests Python3.12/Node20, not all promised floors; author following with matrix3.10/3.12 and18/22.",
+  "limit": "Local exact copy-shell controls plus original CI; no repeated local SDK install/tests, native ARM or device claim"
+}
