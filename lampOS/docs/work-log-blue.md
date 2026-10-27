@@ -643,3 +643,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 21:39: quiet tick; nothing on my PRs or #3859.
 - 21:44: quiet tick; nothing on my PRs or #3859.
 - 21:49: #3859 has a NEXT TRAIN; asked the train not to combine #3840 and #3859 (the SDK skill-format copy would mismatch); #3859 first, then I carry #3840.
+- 21:50: prepared #3840's carry onto #3859 (new skill-format copy; warning fires only for look = true without camera, points to camera); on #3859's tree all 31 repo skills pass with no warnings, 50 tests pass; patch kept as skchk-on-3859.patch.
