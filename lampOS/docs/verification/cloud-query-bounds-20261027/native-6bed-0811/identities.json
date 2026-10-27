@@ -1,0 +1,278 @@
+{
+  "authored_and_preview_tree": "c155a7ae43870c7db375a298c590a8d59ed6d0d3",
+  "authored_head": "6bedf2631c472126572c7065a7c1b72c98d9819d",
+  "base": "0811b553b76823fd19fa018d7af0137007204b32",
+  "pr": 3644,
+  "preview_parents": [
+    "0811b553b76823fd19fa018d7af0137007204b32",
+    "6bedf2631c472126572c7065a7c1b72c98d9819d"
+  ],
+  "raw_metadata_sha256": {
+    "arm64-jobs-final.json": "184739a936183e825a2c5ddb03a4e495804826cdf2f7654e510c7d6ecc29b501",
+    "arm64-run-final.json": "75b9dc1b0b9093ec491e0806151988e5d477dc4e86c35f047604313633bf79c2",
+    "arm64-run-first.json": "d3f709477389529a36f39cf20ff23a9c45a01f4985e98aaec03beb145f1572d6",
+    "authored-commit.json": "4652636cd4d9918998a0813fe999ff3252c61f810010986b0064c0aaca4f6a62",
+    "clippy-jobs-final.json": "780cb02065e07ba2db6c833eda9e3f1d979291d5c59da4cca758238424576429",
+    "clippy-run-final.json": "c8bc225e9f6da4f59784f5cec503b51dd6ae5ae90b4c21ab08bab6da90e78b79",
+    "clippy-run-first.json": "a8fd0022f2ac41b04db1b757416a9741705d866d6630121b26c4e702ee4130f0",
+    "preview-commit.json": "3d097e80939496c5a82f043c0babdf0a6ae32ad9ead57ff857d2c90cb2adaca8"
+  },
+  "runs": {
+    "arm64": {
+      "actual_checkout": "91ad1051145f00d92621d373f9cbca9377baec0d",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:55:03Z",
+      "event": "pull_request",
+      "head_sha": "6bedf2631c472126572c7065a7c1b72c98d9819d",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40435363645",
+      "id": 40435363645,
+      "jobs": [
+        {
+          "completed_at": "2026-10-27T02:11:24Z",
+          "conclusion": "success",
+          "id": 121962914870,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+          "started_at": "2026-10-27T01:56:03Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "system packages",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "publication failure tests (offline, no signing secret)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Rust 1.96.0",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "stable promotion tests (offline, disposable test key)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "restore the cache",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed"
+            },
+            {
+              "conclusion": "skipped",
+              "name": "record fresh source times for a cold publication build",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run taiki-e/install-action@v2",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "build (release, the lamps' binaries)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "every built lamp-* binary is classified for the lamp-os package",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "build the two selected artifact examples without filename collisions",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "which crates a pull request tests",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "doc tests and the own-harness tests (nextest runs neither)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "export only current Cargo targets and their SHA-256",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed"
+            },
+            {
+              "conclusion": "skipped",
+              "name": "discard the isolated example target before saving the cache",
+              "status": "completed"
+            },
+            {
+              "conclusion": "skipped",
+              "name": "save the cache",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "status": "completed"
+            }
+          ]
+        },
+        {
+          "completed_at": "2026-10-27T01:55:58Z",
+          "conclusion": "skipped",
+          "id": 121962916439,
+          "name": "lampOS \u2014 promote a tested release to the stable feed",
+          "started_at": "2026-10-27T01:55:58Z",
+          "status": "completed",
+          "steps": []
+        },
+        {
+          "completed_at": "2026-10-27T02:11:24Z",
+          "conclusion": "skipped",
+          "id": 121967886876,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+          "started_at": "2026-10-27T02:11:24Z",
+          "status": "completed",
+          "steps": []
+        },
+        {
+          "completed_at": "2026-10-27T02:11:24Z",
+          "conclusion": "skipped",
+          "id": 121967887491,
+          "name": "report-full-run-failure",
+          "started_at": "2026-10-27T02:11:24Z",
+          "status": "completed",
+          "steps": []
+        }
+      ],
+      "run_attempt": 1,
+      "status": "completed",
+      "updated_at": "2026-10-27T02:11:25Z"
+    },
+    "clippy": {
+      "actual_checkout": "91ad1051145f00d92621d373f9cbca9377baec0d",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:55:03Z",
+      "event": "pull_request",
+      "head_sha": "6bedf2631c472126572c7065a7c1b72c98d9819d",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40435363619",
+      "id": 40435363619,
+      "jobs": [
+        {
+          "completed_at": "2026-10-27T01:58:56Z",
+          "conclusion": "success",
+          "id": 121962628966,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "started_at": "2026-10-27T01:55:06Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "system packages",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Rust 1.96.0",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "stable promotion formatting and strict Clippy",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "formatting (whole workspace, pinned Rust)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "restore the cache",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "clippy (every crate and target, warnings as errors)",
+              "status": "completed"
+            },
+            {
+              "conclusion": "skipped",
+              "name": "save the cache",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "status": "completed"
+            }
+          ]
+        }
+      ],
+      "run_attempt": 1,
+      "status": "completed",
+      "updated_at": "2026-10-27T01:58:56Z"
+    }
+  },
+  "tested_preview": "91ad1051145f00d92621d373f9cbca9377baec0d"
+}

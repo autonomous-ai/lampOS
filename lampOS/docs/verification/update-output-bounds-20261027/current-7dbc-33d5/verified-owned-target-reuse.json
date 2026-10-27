@@ -1,0 +1,14 @@
+{
+  "actual_and_preserved_outputs_depfiles_verified_before_compiler": true,
+  "actual_executables_verified_before_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/second_provider/probe/tools.rs",
+    "lampOS/docs/memory.md"
+  ],
+  "note": "Same owned worktree/target; old full Update runtime remains bound to431/4bff. Current runtime is lib plus one exact round reader only.",
+  "previous_closure_sha256": "4f5f79d682ef7b390692c6e39a9ba842ae30bf5a5208df3941e7aa055b0d8b03",
+  "previous_complete_sha256": "dffa7813d324b322c45ed633b0ac526b0c19f18b8bf7e8e85f08390e1eb283bf",
+  "previous_head": "14981c5ffdeb2dd0b37ef13935564915b6d9679d",
+  "previous_source_inventory_sha256": "3e932dc6a908b083086aafab18aaf802332a1fa8cc355f7c183dd55e804bcb33"
+}

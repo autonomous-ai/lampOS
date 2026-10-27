@@ -1,0 +1,20 @@
+{
+  "command": [
+    "<reviewer-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--test",
+    "round",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "elapsed_seconds": 3.139,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "5eb88efdf130dc82663c37235a36cd1544857590c22e6e153fb04f6f63c5ba65",
+  "source_unchanged": true
+}

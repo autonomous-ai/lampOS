@@ -1,0 +1,16 @@
+{
+  "cases": [
+    [
+      "a_state_query_failing_mid_watch_is_asked_again_and_puts_nothing_back",
+      "ok"
+    ],
+    [
+      "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+      "ok"
+    ]
+  ],
+  "summaries": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 183 filtered out; finished in 0.12s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 183 filtered out; finished in 0.09s"
+  ]
+}

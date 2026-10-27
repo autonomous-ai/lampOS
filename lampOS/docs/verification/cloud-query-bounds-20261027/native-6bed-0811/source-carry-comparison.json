@@ -1,0 +1,12 @@
+{
+  "head": "6bedf2631c472126572c7065a7c1b72c98d9819d",
+  "preview": "91ad1051145f00d92621d373f9cbca9377baec0d",
+  "tree": "c155a7ae43870c7db375a298c590a8d59ed6d0d3",
+  "ordered_parents": [
+    "0811b553b76823fd19fa018d7af0137007204b32",
+    "6bedf2631c472126572c7065a7c1b72c98d9819d"
+  ],
+  "authored_preview_tree_equal": true,
+  "cloud_query_three_source_files_equal_historical_129": true,
+  "note": "Source equality only; no execution results transfer across heads."
+}

@@ -1,0 +1,11 @@
+{
+  "base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "complete": true,
+  "head": "eee85fa51cff7a7d910158bba8c795b03cae8c76",
+  "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+  "scopes": [
+    "cloud"
+  ],
+  "source_entries": 7243,
+  "source_unchanged": true
+}

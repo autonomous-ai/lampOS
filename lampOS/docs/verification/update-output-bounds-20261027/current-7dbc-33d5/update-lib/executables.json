@@ -1,0 +1,22 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<review-scratch>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "sha256": "0a8cf4d6bf70211bc5a2ff1f6a416bf052a3a60084f4e9098aba67e5e9d89a62",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "<review-scratch>/lampOS/crates/update/src/lib.rs",
+      "test": true
+    }
+  }
+]

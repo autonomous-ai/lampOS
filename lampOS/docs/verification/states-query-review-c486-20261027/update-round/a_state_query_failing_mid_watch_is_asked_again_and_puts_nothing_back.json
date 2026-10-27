@@ -1,0 +1,23 @@
+{
+  "command": [
+    "<reviewer-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--test",
+    "round",
+    "a_state_query_failing_mid_watch_is_asked_again_and_puts_nothing_back",
+    "--no-fail-fast",
+    "--",
+    "--exact",
+    "--test-threads=16"
+  ],
+  "elapsed_seconds": 1.548,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "b624e6b1df72f0b3193479c17432b291aaf1899a97c5840529e2c821af7df887",
+  "source_unchanged": true
+}

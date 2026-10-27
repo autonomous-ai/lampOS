@@ -1,0 +1,20 @@
+{
+  "actual_preserved_outputs_depfiles_executables_verified_before_compile": true,
+  "changed_source_entries": [
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/second_provider/probe/tools.rs",
+    "lampOS/docs/memory.md"
+  ],
+  "previous_head": "6bedf2631c472126572c7065a7c1b72c98d9819d",
+  "prior_closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 439,
+    "executable_count": 5,
+    "exit_code": 0,
+    "local_output_count": 58,
+    "source_unchanged": true
+  },
+  "prior_closure_sha256": "1e7bea44b25595a86e4362d2a83330d330a4c2df443d5f52a07db29174f6d14d",
+  "prior_source_sha256": "03ad92cc8e6ed23507436794df5bcd00145b1ccee20fa4c971263189ce3a919a",
+  "reason": "Carry onto33d5 using latest0811/6bed successful completed boundary. Earlier sandbox-failed131/73/4 remains separate; its old actual paths are not reasserted after subsequent compilation."
+}

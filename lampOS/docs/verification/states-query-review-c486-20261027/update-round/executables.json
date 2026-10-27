@@ -1,0 +1,42 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<worktree>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<exclusive-target>/debug/deps/round-42e77f9cbb014d5a",
+    "sha256": "cec35e2bbce6c24fafb53824558155c4bfc8576de9c2aecc78f42ea38ccc24e9",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "round",
+      "src_path": "<worktree>/lampOS/crates/update/tests/round.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<worktree>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<exclusive-target>/debug/lamp-update",
+    "sha256": "6eeecd11efa83264ff77a50fc92632e88e9414dfca172bd25ca641613e67a7e0",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "<worktree>/lampOS/crates/update/src/main.rs",
+      "test": true
+    }
+  }
+]

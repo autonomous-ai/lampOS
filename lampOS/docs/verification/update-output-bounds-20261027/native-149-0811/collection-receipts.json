@@ -1,0 +1,49 @@
+{
+  "arm64_collection_failure": "gh run watch ended with a GitHub API TCP read timeout. The controller then independently fetched attempt-specific completed/success metadata, final jobs and full job logs successfully. Watcher failure does not establish CI failure; final status is based on those retained terminal receipts.",
+  "arm64_watch": {
+    "command": [
+      "gh",
+      "run",
+      "watch",
+      "40435231650",
+      "--repo",
+      "autonomous-ai/lampOS",
+      "--interval",
+      "30",
+      "--exit-status",
+      "--compact"
+    ],
+    "deadline_seconds": 3600,
+    "elapsed_seconds": 921.809,
+    "exit_code": 1,
+    "interval_seconds": 30
+  },
+  "clippy_watch": {
+    "command": [
+      "gh",
+      "run",
+      "watch",
+      "40435231667",
+      "--repo",
+      "autonomous-ai/lampOS",
+      "--interval",
+      "30",
+      "--exit-status",
+      "--compact"
+    ],
+    "deadline_seconds": 3600,
+    "elapsed_seconds": 514.202,
+    "exit_code": 0,
+    "interval_seconds": 30
+  },
+  "raw_sha256": {
+    "arm64-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "arm64-watch.json": "23f6a97c55cc6db6685426073cd6270ddbe7f6ca12069d3f33907010a190409e",
+    "arm64-watch.log": "ace597b2d950f7fcc48325a839f1136a65cbd9abbf7d836c404c9fe07bd24467",
+    "clippy-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "clippy-watch.json": "d985e9bb6aa9300a1b340c10f7e10dc5d15a09af4895c96cff05a9290055d97a",
+    "clippy-watch.log": "f461ec5813deb29eb15736627ba14cdd29efd641b533c314f7d222df0c143b0b",
+    "watch-complete.json": "db37e9fbca1ebe925d4e691800f602e05e233bf65b63ac1e0003c0cb0e88b0eb"
+  },
+  "scope": "Original attempt 1 only; no workflow rerun or cancellation."
+}

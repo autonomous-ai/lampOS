@@ -1,0 +1,23 @@
+{
+  "command": [
+    "<reviewer-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--test",
+    "round",
+    "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+    "--no-fail-fast",
+    "--",
+    "--exact",
+    "--test-threads=16"
+  ],
+  "elapsed_seconds": 0.879,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "0d2f477f8e29233422656da1c021d0e245ed6412a0c3e4b322780a5d2acf6348",
+  "source_unchanged": true
+}

@@ -1,0 +1,11 @@
+{
+  "name": "a_command_is_read_within_its_bound_and_killed_after",
+  "observed": [
+    [
+      "a_command_is_read_within_its_bound_and_killed_after",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

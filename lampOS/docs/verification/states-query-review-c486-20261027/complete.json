@@ -1,0 +1,11 @@
+{
+  "complete": true,
+  "head": "c486773ade669e0000a2799843afcc8effa9ddfc",
+  "note": "Each scope closed before subsequent compilation. Last scope actual paths verified at end. No other runtime, workspace build, local ARM, device or provider run.",
+  "scopes": [
+    "update-lib",
+    "two exact round tests"
+  ],
+  "source_entries": 7243,
+  "source_unchanged": true
+}

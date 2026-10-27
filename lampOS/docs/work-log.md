@@ -1,5 +1,21 @@
 Ready for lamp-voice: no
 
+## Current checkpoint: 2026-10-27 09:18 +07, current33d carries and states HOLD cleared
+
+Latest code heads are pushed after live-Main checks: #3635 **7dbc4b21e/33d5627ca**, #3644 **eee85fa51/33d5627ca**, all authored blobs and modes unchanged. [Update current host](verification/update-output-bounds-20261027/current-7dbc-33d5/README.txt): fmt/strict Clippy, library **131/0/2**, exact round **1/0/0**,182filtered, nine controls once. [Cloud current host](verification/cloud-query-bounds-20261027/current-eee-33d5/README.txt): fmt/strict Clippy, full **204/0/4**, eight controls once. Source/config/status and actual/preserved artifact/depfile/executable guards pass; no negative or full Update-round replay. Fresh original Update ARM40437322889/Linux40437322868 and Cloud ARM40437575133/Linux40437575131/Surround40437575155/provenance40437575139 collect separately.
+
+The previous0811 native compositions both passed before the new privacy-text Main train: [Update149 proof](verification/update-output-bounds-20261027/native-149-0811/README.md), [Cloud6bed proof](verification/cloud-query-bounds-20261027/native-6bed-0811/README.md). Each has **11,446 unique passes/0 bad/106 skipped/0 selected unrun**, exact preview parent/tree identities, and its required controls once. Update's nine controls and both Linux custom controls are subsets of its nextest total; Cloud's eight controls likewise. Separate process13, docs4, helper25 and relay pass. Fresh Cloud reader artifacts separately pass Surround2/0/0 and provenance2/0/0. Update's watcher TCP read timeout is retained; final API and complete job logs independently prove CI success. None of those counts transfers to33d.
+
+[Earlier Cloud129 cancellation proof](verification/cloud-query-bounds-20261027/native-129-cancelled/README.md) records6,552 unique passes of11,443selected,4,891 without terminal results,106skips; eight controls passed, but ARM was cancelled and not green. Other reader/Clippy successes stay separate.
+
+[Independent Sixth #3641 review](verification/states-query-review-c486-20261027/README.txt) clears Second's resource-lifetime HOLD on exactc486: fmt/strict Update Clippy, full library **135/0/2**, each of the two affected watch tests **1/0/0**,183filtered each. No source edit/retry/fullRound/Linux/device. Both nonblocking pipes retain bounded buffers and owned group cleanup. Actual ancestry is737 with stack994, notlatest0811; source clearance and latest-base readiness are distinct. READ-OK posted6432012842.
+
+Reset is locallybd40/33d. Its first one-thread qualification is running with the original150ms assertion unchanged; the earlierff03/737 sixteen-thread **388/1/5** timing failure remains preserved and unattributed. A new serial pass will not prove that old cause. No device, provider, key, signing or release action.
+
+---
+
+Ready for lamp-voice: no
+
 ## Current checkpoint: 2026-10-27 08:57 +07, latest0811 carries pushed
 
 Both latest-base source heads are pushed after actual public Main verification: #3635 **14981c5ff/0811b553b** and #3644 **6bedf2631/0811b553b**. Every authored blob/mode matches the previous head; proofs accompany [Update host](verification/update-output-bounds-20261027/current-149-0811/README.md) and [Cloud host](verification/cloud-query-bounds-20261027/current-6bed-0811/README.md). Update fmt/strict all-target Clippy, full library **131/0/2**, exact round reader **1/0/0**,182filtered, all nine controls once. Cloud fmt/strict all-target Clippy, full **204/0/4**, eight controls once, docs0/0/0. Frozen source and each actual/preserved artifact boundary pass. No negative or full Update-round replay.

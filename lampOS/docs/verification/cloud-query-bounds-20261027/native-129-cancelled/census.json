@@ -1,0 +1,158 @@
+{
+  "completion_limit": "Cancelled; selected_unrun includes tests with no terminal row, not necessarily never started. No overall gate success.",
+  "counts": {
+    "CANCEL": 0,
+    "EXECFAIL": 0,
+    "FAIL": 0,
+    "LEAK": 0,
+    "PASS": 6552,
+    "TIMEOUT": 0,
+    "XFAIL": 0,
+    "XPASS": 0
+  },
+  "echo_keys": [],
+  "failures": [],
+  "full_terminal_census_sha256": "6f642d18d9dec84c91fa417d9582ba564ab583508a0047b80874bf54fe35218c",
+  "identical_echo_rows_excluded": 0,
+  "linux_custom_harnesses": {
+    "rows": [],
+    "scope": "Subset of the unique nextest census, not additional passes; historical Mac ignored outcomes are separate."
+  },
+  "missing_controls": [],
+  "picked_filter": "",
+  "raw_logs": {
+    "arm64": {
+      "bytes": 1090764,
+      "sha256": "d71fdb6939f6cf9c2d32603ae83a0a6711ff67ee3671b99b9b103c1f19cb9d55"
+    },
+    "clippy": {
+      "bytes": 47224,
+      "sha256": "397bcdf9745a9de5912a563d1fa742002f52dafc49e3648df0c51b22098b36c3"
+    }
+  },
+  "relay_signals": {
+    "success_rows": []
+  },
+  "required_controls": [
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+      "ordinal": 1297,
+      "status": "PASS",
+      "total": 11443
+    },
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::public_output_accepts_256_kib_and_refuses_one_byte_more",
+      "ordinal": 1298,
+      "status": "PASS",
+      "total": 11443
+    },
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string",
+      "ordinal": 1299,
+      "status": "PASS",
+      "total": 11443
+    },
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::invalid_utf8_cleans_closed_output_child",
+      "ordinal": 1300,
+      "status": "PASS",
+      "total": 11443
+    },
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+      "ordinal": 1301,
+      "status": "PASS",
+      "total": 11443
+    },
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+      "ordinal": 1302,
+      "status": "PASS",
+      "total": 11443
+    },
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::query_deadline_applies_after_stdout_closes",
+      "ordinal": 1339,
+      "status": "PASS",
+      "total": 11443
+    },
+    {
+      "binary": "lamp-cloud",
+      "name": "reports::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "ordinal": 1348,
+      "status": "PASS",
+      "total": 11443
+    }
+  ],
+  "selected_unrun": 4891,
+  "selection": {
+    "binaries": 183,
+    "selected": 11443,
+    "skipped_binaries": 2,
+    "skipped_tests": 106
+  },
+  "selection_scope": "Whole workspace selected because lampOS/Cargo.lock changed; PR-profile exclusions apply",
+  "separate_process": {
+    "pass_rows": [],
+    "passed": 0
+  },
+  "stable_promotion_helper": {
+    "failed": 0,
+    "headers": [
+      "Running unittests src/lib.rs",
+      "Running unittests src/main.rs",
+      "Running tests/promotion.rs",
+      "Running tests/workflow.rs",
+      "Doc-tests lampos_promote"
+    ],
+    "ordered_summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 22,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 25
+  },
+  "summary": [],
+  "unique_terminal_rows": 6552,
+  "workspace_doctests": {
+    "failed": 0,
+    "headers": [],
+    "note": "Interleaved stdout/stderr: no fabricated per-crate summary association.",
+    "ordered_summaries": [],
+    "passed": 0
+  }
+}
