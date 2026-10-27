@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 03:07 — original Mood and Restart native gates pass
+
+Ready for lamp-voice: no (latest-base qualification and current independent reads remain).
+
+[Moodbc original native](verification/tests-mood-bc-native-20261028/) and [Restart4dee original native](verification/tests-restart-4dee-native-20261028/) each pass **7,799 unique cases, zero bad or selected unrun**,53 aggregate skips. All341 Expression/two required controls and all21 SameVoice/14ordinaryReader respectively pass once. Current source confirms14Reader, notECC15; DAC remains ignored. Both actual previews are on2e66, each with24 tracked entries different from authored source.93build/CI inputs are bound with explicit publisher/test differences; Restart onboarding also differs. Auxiliary49/12/7Python and other results remain separate; no artifacts/payloads downloaded.
+
+Unpublished b957Mood and f346Restart/2e66 trees match those tested previews exactly, but that is source provenance, not newly executed authored-head tests. The matched Maina17 full3882/1/15 remains Rust101/failed and independently reproduces the Reader failure without Restart; no waiver or cause claim. Reader2671/2e66 Mac4+6 passed and is pushedDRAFT; latestaf546 Memory changes require the next carry37076c5df and refreshed gate. Skills7929/2e66 full gate continues. No device access.
+
 ## 2026-10-28 02:46 — matched Main reproduces Reader failure; fresh Mood passes
 
 Ready for lamp-voice: no (current-base carries/qualification and current reads remain).

@@ -1,0 +1,19 @@
+# Restart original native audit
+
+Original attempt-1 [ARM 40570740948](https://github.com/autonomous-ai/lampOS/actions/runs/40570740948) and [Linux Clippy 40570740988](https://github.com/autonomous-ai/lampOS/actions/runs/40570740988) for API head `4deeae914b9ffec50fffd87f58a24d83a2e391c8` pass. The selected ordinary execution window has **7,799 unique PASS, zero FAIL/LEAK/TIMEOUT or selected unrun; 53 aggregate skips**. It spans 70 starting binaries and 120 skipped binaries in the actual twelve-package pr selection. Raw identities, ordinals, selection commands, boundaries and summary are retained.
+
+All 21 current SameVoice identities pass once. The source-derived stock Reader catalogue has fourteen ordinary Linux cases, all PASS once, plus the ignored privileged DAC case; no ECC15 catalogue is substituted.
+
+Both current native source catalogues contain **14 ordinary Reader cases**, not ECC's 15. All 14 pass once. The privileged dropped-identity DAC case remains source-declared ignored and absent from execution. Aggregate skips do not provide a complete per-skipped-name inventory. No privileged or device acceptance is inferred.
+
+The actual ARM checkout is `311c1588188dec382e4648002b2f52da6292e79e`, ordered parents `[2e66c1aded556f5f688dab729331eacb045eeffc, 4deeae914b9ffec50fffd87f58a24d83a2e391c8]`, tree `ec1d87708d29e6998e4eb70001858fa2c72ab14e`. Authored parent is `a17ec9216e53f6a77931dd9686f83be8244d05a2`, with authored tree `ba5cc611091379f218c3690af182d033c3a76c60`. Full trees differ in 24 explicit tracked entries. Both complete owned blobs/modes match; all tracked CI/config/build inputs and every selected fetched-source blob/mode are recorded independently, including differences. Raw checkout output, not a mutable merge-ref, is the authority.
+
+The **34 post-Summary records** are configured final-output reprints, each matched by identity/status/duration/ordinal/total and later timestamp strictly outside the execution window. There are no execution duplicates or Nextest retry/flaky records. Auxiliary promoter, workspace docs, process, relay and offline Python counts are separately derived in audit.json and never added to nextest. Artifact API digest/size/id agree with upload logs; metadata only, no archive or ARM payload download, execution or individual payload verification.
+
+The separate Mac candidate remains FAILED 3882/1/15, while all 21 SameVoice cases pass. Matched unmodified Main a17 also records full 3882/1/15, Rust 101, same Reader failed identity and all 21 SameVoice PASS. Its controller CONTROL_COMPLETE/native 0 means observation completed, not baseline test PASS.
+
+The matched control is pinned to `a17ec9216e53f6a77931dd9686f83be8244d05a2`, not latest Main 2e66. Its exact source transition excludes only the two Restart-owned files; the Reader source agrees, and the same failure is directly observed without the Restart patch. That is a factual reproduction, not a cause finding or broad regression waiver. Original candidate/Main failures and the old isolated observation retain their outcomes. Preparatory receipts remain unchanged; actual post-run terminal/native/census receipts determine the reported outcome.
+
+Additional prospective source bridge: unpublished local head `f346e271e1c6c4b1cb0415d8efe3f525c5038100` on 2e66 has exactly the same tracked tree as this tested native preview, with one equal authored patch and both full blobs preserved. **Current Mac runtime is UNRUN on that new head.** This bridge does not relabel the original API head/CI result or establish executable-byte reproducibility; embedded Git metadata can differ.
+
+Every collection-manifest entry is checked for bytes and SHA-256 after watchers/collectors close. Only the manifest and separate verification receipt are explicitly excluded from self-reference. No local tests/compiler, source/ref/target mutation, GitHub write, hardware action or payload download occurred in this audit.
