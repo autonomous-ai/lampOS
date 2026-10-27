@@ -165,6 +165,7 @@ it) or `if_choice` (the tool's values it runs for).
 | (none) | `body = { mood = "reading", for, toward }`: the reading pose | `body` |
 | `light` | `light = "NAME"` (`lights/NAME.toml`) or `light = { colour, level 1–5, for ≤ 10m, pattern, … }` | `light` |
 | (none) | `show = "NAME"`: `shows/NAME.toml`, 2 to 30 frames, 60 s at most | `light` |
+| `express` | (none yet: a feeling is the `feelings` skill's, #3691) | `body` and `light` |
 | `say` | `say = "a note the model speaks from"`, `say = { note = "…" }`, or `say = { text = "said as it is" }`, each with `priority` (0 to 8) and `expires` (1 s to 1 h) | `speak` |
 | `sound` | `sound = "NAME"`: `sounds/NAME.wav`; not with a tool | `speak` |
 | (none) | `cue = "hum"`: the lamp's own hum; not with a tool | `speak` |
@@ -174,6 +175,11 @@ it) or `if_choice` (the tool's values it runs for).
 Light values are the protocol's: colours `yellow`, `red`, `green`,
 `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`, levels 1 to 5,
 patterns `breathe`, `candle`, `pulse`. A light never blinks or flashes.
+A skill's light may last up to 10 minutes, while the protocol's `light` is
+at most 30 s (`for_ms`) and is kept by renewing it. Both bounds are right
+for what they are: a skill's light is the lamp's own rule, and a computer's
+light must lapse if the computer goes. So the 10 minutes is no bound of
+the protocol's.
 Gestures are the body's clips that a skill may name ([control.md](control.md),
 "Gestures"): the schema holds a gesture to those 19, so a misspelt one is
 caught before install.
