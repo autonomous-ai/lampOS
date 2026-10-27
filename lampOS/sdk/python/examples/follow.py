@@ -15,8 +15,8 @@ from lampos.errors import LampError
 async def main():
     async with await Lamp.connect() as lamp:
         here = asyncio.Event()
-        lamp.on("person.arrived", lambda event: here.set())
-        lamp.on("person.left", lambda event: here.clear() if event.get("count", 0) == 0 else None)
+        await lamp.on("person.arrived", lambda event: here.set())
+        await lamp.on("person.left", lambda event: here.clear() if event.get("count", 0) == 0 else None)
         while True:
             await here.wait()
             try:

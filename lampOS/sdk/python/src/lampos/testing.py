@@ -251,7 +251,17 @@ class FakeLamp:
         await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits={"joints_hz": 20})
         return request["client"]
 
+    # The grant each event and state needs, as lamp-control's own (#3736).
+    EVENT_GRANT = {
+        "person.arrived": "look", "person.left": "look", "person.stood_up": "look", "person.facing": "look",
+        "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
+    }
+
     def _needs(self, op: str, request: dict) -> list[str]:
+        if op == "subscribe":
+            return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
+        if op == "get":
+            return ["look"] if "presence" in request.get("state", []) else []
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") == "face" else ["body"]

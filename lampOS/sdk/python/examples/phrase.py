@@ -17,7 +17,7 @@ async def main():
             await lamp.light("warm", 1, 30_000, pattern="breathe")
             await lamp.gesture("nod")
 
-        lamp.on("phrase.heard", good_night, phrases=["good night lamp"])
+        await lamp.on("phrase.heard", good_night, phrases=["good night lamp"])
         await lamp.wait_closed()
 
 

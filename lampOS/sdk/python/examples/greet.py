@@ -21,7 +21,7 @@ async def main():
             except LampError as refused:  # private, paused, asleep, rate...
                 print(f"not now: {refused}")
 
-        lamp.on("person.arrived", arrived)
+        await lamp.on("person.arrived", arrived)
         await lamp.wait_closed()
 
 
