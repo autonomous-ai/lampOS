@@ -1,3 +1,13 @@
+## 2026-10-28 01:57 — corrected publication diagnostic original ARM gate reconciled
+
+Ready for lamp-voice: no (Reviewer-two's second source read is active, #3912).
+
+#3912 6472ec41c [current original native proof](verification/publish-diagnostics-3906-20261028/current-6472-native.json): original ARM40561968598/job122393091074 workflow and required job succeed on attempt1,14m36s. Logged checkout7f3cf7a3a has ordered API/Git parents44d1/6472 and full tree11d8f546e exactly authored; all three owned blobs/modes match. Actual offline publication suite passes49/OK in1.301s, including the new empty-component token case,35 retained ASTs exact and14 new controls. Root independently checks the full tree, all fourteen evidence hashes and all49 unique raw native unittest PASS rows. Required build, simulated CLI rehearsal, Rust/tests/docs/custom steps succeed. Rust textual11787/0/106skip observation is not a unique census; no runtime/signature/publish acceptance is inferred beyond stated step scopes. Other sign/promote/report jobs skip; no separate Clippy trigger applies to these paths.
+
+Fourteen READ-OK6472 has no P1/P2 and independently exercises26 diagnostic lines plus49 tests. Three P3s are recorded: unknown credential heuristic forms, short values obscuring error text, and control-bearing configured values. Keep exact short configured-secret redaction, with the synthetic short-value regression intact; heuristic broadenings remain separate from the next real refusal diagnosis. Reviewer-two is reading the same source. No CI action, publication, promotion, artifact execution or device step. Old00cc/b2 native48 receipts stay separately bound and unchanged.
+
+Own-key metadata/formatting/strict18 pass on frozen6a0e1a62f/44d1; normal13 compiler stage is active, runtime318 still unapproved pending actual outputs/discovery. #3889 facc's focused digest/link P2s close; full committed mock suite runs once, with the empty-directory-only verifier gap recorded as P3 and no real storage/race claim.
+
 ## 2026-10-28 01:53 — PID guard source read carries to latest offered base
 
 READ-OK #3913 ee4ddf6f6 in [the unchanged source scope](verification/pid-lock-read-3913-20261028/current-ee4-source.json). Independent Git comparison verifies all three authored blobs/modes, the complete Update subtree and Cargo.lock are exact to read708; range-diff is equal onto44d1. No new local compiler/runtime is claimed. The prior two exact local controls remain708-bound; author's203 current cases and current original ARM/Linux checks remain separate and pending. Nontransferable Session/real-fork/unlock-error limits and old unexplained failures are unchanged. No Memory semantic, activation, device or latest-train acceptance.
