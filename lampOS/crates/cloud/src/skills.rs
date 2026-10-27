@@ -263,6 +263,8 @@ pub fn may_use(permissions: &Permissions) -> Vec<Use> {
         ("messages", permissions.messages),
         // `camera`, or format 1's `look`, which still gives the picture.
         ("camera", permissions.sees_picture()),
+        // Format 2's `look` gives the presence topics without naming them.
+        ("presence", permissions.look && permissions.format_2),
         ("known_faces", permissions.known_faces),
     ] {
         if given {
@@ -283,7 +285,19 @@ pub fn may_use(permissions: &Permissions) -> Vec<Use> {
     if permissions.say.as_deref() == Some("quoted") {
         named.insert("propose_say");
     }
-    for topic in &permissions.topics {
+    // Format 2's `look` reads the presence topics without naming them: the
+    // page says what they are, as for any topic.
+    let presence: &[&str] = if permissions.look && permissions.format_2 {
+        &lamp_skills::PRESENCE_TOPICS
+    } else {
+        &[]
+    };
+    for topic in permissions
+        .topics
+        .iter()
+        .map(String::as_str)
+        .chain(presence.iter().copied())
+    {
         named.insert(topic_use(topic));
     }
     let mut uses: Vec<Use> = USES
@@ -575,6 +589,13 @@ fn row(
             toml.get("permissions")
                 .cloned()
                 .and_then(|table| table.try_into::<Permissions>().ok())
+                // Its format is the file's, not the table's: a format 2
+                // `look` is presence even when the skill doesn't load.
+                .map(|mut permissions| {
+                    permissions.format_2 =
+                        toml.get("format").and_then(toml::Value::as_integer) == Some(2);
+                    permissions
+                })
                 .unwrap_or_default(),
             front_field(&card, "description").unwrap_or_default(),
             Some(cut(&one_line(&why), WHY_MOST)),
@@ -934,6 +955,18 @@ pub mod tests {
             assert_eq!(names(given), ["camera"]);
         }
         assert!(names(Permissions::default()).is_empty());
+        // Format 2's `look` is presence, never the camera, and the page
+        // names the faces it reads (the reviewer-lead's P3 on #3878).
+        let format_2 = names(Permissions {
+            look: true,
+            format_2: true,
+            ..Permissions::default()
+        });
+        assert!(
+            format_2.contains(&"presence") && format_2.contains(&"faces"),
+            "{format_2:?}"
+        );
+        assert!(!format_2.contains(&"camera"), "{format_2:?}");
     }
 
     #[test]
@@ -1048,6 +1081,25 @@ pub mod tests {
         assert_eq!(rows[0]["group"], "installed");
         assert_eq!(rows[0]["description"], "What tutor does.");
         assert_eq!(rows[0]["may_use"][0]["name"], "camera");
+        // The same in format 2: its `look` is presence, read from the file's
+        // `format`, never the camera (the reviewer-lead's P3 on #3878).
+        fs::write(
+            places.folder.join("tutor/skill.toml"),
+            "format = 2\nversion = \"2.0.0\"\ntool = \"tutor\"\n[permissions]\nlook = true\n[[do]]\nbody = { gesture = \"stretching\" }\n",
+        )
+        .unwrap();
+        let rows = listed(&places);
+        assert_eq!(rows[0]["loads"], false);
+        let uses: Vec<&str> = rows[0]["may_use"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|used| used["name"].as_str().unwrap())
+            .collect();
+        assert!(
+            uses.contains(&"presence") && !uses.contains(&"camera"),
+            "{uses:?}"
+        );
     }
 
     /// A skill that does not load (here, its `[stop]` is refused) is

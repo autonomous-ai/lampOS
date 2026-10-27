@@ -1,8 +1,8 @@
-# The skill package format, version 1
+# The skill package format, versions 1 and 2
 
 A skill is a folder the lamp runs without writing code: rules that say
 **when** (triggers and conditions) and **what** (steps). This page is that
-folder's public format, version 1, for people who write skills outside
+folder's public format, for people who write skills outside
 lampOS and for the Store, the SDKs' `lamp skill check` and the app's
 install screen. It describes today's format as `lamp-skills` reads it. Its
 shape is [`skill-format.schema.json`](skill-format.schema.json), and a test
@@ -21,7 +21,7 @@ the reference. Where they differ, the code wins and both are fixed.
 ```
 my-skill/
   SKILL.md          # name and description (front matter), and any notes
-  skill.toml        # the rules: format 1
+  skill.toml        # the rules: format 1, or 2 with format = 2
   moves/NAME.json   # the skill's own recorded moves (optional)
   sounds/NAME.wav   # short sounds, 3 s at most (optional)
   lights/NAME.toml  # named lights (optional)
@@ -53,11 +53,18 @@ voice's loudness bounds (`lamp_voice::say::read_sound`).
 
 ## Versions
 
-- **The format:** a `skill.toml` names no format. Every `skill.toml` today
-  is format 1, and so is every one a lamp of this build accepts. A later
-  format will add a top-level `format` key, and a build will refuse a
-  format it doesn't know rather than guess. A package's `lamp-skill.json`
-  already says `format: 1`.
+- **The format:** a top-level `format` key in `skill.toml` says which
+  rules it is written to, 1 or 2 (`lamp_skills::FORMATS`).
+  - Left out, it is format 1. Every repo skill is format 1, and needs no
+    change.
+  - A format the lamp doesn't read is refused by name, never guessed at:
+    "format 3 is not one this lamp reads (1 or 2)". A lamp built before
+    format 2 refuses the key itself, as it refuses every key it doesn't
+    know.
+  - The two differ only in `look` ("The camera", below). Every other key
+    means the same in both.
+  - A package's `lamp-skill.json` says `format: 1` for the package's own
+    shape (its files and their sums), whichever format its `skill.toml` is.
 - **The skill:** `version`, as `MAJOR.MINOR.PATCH` (no leading zeros, at
   most 9 digits a part). Required in a package and for an add-on.
 
@@ -250,8 +257,14 @@ for the first builder on #3504, 27 Oct, from Ten's proposal there):
 - **Format 1 keeps working.** A skill written before `camera` that says
   `look = true` for the picture still loads and runs. Its `look` is read
   as the camera too (`Permissions::sees_picture`), and it is shown to the
-  person as the camera, never as presence. Format 2 drops that reading
-  (gap 7): there, `look` is presence alone.
+  person as the camera, never as presence.
+- **Format 2** (`format = 2`) drops that reading. There, `look` is
+  presence alone, and `camera` is the only picture:
+  - a `look = true` step needs `camera`;
+  - `look = true` gives the presence topics without `topics` naming them
+    (`humans/faces/tracked`, `room/stood_up`; `lamp_skills::PRESENCE_TOPICS`,
+    the same two a pushed skill's `look` reads);
+  - the app shows it as presence, never as the camera.
 - **The repo's skills** say what they really use:
 
   | skill | what it uses | `[permissions]` |
@@ -266,14 +279,14 @@ for the first builder on #3504, 27 Oct, from Ten's proposal there):
 - **An add-on** may ask neither `look` nor `camera`, as it may ask no
   other grant but `propose`.
 
-**The protocol's grants, and what format 1 has for each:**
+**The protocol's grants, and what the format has for each:**
 
-| grant (control.md) | format 1 | shown before install | enforced on the lamp |
+| grant (control.md) | the format | shown before install | enforced on the lamp |
 |---|---|---|---|
 | `body` | `body = true` | "moves the lamp's body" | yes: at load for every body and rest step, and at the body's sockets |
 | `light` | `light = true` | "changes the light" | yes: at load, at `light/request` and the actions part's light functions |
 | `speak` | `speak = true` | "speaks" | yes: at load for say, sound and cue, and at the say service |
-| `look` | the presence topics in `topics` (`humans/faces/tracked`, `room/stood_up`); in format 1 a `look = true` is the camera ("The camera", above) | "knows when someone arrives" | yes, as topics: a trigger or condition on a topic not listed doesn't load |
+| `look` | format 2: `look = true`, which gives the presence topics; format 1: the presence topics in `topics` (`humans/faces/tracked`, `room/stood_up`), since a format 1 `look = true` is the camera ("The camera", above) | "knows when someone arrives" | yes, as topics: a trigger or condition on a topic not listed doesn't load |
 | (none: never through lamp-control) | `camera = true` | "can see a picture of your room through the lamp's camera when it runs", apart, with a strong warning | yes: at load for every `look = true` step, and at each call (`Call::Look`) |
 | `hear` | `voice/heard` or `name/heard` in `topics` | "hears its phrases" | partly: the topic is checked, the phrases aren't (see the gaps) |
 | `sound` | `ears/classes` in `topics` | "hears knocks, music…" | partly: the topic is checked, the classes aren't (see the gaps) |
@@ -289,13 +302,13 @@ Format 1 also has, beyond the protocol's six:
 
 ### The gaps
 
-What the protocol's grants say that format 1 doesn't yet enforce. Each
+What the protocol's grants say that the format doesn't yet enforce. Each
 gap's code change is its own follow-up PR.
 
 1. **`look` meant two things**, and it's now split ("The camera", above):
-   `camera` is the picture, and `look` is presence. What remains for
-   format 2 is to stop reading format 1's `look` as the camera too, and
-   to map `look` onto the presence topics, so a skill needn't list them.
+   `camera` is the picture, and `look` is presence. Format 2's `look` is
+   presence alone, with the presence topics. Only format 1 still reads its
+   `look` as the camera, so that skills written before keep working.
 2. **`hear` is a topic, not phrases.** A skill granted `voice/heard`
    could match any phrase. The protocol's `hear` grants only the
    package's own listed phrases (`hear = ["good night lamp"]`), matched on
@@ -310,9 +323,8 @@ gap's code change is its own follow-up PR.
    Today `[quiet]` and `[active]` are the skill's own choice, and the
    voice's quiet hours hold every say.
 6. **`net`** is for script skills, a later format.
-7. **No `format` key.** A build can't refuse a newer format by name until
-   format 2 adds it, so format 2's first change is the key, and a build
-   that reads it refuses any `format` it doesn't know.
+7. ~~**No `format` key.**~~ Done in format 2: `format = 2` is read, and a
+   format a lamp doesn't read is refused by name.
 8. **No check without installing.** `lamp-skills install` loads a skill
    before it installs it. A `lamp-skills check DIR` that loads and says
    why, and changes nothing, is what the SDKs' `lamp skill check` would
