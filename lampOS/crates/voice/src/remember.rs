@@ -17055,27 +17055,41 @@ mod tests {
         let client = DAYS.get().and_then(Option::as_ref).unwrap();
         assert!(client.end_conversation());
         let until = Instant::now() + Duration::from_secs(10);
-        let mut ops = vec![];
+        let mut requests = vec![];
         let end = loop {
             let request = read
                 .recv_timeout(until.saturating_duration_since(Instant::now()))
                 .expect("the next conversation's end reaches the memory");
-            ops.push(request["op"].as_str().unwrap_or_default().to_owned());
+            requests.push(request.clone());
             if request["op"] == "conversation_end" {
                 break request;
             }
         };
-        assert_eq!(
-            ops,
-            [
-                "session_open",
-                "forget",
-                "session_open",
-                "session_close",
-                "append_linked",
-                "conversation_end"
-            ],
+        let ops: Vec<&str> = requests
+            .iter()
+            .map(|request| request["op"].as_str().unwrap_or_default())
+            .collect();
+        // The replaced session is closed through the writer's queue, best
+        // effort, while the new one is opened straight to the memory, so
+        // the two may reach it in either order (Nine on #3504). Neither
+        // order matters: the client lets the old one go before it opens the
+        // new, and the forget was answered before either. What does: the
+        // first session gets the forget and is the one closed, a new one is
+        // opened, and the next conversation's writes come after that open.
+        assert_eq!(ops[..2], ["session_open", "forget"], "{ops:?}");
+        let first = &requests[0]["session"];
+        let close = ops.iter().position(|op| *op == "session_close").unwrap();
+        assert_eq!(requests[close]["session"], *first, "{requests:?}");
+        let opened = 2 + ops[2..]
+            .iter()
+            .position(|op| *op == "session_open")
+            .expect("the next conversation opens a session");
+        assert_ne!(requests[opened]["session"], *first, "{requests:?}");
+        assert!(
+            (2..4).contains(&close) && (2..4).contains(&opened),
+            "{ops:?}"
         );
+        assert_eq!(ops[4..], ["append_linked", "conversation_end"], "{ops:?}");
         assert_eq!(end["source_ids"], json!([42]));
         assert!(!client.context.lock().unwrap().journal_inhibited);
         let _ = std::fs::remove_file(&socket);
