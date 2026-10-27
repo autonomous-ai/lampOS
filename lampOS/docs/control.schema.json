@@ -1117,6 +1117,7 @@
           "type": "boolean"
         },
         "quiet_hours": {
+          "description": "Planned: not produced yet. The lamp says it once quiet hours are enforced (control.md, quiet hours).",
           "type": "boolean"
         },
         "lease": {
