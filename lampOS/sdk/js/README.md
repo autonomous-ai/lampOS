@@ -48,8 +48,9 @@ it.
 npx --no-install lampos pair 12345678 --pin 3f9a…   # the code and the lamp's pin (64 hex), both shown in the app
 ```
 
-The lamp's certificate is checked against the pin before anything is sent,
-so the code's proof never reaches another host, and the pin is inside the
+The lamp's certificate is checked against the pin before any frame is sent
+(only the TLS handshake and the WebSocket's upgrade request, which carry no
+secret, go first), so the code's proof never reaches another host, and the pin is inside the
 proof too. There is no pairing without it. The pairing is kept in
 `~/.config/lampos/` (or `$LAMPOS_HOME`, which is made private too, so point it at a folder of its own), the same folder as the Python
 SDK's, so a computer paired by one is paired for both: the folder is yours

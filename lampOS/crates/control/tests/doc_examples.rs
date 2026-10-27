@@ -13,16 +13,23 @@ fn filled(line: &str) -> String {
         .replace("<64 bytes, base64>", &format!("{}==", "A".repeat(86)))
 }
 
+/// Every line of a ```json block on the page that holds `"op"`, whatever its
+/// spacing: a request this test can't read fails it, never skips it (the
+/// reviewer-lead's P3 on #3759).
 fn requests() -> Vec<String> {
     let mut inside = false;
     let mut found = Vec::new();
     for line in PAGE.lines() {
         let line = line.trim();
-        if line.starts_with("```") {
-            inside = line == "```json";
+        if let Some(fence) = line.strip_prefix("```") {
+            inside = !inside && fence == "json";
             continue;
         }
-        if inside && line.starts_with("{\"id\":") {
+        if inside && line.contains("\"op\"") {
+            assert!(
+                line.starts_with("{\"id\":") && line.ends_with('}'),
+                "a request this test can't read, one line from {{\"id\": to }}: {line}"
+            );
             found.push(filled(line));
         }
     }
@@ -33,8 +40,8 @@ fn requests() -> Vec<String> {
 fn every_request_the_page_shows_parses() {
     let requests = requests();
     // The page shows pair, hello, subscribe, get, unsubscribe, the three
-    // lease ops and every action: if a block's fence changes, this says so.
-    assert!(requests.len() >= 16, "{} requests found", requests.len());
+    // lease ops and every action.
+    assert!(requests.len() >= 18, "{} requests found", requests.len());
     for request in &requests {
         if let Err(refused) = parse(request) {
             panic!("{request}: {}", refused.error.why);
