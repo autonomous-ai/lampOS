@@ -2335,7 +2335,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         // asked for, never in the product's journal.
                                         if arguments.mouth_diagnostics {
                                             eprintln!(
-                                                "lamp-eyes: mouth open {open:.4} eyes {eyes:.0} px mesh {} ms",
+                                                "lamp-eyes: mouth open {open:.4} eyes {eyes:.0} px ({:.0} px meshed) mesh {} ms",
+                                                eyes * mesh_scale,
                                                 last.as_millis()
                                             );
                                         }
