@@ -156,6 +156,11 @@ plan = json.load(open(sys.argv[1]))
 show = json.loads(plan["show"]["stdout"])
 answer = show["answer"]
 assert show["state"] == "idle" and plan["new"] == {"default": True}, show
+# The agent the fixture's default `new` makes: `show`, `wait` and `ps` all name it.
+agent = "11111111-1111-4111-8111-111111111111"
+assert show["id"] == agent, show["id"]
+assert [row["id"] for row in json.loads(plan["wait"]["stdout"])["harnesses"]] == [agent], plan["wait"]
+assert [row["id"] for row in json.loads(plan["ps"]["stdout"])["harnesses"]] == [agent], plan["ps"]
 assert "```toml skill.toml\n" in answer and "```markdown SKILL.md\n" in answer, answer
 assert 'kind = "installable"' in answer and "name: stand-up-nudge" in answer and 'policy = "nudge"' in answer, answer
 assert "speak" not in answer and "tool" not in answer, answer
