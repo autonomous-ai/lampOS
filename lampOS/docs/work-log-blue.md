@@ -664,3 +664,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 23:10: #3880 reviewer-lead no finding (P3s: dot-named moves, a stale comment) folded as ad095ae61, 60 passed. Ten carried the SDK skill-schema copy into #3878 (3da79e1a8); reviewer-lead no finding there.
 - 23:14: quiet tick for my PRs.
 - 23:21: took Ten's/reviewer-lead's #3878 P3 (format 2 in lamp skill check); written locally on blue/skill-check-format2 (sees_picture rule, look step needs it, format 3 refused, CLI names the format; 64 passed on 3.12/3.10 with #3878's schema; all 33 #3878 skills ok). Opens after #3878 and #3880 land.
+- 23:24: quiet tick for my PRs. #3878 held for a green ARM64 (lamp-voice's #3863 test red, Friday fixing). Eighth's #3879 (skill push piece A) has NEXT TRAIN.
