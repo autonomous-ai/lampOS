@@ -4484,6 +4484,72 @@ fn second_only_skill_line(
     (run, answered.try_iter().collect())
 }
 
+/// #3697 (lamp-52e6, 27 Oct): the shutdown's line asked while a person is
+/// still speaking, the microphone going on: its cached sound (3.5 s at
+/// 24 kHz), and the plain text it falls back to. The line cuts their turn and
+/// begins; the rest of what they say is drained, never queued for a turn that
+/// will not send it, so the voice goes on (it had ended on "microphone to
+/// provider queue exceeded bound").
+#[test]
+fn the_shutdowns_last_words_over_a_person_speaking_play_and_the_voice_goes_on() {
+    use crate::say::{Answer, Words};
+    const LINE: &str = "Going to sleep now.";
+    let _one = super::pilot_faults::one_session();
+    for cached in [true, false] {
+        let words = if cached {
+            Words::Sound(vec![500; 84_000])
+        } else {
+            Words::Text(LINE.into())
+        };
+        let (says, line, answered) =
+            crate::say::Says::skill_line_for_test(crate::say::SHUTDOWN_SKILL, words);
+        TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+        let run = run(Script {
+            second: false,
+            only: true,
+            speech_frames: 500,
+            say_at_frame: Some((100, line)),
+            written: Written::Said(12),
+            mute_at_frame: Some(900),
+            limit: Duration::from_secs(20),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_SAYS.with(|given| given.borrow_mut().take());
+        let answered: Vec<_> = answered.try_iter().collect();
+        run.assert_clean();
+        assert!(
+            matches!(answered.first(), Some(Answer::Begun(_))),
+            "cached {cached}: {answered:?}"
+        );
+        if cached {
+            assert!(
+                run.events("skill_sound")
+                    .iter()
+                    .any(|event| event["last_words"] == true && event["plays"] == true),
+                "{}",
+                run.summary()
+            );
+            assert!(
+                run.seen
+                    .chunks
+                    .iter()
+                    .any(|chunk| chunk.accepted && chunk.value == 500),
+                "the last words were not played: {}",
+                run.summary()
+            );
+        } else {
+            assert!(
+                run.seen.second.iter().any(|input| matches!(
+                    input,
+                    ProviderInput::Written { text, .. } if text.contains(LINE)
+                )),
+                "{}",
+                run.summary()
+            );
+        }
+    }
+}
+
 fn assert_only_second_worker(run: &Run) {
     run.assert_clean();
     assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);

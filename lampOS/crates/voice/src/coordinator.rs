@@ -10891,9 +10891,15 @@ fn conversation_with_gate_inner(
             && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
         {
             if ticket.last_words() {
-                cancel_reply(owner, reply, trace, "last_words")?;
-                provider_queue.clear();
-                speaker_pending = None;
+                submission_draining |= cut_for_last_words(
+                    owner,
+                    reply,
+                    &mut provider_queue,
+                    &mut speaker_pending,
+                    &mut admission,
+                    &mut detector,
+                    trace,
+                )?;
             }
             // An add-on's quoted line is the second route's alone: there its
             // turn is asked with no functions (#2530 part 2). The Live
@@ -10995,6 +11001,9 @@ fn conversation_with_gate_inner(
                 reply,
                 &mut provider_queue,
                 &mut speaker_pending,
+                &mut admission,
+                &mut detector,
+                &mut submission_draining,
                 rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
@@ -12226,6 +12235,9 @@ fn play_skill_sound(
     reply: &mut Option<Reply>,
     provider_queue: &mut VecDeque<ProviderInput>,
     speaker_pending: &mut Option<PendingSpeaker>,
+    admission: &mut InputAdmission,
+    detector: &mut TurnDetector,
+    submission_draining: &mut bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -12247,9 +12259,15 @@ fn play_skill_sound(
         return Ok(None);
     }
     if ticket.last_words() {
-        cancel_reply(owner, reply, trace, "last_words")?;
-        provider_queue.clear();
-        *speaker_pending = None;
+        *submission_draining |= cut_for_last_words(
+            owner,
+            reply,
+            provider_queue,
+            speaker_pending,
+            admission,
+            detector,
+            trace,
+        )?;
     }
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
@@ -12268,6 +12286,31 @@ fn play_skill_sound(
         current.say = Some(ticket);
     }
     Ok(Some(snapshot))
+}
+
+/// The shutdown's last words (#3697) cut what the lamp was doing: its reply,
+/// unsent input and unwritten speech, and, as a Stop does, the rest of a line
+/// still being said, drained until its end. Without the drain that line's
+/// microphone frames went on into the last words' turn, which sends nothing,
+/// and filled the provider queue past its bound (lamp-52e6, 27 Oct: the voice
+/// ended). Whether input is now drained.
+#[allow(clippy::too_many_arguments)]
+fn cut_for_last_words(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    provider_queue: &mut VecDeque<ProviderInput>,
+    speaker_pending: &mut Option<PendingSpeaker>,
+    admission: &mut InputAdmission,
+    detector: &mut TurnDetector,
+    trace: &mut SessionState,
+) -> Result<bool> {
+    cancel_reply(owner, reply, trace, "last_words")?;
+    provider_queue.clear();
+    *speaker_pending = None;
+    let at_us = monotonic_us();
+    admission.abandon_until_end(at_us)?;
+    detector.abandon_input(at_us);
+    Ok(admission.draining())
 }
 
 /// When a turn's answer begins to be heard, for the session's records

@@ -919,6 +919,23 @@ impl Says {
         )
     }
 
+    /// [`Self::line_for_test`] for `skill`'s `words` as the say client
+    /// hands them on (a cached line comes as a `Sound`): any skill, root's too.
+    #[cfg(test)]
+    pub(crate) fn skill_line_for_test(
+        skill: &str,
+        words: Words,
+    ) -> (Self, LineForTest, mpsc::Receiver<Answer>) {
+        let (says, line, answered) =
+            Self::line_for_test(r#"{"skill":"test","text":"-","expires_in_ms":60000}"#);
+        let request = Request {
+            skill: skill.into(),
+            words,
+            ..line.request
+        };
+        (says, LineForTest { request, ..line }, answered)
+    }
+
     /// For a test of the voice's turn: one `from` ask for what `source`
     /// keeps, waiting until `expires_at_us`, and where its answer goes.
     #[cfg(test)]
