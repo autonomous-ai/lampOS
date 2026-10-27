@@ -508,4 +508,39 @@ mod tests {
             (LightOutranked::TYPE, Kind::Event)
         );
     }
+
+    /// docs/control.schema.json's colours and patterns are the lamp's own.
+    #[test]
+    fn the_control_schemas_colours_and_patterns_are_the_lamps() {
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        let names = |def: &str| -> Vec<String> {
+            schema["$defs"][def]["enum"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|name| name.as_str().unwrap().to_owned())
+                .collect()
+        };
+        assert_eq!(names("colour"), crate::Light::COLOURS);
+        // A new kind does not build here until it is listed below and in the schema.
+        let _listed = |kind: PatternKind| match kind {
+            PatternKind::Breathe | PatternKind::Candle | PatternKind::Pulse => (),
+        };
+        let patterns: Vec<String> = [
+            PatternKind::Breathe,
+            PatternKind::Candle,
+            PatternKind::Pulse,
+        ]
+        .iter()
+        .map(|kind| {
+            serde_json::to_value(kind)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+        assert_eq!(names("pattern"), patterns);
+    }
 }
