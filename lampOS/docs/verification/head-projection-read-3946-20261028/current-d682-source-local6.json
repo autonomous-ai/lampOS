@@ -1,0 +1,501 @@
+{
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "current_compiler_emission": {
+    "executable": "T/debug/deps/lamp_update-cebdb705cde8ec81",
+    "features": [],
+    "filenames": [
+      "T/debug/deps/lamp_update-cebdb705cde8ec81"
+    ],
+    "fresh": false,
+    "manifest_path": "W/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://W/lampOS/crates/update#lamp-update@0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "W/lampOS/crates/update/src/lib.rs",
+      "test": true
+    }
+  },
+  "discovery_and_case_accounting": "Exactly six approved module names discovered and six unique PASS terminals; one module invocation/one test thread/zero retries. The eight equivalence combinations are internal to one committed test, not eight additional tests. 229 filtered controls were not executed.",
+  "disposition": "SCOPED_SOURCE_AND_LOCAL_READ_OK",
+  "evidence_sha256": {
+    "focused-six-proposal.json": "40a4db0271dfcd39aa1e2ef2c53ea8d904b93cb441b045bf4ae314dca70a5625",
+    "focused6-artifact.json": "0226b26630204486665f985ec29e46358d02f53f6131176ace454c419d189f05",
+    "focused6-compile.started.json": "87a44427b5cc630c9ac6cbe00f2677679b8598634b48793c5aac4cf279a7ad2d",
+    "focused6-compile.stderr": "706dc3df27c373c2abd52ce2613e426bb78ac43a85d5affab2e35b023580efcb",
+    "focused6-compile.stdout": "ca78d246b5a7fa9c2d456a0a5c041e2ca62984e7769844566778515b45f68e84",
+    "focused6-compile.terminal.json": "92ec4a87c4c04f631155b8bba10f5e14b7065bddc4bdcf974a505250a0b26626",
+    "focused6-discovery.started.json": "f77776e011ebb904cb641d7117d8f1e0da24ea41da385431a233f93b3b9f4ec9",
+    "focused6-discovery.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused6-discovery.stdout": "ae8624257f932f2bb14995df0c7cef3c00da6a6ef810e470d802be3285b4f757",
+    "focused6-discovery.terminal.json": "9cd43a34a8e8eab026545262f7dbe0302033183fffe3c68ebba06bc85fd77006",
+    "focused6-runtime.started.json": "964eaa559fd1b55ca03cbdc811f7d6569378a8ab57543c7c22418d11ca715a8f",
+    "focused6-runtime.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused6-runtime.stdout": "be84a6fa0393d6e11aa4e0c1da536e9c70cd66388f93183b0b4fdc79ea64bfef",
+    "focused6-runtime.terminal.json": "234b261034924f59c5fa4148d6ee592d31e970460bbeae392c437364c3b20b4d",
+    "gate-index-after.bin": "a6916610c7da06d36239fea0580d5638bff2f9ed15554c383bf8d39735f01d0c",
+    "gate-index-before.bin": "a6916610c7da06d36239fea0580d5638bff2f9ed15554c383bf8d39735f01d0c",
+    "gate-source-after.json": "c524a02fe39f68e76fa323965ee8d344e3003561bb4fcd1e2d45317be0e2dbf5",
+    "gate-source-before.json": "c524a02fe39f68e76fa323965ee8d344e3003561bb4fcd1e2d45317be0e2dbf5",
+    "owned-six.patch": "54f7e75373a12ff72a3486245084c78de021c2936998b7169f416ab34a0ba9dc",
+    "prior-saved189.json": "0c424eb3d38a9c7ac2f7665df1f71711d2c9d6c9a80a278280991a874fc7203a",
+    "private-callsite-census.txt": "2016ac3836187cb15473ecdb476069122bf400d5d6a3b239bdfec9dd8f8ae006",
+    "qualified-focused-six.json": "5ae81386ea19070a2d0639bddf6d823cc010969dd47f76dfc3d3e0c63b38958f",
+    "root-gate-approval.json": "4ffad240375fdcb13b9c4f10933cd02948a1a105ef62f9fc42d37c3d799bfb7f",
+    "run-focused-six.py": "fead6d97fe5f14c675ce73e56bdd3bd727b2ca59f8186c4aba9a4ce5de3bab3a",
+    "saved189-after.json": "833d3e9a741838fa2d73b491eee1c73869f5c6a34436ee14343dfd4b6288729a",
+    "saved189-before.json": "833d3e9a741838fa2d73b491eee1c73869f5c6a34436ee14343dfd4b6288729a",
+    "selected-six-source.json": "3557aafe110e2ec10ccd2efb7b7830e166839fbefd799838f5b851cdae614cda",
+    "source-bindings.json": "2e59e9d4a42c1b09f5b89d94a3c3e3efe04bb0afce6fccaaa2119a115a7a02c9",
+    "source-review-and-six-proposal.json": "8623a6860ec1872c360be02a07974f4d96b20548b14fcb9b5c8a9d5d9f5955d8"
+  },
+  "exact_env_overrides": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "T",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_TEST_THREADS": "1"
+  },
+  "guard_scope": "One full source/index/mode/tool/helper/prior189-copy bookend per gate, plus actual/retained driver guards around discovery/runtime. All7480 tracked source entries match their Git blobs and final metadata; no old/current binary admission transferred.",
+  "head": "d682ee30e52eefd1e760d899f5c178724f40a1ec",
+  "limits": [
+    "Only exact d682 authored source qualifies here. Collector/codec parent dependencies remain draft/unwired and are not newly executed through their full suites.",
+    "Logical newly serialized UTF-8 output and reserve requests are capped. Parsing/prebuilt Value/input/carried/staged allocations, provider side effects/state, whole-plan size/authority, allocator overhead, timing/deadline/cancellation and real filesystem transaction guarantees remain outside this cap.",
+    "No fmt/Clippy/full563/all84/collector21/52/codec26/78/native/device/activation or later-Main result is imported or claimed.",
+    "Author current/broad/native reports and old Third21/26 remain on their own source/platform profiles. Historical failures and physical raw-name limits are not waived."
+  ],
+  "native_handle": {
+    "bank_explicitly_released": true,
+    "groups": [
+      {
+        "pgid": 99267,
+        "pid": 99267,
+        "status": "absent"
+      },
+      {
+        "pgid": 1777,
+        "pid": 1777,
+        "status": "absent"
+      },
+      {
+        "pgid": 1782,
+        "pid": 1782,
+        "status": "absent"
+      }
+    ],
+    "session_id": 23840,
+    "terminal_exit": 0
+  },
+  "parent": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+  "platform": {
+    "machine": "x86_64",
+    "release": "25.6.0",
+    "system": "Darwin",
+    "tool_versions": {
+      "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+      "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+    }
+  },
+  "publication_actions": "No GitHub comments, code edits, commits, push, CI rerun, service, network or device operations.",
+  "retained_current_driver": {
+    "path": "retained-current-update-lib-test",
+    "sha256": "e6c9df7c89fff882655577cfe03904cb2d5adf79a625d2dd374bf8b2c7020c5d",
+    "stat": {
+      "ctime_ns": 1793138625517886378,
+      "device": 16777222,
+      "inode": 329192333,
+      "links": 1,
+      "mode": 493,
+      "mtime_ns": 1793138625381606000,
+      "sha256": "e6c9df7c89fff882655577cfe03904cb2d5adf79a625d2dd374bf8b2c7020c5d",
+      "size": 14047260
+    }
+  },
+  "runtime": {
+    "all_source_index_mode_tools_helpers_current_saved_and189_guards_unchanged": true,
+    "artifact": {
+      "emitted_path": "T/debug/deps/lamp_update-cebdb705cde8ec81",
+      "features": [],
+      "fresh": false,
+      "profile_test": true,
+      "retained_copy": "retained-current-update-lib-test",
+      "sha256": "e6c9df7c89fff882655577cfe03904cb2d5adf79a625d2dd374bf8b2c7020c5d"
+    },
+    "bank_released": true,
+    "child_scope": {
+      "child_census": 0,
+      "details": "The equivalence test creates eight private 0700 fixture roots, writes units/pins/body-env only below them, captures/encodes/decodes, then removes each root before closed replay. Expansion, Keep and late-provider tests each create one further private fixture. None executes unit commands, children, sockets, network, systemd, remote/device or effects APIs. Trace and FailLate mutate test-provider request/read counters. Provider state is consumed, not rolled back.",
+      "memory_only_controls": 2,
+      "private_fixture_roots": 11,
+      "private_tempFS_controls": 4,
+      "threads_tasks_services": 0
+    },
+    "counts": {
+      "FAIL": 0,
+      "PASS": 6,
+      "ignored": 0,
+      "retries": 0,
+      "selected": 6,
+      "unrun": 0
+    },
+    "head": "d682ee30e52eefd1e760d899f5c178724f40a1ec",
+    "helper_sha256": {
+      "focused-six-proposal.json": "40a4db0271dfcd39aa1e2ef2c53ea8d904b93cb441b045bf4ae314dca70a5625",
+      "prior-saved189.json": "0c424eb3d38a9c7ac2f7665df1f71711d2c9d6c9a80a278280991a874fc7203a",
+      "root-gate-approval.json": "4ffad240375fdcb13b9c4f10933cd02948a1a105ef62f9fc42d37c3d799bfb7f",
+      "run-focused-six.py": "fead6d97fe5f14c675ce73e56bdd3bd727b2ca59f8186c4aba9a4ce5de3bab3a",
+      "source-review-and-six-proposal.json": "8623a6860ec1872c360be02a07974f4d96b20548b14fcb9b5c8a9d5d9f5955d8"
+    },
+    "index_bookend_sha256": {
+      "after": "a6916610c7da06d36239fea0580d5638bff2f9ed15554c383bf8d39735f01d0c",
+      "before": "a6916610c7da06d36239fea0580d5638bff2f9ed15554c383bf8d39735f01d0c"
+    },
+    "limits": [
+      "No full563/all84, collector21/52, codec26/78, full-package/workspace, fmt/Clippy or native rerun.",
+      "No authentication, admission, writer, complete-plan, deadline, cancellation or physical-authority conclusion."
+    ],
+    "parent": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+    "prior_saved_bookend_sha256": {
+      "after": "833d3e9a741838fa2d73b491eee1c73869f5c6a34436ee14343dfd4b6288729a",
+      "before": "833d3e9a741838fa2d73b491eee1c73869f5c6a34436ee14343dfd4b6288729a"
+    },
+    "prior_saved_count": 189,
+    "source_bookend_sha256": {
+      "after": "c524a02fe39f68e76fa323965ee8d344e3003561bb4fcd1e2d45317be0e2dbf5",
+      "before": "c524a02fe39f68e76fa323965ee8d344e3003561bb4fcd1e2d45317be0e2dbf5"
+    },
+    "source_guard_count": 7480,
+    "stages": [
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "bound_seconds": 1200,
+        "cleanup": [],
+        "elapsed_seconds": 101.1156,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 99267,
+        "pid": 99267,
+        "stage": "focused6-compile",
+        "stderr_sha256": "706dc3df27c373c2abd52ce2613e426bb78ac43a85d5affab2e35b023580efcb",
+        "stdout_sha256": "ca78d246b5a7fa9c2d456a0a5c041e2ca62984e7769844566778515b45f68e84",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/lamp_update-cebdb705cde8ec81",
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "bound_seconds": 60,
+        "cleanup": [],
+        "elapsed_seconds": 0.8198,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 1777,
+        "pid": 1777,
+        "stage": "focused6-discovery",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "ae8624257f932f2bb14995df0c7cef3c00da6a6ef810e470d802be3285b4f757",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/lamp_update-cebdb705cde8ec81",
+          "head_touch::plan_output::tests::",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "bound_seconds": 120,
+        "cleanup": [],
+        "elapsed_seconds": 0.2671,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 1782,
+        "pid": 1782,
+        "stage": "focused6-runtime",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "be84a6fa0393d6e11aa4e0c1da536e9c70cd66388f93183b0b4fdc79ea64bfef",
+        "timed_out": false
+      }
+    ],
+    "status": "PASS",
+    "terminals": [
+      [
+        "head_touch::plan_output::tests::compact_input_that_expands_past_the_cap_refuses_only_the_new_plan_path",
+        "ok"
+      ],
+      [
+        "head_touch::plan_output::tests::keep_step_has_no_derived_output_and_moves_oversized_existing_text_without_copying",
+        "ok"
+      ],
+      [
+        "head_touch::plan_output::tests::late_provider_failure_returns_no_owned_partial_plan_or_private_diagnostic",
+        "ok"
+      ],
+      [
+        "head_touch::plan_output::tests::ordinary_policy_bytes_hashes_and_request_order_match_all_eight_closed_replays",
+        "ok"
+      ],
+      [
+        "head_touch::plan_output::tests::refusing_an_append_happens_before_buffer_growth_or_partial_write",
+        "ok"
+      ],
+      [
+        "head_touch::plan_output::tests::streaming_pretty_bytes_and_newline_obey_the_exact_utf8_byte_limit",
+        "ok"
+      ]
+    ],
+    "tool_sha256": {
+      "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+      "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+    },
+    "tree": "dcc6bdd12163015d5ebced13f8c8d2260d0b2e4b"
+  },
+  "sideeffect_scope_note": "The fixture code spawns no child process, worker thread, async task or service and opens no network/socket/device. Standard Rust test-harness implementation is not a zero-OS-thread claim. Eleven test-owned private0700 fixture roots and provider counters are the approved local effects.",
+  "source_review": {
+    "binding_cancellation_scope": "The projected setting SHA covers the exact emitted bytes, including newline. Future callers still authenticate and bind root/input/output, exclude writers and validate the complete plan independently. No task or cancellation token is added; synchronous provider ordering and timing are unchanged. The output cap is not a deadline or cancellation proof.",
+    "bounded_output_contract": {
+      "allocation_precision": "New byte length and the requested reserve target are checked before growth; the geometric target uses saturation and the output limit. This does not claim allocator overhead or process RSS is at most1MiB. There is no unrestricted intermediate pretty String; successful Vec bytes move into String.",
+      "escaping_unicode": "Count actual serialized UTF-8 bytes, including JSON escape bytes and the newline, rather than characters. Tests cover quotes, backslashes, control escapes, emoji and exact1MiB/one-over boundaries.",
+      "includes_newline": true,
+      "logical_cap_bytes": 1048576,
+      "not_bounded": [
+        "Prebuilt serde Value and pins parsing before serialization",
+        "Input/carried/settings/preexisting Vec<Step> allocations and searches",
+        "Ordinary bounded-text clone and other staged-row allocations outside the sink",
+        "HeadInputs provider state, calls, latency or filesystem ancestry",
+        "Whole-plan eligibility, size, authentication or output binding",
+        "Deadline, cancellation, asynchronous tasks or atomic transactions"
+      ],
+      "paths": [
+        "plan_output.rs56-75 checked_add/limit before reserve/extend",
+        "plan_output.rs94-96 serializerwrites/newline/conversion"
+      ]
+    },
+    "combined_stack_twelve_paths": [
+      "lampOS/crates/update/src/head_touch.rs",
+      "lampOS/crates/update/src/head_touch/capture.rs",
+      "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "lampOS/crates/update/src/head_touch/plan_output.rs",
+      "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+      "lampOS/docs/head-touch-capture.md",
+      "lampOS/docs/head-touch-codec.md",
+      "lampOS/docs/head-touch-plan-output.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/updates.md"
+    ],
+    "default_unwired_scope": "The module and function are pub(crate), with callers only in the new test module. Existing apply/install/readers retain ordinary head_touch::project. No CLI, unit, switch, storage/schema, authority or effects path is added.",
+    "findings_P1_P2": [],
+    "ordinary_equivalence": {
+      "explanation": "All branch/read/mutation ordering outside the serialization expression is exact. Ordinary project/project_with retain the same parameters, pretty to_string plus newline and error.to_string diagnostics; the formatter closure replaces only that expression. No ordinary-path cap was added.",
+      "line_bindings": {
+        "ordinary_project": 453,
+        "ordinary_wrapper": 463,
+        "serialize_call": 533,
+        "shared_policy": 483
+      },
+      "new_policy_body_sha256": "c8fb8f738ce02036cff2539e5e7044539a803d2e79345cba902e15d8e81e0a1c",
+      "old_policy_body_sha256": "f30e288d2f9aa03be96b2454cd2e8e21104a2fc905fd9ea9ebcc785a367d07a9",
+      "same_after_single_formatter_extraction": true
+    },
+    "owned_six_paths": [
+      "lampOS/crates/update/src/head_touch.rs",
+      "lampOS/crates/update/src/head_touch/plan_output.rs",
+      "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+      "lampOS/docs/head-touch-plan-output.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/updates.md"
+    ],
+    "partial_error_boundary": {
+      "finding": "The owned staged vector returns only on Ok; buffer/provider/policy errors map to fixed REFUSED and drop the vector and partial output. No successful partial vector escapes. Mutable provider state and consumed calls are not rolled back. Ordinary callers retain their old in-place behavior. No secret-zeroization or durable-ownership claim.",
+      "late_failure_control": "FailLate errors on the second pins read after omitted-row insertion and projection mutation; the test asserts that read count and the fixed refusal rather than the private provider marker.",
+      "source_lines": [
+        29,
+        44,
+        46,
+        47,
+        94,
+        95,
+        96
+      ]
+    },
+    "prerequisites": {
+      "collector_prerequisite": "a5e700e07a71ec4a3bbe7afd40a6629181f0f893",
+      "collector_tree_equals_standalone_d4": true,
+      "immediate_parent_exact_reviewed_codec_current": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+      "runtime_transfer": false,
+      "separate_prior_source_carry_sha256": "b15c43f0acfde995d822f4115154580f3a53299721b43f0b5449848903c9691d"
+    },
+    "sideeffects": {
+      "child_census": 0,
+      "details": "The equivalence test creates eight private 0700 fixture roots, writes units/pins/body-env only below them, captures/encodes/decodes, then removes each root before closed replay. Expansion, Keep and late-provider tests each create one further private fixture. None executes unit commands, children, sockets, network, systemd, remote/device or effects APIs. Trace and FailLate mutate test-provider request/read counters. Provider state is consumed, not rolled back.",
+      "memory_only_controls": 2,
+      "private_fixture_roots": 11,
+      "private_tempFS_controls": 4,
+      "threads_tasks_services": 0
+    },
+    "source_bindings": {
+      "lampOS/.cargo/config.toml": {
+        "bytes": 210,
+        "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      "lampOS/.config/nextest.toml": {
+        "bytes": 5157,
+        "mode_blob": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      },
+      "lampOS/Cargo.lock": {
+        "bytes": 122953,
+        "mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+        "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+      },
+      "lampOS/Cargo.toml": {
+        "bytes": 1442,
+        "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      "lampOS/crates/update/Cargo.toml": {
+        "bytes": 2172,
+        "mode_blob": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4",
+        "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+      },
+      "lampOS/crates/update/src/apply.rs": {
+        "bytes": 69318,
+        "mode_blob": "100644 blob 23233e73bed97907a4d3b9cf84d5a5a8616f6542",
+        "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+      },
+      "lampOS/crates/update/src/head_touch.rs": {
+        "bytes": 22678,
+        "mode_blob": "100644 blob f85bd04a47173e02e491c40847941332eb780015",
+        "sha256": "8046a94a819ab03f3d2c00499283f2894d8a1a3b530f81b3c37a065b2cdc740f"
+      },
+      "lampOS/crates/update/src/head_touch/capture.rs": {
+        "bytes": 23567,
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+        "bytes": 69742,
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+        "bytes": 42099,
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+        "bytes": 27694,
+        "mode_blob": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+        "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+      },
+      "lampOS/crates/update/src/head_touch/plan_output.rs": {
+        "bytes": 3060,
+        "mode_blob": "100644 blob 73ff1d98449036be0e7cb518e742e066b12e609b",
+        "sha256": "ec79d76ae9f9dcadf3837ebe5470ad950b46d1b94e011d31c8953e3c00bbf5b2"
+      },
+      "lampOS/crates/update/src/head_touch/plan_output/tests.rs": {
+        "bytes": 10958,
+        "mode_blob": "100644 blob 00a0acca0c909e32b24891474d3b46a6cc20d06b",
+        "sha256": "e891b042bf6092ee1a4e18cf229a8bd0685cc263cc75a268cd9a77aca201a495"
+      },
+      "lampOS/crates/update/src/manifest.rs": {
+        "bytes": 61566,
+        "mode_blob": "100644 blob 25ef60f91246d6e1f2792f946506cb541adaf059",
+        "sha256": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c"
+      },
+      "lampOS/docs/head-touch-plan-output.md": {
+        "bytes": 3163,
+        "mode_blob": "100644 blob eb6d9e9abed58e19a146d54dfa7d817ce20f9521",
+        "sha256": "2f8b14f740d397ed4b5fcd5c6f8594ca453601040cdf33286c646054df0358ee"
+      },
+      "lampOS/docs/reuse-decisions.md": {
+        "bytes": 152985,
+        "mode_blob": "100644 blob 0e8ac9a4d30560523022ac050d64184bf1804634",
+        "sha256": "a6a1ae1ab2d7054d49e7992878cac3b081016e8c0fe890ea2818e047afb45dcf"
+      },
+      "lampOS/docs/updates.md": {
+        "bytes": 176352,
+        "mode_blob": "100644 blob bc10513689c3c029589d029b226c00b6294bd108",
+        "sha256": "6e4ad4ed08fb88162ad1003313397cf364c6fba3f32a2a68243cb7bd28ba7df3"
+      },
+      "lampOS/rust-toolchain.toml": {
+        "bytes": 86,
+        "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      }
+    },
+    "source_controls": [
+      {
+        "function_sha256": "602542aaa7bdd548ddc648be09e9d745ee6e7bcb6c03e732de0d1b671b6bfe51",
+        "name": "head_touch::plan_output::tests::streaming_pretty_bytes_and_newline_obey_the_exact_utf8_byte_limit",
+        "source_line": 84,
+        "source_path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "function_sha256": "2798b8e857d10d454b1cb86b5b5f37c62a1505513908080464ad4188c8595f75",
+        "name": "head_touch::plan_output::tests::refusing_an_append_happens_before_buffer_growth_or_partial_write",
+        "source_line": 116,
+        "source_path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "function_sha256": "32b761a84b3cc7b3c0ab0c3bba9184672d9b18b3f50753165511d31b0a0d0f92",
+        "name": "head_touch::plan_output::tests::ordinary_policy_bytes_hashes_and_request_order_match_all_eight_closed_replays",
+        "source_line": 131,
+        "source_path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "function_sha256": "e674930eae8f9f3e2aa7c518abb1eb1779b9cfd67450585e7fb81d89dc621810",
+        "name": "head_touch::plan_output::tests::compact_input_that_expands_past_the_cap_refuses_only_the_new_plan_path",
+        "source_line": 195,
+        "source_path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "function_sha256": "9abec9119fd1ee0c4eb4ac2bbf4d7f896dd98651cb35dc3e52f563808c9bf7ea",
+        "name": "head_touch::plan_output::tests::keep_step_has_no_derived_output_and_moves_oversized_existing_text_without_copying",
+        "source_line": 247,
+        "source_path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "function_sha256": "058f7467f98ba3838f60a229380e1190cdd92c5a5d8096853bb3ca7ea3b6d3fe",
+        "name": "head_touch::plan_output::tests::late_provider_failure_returns_no_owned_partial_plan_or_private_diagnostic",
+        "source_line": 294,
+        "source_path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      }
+    ]
+  },
+  "tree": "dcc6bdd12163015d5ebced13f8c8d2260d0b2e4b"
+}
