@@ -1160,6 +1160,10 @@ thread_local! {
     /// Before the first privacy reading, pause at the first time until the
     /// second. The initial closed-permission pass runs before this fault.
     static WAKE_PRIVACY_START_PAUSE: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
+    /// The next loop's onboarding walk, its storage loaded, and its file
+    /// (#3747). Unset, no walk, as before.
+    static RIG_ONBOARDING: RefCell<Option<(crate::onboarding::storage::ServiceStorage, PathBuf)>> =
+        const { RefCell::new(None) };
 }
 
 struct SourcePeer {
@@ -1696,6 +1700,10 @@ fn run_loop_ringed(
             .collect::<Vec<_>>();
     }
     let mut trace = SessionState::default();
+    if let Some((storage, file)) = RIG_ONBOARDING.with(|walk| walk.borrow_mut().take()) {
+        trace.onboarding_storage = Some(storage);
+        trace.onboarding_test_file = Some(file);
+    }
     // Made last, just before the loop first polls it: a touch is fresh for
     // 100 ms only. Stepped, the owner and its reply are made here too, inside
     // the scope, so starting the children cannot spend the owner's windows
@@ -2991,6 +2999,104 @@ fn a_hand_lifted_after_its_breath_sighs_and_stays_awake() {
         ran.error
     );
     assert!(ran.ended_us > sleeps_at, "ran past the sleep's time");
+}
+
+/// An onboarding walk for the next loop (#3747) whose kept progress has
+/// each of `ended` skipped: its storage started and loaded. The folder,
+/// for the caller to remove.
+fn walk_for_the_next_loop(ended: &[&str]) -> PathBuf {
+    use crate::onboarding::{
+        Kept, Outcome, Progress,
+        storage::{Paths, ServiceStorage},
+    };
+    static WALKS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let walk = WALKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let directory =
+        std::env::temp_dir().join(format!("lv-held-walk-{}-{walk}", std::process::id()));
+    fs::create_dir(&directory).unwrap();
+    let file = directory.join("progress.json");
+    let mut progress = Progress::default();
+    for step in ended {
+        progress.steps.insert(
+            (*step).into(),
+            Kept {
+                outcome: Outcome::Skipped,
+                at_unix_s: 1,
+                framing: None,
+                offered_at_unix_s: None,
+            },
+        );
+    }
+    fs::write(&file, serde_json::to_vec(&progress).unwrap()).unwrap();
+    let storage = ServiceStorage::start(Paths {
+        progress: file.clone(),
+        checkpoint: directory.join("privacy.json"),
+        mailbox: directory.join("mailbox"),
+        near_call: directory.join("near-call.json"),
+        room_sounds: directory.join("room-sounds.json"),
+        room_sounds_group: None,
+    })
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !storage.client().snapshot().unwrap().ready {
+        assert!(Instant::now() < deadline, "onboarding storage never loaded");
+        std::thread::yield_now();
+    }
+    RIG_ONBOARDING.with(|walk| *walk.borrow_mut() = Some((storage, file)));
+    directory
+}
+
+/// #3747 (the lead on #1711): while the onboarding walk is under way, a
+/// fresh one waiting to begin or one between two steps, a hand kept on the
+/// head from 2.15 s in to 3.5 s, past Controls' sleep at three, gets no
+/// falling breath (its decision says why) and asks no sleep: nothing
+/// played, the conversation going on until the test lets the switch go
+/// stale. With every step ended, the same hold sighs and sleeps on time.
+#[test]
+fn a_hold_while_onboarding_is_under_way_gets_no_breath_and_never_sleeps() {
+    for (label, ended) in [
+        ("waiting to begin", &[][..]),
+        ("between steps", &["where_you_sit"][..]),
+    ] {
+        let directory = walk_for_the_next_loop(ended);
+        let (ran, sleeps_at) = held_run(2_150_000, 3_500_000, 1_800_000);
+        let _ = fs::remove_dir_all(&directory);
+        let breaths: Vec<_> = ran
+            .trace
+            .iter()
+            .filter(|row| row["kind"] == "head_sleep_breath")
+            .collect();
+        assert_eq!(breaths.len(), 1, "{label}: {breaths:?}");
+        assert_eq!(breaths[0]["plays"], false, "{label}: {}", breaths[0]);
+        assert_eq!(breaths[0]["why"], "onboarding_under_way", "{label}");
+        assert!(ran.chunks.is_empty(), "{label}: nothing played");
+        assert!(
+            ran.trace.iter().all(|row| {
+                !(row["kind"] == "hand_control_cancel" && row["reason"] == "head_sleep")
+            }),
+            "{label}: no sleep"
+        );
+        assert!(
+            ran.error.contains("privacy") && !ran.error.contains("software mute"),
+            "{label}: ended only by the stale switch: {}",
+            ran.error
+        );
+        assert!(
+            ran.ended_us > sleeps_at,
+            "{label}: ran past the sleep's time"
+        );
+    }
+    let directory = walk_for_the_next_loop(&crate::onboarding::Step::IDS);
+    let (ran, sleeps_at) = held_run(2_150_000, 3_200_000, 1_500_000);
+    let _ = fs::remove_dir_all(&directory);
+    let breaths: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "head_sleep_breath")
+        .collect();
+    assert_eq!(breaths.len(), 1, "walk over: {breaths:?}");
+    assert_eq!(breaths[0]["plays"], true, "walk over: {}", breaths[0]);
+    slept_on_time(&ran, sleeps_at);
 }
 
 /// #1362: woken from a hand's sleep by the person, the conversation the

@@ -506,8 +506,9 @@ impl TouchEvent {
                     && age >= 5_000_000
             }
             // The head (#711, `docs/creature.md` "Touch"): a touch stops the
-            // lamp talking at once; only a short tap, let go, asks it to
-            // listen; a hand kept there is affection, and then sleep.
+            // lamp talking at once; only a tap, let go under the stroke's
+            // second (#3747), asks it to listen; a hand kept there is
+            // affection, and then sleep.
             (TouchSource::Head, TouchGesture::Touch) => {
                 pair == (TouchIntent::Stop, TouchIntent::Notice)
                     && age >= 20_000
@@ -518,7 +519,7 @@ impl TouchEvent {
                 pair == (TouchIntent::Attend, TouchIntent::Attend)
                     && self.active_mask == 0
                     && self.released_us.is_some_and(|released| {
-                        (20_000..500_000).contains(&(released - self.began_us))
+                        (20_000..1_000_000).contains(&(released - self.began_us))
                     })
             }
             (TouchSource::Head, TouchGesture::Stroke) => {
@@ -566,13 +567,21 @@ impl TouchEvent {
             (TouchSource::Primary, TouchGesture::Tap) => Some(TouchIntent::Stop),
             (TouchSource::Primary, TouchGesture::Hold) => Some(TouchIntent::SoftwareMute),
             (TouchSource::Reset, TouchGesture::Hold) => Some(TouchIntent::FactoryReset),
-            (TouchSource::Head, TouchGesture::Tap)
+            // Asleep, a tap or a hand kept a second on the head wakes it,
+            // never its first touch alone: a lone edge is noise (#3747).
+            (TouchSource::Head, TouchGesture::Tap | TouchGesture::Stroke)
             | (TouchSource::Strip, TouchGesture::Touch | TouchGesture::Hold) => {
                 Some(TouchIntent::Wake)
             }
             _ => None,
         };
-        if !valid || self.when_asleep != asleep {
+        // For one release a head stroke may also ask nothing asleep, as an
+        // older Controls says it (#3747, the Reviewer-lead on #3767): the
+        // parts switch together in one round, and a newer reader never
+        // refuses the older's stroke.
+        let older_stroke = (self.source, self.gesture) == (TouchSource::Head, TouchGesture::Stroke)
+            && self.when_asleep.is_none();
+        if !valid || (self.when_asleep != asleep && !older_stroke) {
             return Err(Invalid(
                 "touch source, gesture and conditional intents disagree".into(),
             ));
