@@ -39,9 +39,9 @@ base64 = "0.22"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
 httparse = "1.10"
-# How much of the disk is free (statvfs) and one run at a time (flock), which
-# the standard library cannot ask. The same version as the other crates.
-rustix = { version = "=1.1.5", features = ["fs"] }
+# Disk space and one run at a time (flock), plus owned query-group cleanup
+# and exit observation without reaping. Keep the same pin as the other crates.
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
 
 [dev-dependencies]
 tempfile = "3"

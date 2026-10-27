@@ -1972,3 +1972,31 @@ No production syscall, protocol or caller changes in this correction. The
 receiver still relies on caller peer authentication. Eyes/Voice integration,
 wrong-peer credential controls, Linux/current-head gates and device latency
 remain separate acceptance evidence.
+
+## Updater output reader completion (27 October 2026)
+
+V1 `system/bootstrap/bootstrap.go::detectVersion` and
+`system/bootstrap/recovery.go::recoverPendingUpdateAt` give
+`system/lib/core/system/system.go::Run` a ten-minute context. That helper
+uses `exec.CommandContext` and `CombinedOutput`; it supplies neither a
+bounded output buffer nor a whole-process-group pipe-completion guarantee.
+Keep V2's existing per-caller query allowance, normally five seconds, without
+copying V1's recovery-wide budget into a read-only query.
+
+Reuse the corrected nonblocking reader and unreaped-leader/group ownership
+mechanics from the Setup query change (#3631, 220251c70), including the
+failure-before-reap repair. Keep a private updater helper: Setup already
+depends on Update, so importing Setup would create a cycle, and introducing
+a shared public executor API is unnecessary for this fix. Use the already
+pinned Rustix process feature explicitly in Update's production dependency.
+No new crate or runtime service is introduced.
+
+Update's existing test accepts a 300,000-byte response and remains unchanged.
+Its deliberate limit is 1 MiB, distinct from Setup's 64 KiB. Complete valid
+responses through that limit stay readable; oversized or invalid UTF-8
+responses return none rather than a partial string. The four readers keep
+their existing failure policy. `Systemctl::states`, stop/restart allowances,
+systemd job cancellation and reset policy are outside this piece. Exclusive
+child ownership and normal-success descendant limits remain explicit; host
+controls do not establish installed update acceptance or a hard kernel-I/O
+deadline.
