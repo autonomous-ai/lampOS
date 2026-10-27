@@ -13,6 +13,11 @@ import (
 	"go.autonomous.ai/os/system/domain"
 )
 
+func init() {
+	// Fail live applies at once in tests; TestInputModeLiveApplyRetriesRefusal covers the window.
+	inputModeLiveRetryFor = 0
+}
+
 func updateInputModeThrough(s *Service, entry string, mode string) error {
 	if entry == "http" {
 		return s.UpdateConfig(domain.UpdateConfigRequest{VoiceInputMode: &mode})
@@ -281,4 +286,65 @@ func TestInputModeToggleSerializesWithExplicitUpdate(t *testing.T) {
 		t.Fatal(mode)
 	}
 	assertSavedInputMode(t, "automatic")
+}
+
+// A refused live switch (HAL starting or busy) must not leave HAL in the old
+// mode under a config that reports the new one: os-server restarts HAL, which
+// loads the saved mode at boot, and the save then succeeds.
+func TestInputModeFailedLiveApplyRestartsHAL(t *testing.T) {
+	for _, entry := range []string{"mqtt", "http"} {
+		t.Run(entry, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cfg := baseConfig()
+			restarts, applies := 0, 0
+			s := &Service{config: cfg, halRestartCommand: func(context.Context) error {
+				restarts++
+				assertSavedInputMode(t, "tap_to_talk")
+				return nil
+			}, halInputModeApply: func(ctx context.Context, mode string, wake bool) error {
+				applies++
+				return errors.New("HAL input mode returned HTTP 503")
+			}}
+			if err := updateInputModeThrough(s, entry, "tap_to_talk"); err != nil {
+				t.Fatalf("restart fallback reported failure: %v", err)
+			}
+			if applies != 1 || restarts != 1 {
+				t.Fatalf("applies=%d restarts=%d, want 1 and 1", applies, restarts)
+			}
+			// Applied through the restart: a repeat save changes nothing.
+			if err := updateInputModeThrough(s, entry, "tap_to_talk"); err != nil {
+				t.Fatalf("duplicate: %v", err)
+			}
+			if applies != 1 || restarts != 1 {
+				t.Fatalf("duplicate re-applied: applies=%d restarts=%d", applies, restarts)
+			}
+		})
+	}
+}
+
+// HAL refusing the switch while it starts is retried in place, so a refusal
+// that clears quickly needs no extra HAL restart.
+func TestInputModeLiveApplyRetriesRefusal(t *testing.T) {
+	t.Chdir(t.TempDir())
+	prev := inputModeLiveRetryFor
+	inputModeLiveRetryFor = 5 * time.Second
+	t.Cleanup(func() { inputModeLiveRetryFor = prev })
+	cfg := baseConfig()
+	restarts, applies := 0, 0
+	s := &Service{config: cfg, halRestartCommand: func(context.Context) error {
+		restarts++
+		return nil
+	}, halInputModeApply: func(ctx context.Context, mode string, wake bool) error {
+		applies++
+		if applies < 3 {
+			return errors.New("HAL input mode returned HTTP 503")
+		}
+		return nil
+	}}
+	if err := s.UpdateVoiceInputMode("tap_to_talk"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if applies != 3 || restarts != 0 {
+		t.Fatalf("applies=%d restarts=%d, want 3 and 0", applies, restarts)
+	}
 }

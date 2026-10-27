@@ -2,6 +2,7 @@ package device
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -58,12 +59,46 @@ func (s *Service) applyPendingWakeWord() error {
 		if apply == nil {
 			apply = hal.SetVoiceInputMode
 		}
-		if err := apply(ctx, s.config.GetVoiceInputMode(), s.config.WakeWordEnabled()); err != nil {
-			return fmt.Errorf("apply voice input mode: %w", err)
+		if err := applyInputModeLive(ctx, apply, s.config.GetVoiceInputMode(), s.config.WakeWordEnabled()); err != nil {
+			// The mode is already saved and HAL reads it at boot, so restart
+			// once rather than leave HAL in the old mode under a config that
+			// reports the new one. No further retry: a failed restart is
+			// returned and stays pending for an explicit retry.
+			slog.Warn("live voice input mode apply failed; restarting HAL to load it",
+				"component", "device", "mode", s.config.GetVoiceInputMode(), "error", err)
+			restartCtx, restartCancel := context.WithTimeout(context.Background(), wakeWordApplyTimeout)
+			defer restartCancel()
+			if rerr := s.restartHALAndWait(restartCtx, "voice input mode apply failed"); rerr != nil {
+				return fmt.Errorf("apply voice input mode: %w", errors.Join(err, rerr))
+			}
 		}
 	}
 	s.wakeApply.modePending = false
 	return nil
+}
+
+// inputModeLiveRetryFor bounds how long a refused live mode switch is retried.
+// HAL answers 503 while it starts (e.g. right after a wake settings restart)
+// or while voice teardown runs; both clear within seconds.
+var inputModeLiveRetryFor = 12 * time.Second
+
+const inputModeLiveRetryEvery = time.Second
+
+// applyInputModeLive asks the running HAL to switch modes, retrying a refusal
+// for up to inputModeLiveRetryFor within ctx. It returns the last error.
+func applyInputModeLive(ctx context.Context, apply func(context.Context, string, bool) error, mode string, wakeword bool) error {
+	deadline := time.Now().Add(inputModeLiveRetryFor)
+	for {
+		err := apply(ctx, mode, wakeword)
+		if err == nil || ctx.Err() != nil || !time.Now().Add(inputModeLiveRetryEvery).Before(deadline) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(inputModeLiveRetryEvery):
+		}
+	}
 }
 
 // applyWakeWord updates the flag and reports whether its effective value changed.
