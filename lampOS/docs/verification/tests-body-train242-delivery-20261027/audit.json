@@ -1,0 +1,15 @@
+{
+  "original_PR": 3845,
+  "original_head": "536fc9c3e3de4a6403afbabc98ff2e345f9b7ba7",
+  "train_PR": 3861,
+  "train_head": "ff61d83781a326406cc2f37e451f00be245a97d4",
+  "train_merged_at": "2026-10-27T14:53:15Z",
+  "landed_main": "ca741c82a22ce03cdb06c35cae3bec374892325b",
+  "carried_member": "9b00bb48a317b27cfcd41beecad8913ab71cf92a",
+  "exact_blobs_in_original_member_and_landed": {
+    "lampOS/crates/body/src/bin/lamp-body.rs": "67c2c6bd0d464fc8d4efdd59fbb894b60b664483",
+    "lampOS/docs/body.md": "14487089cd4da32978fec149b5fc2c39a64b88fc"
+  },
+  "original_PR_closed_via_train_not_direct_GitHub_merge": true,
+  "scope": "API train delivery and exact owned blob equality only; no new train execution census inferred"
+}

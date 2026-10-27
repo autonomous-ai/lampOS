@@ -1,0 +1,153 @@
+{
+  "at_utc": "2026-10-27T14:39:08.221148+00:00",
+  "proposed_decision": "ACCEPT_NARROW_FIXTURE_REPAIR_CURRENT_TESTED_SCOPE; historical failure cause remains UNEXPLAINED; no blanket waiver or whole-issue closure",
+  "external_HOLD_changed": false,
+  "historical": {
+    "full": {
+      "passed": 4085,
+      "failed": 1,
+      "ignored": 21,
+      "status": "FAILED"
+    },
+    "isolated": {
+      "passed": 0,
+      "failed": 1,
+      "direct_exit": 101,
+      "driver_sha256": "8fcfdceae92f3ecd1752d6fa1b93042df0f514dd320b2f09dbb9fd18611b01d8",
+      "raw_sha256": "4514e5ed744d99f88580a95cc1100ab77307a6679bd2cc04aa5379ae0f4dd3de",
+      "status": "FAILED"
+    },
+    "cause": "UNEXPLAINED: generic publisher unavailable does not distinguish Late from SourceGone",
+    "private_old_driver_or_raw_independently_rehashed": false
+  },
+  "merged_3637": {
+    "head": "c7c197f986e870577ef2af34043d92a52b882160",
+    "authored_parent": "f9a9404de4d6cad65e6f3945ab2e60c50eb5eacc",
+    "merge_commit": "4cedf513089c723402e2307161e288dd71bc94cd",
+    "merged_at": "2026-10-27T08:17:44Z",
+    "original_ARM": 40469447096,
+    "original_Linux_Clippy": 40469447100,
+    "actual_preview": "70f1460c70dc4fca4da605da9632e2375e0953c9",
+    "actual_preview_tree": "37f76ccdbb6319aee8436a0734c31bebec17ead2",
+    "actual_ordered_parents": [
+      "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+      "c7c197f986e870577ef2af34043d92a52b882160"
+    ],
+    "native_unique_PASS": 7627,
+    "Voice_privacy_once": 9,
+    "Bus_Msgs_cohort_not_selected": 7,
+    "current_host_public_attributed": {
+      "passed": 238,
+      "failed": 0,
+      "ignored": 1,
+      "docs_passed": 3,
+      "not_full_Voice": true
+    }
+  },
+  "current_Common": {
+    "head": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+    "local_tested_tree": "364776260748a4c355cf625768c2065a32f510d0",
+    "actual_preview": "0bacfde9a344c1b7cd07d21cde6a23b1967daaa5",
+    "actual_tree": "66435569942c9118e5bf84ee1e3dad89448e8b7a",
+    "actual_ordered_parents": [
+      "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+      "28af4573a66c2844cdd0a91936d2eca8c566fd5b"
+    ],
+    "original_ARM": 40513174138,
+    "native_unique_PASS": 11922,
+    "all16_privacy_controls_once_primary_verified": true,
+    "Mac9_once": "Published source-bound ledger; original private Mac raw not independently rehashed",
+    "Mac7_not_selected": 7
+  },
+  "source_binding": {
+    "eleven_full_blobs_equal_across_merged_c7_Common_local_Common_native_and_Main992": true,
+    "snapshot_Main": "992303fc8d72322bab46cdb18801c853ea43bb81",
+    "unchanged_control_bodies": 15,
+    "changed_control_bodies": 1,
+    "all_assertion_lines_equal": true,
+    "whole_privacy_file_assertion_macro_sites": 46,
+    "kept_fixture_assertion_macro_sites": 7,
+    "production_10ms_and_both50ms_limits_unchanged": true,
+    "500ms_read_and_first_datagram_1s_fences_unchanged": true,
+    "stock_Bus_Late_control_uses_80ms_period_not_10ms_latency_test": true
+  },
+  "controlled_mechanism": {
+    "source_base": "b2344a07df6b38d2736e01297999751c26e477a5",
+    "same_diagnostic_instrumentation_except_period": true,
+    "stock": {
+      "period_ms": 10,
+      "pause_us": 31055,
+      "direct_exit": 101,
+      "passed": 0,
+      "failed": 1,
+      "Late": true,
+      "SourceGone": false,
+      "fresh_payload_age_us": 412,
+      "envelope_wall_age_ms": 0
+    },
+    "repaired": {
+      "period_ms": 1000,
+      "pause_us": 33807,
+      "direct_exit": 0,
+      "passed": 1,
+      "failed": 0,
+      "Late": false,
+      "SourceGone": false,
+      "fresh_payload_age_us": 860,
+      "envelope_wall_age_ms": 1
+    },
+    "prospective_mechanism_only": true,
+    "private_raw_logs_and_saved_diagnostic_binaries_rehashed_here": false,
+    "published_terminal_source_patches_and_hashes_verified": true
+  },
+  "input_limits": [
+    "Cargo.lock differs between merged c7, tested Common and Main992.",
+    "Common Voice manifest adds lamp-eyes dev dependency and macOS nix; Main992 Voice manifest matches c7.",
+    "ARM workflow/script add docs/control.md to input selection; nextest profile config and Rust toolchain blobs are unchanged.",
+    "Eleven reviewed full source files being equal does not prove complete forward dependency/build/environment/executable equality.",
+    "Debug Mac libtest diagnostics and release ARM nextest are separate sources/profiles/platforms; their counts are not combined.",
+    "No Main992 runtime qualification or present mutable worktree acceptance is inferred.",
+    "Public Mac/diagnostic raw receipts remain attributed; independently downloaded native raw text has its own hash and does not overwrite Fourth original raw representation.",
+    "No binaries/artifact archives downloaded or executed; artifact API metadata/digests only.",
+    "Other privacy rows, #3564 composition, readiness, pins, core privacy/physical acceptance remain outside this disposition."
+  ],
+  "comments_receipts": {
+    "3315-comments": {
+      "records": 16,
+      "bytes": 37683,
+      "sha256": "db6d9933cfdebaf841ec8e6cbc5f0c4869e306b442c29fa808a1878552f0d29f"
+    },
+    "3637-comments": {
+      "records": 36,
+      "bytes": 77051,
+      "sha256": "65ac14d0f1987d81c3f8f64ebf7f0c26d7f91621e3f4d51a320f8aa1b2f6f572"
+    },
+    "3637-reviews": {
+      "records": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "3637-inline": {
+      "records": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "3544-comments": {
+      "records": 38,
+      "bytes": 89933,
+      "sha256": "91467e99f96a7977dca360d48d051d3530c9891ad84fb786afbe3e659dcc6f4e"
+    },
+    "3544-reviews": {
+      "records": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "3544-inline": {
+      "records": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "other_reader": "Reviewer-two independently claimed #3315 disposition in comment6444652281; no duplicate owned patch or external post",
+  "no_tests_compiler_source_ref_target_device_or_GH_writes": true
+}

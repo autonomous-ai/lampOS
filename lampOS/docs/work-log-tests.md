@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-27 22:07 — Body delivered; privacy disposition scoped
+
+Ready for lamp-voice: #3845 delivered through train242; #3843 still draft for current carry checks and holder acceptance.
+
+[Body delivery](verification/tests-body-train242-delivery-20261027/) confirms #3861 mergedca741c82a, member9b00bb48a, with both original536 file blobs exact. The original PR closed via train. No duplicate work or new train census is claimed.
+
+[Independent #3315 disposition](verification/tests-3315-independent-3637-20261027/) accepts #3637’s narrow demonstrated fixture repair as nonblocking for its tested sources, while keeping historical4085/1/21 and isolated0/1 exit101 FAILED/unexplained. Sixteen Common controls and nine original Voice controls passed once in separately verified native scopes. Eleven source blobs match through Main992, but build inputs differ; no binary equivalence, Main runtime or historical-cause waiver is inferred. Posted disposition6444978359/Queue6444979085. The current Reader full-library gate is active; old control material remains excluded.
+
+
 ## 2026-10-27 21:33 — current updater native proof passes; acceptance remains with holder
 
 Ready for lamp-voice: no (#3843 current reads and device acceptance pending).
