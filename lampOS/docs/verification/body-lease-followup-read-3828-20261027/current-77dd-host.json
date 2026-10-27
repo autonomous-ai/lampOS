@@ -1,0 +1,58 @@
+{
+  "clean_worktree": true,
+  "head": "77dd78bd4a5c8480c31f93f527de54eb87d3f1da",
+  "host_handles_terminal0_reaped_group_absent": {
+    "body-clippy": 87132,
+    "fmt": 17347,
+    "lease-controls": 50004
+  },
+  "limits": [
+    "Host Body formatting/strictClippy and5lease-library tests only; Linuxbinarycases not executed onMac.",
+    "Original native runs inspected separately; no source/helper probe duplicated.",
+    "No fullBody harness, Memoryimplementation/PRreads, device or artifactbinarydownload."
+  ],
+  "linux_original": "40503971271 success attempt1 on preview42593f2; source bindings separate",
+  "native_pending": {
+    "ARM": 40503971219,
+    "watch_handle": 33056
+  },
+  "result": "Scoped source/host READ-OK; no new P1/P2. taken includes held+suspended and ended suppresses already-ended/free terminal repeats. Root owns separate helper proof of P3 closure.",
+  "source_hashes_unchanged": 7373,
+  "source_review_sha256": "b780bcdd35655bb32b119a6f66d57e93602b9d1c94475bd255ab5eabc667bc57",
+  "stages": {
+    "body-clippy": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 23.668748804,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "fmt": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 13.20343862,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "lease-controls": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 27.363916998,
+      "log_sha256": "3e21d42f51996f480962b493c2906b9abaaba958d460fe3a0b632156574b416c",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    }
+  },
+  "target_free": "third-reminder-carry-target"
+}

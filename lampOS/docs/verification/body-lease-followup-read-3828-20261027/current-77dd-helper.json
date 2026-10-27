@@ -1,0 +1,28 @@
+{
+  "head": "77dd78bd4a5c8480c31f93f527de54eb87d3f1da",
+  "scope": "Exact extracted ended helper and actual77dd lease.rs; minimal holder/lease container; nonblocking local UnixStream pairs, no full body binary",
+  "native_exec_handle": 51558,
+  "exit": 0,
+  "observations": {
+    "prior_lost_then_ended_lines": 1,
+    "active_ended_lines": 1,
+    "free_connected_ended_lines": 0,
+    "normal_close_lines": 0,
+    "suspended_ended_lines": 1
+  },
+  "prior_head": "60f0bc20448f4ca12e916f06ad7e5a491bcf2168",
+  "comparison": "Prior-loss total2->1 (existing prior loss retained, no duplicate terminal loss); free1->0; active1,normal0 unchanged; suspended1 positive control",
+  "decision": "Root duplicate terminal-loss P3 fixed within this helper scope",
+  "hashes": {
+    "extracted-ended-current.rs": "523dab49a7db27ccc91b5853a1db256ac4aea96d2f32297a088e109785b601e8",
+    "probe-current/src/main.rs": "0fd3160ddec460ad79dd03edf4eb77a3b088b3f132e7f7429d2d0f9ed1beab9f",
+    "probe-current/Cargo.toml": "85cf3006ff193da6c32d9fb196640406e7795cf1f7dcfe5738a9edcc5b50e550",
+    "probe-current/Cargo.lock": "33ede7feb0e92b7f0fdec3cb69d1ad7c7d11a06c7011c69470054308a10b1776",
+    "ended-current-probe.log": "04f6fce401f2ac81573dde573a0d28ef6fa16a15f6998403ca1227deed05df63"
+  },
+  "actual_lease_source_sha256": "21c72412b2f0a682cdc6eec5253c1d8cdffe6e05e7c3b63a9db2d4f234520300",
+  "limits": [
+    "Five observational assertions on host socket pairs, not physical overload or full Linux binary",
+    "Original current native test audit separate; no transfer from old60f native7752pass"
+  ]
+}
