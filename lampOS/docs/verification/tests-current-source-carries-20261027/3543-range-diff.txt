@@ -1,0 +1,1 @@
+1:  0f4311d95c = 1:  3a554a97c6 lampOS: isolate the reader sentinel fixture from host ancestry

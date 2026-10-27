@@ -1,0 +1,106 @@
+{
+  "at": "2026-10-27T22:45:10.084188+07:00",
+  "scope": "Source-only carries; fresh gates/readers/native still required",
+  "carries": [
+    {
+      "pr": 3543,
+      "old_head": "0f4311d95cc7ac63a8743024229d5590027b93fa",
+      "old_base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+      "head": "3a554a97c60e8d4f27b0b6dae10f52f113697c04",
+      "base": "3c9838fea6591410cdf534d27088615021c8df30",
+      "clean": true,
+      "full_authored_blobs": [
+        {
+          "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+          "old_blob": "506a53ca1e36c002539782a16a794e2b9c9e1064",
+          "new_blob": "506a53ca1e36c002539782a16a794e2b9c9e1064",
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/realtime-tests.md",
+          "old_blob": "1bf56186cf34a2298da4f71cf2da52b834514bb3",
+          "new_blob": "1bf56186cf34a2298da4f71cf2da52b834514bb3",
+          "equal": true
+        }
+      ],
+      "exact_patch_equal": true,
+      "patch_sha256": "e90509ad18bbeff13d5e6a3563a0ebb459993d0e190c64eabcb2877d58ffd7d0",
+      "runtime_or_reader_result_transfer": false
+    },
+    {
+      "pr": 3572,
+      "old_head": "41d283e0ab5d043c7a8621b531ddafbc87d4dcd4",
+      "old_base": "f9926922d0f5c54057ad49f14917ae677e83b028",
+      "head": "4d391fad6f27ddcf74d5ad468b9304d40d5ebc17",
+      "base": "3c9838fea6591410cdf534d27088615021c8df30",
+      "clean": true,
+      "full_authored_blobs": [
+        {
+          "path": "lampOS/crates/voice/src/same_voice.rs",
+          "old_blob": "84d681f66371c607157ab4c1840b5e2d5f70c13b",
+          "new_blob": "84d681f66371c607157ab4c1840b5e2d5f70c13b",
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/same-voice.md",
+          "old_blob": "8923730e5353e76be0ffeee0f395ff57327a53e0",
+          "new_blob": "8923730e5353e76be0ffeee0f395ff57327a53e0",
+          "equal": true
+        }
+      ],
+      "exact_patch_equal": true,
+      "patch_sha256": "16afa737dd332c6e8aa880a7b09af1b24ecbe3b25ee90a74fef30ab85ed4aba2",
+      "runtime_or_reader_result_transfer": false
+    },
+    {
+      "pr": 3545,
+      "old_head": "ba310df3e4ed4fd81b71065b03bba1c3f9d277d8",
+      "old_base": "ca741c82a22ce03cdb06c35cae3bec374892325b",
+      "head": "62632d8fffc2cede9da11ccabd0eeb2a833daac1",
+      "base": "3c9838fea6591410cdf534d27088615021c8df30",
+      "clean": true,
+      "full_authored_blobs": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "old_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "new_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "old_blob": "427bf02820c0797350c701cf33d94efaee23b370",
+          "new_blob": "427bf02820c0797350c701cf33d94efaee23b370",
+          "equal": true
+        }
+      ],
+      "exact_patch_equal": true,
+      "patch_sha256": "03037cc3db3237001b6b8ec506f8644606424384ee24edeb1a5024553ccfac70",
+      "runtime_or_reader_result_transfer": false
+    },
+    {
+      "pr": 3623,
+      "old_head": "8c19811987f19769bf3811cacc2c1056ada33dcc",
+      "old_base": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+      "head": "4a41cca0d13f20b1398f416a87263c98b2e3394b",
+      "base": "3c9838fea6591410cdf534d27088615021c8df30",
+      "clean": true,
+      "full_authored_blobs": [
+        {
+          "path": "lampOS/crates/expression/tests/runtime.rs",
+          "old_blob": "4e1eb67ce0fd0bff90ffb80b1c8352126ef9f422",
+          "new_blob": "4e1eb67ce0fd0bff90ffb80b1c8352126ef9f422",
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/expression.md",
+          "old_blob": "45c62eb8b678e522dd6c92e23e7940832ba31b05",
+          "new_blob": "45c62eb8b678e522dd6c92e23e7940832ba31b05",
+          "equal": true
+        }
+      ],
+      "exact_patch_equal": true,
+      "patch_sha256": "bfba503d4126a6e6ae1d32861f3c417e6936dd4125d8af76626a80a446256b07",
+      "runtime_or_reader_result_transfer": false
+    }
+  ]
+}

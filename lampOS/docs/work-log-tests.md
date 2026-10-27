@@ -1,6 +1,12 @@
 # Tests work log
 
-## 2026-10-27 22:25 — full Reader-containing library result published
+## 2026-10-27 22:45 — current fixture carries; two gate lanes
+
+Ready for lamp-voice: no (fresh gates, native checks and current reads remain).
+
+[Four source carries](verification/tests-current-source-carries-20261027/) put Reader, Restart, Skills and Mood on pinned Main 3c9838fea. Each has one equal range-diff and both complete authored blobs unchanged. The fresh Reader full-library gate is active; its earlier full result is not relabelled. The separate updater cache passed all 30 sealed and 14 actual executable release checks, with no open target file. Its latest full-suite gate is being prepared to include the newly merged Policy fixture fix. No new device access; the updater still requires the holder's installed digest, normal hostname after stopgap removal and health-watch acceptance.
+
+## 2026-10-27 22:20 — full Reader-containing library result published
 
 Ready for lamp-voice: no (#3543 current carry and native gates pending).
 

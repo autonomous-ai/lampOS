@@ -1,0 +1,1 @@
+1:  8c19811987 = 1:  4a41cca0d1 lampOS: align the held Mood fixture with its sample clock
