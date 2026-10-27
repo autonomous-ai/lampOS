@@ -412,6 +412,7 @@ pub fn check_with_image(
         }
         seen.insert(name, file);
     }
+    let mut stale: BTreeMap<&str, &Printed> = BTreeMap::new();
     for (name, text) in product {
         let verdict = match seen.get(name.as_str()) {
             None => Verdict::Missing,
@@ -420,32 +421,40 @@ pub fn check_with_image(
                 if lines.is_empty() {
                     Verdict::Same
                 } else {
-                    // A base unit that does not set a switch its product
-                    // unit sets on, as an older build's (lamp-c0a4's
-                    // lamp-cloud.service of 19 Oct, #3733): the part runs
-                    // off, said by name.
-                    let on = crate::switches::switches(&file.text);
-                    for switch in crate::switches::switches(text) {
-                        if !on.contains(&switch) {
-                            report
-                                .switches_off
-                                .push((file.path.clone(), format!("leaves {switch} off")));
-                        }
-                    }
+                    // An older build's base unit (lamp-c0a4's
+                    // lamp-cloud.service of 19 Oct, #3733) is read with its
+                    // drop-ins below, for a switch it leaves off.
+                    stale.insert(name.as_str(), *file);
                     Verdict::Differs(lines)
                 }
             }
         };
         report.units.insert(name.clone(), verdict);
     }
+    // Each product unit's switches, from its stale base unit when the lamp's
+    // differs, then its drop-ins: a switch is said only if it ends off.
     for (unit, drop_ins) in drop_ins_of {
         let Some(text) = product_unit(product, unit) else {
             continue;
         };
         let switches = crate::switches::switches(text);
-        report
-            .switches_off
-            .extend(crate::switches::merged_off(&switches, &drop_ins));
+        let base = stale
+            .remove(unit)
+            .map(|file| (file.path.as_str(), crate::switches::environment(&file.text)));
+        report.switches_off.extend(crate::switches::merged_off_from(
+            &switches,
+            base.as_ref().map(|(path, found)| (*path, found)),
+            &drop_ins,
+        ));
+    }
+    for (name, file) in stale {
+        let switches = crate::switches::switches(&product[name]);
+        let found = crate::switches::environment(&file.text);
+        report.switches_off.extend(crate::switches::merged_off_from(
+            &switches,
+            Some((file.path.as_str(), &found)),
+            &[],
+        ));
     }
     report
 }
@@ -545,7 +554,7 @@ ExecStart=/opt/extra
             "lamp-b.service: differs",
             "  - Environment=LAMP_X=on",
             "  + Environment=LAMP_X=off",
-            "unit /etc/systemd/system/lamp-b.service leaves LAMP_X off; the product sets it on",
+            r#"unit /etc/systemd/system/lamp-b.service turns LAMP_X off ("off"); the product sets it on"#,
             "lamp-c.timer: missing on the lamp",
             "drop-in: /etc/systemd/system/lamp-b.service.d/office.conf",
             "  Environment=LAMP_OFFICE=on",
@@ -708,7 +717,7 @@ ExecStart=/opt/x
             check(&units, &parse(PRINTED)).switches_off,
             [(
                 "/etc/systemd/system/lamp-b.service".to_owned(),
-                "leaves LAMP_X off".to_owned()
+                r#"turns LAMP_X off ("off")"#.to_owned()
             )]
         );
 
@@ -762,6 +771,25 @@ Environment=LAMP_CLOUD=off
             said.lines().filter(|said| *said == line).count(),
             1,
             "{said}"
+        );
+        // The way that unit was meant to be used: a drop-in turns it on, and
+        // systemd runs it on, so LAMP_CLOUD is not named (the Reviewer-lead's
+        // P3 on #3846); the unit still differs.
+        let with_on = format!(
+            "{printed}\n# /etc/systemd/system/lamp-cloud.service.d/cloud.conf\n[Service]\nEnvironment=LAMP_CLOUD=on\n"
+        );
+        let report = check(&units, &parse(&with_on));
+        assert!(matches!(
+            report.units["lamp-cloud.service"],
+            Verdict::Differs(_)
+        ));
+        assert!(
+            !report
+                .switches_off
+                .iter()
+                .any(|(_, how)| how.contains("LAMP_CLOUD ")),
+            "{:?}",
+            report.switches_off
         );
         // The build's own text names nothing.
         let (_, now) = install::PRODUCT

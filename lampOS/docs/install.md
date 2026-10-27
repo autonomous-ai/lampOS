@@ -1231,10 +1231,14 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
 
 - **Each product unit** is `same`, `missing on the lamp`, or `differs` with
   each differing line, `-` the product's and `+` the lamp's. One that
-  differs and does not set a switch its product unit sets `on` says so
-  after its lines, as an older build's base unit does (#3733, lamp-c0a4's
-  19 Oct `lamp-cloud.service`, with no drop-in):
-  `unit /etc/systemd/system/lamp-cloud.service leaves LAMP_CLOUD off; the product sets it on`. Install writes
+  differs and, read with its drop-ins as systemd merges them, leaves a
+  switch its product unit sets `on` off says so after its lines, as an
+  older build's base unit does (#3733, lamp-c0a4's 19 Oct
+  `lamp-cloud.service`, with no drop-in):
+  `unit /etc/systemd/system/lamp-cloud.service leaves LAMP_CLOUD off; the product sets it on`.
+  A drop-in that sets the switch `on` (how that unit was meant to be used)
+  leaves it on, and nothing is named; a base that sets it `off` says
+  `turns LAMP_CLOUD off ("off")`. Install writes
   every unit whole into `/etc/systemd/system/`, with no `@…@` placeholder
   (`install::tests::no_product_unit_names_a_lamp`), so units are compared
   byte for byte, comments included: a changed comment is a file that isn't

@@ -189,25 +189,47 @@ pub fn switches(unit: &str) -> Vec<String> {
 /// that left it off and how (`turns LAMP_CLOUD off ("off")`). A drop-in's `off` that
 /// a later drop-in or file sets back `on` is not said: the switch is on.
 pub fn merged_off(switches: &[String], sources: &[(String, Assignments)]) -> Vec<(String, String)> {
+    merged_off_from(switches, None, sources)
+}
+
+/// [`merged_off`] read from a lamp's own base unit (`base`: its path and
+/// what it sets) in place of the product's: a switch the base does not set
+/// starts off, said `leaves NAME off` by the base unless a later source sets
+/// it (the Reviewer-lead's P3 on #3846: 19 Oct's lamp-cloud.service with an
+/// `on` drop-in runs on).
+pub fn merged_off_from(
+    switches: &[String],
+    base: Option<(&str, &Assignments)>,
+    sources: &[(String, Assignments)],
+) -> Vec<(String, String)> {
     switches
         .iter()
         .filter_map(|name| {
-            // The product unit sets every switch `on`; `None` is cleared.
-            let mut value = Some("on");
-            let mut by: Option<&str> = None;
+            // `None` is unset: never set by the base (`unset`), or cleared.
+            let (mut value, mut by, mut unset) = match base {
+                Some((path, found)) => match found.get(name) {
+                    Some(set) => (Some(set), Some(path), false),
+                    None => (None, Some(path), true),
+                },
+                // The product unit sets every switch `on`.
+                None => (Some("on"), None, false),
+            };
             for (what, found) in sources {
                 if let Some(set) = found.get(name) {
                     value = Some(set);
                     by = Some(what);
+                    unset = false;
                 } else if found.cleared {
                     value = None;
                     by = Some(what);
+                    unset = false;
                 }
             }
             let by = by?.to_owned();
             match value {
                 Some("on") => None,
                 Some(value) => Some((by, format!("turns {name} off ({value:?})"))),
+                None if unset => Some((by, format!("leaves {name} off"))),
                 None => Some((
                     by,
                     format!("turns {name} off (an empty Environment= clears it)"),
