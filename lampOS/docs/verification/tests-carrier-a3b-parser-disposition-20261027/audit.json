@@ -1,0 +1,1419 @@
+{
+  "status": "READ_ONLY_OUTPUT_RECONCILED_PARTIAL",
+  "head": "63a2a9579f1434ee9c4f323209c89073d918c614",
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "original_runtime_controller_status": "FAIL",
+  "original_runtime_controller_exit": 1,
+  "original_runtime_terminal_sha256": "219e76b05dc347924b7ba96297e11976dcd43be471dfe5fe4bbb65389594127d",
+  "error": "Private single_census incorrectly required a semicolon/duration after filtered out; actual custom harness summary ends at filtered out.",
+  "accepted_custom_summary": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+  "Rust_command_failures": 0,
+  "new_observation_counts": {
+    "passed": 300,
+    "failed": 0,
+    "ignored": 3
+  },
+  "new_unique_observed_identities": 303,
+  "retained_original_completed_counts": {
+    "passed": 142,
+    "failed": 0,
+    "ignored": 2
+  },
+  "observed_unique_case_counts": {
+    "passed": 442,
+    "failed": 0,
+    "ignored": 5
+  },
+  "observed_unique_identities": 447,
+  "inventory_identities": 448,
+  "one_remaining_unstarted": {
+    "target": "self-process-cuts",
+    "case": "persisted_self_switches_survive_sigkill",
+    "declared_ignored": true
+  },
+  "original_interrupted_outcome": "INTERRUPTED_INCONCLUSIVE",
+  "separate_recovery_outcome": "PASS",
+  "recovery_count": 1,
+  "one_full_Cargo_command_claim": false,
+  "compiler_phase_unstarted": true,
+  "observations": [
+    {
+      "label": "install-unstarted",
+      "target": "install",
+      "scope": "PREVIOUSLY_UNSTARTED",
+      "rows": [
+        [
+          "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+          "ok"
+        ],
+        [
+          "a_file_that_does_not_match_installs_nothing_of_it",
+          "ok"
+        ],
+        [
+          "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+          "ok"
+        ],
+        [
+          "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+          "ok"
+        ],
+        [
+          "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+          "ok"
+        ],
+        [
+          "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+          "ok"
+        ],
+        [
+          "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+          "ok"
+        ],
+        [
+          "a_moved_lamp_is_given_the_product_voices_five_lines",
+          "ok"
+        ],
+        [
+          "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+          "ok"
+        ],
+        [
+          "a_newer_default_replaces_only_a_setting_nobody_changed",
+          "ok"
+        ],
+        [
+          "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+          "ok"
+        ],
+        [
+          "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+          "ok"
+        ],
+        [
+          "a_reset_then_prepare_does_not_restore_the_old_key",
+          "ok"
+        ],
+        [
+          "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+          "ok"
+        ],
+        [
+          "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+          "ok"
+        ],
+        [
+          "a_setting_in_the_way_stops_the_install_before_any_is_written",
+          "ok"
+        ],
+        [
+          "a_setting_written_but_not_yet_recorded_is_still_installs",
+          "ok"
+        ],
+        [
+          "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+          "ok"
+        ],
+        [
+          "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+          "ok"
+        ],
+        [
+          "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+          "ok"
+        ],
+        [
+          "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+          "ok"
+        ],
+        [
+          "every_part_of_the_brain_has_a_product_unit",
+          "ok"
+        ],
+        [
+          "every_part_of_the_lamp_waits_for_setups_marker_itself",
+          "ok"
+        ],
+        [
+          "every_skill_folder_is_in_the_product_or_says_why_not",
+          "ok"
+        ],
+        [
+          "harness_at_boot_gives_lamposs_manager_its_home_first",
+          "ok"
+        ],
+        [
+          "harness_is_set_to_start_at_boot_once_when_it_is_there",
+          "ok"
+        ],
+        [
+          "harness_off_after_a_first_install_leaves_no_linger",
+          "ok"
+        ],
+        [
+          "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+          "ok"
+        ],
+        [
+          "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+          "ok"
+        ],
+        [
+          "harness_on_keeps_a_harness_already_there",
+          "ok"
+        ],
+        [
+          "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+          "ok"
+        ],
+        [
+          "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+          "ok"
+        ],
+        [
+          "harness_versions_are_read_as_harness_prints_them",
+          "ok"
+        ],
+        [
+          "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+          "ok"
+        ],
+        [
+          "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+          "ok"
+        ],
+        [
+          "install_head_body_keeps_factory_calibration",
+          "ok"
+        ],
+        [
+          "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+          "ok"
+        ],
+        [
+          "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+          "ok"
+        ],
+        [
+          "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+          "ok"
+        ],
+        [
+          "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+          "ok"
+        ],
+        [
+          "install_records_the_tmpfiles_it_writes",
+          "ok"
+        ],
+        [
+          "install_review_head_pair_keeps_a_benign_drop_in",
+          "ok"
+        ],
+        [
+          "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+          "ok"
+        ],
+        [
+          "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+          "ok"
+        ],
+        [
+          "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+          "ok"
+        ],
+        [
+          "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+          "ok"
+        ],
+        [
+          "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+          "ok"
+        ],
+        [
+          "lamp_update_back_waits_for_its_binary_rather_than_failing",
+          "ok"
+        ],
+        [
+          "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+          "ok"
+        ],
+        [
+          "music_sway_and_watch_you_leave_are_on_in_the_product",
+          "ok"
+        ],
+        [
+          "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+          "ok"
+        ],
+        [
+          "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+          "ok"
+        ],
+        [
+          "prepare_then_reset_then_install_does_not_restore_the_old_key",
+          "ok"
+        ],
+        [
+          "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+          "ok"
+        ],
+        [
+          "product_units_pass_only_options_an_older_binary_takes",
+          "ok"
+        ],
+        [
+          "run_twice_it_changes_nothing",
+          "ok"
+        ],
+        [
+          "second_review_body_head_off_refuses_before_bundle_mutation",
+          "ok"
+        ],
+        [
+          "settings_written_before_one_that_fails_are_still_installs",
+          "ok"
+        ],
+        [
+          "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+          "ok"
+        ],
+        [
+          "the_builds_plan_already_there_is_no_change_and_no_backup",
+          "ok"
+        ],
+        [
+          "the_device_key_is_provisioned_private_and_only_where_missing",
+          "ok"
+        ],
+        [
+          "the_exit_note_allowlist_is_exactly_clouds_product_services",
+          "ok"
+        ],
+        [
+          "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+          "ok"
+        ],
+        [
+          "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+          "ok"
+        ],
+        [
+          "the_pinned_models_are_the_ones_their_parts_check",
+          "ok"
+        ],
+        [
+          "the_plans_install_shipped_are_listed",
+          "ok"
+        ],
+        [
+          "the_product_full_look_is_on_in_both_units_with_one_file",
+          "ok"
+        ],
+        [
+          "the_product_keeps_nothing_personal_while_nobody_is_known",
+          "ok"
+        ],
+        [
+          "the_product_sees_who_speaks",
+          "ok"
+        ],
+        [
+          "the_product_skills_are_exactly_the_core_skills",
+          "ok"
+        ],
+        [
+          "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+          "ok"
+        ],
+        [
+          "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+          "ok"
+        ],
+        [
+          "the_tasks_part_closes_the_harness_a_told_task_started",
+          "ok"
+        ],
+        [
+          "the_tasks_part_waits_for_harness_rather_than_failing",
+          "ok"
+        ],
+        [
+          "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+          "ok"
+        ],
+        [
+          "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+          "ok"
+        ],
+        [
+          "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+          "ok"
+        ],
+        [
+          "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+          "ok"
+        ],
+        [
+          "unreadable_records_stop_install_rather_than_being_written_over",
+          "ok"
+        ],
+        [
+          "what_harness_service_status_still_has_is_read_from_its_json",
+          "ok"
+        ],
+        [
+          "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+          "ok"
+        ],
+        [
+          "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+          "ok"
+        ],
+        [
+          "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+          "ok"
+        ]
+      ],
+      "counts": {
+        "passed": 91,
+        "failed": 0,
+        "ignored": 0
+      },
+      "filtered_out": 10,
+      "raw_command_exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "receipt_sha256": "ba8d575a081859b413a88b29f4c43763f6aa29cd9d9b22fbd471f72d38ad0a7c",
+      "stdout_sha256": "b27e1f4675b7d19ec0e9a9c33d0377c1e2776ff0a9ffb066c000063257ff9fa5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wall_seconds": 468.070345
+    },
+    {
+      "label": "install-recovery",
+      "target": "install",
+      "scope": "NEW_INFRA_RECOVERY_OBSERVATION",
+      "rows": [
+        [
+          "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+          "ok"
+        ]
+      ],
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "filtered_out": 100,
+      "raw_command_exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "receipt_sha256": "016129a94bb8dc565fb4b9adceff846e1220652eff5a46c29f2e6e016076b8b3",
+      "stdout_sha256": "9d72483beebd87bd3715de775cab9e09bbd0854d3a16f92a1fea97c109412489",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wall_seconds": 58.9061
+    },
+    {
+      "label": "it",
+      "target": "it",
+      "scope": "PREVIOUSLY_UNSTARTED",
+      "rows": [
+        [
+          "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+          "ok"
+        ],
+        [
+          "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+          "ok"
+        ],
+        [
+          "image_journal::systemd_reads_it_last_beside_another_drop_in",
+          "ok"
+        ],
+        [
+          "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+          "ok"
+        ],
+        [
+          "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+          "ok"
+        ],
+        [
+          "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+          "ok"
+        ],
+        [
+          "image_ramlog::ramlogs_copies_leave_the_journal_out",
+          "ok"
+        ],
+        [
+          "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+          "ok"
+        ],
+        [
+          "image_ramlog::the_copy_back_leaves_the_journal_alone",
+          "ok"
+        ],
+        [
+          "image_ramlog::the_defaults_keep_the_bases_settings",
+          "ok"
+        ],
+        [
+          "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+          "ok"
+        ],
+        [
+          "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "ok"
+        ],
+        [
+          "scratch_paths::the_names_read_are_the_scratch_folders_only",
+          "ok"
+        ]
+      ],
+      "counts": {
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0
+      },
+      "filtered_out": 0,
+      "raw_command_exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "receipt_sha256": "3ffe6b8fb272442e0ca7cdf6dfc8e3b958e18bb028957006f24d5806140ae544",
+      "stdout_sha256": "7e689044ba50c82c363d4d8fc4480f7499c4d5b294e1b338e2204f087f3a395f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wall_seconds": 3.044069
+    },
+    {
+      "label": "release_pair",
+      "target": "release_pair",
+      "scope": "PREVIOUSLY_UNSTARTED",
+      "rows": [
+        [
+          "release_6408_recovers_a_cut_written_by_release_6449",
+          "ignored"
+        ],
+        [
+          "release_6449_recovers_a_cut_written_by_release_6408",
+          "ignored"
+        ]
+      ],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 2
+      },
+      "filtered_out": 0,
+      "raw_command_exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "receipt_sha256": "ef34ed40c2c2ceb63d3621e43dfab17815b0fad73c0950e1a342393f0d66c631",
+      "stdout_sha256": "7c48783d7b909e77cc5636d0ca0e2868393460b42e89df4528c3e0933fd2314b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wall_seconds": 0.714992
+    },
+    {
+      "label": "round",
+      "target": "round",
+      "scope": "PREVIOUSLY_UNSTARTED",
+      "rows": [
+        [
+          "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed",
+          "ok"
+        ],
+        [
+          "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can",
+          "ok"
+        ],
+        [
+          "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+          "ok"
+        ],
+        [
+          "a_build_put_back_puts_its_settings_back_byte_for_byte",
+          "ok"
+        ],
+        [
+          "a_build_put_back_puts_the_images_files_back",
+          "ok"
+        ],
+        [
+          "a_build_put_back_puts_the_old_reset_plan_back",
+          "ok"
+        ],
+        [
+          "a_build_put_back_puts_the_product_skills_back",
+          "ok"
+        ],
+        [
+          "a_changed_model_is_fetched_checked_and_switched_with_its_part",
+          "ok"
+        ],
+        [
+          "a_command_is_read_within_its_bound_and_killed_after",
+          "ok"
+        ],
+        [
+          "a_core_skill_turned_on_stays_on_through_a_round",
+          "ok"
+        ],
+        [
+          "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+          "ok"
+        ],
+        [
+          "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written",
+          "ok"
+        ],
+        [
+          "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept",
+          "ok"
+        ],
+        [
+          "a_hardware_profile_that_cannot_be_read_never_fails_the_round",
+          "ok"
+        ],
+        [
+          "a_lamp_short_of_room_for_the_models_refuses_before_fetching",
+          "ok"
+        ],
+        [
+          "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so",
+          "ok"
+        ],
+        [
+          "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup",
+          "ok"
+        ],
+        [
+          "a_lamp_with_no_reset_plan_gets_none_from_a_round",
+          "ok"
+        ],
+        [
+          "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written",
+          "ok"
+        ],
+        [
+          "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it",
+          "ok"
+        ],
+        [
+          "a_link_switch_cut_short_is_put_back_at_the_next_start",
+          "ok"
+        ],
+        [
+          "a_linked_part_keeps_its_build_and_the_one_before",
+          "ok"
+        ],
+        [
+          "a_linked_part_that_dies_is_put_back_by_its_link",
+          "ok"
+        ],
+        [
+          "a_model_fetch_cut_by_the_network_is_unreachable_not_refused",
+          "ok"
+        ],
+        [
+          "a_model_only_switch_cut_short_restarts_the_part_that_reads_it",
+          "ok"
+        ],
+        [
+          "a_model_switch_cut_short_is_put_back_at_the_next_start",
+          "ok"
+        ],
+        [
+          "a_model_switch_whose_part_dies_puts_the_model_back",
+          "ok"
+        ],
+        [
+          "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept",
+          "ok"
+        ],
+        [
+          "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched",
+          "ok"
+        ],
+        [
+          "a_new_build_is_installed_beside_the_old_and_switched",
+          "ok"
+        ],
+        [
+          "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+          "ok"
+        ],
+        [
+          "a_new_updater_that_confirms_keeps_its_switch",
+          "ok"
+        ],
+        [
+          "a_new_updater_that_exits_at_once_is_put_back",
+          "ok"
+        ],
+        [
+          "a_new_updater_that_refuses_every_manifest_is_put_back",
+          "ok"
+        ],
+        [
+          "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list",
+          "ok"
+        ],
+        [
+          "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only",
+          "ok"
+        ],
+        [
+          "a_part_that_dies_is_put_back_and_its_build_refused",
+          "ok"
+        ],
+        [
+          "a_part_that_says_it_is_in_error_is_put_back_after_its_minute",
+          "ok"
+        ],
+        [
+          "a_part_whose_folder_is_gone_is_installed_afresh",
+          "ok"
+        ],
+        [
+          "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles",
+          "ok"
+        ],
+        [
+          "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept",
+          "ok"
+        ],
+        [
+          "a_round_after_install_keeps_lamp_updates_own_folder",
+          "ok"
+        ],
+        [
+          "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+          "ok"
+        ],
+        [
+          "a_round_by_hand_keeps_the_folder_it_runs_from",
+          "ok"
+        ],
+        [
+          "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+          "ok"
+        ],
+        [
+          "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+          "ok"
+        ],
+        [
+          "a_round_places_second_json_before_a_voice_unit_that_needs_it",
+          "ok"
+        ],
+        [
+          "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own",
+          "ok"
+        ],
+        [
+          "a_round_that_cannot_place_second_json_writes_no_unit",
+          "ok"
+        ],
+        [
+          "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked",
+          "ok"
+        ],
+        [
+          "a_round_with_nothing_to_change_only_checks",
+          "ok"
+        ],
+        [
+          "a_self_json_from_a_later_version_still_reads",
+          "ok"
+        ],
+        [
+          "a_self_json_the_disk_cannot_give_is_tried_again_next_round",
+          "ok"
+        ],
+        [
+          "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line",
+          "ok"
+        ],
+        [
+          "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start",
+          "ok"
+        ],
+        [
+          "a_switch_cut_short_is_put_back_at_the_next_start",
+          "ok"
+        ],
+        [
+          "a_unit_the_build_carries_is_carried_with_the_build_written_in",
+          "ok"
+        ],
+        [
+          "a_voice_that_is_well_is_put_back_between_two_turns",
+          "ok"
+        ],
+        [
+          "an_old_updater_climbs_one_updater_a_round",
+          "ok"
+        ],
+        [
+          "an_older_build_is_not_taken",
+          "ok"
+        ],
+        [
+          "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so",
+          "ok"
+        ],
+        [
+          "an_unchanged_model_is_not_fetched_and_its_file_stays",
+          "ok"
+        ],
+        [
+          "an_unreadable_journal_is_set_aside_and_the_round_goes_on",
+          "ok"
+        ],
+        [
+          "an_unreadable_self_json_with_both_builds_known_is_put_back",
+          "ok"
+        ],
+        [
+          "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+          "ok"
+        ],
+        [
+          "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries",
+          "ok"
+        ],
+        [
+          "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+          "ok"
+        ],
+        [
+          "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written",
+          "ok"
+        ],
+        [
+          "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round",
+          "ok"
+        ],
+        [
+          "both_kinds_of_part_switch_in_one_round_each_its_own_way",
+          "ok"
+        ],
+        [
+          "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+          "ok"
+        ],
+        [
+          "head_touch::body_head_calibration_cannot_override_the_sleep_reader",
+          "ok"
+        ],
+        [
+          "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration",
+          "ok"
+        ],
+        [
+          "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes",
+          "ok"
+        ],
+        [
+          "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes",
+          "ok"
+        ],
+        [
+          "head_touch::body_head_repeated_exec_start_is_refused_before_writes",
+          "ok"
+        ],
+        [
+          "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader",
+          "ok"
+        ],
+        [
+          "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+          "ok"
+        ],
+        [
+          "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+          "ok"
+        ],
+        [
+          "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+          "ok"
+        ],
+        [
+          "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+          "ok"
+        ],
+        [
+          "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+          "ok"
+        ],
+        [
+          "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+          "ok"
+        ],
+        [
+          "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+          "ok"
+        ],
+        [
+          "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+          "ok"
+        ],
+        [
+          "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+          "ok"
+        ],
+        [
+          "head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+          "ok"
+        ],
+        [
+          "head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+          "ok"
+        ],
+        [
+          "head_touch::malformed_environment_quotes_are_not_reader_evidence",
+          "ok"
+        ],
+        [
+          "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+          "ok"
+        ],
+        [
+          "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+          "ok"
+        ],
+        [
+          "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+          "ok"
+        ],
+        [
+          "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+          "ok"
+        ],
+        [
+          "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+          "ok"
+        ],
+        [
+          "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+          "ok"
+        ],
+        [
+          "head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+          "ok"
+        ],
+        [
+          "head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+          "ok"
+        ],
+        [
+          "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+          "ok"
+        ],
+        [
+          "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+          "ok"
+        ],
+        [
+          "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+          "ok"
+        ],
+        [
+          "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+          "ok"
+        ],
+        [
+          "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+          "ok"
+        ],
+        [
+          "head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+          "ok"
+        ],
+        [
+          "head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+          "ok"
+        ],
+        [
+          "install_writes_the_fallback_and_no_round_touches_it",
+          "ok"
+        ],
+        [
+          "lamp_update_back_puts_back_an_unreadable_self_json",
+          "ok"
+        ],
+        [
+          "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none",
+          "ok"
+        ],
+        [
+          "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+          "ok"
+        ],
+        [
+          "no_network_changes_nothing_and_says_so",
+          "ok"
+        ],
+        [
+          "no_second_round_begins_while_lamp_updates_own_switch_waits",
+          "ok"
+        ],
+        [
+          "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+          "ok"
+        ],
+        [
+          "product_carrier::a_comment_only_product_unit_is_an_intended_noop",
+          "ok"
+        ],
+        [
+          "product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+          "ok"
+        ],
+        [
+          "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+          "ok"
+        ],
+        [
+          "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+          "ok"
+        ],
+        [
+          "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+          "ok"
+        ],
+        [
+          "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+          "ok"
+        ],
+        [
+          "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation",
+          "ok"
+        ],
+        [
+          "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+          "ok"
+        ],
+        [
+          "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+          "ok"
+        ],
+        [
+          "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+          "ok"
+        ],
+        [
+          "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+          "ok"
+        ],
+        [
+          "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit",
+          "ok"
+        ],
+        [
+          "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written",
+          "ok"
+        ],
+        [
+          "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start",
+          "ok"
+        ],
+        [
+          "prune_keeps_the_models_of_the_kept_builds",
+          "ok"
+        ],
+        [
+          "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside",
+          "ok"
+        ],
+        [
+          "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery",
+          "ok"
+        ],
+        [
+          "restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts",
+          "ok"
+        ],
+        [
+          "restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation",
+          "ok"
+        ],
+        [
+          "restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies",
+          "ok"
+        ],
+        [
+          "restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names",
+          "ok"
+        ],
+        [
+          "restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable",
+          "ok"
+        ],
+        [
+          "restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal",
+          "ok"
+        ],
+        [
+          "restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch",
+          "ok"
+        ],
+        [
+          "restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies",
+          "ok"
+        ],
+        [
+          "restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse",
+          "ok"
+        ],
+        [
+          "restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts",
+          "ok"
+        ],
+        [
+          "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit",
+          "ok"
+        ],
+        [
+          "restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off",
+          "ok"
+        ],
+        [
+          "restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it",
+          "ok"
+        ],
+        [
+          "restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice",
+          "ok"
+        ],
+        [
+          "restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice",
+          "ok"
+        ],
+        [
+          "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+          "ok"
+        ],
+        [
+          "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "ok"
+        ],
+        [
+          "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+          "ok"
+        ],
+        [
+          "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+          "ok"
+        ],
+        [
+          "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+          "ok"
+        ],
+        [
+          "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+          "ok"
+        ],
+        [
+          "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+          "ok"
+        ],
+        [
+          "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+          "ok"
+        ],
+        [
+          "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+          "ok"
+        ],
+        [
+          "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts",
+          "ok"
+        ],
+        [
+          "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+          "ok"
+        ],
+        [
+          "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+          "ok"
+        ],
+        [
+          "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+          "ok"
+        ],
+        [
+          "the_fallback_reads_a_self_json_written_by_a_later_updater",
+          "ok"
+        ],
+        [
+          "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+          "ok"
+        ],
+        [
+          "the_journal_line_is_the_units_own_last_cleaned_and_cut",
+          "ok"
+        ],
+        [
+          "the_old_build_not_well_either_says_the_first_unit_not_wells_line",
+          "ok"
+        ],
+        [
+          "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+          "ok"
+        ],
+        [
+          "with_apply_off_a_builds_settings_are_not_written_and_that_is_said",
+          "ok"
+        ],
+        [
+          "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted",
+          "ok"
+        ],
+        [
+          "with_image_off_the_images_files_are_not_written_and_that_is_said",
+          "ok"
+        ],
+        [
+          "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment",
+          "ok"
+        ],
+        [
+          "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+          "ok"
+        ],
+        [
+          "with_the_switch_off_a_build_with_other_models_is_refused",
+          "ok"
+        ],
+        [
+          "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on",
+          "ok"
+        ],
+        [
+          "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries",
+          "ok"
+        ],
+        [
+          "with_the_switch_off_lamp_update_never_switches_itself",
+          "ok"
+        ],
+        [
+          "without_apply_nothing_is_written_and_what_would_change_is_said",
+          "ok"
+        ]
+      ],
+      "counts": {
+        "passed": 195,
+        "failed": 0,
+        "ignored": 0
+      },
+      "filtered_out": 0,
+      "raw_command_exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "receipt_sha256": "55928a87299248ff469f6261852275ba36ce97752e32c793ffe889417cea4fdc",
+      "stdout_sha256": "1c5e026b098035ab843d07cf164df655d086f04c252725e36dbbc05596408e81",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wall_seconds": 1579.932277
+    },
+    {
+      "label": "self-cli-exec",
+      "target": "self-cli-exec",
+      "scope": "PREVIOUSLY_UNSTARTED",
+      "rows": [
+        [
+          "actual_cli_exec_confirms_before_the_next_round",
+          "ignored"
+        ]
+      ],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1
+      },
+      "filtered_out": 0,
+      "raw_command_exit": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "receipt_sha256": "32dfae769f23cc2cc05e5894786a0f68524d10fa6ad903b708b84e8af16f676b",
+      "stdout_sha256": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wall_seconds": 1.119294
+    }
+  ],
+  "guards_as_recorded": {
+    "source_unchanged": true,
+    "sealed_copies_unchanged": 258,
+    "actual_executables_unchanged": 10,
+    "all_owned_groups_closed": true,
+    "lease_held": false
+  },
+  "no_completed_observation_repeated": true,
+  "preparation_scope": "Offline census only; no source/target inspection, tests, compiler or retry.",
+  "receipt_sha256": {
+    "terminal.json @ continuation": "219e76b05dc347924b7ba96297e11976dcd43be471dfe5fe4bbb65389594127d",
+    "runtime-native-result.json @ continuation": "aca5daeb558ce406b54090bef412100e920c705bb71d9681d8a3345190cd22fb",
+    "run.py @ continuation": "9c9c1e684121493e2fdac56cba3b7a83e8cdb57d0f790700182366a46924a2d9",
+    "plan.json @ continuation": "833bc3facbb16a43c836186e9d1a6d9937de94cdf9abaff1d41fb0eb4a6fbbf3",
+    "semantic-source-after.json @ continuation": "b345bd8e3eb69ada8756c3fad4348e5504a3a0aca75e73c9a053654b462a6b2a",
+    "semantic-protected-after.json @ continuation": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+    "semantic-environment.json @ continuation": "45d53113f596e974ebbeacdab1ef6ca13a3648c9f724ae6f9ede6820a6ea0b79",
+    "partial-case-ledger.json @ continuation": "ad7c7924ba97f78dd11a4dc07e715d552f081bab3bef28c24391557846a0abc7",
+    "cmd-install-unstarted.json @ continuation": "ba8d575a081859b413a88b29f4c43763f6aa29cd9d9b22fbd471f72d38ad0a7c",
+    "cmd-install-unstarted.stdout.txt @ continuation": "b27e1f4675b7d19ec0e9a9c33d0377c1e2776ff0a9ffb066c000063257ff9fa5",
+    "cmd-install-unstarted.stderr.txt @ continuation": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cmd-install-recovery.json @ continuation": "016129a94bb8dc565fb4b9adceff846e1220652eff5a46c29f2e6e016076b8b3",
+    "cmd-install-recovery.stdout.txt @ continuation": "9d72483beebd87bd3715de775cab9e09bbd0854d3a16f92a1fea97c109412489",
+    "cmd-install-recovery.stderr.txt @ continuation": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cmd-it.json @ continuation": "3ffe6b8fb272442e0ca7cdf6dfc8e3b958e18bb028957006f24d5806140ae544",
+    "cmd-it.stdout.txt @ continuation": "7e689044ba50c82c363d4d8fc4480f7499c4d5b294e1b338e2204f087f3a395f",
+    "cmd-it.stderr.txt @ continuation": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cmd-release_pair.json @ continuation": "ef34ed40c2c2ceb63d3621e43dfab17815b0fad73c0950e1a342393f0d66c631",
+    "cmd-release_pair.stdout.txt @ continuation": "7c48783d7b909e77cc5636d0ca0e2868393460b42e89df4528c3e0933fd2314b",
+    "cmd-release_pair.stderr.txt @ continuation": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cmd-round.json @ continuation": "55928a87299248ff469f6261852275ba36ce97752e32c793ffe889417cea4fdc",
+    "cmd-round.stdout.txt @ continuation": "1c5e026b098035ab843d07cf164df655d086f04c252725e36dbbc05596408e81",
+    "cmd-round.stderr.txt @ continuation": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cmd-self-cli-exec.json @ continuation": "32dfae769f23cc2cc05e5894786a0f68524d10fa6ad903b708b84e8af16f676b",
+    "cmd-self-cli-exec.stdout.txt @ continuation": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+    "cmd-self-cli-exec.stderr.txt @ continuation": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "terminal.json @ original-abort": "150a4ab02569a5d720e1cab78e5a9be557c3e8c9f08ff7d6be8820ccb8c66dce",
+    "update-tests.json @ original-abort": "c279c7db9b73162da6d8170289bbb43fedad3645a1093ce1f01dc476202dab38",
+    "source-after.json @ original-abort": "b345bd8e3eb69ada8756c3fad4348e5504a3a0aca75e73c9a053654b462a6b2a",
+    "protected-after.json @ original-abort": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+    "update-originals.json @ original-abort": "440b13f4e50fe5f6a349a45c455efc01bc8bbe4120286898b430aa9f27ceb616",
+    "update-inventory.json @ original-abort": "ccff0823cae5fb408e045eafb79f56e548f7c515c3253b79f94411165aef7676",
+    "update-executables.json @ original-abort": "93359886eb63b1e6f891ba9ebdbf19b168c86b053e7a44d88145da4385b3f159",
+    "environment-hashes.json @ original-abort": "b0ce816865d63a045f9552731a44d60b94d125e25d935d5d72e7c7b61edfa01d"
+  },
+  "private_disposition_sha256": "ced797f6468bf39314e0f013866b3c261c364c8d05953ccfb80b03879874a07f"
+}

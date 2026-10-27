@@ -1,0 +1,116 @@
+{
+  "status": "UPDATE_ORDINARY_OBSERVATIONS_COMPLETE_SEPARATE_COMMANDS",
+  "head": "63a2a9579f1434ee9c4f323209c89073d918c614",
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "unique_case_identities": 448,
+  "aggregate_counts": {
+    "passed": 442,
+    "failed": 0,
+    "ignored": 6
+  },
+  "aggregate_not_one_full_Cargo_command": true,
+  "ordinary_outcome_sources": {
+    "original_completed": {
+      "passed": 142,
+      "failed": 0,
+      "ignored": 2
+    },
+    "six_command_continuation": {
+      "passed": 300,
+      "failed": 0,
+      "ignored": 3
+    },
+    "final_previously_unstarted_declaration": {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "final_case": {
+    "target": "self-process-cuts",
+    "case": "persisted_self_switches_survive_sigkill",
+    "outcome": "IGNORE",
+    "observations": 1,
+    "reason": "requires Linux syscall tracing",
+    "raw_command_exit": 0,
+    "direct_wait_status": 0,
+    "owned_group_closed": true,
+    "timed_out": false,
+    "reserve_breached": false,
+    "stdout_sha256": "b2b5dec35eeaf5a469e308f8f57aec00eb02df2c34be190680b12c217c484609",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "preserved_history": {
+    "original_reserve_abort": "FAIL/-15",
+    "original_interrupted_install_observation": "INTERRUPTED_INCONCLUSIVE",
+    "separate_authorized_recovery_observation": "PASS once",
+    "six_command_runtime_controller": "FAIL/1 due private parser; raw test commands all0",
+    "completed_case_replays": false,
+    "failed_original_records_overwritten": false
+  },
+  "final_native_controller": {
+    "controller_exit": 0,
+    "exit_code": 0,
+    "terminal_status": "OBSERVATIONS_COMPLETE",
+    "compiler_authorized": false
+  },
+  "guards": {
+    "source_unchanged": true,
+    "sealed_copies_unchanged": 258,
+    "actual_executables_unchanged": 10,
+    "all_original_bound_attributes_enforced": true,
+    "owned_groups_closed": true,
+    "lease_held": false
+  },
+  "unrun_scopes": [
+    "Update doc tests",
+    "standalone promoter gates",
+    "current native CI",
+    "device acceptance"
+  ],
+  "complete_binding": {
+    "status": "UPDATE_ORDINARY_OBSERVATIONS_COMPLETE_SEPARATE_COMMANDS",
+    "head": "63a2a9579f1434ee9c4f323209c89073d918c614",
+    "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+    "original_abort_terminal_sha256": "150a4ab02569a5d720e1cab78e5a9be557c3e8c9f08ff7d6be8820ccb8c66dce",
+    "original_abort_command_sha256": "c279c7db9b73162da6d8170289bbb43fedad3645a1093ce1f01dc476202dab38",
+    "prior_runtime_FAIL_terminal_sha256": "219e76b05dc347924b7ba96297e11976dcd43be471dfe5fe4bbb65389594127d",
+    "prior_runtime_FAIL_native_sha256": "aca5daeb558ce406b54090bef412100e920c705bb71d9681d8a3345190cd22fb",
+    "read_only_disposition_sha256": "ced797f6468bf39314e0f013866b3c261c364c8d05953ccfb80b03879874a07f",
+    "last_observation_terminal_sha256": "9a74c7f10ff754e749792064072456cc4cf5b6729c4b99438db6e293bcdf62e2",
+    "last_command_receipt_sha256": "e68591bc9498ca60de55567fb4b3f200d94f40cd364df802280b3e04e81510ca",
+    "last_census_sha256": "3a75397f5a8048553bae1cadc99ae69d42f306083443fb59de30d43779e03d50",
+    "source_after_sha256": "b345bd8e3eb69ada8756c3fad4348e5504a3a0aca75e73c9a053654b462a6b2a",
+    "protected_after_sha256": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+    "unique_case_identities": 448,
+    "counts": {
+      "passed": 442,
+      "failed": 0,
+      "ignored": 6
+    },
+    "original_interruption": "INTERRUPTED_INCONCLUSIVE",
+    "separate_recovery": "PASS",
+    "completed_cases_replayed": false,
+    "single_full_Cargo_command": false,
+    "Update_doc_tests_complete": false,
+    "promoter_gates_complete": false,
+    "source_unchanged": true,
+    "sealed_copies_unchanged": 258,
+    "actual_executables_unchanged": 10,
+    "owned_groups_closed": true
+  },
+  "receipt_sha256": {
+    "complete-observations-binding.json": "b48d2bbd1374e1357cdc63d3469ee50dfe26da96195ec5eec0e9456382e28736",
+    "terminal.json": "9a74c7f10ff754e749792064072456cc4cf5b6729c4b99438db6e293bcdf62e2",
+    "native-controller-result.json": "d282c9b27a3f941cb286e36cca0aeb94347ac5c7905cd84ecfb8cef894bf2261",
+    "semantic-final-declaration.json": "3a75397f5a8048553bae1cadc99ae69d42f306083443fb59de30d43779e03d50",
+    "semantic-source-after.json": "b345bd8e3eb69ada8756c3fad4348e5504a3a0aca75e73c9a053654b462a6b2a",
+    "semantic-protected-after.json": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+    "observation/cmd-final-declaration.json": "e68591bc9498ca60de55567fb4b3f200d94f40cd364df802280b3e04e81510ca"
+  },
+  "related_proofs": {
+    "reserve_abort": "../tests-carrier-a3b-reserve-failure-20261027/",
+    "parser_failure_disposition": "../tests-carrier-a3b-parser-disposition-20261027/"
+  },
+  "preparation_scope": "Offline immutable receipt parsing only; no source/target inspection, compiler, runtime or binary copies."
+}

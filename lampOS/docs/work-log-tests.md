@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 07:07 — Carrier ordinary coverage and parser disposition published
+
+Ready for lamp-voice: no (latest-base qualification remains separate)
+
+[The retained parser failure and read-only disposition](verification/tests-carrier-a3b-parser-disposition-20261027/) account for six successful commands with **300 PASS / 0 FAIL / 3 IGNORE**. The custom harness legitimately omits a trailing summary duration; the original controller FAIL/1 remains unchanged. [The final ordinary-coverage binding](verification/tests-carrier-a3b-observations-complete-20261027/) adds only the last previously unstarted default-ignored declaration, yielding all **448** unique identities and **442 PASS / 0 FAIL / 6 IGNORE** across separate observations. The original reserve-abort interruption remains INCONCLUSIVE, its separately authorized recovery passed, and no completed case was replayed. All source, 258 sealed-copy and 10 actual-executable guards passed; groups closed.
+
+The subsequent docs/promoter compiler-only phase also closed with controller **0/PASS**: Update docs **0/0/0**, promoter **25/0/0** plus zero-case docs, final **263** protected witnesses and **15** actual executables. That evidence is bound to 63a/a3b; its separate public packet is preparing. No new ordinary Update cases ran in that phase.
+
+Carrier now has a clean source-only six-equal-patch carry `4fd14a8ed/4bff`; all 14 authored final blobs match 63a. Its compile/compare-only current gate is preparing, with no unsupported transfer of old test outcomes. Main's Memory/Voice changes are real developer/test inputs, so any current runtime decision follows actual comparisons. Mood's clean carry is `0bd3f854c/4bff`, with current checks preparing after the base advanced again; earlier published source/runtime/native scopes remain intact. No device action.
+
 ## 2026-10-27 06:41 — Latest Mood compile comparisons and original native gates pass
 
 Ready for lamp-voice: no (#3623 current peer clearances pending)
