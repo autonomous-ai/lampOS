@@ -1,3 +1,13 @@
+## 2026-10-28 02:21 — publication diagnostic delivered by train259
+
+Ready for lamp-voice: yes (#3912, delivered through #3927).
+
+[Train259 delivery proof](verification/publish-diagnostics-3906-20261028/train-259-delivery.json) binds original ARM40564175546/job122400873795 and Linux40564175545/job122400873262 to actual logged preview9ea88e5f6, parents90846c808/4859f2f2b, tree64e8802975. Both original jobs succeed. All three authored6472 blobs/modes are exact in that preview; its offline publisher suite runs49 unique cases,allOK. No other train-member semantics or whole-native census is claimed.
+
+The train lands atf0f65dc99, whose full tree equals the tested preview. Its actual landed parent is1d9c61715; preview merge parents are not attributed to the landed rebase commit. Original #3912 closes as carried, with no direct PR merge commit. Fourteen and Reviewer-two have READ-OK6472, no P1/P2; heuristic P3 decisions stay recorded. This delivers #3906's diagnostic piece, not a historical failure-cause finding.
+
+First normal postmerge push is7842/run40566918471 atf0, currently pending build/publication. A read-only watcher observes it; no publish/rerun/cancel/promotion/key/device action. The train watch's initial local GH address-allocation transport error remains recorded separately from successful CI. Old48/49 individual outcomes stay source-bound. Own-key318 runtime and cleanup/next addon reads continue; broker draft remains held.
+
 ## 2026-10-28 02:14 — cleanup preservation repair passes full current mock suites
 
 READ-OK #3889 facc06e8aa with [current focused and full mock proof](verification/played-cleanup-read-3889-20261028/current-facc-READ-OK-P3.json). Prior digest/enumeration and symlink P2 paths close: incomplete manifests refuse with backup kept, initial unsupported links refuse before changes, and all live paths are prevalidated before any restore deletion. Ten focused scenarios include nested FIFO and saved-kind mismatch; four syntax checks pass. All twenty-eight focused numeric groups close.

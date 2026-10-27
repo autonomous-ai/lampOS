@@ -1,0 +1,550 @@
+{
+  "schema": "third-owned-diagnostic-train259-delivery-v1",
+  "scope": "Only the three owned #3912 files and their original required CI delivery; no other train-member semantic review.",
+  "owned_pr": 3912,
+  "owned_source": "6472ec41cec29c20111ee52617fcd3afb375ac64",
+  "train_pr": 3927,
+  "frozen_train_head": "4859f2f2b931ecfa9747e5a382c040cbed678a17",
+  "frozen_base": "90846c8089870adb1840c1f52c9e0083d91efaa0",
+  "actual_logged_checkout_both_jobs": "9ea88e5f6e2e76955951af245c54eb3761f62f10",
+  "preview_parents": [
+    "90846c8089870adb1840c1f52c9e0083d91efaa0",
+    "4859f2f2b931ecfa9747e5a382c040cbed678a17"
+  ],
+  "tested_tree": "64e8802975af15939b40a8518ff794633897f950",
+  "owned_three_files": {
+    ".github/scripts/lampos-publish.py": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0bf124c39c41fb3e8eb397d935964b426b663cb2",
+      "size": 27224
+    },
+    ".github/scripts/lampos-publish-test.py": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "37e55bc682a7e9f53437ab904c1c76c4b8b09ef0",
+      "size": 37457
+    },
+    "lampOS/docs/updates.md": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e3b89613d7eb71116eec5a822faff2cad78c54c",
+      "size": 172369
+    }
+  },
+  "owned_source_and_tested_preview_blobs_modes_equal": true,
+  "original_ARM": {
+    "run_id": 40564175546,
+    "run_number": 7838,
+    "attempt": 1,
+    "job_id": 122400873795,
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-27T18:53:46Z",
+    "completed_at": "2026-10-27T19:11:43Z",
+    "steps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 2,
+        "name": "system packages",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 3,
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 4,
+        "name": "publication failure tests (offline, no signing secret)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 5,
+        "name": "Rust 1.96.0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 6,
+        "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 7,
+        "name": "stable promotion tests (offline, disposable test key)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 8,
+        "name": "restore the cache",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 9,
+        "name": "unchanged source files get the cached build's times back",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 10,
+        "name": "record fresh source times for a cold publication build",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "number": 11,
+        "name": "Run taiki-e/install-action@v2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 12,
+        "name": "build (release, the lamps' binaries)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 13,
+        "name": "every built lamp-* binary is classified for the lamp-os package",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 14,
+        "name": "build the two selected artifact examples without filename collisions",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 15,
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 16,
+        "name": "which crates a pull request tests",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 17,
+        "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 18,
+        "name": "doc tests and the own-harness tests (nextest runs neither)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 19,
+        "name": "export only current Cargo targets and their SHA-256",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 20,
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 21,
+        "name": "discard the isolated example target before saving the cache",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "number": 22,
+        "name": "save the cache",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "number": 44,
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 45,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "actual_owned_Python_suite": {
+    "unique_test_rows": 49,
+    "ok_rows": 49,
+    "bad_rows": 0,
+    "summary": [
+      "2026-10-27T18:54:27.0014578Z Ran 49 tests in 0.277s",
+      "2026-10-27T18:54:27.0014770Z OK"
+    ],
+    "rows": [
+      {
+        "method": "test_ansi_controls_and_invalid_utf8_do_not_escape_first_line",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_authorization_schemes_and_standalone_bearer_are_redacted",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_configured_secrets_and_split_private_key_are_redacted",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_credential_shapes_and_assignments_are_redacted",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_gh_failures_use_fixed_labels_without_echoing_argv",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_missing_and_empty_first_stderr_lines_are_safe",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_non_gh_failures_remain_generic_and_silent",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_output_file_is_forwarded_without_echoing_output",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_redaction_happens_before_diagnostic_truncation",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_short_tokens_with_empty_jose_components_are_redacted",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_spawn_and_timeout_failures_do_not_echo_exception_details",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_success_preserves_stdout_and_child_environment",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_url_credentials_and_query_values_are_redacted",
+        "class": "CommandsTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_api_auth_or_network_error_is_not_absence",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_bad_activation_and_non_push_contexts_run_no_updater",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_bad_existing_signature_is_not_bootstrap",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_candidate_rename_failure_restores_previous_head",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_changed_checksum_never_executes_artifact",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_channel_changed_during_upload_is_left_untouched",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_classification_cannot_exclude_the_updater",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_commands_never_pass_private_key_environment_to_children",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_comment_cannot_classify_an_unclassified_artifact_binary",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_duplicate_checksum_never_executes_artifact",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_excluded_bytes_are_verified_before_any_updater_execution",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_existing_channel_advances_only_after_verified_build_and_stage",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_existing_channel_without_envelope_is_not_bootstrap",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_existing_immutable_release_refuses",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_existing_immutable_tag_without_release_refuses",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_explicit_bootstrap_creates_a_verified_head",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_failed_incomplete_or_corrupt_build_upload_never_mutates_head",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_failed_or_corrupt_staging_never_mutates_head",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_failed_or_malformed_channel_lookup_is_not_bootstrap",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_failed_restoration_reports_retained_asset_ids",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_initial_channel_requires_explicit_bootstrap",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_invalid_classification_never_executes_artifact",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_lost_response_after_either_rename_restores_previous_head",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_manifest_cannot_reintroduce_an_excluded_binary",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_manifest_hash_mismatch_refuses_before_github",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_missing_checksums_never_executes_artifact",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_missing_or_linked_classification_never_executes_artifact",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_old_rename_failure_preserves_previous_head",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_promotion_wrapper_keeps_immediate_safe_gh_diagnostic_visible",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_public_key_failure_removes_private_key",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_sign_failure_removes_private_key",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_stale_or_repeated_sequence_never_mutates_head",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_symlink_never_executes_artifact",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_unlisted_file_never_executes_artifact",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_verifier_failure_and_success_without_proof_refuse",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      },
+      {
+        "method": "test_wrong_manifest_identity_refuses_before_github",
+        "class": "PublicationTests",
+        "reported_method": null,
+        "status": "ok"
+      }
+    ],
+    "log_evidence_sha256": "58b964c44d55e7a0ecbe1a11b6b89bc4e72ed2059627064ffaa58b4d2118f9be"
+  },
+  "original_Linux": {
+    "run_id": 40564175545,
+    "attempt": 1,
+    "job_id": 122400873262,
+    "head_sha": "4859f2f2b931ecfa9747e5a382c040cbed678a17",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-27T18:53:44Z",
+    "completed_at": "2026-10-27T18:57:57Z",
+    "logged_checkout": "9ea88e5f6e2e76955951af245c54eb3761f62f10"
+  },
+  "delivery": {
+    "merged": true,
+    "merged_at": "2026-10-27T19:11:52Z",
+    "landed_commit": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+    "landed_tree": "64e8802975af15939b40a8518ff794633897f950",
+    "landed_parents": [
+      "1d9c617152ff483e72d752a3adbe5726d010d22a"
+    ],
+    "landed_tree_equals_tested_tree": true,
+    "queue_confirmation_comment": 6451213790
+  },
+  "first_normal_postmerge_run": {
+    "run_id": 40566918471,
+    "run_number": 7842,
+    "attempt": 1,
+    "event": "push",
+    "branch": "lamp-voice",
+    "head_sha": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+    "created_at": "2026-10-27T19:11:58Z",
+    "build_job_id": 122410547257,
+    "observed_state": "in_progress; cold release build; publication failure-tests step success",
+    "publish_job_observed": false,
+    "publication_outcome": "pending; no publication success or cause claim"
+  },
+  "watch_control": {
+    "original_watch_interval_seconds": 30,
+    "initial_native_handle": 78766,
+    "initial_native_exit": 1,
+    "initial_end_reason": "read-only gh transport failure, not CI failure",
+    "resumed_native_handle": 60748,
+    "resumed_native_exit": 0,
+    "resumed_timeout": false,
+    "no_CI_rerun": true
+  },
+  "limits": [
+    "No other member semantics reviewed; no Memory/Friday review or full repository census.",
+    "No local Cargo, artifact execution/download, signing keys, release mutations, device access, rerun/cancel/dispatch/push/post performed.",
+    "No baseline native credit transferred: train native evidence is tied to its actual logged preview, parents/tree and only the owned three blob/mode equality.",
+    "Normal postmerge publication is still pending at snapshot; this packet does not establish underlying historical gh failure cause."
+  ],
+  "evidence_root": ".claude/worktrees/third-publish-train259-evidence"
+}
