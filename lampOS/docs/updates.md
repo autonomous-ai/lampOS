@@ -2400,3 +2400,15 @@ resolution and null/device overlap remain conservatively unsupported; unrelated
 closed Head facts retain their semantics. No encoding, runtime caller, live
 read, admission, writer grant or restoration effect is added. This agreement
 is not authentication, freshness, exclusion or an atomic filesystem snapshot.
+
+### Pure ordinary plan preparation (#3689)
+
+The private [preparation API](ordinary-plan-preparation.md) now checks full
+signed input/key/context and the independently selected product records against
+saved preimages and closed Head facts. It retains every signed row and the
+projector's separate order, including an appended PINS no-op becoming a write.
+Only the unchanged writer identity and a narrow ordinary-settings shape are
+accepted; units, models, image/reset/tmpfiles/skills effects remain refused.
+The borrowed-context in-memory result is neither durable nor an apply grant.
+There is no State/live-file reader, runtime caller, capability bump, privileged
+writer, publication or restoration path.
