@@ -6121,6 +6121,12 @@ pub const OPEN_NAME_ENVIRONMENT: &str = "LAMP_SECOND_OPEN_NAME";
 /// else.
 pub const NAME_CARRIES_ENVIRONMENT: &str = "LAMP_SECOND_NAME_CARRIES";
 
+/// Where the worker reads whether, right after a start, a line's room not
+/// yet known only for want of history is taken as quiet for a join when the
+/// ears show it is ([`worker::Heeding::showing_the_first_seconds_quiet`]):
+/// `on`, and nothing else.
+pub const FIRST_SECONDS_QUIET_ENVIRONMENT: &str = "LAMP_FIRST_SECONDS_QUIET";
+
 /// Where the worker reads [`Engine::holding_own_echo`] (#2997): `on`, and
 /// nothing else.
 pub const OWN_ECHO_ENVIRONMENT: &str = "LAMP_SECOND_OWN_ECHO";
