@@ -875,6 +875,34 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     remembers that "which?" was asked: a second bare line ("just forget
     it") is asked about again; asking once is the model's instruction. The journal says `a bare forget's source_id N is not
     run: M shown could be meant, asked which`.
+  - **A bare forget with no id, after a recall, asks; and the answer names
+    only what the store removed** (#3504, Friday's N1, lamp follow-up).
+    On lamp-06c1 (27 Oct 20:55) a sunflower was kept, hibiscus tea was
+    recalled, and "Elan. Forget that." went with no `source_id` to
+    `forget_last`, which removed the sunflower, the newest kept thing,
+    while the lamp said "that was the hibiscus tea". Now:
+    - A bare line's forget with no id is marked `heard_bare` too (the
+      journal then says `heard bare true`). The memory runs `forget_last`
+      for it only when the session's last `remember` or `recall` was not a
+      recall that gave something of that scope within 60 s
+      (`remember::recall_was_last`, `DaysContext::given_by_recall`); after
+      such a recall, "that" may be either, so it forgets nothing and tells
+      the model `forget_which`. Right after a keep, or the follow-up just
+      asked about, it runs as before.
+    - A forget that removed something is told what went by the id the
+      store removed (`remember::told_what_went`): its text as this session
+      was shown it (`what_went`, with a note to say that and name nothing
+      else), or, when not shown, a note to say only that it is forgotten
+      and not name it. The model never names its own guess. The named text
+      is cut to 240 bytes at a word and marked "…"
+      (`remember::cut_at_a_word`), and an answer that would still not fit
+      a tool answer is told without the name: a done forget is never told
+      as a failure (Reviewer-two's P2 on #3860).
+    - Tests: `remember::tests::a_bare_forget_after_a_recall_asks_and_one_after_a_keep_names_what_went`
+      (the lamp's sequence and heard line) and
+      `remember::tests::a_forgets_answer_names_only_the_removed_id`,
+      `…::a_long_forgotten_text_is_cut_to_fit_and_the_forget_stays_done`
+      and `…::the_longest_keep_forgotten_is_answered_done_and_fits`.
   - **Every forget's arguments are journalled, content-free** (#3504,
     Friday's N1): `lamp-voice provider: forget called: source_id N, about
     W words, heard named B, heard bare B` (and `forget_everything called:

@@ -309,10 +309,12 @@ fn a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them() {
     assert_eq!(append["source_ids"], json!([id]));
     assert_eq!(answer["ok"], true);
     assert_eq!(fixture.count("entries"), 2);
-    assert_eq!(
-        client.run(&call(FORGET, json!({})), Duration::from_millis(1500)),
-        (json!({"forgotten":true}), true)
-    );
+    // The answer names what went only by the id the store removed
+    // (#3504, Friday's N1 follow-up): here it was not shown, so it names
+    // nothing.
+    let (told, ok) = client.run(&call(FORGET, json!({})), Duration::from_millis(1500));
+    assert!(ok && told["forgotten"] == true, "{told}");
+    assert!(told.get("what_went").is_none(), "{told}");
     assert_eq!(fixture.count("entries"), 0);
     assert!(!client.finished_exchange(fixture.now, "late cached prose", "synthetic violet secret"));
     let (told, ok) = client.run(
@@ -589,7 +591,7 @@ fn forget_that_after(events: bool, asked: bool, journalled: bool) -> (Fixture, V
         Some(&id),
     );
     assert!(ok, "{told}");
-    assert_eq!(told, json!({"forgotten":true}));
+    assert_eq!(told["forgotten"], true, "{told}");
     if asked {
         let (request, _) = fixture.next("forget");
         assert_eq!(request["id"], offered);
@@ -706,7 +708,7 @@ fn a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence() {
         Some(&id),
     );
     assert!(ok, "{told}");
-    assert_eq!(told, json!({"forgotten":true}));
+    assert_eq!(told["forgotten"], true, "{told}");
     // #3113's older-memory probe first (Second's second P2 on #3130): this
     // memory lists, so the forget is sent. An older one refuses the probe
     // and is sent no forget (the voice's unit test).
