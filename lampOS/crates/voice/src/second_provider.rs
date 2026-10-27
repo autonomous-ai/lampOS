@@ -1681,6 +1681,9 @@ struct Marks {
     /// Onboarding's sentence (#1803): its words are counted, never asked
     /// of the model nor kept ([`ProviderInput::CountOnly`]).
     count_only: AtomicBool,
+    /// Begun while onboarding waits for a call (#3504): only the lamp's
+    /// name is the step's call, not a turn ([`ProviderInput::StepCall`]).
+    step_call: AtomicBool,
     /// The line before it in this session and how long after that one's
     /// end this one began, when none of that one's words or sound began
     /// this one already ([`Engine::joining_cut_words`]). When its sound or
@@ -3293,6 +3296,7 @@ impl Engine {
                     called: AtomicBool::new(false),
                     privacy: privacy_generation,
                     count_only: AtomicBool::new(false),
+                    step_call: AtomicBool::new(false),
                     after_end: link,
                     folded,
                     over_the_lamps_voice,
@@ -3475,6 +3479,13 @@ impl Engine {
                 if let Some(turn) = self.turn.as_ref().filter(|turn| turn.request == request) {
                     turn.marks.count_only.store(true, Ordering::Release);
                     crate::thread::count_only(Some(request));
+                }
+            }
+            // Begun while onboarding waits for a call (#3504): read by the
+            // turn's task once its words are in.
+            ProviderInput::StepCall { request, .. } => {
+                if let Some(turn) = self.turn.as_ref().filter(|turn| turn.request == request) {
+                    turn.marks.step_call.store(true, Ordering::Release);
                 }
             }
             ProviderInput::End {
@@ -4738,6 +4749,30 @@ async fn spoken(
                 })
                 .await;
         }
+        return;
+    }
+    // Onboarding's call (#3504): begun while `how_you_sound` waits for the
+    // lamp's name, a line that is only the name (or the name heard and no
+    // words came back) is the step's, measured from `name/heard`. It is not
+    // a turn: no chat is asked, nothing is answered, and it carries to no
+    // later line. On lamp-52e6 each such "Lamp" was answered, and the answer
+    // cut the walk's next prompt. Any other words go on as a turn.
+    if marks.step_call.load(Ordering::Acquire)
+        && before
+            .as_ref()
+            .is_none_or(|before| before.trim().is_empty())
+        && (name_alone(&text) || (text.trim().is_empty() && marks.called.load(Ordering::Acquire)))
+    {
+        drop(prepared.take());
+        eprintln!(
+            "lamp-voice second: request {request}: only the lamp's name, while how_you_sound waits for a call: left to the step, not answered"
+        );
+        shared
+            .emit(ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            })
+            .await;
         return;
     }
     if let Ok(mut last) = shared.heard_last.lock() {

@@ -629,7 +629,8 @@ fn run_with_notice_policy(
                                     | ProviderInput::Written { .. }
                                     | ProviderInput::Called { .. }
                                     | ProviderInput::Paused { .. }
-                                    | ProviderInput::CountOnly { .. },
+                                    | ProviderInput::CountOnly { .. }
+                                    | ProviderInput::StepCall { .. },
                                 ) => {}
                                 None => break,
                             }
