@@ -157,6 +157,34 @@ def test_phrases_go_with_their_subscription_and_events_carry_only_the_phrase(tmp
     run(go())
 
 
+# The lamp's floor and its words (lamp-control's PHRASE_MIN_LETTERS, #3901),
+# with the phrases Fourteen tried there: a short one never leaves the computer.
+SHORT_PHRASES = ["is a", "it is", "ok lamp", "you are", "i want to", "t\u00f4i mu\u1ed1n"]
+# The Hindi lines have vowel signs, which the lamp counts as letters: the
+# SDK must never be stricter than the lamp (Nine's and harness-reviewer's P2).
+LONG_PHRASES = ["thank you", "what is the", "i don't know", "t\u00f4i kh\u00f4ng", "12345678", "नमस्ते दोस्त", "सुनो लैंप"]
+
+
+def test_a_phrase_under_the_lamps_floor_is_refused_before_sending(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body", "light", "speak", "hear")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for phrase in SHORT_PHRASES:
+                    with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                        lamp.on("phrase.heard", print, phrases=[phrase, "good night lamp"])
+                    assert raised.value.why == f'phrases: "{phrase}" is too short: 8 letters at least'
+                    with pytest.raises(errors.BY_CODE["bad_request"]):
+                        await lamp.subscribe(["phrase.heard"], [phrase])
+                assert fake.asked("subscribe") == []
+                await lamp.subscribe(["phrase.heard"], LONG_PHRASES)
+                assert fake.asked("subscribe") == [{"events": ["phrase.heard"], "phrases": LONG_PHRASES}]
+                # The refused on() kept no handler and no phrase.
+                assert lamp._phrases == [] and not lamp._handlers.get("phrase.heard")
+
+    run(go())
+
+
 def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
     async def go():
         async with FakeLamp() as fake:

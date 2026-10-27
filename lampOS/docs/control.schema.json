@@ -276,6 +276,7 @@
           "description": "For phrase.heard: matched on the lamp; the client is told only which matched, never what was said.",
           "type": "array",
           "items": {
+            "description": "8 letters at least, so no short word or pair.",
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
