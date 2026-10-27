@@ -3207,15 +3207,22 @@ mod tests {
         use std::io::Write;
         let (mut holder, door) = std::os::unix::net::UnixStream::pair().unwrap();
         door.set_nonblocking(true).unwrap();
-        holder.write_all(&vec![b'x'; 100_000]).unwrap();
+        // Queue more than one read budget without blocking on the peer that
+        // this same test has not read yet (Unix socket capacity is host-specific).
+        holder.set_nonblocking(true).unwrap();
+        let queued = holder.write(&vec![b'x'; 100_000]).unwrap();
+        assert!(queued > 4_096, "only {queued} holder bytes queued");
         let mut door = door;
         let mut pending = Vec::new();
         assert!(!read_some(&mut door, &mut pending, 4_096, 1_024));
         assert!(pending.len() <= 1_024 + 512, "{}", pending.len());
+        assert!(pending.len() > 1_024, "the line limit was not reached");
         // Whole lines are read on to the bound, never past it.
         let (mut writer, mut reader) = std::os::unix::net::UnixStream::pair().unwrap();
         reader.set_nonblocking(true).unwrap();
-        writer.write_all(&b"{}\n".repeat(10_000)).unwrap();
+        writer.set_nonblocking(true).unwrap();
+        let queued = writer.write(&b"{}\n".repeat(10_000)).unwrap();
+        assert!(queued > 4_096, "only {queued} whole-line bytes queued");
         let mut lines = Vec::new();
         assert!(!read_some(&mut reader, &mut lines, 4_096, usize::MAX));
         assert_eq!(lines.len(), 4_096);
@@ -3227,6 +3234,7 @@ mod tests {
             steps += 1;
             assert!(steps < 10);
         }
+        assert_eq!(rest.len(), queued - 4_096);
         drop(holder);
     }
 

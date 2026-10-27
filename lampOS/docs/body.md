@@ -1865,6 +1865,11 @@ folded lamp up by itself: a gesture asked does that, as any gesture does.
 Gestures and moves still come on the mood socket, at the caps above. No
 product unit passes it yet.
 
+The holder read-budget fixture queues more than 4 KiB with one nonblocking
+write before reading its peer. It checks the line cutoff, the 4 KiB read
+budget, and that every remaining queued byte is drained before EOF, without
+waiting for space in an unread socket.
+
 ## Not tipping over (V1's anti-tip rule)
 
 The body keeps V1's anti-tip rule (#641, #642 in the first lamp software;
