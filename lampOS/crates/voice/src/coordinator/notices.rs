@@ -21,6 +21,9 @@ pub(super) struct FailureNotices {
     /// The Wi-Fi helper's line with no network (#1959): played only when
     /// asked through the say service ([`crate::say::Recordings`]).
     wifi_lost: std::result::Result<Arc<Recording>, Missing>,
+    /// The safe shutdown's line (#3697): played only when asked through the
+    /// say service, so a lamp that cannot reach its model still says it.
+    going_to_sleep: std::result::Result<Arc<Recording>, Missing>,
     /// With a notices folder configured, what a failed line plays when its
     /// recording can't be loaded (#2943 part 3): the lamp's own sigh, made
     /// here, so a lamp whose files are missing never meets a question it
@@ -70,6 +73,7 @@ impl FailureNotices {
             back_online: get(NoticeKind::BackOnline),
             service_down: get(NoticeKind::VoiceServiceUnreachable),
             wifi_lost: get(NoticeKind::WifiLost),
+            going_to_sleep: get(NoticeKind::GoingToSleep),
             fallback: Some(Arc::new(Recording {
                 info: None,
                 samples: crate::head_cue::breath(FALLBACK_DBFS).into_boxed_slice(),
@@ -84,6 +88,7 @@ impl FailureNotices {
             back_online: Err(Missing::NoDirectory),
             service_down: Err(Missing::NoDirectory),
             wifi_lost: Err(Missing::NoDirectory),
+            going_to_sleep: Err(Missing::NoDirectory),
             fallback: None,
             language: None,
         }
@@ -109,23 +114,26 @@ impl FailureNotices {
             capability["back_online"] = state(&self.back_online);
             capability["service_down"] = state(&self.service_down);
             capability["wifi_lost"] = state(&self.wifi_lost);
+            capability["going_to_sleep"] = state(&self.going_to_sleep);
         }
         capability
     }
     /// What the say service may play by name (#1959): the samples, or the
     /// loader's reason as its snake_case name.
     pub(super) fn recordings(&self) -> crate::say::Recordings {
-        let loaded = self
-            .wifi_lost
-            .as_ref()
-            .map(|recording| Arc::<[i16]>::from(&recording.samples[..]))
-            .map_err(|missing| {
-                serde_json::to_value(missing)
-                    .ok()
-                    .and_then(|value| value.as_str().map(str::to_owned))
-                    .unwrap_or_else(|| "unavailable".into())
-            });
-        crate::say::Recordings::none().with("wifi_lost", loaded)
+        let loaded = |held: &std::result::Result<Arc<Recording>, Missing>| {
+            held.as_ref()
+                .map(|recording| Arc::<[i16]>::from(&recording.samples[..]))
+                .map_err(|missing| {
+                    serde_json::to_value(missing)
+                        .ok()
+                        .and_then(|value| value.as_str().map(str::to_owned))
+                        .unwrap_or_else(|| "unavailable".into())
+                })
+        };
+        crate::say::Recordings::none()
+            .with("wifi_lost", loaded(&self.wifi_lost))
+            .with("going_to_sleep", loaded(&self.going_to_sleep))
     }
 }
 
@@ -576,6 +584,7 @@ impl FailureNotices {
             back_online: Err(Missing::NotProvisioned),
             service_down: Err(Missing::NotProvisioned),
             wifi_lost: Err(Missing::NotProvisioned),
+            going_to_sleep: Err(Missing::NotProvisioned),
             // The other tests' catalog stays silent on a missing line.
             fallback: None,
             language: Some("en-US".into()),
@@ -682,6 +691,23 @@ mod loading_tests {
         assert_eq!(
             catalog.recordings().samples("wifi_lost"),
             Ok(vec![99_i16; 7_200])
+        );
+        // #3697: the shutdown's line the same way, each by its own name.
+        assert_eq!(
+            catalog.recordings().samples("going_to_sleep"),
+            Err("the recording is not there: not_provisioned".into())
+        );
+        catalog.going_to_sleep = Ok(Arc::new(Recording {
+            info: None,
+            samples: vec![7_i16; 7_200].into_boxed_slice(),
+        }));
+        assert_eq!(
+            catalog.recordings().samples("going_to_sleep"),
+            Ok(vec![7_i16; 7_200])
+        );
+        assert_eq!(
+            only_turn_lost.capability()["going_to_sleep"]["missing"],
+            "not_provisioned"
         );
     }
     #[test]
