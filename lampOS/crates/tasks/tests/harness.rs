@@ -1211,6 +1211,32 @@ fn every_dispatch_says_one_journal_line_without_the_ask() {
     assert!(rig.calls().is_empty());
 }
 
+/// Fourteen's case on #3727: a name of two given names and no hostname
+/// ("Minh Anh’s PC"), each said alone in stderr, is kept from the line.
+#[test]
+fn a_dispatch_line_keeps_each_given_name_of_a_machines_name() {
+    let mut rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"stdout": format!(
+            "{}\n",
+            json!({"machineId": MACHINE, "current": false, "name": "Minh Anh’s PC"})
+        )},
+        "new": {
+            "exit": 1,
+            "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n",
+            "stderr": "error: minh refused, anh away\n",
+        }
+    }));
+    let (_, lines) = journal_of(&mut rig, &launch());
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let line = &lines[0];
+    assert!(
+        line.ends_with(", stderr: error: … refused, … away)"),
+        "{line}"
+    );
+    assert!(!line.contains("minh") && !line.contains("anh"), "{line}");
+}
+
 /// The Reviewer-lead's P2 on #3727: a Mac's default name and hostname
 /// ("Lan’s MacBook Air", `lans-macbook-air.local`) hide the owner's name
 /// alone too, and so does a two-letter one (`Vy-PC`) and an inner slug
