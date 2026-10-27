@@ -1,0 +1,170 @@
+{
+  "all_jobs_terminal_exit0_groups_absent": true,
+  "case_names": {
+    "install": [
+      "a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept",
+      "a_switch_set_back_on_later_is_not_named_and_a_file_named_twice_is_said_once",
+      "a_clean_install_names_no_switch_off",
+      "an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named"
+    ],
+    "lib": [
+      "switches::tests::a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on",
+      "switches::tests::the_product_switches_are_its_on_lines_and_lamp_cloud_is_one",
+      "switches::tests::several_on_a_line_quoted_continued_and_cleared_are_read_as_systemd_does",
+      "switches::tests::environment_files_and_their_lines",
+      "check_units::tests::a_drop_in_that_turns_a_product_switch_off_says_so",
+      "check_units::tests::the_product_as_install_writes_it_passes",
+      "check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file",
+      "check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check"
+    ]
+  },
+  "commands": {
+    "fmt": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "install-controls": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--test",
+      "install",
+      "--",
+      "--exact",
+      "a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept",
+      "a_switch_set_back_on_later_is_not_named_and_a_file_named_twice_is_said_once",
+      "a_clean_install_names_no_switch_off",
+      "an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "lib-controls": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--lib",
+      "--",
+      "--exact",
+      "switches::tests::a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on",
+      "switches::tests::the_product_switches_are_its_on_lines_and_lamp_cloud_is_one",
+      "switches::tests::several_on_a_line_quoted_continued_and_cleared_are_read_as_systemd_does",
+      "switches::tests::environment_files_and_their_lines",
+      "check_units::tests::a_drop_in_that_turns_a_product_switch_off_says_so",
+      "check_units::tests::the_product_as_install_writes_it_passes",
+      "check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file",
+      "check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "update-clippy": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  "final_pr_head": "0a2830b27635bd9edd146fa93a04256849de7e55",
+  "final_pr_state": "OPEN",
+  "findings": {
+    "knownLeadP3": [
+      {
+        "finding": "Template and instance drop-in folders judged separately, not jointly merged. AlreadyLead6438100987; no product template currently sets an on-switch.",
+        "location": "lampOS/crates/update/src/check_units.rs:368"
+      },
+      {
+        "finding": "EnvironmentFile globs treated literally. AlreadyLead6438100987; current product uses only three literal paths.",
+        "location": "lampOS/crates/update/src/switches.rs:151"
+      }
+    ],
+    "newP1": [],
+    "newP2": [],
+    "newP3": []
+  },
+  "gates": {
+    "fmt": 0,
+    "strict_update_all_targets_clippy": 0
+  },
+  "hashes": {
+    "fmt.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.started.json": "9933d86f6d9d795b8c9071882da7c38a8d27b1784ca7dbd8dd01cd6256c3c23a",
+    "fmt.terminal.json": "744bd665d89cc12c1de12e6972be210ffc690feebebf26c2a6e8d8f0985b86e7",
+    "install-controls.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "install-controls.log": "36567385fea2b712e8230700a956babd66b357734e24953373289f198fe849bb",
+    "install-controls.started.json": "825c8c95870e4f26b8cbaec60887b6e32b80c72c322e05eec1a35e537b62da6c",
+    "install-controls.terminal.json": "092e9782060dbbdf6362851dadf57b16535d1b8828b45914005097c5f158dfa0",
+    "lib-controls.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "lib-controls.log": "377c0d0f38843514a9cf3087da5a7c185b38d793548348645645b235750f71c7",
+    "lib-controls.started.json": "797c51b025ae0728e1b2b62fb49cac71e6df9c103bba227687ed72b61a6adf73",
+    "lib-controls.terminal.json": "6d00a139a9f4f0c169906850eca6938b563bae85dba5419989ad97a32d22b076",
+    "pr-after-tests.json": "3cc2d746b669adbe503798ade09ec23ac5cc1f55d16c8ff3104f755094930ddb",
+    "pr-before-tests.json": "288626ffc90bc30ab721b71588d16f1c711dcc0bb0c68dffabed846cc673a02f",
+    "run-supervised.py": "f868320dd1fb8116191521116994fa8829aa072b1c01fe82804a2b5c6451c97f",
+    "scope.json": "e13e36f3dab37b061c47ed0aebfe5dde12000f3559776990a7397cce4650442b",
+    "source-before.json": "40655dced6fcd9b3caca5e3c9cd83dcec2b8249b1fca4847e8deab82fa6329e3",
+    "update-clippy.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "update-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "update-clippy.started.json": "9b8499b14af1e979d25aa1b73602707d4f39689e12ff36b31fd2e53f20560534",
+    "update-clippy.terminal.json": "47b642eb9ee9fbc3c9dd1e5799027f8da836056e08f221be969e78dc4e81ed0a"
+  },
+  "head": "0a2830b27635bd9edd146fa93a04256849de7e55",
+  "limits": [
+    "Only8library+4installcontrols; no fullUpdate/install/workspace runtime.",
+    "No device or real systemd invocation; install tests use fake host/channel and temporary files.",
+    "Output diagnostics only; no deployment, source edits, staging, commit, push or public post.",
+    "Warm exclusive target; no cold-build or universal parser/systemd equivalence claim."
+  ],
+  "primary_spec": "https://freedesktop.org/software/systemd/man/latest/systemd.exec.html",
+  "scoped_test_counts": {
+    "install_exact4": {
+      "failed": 0,
+      "filtered": 102,
+      "ignored": 0,
+      "passed": 4
+    },
+    "lib_exact8": {
+      "failed": 0,
+      "filtered": 140,
+      "ignored": 0,
+      "passed": 8
+    }
+  },
+  "sessions": {
+    "fmt": 9666,
+    "install_controls": 47886,
+    "lib_controls": 37442,
+    "update_clippy": 51733
+  },
+  "source_conclusions": [
+    "Supported literal sources seed product-on, fold ordered drop-ins, then environment files override; reset directives clear prior contributions. Later on cancels an earlier off. Duplicate environment-file paths are kept only at their last position and named once.",
+    "Install reads literal file contents; check_units only folds printed drop-ins and cannot observe EnvironmentFile contents, as documented. Their shared merge logic has the same semantics on the same inputs.",
+    "Unreadable/invalidUTF8 files are skipped by existing read_to_string branches; optional missing file is covered by exact install control. This is not a complete systemd syntax/validity/readiness check."
+  ],
+  "source_files_hashed": 7282,
+  "source_unchanged": true,
+  "status": "BOUNDED_READ_COMPLETE_NO_NEW_P1_P2",
+  "worktree_clean": true,
+  "private_receipt_sha256": "a04e1a995f414dad325991176e681f5048ab54fa53087cdd82640c4a3d04d314"
+}

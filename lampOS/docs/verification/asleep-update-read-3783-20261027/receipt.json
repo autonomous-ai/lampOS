@@ -1,0 +1,144 @@
+{
+  "execution_head": "6b8e725ba073bc85d570000ac4c2410193d74fcf",
+  "read_head": "e49d4574dc360f913957b69caa94ad8eab7ba17e",
+  "status": "BOUNDED_READ_OK_WITH_EXPLICIT_BROAD_TIMEOUT",
+  "commands": {
+    "fmt": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "clippy": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "focused-lib-corrected": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--lib",
+      "--",
+      "--exact",
+      "quiet::tests::a_voice_asleep_or_muted_for_privacy_is_quiet_at_once",
+      "quiet::tests::a_stale_mute_or_one_in_a_turn_is_not_quiet",
+      "world::tests::the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read",
+      "--test-threads=1"
+    ],
+    "focused-round": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--test",
+      "round",
+      "--",
+      "--exact",
+      "asleep_quiet::a_lamp_asleep_or_muted_for_privacy_is_switched_without_waiting",
+      "asleep_quiet::a_voice_that_says_nothing_is_still_waited_for",
+      "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+      "--test-threads=1"
+    ]
+  },
+  "gate_exits": {
+    "fmt": 0,
+    "clippy": 0,
+    "focused-lib-corrected": 0,
+    "focused-round": 0
+  },
+  "focused_counts": {
+    "library": [
+      3,
+      0,
+      0
+    ],
+    "round": [
+      3,
+      0,
+      0
+    ]
+  },
+  "broad_attempt": {
+    "completed_summary_pass": 274,
+    "completed_summary_failed": 0,
+    "completed_summary_ignored": 4,
+    "round_driver": "incomplete, no per-case PASS credit from dots",
+    "terminal": {
+      "cleanup": [
+        {
+          "after": "absent",
+          "before": "present",
+          "reaped": true,
+          "sent": true,
+          "signal": "SIGTERM"
+        }
+      ],
+      "controller_error": null,
+      "elapsed_seconds": 1802.846057814,
+      "log_sha256": "b3e35d33edfeea14a6eeb45ef65b8396fbe979a67dc4bacdf9fb54d562de86cb",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": -15,
+      "source_unchanged": true,
+      "timed_out": true
+    }
+  },
+  "initial_empty_selector": {
+    "command": "cargo test -p lamp-update --bin lamp-update -- --exact <three library names>",
+    "counts": [
+      0,
+      0,
+      0
+    ],
+    "correction": "Used --lib; then required exactly three actual completions."
+  },
+  "carry": {
+    "range_diff": "1:  6b8e725ba = 1:  e49d4574d lampOS: a lamp asleep or muted counts as quiet for an update round, by its voice/mute on the bus (#3770)",
+    "unchanged_critical_files_sha256": {
+      "lampOS/crates/update/src/quiet.rs": "feb4d5f2db34612f064973ef44e7c0cace742ce4bc18fa45ffda03268eb9cb99",
+      "lampOS/crates/update/src/world.rs": "a82b583d98501d74298f97c719ec8dc2ad8fe2ec7b21e7bce9eff773aa22824f",
+      "lampOS/crates/update/src/round.rs": "f7f02ae54d2c7b700f165645a0382cd6195c3d6fa02b8b7fbe8938f842520610",
+      "lampOS/crates/update/tests/round.rs": "c52595c943d50b63e78e26f8d6242679b79e4e3652014834495c040c4773efd4",
+      "lampOS/crates/update/tests/round/asleep_quiet.rs": "92e96323d0d8d3516efb28857c09e77db3e7d67986a23d6f107b7d671e769615"
+    },
+    "bus_tree_equal": true,
+    "voice_mute_type_block_sha256": "830e87656e48716a2fce34766c495858e3d9ed503cf1d40ad04ceb4832231836"
+  },
+  "logs_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused-lib-corrected": "01db5a98b6bbb1257649bb57a58e576e1356b5fb91e6ba4add91387fb1ad53af",
+    "focused-round": "9b7c3a136439e456d7704a8508ab5bfc513889b2241884ad83c4d3b714d84ca9",
+    "tests": "b3e35d33edfeea14a6eeb45ef65b8396fbe979a67dc4bacdf9fb54d562de86cb",
+    "focused-pure-bus": "aae2a5680ba54bd7ba5d6757bbfb0b15993c95637011d550e95e4e864f4375a0"
+  },
+  "source_files_hashed": 7283,
+  "limits": [
+    "No full Update pass: the serial broad run reached its 1800-second bound during round tests and was terminated/reaped.",
+    "Current read uses clean patch and critical-source equality; executable gates belong to6b, not a newly executed e49 composition.",
+    "No Linux/native process, device, real sound or Expression restart qualification.",
+    "Receipt-time stamping can extend effective mute freshness to about six seconds; existing reviewer P3 remains."
+  ],
+  "private_receipt_sha256": "6350efacb817c0fe3f02d45dc8bfe9cb80dd44b5c2660f744844c1bc0e3af10e"
+}
