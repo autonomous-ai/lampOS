@@ -3240,8 +3240,10 @@ fn wait_clip_ready(engine: &Engine, ready: bool) {
 }
 
 /// A later cue moves the first-chat deadline too: at 4 s, a ready clip
-/// leaves until 7 s, so an answer at 6 s is still heard. Without a clip,
-/// the deadline is the later of the cue time and the plain 3 s bound.
+/// leaves until 7 s, so an answer at 6 s is still heard. Without a clip
+/// (the first turn after a start, its clips still rendering), the deadline
+/// is the same as with one (#3755: it was the later of the cue time and the
+/// plain 3 s, so the first turn after a restart had the least time).
 /// All measurements start at the final words, on the paused runtime
 /// clock; neither cue rendering nor speech-to-text latency counts in them.
 #[tokio::test(start_paused = true)]
@@ -3321,8 +3323,17 @@ async fn a_later_wait_sound_preserves_the_answer_window() {
 
         let (cue, answer, ended) = timings(cue_after, None, false).await;
         assert!(cue.is_none() && answer.is_none(), "no clip, no sound");
-        near(ended, cue_after.max(at(3_000)));
+        near(ended, cue_after + at(3_000));
     }
+    // #3755's turn: no clip ready, a cold chat that begins at 4 s. Answered,
+    // where it was given up at 3 s.
+    let (cue, answer, ended) = timings(at(1_500), Some(at(4_000)), false).await;
+    assert!(cue.is_none());
+    near(
+        answer.expect("a late chat that begins is answered"),
+        at(4_000),
+    );
+    near(ended, at(4_000));
     // A late cue still waits for a chat through its scheduled time when
     // no clip is ready; it does not give up early at the plain 3 s bound.
     let (cue, answer, ended) = timings(at(4_000), Some(at(3_500)), false).await;
