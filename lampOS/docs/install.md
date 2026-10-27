@@ -607,14 +607,18 @@ units stopped:
    lamp-body-measure --device /dev/ttyACM0 --unit-id <this lamp> \
      --lock-directory ~/measure-lock --write ~/lamp.env
    # then root installs the file it wrote, never over one already there
-   test ! -e /etc/lampOS/body/lamp.env &&
+   if sudo test -e /etc/lampOS/body/lamp.env; then
+     echo "/etc/lampOS/body/lamp.env is already there: move it aside first"
+   else
      sudo install -o root -g root -m 0644 ~/lamp.env /etc/lampOS/body/lamp.env
+   fi
    ```
 
    The root step refuses if `/etc/lampOS/body/lamp.env` is there, as the
    tool does for its own file: a lamp with poses set by hand keeps them
-   (Fourteen's P3 on #3919). To replace them, move the old file aside
-   first.
+   (Fourteen's P3 on #3919). It looks as root, so a folder the person can't
+   search still shows the file (Fourteen's P3 on #3932), and says why when
+   it refuses (Sixth's). To replace them, move the old file aside first.
 
    `lamp-body-measure` runs **unprivileged**. As root it refuses by design:
    a process with `CAP_SYS_ADMIN` could bypass the servo port's exclusive
