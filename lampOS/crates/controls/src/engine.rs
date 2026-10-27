@@ -264,9 +264,18 @@ pub struct Engine {
     event_sequence: u64,
     state_sequence: u64,
     rejected_inputs: u64,
+    /// [`Self::set_shutdown`].
+    shutdown: bool,
 }
 
 impl Engine {
+    /// With the shutdown switch on (#3697), a button held 5 s or more asks
+    /// for no mute here: in touch mode that hold is the touch path's
+    /// shutdown ([`crate::touch::TouchEngine::set_shutdown`]).
+    pub fn set_shutdown(&mut self, on: bool) {
+        self.shutdown = on;
+    }
+
     pub fn new(
         config: Config,
         clock_id: impl Into<String>,
@@ -304,6 +313,7 @@ impl Engine {
             event_sequence: 0,
             state_sequence: 0,
             rejected_inputs: 0,
+            shutdown: false,
         })
     }
 
@@ -483,6 +493,14 @@ impl Engine {
                 .unwrap()
                 .active;
             if let Some((gesture, duration_us)) = self.buttons[index].observe(active, at_us) {
+                // With the shutdown switch on, a hold of 5 s or more is the
+                // touch path's shutdown (or its cancel), never this mute.
+                if self.shutdown
+                    && gesture == Gesture::LongPress
+                    && duration_us >= lamp_msgs::SHUTDOWN_HOLD_US
+                {
+                    continue;
+                }
                 let name = name.clone();
                 self.emit(
                     now_us,

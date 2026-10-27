@@ -57,9 +57,66 @@ go and lit, and then starts again every `lamp*` unit that was active before its 
 ## The switch
 
 `LAMP_SHUTDOWN` (`on` exactly; off unless set; `switches.md`) is for the ways
-a person asks: `lamp-cloud` reads it for the app (below); the others come with
-later changes. The runner itself is not behind it: it is only ever started by
+a person asks: `lamp-cloud` reads it for the app (below); the button's, below; the voice's
+comes with a later change. The runner itself is not behind it: it is only ever started by
 one of those, or by hand.
+For the button it is set on three units: Controls
+(`lamp-controls.service`), the voice (`lamp-voice.service`, which hands it to
+its ring worker only) and setup's watcher (`lamp-setup-reset.service`).
+
+## The request
+
+Whoever asks, the lamp is asked the same way: one bus message, which only
+setup's watcher acts on. Nobody else runs a root command. On a product lamp
+there is no keeper; `lamp-setup watch-reset` (`lamp-setup-reset.service`,
+root) is the only privileged part that runs, so it is the one that listens.
+
+- Topic `lamp/shutdown_request`, type `lamp_msgs/ShutdownRequest` (version 1,
+  an event lasting 2 s): `{stamp: {clock_id, at_us, sequence}, source,
+  reason}`. The stamp is the asker's boot clock (`boot_id`); `reason` is for
+  the journal (1 to 200 bytes).
+- `source` is `button` (published by `controls`), the only source: the app
+  asks through setup's change helper instead ([below](#the-ways-a-person-asks)). A request is taken only from its
+  source's own bus publisher; a source this build does not know does not
+  parse.
+- `ShutdownRequest::accept` (in `lamp-msgs`) takes any source the same way:
+  valid, from that source's publisher, this boot's clock, younger than 2 s
+  (`SHUTDOWN_REQUEST_TTL_US`). The watcher adds its own checks: its
+  `LAMP_SHUTDOWN` on, and `--enable`. Off, a valid request is logged
+  (`… not acted on, LAMP_SHUTDOWN is not on`) and nothing happens.
+- The first accepted request starts `lamp-setup shutdown` (the detached
+  runner above). Later ones are logged `already turning off`. A start that
+  fails is logged, and the reset is still watched.
+
+## The button held
+
+The primary button (the one whose short press is Stop and whose 2 s hold is
+the mute), released by hold time (HAL-5.7):
+
+| Held, then released | `LAMP_SHUTDOWN` off | `LAMP_SHUTDOWN=on` |
+|---|---|---|
+| under 2 s | Stop | Stop |
+| 2 s to under 5 s | software mute | software mute |
+| 5 s to 15 s | software mute | **turn off**: no mute; one `lamp/shutdown_request` from `button` |
+| over 15 s | software mute | nothing (cancelled, V1's 5 to 10 s window, widened) |
+
+Nothing happens before the release. Controls' touch path publishes the hold
+on `controls/touch` as `TouchIntent::Shutdown` (not retained in
+`controls/touch_state`'s `latest`) and, from an enabled Controls, the request.
+Its legacy engine, which gives the voice its mute in touch mode, asks no mute
+for a hold of 5 s or more with the switch on.
+
+While the button is held from 5 s to 15 s, the ring shows the warning: the
+whole ring in the setup light's amber (`SetupLook::Failed`, no channel over
+24), steady, in place of its face. The voice's ring worker reads the button's
+held time from `controls/touch_state` (`held_us`, as for the head's
+countdown) and draws through its usual authority: a resting frame only while
+the lamp may listen, so a lamp that is muted shows no warning. Past 15 s the
+warning goes, as the hold no longer asks anything.
+
+`lamp-setup-reset.service` needs its reset plan to start
+(`ConditionPathExists=/etc/lampOS/setup/reset-plan.json`); without it the
+button's request is not heard.
 
 ## The ways a person asks
 
@@ -79,23 +136,28 @@ one of those, or by hand.
    still on is asked again (cloud.md, "The lamp turned off from the app").
    No keeper is needed: a product lamp has none.
 
+2. **The button held**, acting on release by hold time (HAL-5.7), with
+   warning lights while it is held: [The button held](#the-button-held),
+   through [The request](#the-request).
+
 Still to come:
 
-2. The button held, acting on release by hold time (HAL-5.7), with warning
-   lights while it is held.
 3. Voice: "Lamp, turn off", only with a spoken yes, never on a guess. The
    runner itself says it is going to sleep first (the Say step).
 
-Each starts `lamp-setup shutdown` and is behind `LAMP_SHUTDOWN`.
+The button (and later the voice) asks through [the request](#the-request); every way is behind `LAMP_SHUTDOWN`.
 
 ## Not yet seen on a lamp
 
-Host tests only (`lamp-setup`'s `shutdown` and its change helper's answer
-under a held update lock, `lamp-body`'s let-go against simulated servos,
-`lamp-cloud`'s `system.shutdown` against a stand-in helper answering with the
-helper's own code). On a lamp still to see: the app's `success` before the
-lamp goes down, and the helper's `systemd-run` from its sandboxed unit; the
-rest proof on a standing lamp;
+Host tests only (`lamp-setup`'s `shutdown`, its watcher on a real bus and its
+change helper's answer under a held update lock, `lamp-body`'s let-go against
+simulated servos, `lamp-cloud`'s `system.shutdown` against a stand-in helper
+answering with the helper's own code, Controls' holds of 1, 3, 6 and 20 s with
+the switch on and off, the ring's warning window). Not seen on a lamp: the
+button held 6 s turning a lamp off, the amber while held, and how soon after
+the release the runner starts. On a lamp still to see: the app's `success`
+before the lamp goes down, and the helper's `systemd-run` from its sandboxed
+unit; the rest proof on a standing lamp;
 the let-go's per-joint read-back; whether the ring keeps its frame after the
 poweroff (it does only while the LEDs keep power); whether the servos keep
 power after the board's poweroff; and a clean boot with no filesystem repair.
