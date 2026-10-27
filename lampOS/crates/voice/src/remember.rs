@@ -17537,17 +17537,16 @@ mod tests {
                 break request;
             }
         };
-        assert_eq!(
-            ops,
-            [
-                "session_open",
-                "forget",
-                "session_open",
-                "session_close",
-                "append_linked",
-                "conversation_end"
-            ],
-        );
+        // The old session's close and the next one's open are sent from two
+        // threads, so they reach the memory in either order, and each names
+        // its session, so either is right (lamp-voice runs 7749 and 7759, 27
+        // Oct, failed on the order alone). The rest is fixed.
+        assert_eq!(ops.len(), 6, "{ops:?}");
+        assert_eq!(ops[..2], ["session_open", "forget"], "{ops:?}");
+        let mut between = ops[2..4].to_vec();
+        between.sort();
+        assert_eq!(between, ["session_close", "session_open"], "{ops:?}");
+        assert_eq!(ops[4..], ["append_linked", "conversation_end"], "{ops:?}");
         assert_eq!(end["source_ids"], json!([42]));
         assert!(!client.context.lock().unwrap().journal_inhibited);
         let _ = std::fs::remove_file(&socket);
