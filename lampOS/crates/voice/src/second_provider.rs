@@ -709,6 +709,10 @@ pub enum Heard<'a> {
 }
 /// What hears each spoken line's sound, by its request.
 pub type Hearing = Arc<dyn Fn(u64, Heard<'_>) + Send + Sync>;
+/// Told each line the listener opened once it ends, by its request, and
+/// when it was said: from its first sound read to its last, by the lamp's
+/// monotonic clock ([`Engine::telling_lines_heard`]).
+pub type LineHeard = Arc<dyn Fn(u64, (u64, u64)) + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -892,6 +896,9 @@ struct Shared {
     /// network is asked once more when the link is back.
     resend: Option<LinkBack>,
     hearing: Option<Hearing>,
+    /// Told each line's span once it ends, words or none
+    /// ([`Engine::telling_lines_heard`]).
+    line_heard: Option<LineHeard>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -1992,6 +1999,7 @@ impl Engine {
                 written_wait: false,
                 resend: None,
                 hearing: None,
+                line_heard: None,
                 asked: None,
                 cues: None,
                 cue_after: CUE_AFTER,
@@ -2761,6 +2769,17 @@ impl Engine {
     pub fn hearing(mut self, hearing: Hearing) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.hearing = Some(hearing);
+        }
+        self
+    }
+
+    /// Each line the listener opened is told to `heard` once it ends, with
+    /// when it was said, whatever its words turn out to be: none, a hum or
+    /// a sound included (`LAMP_FIRST_SECONDS_QUIET`, the ears' stream read
+    /// outside every line). Before any turn only.
+    pub fn telling_lines_heard(mut self, heard: LineHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.line_heard = Some(heard);
         }
         self
     }
@@ -3653,6 +3672,12 @@ impl Engine {
                     turn.audio = None;
                     if let Some(hearing) = &self.shared.hearing {
                         hearing(request, Heard::Ended);
+                    }
+                    if let Some(heard) = &self.shared.line_heard
+                        && let Ok(said) = turn.said.lock()
+                        && said.0 != 0
+                    {
+                        heard(request, *said);
                     }
                 }
             }

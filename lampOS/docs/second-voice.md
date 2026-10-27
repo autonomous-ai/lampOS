@@ -1182,13 +1182,22 @@ order is kept. A written turn is the same from the chat on.
     as said in a quiet room when the ears' own stream shows one
     (`Heeding::ears_show_quiet`): the room microphone's readings kept
     (`ears/level`, every 100 ms, the last 30 s) outside the lines said
-    (0.3 s before each to 0.7 s after), at least 10 of them up to the
-    line's end, all under 6 dB over the room's own quiet
+    (0.3 s before each to 0.7 s after) and the lamp's own answers played
+    (to 0.7 s after, `Heeding::played_over`, from `Did::Said`), at least
+    10 of them up to the line's end, all under 6 dB over the room's own quiet
     (`FIRST_SECONDS_RISE_DB`), and that quiet under a loud room's -30 dBFS
     (`LOUD_ROOM_FLOOR_DB`). No one level serves every lamp: each lamp's
     quiet sits where its capture level puts it, and lamp-c0a4's quiet room
     read -45 dBFS on 27 Oct (7071), where a first fixed -46 dBFS held the
-    join. And no line since the start was in another voice or seen spoken
+    join. The lines said are every line the listener opened, told as each
+    ends (`Engine::telling_lines_heard`, `Heeding::line_heard`), a line of
+    no words, a hum or a sound included: on lamp-c0a4 on 27 Oct (run 1 on
+    #3864) a head tap's "hm?" heard back as a line of no words, never
+    judged, rose in the stream before the name and held the join. A sound
+    the lamp's speaker plays outside this route's answers (the
+    coordinator's head-tap hum or a cue) is left out only when heard back
+    as a line or while `voice/state` says it is speaking (`ears/level`'s
+    `own_voice`). And no line since the start was in another voice or seen spoken
     by two faces, and the rule held no line since the start
     (`Heeding::showing_the_first_seconds_quiet`): with no voice check
     (`LAMP_SAME_VOICE_MODEL` unset), another person's line with no face

@@ -3131,6 +3131,24 @@ async fn a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear() {
     );
 }
 
+/// `LAMP_FIRST_SECONDS_QUIET` (lamp-c0a4's run 1 on #3864): every line the
+/// listener opened is told as it ends, with when it was said, whatever its
+/// words: a line of no words, the lamp's hum heard back, included.
+#[tokio::test(start_paused = true)]
+async fn every_line_heard_is_told_as_it_ends_words_or_none() {
+    let told = Arc::new(Mutex::new(Vec::new()));
+    let kept = told.clone();
+    let mut engine = waiting(None, vec![vec![], vec![]]).telling_lines_heard(Arc::new(
+        move |request, window| kept.lock().unwrap().push((request, window)),
+    ));
+    engine.submit(start(1));
+    assert!(told.lock().unwrap().is_empty(), "not before its end");
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    spoken_turn_as(&mut engine, 2);
+    assert_eq!(*told.lock().unwrap(), [(1, (1, 1)), (2, (1, 1))]);
+}
+
 fn written_turn(request: u64, words: &str) -> ProviderInput {
     written(request, words)
 }
