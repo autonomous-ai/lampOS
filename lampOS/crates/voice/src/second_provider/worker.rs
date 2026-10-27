@@ -6651,21 +6651,7 @@ impl Heeding {
         self.keep_the_name_in_its_line(request, said, &mut signs);
         self.silence_turned(request, said, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
-        // `LAMP_FIRST_SECONDS_QUIET`: a line held since the start keeps the
-        // first seconds' join off, when its words could be someone's
-        // request: [`HELD_LINE_WORDS`] or more, not a short word or hum. No
-        // words, a hum, the lamp's own "hm?" heard back after a head tap, or
-        // the room's sounds, are no one talking (lamp-c0a4's run 1 on
-        // #3864); the lamp's own words heard back are held as its echo
-        // before the rule. A wait for the Policy is no hold; a bare name
-        // waiting for its request is never judged here.
-        if self.first_seconds_quiet
-            && verdict.is_some_and(|why| why != crate::second_provider::WAITS_FOR_POLICY)
-            && crate::not_speech::plain_words(heard).len() >= HELD_LINE_WORDS
-            && !crate::not_speech::short_word(heard)
-        {
-            self.held_since_start = true;
-        }
+        self.held_since_start_by(verdict, heard);
         if self.said_lately.len() == SAID_KEPT {
             self.said_lately.pop_front();
         }
@@ -6675,6 +6661,24 @@ impl Heeding {
             self.note_the_name(request, said, &signs);
         }
         verdict
+    }
+
+    /// `LAMP_FIRST_SECONDS_QUIET`: a line held since the start keeps the
+    /// first seconds' join off, when its words could be someone's
+    /// request: [`HELD_LINE_WORDS`] or more, not a short word or hum. No
+    /// words, a hum, the lamp's own "hm?" heard back after a head tap, or
+    /// the room's sounds, are no one talking (lamp-c0a4's run 1 on
+    /// #3864); the lamp's own words heard back are held as its echo
+    /// before the rule. A wait for the Policy is no hold; a bare name
+    /// waiting for its request is never judged here.
+    fn held_since_start_by(&mut self, verdict: Option<&str>, heard: &str) {
+        if self.first_seconds_quiet
+            && verdict.is_some_and(|why| why != crate::second_provider::WAITS_FOR_POLICY)
+            && crate::not_speech::plain_words(heard).len() >= HELD_LINE_WORDS
+            && !crate::not_speech::short_word(heard)
+        {
+            self.held_since_start = true;
+        }
     }
 
     /// [`Self::keeping_the_name_in_its_line`]: the hearings that began in the
@@ -18931,16 +18935,16 @@ mod tests {
                 heeding.keep_line_room(98, Room::Unknown, true, true);
                 heeding.keep_line_room(99, Room::Unknown, false, false);
             }
-            // From 11.5 s ago, 0.5 s each and 0.3 s apart, before the name:
-            // no name, nobody in view, no conversation going on.
+            // From 11.5 s ago, 0.5 s each and 0.3 s apart, before the name,
+            // held as said to nobody. Given the rule's verdict rather than
+            // judged: the rule reads the process's one thread, which other
+            // tests write in parallel, so under load a line here was heard
+            // as a conversation going on and answered (reviewer-three's P3
+            // on #3864).
             for (n, words) in (0..).zip(start.held) {
                 let began = now - 11_500_000 + n * 800_000;
-                assert!(
-                    heeding
-                        .heed(95 + n, (began, began + 500_000), words, None)
-                        .is_some(),
-                    "{words:?} held"
-                );
+                heeding.said_over(95 + n, (began, began + 500_000));
+                heeding.held_since_start_by(Some(crate::attention::NOT_SPOKEN_TO), words);
             }
             // The hum from 7.6 s to 7.2 s ago, the empty line from 6.8 s to
             // 6 s ago.
@@ -18987,18 +18991,21 @@ mod tests {
                 }
                 heeding.levels = Some(levels);
             }
-            if let Some(floor) = start.floor {
-                ears.publish_json(
-                    monotonic_us(),
-                    &RoomSound {
-                        level_db: floor + 1.0,
-                        floor_db: Some(floor),
-                        own_voice: false,
-                    },
-                )
-                .unwrap();
-            }
             for (request, window) in [1, 2].into_iter().zip(windows) {
+                // The ears' quiet is taken only fresh, within a second by
+                // the wall clock: told right before each line is kept, so a
+                // stall under load never makes it stale.
+                if let Some(floor) = start.floor {
+                    ears.publish_json(
+                        monotonic_us(),
+                        &RoomSound {
+                            level_db: floor + 1.0,
+                            floor_db: Some(floor),
+                            own_voice: false,
+                        },
+                    )
+                    .unwrap();
+                }
                 eyes.publish_json(
                     monotonic_us(),
                     &Faces {
