@@ -890,6 +890,38 @@ impl Thread {
             .is_some_and(|exchange| crate::remarks::lamp_asked(&exchange.tail))
     }
 
+    /// What the person said in the exchange the lamp's newest answer before
+    /// `request` was, when that answer ended by offering to keep or change
+    /// something ("Want me to keep that?", `offers`), it began within
+    /// [`GOING_ON_FOR`] of `now` and it was `whose`'s, the scope the yes's
+    /// `remember` writes to (`None`: the room's): the line a bare "yes" to
+    /// the offer is about (#3504, N6). Never the face at the lamp: a yes
+    /// from someone else must not keep another's words in their scope
+    /// (Reviewer-three's P2 on #3683). `None` else, and for a note the lamp
+    /// was given in writing.
+    pub fn offered_line(
+        &self,
+        request: u64,
+        whose: Option<&str>,
+        now: Instant,
+        offers: impl Fn(&str) -> bool,
+    ) -> Option<String> {
+        let offer = self
+            .exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))?;
+        let person = offer.person.trim();
+        (offer.whose.as_deref() == whose
+            && offer.written.is_none()
+            && now.saturating_duration_since(offer.at) <= GOING_ON_FOR
+            && person.chars().any(char::is_alphanumeric)
+            && crate::remarks::lamp_asked(&offer.tail)
+            && offers(&offer.tail))
+        .then(|| person.to_owned())
+    }
+
     /// Whether the lamp said something to someone so lately that a
     /// conversation may still be going on.
     /// How long ago the lamp last said words in the thread's exchanges, as

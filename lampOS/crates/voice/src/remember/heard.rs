@@ -16,6 +16,16 @@
 //! app, a line the lamp wrote) or the switch off, the model's text is kept
 //! as before. The heard words are what the person said, as far as the lamp
 //! knows: speech to text may mishear them too.
+//!
+//! A line that is only a yes ([`only_a_yes`]: "Yes, please.", "Sure", "Vâng
+//! ạ") is not what was asked to be kept (#3504, N6: on lamp-06c1 on 27 Oct
+//! "Want me to keep that?" → "Yes, please." kept "They said: Yes, please."
+//! twice out of two). When the lamp's answer before it offered to keep or
+//! change something ([`offers_to_keep`]), the `remember` is held against
+//! the person's line that answer was to ([`crate::thread::Thread::offered_line`]),
+//! and a heard line kept instead keeps the model's `replaces`: it is the
+//! line the offer was about. With no such offer, a yes alone keeps nothing
+//! ([`yes_alone`]).
 use lamp_gemini::ToolCall;
 use serde_json::{Value, json};
 use std::{sync::OnceLock, time::Instant};
@@ -60,6 +70,167 @@ const LEAD_INS: &[&str] = &[
     "nhớ rằng",
     "nhớ là",
 ];
+
+/// What a line that is only a yes begins with, without accents: English and
+/// Vietnamese.
+const YES: &[&str] = &[
+    "yes", "yeah", "yep", "yup", "ok", "okay", "sure", "please", "alright", "right", "correct",
+    "go", "do", "keep", "u", "um", "o", "vang", "co", "duoc", "da", "dung",
+];
+/// What may follow it, without accents ("Yes, please.", "Sure, go ahead",
+/// "Vâng, được rồi ạ").
+const YES_TAIL: &[&str] = &[
+    "yes",
+    "yeah",
+    "ok",
+    "okay",
+    "sure",
+    "please",
+    "thanks",
+    "thank",
+    "you",
+    "go",
+    "ahead",
+    "do",
+    "it",
+    "that",
+    "keep",
+    "of",
+    "course",
+    "lamp",
+    "hey",
+    "absolutely",
+    "definitely",
+    "great",
+    "good",
+    "fine",
+    "right",
+    "correct",
+    "roi",
+    "nhe",
+    "nha",
+    "a",
+    "di",
+    "vang",
+    "duoc",
+    "dung",
+    "vay",
+    "co",
+    "giup",
+    "toi",
+    "minh",
+    "em",
+    "luon",
+];
+/// The most words a line that is only a yes has.
+const YES_MOST: usize = 6;
+
+/// Whether `line` says nothing but a yes: [`YES`], then at most
+/// [`YES_MOST`] words in all of [`YES_TAIL`]. "Yes, my dog is Moe" is not.
+pub fn only_a_yes(line: &str) -> bool {
+    let said: Vec<String> = words(line).map(|word| bare(&word)).collect();
+    let Some((first, rest)) = said.split_first() else {
+        return false;
+    };
+    said.len() <= YES_MOST
+        && YES.contains(&first.as_str())
+        && rest.iter().all(|word| YES_TAIL.contains(&word.as_str()))
+}
+
+/// The words, without accents, by which the lamp's question offers to keep
+/// or change something.
+const OFFERS: &[&str] = &[
+    "keep", "remember", "save", "note", "replace", "update", "change", "store", "ghi", "nho",
+    "luu", "thay",
+];
+
+/// Whether the lamp's words `said` offer to keep or change something: one
+/// of [`OFFERS`] in them ("Want me to keep that?", "Shall I update it?").
+/// Whether they asked is [`crate::remarks::lamp_asked`]'s.
+pub fn offers_to_keep(said: &str) -> bool {
+    words(said).any(|word| OFFERS.contains(&bare(&word).as_str()))
+}
+
+/// The line a `remember` in a line heard as `heard` is held against.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Held {
+    /// The line heard, as ever.
+    Heard(Option<String>),
+    /// The person's line the lamp's offer was about, for a yes to it.
+    Offered(String),
+    /// A yes, with no offer before it.
+    YesAlone,
+}
+
+/// [`Held`] for the words `heard` in a line, `offered` the line the lamp's
+/// newest answer before it offered to keep, asked only for a yes.
+pub(crate) fn held(heard: Option<String>, offered: impl FnOnce() -> Option<String>) -> Held {
+    match heard {
+        Some(line) if only_a_yes(&line) => offered().map_or(Held::YesAlone, Held::Offered),
+        heard => Held::Heard(heard),
+    }
+}
+
+/// The person a `remember` under `lease` writes for: the lease's admitted
+/// person, `None` for the room's or with no lease.
+fn writes_for(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<&str> {
+    lease
+        .and_then(|lease| lease.scope())
+        .and_then(|scope| scope.person())
+}
+
+/// [`held`] for `request` on this process's thread, now, for a `remember`
+/// that writes under `lease`: an offer counts only when it was made in that
+/// same scope.
+fn held_now(request: u64, lease: Option<&crate::memory_scope::ScopeLease>) -> Option<Held> {
+    let now = Instant::now();
+    let whose = writes_for(lease);
+    let thread = crate::thread::THREAD.lock().ok()?;
+    Some(held(thread.heard_for(request, now), || {
+        thread.offered_line(request, whose, now, offers_to_keep)
+    }))
+}
+
+/// The words a `remember` in heard line `request` is held against, with
+/// the switch on: its line's, or for a yes to the lamp's offer the line the
+/// offer was about. Off, its line's.
+pub fn words_for(request: u64, lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    if !on() {
+        let now = Instant::now();
+        return crate::thread::THREAD.lock().ok()?.heard_for(request, now);
+    }
+    match held_now(request, lease)? {
+        Held::Heard(words) => words,
+        Held::Offered(line) => Some(line),
+        Held::YesAlone => None,
+    }
+}
+
+/// What the model is told for a `remember` whose line was only a yes, with
+/// no offer to keep before it.
+pub const YES_ALONE: &str = "Nothing was kept: they only said yes, and you had not offered to keep anything. Ask what they would like kept. Never say it was kept.";
+
+/// The journal's line for it: no words of it.
+pub const YES_ALONE_LINE: &str = "lamp-voice provider: a remember in a line that was only a yes, with no offer before it, was not kept (skipped=1)";
+
+/// What the model is told instead of running a `remember` in heard line
+/// `request` that was only a yes with no offer before it, with the switch
+/// on ([`YES_ALONE`]): a line that is only a yes is never kept. `None`:
+/// run it.
+pub fn yes_alone(
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<Value> {
+    if !heard || call.name != super::REMEMBER || !on() {
+        return None;
+    }
+    (held_now(request, lease)? == Held::YesAlone).then(|| {
+        eprintln!("{YES_ALONE_LINE}");
+        json!({"remembered": false, "note": YES_ALONE})
+    })
+}
 
 /// NFC, lower case, đ as d: `lamp_memory::search::text`.
 fn fold(value: &str) -> String {
@@ -171,17 +342,17 @@ pub fn call_as_heard(
     if !heard || call.name != super::REMEMBER || !on() {
         return None;
     }
-    let words = crate::thread::THREAD
-        .lock()
-        .ok()?
-        .heard_for(request, Instant::now());
     // The replaced fact's words, only for a correction whose sentence
     // was not all heard: as this session was shown them, no store call.
     let replaced = || {
         let id = call.args.get("replaces")?.as_u64()?;
         super::shown_text(id, lease)
     };
-    call_with(call, words.as_deref(), replaced)
+    match held_now(request, lease)? {
+        Held::Heard(words) => call_with(call, words.as_deref(), replaced),
+        Held::Offered(line) => call_kept_with(call, Some(&line), replaced, true),
+        Held::YesAlone => None,
+    }
 }
 
 /// [`call_as_heard`] with the words heard in its line, and `replaced`, the
@@ -196,6 +367,18 @@ pub(crate) fn call_with(
     call: &ToolCall,
     heard: Option<&str>,
     replaced: impl FnOnce() -> Option<String>,
+) -> Option<(ToolCall, String)> {
+    call_kept_with(call, heard, replaced, false)
+}
+
+/// [`call_with`], the heard line kept instead sent with the model's
+/// `replaces` when `keeps_replaces`: for the line a yes to the lamp's
+/// offer was about (N6), which is the whole of what the offer was for.
+fn call_kept_with(
+    call: &ToolCall,
+    heard: Option<&str>,
+    replaced: impl FnOnce() -> Option<String>,
+    keeps_replaces: bool,
 ) -> Option<(ToolCall, String)> {
     if call.name != super::REMEMBER {
         return None;
@@ -217,9 +400,13 @@ pub(crate) fn call_with(
     }
     let mut call = call.clone();
     let on = call.args.get("on").cloned();
+    let replaces = call.args.get("replaces").cloned();
     call.args = json!({"text": kept});
     if let Some(on) = on {
         call.args["on"] = on;
+    }
+    if let Some(replaces) = replaces.filter(|id| keeps_replaces && !id.is_null()) {
+        call.args["replaces"] = replaces;
     }
     Some((call, kept))
 }
@@ -250,10 +437,14 @@ pub fn answered(
     as_heard: Option<&(ToolCall, String)>,
     replaces: bool,
 ) -> Value {
-    let Some((_, kept)) = as_heard else {
+    let Some((sent, kept)) = as_heard else {
         return told;
     };
     let mut told = self::told(told, kept);
+    // Sent with its `replaces` (a yes to the lamp's offer, N6): as told.
+    if sent.args.get("replaces").is_some_and(|id| !id.is_null()) {
+        return told;
+    }
     let old = model.args.get("replaces").and_then(Value::as_u64);
     if let Some(old) = old.filter(|_| replaces && told["remembered"] == true) {
         told["not_replaced"] = json!(old);
@@ -493,6 +684,145 @@ mod tests {
             (Some(4), Some("They said: y"))
         );
         assert!(told["note"].is_string());
+    }
+
+    /// lamp-06c1, 27 Oct (#3504, N6): "Want me to keep that?" → "Yes,
+    /// please." kept "They said: Yes, please.", 2 of 2.
+    #[test]
+    fn a_line_that_is_only_a_yes_is_known_in_english_and_vietnamese() {
+        for yes in [
+            "Yes, please.",
+            "yes",
+            "Yeah, go ahead",
+            "Okay, keep it.",
+            "Sure, thanks!",
+            "Please do",
+            "Ừ",
+            "Vâng ạ",
+            "Có, được rồi",
+            "Dạ vâng",
+            "Ok nhé",
+        ] {
+            assert!(only_a_yes(yes), "{yes}");
+        }
+        for not in [
+            "",
+            "...",
+            "Yes, my dog is called Moe",
+            "please remember that my tea is green",
+            "Best, replace the bakery with the library.",
+            "Có, tôi làm ở thư viện",
+            "yes yes yes yes yes yes yes",
+            "No, thanks",
+        ] {
+            assert!(!only_a_yes(not), "{not}");
+        }
+        assert!(offers_to_keep("I've got that. Want me to keep that?"));
+        assert!(offers_to_keep("Shall I update it to the library?"));
+        assert!(offers_to_keep("Mình ghi nhớ nhé?"));
+        assert!(!offers_to_keep("Shall I remove it?"));
+        assert!(!offers_to_keep("How was your day?"));
+    }
+
+    /// A yes is held against the line the lamp's offer was about; with no
+    /// offer before it, nothing is kept; any other line, as before.
+    #[test]
+    fn a_yes_to_the_lamps_offer_keeps_the_line_the_offer_was_about() {
+        use crate::thread::Thread;
+        const LIBRARY: &str = "I work at a library now, not the bakery";
+        let now = Instant::now();
+        let held_for = |thread: &Thread, request: u64, at: Instant| {
+            held(thread.heard_for(request, at), || {
+                thread.offered_line(request, None, at, offers_to_keep)
+            })
+        };
+        let mut thread = Thread::new();
+        thread.person(LIBRARY, true, now);
+        thread.lamp(1, "A library, nice. Want me to keep that?", now);
+        thread.person("Yes, please.", true, now);
+        assert_eq!(held_for(&thread, 2, now), Held::Offered(LIBRARY.to_owned()));
+        // Once the lamp has begun answering the yes, the same.
+        thread.lamp(2, "Done.", now);
+        assert_eq!(held_for(&thread, 2, now), Held::Offered(LIBRARY.to_owned()));
+        // A line that says more than yes is its own, as ever.
+        let mut thread = Thread::new();
+        thread.person(LIBRARY, true, now);
+        thread.lamp(1, "Want me to keep that?", now);
+        thread.person("Yes, my dog is called Moe", true, now);
+        assert_eq!(
+            held_for(&thread, 2, now),
+            Held::Heard(Some("Yes, my dog is called Moe".to_owned()))
+        );
+        // No offer: a question that offers nothing, none at all, or a yes
+        // long after.
+        for (lamp, after) in [
+            ("How was your day?", 0),
+            ("A library, nice.", 0),
+            ("Want me to keep that?", 60),
+        ] {
+            let mut thread = Thread::new();
+            thread.person(LIBRARY, true, now);
+            thread.lamp(1, lamp, now);
+            let later = now + Duration::from_secs(after);
+            thread.person("Yes.", true, later);
+            assert_eq!(held_for(&thread, 2, later), Held::YesAlone, "{lamp}");
+        }
+        // Reviewer-three's P2 on #3683: the offer counts only in the scope
+        // the yes's `remember` writes to, never by the face at the lamp. A
+        // known person's offer, then a yes kept as the room's (someone not
+        // attributed) or as another known person's, keeps nothing, even
+        // with the first person's face still named at the lamp.
+        let mut thread = Thread::new();
+        thread.seen_now(Some("p-olivia".to_owned()));
+        thread.person(LIBRARY, true, now);
+        thread.lamp(1, "Want me to keep that?", now);
+        thread.person("Yes.", true, now);
+        let offered = |whose| thread.offered_line(2, whose, now, offers_to_keep);
+        assert_eq!(offered(Some("p-olivia")), Some(LIBRARY.to_owned()));
+        assert_eq!(offered(None), None);
+        assert_eq!(offered(Some("p-tom")), None);
+        // And the room's offer is the room's alone.
+        let mut thread = Thread::new();
+        thread.person(LIBRARY, true, now);
+        thread.lamp(1, "Want me to keep that?", now);
+        thread.person("Yes.", true, now);
+        let offered = |whose| thread.offered_line(2, whose, now, offers_to_keep);
+        assert_eq!(offered(None), Some(LIBRARY.to_owned()));
+        assert_eq!(offered(Some("p-olivia")), None);
+        let mut thread = Thread::new();
+        thread.person("Yes.", true, now);
+        assert_eq!(held_for(&thread, 1, now), Held::YesAlone);
+    }
+
+    /// P9b: the model's "Works at a library." against the bakery (kept
+    /// thing 5), after a yes. Each word the old fact's or the offered
+    /// line's: sent as written with `replaces`; else the offered line,
+    /// still with `replaces`, never "They said: Yes, please.".
+    #[test]
+    fn a_correction_after_a_yes_keeps_its_replaces() {
+        const LIBRARY: &str = "I work at a library now, not the bakery";
+        let call = |text: &str| ToolCall {
+            id: String::new(),
+            name: super::super::REMEMBER.into(),
+            args: json!({"text": text, "replaces": 5}),
+        };
+        let bakery = || Some("Works at a bakery.".to_owned());
+        let library = call("Works at a library.");
+        assert_eq!(call_kept_with(&library, Some(LIBRARY), bakery, true), None);
+        let (sent, kept) = call_kept_with(&library, Some(LIBRARY), || None, true).unwrap();
+        assert_eq!(kept, "They said: I work at a library now, not the bakery");
+        assert_eq!(sent.args, json!({"text": kept, "replaces": 5}));
+        let told = answered(
+            json!({"remembered": true, "replaced": 5}),
+            &library,
+            Some(&(sent, kept)),
+            true,
+        );
+        assert!(told.get("not_replaced").is_none());
+        assert_eq!(told["replaced"], 5);
+        // Any other heard line kept instead still drops it (#2510).
+        let (sent, _) = call_with(&library, Some(LIBRARY), || None).unwrap();
+        assert!(sent.args.get("replaces").is_none());
     }
 
     /// The reviewer-lead's P3 at #2590's merge: a correction kept as heard
