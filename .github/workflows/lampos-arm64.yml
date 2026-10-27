@@ -93,6 +93,7 @@ on:
       - '!lampOS/builders/**'
       - 'lampOS/docs/attention.md'
       - 'lampOS/docs/brain-build.md'
+      - 'lampOS/docs/control.md'
       - 'lampOS/docs/endpoint-detection.md'
       - 'lampOS/docs/endpoint-pilot.md'
       - 'lampOS/docs/install.md'

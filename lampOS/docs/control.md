@@ -21,7 +21,7 @@ its types. A few of the crate's checks can't be written in JSON Schema, so a
 request can pass the schema and still be refused with `bad_request` saying
 which:
 - a say's text and each phrase must hold a letter or a digit (a say may hold
-  a newline, nothing else of the control characters);
+  a newline, no other control character, C0 or C1);
 - a move's last frame is all 0, like its first.
 
 What is decided is marked as such; the open questions are at the end.
@@ -248,7 +248,8 @@ only with it. A `get` reply carries each state asked for: `presence`,
 ### Leases
 
 A body lease is needed for `look`, `move`, `play` and `joints`. The lease
-belongs to the connection that took it; only `joints` names it. Parts are
+belongs to the client that took it, on any of its connections, and ends
+when the client's last connection closes; only `joints` names it. Parts are
 `body`, `light` and `voice` (`say`, `sound`), each needing its grant, and one
 client holds a part at a time: a second take is `busy`.
 
@@ -298,7 +299,7 @@ A reply comes when the action is taken. A long one also ends with
 | `no_hello` | an op before `hello` on this connection |
 | `no_grant` | the client lacks the grant; `why` names it |
 | `no_lease`, `lease_lost` | the action needs a lease the client doesn't hold |
-| `busy` | something above the client holds the part |
+| `busy` | another client holds the part, or this one by another lease |
 | `refused` | the body's own check, with its why: "centre of gravity 27 mm > 22 mm", "pitch past its window" |
 | `quiet_hours`, `private`, `paused`, `asleep` | the lamp's state refuses it |
 | `rate` | over a rate below; `retry_ms` says when |
@@ -310,7 +311,7 @@ A reply comes when the action is taken. A long one also ends with
 | op | fields | needs | lease |
 |---|---|---|---|
 | `pair` | `name` (1–64 chars), `key` (Ed25519 public, base64), `proof` (base64) | — | — |
-| `hello` | `client` (`c_` + 1–32 hex), `sig` (base64) | — | — |
+| `hello` | `client` (`c_` + 1–32 lowercase hex), `sig` (base64) | — | — |
 | `subscribe` | `events` (at least one), `phrases` (≤ 16, ≤ 64 chars, only with `phrase.heard`, which needs them) | each event's grant | — |
 | `unsubscribe` | `events` | — | — |
 | `get` | `state`: `presence` (`look`), `light`, `mood`, `lamp` | — | — |
@@ -322,8 +323,8 @@ A reply comes when the action is taken. A long one also ends with
 | `look` | `at`: `"face"` (+ `look`), `"name"`, `"ahead"`, or `{yaw, pitch}` in degrees (±180, ±90) | `body` | body |
 | `move` | `step_ms` 20–1,000, `frames` 2–500 of five joints (body counts from home), first and last all 0 | `body` | body |
 | `play` | `name` (a recorded move of the client's package) | `body` | body |
-| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees, at least one), `within_ms` ≤ 5,000 | `body` | body |
-| `light` | `colour` (one of the ten), `level` 1–5, `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
+| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |
+| `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
 | `say` | `text`: words, ≤ 300 chars | `speak` | — |
 | `sound` | `name` (a clip of the client's package, ≤ 3 s) | `speak` | — |
 | `stop` | — | — | — |
