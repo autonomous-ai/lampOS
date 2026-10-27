@@ -1,3 +1,21 @@
+## 2026-10-27 16:24 UTC — Onboarding repair passes and current forgetting fence read completes
+
+Ready for lamp-voice: no
+
+[Current onboarding proof](verification/onboarding-0063-focused-20261027/README.md):
+source `0063ca3a` on frozen `c3eb20be` passes fresh fmt, metadata, strict
+workspace/all-target Clippy and build (38420/0), plus 230 unique affected
+cases, all 21 required controls and four separate doctests (29318/0).
+Darwin/x86_64 ABI only. The preceding b202 844 PASS / 114 FAIL and 9ab
+interruption remain failed history, with all inputs retained. Final published
+ARM64/Linux, independent reads, mixed-version and physical gates remain open.
+
+[Current #3564 first-landing read](verification/forget-fc312-first-landing-read-20261027/disposition.md):
+READ-OK `fc3125d3f`; original ARM64/Linux succeed, four requested controls pass
+once and six reviewed whole files match the actual CI merge. The old fence
+finding is cleared for first landing only. Common's real Engine composition,
+#3706, device and later-base qualification remain separate.
+
 ## 2026-10-27 15:55 UTC — Onboarding consent validation failure retained and data repaired
 
 Ready for lamp-voice: no

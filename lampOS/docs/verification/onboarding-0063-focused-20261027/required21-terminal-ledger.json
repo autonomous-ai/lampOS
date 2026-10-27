@@ -1,0 +1,149 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+    "event": "ok",
+    "line_one_based": 369,
+    "terminal_ordinal_one_based": 179
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+    "event": "ok",
+    "line_one_based": 365,
+    "terminal_ordinal_one_based": 177
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+    "event": "ok",
+    "line_one_based": 367,
+    "terminal_ordinal_one_based": 178
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+    "event": "ok",
+    "line_one_based": 373,
+    "terminal_ordinal_one_based": 181
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+    "event": "ok",
+    "line_one_based": 363,
+    "terminal_ordinal_one_based": 176
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+    "event": "ok",
+    "line_one_based": 359,
+    "terminal_ordinal_one_based": 174
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files",
+    "event": "ok",
+    "line_one_based": 371,
+    "terminal_ordinal_one_based": 180
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "a_speaker_bound_enrollment_request_is_understood",
+    "event": "ok",
+    "line_one_based": 4,
+    "terminal_ordinal_one_based": 1
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "the_legacy_capture_contract_stays_available_when_not_guarded",
+    "event": "ok",
+    "line_one_based": 14,
+    "terminal_ordinal_one_based": 6
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "the_real_capture_collector_never_mixes_in_a_replacement_under_the_same_id",
+    "event": "ok",
+    "line_one_based": 17,
+    "terminal_ordinal_one_based": 7
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "five_fresh_prints_of_the_requesting_speaker_reach_the_final_fence",
+    "event": "ok",
+    "line_one_based": 8,
+    "terminal_ordinal_one_based": 3
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "missing_or_ambiguous_frames_end_a_capture_and_a_return_cannot_rescue_it",
+    "event": "ok",
+    "line_one_based": 12,
+    "terminal_ordinal_one_based": 5
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "guarded_proof_cannot_be_mixed_with_a_legacy_operation_or_unknown_fields",
+    "event": "ok",
+    "line_one_based": 10,
+    "terminal_ordinal_one_based": 4
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "a_short_line_between_recognition_ticks_has_no_anchor_and_never_falls_back",
+    "event": "ok",
+    "line_one_based": 6,
+    "terminal_ordinal_one_based": 2
+  },
+  {
+    "binary": "lamp-update::it",
+    "test": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+    "event": "ok",
+    "line_one_based": 36,
+    "terminal_ordinal_one_based": 14
+  },
+  {
+    "binary": "lamp-update::it",
+    "test": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+    "event": "ok",
+    "line_one_based": 43,
+    "terminal_ordinal_one_based": 15
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "format::every_skill_folder_in_the_repo_validates_against_format_1",
+    "event": "ok",
+    "line_one_based": 20,
+    "terminal_ordinal_one_based": 8
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "format::the_schema_refuses_what_lamp_skills_refuses_in_shape",
+    "event": "ok",
+    "line_one_based": 29,
+    "terminal_ordinal_one_based": 11
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "format::the_schemas_lists_are_the_codes",
+    "event": "ok",
+    "line_one_based": 24,
+    "terminal_ordinal_one_based": 10
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry",
+    "event": "ok",
+    "line_one_based": 451,
+    "terminal_ordinal_one_based": 220
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byte",
+    "event": "ok",
+    "line_one_based": 211,
+    "terminal_ordinal_one_based": 100
+  }
+]

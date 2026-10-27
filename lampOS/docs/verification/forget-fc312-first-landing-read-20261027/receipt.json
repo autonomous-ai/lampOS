@@ -1,0 +1,162 @@
+{
+  "status": "SELECTED_ORIGINAL_NATIVE_FENCE_EVIDENCE",
+  "first_landing_only": true,
+  "common_pair_qualified": false,
+  "published_head": "fc3125d3f36512d252044cec22e3c8ce2b94a67e",
+  "published_tree": "cbd5f07404c4c6334428fec7f475d4c3759222ac",
+  "actual_checkout": "2be38c966fab995409c1cda672eb9e0286d8d5ea",
+  "actual_tree": "a9600d7e6963f2851e3e1293e7e104e91755123c",
+  "actual_parents": [
+    "c3eb20be307d06a6d6278254ec54654b68698b0e",
+    "fc3125d3f36512d252044cec22e3c8ce2b94a67e"
+  ],
+  "source_files": [
+    {
+      "path": "lampOS/crates/voice/src/known_faces.rs",
+      "head_git_blob": "9ed0d56f0fba99cc5eca74ea6cb2f7046b977203",
+      "native_git_blob": "9ed0d56f0fba99cc5eca74ea6cb2f7046b977203",
+      "exact": true,
+      "head_body_sha256": "4049f0a531629a4bc1d26672d9861f44014421542b1873483b2228ba0a46ed8d"
+    },
+    {
+      "path": "lampOS/crates/voice/src/memory_scope.rs",
+      "head_git_blob": "0d922ac8414f16ee7d45fd94963617e91c534d57",
+      "native_git_blob": "0d922ac8414f16ee7d45fd94963617e91c534d57",
+      "exact": true,
+      "head_body_sha256": "3011473291fd88b0e8dad782af3e97c0618fc97d0e94a5a92bf79f2c9370b029"
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "head_git_blob": "a0f258e80e8be2fdebb44bf038725ff1f21d1f76",
+      "native_git_blob": "a0f258e80e8be2fdebb44bf038725ff1f21d1f76",
+      "exact": true,
+      "head_body_sha256": "125951ba2843df54453777206fd9942bd9a3dca88a52afbace3f6d71a2565742"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "head_git_blob": "92676aa0cdf0b38a67d925e286bd0a80c143cf8c",
+      "native_git_blob": "92676aa0cdf0b38a67d925e286bd0a80c143cf8c",
+      "exact": true,
+      "head_body_sha256": "5900dff9994a0399c9e935b2e31a851e2a53b309ceabb04bd03b9af62255b693"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+      "head_git_blob": "adb765f7e6c8fd3673cff2a0b81daccd90025b3a",
+      "native_git_blob": "adb765f7e6c8fd3673cff2a0b81daccd90025b3a",
+      "exact": true,
+      "head_body_sha256": "7158393beb4d0dc83e619a4982f1c5e04df7d0c6f6b43036dbff1268fd1843ad"
+    },
+    {
+      "path": "lampOS/crates/voice/src/tools.rs",
+      "head_git_blob": "023d3fb6de1e8ff8ce13445b8b62f1c4efd02759",
+      "native_git_blob": "023d3fb6de1e8ff8ce13445b8b62f1c4efd02759",
+      "exact": true,
+      "head_body_sha256": "f7fffdb72f7bb7cb97f869f453c82cb768f84cf331337ffc18905913ac883dd4"
+    }
+  ],
+  "checkout_log_binding": {
+    "member": "2_lampOS \u2014 build and test on Linux ARM64 (1_1).txt",
+    "member_sha256": "287e34737ca2c7e7c99f17249d38a7d4deeb3eff64864b7829a44553c2435a6c",
+    "git_log_marker_line": 290,
+    "actual_checkout": "2be38c966fab995409c1cda672eb9e0286d8d5ea"
+  },
+  "controls": [
+    {
+      "member": "2_lampOS \u2014 build and test on Linux ARM64 (1_1).txt",
+      "line": 9940,
+      "event": "PASS",
+      "duration": "0.027s",
+      "binary": "lamp-voice",
+      "test": "remember::tests::forget_everything_through_the_tools_takes_the_face_only_when_marked",
+      "source": "lampOS/crates/voice/src/remember.rs",
+      "line_start": 9259,
+      "line_end": 9394,
+      "body_sha256": "dde3755519c8a995854c6a7ffa60e6fb2c39b4d724bc4af822480659a5d6d0f6",
+      "native_source_exact": true
+    },
+    {
+      "member": "2_lampOS \u2014 build and test on Linux ARM64 (1_1).txt",
+      "line": 9942,
+      "event": "PASS",
+      "duration": "0.008s",
+      "binary": "lamp-voice",
+      "test": "remember::tests::forgetting_everything_forgets_the_persons_face_too",
+      "source": "lampOS/crates/voice/src/remember.rs",
+      "line_start": 9069,
+      "line_end": 9242,
+      "body_sha256": "ec1d2fc3e82bac825fb8da5be5c7a376b40e1c50fb45da766684112b05aaf1a6",
+      "native_source_exact": true
+    },
+    {
+      "member": "2_lampOS \u2014 build and test on Linux ARM64 (1_1).txt",
+      "line": 9943,
+      "event": "PASS",
+      "duration": "0.006s",
+      "binary": "lamp-voice",
+      "test": "remember::tests::forgetting_everything_says_the_setup_name_stays",
+      "source": "lampOS/crates/voice/src/remember.rs",
+      "line_start": 9399,
+      "line_end": 9406,
+      "body_sha256": "960d80ba92020bd7f159ba8c737566c7f7d589cb99254270de2b5ca5bc903f0b",
+      "native_source_exact": true
+    },
+    {
+      "member": "2_lampOS \u2014 build and test on Linux ARM64 (1_1).txt",
+      "line": 10847,
+      "event": "PASS",
+      "duration": "0.153s",
+      "binary": "lamp-voice",
+      "test": "second_provider::tests::held_forget::only_an_ask_the_guard_showed_marks_everything_for_the_face",
+      "source": "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+      "line_start": 460,
+      "line_end": 545,
+      "body_sha256": "0988a4647cd75a767e984731167feb641eeed13892f81973645267be24bbe30e",
+      "native_source_exact": true
+    }
+  ],
+  "selected_unique_pass": 4,
+  "selected_bad": 0,
+  "selected_duplicates": 0,
+  "full_census_claim": false,
+  "runs": [
+    {
+      "id": 40526027358,
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "fc3125d3f36512d252044cec22e3c8ce2b94a67e"
+    },
+    {
+      "id": 40526027398,
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "fc3125d3f36512d252044cec22e3c8ce2b94a67e"
+    }
+  ],
+  "native_completions": [
+    {
+      "session": 67634,
+      "exit": 0,
+      "chunk": "650f99"
+    },
+    {
+      "session": 17599,
+      "exit": 0,
+      "chunk": "e7b65a"
+    }
+  ],
+  "limits": [
+    "No Common composition qualification, hardware/physical erase acceptance, or runtime rerun.",
+    "These are four outer nextest case identities; internal rows or child summaries are not counted as additional tests.",
+    "Linux status comes from original run/job APIs; no new local clippy or runtime claim."
+  ],
+  "no_mutations": true,
+  "download_bounds": {
+    "compressed_bytes": 443043,
+    "compressed_cap": 33554432,
+    "expanded_bytes": 2010887,
+    "expanded_cap": 67108864,
+    "tree_response_bytes": 3507589,
+    "tree_cap": 8388608,
+    "binary_artifacts_downloaded": false
+  }
+}

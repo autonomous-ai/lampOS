@@ -1,0 +1,545 @@
+{
+  "status": "FOCUSED_LOCAL_QUALIFICATION_ONLY",
+  "ready_for_lamp_voice": false,
+  "tested_head": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+  "tested_tree": "0063ca3a3385aa8d8acb6d904cc2ae1f842f065e",
+  "own_changed_paths": 10,
+  "local_host": {
+    "test_ABI": "Darwin/x86_64",
+    "Python_platform_system": "Darwin",
+    "Python_platform_machine": "x86_64",
+    "selected_drivers": [
+      {
+        "binary": "lamp-eyes::remember_speaker",
+        "sha256": "48510b3c0841102a3d5b5dcafedc0497856db20a1f9590b677255a742b896b35",
+        "MachO_magic": "0xfeedfacf",
+        "MachO_CPU_type": "0x1000007"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "sha256": "460bed97efe29b3be70a26cffc71bed2f2e8b704963095bc845981878b6b34d7",
+        "MachO_magic": "0xfeedfacf",
+        "MachO_CPU_type": "0x1000007"
+      },
+      {
+        "binary": "lamp-update::install",
+        "sha256": "360a7f9b2e1beae5b84a0d8c525713aa92faf35a4ad26b4594a29daf177d77e4",
+        "MachO_magic": "0xfeedfacf",
+        "MachO_CPU_type": "0x1000007"
+      },
+      {
+        "binary": "lamp-update::it",
+        "sha256": "772ff15f6355f18b4de328efa4562b3860733adbe4c40352c6b0f28614a2a241",
+        "MachO_magic": "0xfeedfacf",
+        "MachO_CPU_type": "0x1000007"
+      },
+      {
+        "binary": "lamp-voice",
+        "sha256": "222856ec51df3d530229606e40cd1a4a848d214de2bdaa9ce01188fcbe09e16d",
+        "MachO_magic": "0xfeedfacf",
+        "MachO_CPU_type": "0x1000007"
+      }
+    ],
+    "physical_CPU_model": "not established",
+    "Apple_Silicon_or_aarch64_local_claim": false,
+    "Linux_ARM64_native_gate": "separate, still required"
+  },
+  "compiler": {
+    "actual_native": 38420,
+    "exit": 0,
+    "fresh_stages": 4,
+    "test_bodies": 0,
+    "normal_profiles": true,
+    "jobs": 1,
+    "incremental": 0
+  },
+  "runtime": {
+    "actual_native": 29318,
+    "exit": 0,
+    "counts": {
+      "selected": 230,
+      "passed": 230,
+      "failed": 0,
+      "leaks": 0,
+      "timeouts": 0,
+      "all_selected_terminal": true,
+      "raw_nextest_exit": 0,
+      "census": {
+        "listed": 4646,
+        "eligible": 230,
+        "noneligible": 4416,
+        "discovery_ignored_flags": 22,
+        "filter_exclusions": 4416,
+        "flags_may_overlap_and_are_not_added": true,
+        "ignored_JSON_terminals": 16,
+        "natural_start_only": 6,
+        "natural_without_event": 0,
+        "noneligible_is_not_natural_ignore_count": true
+      }
+    },
+    "selected_unique": 230,
+    "required_unique": 21,
+    "groups": {
+      "onboarding": 142,
+      "same-voice": 21,
+      "remember-speaker": 16,
+      "CLI-process": 17,
+      "switch-census": 7,
+      "ring-startup": 12,
+      "Eyes-enrollment": 7,
+      "Update-install": 3,
+      "workflow-readers": 2,
+      "Skills-format": 3
+    },
+    "test_DEBUG0_only": true,
+    "profile": "pr",
+    "slots": 2,
+    "retries": 0,
+    "no_fail_fast": true,
+    "runtime_input_count": 99,
+    "before_after_artifact_guards_required_and_completed": true
+  },
+  "docs": {
+    "raw_exit": 0,
+    "rows": [
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "2",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "1",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "1",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ]
+    ],
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "separate_from_runtime": true
+  },
+  "retained": {
+    "old_protected": 7890,
+    "added_failed_driver_witnesses": 3,
+    "separate_old_archive": 46,
+    "separate_interrupted_archive": 115,
+    "separate_failed_b202_archive": 115,
+    "initial_final_full_bytes": true
+  },
+  "old_b202_failure": {
+    "tree": "b202b4426b90675d05884f565df051c77f18bc12",
+    "native": 12696,
+    "native_exit": 125,
+    "nextest_exit": 100,
+    "selected": 958,
+    "passed": 844,
+    "failed": 114,
+    "all_selected_terminal": true,
+    "docs": "UNRUN",
+    "qualification": false,
+    "unaffected623eval_and 105other_install_passes_not_current_source_credit": true,
+    "history_log_commit": "0ccd"
+  },
+  "old_source_interruption": {
+    "head": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+    "tree": "9ab408b27bf1471382b58e35cca2fb4967af0e10",
+    "native": 85268,
+    "native_exit": 125,
+    "nextest_exit": 100,
+    "clean_pass": 745,
+    "raw_SIGINT_failures": 2,
+    "selected_unrun": 4874,
+    "docs": "UNRUN",
+    "qualification": false,
+    "no_product_failure_cause_waiver": true,
+    "history_log_commit": "e11"
+  },
+  "holds": [
+    "Fresh final-current-head broad ARM64 and Linux Clippy",
+    "Independent reader and privacy qualification",
+    "Installed and mixed-version two-process/device acceptance",
+    "Normal-light two-person intended-person save within two tries; cancellation and withheld/privacy cases"
+  ],
+  "evidence_hashes": {
+    "compiler-release": "d3dbc6546d72d89358234e05a4f4ad378a63f130b5d767120bad689fd6c5d59c",
+    "runtime-release": "a736e47e1faf961d40db718a5dd9926dc3a028c2c2190f3618b96fd1ca828eae",
+    "compiler-runner": "e675030b24481ebf5704c1108b4ca32e58c192d57ad9e8a09a893e15d627a1ba",
+    "runtime-runner": "5e2520a5d47330bd55adf0bdf914a2fd42738d2bf7474530bdfb5f3b1834ed83",
+    "raw-runtime-json": "8e8242ae90817e07c26375ed495b0acbe608f3c8c3a353a7d8f3fca052a2f719",
+    "raw-runtime-status": "a9881dce6ac93ce6a43bba6a208b6438a5b908ef3f91e7f9a59bbfce2b73bdeb",
+    "runtime-counts": "6235b4ecb832c71a8fb77eee645b554b7097b75c622fde6ebecaf929fc9e033f",
+    "discovery": "61cf08895c7d9ade1db3fb561ebce513e69c7811afb9a017ce3ea5ebf4c48e84",
+    "runtime-input-manifest": "7d7bb9a6da1a98b4c4b541e96526245c31e58239cbb0190a855df359ee572609",
+    "required-source-registry": "19dc33aa71c64c5eb9432b79dffd8ec8b1c3fc25f085fcbf6b6861816831ee66",
+    "focused-source-scope": "4b384e41fcd9fadd2176a5d22cb28b0b73171d2a8b305ef072d20cf79ba864c4",
+    "protected-final-byte-verification": "a602d8e6c3dcddeff92ec503b5796b53ffe2e1eeb9d3e16f1da24db6146a199f"
+  },
+  "no_old_source_runtime_credit": true,
+  "no_hardware_claim": true
+}
