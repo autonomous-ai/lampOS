@@ -1962,7 +1962,7 @@ four rows, "Without it" is what `off` leaves.
 | `--arm-load S,E` | load that sends it back down | 950,950, or 40 under `--force-limit` when that is given | 50 to 1,000, and under `--force-limit` |
 | `--force-limit N` | the most force the base's turn and, for a lamp that may stand, the shoulder and the elbow may push with, of 1,000 | not written: each servo keeps what it holds | 300 to 1,000 |
 | `--give-way return\|stay\|off` (default return) | what a joint does after it gave way, and a joint that pushes without moving told to stop (below, "Giving way to a hand") | `off`: as before the option: no stall rule, a joint that gave way always comes back | return, stay or off |
-| `--limp on\|off` (default on while giving way) | a hand forcing a joint past V1's contact floor slumps the lamp (below) | `off`: gives way without the slump | on or off; on needs `--give-way` |
+| `--limp on\|off` (default on while giving way) | a hand forcing a joint past V1's contact floor lets go of the head and base, the arm still holding (below) | `off`: gives way without the slump | on or off; on needs `--give-way` |
 | `--torque on` | take hold of a joint found without torque: its goal written as where it is, then torque on, and refused if it then moves more than 12 counts | a joint without torque is refused, and torque is not written | on or off |
 | `--wake on` (default) | with `--home`, a joint found out of where it may start but within 400 counts of home is brought home slowly before anything else; a shoulder left up with its elbow folded is lowered first; in the run, a joint held 30 to 50 counts short of its goal, still, rests where it is (see "Waking") | such a joint is refused | on or off |
 | `--let-go-at-stop on\|off` (default off; the factory's, #1682) | asked to stop (SIGINT or SIGTERM), a lamp that got down, its head within 20 counts of home and its arm of its folded counts (inside the tracking bound and the arm's goal step, so an arm left a little short of folded keeps holding), has its last goals written and is then let go, torque off on all five, so that `lamp-body-measure` can read it at rest; a standing lamp folds first, as always, and one that did not get down in time keeps holding (`asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop`, `asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop`, `asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop`). A let-go run (with it, no `--home`, so no `--stand`, and no `--torque on`), all it writes being torque off, may take `--folded-arm SHOULDER,ELBOW` alone; then it is not refused for a head found outside its start window (lamp-0c89 rested at pitch 1755, under 1760, held with torque on) when its shoulder and elbow are each found within 20 counts of those, the same bound the let-go at a stop uses: it is let go at once, torque off on all five and no goal written, stays let go until asked to stop, and its report says why in `let_go_outside_window`. Its arm found standing, no `--folded-arm`, or any other run is refused there as before, nothing written (`a_let_go_run_outside_the_window_with_its_arm_folded_writes_torque_off_only`, `a_let_go_run_outside_the_window_standing_or_without_folded_counts_is_refused`, `a_run_that_is_not_only_a_let_go_outside_the_window_is_still_refused`). The folded counts must come from a read the person confirmed was folded, never from this run's own read of where the arm is now. The product's unit never passes it | a stop keeps the lamp held, torque on, until the power goes | on or off |
@@ -2619,7 +2619,7 @@ it as often as they like.
   where it gave way, and then to the pose its mood wants.
 
 **`--limp on` (with `--give-way`; on unless given while it gives way, since #703, and off with `--give-way off`): a hand makes the
-lamp slump, as V1 did.** The hardware team's requirement: the lamp must
+head and base go limp, as V1 did, while the arm keeps holding.** The hardware team's requirement: the lamp must
 slump rather than let a servo be damaged. Under a hand that would strain a
 servo it lets go, as the old runtime did, and never holds on. Until 2026-10-14 a joint that gave way only had its
 goal set to where it was, its torque left on. On lamp-52e6 that day, run
@@ -2659,10 +2659,15 @@ the one `--overload release` makes ("Letting go under overload"):
   made the lamp slump again every two minutes with nobody touching it.
   Still pushed in the second after it stopped (50 steps in a row): its load over the lower of the bound that stopped it and its
   floor, or more than 11 counts (about a degree) from where it stopped.
-  Then the lamp lets go as under overload: torque off on all five, the
-  lamp slumps, nothing is written for 5 s, then every joint is held
-  where it lies, a shoulder left up over a fallen elbow is lowered, and
-  the head and the base are brought home slowly, as after an overload. V1
+  Then the lamp lets go as under overload, but of the head and the base
+  only: torque off on head pitch, head roll and base yaw, while the
+  shoulder and the elbow keep their torque and their last goal, so a
+  standing lamp stays standing (#3702: onboarding's giving-way step asks
+  a person to push the head, and a lamp whose arm collapsed under that,
+  `stand 0.00`, read as broken; V1 dropped the arm too). Nothing is
+  written for 5 s, then the head and the base are held where they lie
+  and brought home slowly, as after an overload; the arm, which never
+  moved, is not lowered and its stand is kept. V1
   rested 120 s here too, its `retry_s`, which is for a servo cooling
   from overload; a hand is not heat, and a lamp limp for two minutes
   after a push reads as broken, where a creature pushed hard flops and
@@ -2675,8 +2680,8 @@ the one `--overload release` makes ("Letting go under overload"):
   release`) still rests 120 s. The
   report counts it in `released` and, per joint, in `released_by_hand`
   (pitch, roll, yaw); the log says so. A first version (2026-10-15 13:41
-  on lamp-52e6) let go of the base alone: the lamp did not slump, as the
-  person noticed, unlike V1.
+  on lamp-52e6) let go of the base alone: the head did not slump, as the
+  person noticed, unlike V1; the head is let go with it since.
 - **A hand never ends the run.** Pushed again once it is up, or while it
   is brought up (a load or a tracking that would end the wake), it lets
   go again, as often as it is pushed: the rule that ends the run on a
@@ -2719,8 +2724,9 @@ a light head lifted 40 counts at 120 and held a second and a half stays
 at 1,920 when told to stay, and is back at 1,960 when told to come back.
 
 Four tests for `--limp on`: a base turned 30 counts by a hand at 600 and
-held makes the lamp slump about a second after it stopped (torque off to all
-five, byte for byte), nothing is written for 5 s (and it is taken hold
+held makes the lamp slump about a second after it stopped (torque off to the
+head and the base, byte for byte; a standing arm is never written torque off
+and stays standing), nothing is written for 5 s (and it is taken hold
 of within a second after), and each joint is then held where it lies; pushed again once up, or while it is brought
 up, it slumps again and the run goes on; without `--give-way` and
 `--limp` the run ends on its load with no torque ever written. A base
@@ -2783,8 +2789,8 @@ section is what the code does against simulated servos.
 
 `--overload release`, off unless given. Without it the body does exactly
 what it did before, write for write, and writes torque off to all five
-only as a run ends on a surprise ("When it stops"; with `--limp on` a hand makes the same slump: "Giving way to a
-hand").
+only as a run ends on a surprise ("When it stops"; with `--limp on` a hand makes the same slump of the head and the
+base, the arm still holding: "Giving way to a hand").
 
 The hardware team's view, given through the owner's builder: the old
 runtime's answer to a servo pushed hard is the best protection these
@@ -2856,9 +2862,8 @@ under 0.3 s; a hand holding a joint reads 94 to 100%
   down over a folded elbow, and the next start lowers it the rest of the
   way (`--wake`, "Waking"). The held joints' loads during it are kept with the
   run's peaks (`peak_load`, and the elbow's in `arm_peak_load`), so a run
-  shows how near they came to their bounds. After a hand's slump (`--limp on`), a hand that stops it (a load or a tracking), presses the held head, base or elbow over its load bound for as long as the run allows (a load), or moves one more than its tracking bound for as many reads in a row as the run allows (a drift; a single read off is not a hand and is never held to), makes the lamp let
-  go again instead (after an overload the same stop ends the run), and the step that does so writes no goal first: the
-  arm is never sent toward the pose it stood in before the slump. Otherwise the arm is not lifted by that: it stays where
+  shows how near they came to their bounds. A hand's slump (`--limp on`) never lowers the shoulder, since the arm
+  was never let go. Otherwise the arm is not lifted by that: it stays where
   it slumped until a mood or a person in front of the lamp next asks it
   to stand, and then rises by the ordinary way up from where it is, if
   that is on the way between folded and stood up; if not, the lamp runs
