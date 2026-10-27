@@ -353,6 +353,22 @@ mod tests {
         assert!(spoken(&[spoke(3_100, Some(5_000)), spoke(3_200, None)]).is_ok());
     }
 
+    /// lamp-52e6, 27 October (#3504): a name heard at 0.99 0.3 s after the
+    /// prompt's end is refused, however sure: the lamp's own tail or echo
+    /// can't be told from the person there. The same name 0.6 s on counts.
+    #[test]
+    fn a_sure_name_in_the_prompts_tail_is_refused_and_one_after_it_counts() {
+        let room = levels(0, 8_000, 7_000, 2.0);
+        let prompt = [spoke(0, Some(0))];
+        for score in [0.98, 0.99, 1.0] {
+            assert_eq!(
+                near_try(ENDED, &[heard(300, score)], &room, &prompt),
+                Err(Rejected::LampSpoke)
+            );
+        }
+        assert!(near_try(ENDED, &[heard(600, 0.99)], &room, &prompt).is_ok());
+    }
+
     #[test]
     fn a_try_needs_a_level_with_the_quiet_known_and_never_counts_the_lamps_own_sound() {
         let hearing = [heard(2_000, 0.98)];
