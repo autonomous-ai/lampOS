@@ -3238,6 +3238,14 @@ pub fn serve(
                     heeding.hear_levels(root, false);
                 }
             }
+            // Every line the listener opened, words or none, is left out of
+            // the ears' stream (lamp-c0a4's run 1 on #3864).
+            let heard = heeding.clone();
+            engine = engine.telling_lines_heard(Arc::new(move |request, window| {
+                if let Ok(mut heeding) = heard.lock() {
+                    heeding.line_heard(request, window);
+                }
+            }));
         }
         // A line's first word, set off and sounding like the lamp's name, is
         // the name when lamp-name heard it near at the line's start
@@ -4417,6 +4425,9 @@ pub(crate) struct Heeding {
     /// With it, each of the last lines kept and when it was said, so the
     /// ears' stream is read outside them ([`Self::ears_show_quiet`]).
     said: std::collections::VecDeque<(u64, (u64, u64))>,
+    /// With it, when the lamp's own answers played lately, so the ears'
+    /// stream is read outside them too ([`Self::played_over`]).
+    played: std::collections::VecDeque<(u64, u64)>,
 }
 
 /// How the room was as a line was judged, for a join on no sign of a
@@ -5048,6 +5059,9 @@ const HELD_LINE_WORDS: usize = 2;
 /// sound to this long after its end.
 const SAID_BEFORE_US: u64 = 300_000;
 const SAID_AFTER_US: u64 = 700_000;
+/// Pieces of the lamp's answer this close make one stretch played
+/// ([`Heeding::played_over`]).
+const PLAYED_JOINS_US: u64 = 200_000;
 
 impl Heeding {
     pub(crate) fn new(
@@ -5144,6 +5158,7 @@ impl Heeding {
             another_since_start: false,
             held_since_start: false,
             said: std::collections::VecDeque::new(),
+            played: std::collections::VecDeque::new(),
         }
     }
 
@@ -5184,15 +5199,53 @@ impl Heeding {
         if !self.first_seconds_quiet {
             return;
         }
+        // Told again as it is judged: the newer window replaces the older.
+        if let Some(at) = self.said.iter().position(|(of, _)| *of == request) {
+            self.said.remove(at);
+        }
         if self.said.len() == SPOKE_KEPT {
             self.said.pop_front();
         }
         self.said.push_back((request, window));
     }
 
+    /// Every line the listener opened, told as it ends
+    /// (`Engine::telling_lines_heard`), its words none, a hum or a sound
+    /// included: its sound is no one talking between the lines, so the
+    /// ears' stream is read outside it ([`Self::ears_show_quiet`]). On
+    /// lamp-c0a4 on 27 Oct (run 1 on #3864), a head tap's "hm?" heard back
+    /// as a line of no words, never judged, rose in the stream before the
+    /// name and held the join.
+    pub(crate) fn line_heard(&mut self, request: u64, window: (u64, u64)) {
+        self.said_over(request, window);
+    }
+
+    /// The lamp's own answer played over `window`, by the lamp's clock
+    /// ([`crate::second_provider::Did::Said`]), with
+    /// `LAMP_FIRST_SECONDS_QUIET`: the ears' stream is read outside it and
+    /// [`SAID_AFTER_US`] after it, its tail in the room. Pieces that run on
+    /// make one stretch.
+    fn played_over(&mut self, (began, ended): (u64, u64)) {
+        if !self.first_seconds_quiet || ended <= began {
+            return;
+        }
+        if let Some(last) = self.played.back_mut()
+            && began <= last.1.saturating_add(PLAYED_JOINS_US)
+        {
+            last.1 = last.1.max(ended);
+            return;
+        }
+        if self.played.len() == SPOKE_KEPT {
+            self.played.pop_front();
+        }
+        self.played.push_back((began, ended));
+    }
+
     /// Whether the ears show a quiet room up to `request`'s end, by their
     /// own stream rather than one level for every lamp: the readings kept
-    /// ([`Self::hear_levels`], the last 30 s) outside the lines said, at
+    /// ([`Self::hear_levels`], the last 30 s) outside the lines said (every
+    /// line heard, words or none, [`Self::line_heard`]) and the lamp's own
+    /// answers played ([`Self::played_over`]), at
     /// least [`FIRST_SECONDS_READINGS`] of them, all under
     /// [`FIRST_SECONDS_RISE_DB`] over the room's own quiet, and that quiet
     /// (`ears/level`'s, fresh within a second) under a loud room's
@@ -5220,6 +5273,9 @@ impl Heeding {
                     && !self.said.iter().any(|(_, (began, ended))| {
                         (began.saturating_sub(SAID_BEFORE_US)..=ended.saturating_add(SAID_AFTER_US))
                             .contains(at)
+                    })
+                    && !self.played.iter().any(|(began, ended)| {
+                        (*began..=ended.saturating_add(SAID_AFTER_US)).contains(at)
                     })
             })
             .map(|(_, rise)| *rise)
@@ -6375,6 +6431,8 @@ impl Heeding {
                     self.carry_window.answered(request, until_us);
                 }
                 self.said_until_us = self.said_until_us.max(Some(until_us));
+                // Sent now, it plays from now at the soonest.
+                self.played_over((monotonic_us(), until_us));
                 if !self.chain.contains(&request) {
                     self.said_until_free_us = self.said_until_free_us.max(Some(until_us));
                 }
@@ -18729,6 +18787,10 @@ mod tests {
             /// Lines since the start that the rule held, said to nobody
             /// with nobody in view, before the name: their words.
             held: &'static [&'static str],
+            /// Before the name: the lamp's own sound played (its head
+            /// tap's "hm?"), then a line of no words opened over the room's
+            /// sound or the hum heard back, both 15 dB over the quiet.
+            hum: bool,
             on: bool,
         }
         let quiet = Start {
@@ -18738,6 +18800,7 @@ mod tests {
             talk: false,
             other_voice: false,
             held: &[],
+            hum: false,
             on: true,
         };
         let run = |name: &str, start: Start| {
@@ -18784,6 +18847,16 @@ mod tests {
                     "{words:?} held"
                 );
             }
+            // The hum from 7.6 s to 7.2 s ago, the empty line from 6.8 s to
+            // 6 s ago.
+            let loud = [
+                (now - 7_600_000, now - 7_200_000),
+                (now - 6_800_000, now - 6_000_000),
+            ];
+            if start.hum {
+                heeding.played_over(loud[0]);
+                heeding.line_heard(96, loud[1]);
+            }
             // "Lamp." from 5 s to 4.4 s ago, a pause, the request from 3 s
             // to 0.2 s ago; the ears read every 100 ms over the last 8 s,
             // or 12 s with the held line, the person's own lines 20 dB over
@@ -18795,7 +18868,7 @@ mod tests {
             if let Some(rises) = start.room {
                 let levels: Levels = Arc::default();
                 let from = now
-                    - if start.held.is_empty() {
+                    - if start.held.is_empty() && !start.hum {
                         8_000_000
                     } else {
                         12_000_000
@@ -18804,7 +18877,17 @@ mod tests {
                     let said = windows
                         .iter()
                         .any(|(began, ended)| (*began..=*ended).contains(&at));
-                    let rise = if said { 20.0 } else { rises[n % rises.len()] };
+                    let lamp = start.hum
+                        && loud
+                            .iter()
+                            .any(|(began, ended)| (*began..=*ended).contains(&at));
+                    let rise = if said {
+                        20.0
+                    } else if lamp {
+                        15.0
+                    } else {
+                        rises[n % rises.len()]
+                    };
                     levels.lock().unwrap().push_back((at, rise));
                 }
                 heeding.levels = Some(levels);
@@ -18931,6 +19014,13 @@ mod tests {
                 Joined::NoSecond(_)
             ),
             "lines of no words or a hum since the start"
+        );
+        // lamp-c0a4's run 1 on `4377b4254`: the tap's "hm?" played, then a
+        // line of no words, both loud in the ears' stream but no one
+        // talking: left out of it, the name and its request join.
+        assert!(
+            matches!(run("d4", Start { hum: true, ..quiet }), Joined::NoSecond(_)),
+            "the lamp's own hum and a line of no words since the start"
         );
         assert!(
             held(run(
