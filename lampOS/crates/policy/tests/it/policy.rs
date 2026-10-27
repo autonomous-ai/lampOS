@@ -450,13 +450,7 @@ impl Rig {
                 );
                 name.starts_with(kind)
             })
-            .flat_map(|file| {
-                fs::read_to_string(file)
-                    .unwrap()
-                    .lines()
-                    .map(|line| serde_json::from_str(line).expect("a line of JSON"))
-                    .collect::<Vec<Value>>()
-            })
+            .flat_map(|file| whole_records(&fs::read_to_string(file).unwrap()))
             .collect()
     }
 
@@ -492,6 +486,36 @@ impl Rig {
         }
         (totals.unwrap(), notes)
     }
+}
+
+/// The records of a log's text, its whole lines only: the log may be
+/// mid-write while a test waits on it, and its last line is a record only
+/// once its newline is there (an ARM64 run on #3829 read half of one). A
+/// whole line that isn't JSON still fails the test.
+fn whole_records(text: &str) -> Vec<Value> {
+    let whole = text.rfind('\n').map_or("", |end| &text[..end]);
+    whole
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("a line of JSON"))
+        .collect()
+}
+
+#[test]
+fn a_log_line_still_being_written_is_not_read_yet() {
+    // Reviewer-two's P3 on #3836: the race, made certain.
+    assert_eq!(whole_records(""), Vec::<Value>::new());
+    assert_eq!(whole_records("{\"a\":1"), Vec::<Value>::new());
+    assert_eq!(whole_records("{\"a\":1}\n{\"b\":"), vec![json!({"a": 1})]);
+    assert_eq!(
+        whole_records("{\"a\":1}\n{\"b\":2}\n"),
+        vec![json!({"a": 1}), json!({"b": 2})]
+    );
+}
+
+#[test]
+#[should_panic(expected = "a line of JSON")]
+fn a_whole_log_line_that_isnt_json_still_fails() {
+    whole_records("{\"a\":1}\nnot json\n");
 }
 
 impl Drop for Rig {
