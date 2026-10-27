@@ -1,0 +1,12 @@
+{
+  "current_e8e7_preflight_passed": true,
+  "historical_only": true,
+  "original_receipt_sha256": "7cfd57ba1c043173516db8442528885558bfa973b366c66cbfcaa9a6e0a361bc",
+  "phase": "Earlier9e0 unpublished carry preflight",
+  "prior_error": {
+    "classification": "Reviewer path expectation error, corrected without source change or test retry",
+    "error": "Expected tools/played/test.sh; actual changed file is tools/played/stand-in-test.sh",
+    "preserved": true,
+    "stage": "independent carry preflight"
+  }
+}

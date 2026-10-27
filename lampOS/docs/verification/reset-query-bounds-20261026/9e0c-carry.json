@@ -1,0 +1,12 @@
+{
+  "oldbase": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "newbase": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+  "oldhead": "ebd641e1fb4ccc0fbb250287c4428013389c61db",
+  "newhead": "d5e72ea9bf30d9d50adf38b1a4fd986f0ae6191a",
+  "all_authored_blobs_and_modes_unchanged": {
+    "lampOS/crates/setup/src/reset.rs": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+    "lampOS/crates/setup/src/reset/query.rs": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob d31c177ea2ef2819977e04d83982e2cb0c4fb3bf\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/setup.md": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md"
+  }
+}

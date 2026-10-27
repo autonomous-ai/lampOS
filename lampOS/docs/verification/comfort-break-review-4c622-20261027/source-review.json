@@ -1,0 +1,28 @@
+{
+  "confirmed": [
+    "faces_at_most accepted only on humans/faces/tracked, range1..8 and no other comparison/presence/field selector.",
+    "Payload must deserialize into Faces and every face must pass check. Current skill does not opt into unknown holds for faces.",
+    "Freshness uses default 2s lifespan; a gap restarts the 1m condition clock, while a current false payload removes it.",
+    "Existing trigger gap/rearm/cooldown, active/quiet, group budget, rest and stop handling retained.",
+    "Skill kind installable and NOT_PRODUCT_SKILLS exclusion prevent automatic product installation; explicit installation enables it.",
+    "Old strict TestFile reader refuses the unknown field and load_all retains other valid skills while collecting the error. Source-only backwards compatibility inference, not an old-binary run.",
+    "Spoken prompt, model skill description, displayed name and stop description avoid naming a place or bodily need.",
+    "In-memory daily/rest/snooze state can reset on process restart; explicit off names persist."
+  ],
+  "head": "4c622500ae5619aa7946d51fcb1062e612d1fb37",
+  "limits": [
+    "No physical lamp, face detector reliability, latency, privacy outside tracked view, actual generated spoken wording or installed acceptance demonstrated.",
+    "No new runtime fixture specifically probes malformed/missing/expired faces for FacesAtMost; source read follows existing freshness/validation mechanisms.",
+    "Existing P3 doc-comment attachment and sitting baseline wording noted by prior reader remain.",
+    "Exactly eight nonempty fixture folders statically enumerated; the actual CLI reports aggregate8 and zero unrecorded, not one stdout row per case."
+  ],
+  "p1_p2": [],
+  "p3": [
+    {
+      "finding": "faces_at_most=1 plus unknown=\"holds\" without for is accepted even though the diagnostic scopes unknown to a field test. condition_holds returns true before any face sample. Shipped comfort-break has for=1m and no override, so not affected. Source-only finding; no independent runtime probe.",
+      "line": 3104,
+      "path": "lampOS/crates/skills/src/lib.rs"
+    }
+  ],
+  "verified_ancestor": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d"
+}

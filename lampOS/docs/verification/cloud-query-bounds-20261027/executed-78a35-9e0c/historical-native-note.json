@@ -1,0 +1,13 @@
+{
+  "base": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "head": "553e0d653eb9557a7b804e8fb6c469c102159808",
+  "leak_count": 1,
+  "leak_scope": "SameVoice",
+  "native_conclusion": "success",
+  "note": "Historical native evidence is separate from this new78a/9e0c host qualification and is not added to its census.",
+  "old_head_rerun": false,
+  "pass_count": 11458,
+  "retained_tracking_issue": 3572,
+  "source": "Parent root report; not independently reaudited within this host gate",
+  "waiver": false
+}

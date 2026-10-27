@@ -1,0 +1,21 @@
+{
+  "command": [
+    "<reviewer-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-cloud",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=16"
+  ],
+  "disk_free_before": 36051808256,
+  "elapsed_seconds": 13.758,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "2a9b9c97da3df07db449f0382046db4e999eca4c6486a09368f0e76bbbb30682",
+  "source_entries": 7245,
+  "source_unchanged": true
+}

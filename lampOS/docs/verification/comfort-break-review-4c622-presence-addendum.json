@@ -1,0 +1,12 @@
+{
+  "head": "4c622500ae5619aa7946d51fcb1062e612d1fb37",
+  "scope": "Source-only follow-up, no compilation or runtime probe",
+  "zero_faces": "Cannot create a new pending-trigger run: skills/lib.rs5989-6017 checks current trigger holds and always continues on false; gap preserves clocks only.",
+  "policy_answer": "Engine::still requires fresh current trigger and conditions at skills/lib.rs5705-5733; skills/main.rs2462 calls it before accepting a Policy answer.",
+  "queued_items": "skills/main.rs1484 rechecks Engine::still for queued item runs; this skill is not an item-queued skill.",
+  "already_started": "No claim that every output step of an admitted run rechecks presence or cancels when someone leaves.",
+  "replacement": "A sole replacement near face can inherit the timer within2m when room/activity is absent, because sitting_s explicitly sets unknown=holds. Face IDs are not tracked by this trigger. Activity uses geometric sitter following and optional prints, not unconditional identity continuity.",
+  "activity_lines": "eyes/activity.rs319-329 resets sitting after its gap;377-395 follows geometry;515-535 emits sitting_s0 when away after20s. A replacement in the same geometry need not reset the clock without optional print discrimination.",
+  "fixture_limit": "quiet-when-they-stood-up has3m empty, exceeding2m triggergap; it does not prove no replacement inherits a pending chance.",
+  "recommendation": "Qualify READ-OK as current validated tracked-face count/freshness behavior, not proof the original sitter remains. This source inference is not an executed replacement counterexample."
+}

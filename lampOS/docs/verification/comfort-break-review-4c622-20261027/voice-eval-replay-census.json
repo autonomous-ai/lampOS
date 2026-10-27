@@ -1,0 +1,41 @@
+{
+  "cases": [
+    [
+      "export::tests::stretch_breaks_cases_rebuilt_from_the_export_replay_the_same",
+      "ok"
+    ]
+  ],
+  "counts": {
+    "failed": 0,
+    "filtered": 377,
+    "ignored": 0,
+    "passed": 1
+  },
+  "nested_summary_count": 0,
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_voice_eval-95e00a0b23fde87b)",
+      "sha256": "e815549add3129ec35d162b1896fd1c062310c27f257d96986a8c755008408d1"
+    }
+  ],
+  "scope": "voice-eval-replay",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 377,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_voice_eval-95e00a0b23fde87b)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 377 filtered out; finished in 0.09s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ],
+  "unique_case_rows": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_voice_eval-95e00a0b23fde87b)",
+      "name": "export::tests::stretch_breaks_cases_rebuilt_from_the_export_replay_the_same",
+      "status": "ok"
+    }
+  ]
+}

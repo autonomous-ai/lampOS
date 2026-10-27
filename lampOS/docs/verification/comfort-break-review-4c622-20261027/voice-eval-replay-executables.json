@@ -1,0 +1,22 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "path": "<target>/debug/deps/lamp_voice_eval-95e00a0b23fde87b",
+    "sha256": "e815549add3129ec35d162b1896fd1c062310c27f257d96986a8c755008408d1",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_voice_eval",
+      "src_path": "<source>/lampOS/crates/voice-eval/src/lib.rs",
+      "test": true
+    }
+  }
+]

@@ -1,0 +1,941 @@
+{
+  "cases": [
+    [
+      "a_build_without_a_part_is_refused_before_anything_is_written",
+      "ok"
+    ],
+    [
+      "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+      "ok"
+    ],
+    [
+      "a_file_that_does_not_match_installs_nothing_of_it",
+      "ok"
+    ],
+    [
+      "a_moved_lamp_is_given_the_product_voices_five_lines",
+      "ok"
+    ],
+    [
+      "a_newer_default_replaces_only_a_setting_nobody_changed",
+      "ok"
+    ],
+    [
+      "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+      "ok"
+    ],
+    [
+      "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said",
+      "ok"
+    ],
+    [
+      "a_closed_etc_lampos_is_said_and_left_as_it_is",
+      "ok"
+    ],
+    [
+      "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+      "ok"
+    ],
+    [
+      "a_device_key_found_open_is_narrowed_and_never_said",
+      "ok"
+    ],
+    [
+      "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install",
+      "ok"
+    ],
+    [
+      "a_blank_lamp_runs_every_product_skill_as_the_skill",
+      "ok"
+    ],
+    [
+      "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+      "ok"
+    ],
+    [
+      "a_disabled_core_skill_turned_on_stays_on_through_an_install",
+      "ok"
+    ],
+    [
+      "a_build_without_the_bodys_factory_tools_still_installs",
+      "ok"
+    ],
+    [
+      "a_setting_written_but_not_yet_recorded_is_still_installs",
+      "ok"
+    ],
+    [
+      "every_part_of_the_brain_has_a_product_unit",
+      "ok"
+    ],
+    [
+      "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "ok"
+    ],
+    [
+      "every_skill_folder_is_in_the_product_or_says_why_not",
+      "ok"
+    ],
+    [
+      "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+      "ok"
+    ],
+    [
+      "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+      "ok"
+    ],
+    [
+      "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+      "ok"
+    ],
+    [
+      "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+      "ok"
+    ],
+    [
+      "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+      "ok"
+    ],
+    [
+      "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+      "ok"
+    ],
+    [
+      "a_reset_then_prepare_does_not_restore_the_old_key",
+      "ok"
+    ],
+    [
+      "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+      "ok"
+    ],
+    [
+      "harness_versions_are_read_as_harness_prints_them",
+      "ok"
+    ],
+    [
+      "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+      "ok"
+    ],
+    [
+      "a_setting_in_the_way_stops_the_install_before_any_is_written",
+      "ok"
+    ],
+    [
+      "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+      "ok"
+    ],
+    [
+      "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+      "ok"
+    ],
+    [
+      "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+      "ok"
+    ],
+    [
+      "harness_at_boot_gives_lamposs_manager_its_home_first",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "harness_off_after_a_first_install_leaves_no_linger",
+      "ok"
+    ],
+    [
+      "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+      "ok"
+    ],
+    [
+      "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+      "ok"
+    ],
+    [
+      "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+      "ok"
+    ],
+    [
+      "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+      "ok"
+    ],
+    [
+      "harness_on_keeps_a_harness_already_there",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+      "ok"
+    ],
+    [
+      "lamp_update_back_waits_for_its_binary_rather_than_failing",
+      "ok"
+    ],
+    [
+      "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+      "ok"
+    ],
+    [
+      "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+      "ok"
+    ],
+    [
+      "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+      "ok"
+    ],
+    [
+      "product_units_pass_only_options_an_older_binary_takes",
+      "ok"
+    ],
+    [
+      "install_head_body_keeps_factory_calibration",
+      "ok"
+    ],
+    [
+      "install_records_the_tmpfiles_it_writes",
+      "ok"
+    ],
+    [
+      "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+      "ok"
+    ],
+    [
+      "second_review_body_head_off_refuses_before_bundle_mutation",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+      "ok"
+    ],
+    [
+      "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+      "ok"
+    ],
+    [
+      "the_exit_note_allowlist_is_exactly_clouds_product_services",
+      "ok"
+    ],
+    [
+      "settings_written_before_one_that_fails_are_still_installs",
+      "ok"
+    ],
+    [
+      "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+      "ok"
+    ],
+    [
+      "the_pinned_models_are_the_ones_their_parts_check",
+      "ok"
+    ],
+    [
+      "the_plans_install_shipped_are_listed",
+      "ok"
+    ],
+    [
+      "the_product_full_look_is_on_in_both_units_with_one_file",
+      "ok"
+    ],
+    [
+      "the_product_keeps_nothing_personal_while_nobody_is_known",
+      "ok"
+    ],
+    [
+      "the_product_sees_who_speaks",
+      "ok"
+    ],
+    [
+      "the_product_skills_are_exactly_the_core_skills",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_keeps_a_benign_drop_in",
+      "ok"
+    ],
+    [
+      "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+      "ok"
+    ],
+    [
+      "the_tasks_part_closes_the_harness_a_told_task_started",
+      "ok"
+    ],
+    [
+      "the_device_key_is_provisioned_private_and_only_where_missing",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+      "ok"
+    ],
+    [
+      "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+      "ok"
+    ],
+    [
+      "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+      "ok"
+    ],
+    [
+      "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+      "ok"
+    ],
+    [
+      "music_sway_and_watch_you_leave_are_on_in_the_product",
+      "ok"
+    ],
+    [
+      "what_harness_service_status_still_has_is_read_from_its_json",
+      "ok"
+    ],
+    [
+      "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+      "ok"
+    ],
+    [
+      "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+      "ok"
+    ],
+    [
+      "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+      "ok"
+    ],
+    [
+      "prepare_then_reset_then_install_does_not_restore_the_old_key",
+      "ok"
+    ],
+    [
+      "run_twice_it_changes_nothing",
+      "ok"
+    ],
+    [
+      "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+      "ok"
+    ],
+    [
+      "the_builds_plan_already_there_is_no_change_and_no_backup",
+      "ok"
+    ],
+    [
+      "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+      "ok"
+    ],
+    [
+      "the_tasks_part_waits_for_harness_rather_than_failing",
+      "ok"
+    ],
+    [
+      "unreadable_records_stop_install_rather_than_being_written_over",
+      "ok"
+    ],
+    [
+      "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+      "ok"
+    ],
+    [
+      "harness_is_set_to_start_at_boot_once_when_it_is_there",
+      "ok"
+    ],
+    [
+      "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+      "ok"
+    ],
+    [
+      "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+      "ok"
+    ],
+    [
+      "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+      "ok"
+    ],
+    [
+      "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+      "ok"
+    ],
+    [
+      "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+      "ok"
+    ],
+    [
+      "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+      "ok"
+    ]
+  ],
+  "counts": {
+    "failed": 0,
+    "filtered": 0,
+    "ignored": 0,
+    "passed": 101
+  },
+  "nested_summary_count": 0,
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "sha256": "34914c724d054b01714d3414a3a21a69090704dae835eef3f3fb2af82520fd34"
+    }
+  ],
+  "scope": "update-install",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "ignored": 0,
+      "literal": "test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 108.45s",
+      "passed": 101,
+      "status": "ok"
+    }
+  ],
+  "unique_case_rows": [
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_build_without_a_part_is_refused_before_anything_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_file_that_does_not_match_installs_nothing_of_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_moved_lamp_is_given_the_product_voices_five_lines",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_newer_default_replaces_only_a_setting_nobody_changed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_closed_etc_lampos_is_said_and_left_as_it_is",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_device_key_found_open_is_narrowed_and_never_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_blank_lamp_runs_every_product_skill_as_the_skill",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_disabled_core_skill_turned_on_stays_on_through_an_install",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_build_without_the_bodys_factory_tools_still_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_setting_written_but_not_yet_recorded_is_still_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "every_part_of_the_brain_has_a_product_unit",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "every_skill_folder_is_in_the_product_or_says_why_not",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_reset_then_prepare_does_not_restore_the_old_key",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_versions_are_read_as_harness_prints_them",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_setting_in_the_way_stops_the_install_before_any_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_at_boot_gives_lamposs_manager_its_home_first",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_off_after_a_first_install_leaves_no_linger",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_keeps_a_harness_already_there",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "lamp_update_back_waits_for_its_binary_rather_than_failing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "product_units_pass_only_options_an_older_binary_takes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_head_body_keeps_factory_calibration",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_records_the_tmpfiles_it_writes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "second_review_body_head_off_refuses_before_bundle_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_exit_note_allowlist_is_exactly_clouds_product_services",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "settings_written_before_one_that_fails_are_still_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_pinned_models_are_the_ones_their_parts_check",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_plans_install_shipped_are_listed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_full_look_is_on_in_both_units_with_one_file",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_keeps_nothing_personal_while_nobody_is_known",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_sees_who_speaks",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_skills_are_exactly_the_core_skills",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_keeps_a_benign_drop_in",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_tasks_part_closes_the_harness_a_told_task_started",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_device_key_is_provisioned_private_and_only_where_missing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "music_sway_and_watch_you_leave_are_on_in_the_product",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "what_harness_service_status_still_has_is_read_from_its_json",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "prepare_then_reset_then_install_does_not_restore_the_old_key",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "run_twice_it_changes_nothing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_builds_plan_already_there_is_no_change_and_no_backup",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_tasks_part_waits_for_harness_rather_than_failing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "unreadable_records_stop_install_rather_than_being_written_over",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_is_set_to_start_at_boot_once_when_it_is_there",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+      "status": "ok"
+    }
+  ]
+}

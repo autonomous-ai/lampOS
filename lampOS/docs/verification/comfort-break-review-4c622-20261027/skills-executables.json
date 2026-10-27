@@ -1,0 +1,142 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/lamp_skills-171e5dd82d4750be",
+    "sha256": "ddd64fef440b4b4dc2b286cac3e0c136913ddb6dba9a592c3491334f217d7ad1",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-skills",
+      "src_path": "<source>/lampOS/crates/skills/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/lamp-skills",
+    "sha256": "85fccf1e1e91a96142d7bff849752f86cb5bc4cdf186204b8adc5b6ae0e7e8b0",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-skills",
+      "src_path": "<source>/lampOS/crates/skills/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/it-1a236b90d659ff16",
+    "sha256": "803c4edd00bad6e3022ab8b7f1cce37f4c428877f2f517901182f6135e7cfd01",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<source>/lampOS/crates/skills/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/examples/render_relaxing_music",
+    "sha256": "1e9254a67180eb1cb6f32f0d7ee9f5a905b654d4a0fc28123a357c1c7f81bb55",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "example"
+      ],
+      "name": "render_relaxing_music",
+      "src_path": "<source>/lampOS/crates/skills/examples/render_relaxing_music.rs",
+      "test": false
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/release_pair-f6790fe5eb42a3af",
+    "sha256": "39eda875c377edd897b1c97d95757c6fd937d24b2bafdd9c127cfc11838d0f97",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "release_pair",
+      "src_path": "<source>/lampOS/crates/skills/tests/release_pair.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/requested_audio-4485cfdf80ce6ed5",
+    "sha256": "aa501d94e7d7c8072eec456afb3c8adba7742a9b3cc1250b141344230d860f66",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "requested_audio",
+      "src_path": "<source>/lampOS/crates/skills/tests/requested_audio.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/lamp_skills-6dbb59343968e119",
+    "sha256": "540f264a1c92372bc36336ee6d63f3810b8cb8348d82ba0089cce067f134cfcc",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_skills",
+      "src_path": "<source>/lampOS/crates/skills/src/lib.rs",
+      "test": true
+    }
+  }
+]

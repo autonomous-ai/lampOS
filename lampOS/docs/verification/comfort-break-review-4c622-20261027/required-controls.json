@@ -1,0 +1,20 @@
+{
+  "skills::a_comfort_break_never_names_the_bathroom": [
+    [
+      "skills::a_comfort_break_never_names_the_bathroom",
+      "ok"
+    ]
+  ],
+  "skills::every_skill_folder_passes_its_own_recorded_tests": [
+    [
+      "skills::every_skill_folder_passes_its_own_recorded_tests",
+      "ok"
+    ]
+  ],
+  "skills::faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere": [
+    [
+      "skills::faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere",
+      "ok"
+    ]
+  ]
+}

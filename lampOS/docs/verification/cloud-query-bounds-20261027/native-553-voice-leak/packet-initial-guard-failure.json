@@ -1,0 +1,6 @@
+{
+  "exit_code": 1,
+  "script_sha256": "0e64a2a1309f7a7fe5c7861a2c1036fee3b03713d88d670f3e851e3feee397d2",
+  "reason": "Strict clean-pass guard refused successful GitHub job with nextest LEAK; no tests rerun.",
+  "raw_summary": "11459 tests run: 11459 passed (1 leaky), 106 skipped"
+}

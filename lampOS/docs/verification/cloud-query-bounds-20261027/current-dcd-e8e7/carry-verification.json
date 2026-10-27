@@ -1,0 +1,24 @@
+{
+  "all_authored_blob_modes_verified": [
+    "lampOS/Cargo.lock",
+    "lampOS/crates/cloud/Cargo.toml",
+    "lampOS/crates/cloud/src/reports.rs",
+    "lampOS/crates/cloud/src/reports/query.rs",
+    "lampOS/crates/cloud/src/reports/query_tests.rs",
+    "lampOS/docs/cloud.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "base": "e8e7ac36a74062f567b4afb3d64beef6002d1f5c",
+  "base_changed_paths": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/switches.md"
+  ],
+  "head": "dcd4b9b2dfc917714d0718e48f71b2af96499eef",
+  "note": "Prior9e0 executed heads were unpublished; they remain historical source identities. Earlier filename preflight error is separate and does not describe this preflight.",
+  "prior_base": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+  "prior_head": "78a35fe5d013f28dd62ab36468d6b3149abafc77",
+  "root_proof_sha256": "22e2483c01b3f7318a8c49f83e0328f45a1437570f2324ca98bcb3cd28e58e98",
+  "source_clean": true
+}

@@ -1,3 +1,19 @@
+Ready for lamp-voice: no (#3631 and #3644 current e8e7 native pending); updater already delivered
+
+## Current checkpoint: 2026-10-27 10:26 +07, current heads and exact leak accounting
+
+Current pushed heads on Main **e8e7ac36a** are Reset **8870cf489** and Cloud **dcd4b9b2d**. [Reset full serial host gate](verification/reset-query-bounds-20261026/current-887-e8e7/README.txt) passes fmt, strict Setup/Cloud Clippy and **389/0/5**, all eight query controls. [Cloud full host gate](verification/cloud-query-bounds-20261027/current-dcd-e8e7/README.txt) passes fmt, strict Cloud Clippy and **204/0/4**, all eight controls. Source, configuration, status and actual/preserved artifact guards close. All four/seven authored blobs and modes remain unchanged. Earlier successful 9e0 host executions were not pushed because Main advanced before the push guards; their distinct packets and corrected filename-preflight error remain historical. No test assertion changed or old-head runtime retried.
+
+[Previous Reset ebd/5982 native proof](verification/reset-query-bounds-20261026/native-ebd-5982/README.md): original ARM 40440039649/Linux 40440039673 pass, **1,452 unique passes / 0 bad / 9 skipped / 0 selected unrun**, eight controls once, exact current package selection and preview identity. Separate docs 4, process 13, helper 25 and relay pass. The final Main check caught a later base advance; that pass is not relabelled as current 887 execution. Original current ARM 40443537543/Linux 40443537415 are collecting.
+
+[Cloud 553e0d653 / 5982e4b7f audit](verification/cloud-query-bounds-20261027/native-553-voice-leak/README.md) preserves GitHub job success but **11,458 PASS + 1 LEAK**, 106 skipped, zero selected unrun. The exact Voice case is `same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again`; it is not a Cloud control. All eight Cloud controls, Clippy and both extra reader workflows pass. The strict audit guard stopped first, and the corrected accounting retains the leak rather than calling it a clean pass. Tests owns the fixture under #3572 and received exact evidence on that PR, #3644 and Queue. No cause, waiver or old-run retry. Original current Cloud ARM 40443284601/Linux 40443284626 and both reader checks are collecting.
+
+[Independent comfort-break review](verification/comfort-break-review-4c622-20261027/README.md) on exact 4c622500a / 33d5627ca has fmt/strict Skills+Update Clippy, full Skills **527/0/9**, Update install **101/0/0**, focused Cloud loader **24/0/0** (144 filtered), and exact VoiceEval replay **1/0/0** (377 filtered). Eight extra CLI scene results overlap the aggregate fixture test and are reported separately. All source/configuration and per-scope actual/preserved artifacts are guarded; no device, actual speech, or current-Main acceptance. A [source-only presence addendum](verification/comfort-break-review-4c622-presence-addendum.json) confirms fresh zero/missing/expired faces cannot start a run and Policy answers recheck presence. Occupancy timing is not proof of sitter identity: a replacement within the gap can inherit it under the documented fallback. The shipped face-count gate has no unknown override; the custom loader override edge remains nonblocking.
+
+Reset's old ff03/737 timing failure and unchanged 150 ms assertion stay separate. First has the recommended next merge slot to avoid repeatedly overtaken qualification cycles. Updater #3635 is already incorporated in Main; own-keys #3510 is superseded by Third's #3646 with activation holds retained. No device, key, provider, signing or release action.
+
+---
+
 Ready for lamp-voice: yes (#3635 delivered through train 196); no (#3631 and #3644 current native pending)
 
 ## Current checkpoint: 2026-10-27 09:53 +07, updater delivered and remaining carries current

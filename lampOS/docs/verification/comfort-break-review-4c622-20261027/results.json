@@ -1,0 +1,389 @@
+{
+  "primary_complete": {
+    "base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+    "complete": true,
+    "head": "4c622500ae5619aa7946d51fcb1062e612d1fb37",
+    "note": "Full Skills plus focused Update install; supplemental eight-case CLI is separately reported, not added. Earlier scope actual files may be replaced by later compile; preserved copies and prior closure retain identity.",
+    "scopes": [
+      "skills",
+      "update-install"
+    ],
+    "source_entries": 7268,
+    "source_unchanged": true
+  },
+  "primary_identity": {
+    "base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+    "controller_sha256": "4137aedbb77722b137545c40ff4bdca56f402db8a576a2d07356c353e91555d1",
+    "head": "4c622500ae5619aa7946d51fcb1062e612d1fb37",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "raw_receipts_sha256": {
+    "cloud-skills/compile.json": "482deeb9f43555c2e71a9d3aec5b90456f8b0364c26a5625ae2ce12a0c80898e",
+    "cloud-skills/depfiles.json": "0e11f02b2326bdddd622502809c63a1a1d4e601ae8f497f97f56d02d15c2615b",
+    "cloud-skills/local-outputs.json": "1566d828ad876d0e4f43afa377cb26ff9bac61ce1307fa17c97496145d138dd7",
+    "cloud-skills/runtime.json": "d00398a3b846ec4dbb485b38fada3beb5339cd8b79434bc677dd720fb56d5b74",
+    "primary/clippy.json": "da35ebf3ed2119d8f84ebf8bea356616ae3bf449778f2a947cd088c3f586ede8",
+    "primary/comfort-cli.json": "08aa6256cd076382b671e3431d02eca1b8cbad88bd05cf2bcfd9db2440fb6bbe",
+    "primary/fmt.json": "70feda2de41aec9786b43ece2a8d5a11a3c64d4b5355f390c28409d319e580cd",
+    "primary/metadata.json": "13399cc1132c40f25fe735f8284ce99061b905058a58d7da347c67d980a9a7e1",
+    "skills/compile.json": "d2154b20c3ae7ac18d8584b7df2e4fa4b76fa8c4561aa00cb9a4b029293fa756",
+    "skills/depfiles.json": "fb54ecb16407d68a0d71d0a3ecc6647c71a5ee6601716b9ae9f0411b9cbf82d5",
+    "skills/local-outputs.json": "f465d64a4a1438bee62b5aa294e4e70ae9762eccdf25a26fc8fd4f3fe01816a6",
+    "skills/runtime.json": "5820e852aab6d4a84ed0962951810a1d63c248cc8648655fb026f4913ab4544f",
+    "update-install/compile.json": "3fafd7c83236de7c9203e0a00f22454a65b93794def087afa1fa8827ee8c47db",
+    "update-install/depfiles.json": "3446d4fe1fa8ff49a6f62f39f32740c066a60144659ca40de66f3cfd4204f0a9",
+    "update-install/local-outputs.json": "fb29dd09d1a92fca521f0f553505bf02bb6bd15cb9e65e6e9aa1c190eb086e08",
+    "update-install/runtime.json": "2c2fbf1f130de89aaa30f615fc0f32746b2b128836deb37b84e3d23ccbc3b1db",
+    "voice-eval-replay/compile.json": "05741e754f2df8284a243e51709b6f6aa30776918570620c7e31e6f0f4a860a4",
+    "voice-eval-replay/depfiles.json": "9996ba29784af66abe1b115ea817e2336ba00be14f51f61876d19a6f3f93852e",
+    "voice-eval-replay/local-outputs.json": "4e60da22ba7e70a63c9efb52ed479c730395ec194014918c06c527df918de5e9",
+    "voice-eval-replay/runtime.json": "a62dfd62548ac8c2b7aa1482ec483eec4e5a3d8eedc2eca6c1e144b046b0e440"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 43228393472,
+      "elapsed_seconds": 84.45,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "cc778637478220c48adcc8b420e57fd3d5fe622099331b55b34a8f7624f856d2",
+      "source_entries": 7268,
+      "source_unchanged": true
+    },
+    "comfort-cli": {
+      "command": [
+        "<target>/debug/lamp-skills",
+        "test",
+        "<source>/lampOS/skills/comfort-break"
+      ],
+      "disk_free_before": 41046515712,
+      "elapsed_seconds": 1.701,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "791dee493212ae80115355bf908885c80e5e1b47d4c846e9de5bc71e96a5706e",
+      "source_entries": 7268,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 43229540352,
+      "elapsed_seconds": 6.719,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7268,
+      "source_unchanged": true
+    },
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 43231584256,
+      "elapsed_seconds": 0.909,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "604485e05d9686cc1e8a2a100470b94a58c768ff59f3aaf2591552b6b2209412",
+      "source_entries": 7268,
+      "source_unchanged": true
+    }
+  },
+  "reverse_complete": {
+    "base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+    "complete": true,
+    "head": "4c622500ae5619aa7946d51fcb1062e612d1fb37",
+    "note": "Focused Cloud shared-loader module and exact VoiceEval export/replay reader only; other tests unrun. Earlier scope actual paths may be overwritten by later compile; preserved copies and completed closures retain identity.",
+    "scopes": [
+      "cloud-skills",
+      "voice-eval-replay"
+    ],
+    "source_entries": 7268,
+    "source_unchanged": true
+  },
+  "reverse_identity": {
+    "base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+    "controller_sha256": "7dd4f0a333e7c8c90b6a2385ab5c9f8e524009f19a98dbdecbe57c02008fd11c",
+    "head": "4c622500ae5619aa7946d51fcb1062e612d1fb37",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "scopes": {
+    "cloud-skills": {
+      "closure": {
+        "actual_and_preserved_outputs_unchanged": true,
+        "depfile_count": 481,
+        "executable_count": 1,
+        "exit_code": 0,
+        "local_output_count": 52,
+        "source_unchanged": true
+      },
+      "counts": {
+        "failed": 0,
+        "filtered": 144,
+        "ignored": 0,
+        "passed": 24
+      },
+      "receipts": {
+        "compile": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-cloud",
+            "--lib",
+            "skills::tests::",
+            "--no-run",
+            "--message-format=json"
+          ],
+          "disk_free_before": 40517611520,
+          "elapsed_seconds": 88.363,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "6fed4d165b8873d149ca532fbe7396bb30aea24e2b907c2b77c97a9ae9c0f70b",
+          "source_entries": 7268,
+          "source_unchanged": true
+        },
+        "runtime": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-cloud",
+            "--lib",
+            "skills::tests::",
+            "--no-fail-fast",
+            "--",
+            "--test-threads=16"
+          ],
+          "disk_free_before": 38970712064,
+          "elapsed_seconds": 2.439,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "d83373889dc0ab07bd522b38605d3c4acea3667aaecc993868e030caa99eaa63",
+          "source_entries": 7268,
+          "source_unchanged": true
+        }
+      }
+    },
+    "skills": {
+      "closure": {
+        "actual_and_preserved_outputs_unchanged": true,
+        "depfile_count": 417,
+        "executable_count": 7,
+        "exit_code": 0,
+        "local_output_count": 54,
+        "source_unchanged": true
+      },
+      "counts": {
+        "failed": 0,
+        "filtered": 0,
+        "ignored": 9,
+        "passed": 527
+      },
+      "receipts": {
+        "compile": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-skills",
+            "--no-run",
+            "--message-format=json"
+          ],
+          "disk_free_before": 42995695616,
+          "elapsed_seconds": 113.235,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "69b3e2c1c0e49ad0dbb4d9d4b9086b86ba48a32ee6a52198d945fcde33b4155b",
+          "source_entries": 7268,
+          "source_unchanged": true
+        },
+        "runtime": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--",
+            "--test-threads=16"
+          ],
+          "disk_free_before": 41047425024,
+          "elapsed_seconds": 47.316,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "0d9aa4d388ba810e9f1f8975d1ae44e6acfd0305bf9631a92350161b0d6b0ac6",
+          "source_entries": 7268,
+          "source_unchanged": true
+        }
+      }
+    },
+    "update-install": {
+      "closure": {
+        "actual_and_preserved_outputs_unchanged": true,
+        "depfile_count": 420,
+        "executable_count": 2,
+        "exit_code": 0,
+        "local_output_count": 51,
+        "source_unchanged": true
+      },
+      "counts": {
+        "failed": 0,
+        "filtered": 0,
+        "ignored": 0,
+        "passed": 101
+      },
+      "receipts": {
+        "compile": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-update",
+            "--test",
+            "install",
+            "--no-run",
+            "--message-format=json"
+          ],
+          "disk_free_before": 41046593536,
+          "elapsed_seconds": 3.779,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "d131ede37662e6ccfe6c7a1aa20ffb986628fa40d424407a281b97fe77fea9eb",
+          "source_entries": 7268,
+          "source_unchanged": true
+        },
+        "runtime": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-update",
+            "--test",
+            "install",
+            "--no-fail-fast",
+            "--",
+            "--test-threads=16"
+          ],
+          "disk_free_before": 40522489856,
+          "elapsed_seconds": 110.082,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "79f145e2154bd9c701824d767f2e59464c28941122e27b7bd9733a4ab441f4c7",
+          "source_entries": 7268,
+          "source_unchanged": true
+        }
+      }
+    },
+    "voice-eval-replay": {
+      "closure": {
+        "actual_and_preserved_outputs_unchanged": true,
+        "depfile_count": 610,
+        "executable_count": 1,
+        "exit_code": 0,
+        "local_output_count": 60,
+        "source_unchanged": true
+      },
+      "counts": {
+        "failed": 0,
+        "filtered": 377,
+        "ignored": 0,
+        "passed": 1
+      },
+      "receipts": {
+        "compile": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-voice-eval",
+            "--lib",
+            "export::tests::stretch_breaks_cases_rebuilt_from_the_export_replay_the_same",
+            "--no-run",
+            "--message-format=json"
+          ],
+          "disk_free_before": 38987091968,
+          "elapsed_seconds": 172.307,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "d5adcf15c517683a849dd7c6ca0cff04e82a72c37f1a0029cbb822559d34676e",
+          "source_entries": 7268,
+          "source_unchanged": true
+        },
+        "runtime": {
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "lamp-voice-eval",
+            "--lib",
+            "export::tests::stretch_breaks_cases_rebuilt_from_the_export_replay_the_same",
+            "--no-fail-fast",
+            "--",
+            "--test-threads=16",
+            "--exact"
+          ],
+          "disk_free_before": 36633632768,
+          "elapsed_seconds": 1.859,
+          "error": null,
+          "exit_code": 0,
+          "log_sha256": "abdab0ff9948e0e3d1c332edb35cfe3ca2bc4aa7ae4aec0bba222788301117cd",
+          "source_entries": 7268,
+          "source_unchanged": true
+        }
+      }
+    }
+  },
+  "source_inventory_sha256": "200c268e5d3698976d7f9863613a1b6acdee8cc70435a332ba3d1122f6b799f4"
+}

@@ -1,0 +1,9 @@
+{
+  "binding": {
+    "note": "Supplemental replay of recordings also reached by aggregate full-suite case; do not add to libtest counts.",
+    "path": "<target>/debug/lamp-skills",
+    "sha256": "85fccf1e1e91a96142d7bff849752f86cb5bc4cdf186204b8adc5b6ae0e7e8b0"
+  },
+  "note": "Aggregate8/0 plus exact eight nonempty directory inventory and run_tests enumeration bind all eight cases. No per-case stdout exists. These are supplemental fixture replays, not added to libtest totals.",
+  "stdout": "<source>/lampOS/skills/comfort-break: 8 cases pass, 0 have no recording yet\n"
+}

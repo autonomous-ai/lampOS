@@ -1,0 +1,9 @@
+{
+  "base": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "head": "ebd641e1fb4ccc0fbb250287c4428013389c61db",
+  "native_nonpass_terminal_rows": 0,
+  "native_packet_manifest_sha256": "bfffa29510fbaf17bd801f31721575f4c36e0836f67bdec3f10f8832005732ec",
+  "native_unique_passes": 1452,
+  "note": "Prior native ebd identity remains historical and untouched; not added to current8870/e8e7 host serial census.",
+  "prior_note_sha256": "62c98f60eccfec0cf818562f89c087b3155a32026dfcad41a2a69d137adc9e1e"
+}

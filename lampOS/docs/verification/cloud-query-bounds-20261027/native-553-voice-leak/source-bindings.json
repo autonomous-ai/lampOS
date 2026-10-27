@@ -1,0 +1,15 @@
+{
+  "files": {
+    "lampOS/crates/cloud/src/reports.rs": {
+      "sha256": "d27bc36695ff82e4cba65cfb2749e48d7b9d38482543dffb039b8db0a4c73dbe"
+    },
+    "lampOS/crates/cloud/src/reports/query.rs": {
+      "sha256": "23df4a7092a7c4829afb6afa9a95738c6b7aeb388fe5f0a8fc42d130c893e444"
+    },
+    "lampOS/crates/cloud/src/reports/query_tests.rs": {
+      "sha256": "f1a27568a258db6eceb79c1d9c900b63b8974a299407a0a4367a38bfb9a1b787"
+    }
+  },
+  "head": "553e0d653eb9557a7b804e8fb6c469c102159808",
+  "tree": "7d25d6fcae8daf56384108fdb610c85c6640667a"
+}

@@ -1,0 +1,21 @@
+{
+  "actual_preserved_outputs_depfiles_executables_verified_before_compile": true,
+  "changed_source_entries": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/switches.md"
+  ],
+  "previous_head": "78a35fe5d013f28dd62ab36468d6b3149abafc77",
+  "prior_closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 439,
+    "executable_count": 5,
+    "exit_code": 0,
+    "local_output_count": 58,
+    "source_unchanged": true
+  },
+  "prior_closure_sha256": "1e7bea44b25595a86e4362d2a83330d330a4c2df443d5f52a07db29174f6d14d",
+  "prior_source_sha256": "a9a69f1778227a7b97899b962ca0d0cfa9834d4997b7fac9cb4c4eaf28078ae7",
+  "reason": "Carry ontoe8e7 using latest9e0c/78a35 successful completed boundary. Earlier sandbox-failed131/73/4 remains separate; its old actual paths are not reasserted after subsequent compilation."
+}

@@ -1,0 +1,314 @@
+{
+  "cases": {
+    "a-break-after-two-hours": {
+      "expect": {
+        "clock": "10:00",
+        "expect": [
+          {
+            "args": {
+              "look_at": "face"
+            },
+            "at": "120m",
+            "call": "body.gaze",
+            "within": "1m"
+          },
+          {
+            "args": {
+              "note": "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+            },
+            "at": "120m",
+            "call": "say",
+            "within": "1m"
+          }
+        ]
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 7800000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "6884d7607fdce3b56c5a70ea04b9dc2c6f40aa6521d474a8e987c236fe2657c6",
+        "humans_faces_tracked.jsonl": "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 7800000000,
+      "record_count": 1021
+    },
+    "held-while-someone-else-is-in-view": {
+      "expect": {
+        "clock": "10:00",
+        "expect": [
+          {
+            "args": {
+              "look_at": "face"
+            },
+            "at": "126m",
+            "call": "body.gaze",
+            "within": "1m"
+          },
+          {
+            "args": {
+              "note": "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+            },
+            "at": "126m",
+            "call": "say",
+            "within": "1m"
+          }
+        ]
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 6900000000,
+          "face_count": 2
+        },
+        {
+          "at_us": 7500000000,
+          "face_count": 1
+        },
+        {
+          "at_us": 8400000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "4a77d33173d11feb0ba1345e5e796dce3c6b53b9382b6800b8e44a01327af15c",
+        "humans_faces_tracked.jsonl": "836fc96bc011248a42c346ea787b67796d8143f3e40351397308f1289bbbeef7",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 8400000000,
+      "record_count": 1421
+    },
+    "let-go-while-someone-else-stays": {
+      "expect": {
+        "clock": "10:00",
+        "none": true
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 6900000000,
+          "face_count": 2
+        },
+        {
+          "at_us": 9600000000,
+          "face_count": 1
+        },
+        {
+          "at_us": 10500000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "793a64fb36221438966b786a9cf50b2fa6613ae471948f68b90bc94b2ca1f738",
+        "humans_faces_tracked.jsonl": "92f24e9e64a4a0583eeb7e0ebc6bf145b9a1cb348c7188aa5a215a6f5070182c",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 10500000000,
+      "record_count": 2821
+    },
+    "off-when-asked": {
+      "expect": {
+        "call_tool": [
+          {
+            "args": {
+              "how": "off"
+            },
+            "at": "1m",
+            "name": "wellbeing_nudges"
+          }
+        ],
+        "clock": "10:00",
+        "none": true
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 7800000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "a572f930794c21c34b93e804f89387fe3f3a42afb60ec866dab64472b3e7e889",
+        "humans_faces_tracked.jsonl": "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 7800000000,
+      "record_count": 1021
+    },
+    "quiet-at-night": {
+      "expect": {
+        "clock": "21:00",
+        "none": true
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 7800000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "c5a02d16987763927433f729c9a642978888cc63744180ce1020f2fe53c7c5ff",
+        "humans_faces_tracked.jsonl": "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 7800000000,
+      "record_count": 1021
+    },
+    "quiet-in-the-evening": {
+      "expect": {
+        "clock": "18:30",
+        "none": true
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 7800000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "eba9d5844946988f2851242afd61ad06d41ca919a25294d40738aa696e6f5ec6",
+        "humans_faces_tracked.jsonl": "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 7800000000,
+      "record_count": 1021
+    },
+    "quiet-when-they-stood-up": {
+      "expect": {
+        "clock": "10:00",
+        "none": true
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 3600000000,
+          "face_count": 0
+        },
+        {
+          "at_us": 3780000000,
+          "face_count": 1
+        },
+        {
+          "at_us": 7980000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "b620312f1a995a297905f8cf2c2b52671a16e9318c701ecbab978f2dea9f05f9",
+        "humans_faces_tracked.jsonl": "bb12af0912d2e425e3c32699d8eda6c4358e55fb8a7f04b6070545d0e3eec45c",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 7980000000,
+      "record_count": 1141
+    },
+    "twice-a-day-at-most": {
+      "expect": {
+        "clock": "09:00",
+        "expect": [
+          {
+            "args": {
+              "look_at": "face"
+            },
+            "at": "120m",
+            "call": "body.gaze",
+            "within": "1m"
+          },
+          {
+            "args": {
+              "note": "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+            },
+            "at": "120m",
+            "call": "say",
+            "within": "1m"
+          },
+          {
+            "args": {
+              "look_at": "face"
+            },
+            "at": "255m",
+            "call": "body.gaze",
+            "within": "1m"
+          },
+          {
+            "args": {
+              "note": "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+            },
+            "at": "255m",
+            "call": "say",
+            "within": "1m"
+          }
+        ]
+      },
+      "face_count_transitions": [
+        {
+          "at_us": 0,
+          "face_count": 1
+        },
+        {
+          "at_us": 7800000000,
+          "face_count": 0
+        },
+        {
+          "at_us": 8100000000,
+          "face_count": 1
+        },
+        {
+          "at_us": 15900000000,
+          "face_count": 0
+        },
+        {
+          "at_us": 16200000000,
+          "face_count": 1
+        },
+        {
+          "at_us": 24000000000,
+          "face_count": 0
+        }
+      ],
+      "files": {
+        "expect.toml": "39ba3a2cd328f0bf9c8e4efefddabaaf035a3090ca2a3a5fd4e6e798e8502675",
+        "humans_faces_tracked.jsonl": "e83ae0da67cc5051049ae2a1bd9b498b0169f2370b117dc1022a6a0d00859da3",
+        "voice_state.jsonl": "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+      },
+      "first_us": 0,
+      "last_us": 24000000000,
+      "record_count": 3081
+    }
+  },
+  "head": "4c622500ae5619aa7946d51fcb1062e612d1fb37",
+  "scope": "Static fixture audit, not execution. Eight nonempty cases are enumerated by run_tests; CLI aggregate eight/zero proves the enumerated set collectively, not individual stdout rows."
+}

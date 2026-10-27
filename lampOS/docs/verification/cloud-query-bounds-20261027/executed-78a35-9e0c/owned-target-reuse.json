@@ -1,0 +1,20 @@
+{
+  "actual_preserved_outputs_depfiles_executables_verified_before_compile": true,
+  "changed_source_entries": [
+    "lampOS/tools/played/README.md",
+    "lampOS/tools/played/stand-in-test.sh",
+    "lampOS/tools/played/stand-in.sh"
+  ],
+  "previous_head": "553e0d653eb9557a7b804e8fb6c469c102159808",
+  "prior_closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 439,
+    "executable_count": 5,
+    "exit_code": 0,
+    "local_output_count": 58,
+    "source_unchanged": true
+  },
+  "prior_closure_sha256": "1e7bea44b25595a86e4362d2a83330d330a4c2df443d5f52a07db29174f6d14d",
+  "prior_source_sha256": "dce138bad5211877981042a20aefa3cc3200355ba73bc23c11897959aa937c74",
+  "reason": "Carry onto9e0c using latest5982/553 successful completed boundary. Earlier sandbox-failed131/73/4 remains separate; its old actual paths are not reasserted after subsequent compilation."
+}

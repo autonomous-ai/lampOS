@@ -1,0 +1,126 @@
+{
+  "lampOS/crates/skills/src/lib.rs": [
+    420,
+    "cda08ae2a09c584043f0a791e9967205eeb5d1ba78957518b25e89b0cdf358f8"
+  ],
+  "lampOS/crates/skills/tests/it/skills.rs": [
+    420,
+    "d1e9d1261b6b5801e0404bebdf73ac3a566ccd77ed118341e8d8e5fdefd2cd02"
+  ],
+  "lampOS/crates/update/src/install.rs": [
+    420,
+    "e2c94674afa0b9a1eee2d7a362b45e32fc07c148f965339a87962984a4b1c82e"
+  ],
+  "lampOS/docs/skills.md": [
+    420,
+    "9eaa83cc02957446e9b922211c39e6f3dd86db29832d53d544ee6b20ddb73c79"
+  ],
+  "lampOS/skills/comfort-break/SKILL.md": [
+    420,
+    "bf798c2912623bb2af28d61f70b006ee9d3d1508a25f70066af8ddb3ce2398ce"
+  ],
+  "lampOS/skills/comfort-break/skill.toml": [
+    420,
+    "33c94d477541ba217079a8f1eef3cc1a6e781617a8b60bf00c0a0d40aefcb607"
+  ],
+  "lampOS/skills/comfort-break/tests/README.md": [
+    420,
+    "8c6b87a9e7ea7d2aedcd21ee83f7d010537aa8e3988d3c67e9b3214735c3d5f9"
+  ],
+  "lampOS/skills/comfort-break/tests/a-break-after-two-hours/expect.toml": [
+    420,
+    "6884d7607fdce3b56c5a70ea04b9dc2c6f40aa6521d474a8e987c236fe2657c6"
+  ],
+  "lampOS/skills/comfort-break/tests/a-break-after-two-hours/humans_faces_tracked.jsonl": [
+    420,
+    "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a"
+  ],
+  "lampOS/skills/comfort-break/tests/a-break-after-two-hours/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ],
+  "lampOS/skills/comfort-break/tests/held-while-someone-else-is-in-view/expect.toml": [
+    420,
+    "4a77d33173d11feb0ba1345e5e796dce3c6b53b9382b6800b8e44a01327af15c"
+  ],
+  "lampOS/skills/comfort-break/tests/held-while-someone-else-is-in-view/humans_faces_tracked.jsonl": [
+    420,
+    "836fc96bc011248a42c346ea787b67796d8143f3e40351397308f1289bbbeef7"
+  ],
+  "lampOS/skills/comfort-break/tests/held-while-someone-else-is-in-view/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ],
+  "lampOS/skills/comfort-break/tests/let-go-while-someone-else-stays/expect.toml": [
+    420,
+    "793a64fb36221438966b786a9cf50b2fa6613ae471948f68b90bc94b2ca1f738"
+  ],
+  "lampOS/skills/comfort-break/tests/let-go-while-someone-else-stays/humans_faces_tracked.jsonl": [
+    420,
+    "92f24e9e64a4a0583eeb7e0ebc6bf145b9a1cb348c7188aa5a215a6f5070182c"
+  ],
+  "lampOS/skills/comfort-break/tests/let-go-while-someone-else-stays/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ],
+  "lampOS/skills/comfort-break/tests/off-when-asked/expect.toml": [
+    420,
+    "a572f930794c21c34b93e804f89387fe3f3a42afb60ec866dab64472b3e7e889"
+  ],
+  "lampOS/skills/comfort-break/tests/off-when-asked/humans_faces_tracked.jsonl": [
+    420,
+    "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a"
+  ],
+  "lampOS/skills/comfort-break/tests/off-when-asked/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-at-night/expect.toml": [
+    420,
+    "c5a02d16987763927433f729c9a642978888cc63744180ce1020f2fe53c7c5ff"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-at-night/humans_faces_tracked.jsonl": [
+    420,
+    "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-at-night/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-in-the-evening/expect.toml": [
+    420,
+    "eba9d5844946988f2851242afd61ad06d41ca919a25294d40738aa696e6f5ec6"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-in-the-evening/humans_faces_tracked.jsonl": [
+    420,
+    "2b5963c49698b004a49bc3978bd2b73349d323c002aa1793c6de9a772037138a"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-in-the-evening/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-when-they-stood-up/expect.toml": [
+    420,
+    "b620312f1a995a297905f8cf2c2b52671a16e9318c701ecbab978f2dea9f05f9"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-when-they-stood-up/humans_faces_tracked.jsonl": [
+    420,
+    "bb12af0912d2e425e3c32699d8eda6c4358e55fb8a7f04b6070545d0e3eec45c"
+  ],
+  "lampOS/skills/comfort-break/tests/quiet-when-they-stood-up/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ],
+  "lampOS/skills/comfort-break/tests/twice-a-day-at-most/expect.toml": [
+    420,
+    "39ba3a2cd328f0bf9c8e4efefddabaaf035a3090ca2a3a5fd4e6e798e8502675"
+  ],
+  "lampOS/skills/comfort-break/tests/twice-a-day-at-most/humans_faces_tracked.jsonl": [
+    420,
+    "e83ae0da67cc5051049ae2a1bd9b498b0169f2370b117dc1022a6a0d00859da3"
+  ],
+  "lampOS/skills/comfort-break/tests/twice-a-day-at-most/voice_state.jsonl": [
+    420,
+    "881cb9bfefa061a4f2c8f98d8e45b6dcda72e86df7a1e4eb72f7a9c64702f727"
+  ]
+}

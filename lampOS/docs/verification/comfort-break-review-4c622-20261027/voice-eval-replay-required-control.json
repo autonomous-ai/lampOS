@@ -1,0 +1,11 @@
+{
+  "name": "export::tests::stretch_breaks_cases_rebuilt_from_the_export_replay_the_same",
+  "observed": [
+    [
+      "export::tests::stretch_breaks_cases_rebuilt_from_the_export_replay_the_same",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

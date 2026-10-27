@@ -1,0 +1,14 @@
+{
+  "base": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "head": "553e0d653eb9557a7b804e8fb6c469c102159808",
+  "leak_count": 1,
+  "leak_scope": "SameVoice",
+  "native_conclusion": "success",
+  "note": "Historical553/5982 native evidence is separate from currentdcd/e8e7 host qualification; not rerun, added to the census or waived.",
+  "old_head_rerun": false,
+  "pass_count": 11458,
+  "prior_note_sha256": "98f17b90b3a3a5b81d09566a6a5d3b5aad382153241ee9413cb01a82d51c05db",
+  "retained_tracking_issue": 3572,
+  "source": "Parent root report; not independently reaudited within this host gate",
+  "waiver": false
+}

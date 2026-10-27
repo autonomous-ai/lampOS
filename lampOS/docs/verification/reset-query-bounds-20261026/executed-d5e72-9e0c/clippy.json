@@ -1,0 +1,25 @@
+{
+  "command": [
+    "<reviewer-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "clippy",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-setup",
+    "-p",
+    "lamp-cloud",
+    "--all-targets",
+    "--message-format=short",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "disk_free_before": 36046835712,
+  "elapsed_seconds": 5.646,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "b415a8de35e38a3281b07e050d8c96c4a62a39cea80a3933d654a376465b7015",
+  "source_entries": 7244,
+  "source_unchanged": true
+}

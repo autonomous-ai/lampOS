@@ -1,0 +1,19 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/switches.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree. Latest d5e72/9e0c full serial gate succeeded389/0/5; its actual and preserved source/artifact boundary is verified. Current newe8e7 composition uses one runtime thread. Old ff03/737 failure remains historical only, with no causal attribution or waiver. No cold-target or automatic retry claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_head": "d5e72ea9bf30d9d50adf38b1a4fd986f0ae6191a",
+  "previous_runtime_exit_code": 0,
+  "previous_runtime_receipt_sha256": "a0c124e713ab88225da65f716ffd801f4831a8cd52f6b00808393858eb39bebf",
+  "previous_source_inventory_sha256": "7e2f02888227f941cf61a0ace2504375027ea8aef1d85aa406ddcd2f02cd0bf3",
+  "source_worktree": "<review-scratch>",
+  "target": "<review-scratch>"
+}

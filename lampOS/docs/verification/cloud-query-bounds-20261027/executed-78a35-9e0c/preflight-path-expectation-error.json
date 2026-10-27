@@ -1,0 +1,6 @@
+{
+  "classification": "Reviewer path expectation error, corrected without source change or test retry",
+  "error": "Expected tools/played/test.sh; actual changed file is tools/played/stand-in-test.sh",
+  "preserved": true,
+  "stage": "independent carry preflight"
+}

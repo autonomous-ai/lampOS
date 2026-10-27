@@ -1,0 +1,18 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/tools/played/README.md",
+    "lampOS/tools/played/stand-in-test.sh",
+    "lampOS/tools/played/stand-in.sh"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree. Latest ebd/5982 full serial gate succeeded389/0/5; its actual and preserved source/artifact boundary is verified. Current new9e0c composition uses one runtime thread. Old ff03/737 failure remains historical only, with no causal attribution or waiver. No cold-target or automatic retry claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_head": "ebd641e1fb4ccc0fbb250287c4428013389c61db",
+  "previous_runtime_exit_code": 0,
+  "previous_runtime_receipt_sha256": "3f275f94f9d20c010978cd6a4ea1daf95ad5f8aefef9d532b55d1a89b7e1db7b",
+  "previous_source_inventory_sha256": "329e7df1efe05c799866ef3f934635533723c1300f234980161a7ee1b321909c",
+  "source_worktree": "<review-scratch>",
+  "target": "<review-scratch>"
+}

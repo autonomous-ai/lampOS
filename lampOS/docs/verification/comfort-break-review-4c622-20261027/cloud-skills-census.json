@@ -1,0 +1,248 @@
+{
+  "cases": [
+    [
+      "skills::tests::a_skills_folder_that_cannot_be_read_is_said_plainly",
+      "ok"
+    ],
+    [
+      "skills::tests::a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off",
+      "ok"
+    ],
+    [
+      "skills::tests::each_kept_off_file_reads_the_same_skills_off",
+      "ok"
+    ],
+    [
+      "skills::tests::a_skill_that_does_not_load_is_listed_with_why_and_what_it_says_of_itself",
+      "ok"
+    ],
+    [
+      "skills::tests::a_core_skill_can_never_be_removed_and_an_installed_one_can",
+      "ok"
+    ],
+    [
+      "skills::tests::an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp",
+      "ok"
+    ],
+    [
+      "skills::tests::a_core_skill_is_never_removed",
+      "ok"
+    ],
+    [
+      "skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed",
+      "ok"
+    ],
+    [
+      "skills::tests::the_store_is_on_only_with_its_own_switch_and_the_pages",
+      "ok"
+    ],
+    [
+      "skills::tests::the_switch_is_on_only_with_the_cloud",
+      "ok"
+    ],
+    [
+      "skills::tests::a_link_named_as_a_skill_is_left_as_it_is",
+      "ok"
+    ],
+    [
+      "skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched",
+      "ok"
+    ],
+    [
+      "skills::tests::what_a_skill_may_use_is_said_in_plain_words_with_the_privacy_switch",
+      "ok"
+    ],
+    [
+      "skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole",
+      "ok"
+    ],
+    [
+      "skills::tests::only_a_skill_that_loads_can_be_turned_off",
+      "ok"
+    ],
+    [
+      "skills::tests::the_reply_lists_each_skill_with_its_group_and_what_it_may_use",
+      "ok"
+    ],
+    [
+      "skills::tests::an_installed_skill_is_removed",
+      "ok"
+    ],
+    [
+      "skills::tests::an_installed_skill_that_does_not_load_is_removed_too",
+      "ok"
+    ],
+    [
+      "skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is",
+      "ok"
+    ],
+    [
+      "skills::tests::without_the_manage_helper_nothing_is_removed",
+      "ok"
+    ],
+    [
+      "skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed",
+      "ok"
+    ],
+    [
+      "skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused",
+      "ok"
+    ],
+    [
+      "skills::tests::the_reply_is_bounded",
+      "ok"
+    ],
+    [
+      "skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later",
+      "ok"
+    ]
+  ],
+  "counts": {
+    "failed": 0,
+    "filtered": 144,
+    "ignored": 0,
+    "passed": 24
+  },
+  "nested_summary_count": 0,
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "sha256": "86157d5cdf4c60e81bf67b10e046c5c0795ae09883eed13301d1bb694bead492"
+    }
+  ],
+  "scope": "cloud-skills",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 144,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "ignored": 0,
+      "literal": "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 0.55s",
+      "passed": 24,
+      "status": "ok"
+    }
+  ],
+  "unique_case_rows": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_skills_folder_that_cannot_be_read_is_said_plainly",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::each_kept_off_file_reads_the_same_skills_off",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_skill_that_does_not_load_is_listed_with_why_and_what_it_says_of_itself",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_core_skill_can_never_be_removed_and_an_installed_one_can",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_core_skill_is_never_removed",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::the_store_is_on_only_with_its_own_switch_and_the_pages",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::the_switch_is_on_only_with_the_cloud",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_link_named_as_a_skill_is_left_as_it_is",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::what_a_skill_may_use_is_said_in_plain_words_with_the_privacy_switch",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::only_a_skill_that_loads_can_be_turned_off",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::the_reply_lists_each_skill_with_its_group_and_what_it_may_use",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::an_installed_skill_is_removed",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::an_installed_skill_that_does_not_load_is_removed_too",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::without_the_manage_helper_nothing_is_removed",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::the_reply_is_bounded",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "name": "skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later",
+      "status": "ok"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22",
+    "sha256": "86157d5cdf4c60e81bf67b10e046c5c0795ae09883eed13301d1bb694bead492",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_cloud",
+      "src_path": "<source>/lampOS/crates/cloud/src/lib.rs",
+      "test": true
+    }
+  }
+]
