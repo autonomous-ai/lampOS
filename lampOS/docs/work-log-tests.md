@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 07:21 — Mood latest carry pushed after precise compile/reuse gate
+
+Ready for lamp-voice: no (#3623 fresh exact-head native/read gates pending)
+
+Mood `0bd3f854c/4bff` is pushed with [current compile/reuse proof](verification/tests-mood-4bff-reuse-20261027/). Current runtime attempts are **0**; the **340/0/0** result remains the original f441/90ca full observation. The intervening 02485 handoff also had zero runtime. All eight current executable bytes/modes/targets/profiles/features and relevant source/configuration/environment inputs match that original sealed proof. Formatting, strict twelve-package Clippy, workspace and full Expression no-run compilation passed, controller/native exit **0**, groups closed. All 10,675 source/owner files and **270** witnesses/current-eight guards passed.
+
+The new prospective guard schedule records full source/frozen hashes at initial/pre-consumption/final and strict full file-set/metadata plus actual-executable hashes at other compiler boundaries. Existing inherited modes and exclusive/no-writer ownership remain explicit; there is no blanket read-only filesystem claim or all-boundary content-rehash claim. No tests or helpers were launched in that gate. Fresh original ARM64 **40425319056** and Linux **40425319013** are active, and current source reads have been requested.
+
+Sentinel `59a2f5f00/4bff` now runs its reviewed current-source gate on the warm target. Carrier’s 63a compiler/ordinary proofs are published, while current `4fd14a8ed/4bff` compile/artifact/input comparisons remain disabled pending allocation. No device action.
+
 ## 2026-10-27 07:12 — Carrier docs/promoter proof published; latest checks prepare
 
 Ready for lamp-voice: no (latest-base current checks pending)

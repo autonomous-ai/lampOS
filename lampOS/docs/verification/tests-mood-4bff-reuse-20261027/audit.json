@@ -1,0 +1,612 @@
+{
+  "status": "PASS_COMPILE_AND_EXPLICIT_ORIGINAL_RUNTIME_REUSE",
+  "head": "0bd3f854c03806b69c4a8d17b89c29a775db350e",
+  "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "runtime_attempts": 0,
+  "runtime_reuse": true,
+  "current_test_execution_claim": false,
+  "reused_original_run": {
+    "head": "f4419f83042513ae8aca0d3f565926ddc8737423",
+    "base": "90ca725c514bbb1e4b36318d7b3ccbb14dfd05f1",
+    "counts": {
+      "passed": 340,
+      "failed": 0,
+      "ignored": 0
+    },
+    "actual_runtime_attempts": 1,
+    "required_cases_in_original_run": [
+      "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+    ],
+    "doc_blocks": [
+      "\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+    ],
+    "proof_path": "lampOS/docs/verification/tests-mood-90ca-composed-20261027"
+  },
+  "distinct_handoff_parent": {
+    "head": "02485e90a8960fa10ae72d340139af51a1a0f8d7",
+    "runtime_attempts": 0,
+    "provides": "262 frozen and eight actual bindings, not a new340-case runtime"
+  },
+  "current_compile_gates": {
+    "fmt": true,
+    "strict_all_targets_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build": true,
+    "full_Expression_compile_no_run": true,
+    "no_package_clean": true,
+    "freshness_observed_only": true,
+    "no_required_fresh_false": true,
+    "test_inventory_or_fixture_helper_launches": 0,
+    "owned_command_count": 5,
+    "all_command_exits_zero": true,
+    "native_controller_exit": 0,
+    "controller_elapsed_s": 326.810482425004
+  },
+  "guard_policy": {
+    "full_SHA_points": [
+      "initial",
+      "pre-baseline-eight-consumption",
+      "final"
+    ],
+    "full_SHA_scope": "Full private source and official owner file sets/bytes/modes/kinds/stats and all 262 inherited plus eight new frozen witnesses; actual eight SHA/six attributes.",
+    "other_compiler_boundaries": "Before and after each of five commands, strict full repository file-set plus kind/mode/size/mtime/device/inode stats for copy and owner; owner HEAD/branch/index/clean; all frozen strict stats; currently bound eight actual SHA/six attributes. During explicitly released build phase, eight SHA observations are recorded without claiming immutable actual bindings, then new eight are pinned immediately after no-run.",
+    "ownership": "Exclusive private source copy/official owner/target and no legitimate sealed writer required. All sealed paths outside copy/owner/target build roots. Controller never writes inherited witnesses.",
+    "filesystem_mode_limit": "Inherited exact modes include 0555 and 0755; no blanket filesystem write-protection claim, no chmod or retrospective metadata change.",
+    "precise_receipt": "guard-events.json records each exact scope and phase."
+  },
+  "guard_events_summary": [
+    {
+      "point": "initial",
+      "source_and_owner_scope": "full file set, bytes SHA256, mode/kind/size/mtime/device/inode and owner Git metadata",
+      "sealed_scope": "all inherited and new witness SHA256 plus strict metadata",
+      "sealed_count": 262,
+      "actual_scope": "all currently bound actuals SHA256 plus six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "before-fmt",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "strict bound eight SHA256/six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "after-fmt",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "strict bound eight SHA256/six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "before-metadata",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "strict bound eight SHA256/six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "after-metadata",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "strict bound eight SHA256/six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "declared-pre-build-release",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "strict bound eight SHA256/six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "before-strict",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "eight released-phase mutable target SHA256 observations; changes permitted until post-no-run binding",
+      "actual_count": 8
+    },
+    {
+      "point": "after-strict",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "eight released-phase mutable target SHA256 observations; changes permitted until post-no-run binding",
+      "actual_count": 8
+    },
+    {
+      "point": "before-workspace",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "eight released-phase mutable target SHA256 observations; changes permitted until post-no-run binding",
+      "actual_count": 8
+    },
+    {
+      "point": "after-workspace",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "eight released-phase mutable target SHA256 observations; changes permitted until post-no-run binding",
+      "actual_count": 8
+    },
+    {
+      "point": "before-test-compile",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "eight released-phase mutable target SHA256 observations; changes permitted until post-no-run binding",
+      "actual_count": 8
+    },
+    {
+      "point": "after-test-compile",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "strict bound eight SHA256/six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "pre-baseline-eight-consumption",
+      "source_and_owner_scope": "full file set, bytes SHA256, mode/kind/size/mtime/device/inode and owner Git metadata",
+      "sealed_scope": "all inherited and new witness SHA256 plus strict metadata",
+      "sealed_count": 270,
+      "actual_scope": "all currently bound actuals SHA256 plus six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "after-reuse-comparison",
+      "source_and_owner_scope": "strict entire file set and kind/mode/size/mtime/device/inode stats plus owner HEAD/branch/index/clean; no content rehash claimed",
+      "sealed_scope": "strict bytes/mode/mtime/device/inode stats, no SHA rehash claimed",
+      "actual_scope": "strict bound eight SHA256/six attributes",
+      "actual_count": 8
+    },
+    {
+      "point": "final",
+      "source_and_owner_scope": "full file set, bytes SHA256, mode/kind/size/mtime/device/inode and owner Git metadata",
+      "sealed_scope": "all inherited and new witness SHA256 plus strict metadata",
+      "sealed_count": 270,
+      "actual_scope": "all currently bound actuals SHA256 plus six attributes",
+      "actual_count": 8
+    }
+  ],
+  "source": {
+    "tracked_files": 10675,
+    "full_hash_checkpoints_verified": [
+      "initial",
+      "pre-baseline-eight-consumption",
+      "final"
+    ],
+    "full_set_stat6_all_other_boundaries_verified": true,
+    "owner_HEAD_parent_branch_index_clean_guarded": true,
+    "prepush_full_owner_epoch_match": true,
+    "authored_paths": {
+      "lampOS/crates/expression/tests/runtime.rs": {
+        "sha256": "e6d2dd7aeb19addfc1b83faf2049da5b0d38d73945a6b16b17166748abbcb4ce",
+        "bytes": 53210,
+        "mode": 420,
+        "kind": "file"
+      },
+      "lampOS/docs/expression.md": {
+        "sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c",
+        "bytes": 81109,
+        "mode": 420,
+        "kind": "file"
+      }
+    }
+  },
+  "eight_current_to_original_f441_comparisons": [
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "artifact": "debug/deps/it-707453661fb429d2",
+      "original_f441_sealed_copy": "frozen/2-it-707453661fb429d2",
+      "original_f441_sha256": "755088600fc24520b41652f249863e2ae78bdb2674500e38e9193bae78ddf1cf",
+      "current_sha256": "755088600fc24520b41652f249863e2ae78bdb2674500e38e9193bae78ddf1cf",
+      "original_f441_bytes": 12734440,
+      "current_bytes": 12734440,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "recent_playout_cost",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/examples/recent_playout_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "artifact": "debug/examples/recent_playout_cost",
+      "original_f441_sealed_copy": "frozen/0-recent_playout_cost",
+      "original_f441_sha256": "f12487c99d0c3def9c256d9c1bf01cc0379b735da087e4ca47fc290bab79a088",
+      "current_sha256": "f12487c99d0c3def9c256d9c1bf01cc0379b735da087e4ca47fc290bab79a088",
+      "original_f441_bytes": 3732328,
+      "current_bytes": 3732328,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "runtime",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/tests/runtime.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "artifact": "debug/deps/runtime-f9b92bb4002b831f",
+      "original_f441_sealed_copy": "frozen/6-runtime-f9b92bb4002b831f",
+      "original_f441_sha256": "c518054b772d6502313596791a86e42aa0b1bb2a1f20b45e9b7720e4973607c8",
+      "current_sha256": "c518054b772d6502313596791a86e42aa0b1bb2a1f20b45e9b7720e4973607c8",
+      "original_f441_bytes": 6381904,
+      "current_bytes": 6381904,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "replay_cost",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/examples/replay_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "artifact": "debug/examples/replay_cost",
+      "original_f441_sealed_copy": "frozen/1-replay_cost",
+      "original_f441_sha256": "4da63ed06b4d107c628208b1a78686c0b144d71edc70e53c6d91535bd1f6a528",
+      "current_sha256": "4da63ed06b4d107c628208b1a78686c0b144d71edc70e53c6d91535bd1f6a528",
+      "original_f441_bytes": 3714712,
+      "current_bytes": 3714712,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-expression",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "artifact": "debug/deps/lamp_expression-7d5e7ac9619c42c0",
+      "original_f441_sealed_copy": "frozen/5-lamp_expression-7d5e7ac9619c42c0",
+      "original_f441_sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+      "current_sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+      "original_f441_bytes": 2299560,
+      "current_bytes": 2299560,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-expression",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "artifact": "debug/lamp-expression",
+      "original_f441_sealed_copy": "frozen/4-lamp-expression",
+      "original_f441_sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+      "current_sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+      "original_f441_bytes": 8268912,
+      "current_bytes": 8268912,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "rest_cost",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/examples/rest_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "artifact": "debug/examples/rest_cost",
+      "original_f441_sealed_copy": "frozen/3-rest_cost",
+      "original_f441_sha256": "cfe173587b297236070e00b8407738b417562af69efa8f017f13f20a9451db21",
+      "current_sha256": "cfe173587b297236070e00b8407738b417562af69efa8f017f13f20a9451db21",
+      "original_f441_bytes": 3737504,
+      "current_bytes": 3737504,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_expression",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "artifact": "debug/deps/lamp_expression-97b0d6d78b5cc498",
+      "original_f441_sealed_copy": "frozen/7-lamp_expression-97b0d6d78b5cc498",
+      "original_f441_sha256": "86434515115fd6f927efaa81ac324e184254c534d8f6caec6de50ff684974ef8",
+      "current_sha256": "86434515115fd6f927efaa81ac324e184254c534d8f6caec6de50ff684974ef8",
+      "original_f441_bytes": 5784872,
+      "current_bytes": 5784872,
+      "original_f441_mode": 493,
+      "current_mode": 493
+    }
+  ],
+  "relevant_forward_inputs": {
+    "metadata_equal": true,
+    "source_config_equal_inside_relevant_roots": true,
+    "closure_kind_policy": "Include root Expression dev dependencies; traverse normal/build dependency edges only below the root, retaining all target predicates conservatively. Dependency dev-only edges do not propagate.",
+    "local_packages": [
+      "lamp-body",
+      "lamp-bus",
+      "lamp-expression",
+      "lamp-ipc",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-local-time",
+      "lamp-msgs",
+      "lamp-turn-owner",
+      "lamp-update"
+    ],
+    "changed_paths_outside_closure": [
+      "lampOS/crates/memory/src/days.rs",
+      "lampOS/crates/memory/src/days_protocol.rs",
+      "lampOS/crates/memory/src/search.rs",
+      "lampOS/crates/memory/tests/it/days.rs",
+      "lampOS/crates/memory/tests/it/voice.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+      "lampOS/docs/memory-days.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/vi/memory-days_vi.md"
+    ],
+    "registry_limit": "Source IDs and Cargo.lock checksums compared; no historical registry per-file snapshot invented"
+  },
+  "relevant_build_environment": {
+    "equal": true,
+    "hashes": {
+      "CARGO_TARGET_DIR": "609cf2fd96456ae0954629d4be7a5b96e4a7fa4e5e28c765e422657d49ad8169",
+      "CARGO_BUILD_JOBS": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "CARGO_INCREMENTAL": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "CARGO_PROFILE_DEV_DEBUG": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "CARGO_PROFILE_TEST_DEBUG": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "CARGO_NET_OFFLINE": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "CARGO_TERM_COLOR": "6497e4b3d7bed16979a343a7db4efa6d57725529f5ac3cec45c1f08fabcbdafc"
+    }
+  },
+  "bounded_dynamic_input_audit": {
+    "scope": "Expression four drivers/four helpers and ten forward local trees; bounded static audit only",
+    "current_nine_paths": [
+      "lampOS/crates/memory/src/days.rs",
+      "lampOS/crates/memory/src/days_protocol.rs",
+      "lampOS/crates/memory/src/search.rs",
+      "lampOS/crates/memory/tests/it/days.rs",
+      "lampOS/crates/memory/tests/it/voice.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/docs/memory-days.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/vi/memory-days_vi.md"
+    ],
+    "all_forward_local_source_unchanged_from_f441": true,
+    "changed_path_dynamic_noncomment_reference_hits": [],
+    "Expression_repository_directory_or_glob_scan_hits": [],
+    "known_dynamic_inputs": [
+      "Expression own fixtures/held-resumed.jsonl and rest-behaviours.json (tests/it/rest_replay.rs:728-735)",
+      "Unchanged skills/startle/skill.toml (tests/it/sudden_engine.rs:260-263)",
+      "Explicit CLI catalogue/input files, temporary fixture bus/journal roots; runtime.rs:17-22 and1056-1080"
+    ],
+    "broad_workspace_scanners_excluded": "lamp-update tests/it/ci_paths.rs and scratch_paths.rs are separate dependency test binaries; actual Expression profile.test units are only its four drivers",
+    "result": "CLEAR for actual fixed Expression fixture invocations; arbitrary CLI argument behavior is outside this claim",
+    "no_runtime_or_target_access": true
+  },
+  "guards": {
+    "prior_frozen": 262,
+    "new_frozen": 8,
+    "final_frozen": 270,
+    "all_original_modes_preserved": true,
+    "final_mode_counts": {
+      "0o555": 268,
+      "0o755": 2
+    },
+    "filesystem_write_protection_claim": false,
+    "blanket_full_hash_every_boundary_claim": false,
+    "exclusive_source_owner_target_and_no_legitimate_frozen_writer_required": true,
+    "all_frozen_paths_outside_build_roots": true,
+    "current_actuals_strict_until_declared_release": true,
+    "released_build_phase_records_actual_SHA_without_immutable_binding_claim": true,
+    "all_eight_new_actuals_pinned_post_no_run": true,
+    "actual_executable_guards_passed": true,
+    "source_unchanged": true,
+    "owner_unchanged": true,
+    "all_owned_groups_closed": true,
+    "unresolved_owned_processes": [],
+    "lease_released": true
+  },
+  "limits": [
+    "No current Mac test, documentation test, list/inventory or fixture-helper execution",
+    "340/0/0 refers to originalf441 full run only;02485 is a zero-runtime handoff",
+    "No blanket source/frozen SHA at every boundary or blanket filesystem write-protection claim",
+    "Fresh current-head native audit, reads/latest-base disposition, reverse-dependent runtime and device acceptance remain separate"
+  ],
+  "private_receipt_sha256": {
+    "terminal.json": "7d7c3a560587e0b0355e6278dcf351f06dbf0a05f3410e663a7a924a7c47a6f6",
+    "native-controller-result.json": "15553ef10baf19914798d10d9640316d976f24bed76b8f3d421906f71d0bfacf",
+    "run.py": "36d8a64f5ec63cbf2d6acf693f749d81ddde194fac58c5411b7ea533cd5c62ea",
+    "plan.json": "aa6845a567454478db2844c3dafddb4dfc69846a10d8b2bf56b9180c1daaad63",
+    "guard-events.json": "ba4354fe1fce36b8d2197ea52703d74fd08adb176ae0b6288a1acad63fe3003b",
+    "dynamic-input-static-audit.json": "8a7f02371da35e6a3421e8dfb6aea896f20dcf0105f02b7d3fa654b91f526e6a",
+    "root-prepush-owner-check.json": "282f2e06b14813e9a9faa15e29c45361ee8fdc9b8b91a250cfc964d1d0be418f",
+    "eight-executable-reuse-comparison.json": "74a1945f6d029fcd7654932dfd4a3036045bbc267b56fdae583eeb70815c5c91",
+    "forward-input-reuse-comparison.json": "8c81d7bcf518afd2f31165046e548b42a3752cf78e0e118cc73bce3027fb8d49",
+    "build-environment-reuse-comparison.json": "5eae1f24fc47d923285c68230a3ed27d5af68d12f15bda4fb8b15a0f20c34d81",
+    "post-no-run-current-actual-binding.json": "eb123530c3b061b317d454d29248a32004b7874ec767118c0ae023725644ae7f",
+    "source-before.json": "836af2dded094e014a3976e80ca19db1c1ead8a5f090151521ef332cc9375f76",
+    "source-after.json": "836af2dded094e014a3976e80ca19db1c1ead8a5f090151521ef332cc9375f76",
+    "owner-source-before.json": "d5a04687f34b7a542533bb5ea6769b5c58cfe69f8f4924431dc43862a4bea782",
+    "owner-source-after.json": "d5a04687f34b7a542533bb5ea6769b5c58cfe69f8f4924431dc43862a4bea782",
+    "actual-executables.json": "eb123530c3b061b317d454d29248a32004b7874ec767118c0ae023725644ae7f",
+    "protected-before.json": "944871b397eab546d8b97a3ce71951adf6c4d0b27da78bd3ccc5d5b011d54244",
+    "new-frozen.json": "274def2f53baa0e0f3e5e6174746140ea510b29274804b3ac5ec46fed86618f9",
+    "protected-after.json": "3ddcea6c1928c946fd92940274ff21b30ea306e16dcfc4f408db6f1149aad6d8",
+    "cmd-workspace.json": "c2e45be65ef5f5fa87370c04e977619ea8d09e32e5091ca62fabc6749eca95f0",
+    "cmd-metadata.json": "d754ea7c2819294117b43682db7d91930edbcbe55db10d16e9ed1744f5fb4cb6",
+    "cmd-fmt.json": "15bb2ba4057af7b427e13fb7d54b5cb65195c0faccd5fd274a1303193edfcf3a",
+    "cmd-strict.json": "e69a9827034af6b77088661367704df043978b52348f0079b1127f9b4adba8a7",
+    "cmd-test-compile.json": "83aa25622a3a38366c1a7b26aa27224ee7e03f0f6db7465f0647c63fb771173e"
+  }
+}
