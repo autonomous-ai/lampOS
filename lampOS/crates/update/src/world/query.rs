@@ -51,7 +51,7 @@ fn time_left(until: Instant) -> io::Result<()> {
     }
 }
 
-pub(super) fn output_within(command: &mut Command, until: Instant) -> io::Result<Vec<u8>> {
+pub(crate) fn output_within(command: &mut Command, until: Instant) -> io::Result<Vec<u8>> {
     // These query responses do not expose stderr.
     // Discard it instead of retaining another output buffer.
     read_within(command.stderr(Stdio::null()), until, false)
@@ -61,7 +61,7 @@ pub(super) fn output_within(command: &mut Command, until: Instant) -> io::Result
 /// its first 64 KiB kept. Both pipes must reach EOF by `until`. On a nonzero
 /// exit the error (kind `Other`) is that stderr, lossy and trimmed, or the
 /// exit status when it wrote nothing there.
-pub(super) fn output_and_stderr_within(
+pub(crate) fn output_and_stderr_within(
     command: &mut Command,
     until: Instant,
 ) -> io::Result<Vec<u8>> {

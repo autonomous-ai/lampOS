@@ -13,7 +13,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-mod query;
+pub(crate) mod query;
 
 pub trait Systemd {
     /// Each unit's state, as `systemctl show` gives it.
@@ -68,7 +68,7 @@ pub struct Systemctl {
 impl Default for Systemctl {
     fn default() -> Self {
         Self {
-            restart_within: Duration::from_secs(120),
+            restart_within: RESTART_WITHIN,
             restarted: Vec::new(),
         }
     }
@@ -265,6 +265,11 @@ fn self_recovery_show(text: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// The longest a `systemctl restart` may take by default (the body folds
+/// down before it stops, up to 25 s); install's own `systemctl` steps and
+/// Harness's service steps are given as long.
+pub const RESTART_WITHIN: Duration = Duration::from_secs(120);
 
 /// The longest `journalctl` has to say a unit's last line: a put-back waits
 /// for it, and must never wait without end.
