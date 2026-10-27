@@ -1,0 +1,42 @@
+{
+  "raw_nextest_stderr_sha256": "674d046b4f2261044850ece6ab8cd6f7031b9abaee4bf776ef4d549637068f61",
+  "producer_census_sha256": "779d978e2d4b53f72d3e43b2edd8fe8466c221671b29f494191b6ba2de44cb7d",
+  "independent_raw_terminal_rows": 614,
+  "unique_pairs": 614,
+  "all_PASS": true,
+  "complete_ordinals_1_through_614": true,
+  "unknown_or_retry_rows": [],
+  "exact_policy_skip_pairs": [
+    {
+      "binary": "lamp-update",
+      "name": "fetch::tests::a_release_file_from_github"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "records::tests::write_records_fixtures"
+    },
+    {
+      "binary": "lamp-update::release_pair",
+      "name": "release_6408_recovers_a_cut_written_by_release_6449"
+    },
+    {
+      "binary": "lamp-update::release_pair",
+      "name": "release_6449_recovers_a_cut_written_by_release_6408"
+    },
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "name": "actual_cli_exec_confirms_before_the_next_round"
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "name": "persisted_self_switches_survive_sigkill"
+    }
+  ],
+  "listed_driver_explicit_selected_sum": 614,
+  "listed_driver_explicit_ignored_sum": 6,
+  "source_census_rows_equal_raw_rows": true,
+  "selected_header": "    Starting 614 tests across 9 binaries (6 tests skipped)",
+  "summary": "     Summary [ 446.732s] 614 tests run: 614 passed (1 slow), 6 skipped",
+  "all_c0ae_prep_guards_explicitly_true": true,
+  "no_test_or_target_execution": true
+}

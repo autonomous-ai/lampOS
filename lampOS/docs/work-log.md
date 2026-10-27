@@ -1,3 +1,11 @@
+## 28 October 2026, 06:46 +07 — first full ordinary preparation gate
+
+Ready for lamp-voice: no (#3960 original native CI and independent reads remain separate).
+
+The [complete first Mac preparation packet](verification/ordinary-plan-preparation-20261028/first-full614-8982/README.md) records **614 unique passes**, all **135** required controls including **14** new, zero bad or selected unrun and six existing ignored. Ten stages and all 7,525 source/configuration/controller/tool/selector guards close. Its direct original request/FIRST/CONTINUE1..4 receipts, full ordinal census and preserved driver bindings are independently reconciled. Exact seven-file commit binding remains e135 from frozen working source over154621cf/8982; current c3's exact blobs/modes and four patches are unchanged. c0ae metadata/fmt/strict Clippy is prep-only, with no new execution.
+
+Twenty-one manifest members and all22 text files are verified in the index and committed tree before push. Complete snapshots/binaries remain private; retained preserved hashes are not a read of reused target paths. Earlier failures remain unwaived. The original ARM/Linux runs are independently owned and supply no result to this packet. The next saved container remains separate unrun source, with no durable publication, grant, execution, restoration or lamp acceptance.
+
 ## 28 October 2026, 06:42 +07 — original native results and saved-plan preparation
 
 Ready for lamp-voice: no (#3960 is draft pending its original CI and independent reads; #3858, #3913, #3907 and #3949 have separate reader/dependency conditions).

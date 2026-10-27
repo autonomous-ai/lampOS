@@ -1,0 +1,6 @@
+{
+  "cmd": "python3 <private-path> <private-path> 424f18986f89fb2abef19b0d1e4883a0a9215c7a463548b9b1478db03f36967b",
+  "sandbox_permissions": "require_escalated",
+  "yield_time_ms": 1000,
+  "max_output_tokens": 2500
+}

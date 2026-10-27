@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "summaries": [
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "totals": {
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0
+  }
+}

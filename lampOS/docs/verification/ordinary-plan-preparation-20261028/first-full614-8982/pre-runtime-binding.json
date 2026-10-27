@@ -1,0 +1,17 @@
+{
+  "head": "154621cf8eb37381aed3cd30a95c3b2060f8e50f",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "full_discovery_sha256": "8d68c0d8aa9db7fd0fb115009013e5b90877bf4fbf63d430daeb1738f87f1b38",
+  "scoped_discovery_sha256": "8d68c0d8aa9db7fd0fb115009013e5b90877bf4fbf63d430daeb1738f87f1b38",
+  "compiler_stdout_sha256": "b15fe9f4eb4c1da6170d1dce5d9006be183588bb24fa3ba65d104c562b8e2601",
+  "selected_cases": 614,
+  "policy_ignored": 6,
+  "filtered_nonignored": 0,
+  "excluded_binaries": [],
+  "required_controls": 135,
+  "profile": "pr",
+  "filter": "all()",
+  "processes": 4,
+  "retries": 0,
+  "no_fail_fast": true
+}

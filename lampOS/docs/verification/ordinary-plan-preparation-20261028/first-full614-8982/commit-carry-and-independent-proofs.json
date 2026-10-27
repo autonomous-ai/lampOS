@@ -1,0 +1,56 @@
+{
+  "commit-binding": {
+    "head": "e135aac044da28fef3d3cfd27ad7a1a2975daff2",
+    "own7_committed_bytes_modes_equal_actual614_source": true,
+    "paths": [
+      "lampOS/crates/update/src/lib.rs",
+      "lampOS/crates/update/src/writer_plan.rs",
+      "lampOS/crates/update/src/writer_plan/tests.rs",
+      "lampOS/crates/update/src/writer_refresh.rs",
+      "lampOS/docs/ordinary-plan-preparation.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/updates.md"
+    ],
+    "clean": true,
+    "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7"
+  },
+  "independent-full-closure": {
+    "handle": 83689,
+    "native_exit0": true,
+    "passed": 614,
+    "bad_unrun": 0,
+    "ignored": 6,
+    "required": 135,
+    "new_writer_plan_tests": 14,
+    "source_guards": 7525,
+    "all10stages0": true,
+    "all10_actual_preserved_post_verified_before_release": true,
+    "donor_sha256": "fb861aab6af927fa6971fd7b52f00bd31410cbcecf20b0d3285789fb919f8256",
+    "closure_sha256": "232a71707e147ec977bf148db20aeec6eb5b6cea73dccbe7706b5956f87e90d5"
+  },
+  "c0ae-source-carry": {
+    "head": "c3b125455ad00c21c444edd30fee998fdff63a01",
+    "base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+    "all7_complete_owned_blobs_modes_equal_actual614": true,
+    "only_inherited_unconsumed_SDK_delta": [
+      ".github/workflows/lampos-sdk.yml",
+      "lampOS/sdk/python/README.md",
+      "lampOS/sdk/python/src/lampos/skillcheck.py",
+      "lampOS/sdk/python/tests/test_skillcheck.py"
+    ],
+    "actual614_execution_commit": "e135aac044da28fef3d3cfd27ad7a1a2975daff2",
+    "runtime_not_reexecuted_or_relabelled": true,
+    "range_diff": "1:  fdd5a54aac = 1:  28f8075f9e lampOS: capture and revalidate raw setting ownership\n2:  ee58d883ea = 2:  77ef847d92 lampOS: persist bounded private setting preimages\n3:  154621cf8e = 3:  02f82addc0 lampOS: compare saved head inputs with setting preimages\n4:  e135aac044 = 4:  c3b125455a lampOS: prepare ordinary updates from protected saved inputs",
+    "clean": true
+  },
+  "independent-prep-closure": {
+    "prep_only_closed0": true,
+    "metadata_fmt_strictclippy": true,
+    "runtime_UNRUN": true,
+    "ten_retained_actual_preserved_hashes_verified_before_release": true,
+    "latest_custody_sha": "d11cad93132fe7999af3a711bf03acdb1f5a26d37af058d16648cc8f626d29aa",
+    "prep_closure_sha": "73a4b836ebb8e03872a3f3d4d89c4d07c53942cbfb681ae51cfdb301561b5b9e",
+    "runtime_origin": "full614 actual frozen8982 source, committed equivalent e135",
+    "rule": "First6456076191 leave offered bases; train actual merged tree ARM qualifies latest base"
+  }
+}
