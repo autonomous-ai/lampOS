@@ -507,9 +507,28 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   text runs one only when the typed text asks; a typed yes confirms
   nothing. Not taken, so asked again: "never mind what I told you" and
   other words without one of these.
-  On the second spoken route, `forget_everything` runs only on a request
-  whose own words ask for everything, on the same person's such ask in
-  their turn just before, or on their yes to one the lamp held, and never
+  On the second spoken route, `forget_everything` from someone known
+  **always asks first** (#3504, N3, the person's decision, 27 Oct; this
+  changes the product default). On lamp-06c1 on 27 Oct speech to text heard
+  "Forget everything about me, except my name" as "… Accept my name", and
+  one person's whole memory went (1 of 1). So a call on the turn that asks
+  for it is held, however plainly it asks, and the model is told
+  `remember::FORGET_EVERYTHING_ASKS`: ask once whether to forget everything
+  about them, including their name ("Shall I forget everything I know about
+  you, including your name?"), and stop. It runs only on the same person's
+  plain yes to that hold on the next turn, within 60 s (the held yes below,
+  with `LAMP_EYES_SPEAKING` only when their face is seen saying it). Their
+  ask just before never runs it on a yes, as it still does for
+  `forget_my_face`: a yes read there has no check of whose face said it
+  (the reviewer-lead's P2 on #3706). When the model asked in prose without
+  calling it, the call on the yes is held and asked about again. Called
+  again on the yes that ran it, it is not run twice. A no, another line,
+  asking again, another person's yes or silence forgets nothing. With nobody
+  known, nothing is held and the memory refuses it, as before. One extra turn
+  only for a real wipe; no other turn changes. The rules below still decide
+  which words may ask for it at all: it runs only after a request
+  whose own words ask for everything, the same person's such ask in
+  their turn just before, or their yes to one the lamp held, and never
   when the request's own words refuse it or ask for something less,
   whatever came before. The words are read by `remember::everything_asked`,
   clause by clause (split at `.`, `!`, `?`, `;`, `,`, `…`), the last clause
@@ -539,13 +558,15 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   dropped; one called with no ask at all is held, as below (lamp-06c1,
   26 Oct: a bare "forget that" could take all of a person; Reviewer-two's
   HOLDs on #3608). `forget_everything`'s description there says to call it
-  only for an ask for everything and to ask without calling it when
-  unsure, and no longer carries the hold's sentence. `LAMP_FORGET_ASKED=off`
+  only for an ask for everything, at once, since the lamp holds it and asks
+  first and only their yes runs it, and no longer carries the hold's
+  sentence. `LAMP_FORGET_ASKED=off`
   leaves it as before. Neither the Live route nor texts are changed (texts
   know nobody by face, so their `forget_everything` empties nobody). Tests:
   `held_forget::a_bare_forget_never_runs_or_holds_forget_everything`,
-  `held_forget::a_refusal_now_outweighs_an_ask_before_and_a_held_yes` and
-  `held_forget::only_unnegated_words_ask_to_forget_everything`.
+  `held_forget::a_refusal_now_outweighs_an_ask_before_and_a_held_yes`,
+  `held_forget::only_unnegated_words_ask_to_forget_everything` and
+  `held_forget::a_spoken_forget_everything_always_asks_first`.
 - **A forget the model calls unasked is held for a yes** (second route,
   spoken turns, same switch). Keying a yes on the words of the lamp's
   question leaked each time (#2324, #2326, #2331), since the model writes

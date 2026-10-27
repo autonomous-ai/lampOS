@@ -390,11 +390,8 @@ async fn a_held_forget_runs_only_on_a_plain_yes_from_them_within_a_minute() {
 
 #[tokio::test]
 async fn a_forget_asked_for_in_words_runs_at_once() {
-    for (said, name) in [
-        ("Forget everything about me.", EVERYTHING),
-        ("xóa khuôn mặt tôi", FACE),
-        ("delete my face", FACE),
-    ] {
+    // Not `forget_everything`, which always asks first (#3504, N3).
+    for (said, name) in [("xóa khuôn mặt tôi", FACE), ("delete my face", FACE)] {
         let ran = run(&[("A", said, Lamp::Calls(name, "Done."), 0)]).await;
         assert_eq!(
             ran.forgets,
@@ -440,8 +437,17 @@ async fn a_bare_forget_never_runs_or_holds_forget_everything() {
             );
         }
     }
+    // The explicit ask is held and asked about (#3504, N3); their yes runs it.
+    let asks = Lamp::Calls(EVERYTHING, "Shall I forget everything about you?");
     for said in ["Forget everything about me.", "Xóa tất cả về tôi."] {
-        let ran = run(&[follow_up, ("A", said, Lamp::Calls(EVERYTHING, "Done."), 5)]).await;
+        let ran = run(&[follow_up, ("A", said, asks, 5)]).await;
+        assert!(ran.forgets.is_empty(), "{said}");
+        let ran = run(&[
+            follow_up,
+            ("A", said, asks, 5),
+            ("A", "Yes.", Lamp::Says("Done."), 5),
+        ])
+        .await;
         assert_eq!(
             ran.forgets,
             [(EVERYTHING.to_owned(), json!({"name": "A"}))],
@@ -452,10 +458,12 @@ async fn a_bare_forget_never_runs_or_holds_forget_everything() {
 
 /// #3564 on #3608's guard: a `forget_everything` the guard runs marks its
 /// request as asking for everything, and only then is the face forgotten
-/// too (`remember::forget_everything_face`): their words now, their own ask
-/// just before, their yes to one held. A forget of one thing, a face forget,
-/// and a later request never carry the mark; a bare "forget that" never
-/// runs `forget_everything` at all (Reviewer-two's P2s, 01:12 and 02:20).
+/// too (`remember::forget_everything_face`): their yes to one held, whether
+/// their words asked for it or not (#3504, N3: a spoken `forget_everything`
+/// is always held first), never an ask just before. A forget of one thing,
+/// a face forget, and a later request never carry the mark; a bare "forget
+/// that" never runs `forget_everything` at all (Reviewer-two's P2s, 01:12
+/// and 02:20).
 #[tokio::test]
 async fn only_an_ask_the_guard_showed_marks_everything_for_the_face() {
     // A forget run, by name, and whether its request was marked.
@@ -472,17 +480,21 @@ async fn only_an_ask_the_guard_showed_marks_everything_for_the_face() {
             .collect()
     };
     let cases: &[(&[Turn], &[Marked])] = &[
-        // Their words now.
+        // Their words now: held all the same (N3), and their yes runs it.
         (
-            &[(
-                "A",
-                "Forget everything about me.",
-                Lamp::Calls(EVERYTHING, "Done."),
-                0,
-            )],
+            &[
+                (
+                    "A",
+                    "Forget everything about me.",
+                    Lamp::Calls(EVERYTHING, "Shall I forget everything about you?"),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Done."), 5),
+            ],
             &[(EVERYTHING, true)],
         ),
-        // Their own ask just before, run on the call at their yes.
+        // Their own ask just before, the call at their yes: held, not run
+        // (N3, the reviewer-lead's P2 on #3706), so nothing marked.
         (
             &[
                 (
@@ -493,7 +505,7 @@ async fn only_an_ask_the_guard_showed_marks_everything_for_the_face() {
                 ),
                 ("A", "Yes.", Lamp::Calls(EVERYTHING, "Done."), 5),
             ],
-            &[(EVERYTHING, true)],
+            &[],
         ),
         // Their yes to one held.
         (
@@ -511,10 +523,11 @@ async fn only_an_ask_the_guard_showed_marks_everything_for_the_face() {
                 (
                     "A",
                     "Forget everything about me.",
-                    Lamp::Calls(EVERYTHING, "Done."),
+                    Lamp::Calls(EVERYTHING, "Shall I forget everything about you?"),
                     0,
                 ),
-                ("A", "delete my face", Lamp::Calls(FACE, "Done."), 5),
+                ("A", "Yes.", Lamp::Says("Done."), 5),
+                ("A", "delete my face", Lamp::Calls(FACE, "Done."), 10),
             ],
             &[(EVERYTHING, true), (FACE, false)],
         ),
@@ -542,6 +555,75 @@ async fn only_an_ask_the_guard_showed_marks_everything_for_the_face() {
             turns.iter().map(|turn| turn.1).collect::<Vec<_>>()
         );
     }
+}
+
+/// #3504, N3 (the person's decision, 27 Oct): on lamp-06c1 speech to text
+/// heard "except my name" as "accept my name", and one person's whole
+/// memory went. A spoken `forget_everything` never runs on the turn that
+/// asks for it: the lamp asks once, and only the same person's plain yes on
+/// the next turn runs it. A no, another person's yes, another line or
+/// nothing at all forgets nothing.
+#[tokio::test]
+async fn a_spoken_forget_everything_always_asks_first() {
+    let asks = Lamp::Calls(
+        EVERYTHING,
+        "Shall I forget everything I know about you, including your name?",
+    );
+    let ask = ("A", "Forget everything about me.", asks, 0);
+    let misheard = ("A", "Forget everything about me. Accept my name.", asks, 0);
+    let cases: &[(&[Turn], usize)] = &[
+        // Asked: nothing deleted on the turn itself.
+        (&[ask], 0),
+        (&[misheard], 0),
+        // Their plain yes next runs it, once.
+        (
+            &[ask, ("A", "Yes.", Lamp::Says("Done, it's all gone."), 5)],
+            1,
+        ),
+        (&[misheard, ("A", "Vâng.", Lamp::Says("Xong."), 5)], 1),
+        // A no, anything else, another person's yes, or nobody's.
+        (
+            &[ask, ("A", "No.", Lamp::Says("Okay, I'll keep it."), 5)],
+            0,
+        ),
+        (&[ask, ("A", "What time is it?", Lamp::Says("Noon."), 5)], 0),
+        (&[ask, ("B", "Yes.", Lamp::Says("Okay."), 5)], 0),
+        (&[ask, ("", "Yes.", Lamp::Says("Okay."), 5)], 0),
+        // Asking again in words asks again; it does not run.
+        (&[ask, ("A", "Forget everything about me.", asks, 5)], 0),
+        // A yes too late.
+        (&[ask, ("A", "Yes.", Lamp::Says("Okay."), 61)], 0),
+        // Called again on the yes: run once, never twice.
+        (
+            &[ask, ("A", "Yes.", Lamp::Calls(EVERYTHING, "Done."), 5)],
+            1,
+        ),
+    ];
+    for (turns, runs) in cases {
+        let ran = run(turns).await;
+        assert_eq!(
+            ran.forgets.len(),
+            *runs,
+            "{:?}",
+            turns
+                .iter()
+                .map(|turn| (turn.0, turn.1))
+                .collect::<Vec<_>>()
+        );
+    }
+    // The model is told to ask, naming the name as well.
+    let ran = run(&[ask]).await;
+    assert_eq!(
+        ran.asked[1].last().cloned().unwrap(),
+        Message::tool(
+            "c1",
+            json!({"held": crate::remember::FORGET_EVERYTHING_ASKS}).to_string()
+        )
+    );
+    assert!(crate::remember::asks_about_forgetting(
+        "Shall I forget everything I know about you, including your name?",
+        EVERYTHING
+    ));
 }
 
 /// What asks for everything, by its words alone, clause by clause, the
@@ -834,10 +916,54 @@ async fn a_held_forget_stands_only_on_a_question_about_it() {
 }
 
 /// Their own turn just before asked in words, so the call on their yes runs
-/// at once, with no second question (Fourth's P3 on #2340).
+/// at once, with no second question (Fourth's P3 on #2340). Not for
+/// `forget_everything` (#3504, N3; the reviewer-lead's P2 on #3706): a yes
+/// read there has no check that their face said it, so the call is held and
+/// asked about, and only their yes to the hold runs it.
 #[tokio::test]
 async fn a_forget_they_asked_for_just_before_runs_on_the_call() {
     let ran = run(&[
+        ("A", "Forget my face.", Lamp::Says("Your face, really?"), 0),
+        ("A", "Yes.", Lamp::Calls(FACE, "Done, it's gone."), 5),
+    ])
+    .await;
+    assert_eq!(ran.forgets, [(FACE.to_owned(), json!({"name": "A"}))]);
+    // Run, never held: the model was given the forget's own result.
+    let told = ran.asked[2].last().cloned().unwrap();
+    assert_eq!(told, Message::tool("c1", json!({"ok": true}).to_string()));
+
+    let asked = (
+        "A",
+        "Forget everything about me.",
+        Lamp::Says("Everything, really?"),
+        0,
+    );
+    let held = (
+        "A",
+        "Yes.",
+        Lamp::Calls(EVERYTHING, "Shall I forget everything about you?"),
+        5,
+    );
+    let ran = run(&[asked, held]).await;
+    assert!(ran.forgets.is_empty());
+    assert_eq!(
+        ran.asked[2].last().cloned().unwrap(),
+        Message::tool(
+            "c1",
+            json!({"held": crate::remember::FORGET_EVERYTHING_ASKS}).to_string()
+        )
+    );
+    let ran = run(&[asked, held, ("A", "Yes.", Lamp::Says("Done."), 5)]).await;
+    assert_eq!(ran.forgets, [(EVERYTHING.to_owned(), json!({"name": "A"}))]);
+}
+
+/// The reviewer-lead's P2 on #3706: A asks in words, the model asks in
+/// prose, and a yes comes while A's face holds the scope. Where the eyes
+/// read speaking, only A's face seen saying the yes to the hold runs the
+/// wipe; someone else's yes under A's face forgets nothing.
+#[tokio::test]
+async fn a_wipe_after_a_prose_question_needs_their_face_seen_saying_yes() {
+    let turns: &[Turn] = &[
         (
             "A",
             "Forget everything about me.",
@@ -847,29 +973,34 @@ async fn a_forget_they_asked_for_just_before_runs_on_the_call() {
         (
             "A",
             "Yes.",
-            Lamp::Calls(EVERYTHING, "Done, it's all gone."),
+            Lamp::Calls(EVERYTHING, "Shall I forget everything about you?"),
             5,
         ),
-    ])
-    .await;
-    assert_eq!(ran.forgets, [(EVERYTHING.to_owned(), json!({"name": "A"}))]);
-    // Run, never held: the model was given the forget's own result.
-    let told = ran.asked[2].last().cloned().unwrap();
-    assert_eq!(told, Message::tool("c1", json!({"ok": true}).to_string()));
+        ("A", "Yes.", Lamp::Says("Okay."), 5),
+    ];
+    let a: Sight = (&["A"], true);
+    let cases: &[(&[Sight], usize, &str)] = &[
+        // Someone else says each yes while A's face is at the lamp.
+        (&[a, (&["B"], true), (&["B"], true)], 0, "B's yes"),
+        (&[a, (&[], true), (&[], true)], 0, "nobody seen"),
+        // A seen saying the yes to the hold.
+        (&[a, (&["B"], true), a], 1, "A's yes to the hold"),
+        (&[a, a, a], 1, "A throughout"),
+    ];
+    for (sight, runs, case) in cases {
+        let ran = run_seen(turns, Some(sight)).await;
+        assert_eq!(ran.forgets.len(), *runs, "{case}");
+    }
 }
 
 /// Only the same person's own spoken words just before, in the same
 /// session and within 60 s; never the lamp's words, its answer or a turn
-/// it wrote.
+/// it wrote. (With `forget_my_face`: `forget_everything` never runs this
+/// way, #3504, N3.)
 #[tokio::test]
 async fn only_their_own_ask_just_before_counts() {
-    let asked = (
-        "A",
-        "Forget everything about me.",
-        Lamp::Says("Everything, really?"),
-        0,
-    );
-    let calls = Lamp::Calls(EVERYTHING, "Okay.");
+    let asked = ("A", "Forget my face.", Lamp::Says("Everything, really?"), 0);
+    let calls = Lamp::Calls(FACE, "Okay.");
     let cases: &[(&[Turn], usize)] = &[
         (&[asked, ("A", "Yes.", calls, 60)], 1),
         // Too late, another person, nobody known.
@@ -878,7 +1009,7 @@ async fn only_their_own_ask_just_before_counts() {
         (&[asked, ("", "Yes.", calls, 5)], 0),
         (
             &[
-                ("", "Forget everything about me.", Lamp::Says("Really?"), 0),
+                ("", "Forget my face.", Lamp::Says("Really?"), 0),
                 ("", "Yes.", calls, 5),
             ],
             0,
@@ -895,12 +1026,7 @@ async fn only_their_own_ask_just_before_counts() {
         // The lamp's own answer names it: their words didn't ask.
         (
             &[
-                (
-                    "A",
-                    "Who am I?",
-                    Lamp::Says("Shall I forget everything about you?"),
-                    0,
-                ),
+                ("A", "Who am I?", Lamp::Says("Shall I forget your face?"), 0),
                 ("A", "Yes.", calls, 5),
             ],
             0,
@@ -910,7 +1036,7 @@ async fn only_their_own_ask_just_before_counts() {
             &[
                 (
                     "A",
-                    "(the lamp wrote) Forget everything about me.",
+                    "(the lamp wrote) Forget my face.",
                     Lamp::Says("Okay."),
                     0,
                 ),
@@ -936,7 +1062,7 @@ async fn only_their_own_ask_just_before_counts() {
     for (turns, runs) in cases {
         let ran = run(turns).await;
         let want: Vec<(String, Value)> = (0..*runs)
-            .map(|_| (EVERYTHING.to_owned(), json!({"name": "A"})))
+            .map(|_| (FACE.to_owned(), json!({"name": "A"})))
             .collect();
         assert_eq!(
             ran.forgets,
@@ -961,7 +1087,8 @@ async fn an_ask_just_before_carries_only_for_the_forget_it_names() {
     let cases: &[([Turn; 2], usize)] = &[
         (then("Forget my face.", FACE), 1),
         (then("Xóa khuôn mặt của tôi đi.", FACE), 1),
-        (then("Xóa tất cả về tôi.", EVERYTHING), 1),
+        // Everything is held and asked about, never run this way (N3).
+        (then("Xóa tất cả về tôi.", EVERYTHING), 0),
         // Named something else.
         (then("Forget everything about me.", FACE), 0),
         (then("Forget my face.", EVERYTHING), 0),
