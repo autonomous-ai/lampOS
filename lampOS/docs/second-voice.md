@@ -389,8 +389,14 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   can't take is said and left at 1.5 s. A ready sound also moves the
   first-chat deadline: 3,000 ms means a 6 s deadline from the words,
   4,000 ms means 7 s. With no sound ready at the cue time, the deadline
-  is the later of that time and the plain 3 s bound; it does not wait
-  another 3 s in silence. These bounds end the wait for the first chat
+  is the same as with one (1.5 s + 3 s, 4.5 s at the default): before
+  #3755 it was the later of that time and the plain 3 s, so the first turn
+  after a restart, its clips not rendered yet and its chat connection
+  coldest, had the least time and was given up at 3.0 s (the tester's
+  7071 lamp, 27 Oct 13:53; on lamp-75c9 a cold chat's first event came
+  1.2 s later than a warm one's). The sounds and the down lines are also
+  rendered as the worker starts and as each line begins, not only once its
+  words are heard, so the first turn's "hmm" is usually ready. These bounds end the wait for the first chat
   event, not for speech playback to begin. Fourth's breakdown of lamp-4ace's
   silences (#2602, 21 Oct 20:41): the first answer audio now comes at p50
   1.99 s and p90 3.47 s over 96 turns, so at 1.5 s the sound came in about
