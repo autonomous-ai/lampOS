@@ -1,0 +1,63 @@
+{
+  "head": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+  "actual": {
+    "parents": [
+      "fc9c781afaed38dc976f650484c30f65bf5db57a",
+      "5613b3420fd7a189f7f140035d38bd8821379ad4"
+    ],
+    "sha": "8a727395d174c5e90f8c62017e74e62ad65a6433",
+    "tree": "488913d2af0646bccaf7a1846ffe3e2ad9f5a02a"
+  },
+  "whole_authored_tree_equal": true,
+  "original_run": 40596281263,
+  "attempt": 1,
+  "conclusion": "success",
+  "required_native_cases": {
+    "publisher": {
+      "PASS": 51,
+      "required_method_names_exact": true,
+      "duplicates": 0
+    },
+    "CLI": {
+      "PASS": 7,
+      "required_method_names_exact": true,
+      "duplicates": 0
+    }
+  },
+  "additional_workflow_controls": "Inventory11+CargoRegression1 separate from publisher51 andCLI7",
+  "publication": "skipped",
+  "raw_log_sha256": "fa3ac8669bcc1843e60bcc936ea96b2e19e157ff7fa1188b31ad296a9c338d36",
+  "jobs": [
+    {
+      "id": 122512887697,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "conclusion": "success"
+    },
+    {
+      "id": 122512889681,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 122519484108,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 122519484606,
+      "name": "report-full-run-failure",
+      "conclusion": "skipped"
+    }
+  ],
+  "observer": {
+    "run": "40596281263",
+    "observer_exit": 0,
+    "observer_timeout": false,
+    "elapsed_seconds": 900.87,
+    "qualification": "Observer terminal status only; inspect actual run conclusion/source before CI claim."
+  },
+  "limits": [
+    "No live authorization provisioned or exercised; draft holds remain.",
+    "Prior native/local results not transferred."
+  ]
+}
