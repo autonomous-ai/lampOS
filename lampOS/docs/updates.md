@@ -354,6 +354,15 @@ because [Actions concurrency ordering](https://docs.github.com/en/actions/how-to
 is not build order. Other publishers must remain disabled; GitHub offers
 no compare-and-swap operation across release assets.
 
+When a `gh` command fails, the helper immediately logs its fixed command label
+and exit code with only the first stderr line, stripped of terminal escapes and
+nonprintable characters and limited to 320 diagnostic characters. It redacts
+configured secret values and recognized credential patterns, including JWT/JWE
+forms with empty components, before truncation; this bounded summary is not a complete error transcript or a guarantee that
+every unknown secret format is recognized. It does not echo command arguments
+or stdout, and other command failures retain their generic message. The log
+survives promotion recovery wrapping the error; it adds no publication retry.
+
 ### Promotion and recovery
 
 The helper uploads the candidate envelope under the unique name
