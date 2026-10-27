@@ -422,7 +422,7 @@ export function DeviceSection({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {([
               ["automatic", "Automatic"],
-              ["tap_to_talk", "Tap to talk"],
+              ["tap_to_talk", "Press to talk"],
             ] as const).map(([mode, label]) => (
               <label key={mode} style={{ display: "flex", flex: "1 1 140px", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, border: `1px solid ${voiceInputMode === mode ? C.amber : C.border}`, background: voiceInputMode === mode ? C.amberDim : C.surface, color: C.text, fontSize: 13, cursor: "pointer" }}>
                 <input type="radio" name="voice_input_mode" value={mode} checked={voiceInputMode === mode} onChange={() => setVoiceInputMode(mode)} />
@@ -430,11 +430,23 @@ export function DeviceSection({
               </label>
             ))}
           </div>
-          <p id="voice-input-help" style={{ ...HINT_STYLE, margin: "8px 0 0" }}>
-            {voiceInputMode === "automatic"
-              ? "Your device detects speech and sends it when you finish speaking."
-              : "Tap once, then speak after the chime or light. Tap again when you finish to send. Pausing won't send your message. If you don't tap again within about 30 seconds, recording stops and nothing is sent. While your device is speaking, a tap stops it; tap again to start recording."}
-          </p>
+          <div id="voice-input-help">
+            {voiceInputMode === "automatic" ? (
+              <p style={{ ...HINT_STYLE, margin: "8px 0 0" }}>
+                Your device detects speech and sends it when you finish speaking.
+              </p>
+            ) : (
+              <>
+                {/* The second press is what sends, so the two presses lead, boxed. */}
+                <p style={{ margin: "8px 0 0", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.amber}`, background: C.amberDim, color: C.text, fontSize: 12.5, fontWeight: 600, lineHeight: 1.5 }}>
+                  Press the button once to start, then press it again when you finish to send. Two short presses; don&apos;t hold it down.
+                </p>
+                <p style={{ ...HINT_STYLE, margin: "8px 0 0" }}>
+                  Speak after the chime or light. Pausing won&apos;t send your message, and if you don&apos;t press the second time within about 30 seconds, recording stops and nothing is sent. While your device is speaking, a press stops it; press again to start recording.
+                </p>
+              </>
+            )}
+          </div>
           {voiceInputMode === "tap_to_talk" && (
             <p style={{ ...HINT_STYLE, margin: "5px 0 0" }}>
               No wake phrase or gaze needed. Your automatic wake preference is kept. The physical mic switch still applies.
