@@ -1,0 +1,38 @@
+{
+  "head": "bce4c004e169f84e7daa023e1cb756a7990745e6",
+  "base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+  "source_files": {
+    "lampOS/crates/control/tests/doc_examples.rs": "5f2df081364b795e7c346c82848375c6036cf38099ec1fdd942cc3ef3678fe86",
+    "lampOS/docs/control.md": "ac5587666714adb0bab2cc9d846ecb1248c093acc385636e01e1d26135498c75",
+    "lampOS/docs/control.schema.json": "d3f32d7da3fe9621ea9387998e1b1fba373bd6a7061bd2cc4cd3e6b608043534"
+  },
+  "host_gates": [
+    "cargo fmt --all --check",
+    "cargo clippy --offline --locked -p lamp-control --all-targets -- -D warnings",
+    "cargo test --offline --locked -p lamp-control"
+  ],
+  "host_counts": {
+    "passed": 17,
+    "failed": 0,
+    "ignored": 0
+  },
+  "log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests": "575d0b2ec6501b6f58dd03f7c4a7b83a4a31c2de1cca1e2ffbe3c6c36af38c54"
+  },
+  "schema_regex_probe": {
+    "runtime": "Node.js RegExp on parsed actual JSON schema patterns",
+    "c1_refusals": 64,
+    "normal_and_newline_controls": 4,
+    "failed": 0
+  },
+  "findings": {
+    "p1_p2": [],
+    "p3": "the_pages_ops_are_every_op hard-codes sixteen operation names, omitting supported play and sound. Their absent examples therefore do not fail this claimed every-op census. Add both or state the deliberate subset."
+  },
+  "limits": [
+    "Independent host source/test/schema-regex review only. No server, network, client pairing, real actuator or device acceptance.",
+    "Regex probes cover the changed C1 range and ordinary/newline behavior, not complete schema/parser equivalence."
+  ]
+}
