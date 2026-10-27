@@ -145,7 +145,10 @@ mod tests {
         let deadline = std::time::Duration::from_secs(2);
         assert_eq!(
             super::super::run_for(&socket, &call, deadline, Some(MINH)),
-            (json!({"remembered":true}), true)
+            (
+                super::super::tests::theirs(json!({"remembered":true})),
+                true
+            )
         );
         let read = served.join().unwrap();
         assert_eq!(read[0]["op"], "remember");

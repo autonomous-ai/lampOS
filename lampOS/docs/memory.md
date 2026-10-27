@@ -1028,6 +1028,22 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `remember::tests::a_repeat_in_a_persons_own_scope_is_told_known_already` and
   `remember::tests::without_the_switch_a_remember_in_either_scope_is_as_before`.
 
+- **A known person's keep is told as theirs** (#3504, Friday's N7; the
+  Days client, every switch, both voice routes). A known person's keep is
+  kept in their own scope, and the room's memory comes only from unknown
+  speakers, so "keep this for everyone" from a known face is theirs too.
+  On lamp-06c1 on 27 Oct that keep went to the person's scope, as designed,
+  but the lamp said "Kept: … for everyone in the office", and another
+  person then could not find it. Now `remember`'s answer in a known
+  person's scope also says `"kept_for"`: `remember::KEPT_FOR_THEM`, "Kept
+  for them alone: nobody else here can recall it. If they asked to keep it
+  for everyone or the room, say it is kept for them; never say it is kept
+  for everyone." It stands beside an `Already kept` note, a `replaced` id
+  and a heard line's note. In the room's scope nothing is added: what is
+  kept there is everyone's. Keeping a known person's thing in the room on
+  request was the other choice, and is not built. Test:
+  `remember::tests::a_known_persons_keep_is_told_as_theirs_never_for_everyone`.
+
 - **A correction replaces a kept thing** (#2510, `LAMP_MEMORY_REPLACES=on`,
   with the Days client only; off unless set; both voice routes).
   - **Why:** on lamp-06c1 on 21 Oct "it's green now" after a kept violet
