@@ -282,8 +282,9 @@ lamp-0c89, 23 October), or its absolute path (openharness `newCommand.ts`,
 for another machine). On that refusal alone, with a FOLDER that ends in that
 name, `lamp-tasks` asks the same `new` once more in exactly that FOLDER, in what
 is left of `new`'s one 60 s bound, and its journal says so (`tasks:
-lamp-task-N: the name 'NAME' is taken by the folder FOLDER on that computer,
-so it starts there`, with no ask's words). A name Harness turns into a
+lamp-task-N: the name 'NAME' is taken by a folder of that name on that
+computer, so it starts there`: never the folder itself, which may hold a
+user name, and no ask's words). A name Harness turns into a
 folder of another spelling (capitals, spaces) gets no retry, as before:
 give such a target its folder. A folder target,
 any other refusal, a timeout or a second refusal is never asked again,
@@ -300,7 +301,11 @@ spans go whole, and a word stays only if it is plain lowercase ASCII
 (`error:`, `refused`) or an upper-case code (`SPAWN_FAILED`), is none of the
 ask's words at any length, has no `/` or `@`, doesn't look secret, and is
 none of the machines' names, hostnames or ids that the preflight's `machines`
-listed, nor a long run with digits (an id). A name, a computer's label
+listed, nor any part of one of two letters or more (split at spaces, `-`,
+`_`, `.` and apostrophes, and again without a trailing `s`: `lan` of "Lan’s
+MacBook Air" and of `lans-macbook-air`), nor any run of its dashed parts
+(`lan-mbp` of `dev-lan-mbp`), nor a long run with digits (an id). `local`
+is kept, since it names nobody. A name, a computer's label
 (`lan-macbook` too), a folder or a word with an accent is `…`, one per run
 (Fourteen's privacy read; their and the Reviewer-lead's P3 on #3234). The ask is never in it. Before (lamp-0c89, 23 October), an `uncertain` hand-over said
 nothing in the journal, only in the task store.

@@ -590,7 +590,7 @@ impl Cli {
             && let Some(folder) = name_taken(&refused.stdout, &launch.target.project)
         {
             eprintln!(
-                "tasks: {}: the name '{}' is taken by the folder {folder} on that computer, so it starts there",
+                "tasks: {}: the name '{}' is taken by a folder of that name on that computer, so it starts there",
                 launch.name, launch.target.project
             );
             args[at] = folder.into();
@@ -1386,8 +1386,13 @@ impl Seen {
 
 /// Every word naming a machine in a `machines --json` reply, lowercased:
 /// each machine's name and hostname whole, word by word and without a
-/// domain (`lans-mbp.local` as `lans-mbp` too), and its ids. A line that
-/// isn't JSON gives nothing; the preflight's own check refuses it.
+/// domain (`lans-mbp.local` as `lans-mbp` too), and its ids; each part of
+/// two letters or more split at spaces, `-`, `_`, `.` and apostrophes, and
+/// the same without a trailing `s` (`lan` of "Lan’s MacBook Air" and of
+/// `lans-macbook-air`); and every run of two or more dashed parts
+/// (`lan-macbook`, `macbook-air`). [`NOT_A_NAME`] stays, so diagnostics keep
+/// it. A line that isn't JSON gives nothing; the preflight's own check
+/// refuses it.
 fn machine_words(bytes: &[u8]) -> BTreeSet<String> {
     let mut words = BTreeSet::new();
     for line in String::from_utf8_lossy(bytes).lines() {
@@ -1403,12 +1408,44 @@ fn machine_words(bytes: &[u8]) -> BTreeSet<String> {
                 words.insert(host.to_owned());
             }
             words.extend(value.split_whitespace().map(str::to_owned));
+            // Each part: a machine's owner ("Lan’s MacBook Air",
+            // `lans-macbook-air`) is said alone as often as whole (the
+            // Reviewer-lead's P2 on #3727).
+            for part in value
+                .split(|c: char| c.is_whitespace() || "-_.'’".contains(c))
+                .filter(|part| part.chars().count() >= 2)
+            {
+                words.insert(part.to_owned());
+                if let Some(owner) = part.strip_suffix('s')
+                    && owner.chars().count() >= 2
+                {
+                    words.insert(owner.to_owned());
+                }
+            }
+            // Every run of two or more dashed parts: `lan-macbook`,
+            // `macbook-air` and `lan-mbp` of `dev-lan-mbp`.
+            let dashed: Vec<&str> = value
+                .split(['-', '.'])
+                .filter(|part| !part.is_empty())
+                .collect();
+            for start in 0..dashed.len() {
+                for end in start + 2..=dashed.len() {
+                    words.insert(dashed[start..end].join("-"));
+                }
+            }
             words.insert(value);
         }
     }
     words.remove("");
+    for kept in NOT_A_NAME {
+        words.remove(kept);
+    }
     words
 }
+
+/// Words a machine's name or hostname may hold that name nobody: `local`
+/// of `.local`, which diagnostics need ("could not reach local daemon").
+const NOT_A_NAME: [&str; 1] = ["local"];
 
 /// The most of stderr's last line a journal line keeps.
 const STDERR_SAID_CHARS: usize = 160;
