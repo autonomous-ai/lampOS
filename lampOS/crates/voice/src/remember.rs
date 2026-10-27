@@ -886,6 +886,11 @@ pub fn events_on() -> bool {
 /// stopped until a fresh worker, as before.
 pub const JOURNAL_RESUMES_ENVIRONMENT: &str = "LAMP_MEMORY_JOURNAL_RESUMES";
 
+/// The journal's line when a conversation ends whose every exchange was
+/// forgotten since: memory closed it with nothing to observe (Friday's N12
+/// on #3504). No words, no person.
+pub const END_ALL_FORGOTTEN: &str = "lamp-voice provider: memory conversation end had nothing left to observe: every exchange was forgotten";
+
 /// The journal's line when journalling starts again: counts only.
 pub const JOURNAL_RESUMED: &str =
     "lamp-voice provider: memory journal resumes with a fresh session";
@@ -8251,6 +8256,15 @@ fn days_writer(
             WRITER_DEADLINE,
             JOB_ANSWER_BYTES,
         );
+        // Every exchange it named forgotten since: memory closed it with
+        // nothing to observe (N12), said apart from a lost or refused end.
+        let forgotten = answer
+            .as_ref()
+            .is_some_and(|answer| answer["ok"] == true && answer["reason"] == "forgotten");
+        if forgotten {
+            eprintln!("{END_ALL_FORGOTTEN}");
+            return;
+        }
         if observing {
             match answer
                 .filter(|answer| answer["ok"] == true)
