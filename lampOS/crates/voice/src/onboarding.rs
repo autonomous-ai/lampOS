@@ -382,6 +382,9 @@ struct Led {
     looked_since: Option<u64>,
     /// What of the answers has been heard ([`Onboarding::heard`]).
     heard: Answers,
+    /// "Touch": a touch on the head felt since the ask, kept until the step
+    /// is looked at (#3756).
+    touched: bool,
 }
 
 /// "Who you are"'s fallback: the name heard, asked back once.
@@ -1775,8 +1778,20 @@ impl Onboarding {
     ) -> Option<String> {
         self.poll_storage(now_us);
         self.look_for_receipt_eyes();
-        // Read every tick, so what came before the ask is never taken.
+        // Read every tick, so what came before the ask is never taken. One
+        // felt after "touch" was asked is kept with the step until it is
+        // looked at: a tap is one event, read on one tick, and a tick may
+        // return before the step is looked at (storage busy, a note owed),
+        // which lost every tap on 3e83 and 29e7 (#3756).
         let touched = self.head_touched();
+        if touched
+            && let Some(led) = self
+                .led
+                .as_mut()
+                .filter(|led| led.step == Step::Touch && led.asked_us.is_some())
+        {
+            led.touched = true;
+        }
         if face.is_some() {
             self.seen_us = Some(now_us);
         }
@@ -1913,7 +1928,7 @@ impl Onboarding {
         }
         if step == Step::Touch {
             // Done only by a touch Controls felt; one reminder, then failed.
-            if touched {
+            if touched || led.touched {
                 self.finish(step, Outcome::Done, None, now_us);
             } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
                 self.finish(step, Outcome::Failed, None, now_us);
@@ -3701,6 +3716,69 @@ mod tests {
         assert_eq!(room.walk.take_gesture(), None);
         // Only the outcome is kept.
         assert_eq!(room.walk.kept().steps["touch"].framing, None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// A tap is one event, read on one tick (#3756: 3e83 and 29e7, where
+    /// taps never counted and only a hand left resting did). A tick that
+    /// reads it and then returns before the touch step is looked at, here
+    /// with a note owed, as it does too while storage is busy or a privacy
+    /// receipt is read, still ends the step on it.
+    #[test]
+    fn a_tap_read_on_a_tick_that_returns_early_still_ends_touch() {
+        let (mut room, mut says, root) = at_touch("tap-early");
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        // The bus delivers, then one tick reads every touch and returns
+        // with the note it owed.
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        room.walk.drain_storage_for_test(room.at);
+        room.walk.owed = Some("owed".into());
+        assert_eq!(
+            room.walk
+                .tick(
+                    room.at,
+                    room.at - room.said,
+                    true,
+                    false,
+                    Some(NEAR_MIDDLE),
+                    true
+                )
+                .as_deref(),
+            Some("owed")
+        );
+        assert_eq!(room.outcome(Step::Touch), None);
+        // Nothing more is felt; the next ticks end the step on that tap.
+        until_touch_ends(&mut room);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// A touch felt before "touch" is asked never ends it (#3756's latch
+    /// holds only what came after the ask).
+    #[test]
+    fn a_touch_before_the_touch_step_is_asked_is_not_kept() {
+        let (mut room, mut says, root) = at_touch("tap-before");
+        // Back before the ask: the step is led but not yet asked.
+        room.walk.led.as_mut().unwrap().asked_us = None;
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        room.walk.drain_storage_for_test(room.at);
+        room.walk.owed = Some("owed".into());
+        room.walk.tick(
+            room.at,
+            room.at - room.said,
+            true,
+            false,
+            Some(NEAR_MIDDLE),
+            true,
+        );
+        assert!(!room.walk.led.as_ref().is_some_and(|led| led.touched));
         std::fs::remove_dir_all(root).unwrap();
     }
 
