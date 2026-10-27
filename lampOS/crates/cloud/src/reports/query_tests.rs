@@ -206,3 +206,98 @@ fn invalid_utf8_cleans_closed_output_child() {
         "invalid query output left its closed-output descendant running"
     );
 }
+
+// Keeps writing 256-byte lines until killed. Its rate stays modest so a run
+// with the cap removed fills memory slowly until the deadline instead.
+const ENDLESS: &str = "while :; do printf '%0256d' 0; done";
+const ENDLESS_DEADLINE: Duration = Duration::from_secs(6);
+
+fn pid_in(path: &Path) -> String {
+    let pid = fs::read_to_string(path).unwrap();
+    assert!(
+        !pid.is_empty() && pid.bytes().all(|byte| byte.is_ascii_digit()),
+        "bad pid file {pid:?}"
+    );
+    pid
+}
+
+/// True while `kill -0` still finds `pid`. A killed orphan stays a zombie
+/// until init reaps it, so wait a bounded time for it to be gone.
+fn still_running(pid: &str) -> bool {
+    let until = Instant::now() + Duration::from_secs(3);
+    loop {
+        let alive = Command::new("/bin/sh")
+            .args(["-c", "kill -0 \"$1\" 2>/dev/null", "probe", pid])
+            .status()
+            .unwrap()
+            .success();
+        if !alive || Instant::now() >= until {
+            return alive;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn assert_refused_at_the_cap(error: io::Error, started: Instant) {
+    let elapsed = started.elapsed();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData, "{error}");
+    assert_eq!(error.to_string(), "cloud query output exceeds 256 KiB");
+    // The cap is reached in well under a second; half the deadline is slack.
+    assert!(
+        elapsed < ENDLESS_DEADLINE / 2,
+        "endless writer refused only after {elapsed:?}"
+    );
+}
+
+#[test]
+fn an_endless_writer_is_refused_at_the_cap_and_its_group_killed() {
+    let root = tempfile::tempdir().unwrap();
+    let leader = root.path().join("leader");
+    let started = Instant::now();
+    let error = output_within(
+        shell(&format!("printf '%s' $$ > \"$1\"; {ENDLESS}"))
+            .arg("endless-writer")
+            .arg(&leader),
+        started + ENDLESS_DEADLINE,
+    )
+    .unwrap_err();
+    assert_refused_at_the_cap(error, started);
+    let pid = pid_in(&leader);
+    assert!(
+        !still_running(&pid),
+        "endless writer {pid} survived the cap"
+    );
+}
+
+#[test]
+fn an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed() {
+    let root = tempfile::tempdir().unwrap();
+    let leader = root.path().join("leader");
+    let child = root.path().join("child");
+    let started = Instant::now();
+    let error = output_within(
+        shell(&format!(
+            "printf '%s' $$ > \"$1\"; \
+             /bin/sh -c 'printf %s $$ > \"$1\"; exec /bin/sleep 30' pipe-holder \"$2\" & \
+             attempts=0; \
+             while [ ! -s \"$2\" ] && [ \"$attempts\" -lt 100 ]; do \
+               /bin/sleep 0.02; attempts=$((attempts+1)); \
+             done; \
+             [ -s \"$2\" ] || exit 99; {ENDLESS}"
+        ))
+        .arg("endless-writer-with-child")
+        .arg(&leader)
+        .arg(&child),
+        started + ENDLESS_DEADLINE,
+    )
+    .unwrap_err();
+    assert_refused_at_the_cap(error, started);
+    let leader = pid_in(&leader);
+    let child = pid_in(&child);
+    assert_ne!(leader, child);
+    assert!(!still_running(&leader), "endless writer {leader} survived");
+    assert!(
+        !still_running(&child),
+        "pipe-holding child {child} survived the cap"
+    );
+}
