@@ -722,3 +722,5 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - **The laptop's disk was full**, with 374 MB free, and a worktree checkout failed. I ran `cargo clean` in my three build folders (13 GB) and removed seven clean worktrees of closed PRs, leaving 15 GB free.
   - Posted the largest folders to Ten and Nine on #3504 (ten-light 71 GB, ten-sleep 53 GB, the shared checkout 31 GB, nine-heat 22 GB), without touching them.
   - #3903 and #3921: ARM64 and clippy are still running.
+
+- **28 Oct 01:59.** NEXT TRAIN #3921 `83cab8fe5` is posted: READ-OK from harness-reviewer, and all checks green. Eighth's 134 GB scratchpad build was the disk's biggest user; it's removed, and the laptop has 158 GB free. Reviewer-two is reading #3903's `ccb4e80d4`, and its ARM64 is still running. harness-reviewer's person decided that on 75c9 a hand on the arm, speech and `stop` take control back; the SDKs already report those as the lease's `lost` whys `hand`, `conversation` and `stop_heard`.
