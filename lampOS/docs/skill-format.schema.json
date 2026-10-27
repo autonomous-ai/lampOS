@@ -763,6 +763,31 @@
               "type": "string"
             }
           }
+        },
+        "sooner": {
+          "description": "A shorter `for` while another topic's field is above a line (#3709); kept only with LAMP_YAWN_SOONER=on. The trigger needs a `for`, and sooner's `for` is shorter.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "topic",
+            "field",
+            "above",
+            "for"
+          ],
+          "properties": {
+            "topic": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            },
+            "above": {
+              "type": "number"
+            },
+            "for": {
+              "$ref": "#/$defs/duration"
+            }
+          }
         }
       }
     },

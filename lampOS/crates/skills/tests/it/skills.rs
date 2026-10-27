@@ -1927,6 +1927,103 @@ fn sitting(from: u64, to: u64, away: &[u64]) -> Vec<(u64, &'static str, &'static
     messages
 }
 
+/// #3709: a yawn in the sitting brings Stretch break forward, from 50
+/// minutes to 30, with `LAMP_YAWN_SOONER=on`; still once a sitting. Off,
+/// or with no yawn, it is as before.
+#[test]
+fn a_yawn_in_the_sitting_brings_the_stretch_forward_once() {
+    let dir = tempfile::tempdir().unwrap();
+    // Its sooner's topic is read only as its permissions allow.
+    let reading =
+        |topics: &str| format!("\n[permissions]\ntopics = [{topics}]\nlight = true\nbody = true\n");
+    let with = |toml: &str| {
+        format!(
+            "{toml}{}",
+            reading(r#""humans/faces/tracked", "voice/state", "room/activity""#)
+        )
+    };
+    let sooner_line = "rearm = \"leaves\"\nsooner = { topic = \"room/activity\", field = \"yawns\", above = 0, for = \"30m\" }\n";
+    let skill = skill_with(
+        dir.path(),
+        "stretch-break",
+        &with(&STRETCH.replace("rearm = \"leaves\"\n", sooner_line)),
+    );
+    let unread = format!(
+        "{}{}",
+        STRETCH.replace("rearm = \"leaves\"\n", sooner_line),
+        reading(r#""humans/faces/tracked", "voice/state""#)
+    );
+    let error = load(&skill_with(
+        &dir.path().join("unread"),
+        "stretch-break",
+        &unread,
+    ))
+    .unwrap_err();
+    assert!(
+        error.contains("a trigger's sooner reads room/activity"),
+        "{error}"
+    );
+    let at_desk = |yawns: u32| {
+        format!(
+            r#"{{"state":"at_desk","for_s":60,"sitting_s":600,"baseline":true,"yawns":{yawns}}}"#
+        )
+    };
+    let (none, one) = (at_desk(0), at_desk(1));
+    let runs = |sooner: bool, yawned: &str| {
+        let mut messages = vec![(0, "voice/state", r#"{"state":"resting"}"#)];
+        messages.extend(sitting(0, 3300, &[]));
+        messages.push((600, "room/activity", yawned));
+        messages.sort_by_key(|message| message.0);
+        let mut engine = Engine::new(vec![load(&skill).unwrap()], true);
+        if sooner {
+            engine = engine.sooner();
+        }
+        let mut at = Vec::new();
+        for (when, topic, payload) in &messages {
+            if !engine
+                .observe(topic, when * 1_000_000, payload.as_bytes(), None)
+                .is_empty()
+            {
+                at.push(*when);
+            }
+        }
+        at
+    };
+    assert_eq!(runs(true, &one), [1800], "brought forward, once");
+    assert_eq!(runs(true, &none), [3000], "no yawn: as before");
+    assert_eq!(runs(false, &one), [3000], "the switch off: as before");
+    // Its line and its for are checked when it loads.
+    for (sooner, why) in [
+        (
+            r#"sooner = { topic = "room/activity", field = "yawns", above = 0, for = "50m" }"#,
+            "shorter than the trigger's for",
+        ),
+        (
+            r#"sooner = { topic = "room/activity", field = "yawns", for = "30m" }"#,
+            "missing field `above`",
+        ),
+    ] {
+        let toml = with(&STRETCH.replace(
+            "rearm = \"leaves\"\n",
+            &format!("rearm = \"leaves\"\n{sooner}\n"),
+        ));
+        let error = load(&skill_with(&dir.path().join("bad"), "stretch-break", &toml)).unwrap_err();
+        assert!(error.contains(why), "{sooner}: {error}");
+    }
+    let toml = with(
+        &STRETCH
+            .replace("for = \"50m\"\n", "")
+            .replace("rearm = \"leaves\"\n", sooner_line),
+    );
+    let error = load(&skill_with(
+        &dir.path().join("no-for"),
+        "stretch-break",
+        &toml,
+    ))
+    .unwrap_err();
+    assert!(error.contains("give the trigger a for"), "{error}");
+}
+
 /// #940 item 3: a light file's pattern is loaded into its call, its kind's
 /// period when it names none and a low of 1; a kind the ring does not play,
 /// a pattern without the light's level, a low at the level or a period out

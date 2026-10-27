@@ -145,6 +145,10 @@ Keys of a trigger:
   `unless_heard`.
 - `yields_to = { skill, trigger }`: it gives way to another skill's
   trigger.
+- `sooner = { topic, field, above, for }`: a shorter `for` while that
+  topic's field is above the line, on a trigger with a `for`. It is kept
+  only with `LAMP_YAWN_SOONER=on`; off, it is read, checked and ignored
+  (#3709).
 
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on

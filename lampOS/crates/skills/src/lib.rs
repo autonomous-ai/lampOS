@@ -58,6 +58,11 @@ pub const ADDONS_ENVIRONMENT: &str = "LAMP_ADDONS";
 /// set: both are read, checked and ignored, the clock begun again as before.
 pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
 
+/// `LAMP_YAWN_SOONER=on`: a trigger's `sooner` shortens its `for` while its
+/// field is past its line (#3709: a yawn seen in the sitting brings Stretch
+/// break forward). Off unless set: `sooner` is read, checked and ignored.
+pub const SOONER_ENVIRONMENT: &str = "LAMP_YAWN_SOONER";
+
 /// The topics a `[[while]]`'s `broken_by` may name, each with its rule
 /// ([`breaks`]): words heard, the lamp's name heard, a new push on the
 /// lamp, and a touch.
@@ -587,6 +592,19 @@ struct TriggerFile {
     /// After a night the lamp rested, a chance waits for another skill's
     /// daily trigger to be judged first (#1672): its greeting comes first.
     yields_to: Option<YieldFile>,
+    /// A shorter `for` while another topic's field is above a line (#3709).
+    sooner: Option<SoonerFile>,
+}
+
+/// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SoonerFile {
+    topic: String,
+    field: String,
+    above: f64,
+    #[serde(rename = "for")]
+    lasting: String,
 }
 
 /// `yields_to = { skill = "bedtime-morning", trigger = "morning" }`.
@@ -1720,6 +1738,12 @@ impl Skill {
                     .is_some()
                     .then(|| (Speech::TOPICS[0].to_owned(), "[again]")),
             )
+            .chain(self.triggers.iter().filter_map(|trigger| {
+                trigger
+                    .sooner
+                    .as_ref()
+                    .map(|sooner| (sooner.topic.clone(), "a trigger's sooner"))
+            }))
             .chain(
                 self.triggers
                     .iter()
@@ -2067,6 +2091,20 @@ pub struct Trigger {
     /// The skill and its daily trigger this one's chance waits for, after a
     /// night the lamp rested (#1672): `yields_to`.
     pub yields_to: Option<(String, String)>,
+    /// Its shorter `for` while another topic's field is above a line
+    /// ([`SOONER_ENVIRONMENT`], #3709).
+    pub sooner: Option<Sooner>,
+}
+
+/// A trigger's `sooner` (#3709): while `test` holds on `topic`'s newest
+/// value that still lasts, the trigger needs to have held only `for_us`.
+/// With `rearm`, it still takes one chance each time it holds: brought
+/// forward, never a second time.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Sooner {
+    pub topic: String,
+    test: Test,
+    pub for_us: u64,
 }
 
 /// A trigger's `rise` (#1684): the field's newest reading is at least `by`
@@ -2586,10 +2624,11 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             || file.during.is_some()
             || file.once_per_day
             || file.unless_heard
-            || file.yields_to.is_some())
+            || file.yields_to.is_some()
+            || file.sooner.is_some())
     {
         return Err(
-            "when = \"changes\" needs a field test, without each, key, near, present, absent_for, for, gap, rearm, cooldown, wait, rise, during, once_per_day, unless_heard or yields_to"
+            "when = \"changes\" needs a field test, without each, key, near, present, absent_for, for, gap, rearm, cooldown, wait, rise, during, once_per_day, unless_heard, yields_to or sooner"
                 .into(),
         );
     }
@@ -2768,6 +2807,33 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             ));
         }
     }
+    let for_us = optional(&file.lasting)?;
+    let sooner = match file.sooner {
+        None => None,
+        Some(sooner) => {
+            if for_us == 0 {
+                return Err("sooner shortens a trigger's for: give the trigger a for".into());
+            }
+            if !sooner.above.is_finite() {
+                return Err("sooner.above is a number".into());
+            }
+            let sooner_us = duration_us(&sooner.lasting)?;
+            if sooner_us == 0 || sooner_us >= for_us {
+                return Err("sooner.for is shorter than the trigger's for, and above 0".into());
+            }
+            Some(Sooner {
+                test: crate::test(
+                    &sooner.topic,
+                    Some(sooner.field),
+                    None,
+                    Some(sooner.above),
+                    None,
+                )?,
+                topic: sooner.topic,
+                for_us: sooner_us,
+            })
+        }
+    };
     // A compound comparison can turn false because a selected child is
     // malformed, incorrectly rearming its unchanged valid scalar tuple.
     if when == When::Changes && matches!(&test, Test::Equals(_, Value::Array(_) | Value::Object(_)))
@@ -2782,7 +2848,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         when,
         changes,
         absent_for_us: optional(&file.absent_for)?,
-        for_us: optional(&file.lasting)?,
+        for_us,
         gap_us: optional(&file.gap)?,
         rearm,
         rearm_line,
@@ -2793,6 +2859,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         once_per_day: file.once_per_day,
         unless_heard: file.unless_heard,
         yields_to,
+        sooner,
     })
 }
 
@@ -4766,6 +4833,8 @@ pub struct Engine {
     /// With [`REST_THROUGH_SOUNDS_ENVIRONMENT`] on: a `[[while]]`'s
     /// `through` and `broken_by` are kept (#1672).
     rest_through_sounds: bool,
+    /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709).
+    sooner: bool,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -4956,6 +5025,7 @@ impl Engine {
             judged: HashMap::new(),
             dropped: Vec::new(),
             rest_through_sounds: false,
+            sooner: false,
         }
     }
 
@@ -4965,6 +5035,13 @@ impl Engine {
     /// ignored: any value that does not hold begins the clock again.
     pub fn resting_through_sounds(mut self) -> Self {
         self.rest_through_sounds = true;
+        self
+    }
+
+    /// A trigger's `sooner` shortens its `for` while its field is past its
+    /// line (`LAMP_YAWN_SOONER=on`, #3709). Without it `sooner` is ignored.
+    pub fn sooner(mut self) -> Self {
+        self.sooner = true;
         self
     }
 
@@ -6259,7 +6336,17 @@ impl Engine {
                 }
                 watch.last_held_us = Some(now_us);
                 let held_us = now_us - watch.since_us.unwrap_or(now_us);
-                if held_us < trigger.for_us {
+                // Brought forward while its sooner's field is past its line.
+                let for_us = trigger
+                    .sooner
+                    .as_ref()
+                    .filter(|sooner| {
+                        self.sooner
+                            && Self::fresh(&self.latest, &sooner.topic, now_us)
+                                .is_some_and(|value| sooner.test.holds(value))
+                    })
+                    .map_or(trigger.for_us, |sooner| sooner.for_us);
+                if held_us < for_us {
                     continue;
                 }
                 watch.visited_us = Some(now_us);
