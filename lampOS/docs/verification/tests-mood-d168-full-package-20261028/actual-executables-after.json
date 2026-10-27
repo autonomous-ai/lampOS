@@ -1,0 +1,66 @@
+{
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost": {
+    "sha256": "8e321c7e5c29a8868ce246728ee80e00b35ea73f85bec6080aefd63510638547",
+    "bytes": 3732800,
+    "mode": 493,
+    "mtime_ns": 1793124461146806266,
+    "device": 16777222,
+    "inode": 489307722
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/it-707453661fb429d2": {
+    "sha256": "2442a840883742ff7d522dc3701073ae573421ce4d9ffc905db1e581206effd9",
+    "bytes": 12759968,
+    "mode": 493,
+    "mtime_ns": 1793124464973463970,
+    "device": 16777222,
+    "inode": 489297767
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_expression-7d5e7ac9619c42c0": {
+    "sha256": "504ed2df6a215d0032df7a537a5cd3a4ab50a84ddf9232b0c8c29e05d9e3271b",
+    "bytes": 2299584,
+    "mode": 493,
+    "mtime_ns": 1793124465427060082,
+    "device": 16777222,
+    "inode": 489297786
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost": {
+    "sha256": "2f212e80553567a056196160fa09134c2e1089a761c5e2eb991f9d03f6abf953",
+    "bytes": 3715176,
+    "mode": 493,
+    "mtime_ns": 1793124465864382073,
+    "device": 16777222,
+    "inode": 489307721
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost": {
+    "sha256": "b40eac54698fd243235b451069f8ef5956585a2c0031199e115e6817cfb5f66e",
+    "bytes": 3737976,
+    "mode": 493,
+    "mtime_ns": 1793124466268800160,
+    "device": 16777222,
+    "inode": 489307723
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/runtime-f9b92bb4002b831f": {
+    "sha256": "916f6e4f3a8526193b7319e3417417d7cc7307a8331595793abd142646ffb994",
+    "bytes": 6417248,
+    "mode": 493,
+    "mtime_ns": 1793124467200645766,
+    "device": 16777222,
+    "inode": 489297857
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression": {
+    "sha256": "ef989b9c8cfb973b3c42c728e6d82e604dc467ad3fd94fadff9500bc90cb1e88",
+    "bytes": 8294520,
+    "mode": 493,
+    "mtime_ns": 1793124467883630346,
+    "device": 16777222,
+    "inode": 489307720
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_expression-97b0d6d78b5cc498": {
+    "sha256": "8faf24ca6b1a727e23111bd2262f7826e8cd698c4d75d43bebaf0b67b77adde2",
+    "bytes": 5814912,
+    "mode": 493,
+    "mtime_ns": 1793124471078216745,
+    "device": 16777222,
+    "inode": 489297927
+  }
+}

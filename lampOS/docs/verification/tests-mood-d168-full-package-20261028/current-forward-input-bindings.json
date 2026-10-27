@@ -1,0 +1,3336 @@
+{
+  "current_head": "d168fa939905531a3257f80a335a69dcfd528027",
+  "source_count": 10911,
+  "kind_policy": "Include root Expression dev dependencies; traverse normal/build dependency edges only below the root, retaining all target predicates conservatively. Dependency dev-only edges do not propagate.",
+  "local_packages": [
+    "lamp-body",
+    "lamp-bus",
+    "lamp-expression",
+    "lamp-ipc",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-local-time",
+    "lamp-msgs",
+    "lamp-turn-owner",
+    "lamp-update"
+  ],
+  "new_changes_inside_forward_inputs": [
+    "lampOS/crates/expression/tests/runtime.rs"
+  ],
+  "resolved_package_source_features": [
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/body#lamp-body@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/body/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/bus#lamp-bus@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/bus/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/ipc/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/keeper/Cargo.toml",
+      "features": {
+        "default": [
+          "prepare"
+        ],
+        "prepare": [
+          "dep:lamp-update"
+        ]
+      }
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/lean#lamp-lean@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/lean/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/local-time/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/msgs/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/turn-owner/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/update#lamp-update@0.1.0",
+      "source": null,
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/update/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/base64-0.22.1/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "default": [
+          "std"
+        ],
+        "std": [
+          "alloc"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#bitflags@1.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitflags-1.3.2/Cargo.toml",
+      "features": {
+        "compiler_builtins": [
+          "dep:compiler_builtins"
+        ],
+        "core": [
+          "dep:core"
+        ],
+        "default": [],
+        "example_generated": [],
+        "rustc-dep-of-std": [
+          "core",
+          "compiler_builtins"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#bitflags@2.13.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitflags-2.13.2/Cargo.toml",
+      "features": {
+        "arbitrary": [
+          "dep:arbitrary"
+        ],
+        "bytemuck": [
+          "dep:bytemuck"
+        ],
+        "example_generated": [],
+        "serde": [
+          "serde_core"
+        ],
+        "serde_core": [
+          "dep:serde_core"
+        ],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#block-buffer@0.10.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/block-buffer-0.10.4/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#cc@1.7.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.7.0/Cargo.toml",
+      "features": {
+        "jobserver": [],
+        "parallel": [
+          "dep:jobserver",
+          "dep:libc"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cfg-if-1.0.5/Cargo.toml",
+      "features": {
+        "core": [
+          "dep:core"
+        ],
+        "rustc-dep-of-std": [
+          "core"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#cfg_aliases@0.2.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cfg_aliases-0.2.2/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.2.17",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpufeatures-0.2.17/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#crypto-common@0.1.7",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crypto-common-0.1.7/Cargo.toml",
+      "features": {
+        "getrandom": [
+          "rand_core/getrandom"
+        ],
+        "rand_core": [
+          "dep:rand_core"
+        ],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#defmt-macros@1.1.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/defmt-macros-1.1.1/Cargo.toml",
+      "features": {
+        "unstable-test": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#defmt-parser@1.0.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/defmt-parser-1.0.0/Cargo.toml",
+      "features": {
+        "unstable": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#defmt@1.1.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/defmt-1.1.1/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "avoid-default-panic": [],
+        "encoding-raw": [],
+        "encoding-rzcobs": [],
+        "ip_in_core": [],
+        "unstable-test": [
+          "defmt-macros/unstable-test"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#digest@0.10.7",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "blobby": [
+          "dep:blobby"
+        ],
+        "block-buffer": [
+          "dep:block-buffer"
+        ],
+        "const-oid": [
+          "dep:const-oid"
+        ],
+        "core-api": [
+          "block-buffer"
+        ],
+        "default": [
+          "core-api"
+        ],
+        "dev": [
+          "blobby"
+        ],
+        "mac": [
+          "subtle"
+        ],
+        "oid": [
+          "const-oid"
+        ],
+        "rand_core": [
+          "crypto-common/rand_core"
+        ],
+        "std": [
+          "alloc",
+          "crypto-common/std"
+        ],
+        "subtle": [
+          "dep:subtle"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#equivalent@1.0.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/equivalent-1.0.2/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#errno@0.3.14",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/errno-0.3.14/Cargo.toml",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "libc/std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#find-msvc-tools@0.1.14",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/find-msvc-tools-0.1.14/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#foldhash@0.2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/foldhash-0.2.0/Cargo.toml",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "nightly": [],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/generic-array-0.14.7/Cargo.toml",
+      "features": {
+        "more_lengths": [],
+        "serde": [
+          "dep:serde"
+        ],
+        "zeroize": [
+          "dep:zeroize"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.2.17",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/Cargo.toml",
+      "features": {
+        "compiler_builtins": [
+          "dep:compiler_builtins"
+        ],
+        "core": [
+          "dep:core"
+        ],
+        "custom": [],
+        "js": [
+          "wasm-bindgen",
+          "js-sys"
+        ],
+        "js-sys": [
+          "dep:js-sys"
+        ],
+        "linux_disable_fallback": [],
+        "rdrand": [],
+        "rustc-dep-of-std": [
+          "compiler_builtins",
+          "core",
+          "libc/rustc-dep-of-std",
+          "wasi/rustc-dep-of-std"
+        ],
+        "std": [],
+        "test-in-browser": [],
+        "wasm-bindgen": [
+          "dep:wasm-bindgen"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.4.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.4.3/Cargo.toml",
+      "features": {
+        "std": [],
+        "sys_rng": [
+          "dep:rand_core"
+        ],
+        "wasm_js": [
+          "dep:wasm-bindgen",
+          "dep:js-sys"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#glam@0.33.12",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glam-0.33.12/Cargo.toml",
+      "features": {
+        "all-types": [
+          "float-types",
+          "integer-types",
+          "size-types"
+        ],
+        "approx": [
+          "approx-05"
+        ],
+        "approx-05": [
+          "dep:approx-05"
+        ],
+        "arbitrary": [
+          "dep:arbitrary"
+        ],
+        "bytecheck": [
+          "rkyv-08?/bytecheck"
+        ],
+        "bytemuck": [
+          "dep:bytemuck"
+        ],
+        "core-simd": [
+          "bytemuck?/nightly_portable_simd"
+        ],
+        "cuda": [],
+        "debug-glam-assert": [],
+        "default": [
+          "std",
+          "all-types"
+        ],
+        "encase": [
+          "encase-012"
+        ],
+        "encase-012": [
+          "dep:encase-012"
+        ],
+        "encase-013": [
+          "dep:encase-013"
+        ],
+        "f64": [],
+        "fast-math": [],
+        "float-types": [
+          "f64"
+        ],
+        "float_eq": [
+          "dep:float_eq"
+        ],
+        "glam-assert": [],
+        "i16": [],
+        "i32": [],
+        "i64": [],
+        "i8": [],
+        "integer-types": [
+          "i8",
+          "u8",
+          "i16",
+          "u16",
+          "i32",
+          "u32",
+          "i64",
+          "u64"
+        ],
+        "isize": [],
+        "libm": [
+          "dep:libm"
+        ],
+        "mint": [
+          "mint-05"
+        ],
+        "mint-05": [
+          "dep:mint-05"
+        ],
+        "nostd-libm": [
+          "dep:libm"
+        ],
+        "rand": [
+          "rand-010"
+        ],
+        "rand-010": [
+          "dep:rand-010"
+        ],
+        "rkyv": [
+          "dep:rkyv-08"
+        ],
+        "rkyv-08": [
+          "dep:rkyv-08"
+        ],
+        "scalar-math": [],
+        "serde": [
+          "dep:serde_core"
+        ],
+        "size-types": [
+          "isize",
+          "usize"
+        ],
+        "speedy": [
+          "speedy-08"
+        ],
+        "speedy-08": [
+          "dep:speedy-08"
+        ],
+        "std": [],
+        "u16": [],
+        "u32": [],
+        "u64": [],
+        "u8": [],
+        "usize": [],
+        "zerocopy": [
+          "zerocopy-08"
+        ],
+        "zerocopy-08": [
+          "dep:zerocopy-08",
+          "dep:zerocopy-derive-08"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.17.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hashbrown-0.17.1/Cargo.toml",
+      "features": {
+        "alloc": [
+          "dep:alloc"
+        ],
+        "allocator-api2": [
+          "dep:allocator-api2"
+        ],
+        "core": [
+          "dep:core"
+        ],
+        "default": [
+          "default-hasher",
+          "inline-more",
+          "allocator-api2",
+          "equivalent",
+          "raw-entry"
+        ],
+        "default-hasher": [
+          "dep:foldhash"
+        ],
+        "equivalent": [
+          "dep:equivalent"
+        ],
+        "inline-more": [],
+        "nightly": [
+          "foldhash?/nightly",
+          "bumpalo/allocator_api"
+        ],
+        "raw-entry": [],
+        "rayon": [
+          "dep:rayon"
+        ],
+        "rustc-dep-of-std": [
+          "nightly",
+          "core",
+          "alloc",
+          "rustc-internal-api"
+        ],
+        "rustc-internal-api": [],
+        "serde": [
+          "dep:serde_core",
+          "dep:serde"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#httparse@1.10.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/httparse-1.10.1/Cargo.toml",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#indexmap@2.14.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/indexmap-2.14.2/Cargo.toml",
+      "features": {
+        "arbitrary": [
+          "dep:arbitrary"
+        ],
+        "borsh": [
+          "dep:borsh"
+        ],
+        "default": [
+          "std"
+        ],
+        "quickcheck": [
+          "dep:quickcheck"
+        ],
+        "rayon": [
+          "dep:rayon"
+        ],
+        "serde": [
+          "dep:serde_core",
+          "dep:serde"
+        ],
+        "std": [],
+        "sval": [
+          "dep:sval"
+        ],
+        "test_debug": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.18",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/itoa-1.0.18/Cargo.toml",
+      "features": {
+        "no-panic": [
+          "dep:no-panic"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#jiff-core@0.1.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jiff-core-0.1.1/Cargo.toml",
+      "features": {
+        "alloc": [
+          "defmt?/alloc"
+        ],
+        "arbitrary": [
+          "dep:arbitrary",
+          "std"
+        ],
+        "default": [
+          "std",
+          "tz-fat"
+        ],
+        "defmt": [
+          "dep:defmt"
+        ],
+        "logging": [
+          "dep:log"
+        ],
+        "std": [
+          "alloc",
+          "log?/std"
+        ],
+        "tz-fat": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#jiff-static@0.2.38",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jiff-static-0.2.38/Cargo.toml",
+      "features": {
+        "default": [],
+        "perf-inline": [],
+        "tz-fat": [],
+        "tzdb": [
+          "dep:jiff-tzdb"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#jiff-tzdb-platform@0.1.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jiff-tzdb-platform-0.1.3/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#jiff-tzdb@0.1.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jiff-tzdb-0.1.9/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#jiff@0.2.38",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jiff-0.2.38/Cargo.toml",
+      "features": {
+        "alloc": [
+          "jcore/alloc",
+          "serde_core?/alloc",
+          "portable-atomic-util/alloc",
+          "defmt?/alloc"
+        ],
+        "arbitrary": [
+          "dep:arbitrary",
+          "jcore/arbitrary",
+          "std"
+        ],
+        "default": [
+          "std",
+          "tz-system",
+          "tz-fat",
+          "tzdb-bundle-platform",
+          "tzdb-zoneinfo",
+          "tzdb-concatenated",
+          "perf-inline"
+        ],
+        "defmt": [
+          "dep:defmt",
+          "jcore/defmt"
+        ],
+        "js": [
+          "dep:wasm-bindgen",
+          "dep:js-sys"
+        ],
+        "logging": [
+          "dep:log",
+          "jcore/logging"
+        ],
+        "perf-inline": [],
+        "serde": [
+          "dep:serde_core"
+        ],
+        "static": [
+          "static-tz",
+          "jiff-static?/tzdb"
+        ],
+        "static-tz": [
+          "dep:jiff-static"
+        ],
+        "std": [
+          "alloc",
+          "jcore/std",
+          "log?/std",
+          "serde_core?/std"
+        ],
+        "tz-fat": [
+          "jcore/tz-fat",
+          "jiff-static?/tz-fat"
+        ],
+        "tz-system": [
+          "std",
+          "dep:windows-link"
+        ],
+        "tzdb-bundle-always": [
+          "dep:jiff-tzdb",
+          "alloc"
+        ],
+        "tzdb-bundle-platform": [
+          "dep:jiff-tzdb-platform",
+          "alloc"
+        ],
+        "tzdb-concatenated": [
+          "std"
+        ],
+        "tzdb-zoneinfo": [
+          "std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#jobserver@0.1.35",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jobserver-0.1.35/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.190/Cargo.toml",
+      "features": {
+        "align": [],
+        "const-extern-fn": [],
+        "default": [
+          "std"
+        ],
+        "extra_traits": [],
+        "rustc-dep-of-std": [
+          "align",
+          "rustc-std-workspace-core"
+        ],
+        "rustc-std-workspace-core": [
+          "dep:rustc-std-workspace-core"
+        ],
+        "std": [],
+        "use_std": [
+          "std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#linux-raw-sys@0.12.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/linux-raw-sys-0.12.1/Cargo.toml",
+      "features": {
+        "auxvec": [],
+        "bootparam": [],
+        "btrfs": [],
+        "core": [
+          "dep:core"
+        ],
+        "default": [
+          "std",
+          "general",
+          "errno"
+        ],
+        "elf": [],
+        "elf_uapi": [],
+        "errno": [],
+        "general": [],
+        "if_arp": [],
+        "if_ether": [],
+        "if_packet": [],
+        "if_tun": [],
+        "image": [],
+        "io_uring": [],
+        "ioctl": [],
+        "landlock": [],
+        "loop_device": [],
+        "mempolicy": [],
+        "net": [],
+        "netlink": [],
+        "no_std": [],
+        "prctl": [],
+        "ptrace": [],
+        "rustc-dep-of-std": [
+          "core",
+          "no_std"
+        ],
+        "std": [],
+        "system": [],
+        "vm_sockets": [],
+        "xdp": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#log@0.4.34",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/log-0.4.34/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "kv": [],
+        "kv_serde": [
+          "kv_std",
+          "value-bag/serde",
+          "serde"
+        ],
+        "kv_std": [
+          "std",
+          "kv",
+          "value-bag/error"
+        ],
+        "kv_sval": [
+          "kv",
+          "value-bag/sval",
+          "sval",
+          "sval_ref"
+        ],
+        "kv_unstable": [
+          "kv",
+          "value-bag"
+        ],
+        "kv_unstable_serde": [
+          "kv_serde",
+          "kv_unstable_std"
+        ],
+        "kv_unstable_std": [
+          "kv_std",
+          "kv_unstable"
+        ],
+        "kv_unstable_sval": [
+          "kv_sval",
+          "kv_unstable"
+        ],
+        "max_level_debug": [],
+        "max_level_error": [],
+        "max_level_info": [],
+        "max_level_off": [],
+        "max_level_trace": [],
+        "max_level_warn": [],
+        "release_max_level_debug": [],
+        "release_max_level_error": [],
+        "release_max_level_info": [],
+        "release_max_level_off": [],
+        "release_max_level_trace": [],
+        "release_max_level_warn": [],
+        "serde": [
+          "serde_core"
+        ],
+        "serde_core": [
+          "dep:serde_core"
+        ],
+        "std": [
+          "alloc"
+        ],
+        "sval": [
+          "dep:sval"
+        ],
+        "sval_ref": [
+          "dep:sval_ref"
+        ],
+        "value-bag": [
+          "dep:value-bag"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "core": [
+          "dep:core"
+        ],
+        "default": [
+          "std"
+        ],
+        "libc": [],
+        "logging": [
+          "dep:log"
+        ],
+        "rustc-dep-of-std": [
+          "core"
+        ],
+        "std": [
+          "alloc"
+        ],
+        "use_std": [
+          "std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nix-0.29.0/Cargo.toml",
+      "features": {
+        "acct": [],
+        "aio": [
+          "pin-utils"
+        ],
+        "default": [],
+        "dir": [
+          "fs"
+        ],
+        "env": [],
+        "event": [],
+        "fanotify": [],
+        "feature": [],
+        "fs": [],
+        "hostname": [],
+        "inotify": [],
+        "ioctl": [],
+        "kmod": [],
+        "memoffset": [
+          "dep:memoffset"
+        ],
+        "mman": [],
+        "mount": [
+          "uio"
+        ],
+        "mqueue": [
+          "fs"
+        ],
+        "net": [
+          "socket"
+        ],
+        "personality": [],
+        "pin-utils": [
+          "dep:pin-utils"
+        ],
+        "poll": [],
+        "process": [],
+        "pthread": [],
+        "ptrace": [
+          "process"
+        ],
+        "quota": [],
+        "reboot": [],
+        "resource": [],
+        "sched": [
+          "process"
+        ],
+        "signal": [
+          "process"
+        ],
+        "socket": [
+          "memoffset"
+        ],
+        "term": [],
+        "time": [],
+        "ucontext": [
+          "signal"
+        ],
+        "uio": [],
+        "user": [
+          "feature"
+        ],
+        "zerocopy": [
+          "fs",
+          "uio"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#once_cell@1.21.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/Cargo.toml",
+      "features": {
+        "alloc": [
+          "race"
+        ],
+        "atomic-polyfill": [
+          "critical-section"
+        ],
+        "critical-section": [
+          "dep:critical-section",
+          "portable-atomic"
+        ],
+        "default": [
+          "std"
+        ],
+        "parking_lot": [
+          "dep:parking_lot_core"
+        ],
+        "portable-atomic": [
+          "dep:portable-atomic"
+        ],
+        "race": [],
+        "std": [
+          "alloc"
+        ],
+        "unstable": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#portable-atomic-util@0.2.8",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-util-0.2.8/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "default": [],
+        "serde": [
+          "dep:serde"
+        ],
+        "std": [
+          "alloc"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#portable-atomic@1.15.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.15.0/Cargo.toml",
+      "features": {
+        "critical-section": [
+          "dep:critical-section"
+        ],
+        "default": [
+          "fallback"
+        ],
+        "disable-fiq": [],
+        "fallback": [],
+        "float": [],
+        "force-amo": [],
+        "require-cas": [],
+        "s-mode": [],
+        "serde": [
+          "dep:serde"
+        ],
+        "std": [],
+        "unsafe-assume-privileged": [],
+        "unsafe-assume-single-core": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro2-1.0.107/Cargo.toml",
+      "features": {
+        "default": [
+          "proc-macro"
+        ],
+        "nightly": [],
+        "proc-macro": [],
+        "span-locations": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quote-1.0.47/Cargo.toml",
+      "features": {
+        "default": [
+          "proc-macro"
+        ],
+        "proc-macro": [
+          "proc-macro2/proc-macro"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#r-efi@6.0.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/r-efi-6.0.0/Cargo.toml",
+      "features": {
+        "core": [
+          "dep:core"
+        ],
+        "native": [],
+        "rustc-dep-of-std": [
+          "core"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rand_core-0.10.1/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#ring@0.17.14",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ring-0.17.14/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "default": [
+          "alloc",
+          "dev_urandom_fallback"
+        ],
+        "dev_urandom_fallback": [],
+        "less-safe-getrandom-custom-or-rdrand": [],
+        "less-safe-getrandom-espidf": [],
+        "slow_tests": [],
+        "std": [
+          "alloc"
+        ],
+        "test_logging": [],
+        "unstable-testing-arm-no-hw": [],
+        "unstable-testing-arm-no-neon": [],
+        "wasm32_unknown_unknown_js": [
+          "getrandom/js"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.5/Cargo.toml",
+      "features": {
+        "all-apis": [
+          "event",
+          "fs",
+          "io_uring",
+          "mm",
+          "mount",
+          "net",
+          "param",
+          "pipe",
+          "process",
+          "pty",
+          "rand",
+          "runtime",
+          "shm",
+          "stdio",
+          "system",
+          "termios",
+          "thread",
+          "time"
+        ],
+        "alloc": [],
+        "core": [
+          "dep:core"
+        ],
+        "default": [
+          "std"
+        ],
+        "event": [],
+        "fs": [],
+        "io_uring": [
+          "event",
+          "fs",
+          "net",
+          "thread",
+          "linux-raw-sys/io_uring"
+        ],
+        "libc": [
+          "dep:libc"
+        ],
+        "libc_errno": [
+          "dep:libc_errno"
+        ],
+        "linux_4_11": [],
+        "linux_5_1": [
+          "linux_4_11"
+        ],
+        "linux_5_11": [
+          "linux_5_1"
+        ],
+        "linux_latest": [
+          "linux_5_11"
+        ],
+        "mm": [],
+        "mount": [],
+        "net": [
+          "linux-raw-sys/net",
+          "linux-raw-sys/netlink",
+          "linux-raw-sys/if_ether",
+          "linux-raw-sys/xdp"
+        ],
+        "param": [],
+        "pipe": [],
+        "process": [
+          "linux-raw-sys/prctl"
+        ],
+        "pty": [
+          "fs"
+        ],
+        "rand": [],
+        "runtime": [
+          "linux-raw-sys/prctl"
+        ],
+        "rustc-dep-of-std": [
+          "core",
+          "rustc-std-workspace-alloc",
+          "linux-raw-sys/rustc-dep-of-std",
+          "bitflags/rustc-dep-of-std"
+        ],
+        "rustc-std-workspace-alloc": [
+          "dep:rustc-std-workspace-alloc"
+        ],
+        "shm": [
+          "fs"
+        ],
+        "std": [
+          "bitflags/std",
+          "alloc",
+          "libc?/std",
+          "libc_errno?/std"
+        ],
+        "stdio": [],
+        "system": [
+          "linux-raw-sys/system"
+        ],
+        "termios": [],
+        "thread": [
+          "linux-raw-sys/prctl"
+        ],
+        "time": [],
+        "try_close": [],
+        "use-explicitly-provided-auxv": [],
+        "use-libc": [
+          "libc_errno",
+          "libc"
+        ],
+        "use-libc-auxv": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#rustls-pki-types@1.15.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-pki-types-1.15.1/Cargo.toml",
+      "features": {
+        "alloc": [
+          "dep:zeroize"
+        ],
+        "default": [
+          "alloc"
+        ],
+        "std": [
+          "alloc"
+        ],
+        "web": [
+          "web-time"
+        ],
+        "web-time": [
+          "dep:web-time"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#rustls-webpki@0.103.15",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-webpki-0.103.15/Cargo.toml",
+      "features": {
+        "alloc": [
+          "ring?/alloc",
+          "pki-types/alloc"
+        ],
+        "aws-lc-rs": [
+          "dep:aws-lc-rs",
+          "aws-lc-rs/aws-lc-sys",
+          "aws-lc-rs/prebuilt-nasm"
+        ],
+        "aws-lc-rs-fips": [
+          "dep:aws-lc-rs",
+          "aws-lc-rs/fips"
+        ],
+        "aws-lc-rs-unstable": [
+          "aws-lc-rs"
+        ],
+        "default": [
+          "std"
+        ],
+        "ring": [
+          "dep:ring"
+        ],
+        "std": [
+          "alloc",
+          "pki-types/std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.45",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-0.23.45/Cargo.toml",
+      "features": {
+        "aws-lc-rs": [
+          "aws_lc_rs"
+        ],
+        "aws_lc_rs": [
+          "dep:aws-lc-rs",
+          "webpki/aws-lc-rs",
+          "aws-lc-rs/aws-lc-sys",
+          "aws-lc-rs/prebuilt-nasm"
+        ],
+        "brotli": [
+          "dep:brotli",
+          "dep:brotli-decompressor",
+          "std"
+        ],
+        "custom-provider": [],
+        "default": [
+          "aws_lc_rs",
+          "logging",
+          "prefer-post-quantum",
+          "std",
+          "tls12"
+        ],
+        "fips": [
+          "aws_lc_rs",
+          "aws-lc-rs?/fips",
+          "webpki/aws-lc-rs-fips"
+        ],
+        "hashbrown": [
+          "dep:hashbrown"
+        ],
+        "log": [
+          "dep:log"
+        ],
+        "logging": [
+          "log"
+        ],
+        "prefer-post-quantum": [
+          "aws_lc_rs"
+        ],
+        "read_buf": [
+          "rustversion",
+          "std"
+        ],
+        "ring": [
+          "dep:ring",
+          "webpki/ring"
+        ],
+        "rustversion": [
+          "dep:rustversion"
+        ],
+        "std": [
+          "webpki/std",
+          "pki-types/std",
+          "once_cell/std"
+        ],
+        "tls12": [],
+        "zlib": [
+          "dep:zlib-rs"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/Cargo.toml",
+      "features": {
+        "alloc": [
+          "serde_core/alloc"
+        ],
+        "default": [
+          "std"
+        ],
+        "derive": [
+          "serde_derive"
+        ],
+        "rc": [
+          "serde_core/rc"
+        ],
+        "serde_derive": [
+          "dep:serde_derive"
+        ],
+        "std": [
+          "serde_core/std"
+        ],
+        "unstable": [
+          "serde_core/unstable"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "default": [
+          "std",
+          "result"
+        ],
+        "rc": [],
+        "result": [],
+        "std": [],
+        "unstable": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.229",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_derive-1.0.229/Cargo.toml",
+      "features": {
+        "default": [],
+        "deserialize_in_place": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/Cargo.toml",
+      "features": {
+        "alloc": [
+          "serde_core/alloc"
+        ],
+        "arbitrary_precision": [],
+        "default": [
+          "std"
+        ],
+        "float_roundtrip": [],
+        "indexmap": [
+          "dep:indexmap"
+        ],
+        "preserve_order": [
+          "indexmap",
+          "std"
+        ],
+        "raw_value": [],
+        "std": [
+          "memchr/std",
+          "serde_core/std"
+        ],
+        "unbounded_depth": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#serde_spanned@1.1.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_spanned-1.1.2/Cargo.toml",
+      "features": {
+        "alloc": [
+          "serde_core?/alloc"
+        ],
+        "default": [
+          "std",
+          "serde"
+        ],
+        "serde": [
+          "dep:serde_core"
+        ],
+        "std": [
+          "alloc",
+          "serde_core?/std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#sha2@0.10.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha2-0.10.9/Cargo.toml",
+      "features": {
+        "asm": [
+          "sha2-asm"
+        ],
+        "asm-aarch64": [
+          "asm"
+        ],
+        "compress": [],
+        "default": [
+          "std"
+        ],
+        "force-soft": [],
+        "force-soft-compact": [],
+        "loongarch64_asm": [],
+        "oid": [
+          "digest/oid"
+        ],
+        "sha2-asm": [
+          "dep:sha2-asm"
+        ],
+        "std": [
+          "digest/std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#shlex@2.0.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shlex-2.0.1/Cargo.toml",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#subtle@2.6.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/subtle-2.6.1/Cargo.toml",
+      "features": {
+        "const-generics": [],
+        "core_hint_black_box": [],
+        "default": [
+          "std",
+          "i128"
+        ],
+        "i128": [],
+        "nightly": [],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#syn@2.0.119",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.119/Cargo.toml",
+      "features": {
+        "clone-impls": [],
+        "default": [
+          "derive",
+          "parsing",
+          "printing",
+          "clone-impls",
+          "proc-macro"
+        ],
+        "derive": [],
+        "extra-traits": [],
+        "fold": [],
+        "full": [],
+        "parsing": [],
+        "printing": [
+          "dep:quote"
+        ],
+        "proc-macro": [
+          "proc-macro2/proc-macro",
+          "quote?/proc-macro"
+        ],
+        "test": [
+          "syn-test-suite/all-features"
+        ],
+        "visit": [],
+        "visit-mut": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#syn@3.0.7",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-3.0.7/Cargo.toml",
+      "features": {
+        "clone-impls": [],
+        "default": [
+          "derive",
+          "parsing",
+          "printing",
+          "clone-impls",
+          "proc-macro"
+        ],
+        "derive": [],
+        "extra-traits": [],
+        "fold": [],
+        "full": [],
+        "parsing": [],
+        "printing": [
+          "dep:quote"
+        ],
+        "proc-macro": [
+          "proc-macro2/proc-macro",
+          "quote?/proc-macro"
+        ],
+        "test": [
+          "syn-test-suite/all-features"
+        ],
+        "visit": [],
+        "visit-mut": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#thiserror-impl@2.0.21",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-2.0.21/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.21",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/Cargo.toml",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#toml@1.1.8+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-1.1.8+spec-1.1.0/Cargo.toml",
+      "features": {
+        "debug": [
+          "std",
+          "toml_parser?/debug",
+          "dep:anstream",
+          "dep:anstyle"
+        ],
+        "default": [
+          "std",
+          "serde",
+          "parse",
+          "display"
+        ],
+        "display": [
+          "dep:toml_writer"
+        ],
+        "fast_hash": [
+          "preserve_order",
+          "dep:foldhash"
+        ],
+        "parse": [
+          "dep:toml_parser",
+          "dep:winnow"
+        ],
+        "preserve_order": [
+          "dep:indexmap",
+          "std"
+        ],
+        "serde": [
+          "dep:serde_core",
+          "toml_datetime/serde",
+          "serde_spanned/serde"
+        ],
+        "std": [
+          "indexmap?/std",
+          "serde_core?/std",
+          "toml_parser?/std",
+          "toml_writer?/std",
+          "toml_datetime/std",
+          "serde_spanned/std"
+        ],
+        "unbounded": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#toml_datetime@1.1.2+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_datetime-1.1.2+spec-1.1.0/Cargo.toml",
+      "features": {
+        "alloc": [
+          "serde_core?/alloc"
+        ],
+        "default": [
+          "std"
+        ],
+        "serde": [
+          "dep:serde_core"
+        ],
+        "std": [
+          "alloc",
+          "serde_core?/std"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#toml_parser@1.1.5+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_parser-1.1.5+spec-1.1.0/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "debug": [
+          "std",
+          "dep:anstream",
+          "dep:anstyle"
+        ],
+        "default": [
+          "std"
+        ],
+        "simd": [
+          "winnow/simd"
+        ],
+        "std": [
+          "alloc"
+        ],
+        "unsafe": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#toml_writer@1.1.3+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.1.3+spec-1.1.0/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "default": [
+          "std"
+        ],
+        "std": [
+          "alloc"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#typenum@1.20.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/typenum-1.20.1/Cargo.toml",
+      "features": {
+        "const-generics": [],
+        "i128": [],
+        "scale-info": [
+          "dep:scale-info"
+        ],
+        "scale_info": [
+          "scale-info/derive"
+        ],
+        "strict": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.26",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.26/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#untrusted@0.9.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/untrusted-0.9.0/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#version_check@0.9.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/version_check-0.9.5/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#wasi@0.11.1+wasi-snapshot-preview1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasi-0.11.1+wasi-snapshot-preview1/Cargo.toml",
+      "features": {
+        "core": [
+          "dep:core"
+        ],
+        "default": [
+          "std"
+        ],
+        "rustc-dep-of-std": [
+          "core",
+          "rustc-std-workspace-alloc"
+        ],
+        "rustc-std-workspace-alloc": [
+          "dep:rustc-std-workspace-alloc"
+        ],
+        "std": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#webpki-roots@1.0.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/webpki-roots-1.0.9/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows-link@0.2.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows-link-0.2.1/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows-sys@0.52.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows-sys-0.52.0/Cargo.toml",
+      "features": {
+        "Wdk": [],
+        "Wdk_Foundation": [
+          "Wdk"
+        ],
+        "Wdk_Graphics": [
+          "Wdk"
+        ],
+        "Wdk_Graphics_Direct3D": [
+          "Wdk_Graphics"
+        ],
+        "Wdk_Storage": [
+          "Wdk"
+        ],
+        "Wdk_Storage_FileSystem": [
+          "Wdk_Storage"
+        ],
+        "Wdk_Storage_FileSystem_Minifilters": [
+          "Wdk_Storage_FileSystem"
+        ],
+        "Wdk_System": [
+          "Wdk"
+        ],
+        "Wdk_System_IO": [
+          "Wdk_System"
+        ],
+        "Wdk_System_OfflineRegistry": [
+          "Wdk_System"
+        ],
+        "Wdk_System_Registry": [
+          "Wdk_System"
+        ],
+        "Wdk_System_SystemInformation": [
+          "Wdk_System"
+        ],
+        "Wdk_System_SystemServices": [
+          "Wdk_System"
+        ],
+        "Wdk_System_Threading": [
+          "Wdk_System"
+        ],
+        "Win32": [],
+        "Win32_Data": [
+          "Win32"
+        ],
+        "Win32_Data_HtmlHelp": [
+          "Win32_Data"
+        ],
+        "Win32_Data_RightsManagement": [
+          "Win32_Data"
+        ],
+        "Win32_Devices": [
+          "Win32"
+        ],
+        "Win32_Devices_AllJoyn": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_BiometricFramework": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Bluetooth": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Communication": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_DeviceAndDriverInstallation": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_DeviceQuery": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Display": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Enumeration": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Enumeration_Pnp": [
+          "Win32_Devices_Enumeration"
+        ],
+        "Win32_Devices_Fax": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_HumanInterfaceDevice": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_PortableDevices": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Properties": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Pwm": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Sensors": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_SerialCommunication": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Tapi": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Usb": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_WebServicesOnDevices": [
+          "Win32_Devices"
+        ],
+        "Win32_Foundation": [
+          "Win32"
+        ],
+        "Win32_Gaming": [
+          "Win32"
+        ],
+        "Win32_Globalization": [
+          "Win32"
+        ],
+        "Win32_Graphics": [
+          "Win32"
+        ],
+        "Win32_Graphics_Dwm": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Gdi": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_GdiPlus": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Hlsl": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_OpenGL": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Printing": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Printing_PrintTicket": [
+          "Win32_Graphics_Printing"
+        ],
+        "Win32_Management": [
+          "Win32"
+        ],
+        "Win32_Management_MobileDeviceManagementRegistration": [
+          "Win32_Management"
+        ],
+        "Win32_Media": [
+          "Win32"
+        ],
+        "Win32_Media_Audio": [
+          "Win32_Media"
+        ],
+        "Win32_Media_DxMediaObjects": [
+          "Win32_Media"
+        ],
+        "Win32_Media_KernelStreaming": [
+          "Win32_Media"
+        ],
+        "Win32_Media_Multimedia": [
+          "Win32_Media"
+        ],
+        "Win32_Media_Streaming": [
+          "Win32_Media"
+        ],
+        "Win32_Media_WindowsMediaFormat": [
+          "Win32_Media"
+        ],
+        "Win32_NetworkManagement": [
+          "Win32"
+        ],
+        "Win32_NetworkManagement_Dhcp": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Dns": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_InternetConnectionWizard": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_IpHelper": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Multicast": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Ndis": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetBios": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetManagement": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetShell": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetworkDiagnosticsFramework": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_P2P": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_QoS": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Rras": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Snmp": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WNet": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WebDav": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WiFi": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsConnectionManager": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsFilteringPlatform": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsFirewall": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsNetworkVirtualization": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_Networking": [
+          "Win32"
+        ],
+        "Win32_Networking_ActiveDirectory": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_Clustering": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_HttpServer": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_Ldap": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WebSocket": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WinHttp": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WinInet": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WinSock": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WindowsWebServices": [
+          "Win32_Networking"
+        ],
+        "Win32_Security": [
+          "Win32"
+        ],
+        "Win32_Security_AppLocker": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Authentication": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Authentication_Identity": [
+          "Win32_Security_Authentication"
+        ],
+        "Win32_Security_Authorization": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Credentials": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Cryptography": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Cryptography_Catalog": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_Cryptography_Certificates": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_Cryptography_Sip": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_Cryptography_UI": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_DiagnosticDataQuery": [
+          "Win32_Security"
+        ],
+        "Win32_Security_DirectoryServices": [
+          "Win32_Security"
+        ],
+        "Win32_Security_EnterpriseData": [
+          "Win32_Security"
+        ],
+        "Win32_Security_ExtensibleAuthenticationProtocol": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Isolation": [
+          "Win32_Security"
+        ],
+        "Win32_Security_LicenseProtection": [
+          "Win32_Security"
+        ],
+        "Win32_Security_NetworkAccessProtection": [
+          "Win32_Security"
+        ],
+        "Win32_Security_WinTrust": [
+          "Win32_Security"
+        ],
+        "Win32_Security_WinWlx": [
+          "Win32_Security"
+        ],
+        "Win32_Storage": [
+          "Win32"
+        ],
+        "Win32_Storage_Cabinets": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_CloudFilters": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Compression": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_DistributedFileSystem": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_FileHistory": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_FileSystem": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Imapi": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_IndexServer": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_InstallableFileSystems": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_IscsiDisc": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Jet": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Nvme": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_OfflineFiles": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_OperationRecorder": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Packaging": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Packaging_Appx": [
+          "Win32_Storage_Packaging"
+        ],
+        "Win32_Storage_ProjectedFileSystem": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_StructuredStorage": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Vhd": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Xps": [
+          "Win32_Storage"
+        ],
+        "Win32_System": [
+          "Win32"
+        ],
+        "Win32_System_AddressBook": [
+          "Win32_System"
+        ],
+        "Win32_System_Antimalware": [
+          "Win32_System"
+        ],
+        "Win32_System_ApplicationInstallationAndServicing": [
+          "Win32_System"
+        ],
+        "Win32_System_ApplicationVerifier": [
+          "Win32_System"
+        ],
+        "Win32_System_ClrHosting": [
+          "Win32_System"
+        ],
+        "Win32_System_Com": [
+          "Win32_System"
+        ],
+        "Win32_System_Com_Marshal": [
+          "Win32_System_Com"
+        ],
+        "Win32_System_Com_StructuredStorage": [
+          "Win32_System_Com"
+        ],
+        "Win32_System_Com_Urlmon": [
+          "Win32_System_Com"
+        ],
+        "Win32_System_ComponentServices": [
+          "Win32_System"
+        ],
+        "Win32_System_Console": [
+          "Win32_System"
+        ],
+        "Win32_System_CorrelationVector": [
+          "Win32_System"
+        ],
+        "Win32_System_DataExchange": [
+          "Win32_System"
+        ],
+        "Win32_System_DeploymentServices": [
+          "Win32_System"
+        ],
+        "Win32_System_DeveloperLicensing": [
+          "Win32_System"
+        ],
+        "Win32_System_Diagnostics": [
+          "Win32_System"
+        ],
+        "Win32_System_Diagnostics_Ceip": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_Debug": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_Debug_Extensions": [
+          "Win32_System_Diagnostics_Debug"
+        ],
+        "Win32_System_Diagnostics_Etw": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_ProcessSnapshotting": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_ToolHelp": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_DistributedTransactionCoordinator": [
+          "Win32_System"
+        ],
+        "Win32_System_Environment": [
+          "Win32_System"
+        ],
+        "Win32_System_ErrorReporting": [
+          "Win32_System"
+        ],
+        "Win32_System_EventCollector": [
+          "Win32_System"
+        ],
+        "Win32_System_EventLog": [
+          "Win32_System"
+        ],
+        "Win32_System_EventNotificationService": [
+          "Win32_System"
+        ],
+        "Win32_System_GroupPolicy": [
+          "Win32_System"
+        ],
+        "Win32_System_HostCompute": [
+          "Win32_System"
+        ],
+        "Win32_System_HostComputeNetwork": [
+          "Win32_System"
+        ],
+        "Win32_System_HostComputeSystem": [
+          "Win32_System"
+        ],
+        "Win32_System_Hypervisor": [
+          "Win32_System"
+        ],
+        "Win32_System_IO": [
+          "Win32_System"
+        ],
+        "Win32_System_Iis": [
+          "Win32_System"
+        ],
+        "Win32_System_Ioctl": [
+          "Win32_System"
+        ],
+        "Win32_System_JobObjects": [
+          "Win32_System"
+        ],
+        "Win32_System_Js": [
+          "Win32_System"
+        ],
+        "Win32_System_Kernel": [
+          "Win32_System"
+        ],
+        "Win32_System_LibraryLoader": [
+          "Win32_System"
+        ],
+        "Win32_System_Mailslots": [
+          "Win32_System"
+        ],
+        "Win32_System_Mapi": [
+          "Win32_System"
+        ],
+        "Win32_System_Memory": [
+          "Win32_System"
+        ],
+        "Win32_System_Memory_NonVolatile": [
+          "Win32_System_Memory"
+        ],
+        "Win32_System_MessageQueuing": [
+          "Win32_System"
+        ],
+        "Win32_System_MixedReality": [
+          "Win32_System"
+        ],
+        "Win32_System_Ole": [
+          "Win32_System"
+        ],
+        "Win32_System_PasswordManagement": [
+          "Win32_System"
+        ],
+        "Win32_System_Performance": [
+          "Win32_System"
+        ],
+        "Win32_System_Performance_HardwareCounterProfiling": [
+          "Win32_System_Performance"
+        ],
+        "Win32_System_Pipes": [
+          "Win32_System"
+        ],
+        "Win32_System_Power": [
+          "Win32_System"
+        ],
+        "Win32_System_ProcessStatus": [
+          "Win32_System"
+        ],
+        "Win32_System_Recovery": [
+          "Win32_System"
+        ],
+        "Win32_System_Registry": [
+          "Win32_System"
+        ],
+        "Win32_System_RemoteDesktop": [
+          "Win32_System"
+        ],
+        "Win32_System_RemoteManagement": [
+          "Win32_System"
+        ],
+        "Win32_System_RestartManager": [
+          "Win32_System"
+        ],
+        "Win32_System_Restore": [
+          "Win32_System"
+        ],
+        "Win32_System_Rpc": [
+          "Win32_System"
+        ],
+        "Win32_System_Search": [
+          "Win32_System"
+        ],
+        "Win32_System_Search_Common": [
+          "Win32_System_Search"
+        ],
+        "Win32_System_SecurityCenter": [
+          "Win32_System"
+        ],
+        "Win32_System_Services": [
+          "Win32_System"
+        ],
+        "Win32_System_SetupAndMigration": [
+          "Win32_System"
+        ],
+        "Win32_System_Shutdown": [
+          "Win32_System"
+        ],
+        "Win32_System_StationsAndDesktops": [
+          "Win32_System"
+        ],
+        "Win32_System_SubsystemForLinux": [
+          "Win32_System"
+        ],
+        "Win32_System_SystemInformation": [
+          "Win32_System"
+        ],
+        "Win32_System_SystemServices": [
+          "Win32_System"
+        ],
+        "Win32_System_Threading": [
+          "Win32_System"
+        ],
+        "Win32_System_Time": [
+          "Win32_System"
+        ],
+        "Win32_System_TpmBaseServices": [
+          "Win32_System"
+        ],
+        "Win32_System_UserAccessLogging": [
+          "Win32_System"
+        ],
+        "Win32_System_Variant": [
+          "Win32_System"
+        ],
+        "Win32_System_VirtualDosMachines": [
+          "Win32_System"
+        ],
+        "Win32_System_WindowsProgramming": [
+          "Win32_System"
+        ],
+        "Win32_System_Wmi": [
+          "Win32_System"
+        ],
+        "Win32_UI": [
+          "Win32"
+        ],
+        "Win32_UI_Accessibility": [
+          "Win32_UI"
+        ],
+        "Win32_UI_ColorSystem": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Controls": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Controls_Dialogs": [
+          "Win32_UI_Controls"
+        ],
+        "Win32_UI_HiDpi": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Input": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Input_Ime": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_KeyboardAndMouse": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_Pointer": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_Touch": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_XboxController": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_InteractionContext": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Magnification": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Shell": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Shell_PropertiesSystem": [
+          "Win32_UI_Shell"
+        ],
+        "Win32_UI_TabletPC": [
+          "Win32_UI"
+        ],
+        "Win32_UI_TextServices": [
+          "Win32_UI"
+        ],
+        "Win32_UI_WindowsAndMessaging": [
+          "Win32_UI"
+        ],
+        "Win32_Web": [
+          "Win32"
+        ],
+        "Win32_Web_InternetExplorer": [
+          "Win32_Web"
+        ],
+        "default": [],
+        "docs": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows-sys@0.61.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows-sys-0.61.2/Cargo.toml",
+      "features": {
+        "Wdk": [
+          "Win32_Foundation"
+        ],
+        "Wdk_Devices": [
+          "Wdk"
+        ],
+        "Wdk_Devices_Bluetooth": [
+          "Wdk_Devices"
+        ],
+        "Wdk_Devices_HumanInterfaceDevice": [
+          "Wdk_Devices"
+        ],
+        "Wdk_Foundation": [
+          "Wdk"
+        ],
+        "Wdk_Graphics": [
+          "Wdk"
+        ],
+        "Wdk_Graphics_Direct3D": [
+          "Wdk_Graphics"
+        ],
+        "Wdk_NetworkManagement": [
+          "Wdk"
+        ],
+        "Wdk_NetworkManagement_Ndis": [
+          "Wdk_NetworkManagement"
+        ],
+        "Wdk_NetworkManagement_WindowsFilteringPlatform": [
+          "Wdk_NetworkManagement"
+        ],
+        "Wdk_Storage": [
+          "Wdk"
+        ],
+        "Wdk_Storage_FileSystem": [
+          "Wdk_Storage"
+        ],
+        "Wdk_Storage_FileSystem_Minifilters": [
+          "Wdk_Storage_FileSystem"
+        ],
+        "Wdk_System": [
+          "Wdk"
+        ],
+        "Wdk_System_IO": [
+          "Wdk_System"
+        ],
+        "Wdk_System_Memory": [
+          "Wdk_System"
+        ],
+        "Wdk_System_OfflineRegistry": [
+          "Wdk_System"
+        ],
+        "Wdk_System_Registry": [
+          "Wdk_System"
+        ],
+        "Wdk_System_SystemInformation": [
+          "Wdk_System"
+        ],
+        "Wdk_System_SystemServices": [
+          "Wdk_System"
+        ],
+        "Wdk_System_Threading": [
+          "Wdk_System"
+        ],
+        "Win32": [
+          "Win32_Foundation"
+        ],
+        "Win32_Data": [
+          "Win32"
+        ],
+        "Win32_Data_HtmlHelp": [
+          "Win32_Data"
+        ],
+        "Win32_Data_RightsManagement": [
+          "Win32_Data"
+        ],
+        "Win32_Devices": [
+          "Win32"
+        ],
+        "Win32_Devices_AllJoyn": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Beep": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_BiometricFramework": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Bluetooth": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Cdrom": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Communication": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_DeviceAndDriverInstallation": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_DeviceQuery": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Display": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Dvd": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Enumeration": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Enumeration_Pnp": [
+          "Win32_Devices_Enumeration"
+        ],
+        "Win32_Devices_Fax": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_HumanInterfaceDevice": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Nfc": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Nfp": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_PortableDevices": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Properties": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Pwm": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Sensors": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_SerialCommunication": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Tapi": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_Usb": [
+          "Win32_Devices"
+        ],
+        "Win32_Devices_WebServicesOnDevices": [
+          "Win32_Devices"
+        ],
+        "Win32_Foundation": [
+          "Win32"
+        ],
+        "Win32_Gaming": [
+          "Win32"
+        ],
+        "Win32_Globalization": [
+          "Win32"
+        ],
+        "Win32_Graphics": [
+          "Win32"
+        ],
+        "Win32_Graphics_Dwm": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Gdi": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_GdiPlus": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Hlsl": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_OpenGL": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Printing": [
+          "Win32_Graphics"
+        ],
+        "Win32_Graphics_Printing_PrintTicket": [
+          "Win32_Graphics_Printing"
+        ],
+        "Win32_Management": [
+          "Win32"
+        ],
+        "Win32_Management_MobileDeviceManagementRegistration": [
+          "Win32_Management"
+        ],
+        "Win32_Media": [
+          "Win32"
+        ],
+        "Win32_Media_Audio": [
+          "Win32_Media"
+        ],
+        "Win32_Media_DxMediaObjects": [
+          "Win32_Media"
+        ],
+        "Win32_Media_KernelStreaming": [
+          "Win32_Media"
+        ],
+        "Win32_Media_Multimedia": [
+          "Win32_Media"
+        ],
+        "Win32_Media_Streaming": [
+          "Win32_Media"
+        ],
+        "Win32_Media_WindowsMediaFormat": [
+          "Win32_Media"
+        ],
+        "Win32_NetworkManagement": [
+          "Win32"
+        ],
+        "Win32_NetworkManagement_Dhcp": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Dns": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_InternetConnectionWizard": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_IpHelper": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Multicast": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Ndis": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetBios": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetManagement": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetShell": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_NetworkDiagnosticsFramework": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_P2P": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_QoS": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Rras": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_Snmp": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WNet": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WebDav": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WiFi": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsConnectionManager": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsFilteringPlatform": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsFirewall": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_NetworkManagement_WindowsNetworkVirtualization": [
+          "Win32_NetworkManagement"
+        ],
+        "Win32_Networking": [
+          "Win32"
+        ],
+        "Win32_Networking_ActiveDirectory": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_Clustering": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_HttpServer": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_Ldap": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WebSocket": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WinHttp": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WinInet": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WinSock": [
+          "Win32_Networking"
+        ],
+        "Win32_Networking_WindowsWebServices": [
+          "Win32_Networking"
+        ],
+        "Win32_Security": [
+          "Win32"
+        ],
+        "Win32_Security_AppLocker": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Authentication": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Authentication_Identity": [
+          "Win32_Security_Authentication"
+        ],
+        "Win32_Security_Authorization": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Credentials": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Cryptography": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Cryptography_Catalog": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_Cryptography_Certificates": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_Cryptography_Sip": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_Cryptography_UI": [
+          "Win32_Security_Cryptography"
+        ],
+        "Win32_Security_DiagnosticDataQuery": [
+          "Win32_Security"
+        ],
+        "Win32_Security_DirectoryServices": [
+          "Win32_Security"
+        ],
+        "Win32_Security_EnterpriseData": [
+          "Win32_Security"
+        ],
+        "Win32_Security_ExtensibleAuthenticationProtocol": [
+          "Win32_Security"
+        ],
+        "Win32_Security_Isolation": [
+          "Win32_Security"
+        ],
+        "Win32_Security_LicenseProtection": [
+          "Win32_Security"
+        ],
+        "Win32_Security_NetworkAccessProtection": [
+          "Win32_Security"
+        ],
+        "Win32_Security_WinTrust": [
+          "Win32_Security"
+        ],
+        "Win32_Security_WinWlx": [
+          "Win32_Security"
+        ],
+        "Win32_Storage": [
+          "Win32"
+        ],
+        "Win32_Storage_Cabinets": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_CloudFilters": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Compression": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_DistributedFileSystem": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_FileHistory": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_FileSystem": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Imapi": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_IndexServer": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_InstallableFileSystems": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_IscsiDisc": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Jet": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Nvme": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_OfflineFiles": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_OperationRecorder": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Packaging": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Packaging_Appx": [
+          "Win32_Storage_Packaging"
+        ],
+        "Win32_Storage_ProjectedFileSystem": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_StructuredStorage": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Vhd": [
+          "Win32_Storage"
+        ],
+        "Win32_Storage_Xps": [
+          "Win32_Storage"
+        ],
+        "Win32_System": [
+          "Win32"
+        ],
+        "Win32_System_AddressBook": [
+          "Win32_System"
+        ],
+        "Win32_System_Antimalware": [
+          "Win32_System"
+        ],
+        "Win32_System_ApplicationInstallationAndServicing": [
+          "Win32_System"
+        ],
+        "Win32_System_ApplicationVerifier": [
+          "Win32_System"
+        ],
+        "Win32_System_ClrHosting": [
+          "Win32_System"
+        ],
+        "Win32_System_Com": [
+          "Win32_System"
+        ],
+        "Win32_System_Com_Marshal": [
+          "Win32_System_Com"
+        ],
+        "Win32_System_Com_StructuredStorage": [
+          "Win32_System_Com"
+        ],
+        "Win32_System_Com_Urlmon": [
+          "Win32_System_Com"
+        ],
+        "Win32_System_ComponentServices": [
+          "Win32_System"
+        ],
+        "Win32_System_Console": [
+          "Win32_System"
+        ],
+        "Win32_System_CorrelationVector": [
+          "Win32_System"
+        ],
+        "Win32_System_DataExchange": [
+          "Win32_System"
+        ],
+        "Win32_System_DeploymentServices": [
+          "Win32_System"
+        ],
+        "Win32_System_DeveloperLicensing": [
+          "Win32_System"
+        ],
+        "Win32_System_Diagnostics": [
+          "Win32_System"
+        ],
+        "Win32_System_Diagnostics_Ceip": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_Debug": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_Debug_Extensions": [
+          "Win32_System_Diagnostics_Debug"
+        ],
+        "Win32_System_Diagnostics_Etw": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_ProcessSnapshotting": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_ToolHelp": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_Diagnostics_TraceLogging": [
+          "Win32_System_Diagnostics"
+        ],
+        "Win32_System_DistributedTransactionCoordinator": [
+          "Win32_System"
+        ],
+        "Win32_System_Environment": [
+          "Win32_System"
+        ],
+        "Win32_System_ErrorReporting": [
+          "Win32_System"
+        ],
+        "Win32_System_EventCollector": [
+          "Win32_System"
+        ],
+        "Win32_System_EventLog": [
+          "Win32_System"
+        ],
+        "Win32_System_EventNotificationService": [
+          "Win32_System"
+        ],
+        "Win32_System_GroupPolicy": [
+          "Win32_System"
+        ],
+        "Win32_System_HostCompute": [
+          "Win32_System"
+        ],
+        "Win32_System_HostComputeNetwork": [
+          "Win32_System"
+        ],
+        "Win32_System_HostComputeSystem": [
+          "Win32_System"
+        ],
+        "Win32_System_Hypervisor": [
+          "Win32_System"
+        ],
+        "Win32_System_IO": [
+          "Win32_System"
+        ],
+        "Win32_System_Iis": [
+          "Win32_System"
+        ],
+        "Win32_System_Ioctl": [
+          "Win32_System"
+        ],
+        "Win32_System_JobObjects": [
+          "Win32_System"
+        ],
+        "Win32_System_Js": [
+          "Win32_System"
+        ],
+        "Win32_System_Kernel": [
+          "Win32_System"
+        ],
+        "Win32_System_LibraryLoader": [
+          "Win32_System"
+        ],
+        "Win32_System_Mailslots": [
+          "Win32_System"
+        ],
+        "Win32_System_Mapi": [
+          "Win32_System"
+        ],
+        "Win32_System_Memory": [
+          "Win32_System"
+        ],
+        "Win32_System_Memory_NonVolatile": [
+          "Win32_System_Memory"
+        ],
+        "Win32_System_MessageQueuing": [
+          "Win32_System"
+        ],
+        "Win32_System_MixedReality": [
+          "Win32_System"
+        ],
+        "Win32_System_Ole": [
+          "Win32_System"
+        ],
+        "Win32_System_PasswordManagement": [
+          "Win32_System"
+        ],
+        "Win32_System_Performance": [
+          "Win32_System"
+        ],
+        "Win32_System_Performance_HardwareCounterProfiling": [
+          "Win32_System_Performance"
+        ],
+        "Win32_System_Pipes": [
+          "Win32_System"
+        ],
+        "Win32_System_Power": [
+          "Win32_System"
+        ],
+        "Win32_System_ProcessStatus": [
+          "Win32_System"
+        ],
+        "Win32_System_Recovery": [
+          "Win32_System"
+        ],
+        "Win32_System_Registry": [
+          "Win32_System"
+        ],
+        "Win32_System_RemoteDesktop": [
+          "Win32_System"
+        ],
+        "Win32_System_RemoteManagement": [
+          "Win32_System"
+        ],
+        "Win32_System_RestartManager": [
+          "Win32_System"
+        ],
+        "Win32_System_Restore": [
+          "Win32_System"
+        ],
+        "Win32_System_Rpc": [
+          "Win32_System"
+        ],
+        "Win32_System_Search": [
+          "Win32_System"
+        ],
+        "Win32_System_Search_Common": [
+          "Win32_System_Search"
+        ],
+        "Win32_System_SecurityCenter": [
+          "Win32_System"
+        ],
+        "Win32_System_Services": [
+          "Win32_System"
+        ],
+        "Win32_System_SetupAndMigration": [
+          "Win32_System"
+        ],
+        "Win32_System_Shutdown": [
+          "Win32_System"
+        ],
+        "Win32_System_StationsAndDesktops": [
+          "Win32_System"
+        ],
+        "Win32_System_SubsystemForLinux": [
+          "Win32_System"
+        ],
+        "Win32_System_SystemInformation": [
+          "Win32_System"
+        ],
+        "Win32_System_SystemServices": [
+          "Win32_System"
+        ],
+        "Win32_System_Threading": [
+          "Win32_System"
+        ],
+        "Win32_System_Time": [
+          "Win32_System"
+        ],
+        "Win32_System_TpmBaseServices": [
+          "Win32_System"
+        ],
+        "Win32_System_UserAccessLogging": [
+          "Win32_System"
+        ],
+        "Win32_System_Variant": [
+          "Win32_System"
+        ],
+        "Win32_System_VirtualDosMachines": [
+          "Win32_System"
+        ],
+        "Win32_System_WindowsProgramming": [
+          "Win32_System"
+        ],
+        "Win32_System_Wmi": [
+          "Win32_System"
+        ],
+        "Win32_UI": [
+          "Win32"
+        ],
+        "Win32_UI_Accessibility": [
+          "Win32_UI"
+        ],
+        "Win32_UI_ColorSystem": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Controls": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Controls_Dialogs": [
+          "Win32_UI_Controls"
+        ],
+        "Win32_UI_HiDpi": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Input": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Input_Ime": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_KeyboardAndMouse": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_Pointer": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_Touch": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_Input_XboxController": [
+          "Win32_UI_Input"
+        ],
+        "Win32_UI_InteractionContext": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Magnification": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Shell": [
+          "Win32_UI"
+        ],
+        "Win32_UI_Shell_Common": [
+          "Win32_UI_Shell"
+        ],
+        "Win32_UI_Shell_PropertiesSystem": [
+          "Win32_UI_Shell"
+        ],
+        "Win32_UI_TabletPC": [
+          "Win32_UI"
+        ],
+        "Win32_UI_TextServices": [
+          "Win32_UI"
+        ],
+        "Win32_UI_WindowsAndMessaging": [
+          "Win32_UI"
+        ],
+        "Win32_Web": [
+          "Win32"
+        ],
+        "Win32_Web_InternetExplorer": [
+          "Win32_Web"
+        ],
+        "default": [],
+        "docs": []
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows-targets@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows-targets-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_aarch64_gnullvm@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_aarch64_gnullvm-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_aarch64_msvc@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_aarch64_msvc-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_i686_gnu@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_i686_gnu-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_i686_gnullvm@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_i686_gnullvm-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_i686_msvc@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_i686_msvc-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_x86_64_gnu@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_x86_64_gnu-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_x86_64_gnullvm@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_x86_64_gnullvm-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#windows_x86_64_msvc@0.52.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows_x86_64_msvc-0.52.6/Cargo.toml",
+      "features": {}
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#winnow@1.0.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winnow-1.0.4/Cargo.toml",
+      "features": {
+        "alloc": [],
+        "ascii": [
+          "parser"
+        ],
+        "binary": [
+          "parser"
+        ],
+        "debug": [
+          "std",
+          "dep:anstream",
+          "dep:anstyle",
+          "dep:is_terminal_polyfill",
+          "dep:terminal_size"
+        ],
+        "default": [
+          "std",
+          "ascii",
+          "binary"
+        ],
+        "parser": [],
+        "simd": [
+          "dep:memchr"
+        ],
+        "std": [
+          "alloc",
+          "memchr?/std"
+        ],
+        "unstable-doc": [
+          "alloc",
+          "std",
+          "ascii",
+          "binary",
+          "simd",
+          "unstable-recover"
+        ],
+        "unstable-recover": [
+          "parser"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#zeroize@1.9.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.1/Cargo.toml",
+      "features": {
+        "aarch64": [],
+        "alloc": [],
+        "default": [
+          "alloc"
+        ],
+        "derive": [
+          "zeroize_derive"
+        ],
+        "serde": [
+          "dep:serde"
+        ],
+        "simd": [],
+        "std": [
+          "alloc"
+        ],
+        "zeroize_derive": [
+          "dep:zeroize_derive"
+        ]
+      }
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_path": "/Users/autonomous/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.23/Cargo.toml",
+      "features": {
+        "no-panic": [
+          "dep:no-panic"
+        ]
+      }
+    }
+  ],
+  "runtime_reuse": false,
+  "registry_scope": "Actual Cargo metadata source IDs/lock/config identity and emitted profile/features; no historical per-registry-file byte snapshot or transitive freshness claim"
+}

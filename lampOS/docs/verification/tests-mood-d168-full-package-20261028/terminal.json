@@ -1,0 +1,113 @@
+{
+  "status": "PASS",
+  "head": "d168fa939905531a3257f80a335a69dcfd528027",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "branch": "tests/1806-sleep-mood-clock",
+  "authored_paths": [
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/expression.md"
+  ],
+  "uncommitted_paths": [],
+  "runtime_attempts": 1,
+  "runtime_reuse": false,
+  "current_test_execution_claim": true,
+  "scope": "Fresh full serial current Expression package, including every actual program driver and doctest; no runtime reuse or ordinary filters.",
+  "controlled_overlay": false,
+  "native_claim": false,
+  "fmt": true,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "Expression_artifact_freshness_observed_only": true,
+  "blanket_local_freshness_claim": false,
+  "workspace_build": true,
+  "counts": {
+    "passed": 341,
+    "failed": 0,
+    "ignored": 0
+  },
+  "doc_blocks": [
+    "\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+  ],
+  "ordinary_filter_count": 0,
+  "runtime_command_exit": 0,
+  "runtime_command_completed": true,
+  "qualification_mode": "fresh_full_package_runtime",
+  "affected_case_passed_once": true,
+  "required_cases_passed_once": [
+    "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+    "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+  ],
+  "qualified_committed_paths": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "sha256": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752",
+      "bytes": 53262,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/docs/expression.md": {
+      "sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c",
+      "bytes": 81109,
+      "mode": 420,
+      "kind": "file"
+    }
+  },
+  "committed_head_matches_qualified_owner": "d168fa939905531a3257f80a335a69dcfd528027",
+  "unresolved_owned_pids": [],
+  "lease_released": true,
+  "permanent_owner_unchanged": true,
+  "source_unchanged": true,
+  "owned_groups_closed": true,
+  "sealed_witnesses_unchanged": true,
+  "sealed_final_count": 531,
+  "actual_executable_guards_passed": true,
+  "guard_policy": {
+    "full_SHA_points": [
+      "initial",
+      "final"
+    ],
+    "full_SHA_scope": "All tracked canonical/official source and inherited/new sealed witnesses; no filesystem-wide read-only claim.",
+    "other_boundaries": "Entire tracked file-set/stat6 plus both HEAD/branch/base/index/clean metadata; all sealed original metadata and every active actual executable SHA/stat.",
+    "consumption": "All post-no-run actual SHA/stat before every list and sole full Cargo runtime, corresponding independent witnesses guarded; raw and parsed Cargo census durable before postguards.",
+    "parent_handoff": "Actual closed Reader4+Trace6 module PASS only;523 frozen and3 retired actuals verified by Root release. No full Voice/current Mood runtime transfer.",
+    "alias_policy": "Prospective metadata-derived normal bin/example convenience aliases may republish inode only at successful no-recompile full Cargo boundary; all other fields and all test/frozen inodes strict.",
+    "new_frozen_modes": "copy2 retains each emitted executable mode; no chmod/read-only-filesystem claim. All inherited modes remain strict."
+  },
+  "convenience_alias_inode_events": [
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost",
+      "before_inode": 489297669,
+      "after_inode": 489307722,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    },
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost",
+      "before_inode": 489297810,
+      "after_inode": 489307721,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    },
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost",
+      "before_inode": 489297834,
+      "after_inode": 489307723,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    },
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression",
+      "before_inode": 489297885,
+      "after_inode": 489307720,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    }
+  ]
+}

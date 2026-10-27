@@ -1,0 +1,61 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-expression",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T18:07:08.970391+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-test-compile.stdout.txt",
+  "stderr": "cmd-test-compile.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 7397,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 42,
+  "disk_last_available_bytes": 9151070208,
+  "disk_minimum_available_bytes": 9151070208,
+  "available_bytes_before_Cargo": 9288970240,
+  "owned_pid": 7397,
+  "owned_process_group": 7397,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 42.235129,
+  "finished_at": "2026-10-27T18:07:51.204761+00:00",
+  "stdout_sha256": "52a2d1e9451126e14143f9bef74c4e922cf30ad00554fccc0fc35161736d1c34",
+  "stdout_bytes": 54778,
+  "stderr_sha256": "936d997dce157d32fac30a2b74fd57a1208c63d27b392d2a954e0a1098a6e894",
+  "stderr_bytes": 1232
+}

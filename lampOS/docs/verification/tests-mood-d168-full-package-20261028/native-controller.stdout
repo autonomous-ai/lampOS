@@ -1,0 +1,28 @@
+{"event": "start", "label": "cmd-fmt", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-fmt", "exit_code": 0, "wall_seconds": 13.254676}
+{"event": "start", "label": "cmd-metadata", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-metadata", "exit_code": 0, "wall_seconds": 0.959192}
+{"event": "start", "label": "cmd-strict", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-strict", "exit_code": 0, "wall_seconds": 167.340798}
+{"event": "start", "label": "cmd-workspace", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-workspace", "exit_code": 0, "wall_seconds": 93.633316}
+{"event": "start", "label": "cmd-test-compile", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-test-compile", "exit_code": 0, "wall_seconds": 42.235129}
+{"event": "start", "label": "cmd-inventory-0-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-0-all", "exit_code": 0, "wall_seconds": 0.774294}
+{"event": "start", "label": "cmd-inventory-0-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-0-ignored", "exit_code": 0, "wall_seconds": 0.101277}
+{"event": "start", "label": "cmd-inventory-1-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-1-all", "exit_code": 0, "wall_seconds": 0.649769}
+{"event": "start", "label": "cmd-inventory-1-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-1-ignored", "exit_code": 0, "wall_seconds": 0.10051}
+{"event": "start", "label": "cmd-inventory-2-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-2-all", "exit_code": 0, "wall_seconds": 0.698419}
+{"event": "start", "label": "cmd-inventory-2-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-2-ignored", "exit_code": 0, "wall_seconds": 0.099496}
+{"event": "start", "label": "cmd-inventory-3-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-3-all", "exit_code": 0, "wall_seconds": 0.88444}
+{"event": "start", "label": "cmd-inventory-3-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-3-ignored", "exit_code": 0, "wall_seconds": 0.103875}
+{"event": "start", "label": "cmd-tests", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep"}
+{"event": "finish", "label": "cmd-tests", "exit_code": 0, "wall_seconds": 23.014075}

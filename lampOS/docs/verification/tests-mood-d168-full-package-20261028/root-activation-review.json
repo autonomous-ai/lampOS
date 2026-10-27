@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-28T01:01:51.897827+07:00",
+  "approved": true,
+  "controller_sha256": "94774bd525cab67512d01711bf215cb5b3c40c8bdd927bcfe7044c94c6012f96",
+  "reviewed": [
+    "Actual523/3 integrity release from module4+6 pass, no parent full-Voice claim",
+    "Current clean official/canonical source and all physical/head/index/branch metadata",
+    "Actual metadata forward/reverse closure strict/workspace/fresh changed-runtime no-run/depinfo/source and marker checks",
+    "All package test targets/helpers derived, all/ignored inventories and one full unfiltered Cargo runtime incldocs",
+    "Raw and parsed runtime census saved before postruntime guards; failure retains raw and no retry",
+    "Typed four normal-helper aliases inode-only at sole successful no-recompile boundary; all bytes and other attributes strict",
+    "All original Mood/Journal assertions and historical failures preserved"
+  ],
+  "disk_free_bytes": 9553920000
+}

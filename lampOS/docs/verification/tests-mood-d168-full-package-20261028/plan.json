@@ -1,0 +1,185 @@
+{
+  "reserved_closer_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/privacy-2a-host-control-prep/run.py",
+  "reserved_closer_sha256": "468ea6f8b4ce19e58c977014f7f015d12bc99e02ef158498e7c2fd2191a57efc",
+  "minimum_free_bytes": 3221225472,
+  "operational_reserve_bytes": 2214592512,
+  "expected_reverse_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "candidate_paths": [
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/expression.md"
+  ],
+  "required_cases": [
+    "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+    "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+  ],
+  "forward_closure_kind_policy": "Include root Expression dev dependencies; traverse normal/build dependency edges only below the root, retaining all target predicates conservatively. Dependency dev-only edges do not propagate.",
+  "support_sha256": "8910e667094e5511a4311da37ae44c59e8c8ee635641863bf91cc2037676627d",
+  "execution_ready": true,
+  "root_review_required": true,
+  "compiler_lease": "root-mood-3aa-full-expression",
+  "worktree": "/private/tmp/tests-ready-speaking-1c-20261026",
+  "permanent_worktree": "/private/tmp/tests-sleep-mood-clock-20261027",
+  "canonical_branch": "tests/3623-qualify-3aa",
+  "branch": "tests/1806-sleep-mood-clock",
+  "head": "d168fa939905531a3257f80a335a69dcfd528027",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "target": "/private/tmp/tests-restart-f9-cargo-20261027_root",
+  "target_dev_ino": [
+    16777222,
+    486188298
+  ],
+  "handoff_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/handoff-binding.json",
+    "sha256": "18dc89e6ba362de70f23172c3703187aaaf7b2c58d5476168a1d2876e80e4385",
+    "bytes": 8619
+  },
+  "inherited_frozen_count": 523,
+  "initial_current_actual_count": 0,
+  "parent_current_actual": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep/actual-after.json",
+    "sha256": "fb96a119fc71f3d667cadb741186a69076005d2a8865a6b5077a4d6b8de21796",
+    "bytes": 5984
+  },
+  "canonical_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/prepared-canonical-source.json",
+    "sha256": "99cba24c289e68c829097cbe1a7995e9e8527ce4f3ce7abfce2605315ca63f76",
+    "bytes": 2457655
+  },
+  "official_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/prepared-official-source.json",
+    "sha256": "05efa02d489bd219e1676c1459595fa2b09b594391164dedc58f7f7d408939e5",
+    "bytes": 2457660
+  },
+  "parent_final_protected": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep/protected-after.json",
+    "sha256": "0965b36b42cb2f0ed6cf265f22933b5017a93f461ce13bd5eed8f9af6a322a53",
+    "bytes": 214655
+  },
+  "canonical_alias_bound": true,
+  "scope": "Fresh full serial current Expression package, including every actual program driver and doctest; no runtime reuse or ordinary filters.",
+  "runtime_reuse_authorized": false,
+  "expected_current_ordinary_counts": null,
+  "expected_doc_counts": null,
+  "historical_inputs": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/historical-dispositions.json",
+    "sha256": "518accd6245399f81d3d5c9f5aa5acbb003f9de9fdf24cbce0f1fdbc136759b7",
+    "bytes": 7244
+  },
+  "source_transition": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/prepared-parent-to-child-source-transition.json",
+    "sha256": "6a123522154d117d7f656b9225b1a942ca507c9b18b5ab92302ee465dfcb7f3d",
+    "bytes": 18612
+  },
+  "parent_source_transition": [
+    "lampOS/crates/control/src/lib.rs",
+    "lampOS/crates/control/src/main.rs",
+    "lampOS/crates/control/src/pairing.rs",
+    "lampOS/crates/control/src/parts.rs",
+    "lampOS/crates/control/src/protocol.rs",
+    "lampOS/crates/control/src/rate.rs",
+    "lampOS/crates/control/src/server.rs",
+    "lampOS/crates/control/src/session.rs",
+    "lampOS/crates/control/src/watch.rs",
+    "lampOS/crates/control/tests/door.rs",
+    "lampOS/crates/control/tests/event_schema.rs",
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/crates/eyes/src/yawn.rs",
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/known_faces.rs",
+    "lampOS/crates/voice/src/lib.rs",
+    "lampOS/crates/voice/src/memory_scope.rs",
+    "lampOS/crates/voice/src/policy_holds.rs",
+    "lampOS/crates/voice/src/provider_worker.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/going_on_asks.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/session_reader/tests.rs",
+    "lampOS/crates/voice/src/tools.rs",
+    "lampOS/crates/voice/src/turned_away.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/control.schema.json",
+    "lampOS/docs/expression.md",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/realtime-tests.md",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/switches.md",
+    "lampOS/sdk/js/src/client.js",
+    "lampOS/sdk/js/src/control.schema.json",
+    "lampOS/sdk/python/src/lampos/client.py",
+    "lampOS/sdk/python/src/lampos/control.schema.json",
+    "lampOS/tools/played/make-skill-test.sh",
+    "lampOS/tools/played/make-skill.sh"
+  ],
+  "require_changed_runtime_fresh_false": true,
+  "known_forbidden_diagnostic_markers": [
+    "SHARED_INPUT_PAUSE",
+    "CONTROLLED_CANDIDATE_PAUSE",
+    "BASE_ONLY_INPUT_DELAY"
+  ],
+  "source_count": 10911,
+  "inputs_sha256": {},
+  "no_clean": true,
+  "prospective_alias_inode_policy": {
+    "derivation": "Only current Cargo artifacts for this package with profile.test=false and kind bin/example, exact convenience path under current target/debug or target/debug/examples. No legacy retired target paths.",
+    "allowed_change": [
+      "inode"
+    ],
+    "strict_other_fields": [
+      "sha256",
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device"
+    ],
+    "allowed_boundary": "Only post-successful sole full Cargo package command, closed group/no timeout/reserve/descendants and no Compiling/Checking; all drivers/frozen inodes remain strict.",
+    "legacy_paths": []
+  },
+  "guard_policy": {
+    "full_SHA_points": [
+      "initial",
+      "final"
+    ],
+    "full_SHA_scope": "All tracked canonical/official source and inherited/new sealed witnesses; no filesystem-wide read-only claim.",
+    "other_boundaries": "Entire tracked file-set/stat6 plus both HEAD/branch/base/index/clean metadata; all sealed original metadata and every active actual executable SHA/stat.",
+    "consumption": "All post-no-run actual SHA/stat before every list and sole full Cargo runtime, corresponding independent witnesses guarded; raw and parsed Cargo census durable before postguards.",
+    "parent_handoff": "Actual closed Reader4+Trace6 module PASS only;523 frozen and3 retired actuals verified by Root release. No full Voice/current Mood runtime transfer.",
+    "alias_policy": "Prospective metadata-derived normal bin/example convenience aliases may republish inode only at successful no-recompile full Cargo boundary; all other fields and all test/frozen inodes strict.",
+    "new_frozen_modes": "copy2 retains each emitted executable mode; no chmod/read-only-filesystem claim. All inherited modes remain strict."
+  },
+  "expected_parent_head": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+  "expected_parent_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep/source-before.json",
+    "sha256": "0caa3583fbcfbcbb275ed7937bc122ed0592c16a058a420b40999464913d4ff3",
+    "bytes": 2457147
+  },
+  "canonical_physical_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/prepared-canonical-physical.json",
+    "sha256": "bd1eddda030169c75c904bf9ee9a3fe4e888178402e65c175a2b20b473321be8",
+    "bytes": 2359245
+  },
+  "official_physical_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/prepared-official-physical.json",
+    "sha256": "89382a7b663bfc65c1aa6692cbbeb0a53ed9b7712e925608e2007030e1a8db31",
+    "bytes": 2359245
+  },
+  "expected_parent_base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "inventory_timeout_seconds": 300,
+  "package_runtime_timeout_seconds": 3600,
+  "expected_executable_count_reference": 8,
+  "expected_driver_count_reference": 4
+}

@@ -1,0 +1,167 @@
+{
+  "eligible_boundary": true,
+  "derived_current_non_test_alias_artifacts": [
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "recent_playout_cost",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/recent_playout_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "replay_cost",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/replay_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "rest_cost",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/rest_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression",
+      "fresh": false
+    }
+  ],
+  "current_derived_alias_paths": [
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression"
+  ],
+  "inode_events": [
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost",
+      "before_inode": 489297669,
+      "after_inode": 489307722,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    },
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost",
+      "before_inode": 489297810,
+      "after_inode": 489307721,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    },
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost",
+      "before_inode": 489297834,
+      "after_inode": 489307723,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    },
+    {
+      "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression",
+      "before_inode": 489297885,
+      "after_inode": 489307720,
+      "boundary": "successful sole full Cargo Expression command after no-run; all other attributes strict"
+    }
+  ],
+  "boundary_guard_passed": true,
+  "strictness_requirement": "All other attributes, four test-driver inodes and every frozen inode always strict; any guard error retains FAIL."
+}

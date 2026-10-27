@@ -1,0 +1,124 @@
+{
+  "records": [
+    {
+      "label": "original_337_3_failure",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-fresh-gates",
+      "receipt_status": "immutable JSON receipt pointers only",
+      "receipts": {
+        "terminal.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-fresh-gates/terminal.json",
+          "sha256": "043320513d397c2d89767c8732eedde922c5eba69b4cd57ba9cec502ac0d9560",
+          "bytes": 2608
+        },
+        "native-controller-result.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-fresh-gates/native-controller-result.json",
+          "sha256": "34368c6c09b72a027de526f5d1724830597376828b45bc45c8fc4f15e15899da",
+          "bytes": 757
+        }
+      }
+    },
+    {
+      "label": "natural_baseline28",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-failure-disposition-prep/unmodified-99b-runtime-control",
+      "receipt_status": "Resolved from immutable original historical binding; no new execution or causal credit",
+      "receipts": {
+        "terminal.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-failure-disposition-prep/unmodified-99b-runtime-control/terminal.json",
+          "sha256": "875390b051784e90ef80c583bbf3aa165d9d34663a7ba1cef022c71f74fcf64b",
+          "bytes": 681
+        },
+        "native-controller-result.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-failure-disposition-prep/unmodified-99b-runtime-control/native-controller-result.json",
+          "sha256": "0acd4be07d602b8f9183ddb975b1c2fb8eacbbbb3ba87a57a366409724ea66ee",
+          "bytes": 769
+        }
+      }
+    },
+    {
+      "label": "matched_base_partial",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-shared-input-pause-control-prep",
+      "receipt_status": "immutable JSON receipt pointers only",
+      "receipts": {
+        "terminal.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-shared-input-pause-control-prep/terminal.json",
+          "sha256": "b5d8fd61061781c2597bac57d56f1985e5a87f0aad31991191f51d260596976f",
+          "bytes": 586
+        },
+        "native-controller-result.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-shared-input-pause-control-prep/native-controller-result.json",
+          "sha256": "15b6ea3242885bca4529d9f2ac4abb6dea81c46cb7493f13b97efab3bdceffee",
+          "bytes": 764
+        }
+      }
+    },
+    {
+      "label": "matched_candidate_continuation",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-shared-input-pause-candidate-continuation",
+      "receipt_status": "immutable JSON receipt pointers only",
+      "receipts": {
+        "terminal.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-shared-input-pause-candidate-continuation/terminal.json",
+          "sha256": "a38b88e5f26bc52f9e1492e04b9d3fab9acf6a342af66edeb689cadfc60dc47f",
+          "bytes": 4925
+        },
+        "native-controller-result.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-99b-shared-input-pause-candidate-continuation/native-controller-result.json",
+          "sha256": "acfe2cd4bd24a52ca55370c111e765054788287e70e1e0366b8dcdc4f6e5db59",
+          "bytes": 784
+        }
+      }
+    },
+    {
+      "label": "wrong_source_338_2",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-9e0-fresh-gates",
+      "receipt_status": "immutable JSON receipt pointers only",
+      "receipts": {
+        "terminal.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-9e0-fresh-gates/terminal.json",
+          "sha256": "88e423aaed841727f5b8564851e4e4e100170e67ec8985ea267dbc39bc840942",
+          "bytes": 2953
+        },
+        "native-controller-result.json": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-9e0-fresh-gates/native-controller-result.json",
+          "sha256": "6bfed9b04a56305ae76af248c4c04c4b0238aaa13302f7919b9083ba4d35f428",
+          "bytes": 758
+        }
+      }
+    },
+    {
+      "label": "Reader failed Mac/native and inconclusive historical scopes",
+      "receipts": {
+        "b7_original_native_failure": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-original-ci-20261027/audit.json",
+          "sha256": "0ef0404dd8c92047d9c5f2d9c0b4b550ad43299b248d1cb712d682ec66b7400e",
+          "bytes": 11773
+        },
+        "candidate_full_Mac_failure": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep/terminal.json",
+          "sha256": "e203a26a29fe09b2dfcdf0cad65d3d89f6d8488c206f9dda6f656477401d2656",
+          "bytes": 874
+        },
+        "isolated_Main_control_inconclusive": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep/terminal.json",
+          "sha256": "710c8436fb713d9128225175904d77857838ebc5e05dd30a16f768c10997e766",
+          "bytes": 1748
+        }
+      }
+    },
+    {
+      "label": "unmodified Main full context failure retained",
+      "receipts": {
+        "terminal": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-full-context-control-prep/terminal.json",
+          "sha256": "5d307b18ad6ec652e0bc75fb99f12a8b3b451c6ec433c14e8855d0b338e307d1",
+          "bytes": 1233
+        }
+      }
+    }
+  ],
+  "runtime_reuse": false,
+  "old_failed_results_remain_FAILED": true,
+  "natural28_not_causal_proof": true,
+  "matched_pause_possible_mechanism_not_historical_cause": true,
+  "wrong_source338_2_invalid_qualification": true
+}

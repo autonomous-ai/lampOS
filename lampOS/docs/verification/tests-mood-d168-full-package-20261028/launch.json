@@ -1,0 +1,23 @@
+{
+  "controller_sha256": "94774bd525cab67512d01711bf215cb5b3c40c8bdd927bcfe7044c94c6012f96",
+  "plan_sha256": "6c912af41ad1ea36b16a21566a791a2626927a481fdc2d4289c9f54dd5dad952",
+  "compiler_lease": "root-mood-3aa-full-expression",
+  "root_review_approved": true,
+  "parent_closed": true,
+  "exclusive_target": true,
+  "previous_owner_released": true,
+  "full_runtime_authorized": true,
+  "exclusive_source_copy": true,
+  "exclusive_owner": true,
+  "sealed_no_legitimate_writer": true,
+  "require_escalated": true,
+  "target_dev_ino": [
+    16777222,
+    486188298
+  ],
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "other_own_compilers": "None at launch; Reader/updater native CI remote, source/CI review agents active; other builders unobserved",
+    "build_jobs": 1
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "actual_derived_artifacts": [
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "recent_playout_cost",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/recent_playout_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/recent_playout_cost",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "replay_cost",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/replay_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/replay_cost",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "rest_cost",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/rest_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/rest_cost",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-expression",
+      "fresh": false
+    }
+  ],
+  "derivation": "Only current Cargo artifacts for this package with profile.test=false and kind bin/example, exact convenience path under current target/debug or target/debug/examples. No legacy retired target paths.",
+  "allowed_change": [
+    "inode"
+  ],
+  "strict_other_fields": [
+    "sha256",
+    "bytes",
+    "mode",
+    "mtime_ns",
+    "device"
+  ],
+  "allowed_boundary": "Only post-successful sole full Cargo package command, closed group/no timeout/reserve/descendants and no Compiling/Checking; all drivers/frozen inodes remain strict.",
+  "legacy_paths": []
+}

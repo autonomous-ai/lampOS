@@ -1,0 +1,101 @@
+{
+  "prelaunch_status": "DISABLED_ROOT_REVIEW_REQUIRED",
+  "activation_expected_lease": "root-mood-3aa-full-expression",
+  "whole_controller_command": [
+    "python3",
+    "-B",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/native-wrapper.py"
+  ],
+  "permission": "require_escalated, whole controller for WNOWAIT/process inventory/local sockets",
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "metadata",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "strict",
+      "command": "cargo +1.96.0 clippy --offline --locked --all-targets --jobs1 --message-format=json -p EACH_ACTUAL_REVERSE -- -D warnings",
+      "timeout_seconds": 3600
+    },
+    {
+      "name": "workspace",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--jobs",
+        "1",
+        "--message-format=json"
+      ],
+      "timeout_seconds": 3600
+    },
+    {
+      "name": "test-compile",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-expression",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "timeout_seconds": 3600
+    },
+    {
+      "name": "inventories",
+      "command": "every actual driver --list --format terse and --ignored --list --format terse once",
+      "timeout_seconds_each": 300
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-expression",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "timeout_seconds": 3600,
+      "execution_count": 1,
+      "ordinary_filter": null,
+      "doctests_included": true
+    }
+  ],
+  "no_clean": true,
+  "parent_scope": "Reader4+Trace6 only; no fullVoice or Mood runtime transfer"
+}

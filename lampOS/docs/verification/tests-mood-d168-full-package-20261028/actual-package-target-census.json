@@ -1,0 +1,122 @@
+{
+  "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression#lamp-expression@0.1.0",
+  "driver_targets": [
+    {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_expression",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-expression",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "runtime",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/tests/runtime.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    }
+  ],
+  "helper_targets": [
+    {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-expression",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "recent_playout_cost",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/recent_playout_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "replay_cost",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/replay_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "rest_cost",
+      "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/expression/examples/rest_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    }
+  ],
+  "drivers": 4,
+  "executable_outputs": 8,
+  "ordinary_test_count": "derive current inventories, never assumed340"
+}

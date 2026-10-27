@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 01:19 — full current Mood package passes; next Skills gate
+
+Ready for lamp-voice: no (#3623 fresh native checks and current reads remain; #3543 ready).
+
+[Current Mood full-package proof](verification/tests-mood-d168-full-package-20261028/) records **341/0/0**, four actual drivers plus doctests, on committed d168fa939 / Main3aa752f73. Both affected cases pass once. Formatting, twelve-package strict Clippy, workspace build and fresh runtime compilation pass; all source,531 witness and eight executable guards pass, native/controller0, groups closed. This is fresh execution, not reused old340 credit. Old failed contexts remain separate. The qualified own branch is pushed for current native CI.
+
+The completed updater's failed full host run retains its failure, while132 frozen witnesses and102 actual executable bindings passed an integrity-only target release. Skills gets that separate cache for its next current full-package gate. The updater's green native result still needs holder-installed acceptance. No device access.
+
 ## 2026-10-28 01:09 — updater current native green; holder acceptance pending
 
 Ready for lamp-voice: no (#3843 software current reads/device acceptance pending; #3543 ready for current reads).

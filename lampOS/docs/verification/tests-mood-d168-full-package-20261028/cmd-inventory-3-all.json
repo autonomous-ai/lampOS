@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_expression-97b0d6d78b5cc498",
+    "--list",
+    "--format",
+    "terse"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T18:08:12.470795+00:00",
+  "timeout_seconds": 300,
+  "stdout": "cmd-inventory-3-all.stdout.txt",
+  "stderr": "cmd-inventory-3-all.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 10751,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 9317199872,
+  "disk_minimum_available_bytes": 9317199872,
+  "available_bytes_before_Cargo": 9317199872,
+  "owned_pid": 10751,
+  "owned_process_group": 10751,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.88444,
+  "finished_at": "2026-10-27T18:08:13.355357+00:00",
+  "stdout_sha256": "b5eadc203eb427dbf91183448b5799fa510decc395b1f41b6a66a37bf2d2e7c5",
+  "stdout_bytes": 2399,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}
