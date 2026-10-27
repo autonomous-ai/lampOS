@@ -1,0 +1,125 @@
+{
+  "status": "ORIGINAL_ARM_AND_LINUX_CLIPPY_SUCCESS",
+  "published_head": "2ced256ffdc19dfb5aa84a8adf75638a0da94420",
+  "published_authored_base": "f903659bba298cdee290ee4285038a8f46af930b",
+  "published_tree": "7e3ad60286969aa72c1e11cc1e1bf184eab2428b",
+  "actual_checkout": "d2b33e18b69d478bd8a4a4e2d1ef6825f7722b78",
+  "actual_tree": "43da54b09c99c0fa4a584ac1b292d224d02e2ec9",
+  "actual_parents": [
+    "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+    "2ced256ffdc19dfb5aa84a8adf75638a0da94420"
+  ],
+  "actual_tree_entries": 10920,
+  "current_rebased_commit": "bc06a6eff458f736b992ad4190d76127f551acd9",
+  "current_rebased_tree": "43da54b09c99c0fa4a584ac1b292d224d02e2ec9",
+  "full_tree_equality_independently_observed": true,
+  "ARM_run": 40575097415,
+  "ARM_job": 122439279626,
+  "ARM_attempt": 1,
+  "Linux_Clippy_run": 40575097494,
+  "Linux_Clippy_job": 122439280247,
+  "unique_outer_PASS": 11829,
+  "FAIL": 0,
+  "LEAK": 0,
+  "TIMEOUT": 0,
+  "ABORT": 0,
+  "duplicate_outer_terminals": 0,
+  "retries": 0,
+  "selected": 11829,
+  "executed": 11829,
+  "selected_unrun": 0,
+  "summary_skips": 107,
+  "skip_identities_not_invented": true,
+  "required_once_PASS": {
+    "new": 29,
+    "retained": 16,
+    "Eyes": 11
+  },
+  "required_total_once_PASS": 56,
+  "required_source_file_blobs_exact_to_locally_tested_tree": true,
+  "required_body_hashes_carried_only_after_complete_source_file_identity_match": true,
+  "owned_path_comparison": {
+    "total": 35,
+    "exact_published_blobs_modes": 33,
+    "upstream_composed_paths": [
+      "lampOS/crates/voice/src/onboarding.rs",
+      "lampOS/docs/onboarding.md"
+    ]
+  },
+  "separate_not_added_to_nextest": {
+    "doc_targets": 47,
+    "doc_pass": 4,
+    "doc_failed": 0,
+    "relay_aggregate_pass": 1,
+    "process_cases_pass": 13,
+    "process_failed": 0
+  },
+  "export_log": {
+    "binaries": 48,
+    "examples": 2,
+    "complete_SHA256SUMS_reported": true
+  },
+  "artifact_metadata_only": {
+    "id": 12766004878,
+    "compressed_bytes": 118857309,
+    "API_ZIP_digest": "sha256:5142fee5bd509463e18e8b04dd536f6581f10ca7ccae55879ceddb356a70b76d",
+    "upload_log_digest_matches_API": true,
+    "archive_downloaded": false,
+    "payload_hashes_or_ELF_headers_verified": false,
+    "Voice_Eyes_pins_derived": false,
+    "test_executable_equivalence_claimed": false
+  },
+  "historical_failed_native_and_local_epochs_unchanged": true,
+  "no_rerun_dispatch_cancel_source_ref_target_or_post_actions": true,
+  "ready": false,
+  "scope": "Original CI on published 2ced; full actual CI source tree equals rebased bc06",
+  "ARM_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40575097415",
+  "Linux_Clippy_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40575097494",
+  "native_watch_results": {
+    "ARM": {
+      "session": 81395,
+      "exit": 0,
+      "chunk": "0fcac2"
+    },
+    "Linux_Clippy": {
+      "session": 66905,
+      "exit": 0,
+      "chunk": "a3a530"
+    }
+  },
+  "independent_private_receipt_sha256": "97e6ce5d514e67129757522a7d80f285a0f329864ae9c927d3498ef303e2f4bd",
+  "retained_evidence_sha256": {
+    "40575097415-original-logs.zip": "216163a04e7bcf700fa58066ba4ea25f87d332ad4b434fa1d7e34248372b917c",
+    "40575097494-original-logs.zip": "87098bcaefbbf482edc0a12b0427ea0e8f0d7c591aac880ffef5dab8ecafeb97",
+    "native-terminal-ledger.json": "5d208e7f94f1dc64b6dfc784dc32f057a00b1114c11b746a85147e2187a1024a",
+    "native-runtime-accounting.json": "08e05b7b9432db6dfce1e7d06c91e48b9b76eb869edbf268b0cee726a3339cfa",
+    "required56-native-ledger.json": "3c47c26d6a712fb34bfde79755b4142a1d0bf1a991b8d71baf3e19821f45c182",
+    "separate-harness-accounting.json": "0709f16fb164f91fbee8f612e8cf52219aeb4f47b8c07bd68f3dfec5918649b7",
+    "artifact-metadata-accounting.json": "29bc087d4b361eb96aa6782788594a9ecfbc9a2bb4cbf1a562d865a27ea3082e",
+    "d2b33e18b69d478bd8a4a4e2d1ef6825f7722b78-source-binding.json": "c5cfa8a76a68ea59855ef4f4b03ddfd8b9f9f5b3306e932171f008702b993e1b",
+    "current-rebase-tree-equality.json": "4e0a2f8f2cde88e72f4e2553fb20feaef4ee15376dd11e602fe439170640f1aa"
+  },
+  "source_based_runtime_disposition": {
+    "decision_by": "Fourth",
+    "actual_current_source_runtime_gate": "Original ARM 40575097415 on exactly tree 43da54b09c99c0fa4a584ac1b292d224d02e2ec9",
+    "prepared_second_Mac_runtime": "UNRUN",
+    "second_Mac_runtime_pass_credit": 0,
+    "historical_Mac_4563_source_tree": "ab92a0a49c5eb642a848ce53454f9856ecf1eee3",
+    "historical_Mac_4563_not_added_to_current_native_count": true,
+    "current_Mac_compiler_completion_reported_by_gate_owner": {
+      "session": 8385,
+      "exit": 0,
+      "chunk": "fa7101",
+      "tree": "43da54b09c99c0fa4a584ac1b292d224d02e2ec9",
+      "stages": {
+        "fmt": 0,
+        "metadata": 0,
+        "strict_workspace_all_targets_Clippy": 0,
+        "workspace_build": 0
+      }
+    }
+  },
+  "latest_Main_observed_during_preparation": "61c2a7264744a851ba18334ff4bcffd4668310ed",
+  "no_61c2_source_or_runtime_qualification_claimed": true,
+  "independent_review_policy_privacy_device_and_latest_base_conditions_not_automatically_cleared": true
+}

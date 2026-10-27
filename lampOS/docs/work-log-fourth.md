@@ -1,3 +1,9 @@
+## 2026-10-28 03:38 ICT — Exact-tree native consent gates pass; final carry is bounded
+
+[Original native proof](verification/onboarding-2ced-current-native-20261028/README.md): #3472 2ced256ff has ARM 40575097415 and Linux Clippy 40575097494 green. Both checked out d2b33e18b/tree43da54b09, exactly the rebased bc06a6eff tree. ARM has 11,829 unique passes, all 56 controls once and zero bad/unrun; docs4, relay1 aggregate and process13 remain separate. Fresh Mac compiler8385/0 passed all four stages on that tree; a second full Mac runtime was not run or credited. Reviewer-three posted READ-OK; Reviewer-two is still reading.
+
+Main then added the body-measure Linux fault wording and install-guide guard. The final f8fec8464/tree2da810d4f carry includes exactly those two incoming paths; all 35 authored paths remain unchanged and range-diff is equal. Its fresh compiler and focused delta checks are in progress; the 43da native count is not transferred wholesale. Final-head ARM/Linux remains the merge gate. Source, privacy/composition and physical holds remain explicit; no device or pin action.
+
 ## 2026-10-28 03:19 ICT — Caller-bound consent fix pushed; current-base gates continue
 
 [Host qualification](verification/consent-ab92-host-20261028/README.md): #3472 is pushed as one commit, 2ced256ff, with 4,563 unique passes, all 56 named controls and four separate doctests. Formatting, metadata, strict workspace Clippy and build passed. Earlier failures remain recorded. This qualifies the stated frozen source; no count transfers to a new base.
