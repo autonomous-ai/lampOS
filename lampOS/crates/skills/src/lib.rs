@@ -58,6 +58,19 @@ pub const ADDONS_ENVIRONMENT: &str = "LAMP_ADDONS";
 /// set: both are read, checked and ignored, the clock begun again as before.
 pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
 
+/// The formats of `skill.toml` this build reads: 1 (no `format` key, or
+/// `format = 1`) and 2 (`format = 2`, #3822's gap 7). In format 2 `look` is
+/// presence alone and `camera` the only picture; any other is refused by
+/// name, never guessed at.
+pub const FORMATS: [u32; 2] = [1, 2];
+
+/// What format 2's `look` gives without `topics` naming them: who is there,
+/// how near and which way they face, and someone standing up to leave (the
+/// protocol's `person.*` events, docs/control.md). The same two a pushed
+/// skill's `look` reads (`dev::PUSHED_TOPICS`, #3879), so presence has one
+/// definition.
+pub const PRESENCE_TOPICS: [&str; 2] = ["humans/faces/tracked", "room/stood_up"];
+
 /// `LAMP_YAWN_SOONER=on`: a trigger's `sooner` shortens its `for` while its
 /// field is past its line (#3709: a yawn seen in the sitting brings Stretch
 /// break forward). Off unless set: `sooner` is read, checked and ignored.
@@ -186,6 +199,8 @@ pub const SILENT_ENDS_US: u64 = 15 * 60 * 1_000_000;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SkillFile {
+    /// The rules' format ([`FORMATS`]): left out, format 1.
+    format: Option<u32>,
     /// Installed core skills can remain disabled until their lamp check.
     #[serde(default = "enabled_by_default")]
     enabled: bool,
@@ -1145,6 +1160,11 @@ pub struct Permissions {
     /// default (#3822's gap 1, the helper's decision on #3504).
     #[serde(default)]
     pub camera: bool,
+    /// The skill says `format = 2`: its `look` is presence alone, never the
+    /// picture, and gives the presence topics ([`PRESENCE_TOPICS`]).
+    /// Format 1 (the key left out) when false.
+    #[serde(skip)]
+    pub format_2: bool,
     /// It may send a short text for the person's phone, unasked
     /// (`messages/out`, a watch's news: [`watch`]).
     #[serde(default)]
@@ -1265,7 +1285,7 @@ impl Permissions {
     /// Whether the model may see the camera's picture: `camera`, or format
     /// 1's `look`, which gave it before `camera` was its own grant.
     pub fn sees_picture(&self) -> bool {
-        self.camera || self.look
+        self.camera || (self.look && !self.format_2)
     }
 
     /// Whether it lists the core-only grant `grant` ([`CORE_GRANTS`]).
@@ -1329,6 +1349,10 @@ impl Permissions {
 
     /// Why a skill with these permissions may not read `topic`, if not.
     pub fn refuses_reading(&self, topic: &str) -> Option<String> {
+        // Format 2's `look` is the protocol's: the presence topics with it.
+        if self.format_2 && self.look && PRESENCE_TOPICS.contains(&topic) {
+            return None;
+        }
         (!self.topics.iter().any(|given| given == topic))
             .then(|| format!("{topic} is not in [permissions] topics"))
     }
@@ -1356,6 +1380,7 @@ impl Permissions {
             ("speak", self.speak),
             ("light", self.light),
             ("body", self.body),
+            ("look", self.look && self.format_2),
             ("camera", self.sees_picture()),
             ("messages", self.messages),
             ("known faces", self.known_faces),
@@ -2912,8 +2937,17 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         return Err("run.py is not run yet: a skill with one is not loaded".into());
     }
     let manifest_text = read("skill.toml")?;
-    let file: SkillFile =
+    let mut file: SkillFile =
         toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+    match file.format {
+        None | Some(1) => {}
+        Some(2) => file.permissions.format_2 = true,
+        Some(other) => {
+            return Err(format!(
+                "skill.toml: format {other} is not one this lamp reads (1 or 2)"
+            ));
+        }
+    }
     let kind = SkillKind::read(file.kind.as_deref())?;
     file.permissions.check_core(kind)?;
     file.permissions.check_say(kind)?;

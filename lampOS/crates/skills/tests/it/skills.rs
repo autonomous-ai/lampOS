@@ -654,6 +654,77 @@ fn a_format_1_look_still_gives_the_picture_and_camera_is_its_own_grant() {
     assert!(!none.sees_picture());
 }
 
+/// Format 2 (#3822's gap 7): `look` is the protocol's presence alone. It
+/// gives the presence topics without `topics` naming them, and never the
+/// picture, which is `camera`'s only. A format this lamp doesn't read is
+/// refused by name.
+#[test]
+fn in_format_2_look_is_presence_alone_and_camera_the_only_picture() {
+    let dir = tempfile::tempdir().unwrap();
+    let presence = "format = 2\n[permissions]\nlook = true\nlight = true\n\
+                    [trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n\
+                    [ask]\npolicy = \"nudge\"\n[[do]]\nlight = { colour = \"warm\", level = 2, for = \"20s\" }\n";
+    let skill = load(&skill_with(dir.path(), "presence", presence)).unwrap();
+    assert!(skill.permissions.format_2 && skill.permissions.look);
+    assert!(!skill.permissions.sees_picture());
+    assert_eq!(
+        skill.permissions.refuses_reading("humans/faces/tracked"),
+        None
+    );
+    assert_eq!(skill.permissions.refuses_reading("room/stood_up"), None);
+    assert!(skill.permissions.refuses_reading("voice/heard").is_some());
+    assert!(skill.permissions.said().contains("look"));
+    assert!(!skill.permissions.said().contains("camera"));
+    assert!(
+        skill
+            .permissions
+            .refuses(&Call::Look)
+            .unwrap()
+            .contains("needs camera = true")
+    );
+    let engine = Engine::new(vec![skill], true);
+    assert_eq!(engine.topics(), ["humans/faces/tracked"]);
+    // The same in format 1 reads no presence: its topic is not listed.
+    let older = presence.replace("format = 2\n", "");
+    let error = load(&skill_with(&dir.path().join("older"), "presence", &older)).unwrap_err();
+    assert!(
+        error.contains("humans/faces/tracked is not in [permissions] topics"),
+        "{error}"
+    );
+    // Format 2's picture: desk-tutor with `look` and no `camera` is refused,
+    // with `camera` it loads.
+    let tutor = |from: &str, to: &str| {
+        let copy = repo_skill_with(
+            &dir.path().join(to.replace([' ', '\n', '='], "_")),
+            "desk-tutor",
+            from,
+            to,
+        );
+        let text = fs::read_to_string(copy.join("skill.toml")).unwrap();
+        fs::write(copy.join("skill.toml"), format!("format = 2\n{text}")).unwrap();
+        load(&copy)
+    };
+    let error = tutor("camera = true\n", "look = true\n").unwrap_err();
+    assert!(error.contains("look needs camera = true"), "{error}");
+    assert!(
+        tutor("camera = true\n", "camera = true\n")
+            .unwrap()
+            .permissions
+            .sees_picture()
+    );
+    // A format it doesn't read.
+    let error = load(&skill_with(
+        &dir.path().join("newer"),
+        "presence",
+        &presence.replace("format = 2", "format = 3"),
+    ))
+    .unwrap_err();
+    assert!(
+        error.contains("format 3 is not one this lamp reads (1 or 2)"),
+        "{error}"
+    );
+}
+
 /// A skill that has the voice say the person's reminder or the news of
 /// their work reads those words, so it declares their topic: a skill
 /// started by the air could otherwise say the person's reminders at its own
