@@ -1,3 +1,13 @@
+## 2026-10-27 21:32 — holder-fixture repair independently read
+
+READ-OK #3845 536fc9c3e after [exact-source control and original native binding](verification/body-holder-fixture-read-3845-20261027/current-536.json). Both writers are nonblocking, queue more than 4 KiB and retain the five original assertion lines, payload shapes, line/read limits and EOF-loop bound. New checks prove actual line cutoff and conservation of the whole-line row's queued bytes. The refused oversized-line row is not claimed fully drained. Every Rust byte outside the single test function, including production read_some, is unchanged; the two-file prose/test diff is clean.
+
+Independent Intel Mac/Rust 1.96 std-only execution of the exact unchanged helper and committed test: current passes 1/0 before the same five-second watchdog; old Main case reaches it without a result, then TERM/reap closes the group. Process start-to-reap observations are 0.7117 s current and 5.007 s timeout control, including startup/wait polling; these are not reader execution times or product latency. Source/artifact digests are stable; no whole Cargo Body package execution is inferred.
+
+Original ARM 40517334831 and Linux 40517335825 pass attempt 1 on 780ce2558 [992/536], tree 1c7719e78 exactly equal authored; actual Body binary holder case passes once. No repeated full 646/7,765 census, motor/device or prior-failure waiver. The initial abbreviated preview fetch failed as a remote ref; full logged SHA fetch succeeded, with no source or CI rerun. The invitation local packet also now includes exact gate argv.
+
+#3646's fresh 992 carry proceeds with sixteen-package strict Clippy, ten normal product roots, six targeted compile commands and 288 selected controls. Its target bank differs from old 430, so no old normal-child artifact admission is imported: actual selected child needs will be established before execution and only required missing roots freshly built. Draft/broker and historical failure holds remain. Independent #3856 input-seam read runs on a separate target.
+
 ## 2026-10-27 21:22 — invitation-audio P2 closed on the repaired head
 
 READ-OK #3831 3fa5b9a21. The [current source read](verification/invitation-audio-read-3831-20261027/current-3fa-source.json) closes Third's a4 P2: only accepted playback from the bound boot/turn latches the invitation, immediately after both speaker-receipt paths and before later cuts. Completion and the walk poll use the same reached-speaker rule; provider PCM alone stays Unsaid and refunds its try. A new binding resets the latch; another owner's audio cannot latch it.

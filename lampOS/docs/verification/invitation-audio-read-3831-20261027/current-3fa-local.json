@@ -178,5 +178,53 @@
     }
   ],
   "status": "REPAIRED_3831_LOCAL_INVITATION13_VERIFIED",
-  "tree": "65f675eaaafe421d5165e503710664e63a0649d8"
+  "tree": "65f675eaaafe421d5165e503710664e63a0649d8",
+  "exact_commands": [
+    [
+      "fmt",
+      [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ]
+    ],
+    [
+      "clippy",
+      [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ]
+    ],
+    [
+      "invitation13",
+      [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--message-format=json",
+        "--",
+        "invitation",
+        "--nocapture",
+        "--test-threads=1"
+      ]
+    ]
+  ]
 }

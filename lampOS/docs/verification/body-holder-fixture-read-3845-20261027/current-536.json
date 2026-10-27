@@ -1,0 +1,117 @@
+{
+  "pr": 3845,
+  "head": "536fc9c3e3de4a6403afbabc98ff2e345f9b7ba7",
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "tree": "1c7719e7830c18f02cfcee657b95cf399798e763",
+  "review": "READ_OK",
+  "changed_paths": [
+    "lampOS/crates/body/src/bin/lamp-body.rs",
+    "lampOS/docs/body.md"
+  ],
+  "diff_check": 0,
+  "source_conclusions": [
+    "Only the single test function changes inside the Rust file; every byte outside it, including production read_some, is unchanged.",
+    "Both original payload shapes remain; writers use one nonblocking write and assert queued exceeds4096. All five original assertion lines,4096read budget,1024line limit and<10EOF loop cap remain; new cutoff/queue-conservation assertions strengthen them.",
+    "First oversized-line row proves line cutoff. The whole-line row separately proves4096first read and exact remaining queued-byte drain before EOF; no claim that the refused oversized line is fully drained.",
+    "No product code, dependency, new sleep/thread or timeout change."
+  ],
+  "isolated_Mac_control": {
+    "head": "536fc9c3e3de4a6403afbabc98ff2e345f9b7ba7",
+    "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+    "tool": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+    "only_fixture_changed_in_Rust_file": true,
+    "production_read_some_exact_equal": true,
+    "original_assertion_lines_retained": [
+      "assert!(!read_some(&mut door, &mut pending, 4_096, 1_024));",
+      "assert!(pending.len() <= 1_024 + 512, \"{}\", pending.len());",
+      "assert!(!read_some(&mut reader, &mut lines, 4_096, usize::MAX));",
+      "assert_eq!(lines.len(), 4_096);",
+      "assert!(steps < 10);"
+    ],
+    "bound_seconds": 5,
+    "results": {
+      "current": {
+        "returncode": 0,
+        "timed_out": false,
+        "elapsed_s": 0.7117,
+        "reaped": true,
+        "group": "absent",
+        "cleanup": [],
+        "source_sha256": "229c7cafac2152fdafd980bb5639910810e908750add424a230236e398b3bd64",
+        "binary_before_sha256": "7a47c662a1625e96b7c5fc3a12c7448efd951f256152d3ad3781104355296e2e",
+        "binary_after_sha256": "7a47c662a1625e96b7c5fc3a12c7448efd951f256152d3ad3781104355296e2e",
+        "runtime_output": "\nrunning 1 test\ntest a_step_reads_a_bounded_amount_of_its_holder ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+      },
+      "base": {
+        "returncode": -15,
+        "timed_out": true,
+        "elapsed_s": 5.007,
+        "reaped": true,
+        "group": "absent",
+        "cleanup": [
+          "TERM"
+        ],
+        "source_sha256": "f950ddbdb89b100e494331b582c908c4ee48663ed756f2adcff3ff0c954d8f5e",
+        "binary_before_sha256": "5ff9e2956af9c15bc9ced72764de2a6a57e09fbf8799df8d37fc15aa042fad58",
+        "binary_after_sha256": "5ff9e2956af9c15bc9ced72764de2a6a57e09fbf8799df8d37fc15aa042fad58",
+        "runtime_output": "\nrunning 1 test\ntest a_step_reads_a_bounded_amount_of_its_holder ... "
+      }
+    },
+    "scope": "Isolated exact unchanged production read_some plus exact committed test function under std-only rustc test harness; no Cargo or whole Body binary/other module execution. Baseline timeout is retained as a control, not a product/device deadline or waived package failure.",
+    "exact_compile_argv_template": [
+      "rustc",
+      "+1.96.0",
+      "--edition=2024",
+      "--test",
+      "<case>-exact.rs",
+      "-o",
+      "<case>-exact"
+    ],
+    "exact_runtime_argv_template": [
+      "<case>-exact",
+      "--exact",
+      "a_step_reads_a_bounded_amount_of_its_holder",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "timing_boundary": "Popen start through wait/reap, includes process startup and wait polling; 0.7117s is not reader runtime or product latency. Old case has no completion by 5s and is TERM/reaped."
+  },
+  "original_native": {
+    "preview": "780ce2558483d82f530f96dbfe98339f27a8cba2",
+    "parents": [
+      "992303fc8d72322bab46cdb18801c853ea43bb81",
+      "536fc9c3e3de4a6403afbabc98ff2e345f9b7ba7"
+    ],
+    "tree_equal_authored": true,
+    "both_complete_changed_blobs_equal": true,
+    "runs": {
+      "arm": {
+        "run": {
+          "conclusion": "success",
+          "head_sha": "536fc9c3e3de4a6403afbabc98ff2e345f9b7ba7",
+          "id": 40517334831,
+          "run_attempt": 1,
+          "status": "completed"
+        },
+        "log_sha256": "f53b6aeb53975c5ac63f9a6749416eafc4a2ea136c88248dacfcdf2c7e7b580b"
+      },
+      "linux": {
+        "run": {
+          "conclusion": "success",
+          "head_sha": "536fc9c3e3de4a6403afbabc98ff2e345f9b7ba7",
+          "id": 40517335825,
+          "run_attempt": 1,
+          "status": "completed"
+        },
+        "log_sha256": "abefafddd496bfd65b8cf4552f9e51b889507004b1a2a237dcbac202df41c756"
+      }
+    },
+    "selected_case": "PASS [   0.004s] ( 614/7765) lamp-body::bin/lamp-body tests::a_step_reads_a_bounded_amount_of_its_holder",
+    "selected_case_pass_occurrences": 1
+  },
+  "limits": [
+    "Mac execution is std-only exact helper/test extraction, not full Cargo Body package or its production bootstrap.",
+    "No new646-package/fullnativecensus, device/motor or application-latency claim. Old five-second timeout stays a separate expected baseline-control observation; author prior attempts are not waived.",
+    "Initial fetch of abbreviated780ce2558 was refused as a remote ref; fetching full loggedSHA succeeded without changing source/CI."
+  ]
+}
