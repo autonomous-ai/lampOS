@@ -54,6 +54,9 @@ pub enum NoticeKind {
     /// Neither the new Wi-Fi nor the old one could be joined after a change
     /// from the app (#1959): no network, so no cloud voice to say so.
     WifiLost,
+    /// The safe shutdown's line (#3697, `docs/shutdown.md`): said before the
+    /// lamp powers off, whether or not the model can be reached.
+    GoingToSleep,
 }
 
 /// Who may hear it.
