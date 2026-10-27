@@ -8649,7 +8649,22 @@ async fn answer(
                     ));
                     continue;
                 }
-                if crate::remember::is_forget(&call.name) && !forget_may_run && !asked_just_before {
+                // A spoken `forget_everything` from someone known never runs
+                // on the turn that asks for it, however plainly (#3504, N3,
+                // the person's decision, 27 Oct: "except my name" heard as
+                // "accept my name" wiped one person). It is held and asked
+                // about once, and only their yes to the hold runs it
+                // ([`take_held_forget`], with the eyes' check that their face
+                // said it), never an ask just before: a yes there is read
+                // with no such check (the reviewer-lead's P2 on #3706).
+                // Nobody known: as before, the memory refuses it.
+                let everything_waits = call.name == crate::remember::FORGET_EVERYTHING
+                    && heard
+                    && !crate::remember::forget_unguarded()
+                    && forget_asker(scope.as_ref()).is_some();
+                if crate::remember::is_forget(&call.name)
+                    && ((!forget_may_run && !asked_just_before) || everything_waits)
+                {
                     let holding = match forget_asker(scope.as_ref()) {
                         _ if held_forget_ran => None,
                         Some(asker) if heard => {
