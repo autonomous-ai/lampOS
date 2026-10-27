@@ -2478,11 +2478,41 @@ fn versions(db: &Connection) -> Result<()> {
 /// not used, and typed provenance is what replaces this. A fact with no
 /// distinctive word takes the whole walk ([`descendants`]), as before,
 /// and its literal copies too. Kept things never go here unless named.
+/// Only rows the search index finds are read (#3871): the rule once read
+/// every row of the person's, 9 s on a 9.6 MB store on lamp-4ace.
 fn selective_descendants(db: &Connection, person: &Person) -> Result<()> {
     let texts: Vec<String> = db
         .prepare("SELECT text FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
         .query_map([], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
+    // A fact whose words the index may hold otherwise ("İstanbul": Fourteen
+    // on #3902) reads every row, as before #3871: slow, never short.
+    let read = if texts.iter().any(|text| search::splits_unlike_index(text)) {
+        Read::Every
+    } else {
+        Read::Indexed
+    };
+    selective_rows(db, person, &texts, read).map(|_| ())
+}
+
+/// Which rows [`selective_rows`] reads and checks word by word.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Read {
+    /// Every row the rule could take, as #3613 did.
+    Every,
+    /// Only those the search index finds with the fact's words, and every
+    /// one whose words it may hold otherwise
+    /// ([`search::splits_unlike_index`]): the same rows go (#3871).
+    Indexed,
+}
+
+/// Rows with a character past ASCII, as SQLite's `GLOB` reads them: the
+/// only ones [`search::splits_unlike_index`] can be true of.
+const NOT_ASCII: &str = "*[^\u{1}-\u{7f}]*";
+
+/// [`selective_descendants`] for the doomed rows' `texts`, reading what
+/// `read` says: how many rows it checked word by word.
+fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read) -> Result<u64> {
     let own: Vec<BTreeSet<String>> = texts
         .iter()
         .map(|text| {
@@ -2501,43 +2531,59 @@ fn selective_descendants(db: &Connection, person: &Person) -> Result<()> {
         .collect();
     let any: BTreeSet<String> = own.iter().flatten().cloned().collect();
     let doom = |rid: i64| db.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid]);
+    // Read when the index found it (`hit`), or its words may be held
+    // otherwise; every row read, with `Read::Every`.
+    let checked = std::cell::Cell::new(0_u64);
+    let read_row = |hit: bool, body: &str| {
+        let read = read == Read::Every || hit || search::splits_unlike_index(body);
+        checked.set(checked.get() + u64::from(read));
+        read
+    };
     if any.is_empty() {
         descendants(db, None)?;
     } else {
-        // Every row reachable through links, those that stay included.
-        let mut visited: BTreeSet<i64> = db
-            .prepare("SELECT rid FROM doomed")?
-            .query_map([], |r| r.get(0))?
+        // Every row reachable through links, those that stay included: one
+        // recursive walk on `sources_parent`, each row once (#3871). Of
+        // those, only the ones the search index finds with a word of the
+        // fact, or past ASCII, are read.
+        let candidates: Vec<(bool, String, i64)> = db
+            .prepare(
+                "WITH RECURSIVE reach(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN reach r ON s.parent=r.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept') SELECT e.rid IN (SELECT rowid FROM search WHERE search MATCH ?1) AS hit,e.heard||' '||e.said||' '||e.text,e.rid FROM entries e WHERE e.rid IN (SELECT rid FROM reach) AND e.rid NOT IN (SELECT rid FROM doomed) AND (?2 OR hit OR e.heard||e.said||e.text GLOB ?3)",
+            )?
+            .query_map(params![any_word(&any), read == Read::Every, NOT_ASCII], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })?
             .collect::<rusqlite::Result<_>>()?;
-        let mut frontier: Vec<i64> = visited.iter().copied().collect();
-        let mut children = db.prepare(
-            "SELECT e.rid,e.heard||' '||e.said||' '||e.text FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent=?1 AND e.kind!='kept'",
-        )?;
-        while let Some(parent) = frontier.pop() {
-            let found: Vec<(i64, String)> = children
-                .query_map([parent], |r| Ok((r.get(0)?, r.get(1)?)))?
-                .collect::<rusqlite::Result<_>>()?;
-            for (rid, body) in found {
-                if !visited.insert(rid) {
-                    continue;
-                }
-                if search::content_words(&body)
+        for (hit, body, rid) in candidates {
+            if read_row(hit, &body)
+                && search::content_words(&body)
                     .iter()
                     .any(|word| any.contains(word))
-                {
-                    doom(rid)?;
-                }
-                frontier.push(rid);
+            {
+                doom(rid)?;
             }
         }
     }
-    // The person's own copies of a version, linked or not.
-    let rows: Vec<(i64, [String; 3])> = db
-        .prepare("SELECT rid,heard,said,text FROM entries WHERE person=?1 AND kind!='kept' AND rid NOT IN (SELECT rid FROM doomed)")?
-        .query_map([person.as_str()], |r| Ok((r.get(0)?, [r.get(1)?, r.get(2)?, r.get(3)?])))?
+    // The person's own copies of a version, linked or not: only the rows
+    // the search index finds with every word of one version, or every word
+    // of one whole text, or past ASCII, are read and checked as before
+    // (#3871).
+    let Some(copies) = copy_words(&own, &literals) else {
+        versions(db)?;
+        return Ok(checked.get());
+    };
+    let rows: Vec<(bool, i64, [String; 3])> = db
+        .prepare("SELECT e.rid IN (SELECT rowid FROM search WHERE search MATCH ?1) AS hit,e.rid,e.heard,e.said,e.text FROM entries e WHERE e.person=?2 AND e.kind!='kept' AND e.rid NOT IN (SELECT rid FROM doomed) AND (?3 OR hit OR e.heard||e.said||e.text GLOB ?4)")?
+        .query_map(
+            params![copies, person.as_str(), read == Read::Every, NOT_ASCII],
+            |r| Ok((r.get(0)?, r.get(1)?, [r.get(2)?, r.get(3)?, r.get(4)?])),
+        )?
         .collect::<rusqlite::Result<_>>()?;
-    for (rid, fields) in rows {
+    for (hit, rid, fields) in rows {
         let body = fields.join(" ");
+        if !read_row(hit, &body) {
+            continue;
+        }
         let words: BTreeSet<String> = search::content_words(&body).into_iter().collect();
         // Whole words only: "it is so" is not in "bit is sour". A text of
         // fewer than three characters is a copy only as a whole field
@@ -2554,7 +2600,44 @@ fn selective_descendants(db: &Connection, person: &Person) -> Result<()> {
             doom(rid)?;
         }
     }
-    versions(db)
+    versions(db)?;
+    Ok(checked.get())
+}
+
+/// The search index's question for rows with one of `words`
+/// ([`search::content_words`]' form), wider than the words: each as a
+/// prefix, so "peanut" finds "peanuts" and "allerg" "allergy", and accents
+/// folded. What it finds is checked word by word ([`selective_descendants`]).
+fn any_word(words: &BTreeSet<String>) -> String {
+    words
+        .iter()
+        .map(|word| format!("\"{word}\"*"))
+        .collect::<Vec<_>>()
+        .join(" OR ")
+}
+
+/// The search index's question for rows that may be a copy of a version:
+/// every word of one version, each as a prefix, or every word of one whole
+/// text; wider than a copy, so what it finds is checked as before. `None`
+/// when there is nothing a copy could be of.
+fn copy_words(own: &[BTreeSet<String>], literals: &[String]) -> Option<String> {
+    let groups: Vec<String> = own
+        .iter()
+        .map(|version| {
+            version
+                .iter()
+                .map(|word| format!("\"{word}\"*"))
+                .collect::<Vec<_>>()
+        })
+        .chain(literals.iter().map(|text| {
+            text.split(' ')
+                .map(|word| format!("\"{word}\""))
+                .collect::<Vec<_>>()
+        }))
+        .filter(|group| !group.is_empty())
+        .map(|group| format!("({})", group.join(" AND ")))
+        .collect();
+    (!groups.is_empty()).then(|| groups.join(" OR "))
 }
 
 /// A text as [`selective_descendants`] compares it whole: [`search::text`]'s
@@ -3157,6 +3240,352 @@ mod tests {
         assert!(store.record(&room, older).unwrap().is_some());
         drop(store);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A days store of about `megabytes` MB, generated (never a lamp's
+    /// own): a person's month of exchanges, each linked to the kept things
+    /// its session was shown, the fact among them in one of twenty; observations
+    /// made from exchanges; the room's exchanges; and a few lines that carry
+    /// the fact's words, linked or not. The fact's id.
+    fn big_store(name: &str, megabytes: u64) -> (std::path::PathBuf, Days, Person, u64) {
+        let (dir, mut store, person, now) = scratch(name);
+        let seed = std::cell::Cell::new(0x2545_f491_4f6c_dd1d_u64);
+        let next = |below: u64| {
+            let mut x = seed.get();
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            seed.set(x);
+            x % below
+        };
+        const SYLLABLES: [&str; 16] = [
+            "ka", "lo", "mi", "ren", "tu", "sa", "vi", "del", "mon", "ra", "jo", "qu", "zi", "nor",
+            "bel", "fen",
+        ];
+        // Half the words Vietnamese, so most lines are past ASCII and the
+        // forget reads them to check (`search::splits_unlike_index`).
+        const VIETNAMESE: [&str; 16] = [
+            "mưa", "bếp", "chợ", "nhà", "sông", "lá", "gió", "trà", "đèn", "cá", "núi", "hoa",
+            "mây", "bàn", "ghế", "sách",
+        ];
+        let vocabulary: Vec<String> = (0..4096_u64)
+            .map(|n| {
+                let syllables = if n % 4 < 2 { SYLLABLES } else { VIETNAMESE };
+                (0..2 + n % 2)
+                    .map(|k| syllables[((n >> (4 * k)) % 16) as usize])
+                    .collect::<Vec<_>>()
+                    .join(if n % 4 < 2 { "" } else { " " })
+            })
+            .collect();
+        let words = |count: u64| {
+            (0..count)
+                .map(|_| vocabulary[next(4096) as usize].as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let fact = store.remember(&person, now, "allergic to peanuts").unwrap();
+        let tx = store.db.transaction().unwrap();
+        let rid_of = |tx: &Transaction<'_>, who: &Person, id: u64| -> i64 {
+            tx.query_row(
+                "SELECT rid FROM entries WHERE person=?1 AND id=?2",
+                params![who.as_str(), id],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        let fact_rid = rid_of(&tx, &person, fact);
+        let room = Person::new(Person::EVERYONE).unwrap();
+        tx.execute(
+            "INSERT OR IGNORE INTO people(person) VALUES(?1)",
+            [room.as_str()],
+        )
+        .unwrap();
+        let mut ids = [fact + 1, 1];
+        let mut insert = |tx: &Transaction<'_>,
+                          who: &Person,
+                          kind: &str,
+                          at: u64,
+                          [heard, said, text]: [&str; 3],
+                          parents: &[i64]|
+         -> i64 {
+            let slot = usize::from(who.as_str() == Person::EVERYONE);
+            let id = ids[slot];
+            ids[slot] += 1;
+            let day = Day::at(at, &LocalTime::Offset(0)).unwrap().to_string();
+            tx.execute("INSERT INTO entries(person,id,kind,at_unix_ms,day,heard,said,text,used_unix_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?4)", params![who.as_str(), id, kind, at, day, heard, said, text]).unwrap();
+            let rid = tx.last_insert_rowid();
+            tx.execute(
+                "INSERT INTO search(rowid,body) VALUES(?1,?2)",
+                params![rid, search::text(&format!("{heard} {said} {text}"))],
+            )
+            .unwrap();
+            for parent in parents {
+                tx.execute(
+                    "INSERT OR IGNORE INTO sources(child,parent) VALUES(?1,?2)",
+                    params![rid, parent],
+                )
+                .unwrap();
+            }
+            rid
+        };
+        let start = now - 25 * 86_400_000;
+        let kept: Vec<i64> = (0..300)
+            .map(|n| {
+                let text = format!("likes {}", words(4));
+                insert(&tx, &person, "kept", start + n, ["", "", &text], &[])
+            })
+            .collect();
+        let mut exchanges = Vec::new();
+        let mut at = start + 1_000;
+        let mut n = 0_u64;
+        loop {
+            n += 1;
+            at += 60_000;
+            if n.is_multiple_of(500) {
+                let size: u64 = tx
+                    .query_row(
+                        "SELECT page_count*page_size FROM pragma_page_count(),pragma_page_size()",
+                        [],
+                        |r| r.get(0),
+                    )
+                    .unwrap();
+                if size >= megabytes << 20 {
+                    break;
+                }
+            }
+            let who = if n.is_multiple_of(5) { &room } else { &person };
+            let mut heard = words(10);
+            match n % 97 {
+                0 => heard.push_str(" peanuts"),
+                1 => heard.push_str(" I am allergic to peanuts"),
+                _ => {}
+            }
+            let said = words(36);
+            let mut parents: Vec<i64> = (0..6).map(|_| kept[next(300) as usize]).collect();
+            if who == &person && next(20) == 0 {
+                parents.push(fact_rid);
+            }
+            let rid = insert(&tx, who, "exchange", at, [&heard, &said, ""], &parents);
+            if who == &person {
+                exchanges.push(rid);
+            }
+            if n.is_multiple_of(20) {
+                let parents: Vec<i64> = (0..5)
+                    .map(|_| exchanges[next(exchanges.len() as u64) as usize])
+                    .collect();
+                let text = words(20);
+                insert(
+                    &tx,
+                    &person,
+                    "observation",
+                    at + 1,
+                    ["", "", &text],
+                    &parents,
+                );
+            }
+        }
+        for (who, id) in [(&person, ids[0]), (&room, ids[1])] {
+            tx.execute(
+                "UPDATE people SET next_id=?2 WHERE person=?1",
+                params![who.as_str(), id],
+            )
+            .unwrap();
+        }
+        tx.commit().unwrap();
+        (dir, store, person, fact)
+    }
+
+    /// #3871 (lamp-4ace, 27 Oct: a targeted forget took about 9 s on a
+    /// 9.6 MB store, past the voice's 1.5 s, so the lamp said it couldn't):
+    /// on a store of about 10 MB it answers inside the voice's wait, and
+    /// takes what #3613 takes there: the fact, every line linked to it or of
+    /// theirs that carries its words, and none only shown it.
+    #[test]
+    fn a_targeted_forget_on_a_ten_megabyte_store_answers_inside_the_voice_wait() {
+        let (dir, mut store, person, fact) = big_store("forget-ten-megabytes", 10);
+        let size = fs::metadata(dir.join(DATABASE)).unwrap().len();
+        assert!(size >= 10 << 20, "{size}");
+        let count = |store: &Days, query: &str| -> u64 {
+            store
+                .db
+                .query_row(query, [person.as_str()], |r| r.get(0))
+                .unwrap()
+        };
+        const COPIES: &str =
+            "SELECT count(*) FROM entries WHERE person=?1 AND heard LIKE '%allergic to peanuts%'";
+        const LINKED: &str = "SELECT count(*) FROM entries e JOIN sources s ON s.child=e.rid JOIN entries f ON f.rid=s.parent WHERE f.person=?1 AND f.kind='kept' AND f.text='allergic to peanuts'";
+        const LINKED_WORD: &str = "SELECT count(*) FROM entries e JOIN sources s ON s.child=e.rid JOIN entries f ON f.rid=s.parent WHERE f.person=?1 AND f.kind='kept' AND f.text='allergic to peanuts' AND e.heard LIKE '%peanuts%' AND e.heard NOT LIKE '%allergic to peanuts%'";
+        const ONE_WORD: &str = "SELECT count(*) FROM entries WHERE person=?1 AND heard LIKE '%peanuts%' AND heard NOT LIKE '%allergic%'";
+        let (copies, linked, linked_word, one_word) = (
+            count(&store, COPIES),
+            count(&store, LINKED),
+            count(&store, LINKED_WORD),
+            count(&store, ONE_WORD),
+        );
+        assert!(copies > 0 && linked > linked_word && one_word > linked_word);
+        let rows = count(&store, "SELECT count(*) FROM entries WHERE ?1 IS NOT NULL");
+        // What the rule reads and checks is bounded by the lines with the
+        // fact's words, not the person's every line as #3613 did (#3871),
+        // and choosing them fits the voice's wait with room to spare in any
+        // build: #3613's rule took 11 s optimized, 137 s not. The rest of a
+        // forget, the deletion and the commit, is the disk's, and waits on
+        // every other test's writes here; `forget_timing_on_ten_megabytes`
+        // times it all, alone.
+        let started = std::time::Instant::now();
+        let (_, checked) = chosen(&mut store, &person, fact, Read::Indexed);
+        let took = started.elapsed();
+        assert!(
+            took < std::time::Duration::from_millis(1_500),
+            "choosing what a targeted forget takes took {} ms",
+            took.as_millis()
+        );
+        assert!(
+            checked <= linked_word + one_word + copies,
+            "{checked} of {rows}"
+        );
+        let removed = store.forget(&person, fact).unwrap();
+        // The fact, each of the person's copies of it, and each line linked
+        // to it with one of its words; a line of theirs with one word, never
+        // linked, stays, as does every line only shown it.
+        assert_eq!(removed, 1 + copies + linked_word);
+        assert!(store.record(&person, fact).unwrap().is_none());
+        assert_eq!(count(&store, COPIES), 0);
+        assert_eq!(count(&store, ONE_WORD), one_word - linked_word);
+        assert_eq!(
+            count(&store, "SELECT count(*) FROM entries WHERE ?1 IS NOT NULL"),
+            rows - removed
+        );
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The rows [`selective_rows`] takes for `id`, read as `read`, nothing
+    /// erased, and how many it checked word by word.
+    fn chosen(store: &mut Days, person: &Person, id: u64, read: Read) -> (BTreeSet<i64>, u64) {
+        let tx = store.db.transaction().unwrap();
+        tx.execute("DELETE FROM doomed", []).unwrap();
+        tx.execute(
+            "INSERT INTO doomed SELECT rid FROM entries WHERE person=? AND id=?",
+            params![person.as_str(), id],
+        )
+        .unwrap();
+        versions(&tx).unwrap();
+        let texts: Vec<String> = tx
+            .prepare("SELECT text FROM entries WHERE rid IN (SELECT rid FROM doomed)")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        let checked = selective_rows(&tx, person, &texts, read).unwrap();
+        let doomed = tx
+            .prepare("SELECT rid FROM doomed")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        (doomed, checked)
+    }
+
+    /// Fourteen's P2 on #3902: the index reads "İstanbul" as "istanbul",
+    /// where the fact's words are "stanbul", so it missed 33 of the 70 rows
+    /// #3613 took. Every fact here, with a combining mark, a private-use
+    /// character or Vietnamese, and each of its copies upper-cased, in NFD,
+    /// alone, linked, linked through a line that stays and not linked,
+    /// takes the same rows read through the index as read whole; and
+    /// forgetting "İstanbul trip 2027" takes its upper-cased copy.
+    #[test]
+    fn the_index_takes_the_same_rows_as_reading_every_one() {
+        use unicode_normalization::UnicodeNormalization;
+        let (dir, mut store, person, now) = scratch("selective-same-rows");
+        let mut at = now;
+        let mut line = |store: &mut Days, heard: &str, said: &str, sources: &[u64]| {
+            at += 1;
+            store.append(&person, at, heard, said, sources).unwrap()
+        };
+        let facts = [
+            (
+                "İstanbul trip 2027",
+                vec!["İSTANBUL TRIP 2027", "my trip to istanbul"],
+            ),
+            ("stanbul tour", vec!["İstanbul tour", "İSTANBUL TOUR"]),
+            (
+                "allergic to peanuts",
+                vec!["\u{e000}peanuts I am allergic", "peanuts\u{e000} allergic"],
+            ),
+            (
+                "Bố thích ăn phở ở Đà Nẵng",
+                vec!["BỐ THÍCH ĂN PHỞ Ở ĐÀ NẴNG", "bo thich an pho o da nang"],
+            ),
+            ("phở", vec!["PHỞ", "phở bò", "pho"]),
+            ("Đà Nẵng", vec!["ĐÀ NẴNG", "đi Đà Nẵng", "Da Nang"]),
+        ];
+        let mut ids = Vec::new();
+        for (fact, others) in &facts {
+            let id = store.remember(&person, now, fact).unwrap();
+            let mut variants: Vec<String> = vec![
+                fact.to_string(),
+                fact.to_uppercase(),
+                fact.nfd().collect(),
+                format!("Remember: {fact}!"),
+            ];
+            variants.extend(fact.split(' ').map(str::to_owned));
+            variants.extend(others.iter().map(|other| other.to_string()));
+            variants.extend(others.iter().map(|other| other.nfd().collect::<String>()));
+            for variant in &variants {
+                let bridge = line(&mut store, "What's the weather?", "Sunny", &[id]);
+                line(&mut store, variant, "Noted", &[]);
+                line(&mut store, "And then?", variant, &[id]);
+                line(&mut store, variant, "Okay", &[bridge]);
+            }
+            ids.push(id);
+        }
+        for (id, (fact, _)) in ids.iter().zip(&facts) {
+            let (every, _) = chosen(&mut store, &person, *id, Read::Every);
+            let (indexed, _) = chosen(&mut store, &person, *id, Read::Indexed);
+            assert!(every.len() > 1, "{fact}");
+            assert_eq!(indexed, every, "{fact}");
+        }
+        let copy = line(&mut store, "İSTANBUL TRIP 2027", "Noted", &[]);
+        store.forget(&person, ids[0]).unwrap();
+        assert!(store.record(&person, copy).unwrap().is_none());
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #3871's numbers on the machine that runs this, with and without
+    /// #3613's rule, its forget inside the voice's 1.5 s when optimized:
+    /// `cargo test -p lamp-memory --release --lib forget_timing --
+    /// --ignored --nocapture`, alone, as the disk is part of it.
+    #[test]
+    #[ignore]
+    fn forget_timing_on_ten_megabytes() {
+        for selective in [false, true] {
+            let (dir, mut store, person, fact) = big_store(&format!("timing-{selective}"), 10);
+            let size = fs::metadata(dir.join(DATABASE)).unwrap().len();
+            let rows: u64 = store
+                .db
+                .query_row("SELECT count(*) FROM entries", [], |r| r.get(0))
+                .unwrap();
+            let started = std::time::Instant::now();
+            let removed = store.forget_linked(&person, fact, selective).unwrap();
+            let took = started.elapsed();
+            eprintln!(
+                "selective {selective}: {size} bytes, {rows} rows, {removed} removed in {} ms",
+                took.as_millis()
+            );
+            // Inside the voice's wait, built as it ships.
+            assert!(
+                !selective
+                    || cfg!(debug_assertions)
+                    || took < std::time::Duration::from_millis(1_500),
+                "{} ms",
+                took.as_millis()
+            );
+            drop(store);
+            fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     #[test]

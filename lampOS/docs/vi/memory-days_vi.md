@@ -34,6 +34,20 @@ Voice chỉ yêu cầu quy tắc này bằng `selective:true` khi không bật
 `LAMP_MEMORY_LINK_USED`; khi bật (liên kết nghĩa là đã dùng), lệnh quên xóa
 mọi thứ có liên kết như trước. Lệnh quên không có trường này (voice cũ) cũng
 như trước; memory cũ từ chối trường này và voice gửi lại một lần không kèm nó.
+Quy tắc chỉ đọc những dòng nó có thể xóa (#3871): các dòng có liên kết đến từ
+một lượt đi đệ quy trên `sources_parent`, mỗi dòng một lần, và chỉ mục tìm
+kiếm chọn ra những dòng có một từ của ghi chú (mỗi từ là một tiền tố), cùng
+các dòng của người đó có đủ mọi từ của một phiên bản hoặc của một văn bản
+nguyên vẹn; chỉ những dòng này được so từng từ như trên. Chỉ mục tách từ theo
+cách riêng: nó đọc «İstanbul» (viết thường là «i» kèm một dấu chấm tổ hợp)
+thành «istanbul», còn phần tách từ lại ra «stanbul» (#3902). Vì vậy dòng
+ngoài ASCII có dấu tổ hợp không phải chữ cái, hoặc ký tự dùng riêng, cũng được
+đọc và so (`search::splits_unlike_index`), và ghi chú có ký tự như vậy thì
+đọc mọi dòng như trước. Một bài kiểm tra bảo đảm hai cách xóa đúng cùng những
+dòng. Trên một kho 10 MB được sinh ra (7,1 nghìn dòng, nửa số từ là tiếng
+Việt), một lệnh quên có mục tiêu giảm từ khoảng 11,3 s xuống khoảng 260 ms
+(bản release, trên Mac; 440 ms bản debug); phần còn lại là xóa và ghi bền
+vững. Trước đây nó so mọi dòng của người đó.
 Lượt gốc có nhiều chủ đề vẫn bị xóa nguyên lượt.
 
 Đây là quy tắc theo từ, không bảo đảm xóa mọi cách diễn đạt: liên kết cũ chỉ

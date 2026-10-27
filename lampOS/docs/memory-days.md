@@ -207,6 +207,20 @@ it; and a copy matches one version's own words, so a copy of the newer
 "violet" goes without the older "teal" (Reviewer-two, 03:15). The voice
 asks for this rule with `selective:true` unless `LAMP_MEMORY_LINK_USED=on`,
 whose links say what was used: then, as before, everything linked goes.
+The rule reads only rows it may take (#3871): the linked rows come from one
+recursive walk on `sources_parent`, each row once, and the search index
+picks those with a word of the fact (each word as a prefix), and the
+person's rows with every word of one version or of one whole text; only
+those are checked word by word as above. The index splits words its own
+way: it reads "İstanbul" (lower-cased, "i" and a combining dot) as
+"istanbul" where the words say "stanbul" (#3902). So a row past ASCII with
+a combining mark that is no letter, or a private-use character, is read
+and checked too (`search::splits_unlike_index`), and a fact with one reads
+every row, as before. A test pins that both ways take the same rows. On a
+generated 10 MB store (7.1k rows, half its words Vietnamese) a targeted
+forget went from about 11.3 s to about 260 ms in release on a Mac (440 ms
+in debug); the rest of that time is the deletion and the durable commit.
+It used to check every row of the person's.
 This is a lexical rule, not proof that every paraphrase is
 gone: old links do not tell use from exposure, so "avoid those" may stay,
 and a mixed evidence exchange goes whole. `forget_all` and `forget_person`
