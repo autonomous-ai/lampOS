@@ -143,7 +143,7 @@ lamp-control clients
   - Lease changes (a lapse, a conversation, a hand) go to every connection of the computer that held the lease.
 - **The owner's side:** `--admin-socket`, `/run/lampos-control/admin.sock`, 0600 in a 0700 folder, one JSON object a line:
   - `{"code": {"grants": [...]}}` → `{"code", "pin"}`;
-  - `{"revoke": "c_…"}` → `{"revoked"}`;
+  - `{"revoke": "c_…"}` → `{"revoked": true, "saved": true}`. The revoke takes effect at once either way. If the file can't take it yet, the answer is `"saved": false` with an `error`, because a restart before a save succeeds brings the key back; the next save that succeeds writes it out;
   - `{"clients": true}` → the list.
 
   The app reaches it through the lamp's cloud part in a later piece.
