@@ -21,6 +21,7 @@ import ipaddress
 import json
 import math
 import os
+import random
 import ssl
 import tempfile
 import time
@@ -115,6 +116,109 @@ PATTERN_LEAST_LEVEL = {
 # without its pulse (lamp_msgs' PULSE_GAP_US): the door has answered by then.
 PULSE_GAP_S = 60.0
 
+# How a synthetic hand moves (`hand_track`): across the picture and back
+# (`wave`), round in a circle, left to right once, or held still.
+HAND_PATHS = ("wave", "circle", "across", "still")
+# How lamp-control turns `humans/hands/tracked` into `hand` events (Nine's
+# watch.rs): told when first seen, moved or grown by `HAND_STEP`, or opened
+# or closed, at most every `HAND_EVERY_US` with the newest held back until
+# then; `seen: false` once, `HAND_GONE_US` after the last message. A message
+# under `HAND_SURE`, or a share outside 0 to 1, is no hand. Its check runs
+# every `HAND_CHECK_US`.
+HAND_STEP = 0.05
+HAND_EVERY_US = 250_000
+HAND_GONE_US = 1_000_000
+HAND_SURE = 0.5
+HAND_CHECK_US = 250_000
+HAND_FIELDS = ("x", "y", "size", "open", "confidence")
+
+
+def hand_track(
+    path: str = "wave", *, seconds: float = 3.0, hz: float = 15.0, open: bool = True, seed: int = 0, t0: int = 0
+) -> list[dict]:
+    """A synthetic hand track in `humans/hands/tracked`'s shape (Ten's): `x`
+    and `y` the palm centre as shares of the picture from its left and top,
+    `size` the palm box's width over the picture's, `open`, `confidence`, and
+    `t` the lamp's monotonic clock in microseconds, from `t0`. A seeded jitter
+    of a hundredth keeps it from being a perfect line, and the same seed gives
+    the same track."""
+    if path not in HAND_PATHS:
+        raise ValueError(f"path: one of {', '.join(HAND_PATHS)}")
+    jitter = random.Random(seed)
+    frames = max(1, round(seconds * hz))
+    track = []
+    for n in range(frames):
+        share = n / max(frames - 1, 1)
+        angle = 2 * math.pi * share
+        x, y = {
+            "wave": (0.5 + 0.3 * math.sin(angle), 0.45),
+            "circle": (0.5 + 0.25 * math.cos(angle), 0.5 + 0.25 * math.sin(angle)),
+            "across": (0.15 + 0.7 * share, 0.5),
+            "still": (0.5, 0.5),
+        }[path]
+        track.append(
+            {
+                "x": round(min(max(x + jitter.uniform(-0.01, 0.01), 0.0), 1.0), 4),
+                "y": round(min(max(y + jitter.uniform(-0.01, 0.01), 0.0), 1.0), 4),
+                "size": round(0.12 + jitter.uniform(-0.01, 0.01), 4),
+                "open": open,
+                "confidence": round(0.9 + jitter.uniform(-0.05, 0.05), 3),
+                "t": t0 + round(n * 1_000_000 / hz),
+            }
+        )
+    return track
+
+
+def _two(value: float) -> float:
+    # Rust's `round`: halves away from zero (the shares are never negative).
+    return math.floor(value * 100 + 0.5) / 100
+
+
+def hand_events(track: list[dict]) -> list[tuple[int, dict]]:
+    """The `hand` events lamp-control says for a `humans/hands/tracked`
+    track, as its watch.rs does, each with the topic time (µs) it is said
+    at: `seen` with where the hand is, rounded to 2 places, never the
+    tracker's clock; `seen: false` once it's gone. Each message is taken at
+    its `t`, and the 250 ms check runs from the first."""
+    events: list[tuple[int, dict]] = []
+    newest: tuple[dict, int] | None = None
+    told: dict | None = None
+    told_us: int | None = None
+
+    def news(now: int) -> None:
+        nonlocal newest, told, told_us
+        if newest is None:
+            return
+        hand, heard = newest
+        if now - heard >= HAND_GONE_US:
+            newest = None
+            if told is None:
+                return
+            told, told_us = None, now
+            events.append((now, {"seen": False}))
+            return
+        fresh = told is None or hand["open"] != told["open"] or any(
+            abs(hand[k] - told[k]) >= HAND_STEP for k in ("x", "y", "size")
+        )
+        if not fresh or (told_us is not None and now - told_us < HAND_EVERY_US):
+            return
+        told, told_us = hand, now
+        events.append((now, {"seen": True, **{k: hand[k] if k == "open" else _two(hand[k]) for k in HAND_FIELDS}}))
+
+    check = track[0]["t"] + HAND_CHECK_US if track else 0
+    for hand in track:
+        while check < hand["t"]:
+            news(check)
+            check += HAND_CHECK_US
+        if hand["confidence"] < HAND_SURE or not all(0 <= hand[k] <= 1 for k in ("x", "y", "size", "confidence")):
+            continue
+        newest = (hand, hand["t"])
+        news(hand["t"])
+    while newest is not None:
+        news(check)
+        check += HAND_CHECK_US
+    return events
+
 
 def _whole(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
@@ -146,11 +250,15 @@ class FakeLamp:
         name: str = "Fake lamp",
         auto_done: bool = True,
         refuses: dict[str, str] | None = None,
+        follows_hand: bool = True,
     ):
         self.code = code
         # Ops refused `refused` with this why, as a lamp that doesn't route
         # them yet does (LAMP_CONTROL_REFUSES); none by default.
         self.refuses = dict(refuses or {})
+        # False answers a look at `hand` as a lamp-control from before #4183
+        # does: taken, with no `follow`, and nothing follows it.
+        self.follows_hand = follows_hand
         # gesture, move and play end with `done` at once; False leaves it to
         # the test (`done`).
         self.auto_done = auto_done
@@ -186,6 +294,11 @@ class FakeLamp:
             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
         }
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
+        # Each connection whose head follows the hand (`look` at `hand`) and
+        # its lease, until its stop, another look, or the lease ends; and the
+        # last hand said.
+        self.following: dict[int, tuple[ServerConnection, str]] = {}
+        self.hand: dict | None = None
         self._connections: set[ServerConnection] = set()
         self._next_lease = 1
         self._server = None
@@ -256,6 +369,32 @@ class FakeLamp:
             own["shows"] = {key: own[key] for key in ("on", "colour", "level") if key in own}
         return own or None
 
+    async def emit_hand_track(self, track: list[dict], *, realtime: bool = False) -> None:
+        """Say a `humans/hands/tracked` track (`hand_track`) as lamp-control
+        would (`hand_events`): `hand` events by change, at most four a second,
+        and `seen: false` once the hand is gone. `realtime` paces them by the
+        track's clock; without it they go as fast as they can. A lost hand
+        doesn't end a following: the head waits for it, as the lamp's does."""
+        started = asyncio.get_running_loop().time()
+        first = track[0]["t"] if track else 0
+        for at, event in hand_events(track):
+            if realtime:
+                await asyncio.sleep(max(0.0, started + (at - first) / 1e6 - asyncio.get_running_loop().time()))
+            self.hand = event if event["seen"] else None
+            await self.emit("hand", **event)
+
+    def stop_following(self, ws: ServerConnection | None = None) -> None:
+        """End the following of `ws` (or of every connection). lamp-control
+        says nothing for it: the head just stops following."""
+        for key, (held_ws, _lease) in list(self.following.items()):
+            if ws is None or held_ws is ws:
+                del self.following[key]
+
+    def _unfollow(self, lease: str) -> None:
+        for key, (_ws, held) in list(self.following.items()):
+            if held == lease:
+                del self.following[key]
+
     async def lease_event(self, lease: str, state: str, why: str | None = None) -> None:
         """Tell a lease's holder its lease is `held`, `suspended` or `lost`
         (and, lost, end it here), as the lamp would."""
@@ -268,6 +407,8 @@ class FakeLamp:
         if why is not None:
             event["why"] = why
         await holder["ws"].send(json.dumps(event))
+        if state == "lost":
+            self._unfollow(lease)
 
     async def lose_lease(self, lease: str, why: str = "hand") -> None:
         """The lamp takes a lease back, as a hand on the head would."""
@@ -337,6 +478,7 @@ class FakeLamp:
         finally:
             self._connections.discard(ws)
             self.subscribed.pop(id(ws), None)
+            self.following.pop(id(ws), None)
             for lease in [l for l, held in self.leases.items() if held["ws"] is ws]:
                 self.leases.pop(lease)
 
@@ -441,6 +583,11 @@ class FakeLamp:
         elif op == "lease.release":
             self.leases.pop(request["lease"], None)
             await self._ok(ws, id_)
+            self._unfollow(request["lease"])
+        elif op == "stop":
+            # The holder's stop ends its following, as any of its actions.
+            self.stop_following(ws)
+            await self._ok(ws, id_)
         elif op in ("gesture", "move"):
             # As lamp-control routes them: the body takes them, and no
             # `done` follows.
@@ -481,7 +628,17 @@ class FakeLamp:
             if isinstance(request["at"], str) and request["at"] in LOOK_WAITS:
                 await self._refuse(ws, id_, "refused", LOOK_WAITS[request["at"]])
                 return
+            # Another look ends a following. At `hand`, the body follows the
+            # hand, waiting while it's gone; `follows_hand=False` is a
+            # lamp-control from before #4183, which takes the look without
+            # saying it follows.
+            self.stop_following(ws)
+            if request["at"] == "hand" and not self.follows_hand:
+                await self._ok(ws, id_)
+                return
             if request["at"] == "hand":
+                lease = next(l for l, h in self.leases.items() if h["ws"] is ws and "body" in h["parts"])
+                self.following[id(ws)] = (ws, lease)
                 await self._ok(ws, id_, to="body", follow="hand")
                 return
             await self._ok(ws, id_, to="body")

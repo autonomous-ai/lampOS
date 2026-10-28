@@ -5,14 +5,18 @@
 import { Lamp } from './client.js';
 import { Keyring } from './keys.js';
 import * as schema from './schema.js';
-import { FakeLamp, LAMP_CONTROL_REFUSES } from './testing.js';
+import { FakeLamp, LAMP_CONTROL_REFUSES, handTrack } from './testing.js';
 
 const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
 
 // `everything`: answer every op; by default it refuses what lamp-control
-// doesn't route yet, as a lamp does.
-export async function fake({ every = 10, cycles, everything = false } = {}) {
-  const refuses = everything ? {} : LAMP_CONTROL_REFUSES;
+// doesn't route yet, as a lamp does. `hands`: a hand waves for 3 s after each
+// arrival, and looks are answered, as on a lamp with the body's lease socket
+// (examples/follow-hand.js).
+export async function fake({ every = 10, cycles, everything = false, hands = false } = {}) {
+  const refuses = everything ? {} : { ...LAMP_CONTROL_REFUSES };
+  // A lamp with the body's lease socket, which a look at the hand needs.
+  if (hands) delete refuses.look;
   const lamp = await FakeLamp.start({ grants: schema.grants, name: 'Fake lamp (lamp fake)', refuses });
   try {
     const keyring = new Keyring();
@@ -29,6 +33,10 @@ export async function fake({ every = 10, cycles, everything = false } = {}) {
         await sleep(every / 3);
         lamp.emit(event, fields);
         console.log(`said ${event}`);
+        if (hands && event === 'person.arrived') {
+          await lamp.emitHandTrack(handTrack('wave', { seconds: 3, seed: cycle }), { realtime: true });
+          console.log('said a hand waving for 3 s, then gone');
+        }
         for (const { id, ...request } of lamp.requests.slice(shown)) console.log('  asked', JSON.stringify(request));
         shown = lamp.requests.length;
       }

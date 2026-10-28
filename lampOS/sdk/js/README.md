@@ -43,7 +43,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 ```
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
-example runs this way: `greet.js`, `follow.js`, `phrase.js`, `pomodoro.js`,
+example runs this way: `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `phrase.js`, `pomodoro.js`,
 `ci-light.js`.
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
@@ -120,8 +120,26 @@ await lamp.closed();
 - **Leases:** `await lamp.withLease(['body'], async (lease) => ...)` holds
   the body for looks, moves and joints, renewed for you, until the callback
   ends or the lamp takes it back: `lease.state`, `lease.lostWhy`.
+- **Following a hand:** `const following = await lamp.followHand().start()`
+  (or `lamp.withHand(async (following) => ...)`) has the body follow the
+  hand it sees, under a body lease of its own, waiting while the hand is
+  gone, until `following.stop()`, `lamp.stop()`, another `lamp.look(...)`,
+  or the lamp takes the body back. lamp-control answers it `{"to":"body",
+  "follow":"hand"}` with no `done`, so `following.wait()` is told here:
+  `how` and `why`. Needs `body` and `look`; each start is a look, held to
+  the motion rate (one in 2 s). See `examples/follow-hand.js`.
+  A lamp that takes the look without answering `follow: "hand"` (a
+  lamp-control from before #4183) is refused, "this lamp doesn't follow a
+  hand yet", and the lease let go.
 - **Refusals** reject with typed errors: `byCode.rate` (with `retryMs`),
   `byCode.no_grant`, `byCode.private`, ...
+- **Synthetic hands:** `handTrack(path, { seconds, hz, seed })` from
+  `lampos/testing` makes a track in `humans/hands/tracked`'s shape (`t` in
+  µs), `handEvents(track)` the `hand` events lamp-control's watch.rs tells
+  for it (by change, at most four a second, rounded to 2 places,
+  `seen: false` 1 s after the last), and `fake.emitHandTrack(track, {
+  realtime })` says them. `lamp fake --hands` waves a hand for 3 s after
+  each arrival and answers a look at it.
 - **In your tests:** `FakeLamp` from `lampos/testing` is the same fake lamp:
   `emit`, `refuseNext`, `done`, `leaseEvent`, `requests`, `received`. Its
   `light` keeps lamp-control's pattern levels (a `breathe` at level 1 is refused)
@@ -253,6 +271,7 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.express(feeling, strength)` | `feeling`: `glad`, `lively` or `low`. `strength`: 0–1, default 0.5 | `body` and `light` | no | 1 a minute |
 | `lamp.gesture(name, { wait })` | `name`: `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (never `idle` or `scanning`) | `body` | no | motion: 1 every 2 s |
 | `lamp.look(at)` | `at`: `'face'` (needs `look` too), `'hand'` (needs `look` too: the body follows the hand in view until another look, a `stop` or the lease ends; answered `{"to":"body","follow":"hand"}`, no `done`; needs the body's lease socket on the lamp), `'name'`, `'ahead'`, or `{ yaw, pitch }` in degrees, −180 to 180 and −90 to 90, right and up positive | `body` | `body` | motion |
+| `lamp.followHand({ forMs, why })`, `lamp.withHand(body, options)` | `await lamp.followHand().start()` then `await following.stop()`, or `lamp.withHand(async (following) => ...)`: a `look` at `'hand'` under a body lease of its own (`forMs`, default 10,000, renewed), until `stop()`, another look, or the lamp takes the body back. `following.ended` says how: `finished`/`stopped`, or `cut_short` with the why. A lamp that takes the look without following (before #4183) is `refused`, and the lease let go. Where the hand is comes as `hand` events | `body`, `look` | its own | motion |
 | `lamp.move(frames, stepMs, { wait })` | `frames`: 2–500 frames of 5 joints in counts from home, the first and last all 0. `stepMs`: 40–1,000, and 1.5 to 10 s in all. Each joint within the body's reach and speed, else `bad_request` in the body's words | `body` | `body` | motion |
 | `lamp.play(name, { wait })` | `name`: a move of your installed package | `body` | `body` | motion |
 | `lamp.joints(lease, withinMs, targets)` | `lease`: your held `body` lease. `withinMs`: up to 5,000. `targets`: `{ pitch, roll, yaw, shoulder, elbow }` in degrees, −180 to 180, at least one | `body` | `body` (named) | 20 a second |
@@ -274,7 +293,7 @@ for `rate`, `retryMs`: `unpaired`, `no_hello`, `no_grant`, `no_lease`,
 | `lamp find` | none: lamps on this network by mDNS |
 | `lamp pair CODE --pin PIN [--host HOST] [--port 7731] [--name NAME]` | `CODE`: the 8-digit code. `--pin`: the 64-hex pin the app shows (required). `--host`: the address, found by mDNS without it, by the pin's first 16 hex. `--port`: 7731. `--name`: this computer's name in the app |
 | `lamp hello [LAMP_ID]` | a paired lamp's id, or the only one: connects and shows its grants |
-| `lamp fake [--every 10] [--cycles N] [--everything]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet |
+| `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
 
 `lamp skill check` is the Python SDK's. `LAMPOS_HOME` sets where the key and
 pairings are kept, for every command.
