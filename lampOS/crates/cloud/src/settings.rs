@@ -373,6 +373,7 @@ pub fn ask_wifi(
     socket: &std::path::Path,
     line: &str,
     wait: Duration,
+    ack_wait: Duration,
     link: &WifiLink,
     request_id: Option<String>,
     mut say: impl FnMut(&str, Result<Option<Value>, String>),
@@ -414,7 +415,7 @@ pub fn ask_wifi(
         let (events, heard) = std::sync::mpsc::channel::<Event>();
         link.await_ack(WIFI_KIND, events);
         say(WIFI_KIND, result);
-        let acked = matches!(heard.recv_timeout(WIFI_RESULT_ACK_WAIT), Ok(Event::Acked));
+        let acked = matches!(heard.recv_timeout(ack_wait), Ok(Event::Acked));
         link.stop_awaiting_ack();
         if !acked {
             link.want_relink();
@@ -654,6 +655,10 @@ pub struct Changes {
     /// A keys request is under way: a second fails `busy` (#2094).
     keys_busy: Arc<AtomicBool>,
     done: Arc<Mutex<Vec<Outcome>>>,
+    /// How long a failure with no join waits for the broker's ack before
+    /// the link is made again: [`WIFI_RESULT_ACK_WAIT`], shorter only in
+    /// this file's tests (#1806).
+    result_ack_wait: Duration,
 }
 
 impl Changes {
@@ -687,7 +692,23 @@ impl Changes {
             wifi_link: Arc::default(),
             keys_busy: Arc::default(),
             done: Arc::default(),
+            result_ack_wait: WIFI_RESULT_ACK_WAIT,
         })
+    }
+
+    /// [`Changes::with_wifi`], a failure's ack waited for only `ack_wait`.
+    #[cfg(test)]
+    fn with_wifi_result_ack_wait(
+        socket: impl Into<PathBuf>,
+        wait: Duration,
+        wifi: Option<(PathBuf, Duration)>,
+        ack_wait: Duration,
+    ) -> Arc<Self> {
+        let mut changes = Self::with_wifi(socket, wait, wifi);
+        Arc::get_mut(&mut changes)
+            .expect("just made")
+            .result_ack_wait = ack_wait;
+        changes
     }
 
     /// The product's: the helpers' sockets, the Wi-Fi's only when `wifi`,
@@ -787,6 +808,7 @@ impl Changes {
         }
         let (done, busy) = (self.done.clone(), self.wifi_busy.clone());
         let link = self.wifi_link.clone();
+        let ack_wait = self.result_ack_wait;
         std::thread::spawn(move || {
             let say = |kind: &str, result| {
                 if let Ok(mut done) = done.lock() {
@@ -798,7 +820,15 @@ impl Changes {
                     });
                 }
             };
-            ask_wifi(&socket, &line, wait, &link, request_id.clone(), say);
+            ask_wifi(
+                &socket,
+                &line,
+                wait,
+                ack_wait,
+                &link,
+                request_id.clone(),
+                say,
+            );
             busy.store(false, Ordering::Release);
         });
         Ok(())
@@ -1793,8 +1823,17 @@ mod tests {
         for ack in [false, true] {
             let path = socket(&format!("no-ack-{ack}"));
             let serving = helper(&path, Duration::ZERO, wrong);
-            let changes =
-                Changes::with_wifi(socket("names"), WAIT, Some((path.clone(), WIFI_WAIT)));
+            // The product's 5 s wait, shortened for this test only (#1806):
+            // the relink is still decided by the ack, not by the time. A
+            // second leaves the acked case's ack, sent once the result is
+            // seen, room on a loaded runner.
+            let ack_wait = Duration::from_secs(1);
+            let changes = Changes::with_wifi_result_ack_wait(
+                socket("names"),
+                WAIT,
+                Some((path.clone(), WIFI_WAIT)),
+                ack_wait,
+            );
             changes.set_broker("broker.test", 1883);
             changes
                 .start_wifi(&json!({"ssid": "New Home", "password": FAKE_PASSWORD}))
@@ -1805,7 +1844,7 @@ mod tests {
             if ack {
                 changes.acked(&failed);
             }
-            let until = Instant::now() + WIFI_RESULT_ACK_WAIT + Duration::from_millis(500);
+            let until = Instant::now() + ack_wait + Duration::from_millis(500);
             // The worker clears busy after resolving the ack and asking for any
             // relink. Observe that completion before checking the final result.
             while changes.wifi_busy.load(Ordering::Acquire) {
