@@ -189,6 +189,9 @@ struct Look {
     /// Every passing id in this look, speaking or not
     /// ([`SpeakingFaces::in_view_at`]).
     tracked: Vec<String>,
+    /// The faces whose mouth read still (`no`), turned to the lamp or not
+    /// ([`SpeakingFaces::alone_in_view`]).
+    still: Vec<String>,
     /// Of those, the ones turned to the lamp (`facing`), for a line the lamp
     /// began itself (#2287's follow-up, [`SpeakingFaces::turned_speakers`]).
     turned: Vec<String>,
@@ -270,6 +273,19 @@ impl SpeakingFaces {
         let tracked = frame
             .map(|(_, faces)| faces.faces.iter().map(|face| face.id.clone()).collect())
             .unwrap_or_default();
+        let still = frame
+            .map(|(_, faces)| {
+                faces
+                    .faces
+                    .iter()
+                    .filter(|face| {
+                        face.speaking
+                            .is_some_and(|speaking| speaking.state == SpeakingState::No)
+                    })
+                    .map(|face| face.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
         let turned = speaking_faces
             .iter()
             .filter(|face| face.facing == Some(true))
@@ -321,6 +337,7 @@ impl SpeakingFaces {
             boot,
             speaking,
             tracked,
+            still,
             turned,
             turned_silent,
             turned_unread,
@@ -445,6 +462,36 @@ impl SpeakingFaces {
                         .any(|id| format!("{}/{id}", look.boot) == face)
                 })
         })
+    }
+
+    /// Whether the face `face` (`boot/f3`, [`Self::known_with_boot`]) was
+    /// the only face in view through a line from `from` to `to`, and not
+    /// read still: in each of at least [`FEWEST_LOOKS`] of the eyes' own
+    /// looks it was the one face tracked, and its mouth read still in under
+    /// half of them (a voice off camera while they sit silent is not
+    /// theirs). On lamp-3e83 (stable 8163, 28 Oct
+    /// 16:30) the known person alone at the lamp had about half their lines
+    /// read with no face speaking (a mouth not read often enough), so kept
+    /// as the room's, and the lamp forgot their name (#3437's follow-up).
+    /// Looks the eyes published nothing fresh in say nothing either way.
+    pub fn alone_in_view(&self, face: &str, from: Instant, to: Instant) -> bool {
+        let Ok(looks) = self.looks.lock() else {
+            return false;
+        };
+        let during: Vec<_> = looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= from && look.at <= to && !look.boot.is_empty())
+            .collect();
+        let own = |look: &Look, ids: &[String]| {
+            ids.iter().any(|id| format!("{}/{id}", look.boot) == face)
+        };
+        let still = during.iter().filter(|look| own(look, &look.still)).count();
+        during.len() >= FEWEST_LOOKS
+            && during
+                .iter()
+                .all(|look| look.tracked.len() == 1 && own(look, &look.tracked))
+            && still * 2 < during.len()
     }
 
     /// Whether the person the eyes know at the lamp now (`known`, its face
@@ -662,28 +709,41 @@ pub fn someone_elses(speakers: &[String], person: &str, known: Option<(String, S
 /// scope taken from a line goes through (the line's own admission and a
 /// late look's keeper, `second_provider`). With `seen_only`
 /// (`LAMP_PERSON_SCOPE_SEEN=on`), unless their own face alone was seen
-/// speaking it ([`seen_saying`]): no face seen speaking is not theirs
-/// (reviewer-three's P1 and P2 on #3435). Without it, only when another
-/// face was ([`someone_elses`]), as before.
+/// speaking it ([`seen_saying`]), or no face was seen speaking it and the
+/// known face, theirs, was `alone` in view through it
+/// ([`SpeakingFaces::alone_in_view`], lamp-3e83 on 28 Oct): otherwise no
+/// face seen speaking is not theirs (reviewer-three's P1 and P2 on #3435).
+/// Without it, only when another face was ([`someone_elses`]), as before.
 pub fn not_theirs(
     speakers: &[String],
     person: &str,
     known: Option<(String, String)>,
     seen_only: bool,
+    alone: bool,
 ) -> bool {
     if seen_only {
-        !seen_saying(speakers, person, known)
+        let theirs_alone = speakers.is_empty()
+            && alone
+            && known
+                .as_ref()
+                .is_some_and(|(name, _)| crate::known_faces::memory_person(name) == person);
+        !(theirs_alone || seen_saying(speakers, person, known))
     } else {
         someone_elses(speakers, person, known)
     }
 }
 
 /// The journal's words for who was seen speaking a line admitted as a known
-/// person's, given whether it stayed `theirs` ([`not_theirs`]): the passing
-/// face ids only, never a name or the line's words. `None` when no face was
-/// seen speaking it and it stayed theirs (the switch off): nothing to tell.
-pub fn seen_speaking_note(speakers: &[String], theirs: bool) -> Option<String> {
+/// person's, given whether it stayed `theirs` ([`not_theirs`]) and whether
+/// their face was `alone` in view: the passing face ids only, never a name
+/// or the line's words. `None` when no face was seen speaking it and it
+/// stayed theirs with the switch off: nothing to tell.
+pub fn seen_speaking_note(speakers: &[String], theirs: bool, alone: bool) -> Option<String> {
     match (speakers, theirs) {
+        ([], true) if alone => Some(
+            "no face was seen speaking it, the known person's face alone in view (LAMP_PERSON_SCOPE_SEEN)"
+                .to_owned(),
+        ),
         ([], true) => None,
         ([], false) => Some("no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)".to_owned()),
         ([id], true) => Some(format!(
@@ -711,16 +771,16 @@ mod tests {
         let known = || Some(("A".to_owned(), "f1".to_owned()));
         let ids = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
         // On: only their own face seen speaking keeps it theirs.
-        assert!(not_theirs(&ids(&[]), &lan, known(), true));
-        assert!(!not_theirs(&ids(&["f1"]), &lan, known(), true));
-        assert!(not_theirs(&ids(&["f2"]), &lan, known(), true));
-        assert!(not_theirs(&ids(&["f1", "f2"]), &lan, known(), true));
-        assert!(not_theirs(&ids(&["f1"]), &lan, None, true));
+        assert!(not_theirs(&ids(&[]), &lan, known(), true, false));
+        assert!(!not_theirs(&ids(&["f1"]), &lan, known(), true, false));
+        assert!(not_theirs(&ids(&["f2"]), &lan, known(), true, false));
+        assert!(not_theirs(&ids(&["f1", "f2"]), &lan, known(), true, false));
+        assert!(not_theirs(&ids(&["f1"]), &lan, None, true, false));
         // Off: exactly `someone_elses`.
         for speakers in [&[][..], &["f1"], &["f2"], &["f1", "f2"]] {
             for pair in [known(), None] {
                 assert_eq!(
-                    not_theirs(&ids(speakers), &lan, pair.clone(), false),
+                    not_theirs(&ids(speakers), &lan, pair.clone(), false, false),
                     someone_elses(&ids(speakers), &lan, pair),
                 );
             }
@@ -735,7 +795,11 @@ mod tests {
         let ids = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
         let note = |speakers: &[&str]| {
             let speakers = ids(speakers);
-            seen_speaking_note(&speakers, !not_theirs(&speakers, &lan, known(), true))
+            seen_speaking_note(
+                &speakers,
+                !not_theirs(&speakers, &lan, known(), true, false),
+                false,
+            )
         };
         assert_eq!(
             note(&["b/f1"]).as_deref(),
@@ -754,7 +818,7 @@ mod tests {
             Some("no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)")
         );
         // Off, no face seen leaves it theirs: nothing to tell.
-        assert_eq!(seen_speaking_note(&[], true), None);
+        assert_eq!(seen_speaking_note(&[], true, false), None);
         for speakers in [&[][..], &["b/f1"], &["b/f2"], &["b/f1", "b/f2"]] {
             let note = note(speakers).unwrap_or_default();
             assert!(!note.contains(name) && !note.contains(&lan), "{note}");
@@ -797,6 +861,71 @@ mod tests {
     }
 
     use SpeakingState::{No, Unknown, Yes};
+
+    /// lamp-3e83 (stable 8163, 28 Oct 16:30): the known person alone at the
+    /// lamp, their mouth not read speaking often enough, had about half
+    /// their lines kept as the room's. Their face the one in view through
+    /// the line, not read still, keeps the line theirs; another face in any
+    /// look, too few looks, their face read still, another person known, or
+    /// a face seen speaking that isn't theirs does not.
+    #[test]
+    fn a_line_no_face_was_seen_speaking_is_theirs_when_their_face_alone_was_in_view() {
+        let lan = crate::known_faces::memory_person("A");
+        let known = || Some(("A".to_owned(), "b/f1".to_owned()));
+        // Unread or read speaking now and then, never the half: no speaker.
+        let (eyes, from, to) = seen(&[
+            &[("f1", Unknown)],
+            &[("f1", Yes)],
+            &[("f1", Unknown)],
+            &[("f1", Unknown)],
+        ]);
+        let speakers = eyes.speakers_with_boot(from, to);
+        assert!(speakers.is_empty());
+        let alone = eyes.alone_in_view("b/f1", from, to);
+        assert!(alone);
+        assert!(!not_theirs(&speakers, &lan, known(), true, alone));
+        assert_eq!(
+            seen_speaking_note(&speakers, true, alone).as_deref(),
+            Some(
+                "no face was seen speaking it, the known person's face alone in view (LAMP_PERSON_SCOPE_SEEN)"
+            )
+        );
+        // Without their face alone, as before: the room's.
+        assert!(not_theirs(&speakers, &lan, known(), true, false));
+        // Someone else known now, or nobody: not theirs.
+        let other = Some(("B".to_owned(), "b/f1".to_owned()));
+        assert!(not_theirs(&speakers, &lan, other, true, alone));
+        assert!(not_theirs(&speakers, &lan, None, true, alone));
+        // Another face seen speaking it: not theirs, alone or not.
+        assert!(not_theirs(&["b/f2".to_owned()], &lan, known(), true, true));
+        // Off: unchanged.
+        assert!(!not_theirs(&speakers, &lan, known(), false, alone));
+        // A second face in one look: not alone.
+        let (eyes, from, to) = seen(&[
+            &[("f1", Unknown)],
+            &[("f1", Unknown), ("f2", Unknown)],
+            &[("f1", Unknown)],
+        ]);
+        assert!(!eyes.alone_in_view("b/f1", from, to));
+        // Too few looks.
+        let (eyes, from, to) = seen(&[&[("f1", Unknown)], &[("f1", Unknown)]]);
+        assert!(!eyes.alone_in_view("b/f1", from, to));
+        // Their mouth read still through most of it: a voice off camera.
+        let (eyes, from, to) = seen(&[
+            &[("f1", No)],
+            &[("f1", No)],
+            &[("f1", Unknown)],
+            &[("f1", No)],
+        ]);
+        assert!(!eyes.alone_in_view("b/f1", from, to));
+        // Another face alone, or theirs from another boot: not theirs.
+        let (eyes, from, to) = seen(&[&[("f2", Unknown)][..]; 4]);
+        assert!(!eyes.alone_in_view("b/f1", from, to));
+        assert!(!eyes.alone_in_view("a/f2", from, to));
+        // Nobody in view at all.
+        let (eyes, from, to) = seen(&[&[][..]; 4]);
+        assert!(!eyes.alone_in_view("b/f1", from, to));
+    }
 
     #[test]
     fn remember_speaker_rejects_a_competitor_seen_once() {

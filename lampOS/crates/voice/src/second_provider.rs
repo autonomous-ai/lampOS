@@ -1125,16 +1125,24 @@ async fn line_sight(
     begun: Instant,
     finishing: Instant,
     seen_only: bool,
-) -> (crate::speaking_faces::Speakers, Option<(String, String)>) {
+) -> (
+    crate::speaking_faces::Speakers,
+    Option<(String, String)>,
+    bool,
+) {
     let known = known.to_owned();
     if seen_only {
         let speakers = eyes.speakers_with_boot(begun, finishing);
-        let eyes = eyes.clone();
-        let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
+        let eyes_now = eyes.clone();
+        let pair = tokio::task::spawn_blocking(move || eyes_now.known_with_boot(&known))
             .await
             .ok()
             .flatten();
-        (speakers, pair)
+        // The known face the only one in view through the line (lamp-3e83).
+        let alone = pair
+            .as_ref()
+            .is_some_and(|(_, face)| eyes.alone_in_view(face, begun, finishing));
+        (speakers, pair, alone)
     } else {
         let speakers = eyes.speakers(begun, finishing);
         let pair =
@@ -1142,7 +1150,7 @@ async fn line_sight(
                 .await
                 .ok()
                 .flatten();
-        (speakers, pair)
+        (speakers, pair, false)
     }
 }
 
@@ -5111,11 +5119,16 @@ async fn spoken(
             .map(str::to_owned)
         && let Some(why) = match &shared.speaking {
             Some((eyes, known)) => {
-                let (speakers, pair) =
+                let (speakers, pair, alone) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
-                let theirs =
-                    !crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen);
-                let note = crate::speaking_faces::seen_speaking_note(&speakers, theirs);
+                let theirs = !crate::speaking_faces::not_theirs(
+                    &speakers,
+                    &person,
+                    pair,
+                    shared.scope_seen,
+                    alone,
+                );
+                let note = crate::speaking_faces::seen_speaking_note(&speakers, theirs, alone);
                 // Kept as theirs: one line saying whose face it was, so a
                 // journal with two faces in view tells which one it went to.
                 if theirs && let Some(note) = &note {
@@ -5152,9 +5165,10 @@ async fn spoken(
             let found = late_face.await.ok().flatten();
             let keeper = match (found, speaking) {
                 (Some(person), Some((eyes, known))) => {
-                    let (speakers, pair) =
+                    let (speakers, pair, alone) =
                         line_sight(&eyes, &known, begun, finishing, seen_only).await;
-                    if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only) {
+                    if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only, alone)
+                    {
                         eprintln!(
                             "lamp-voice second: request {request}: {}: its keep stays the room's",
                             if speakers.is_empty() {
