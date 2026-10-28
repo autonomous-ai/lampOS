@@ -27,14 +27,14 @@ SUMMARISED = frozenset({"text", "data"})
 # an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
 # phrase, events' fields, and a refusal's `why`.
 SHOWN = frozenset({
-    "asleep", "at", "class", "client", "code", "colour", "count", "elbow", "error", "ev", "events",
-    "express", "facing", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
+    "asleep", "at", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
+    "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
-    "mood", "most", "motion", "name", "near", "ok", "op", "parts", "pattern", "paused", "phrase",
+    "mood", "most", "motion", "name", "near", "ok", "op", "open", "parts", "pattern", "paused", "phrase",
     "phrases", "pitch", "presence", "press", "private", "push", "quiet_hours", "re", "refused",
-    "retry_ms", "roll", "say", "say_max_chars", "score", "shoulder", "side", "skill", "skills",
-    "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "until", "v", "where",
-    "why", "within_ms", "yaw"
+    "retry_ms", "roll", "say", "say_max_chars", "score", "seen", "shoulder", "side", "size", "skill", "skills",
+    "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "to", "until", "v", "where",
+    "why", "within_ms", "x", "y", "yaw"
 })
 # A said text's tag is keyed with this process's own random key: the same text
 # gives the same tag within a run, and nobody holding the log can test a guess.
