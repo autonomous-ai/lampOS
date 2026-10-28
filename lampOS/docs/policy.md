@@ -1018,7 +1018,8 @@ budget and requested slow model. `judges-YYYY-MM-DD.jsonl` contains:
   `late_or_closed` also includes a reply after an early superseding choice;
   the times distinguish it from a wall-clock deadline miss.
 - `choice`: exactly one final choice per decided utterance, both judge
-  slots (which may say pending, failed or busy), probabilities, guard,
+  slots (each with a `status`: `answered`, `failed`, `pending`, `late`,
+  `remote_busy`, `worker_gone` or `deadline_before_remote`), probabilities, guard,
   context, request if supplied, comparison snapshot and exact boundaries.
 - `shutdown`: comparison totals, failures, any unobserved slow request and
   still-open outcome. These are not silently labelled completed/silent.
