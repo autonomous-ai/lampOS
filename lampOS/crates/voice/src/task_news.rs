@@ -833,6 +833,23 @@ impl TaskNews {
         }
     }
 
+    /// News whose turn played through with a gap, not whole (`coordinator`,
+    /// #4035): not heard, so neither told nor closed, and told again later
+    /// as now. But a made skill's question in it was said aloud, so it is
+    /// kept as asked ([`asked`]), what the person's yes is held to
+    /// (fourteen-P10 on #2814). On a thread of its own: never waits.
+    pub fn played_through(&self, keys: Vec<String>) {
+        let _ = std::thread::Builder::new()
+            .name("lamp-voice-news-played-through".into())
+            .spawn(move || {
+                // As the heard news' own thread finds it.
+                let made = crate::made_skill::Keeping::from_environment();
+                for key in keys {
+                    asked(made.as_ref(), &key);
+                }
+            });
+    }
+
     /// The news waiting to be told, if any. Call every tick: it never blocks.
     pub fn waiting(&mut self) -> Option<&News> {
         while let Ok(news) = self.offered.try_recv() {

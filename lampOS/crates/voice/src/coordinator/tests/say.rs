@@ -409,6 +409,43 @@ fn news_not_heard_whole_is_never_handed_on() {
     assert!(gap.heard.is_empty());
 }
 
+/// fourteen-P10 on #2814 (lamp-9adf, 28 Oct 17:07): news played to its end
+/// with a gap, nobody's turn over it, is played through though not heard
+/// whole, so a made skill's question in it counts as asked; whole is heard,
+/// and none of it is played through; with no audio, neither.
+#[test]
+fn news_played_through_with_a_gap_is_played_through_not_heard() {
+    for (gaps, audio) in [(1, true), (0, true), (0, false)] {
+        let mut test = Test::new();
+        telling_news(&mut test);
+        if audio {
+            let chunk = test.generation(17);
+            test.accept(&chunk, 240);
+            test.retire(&chunk);
+        }
+        test.provider_complete();
+        let current = test.reply.as_mut().unwrap();
+        current.playback_gaps = gaps;
+        assert!(current.settled(&test.pending));
+        test.owner.complete_turn(now(), current.owner).unwrap();
+        test.snapshot = test.owner.snapshot(now()).unwrap();
+        let through = current.news_played_through(&test.pending, test.snapshot);
+        let heard = current.heard_news(&test.pending, test.snapshot);
+        let case = format!("{gaps} gap(s), audio {audio}");
+        match (gaps, audio) {
+            (1, _) => {
+                assert_eq!(through, NEWS, "{case}");
+                assert!(heard.is_empty(), "{case}: its harness stays open");
+            }
+            (_, true) => {
+                assert!(through.is_empty(), "{case}");
+                assert_eq!(heard, NEWS, "{case}");
+            }
+            _ => assert!(through.is_empty() && heard.is_empty(), "{case}"),
+        }
+    }
+}
+
 /// #939, (c): with the switch, a due reminder or news waits for a skill's
 /// ask, at most `SKILL_WAITS_US` from when it was first held: taken with
 /// the ask's ticket when one is there, said by the voice once it has

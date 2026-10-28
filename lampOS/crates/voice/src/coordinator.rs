@@ -1181,6 +1181,29 @@ impl Reply {
         }
     }
 
+    /// The news this turn told when it played through but not whole: every
+    /// word played, with a gap, and nobody's turn taken over it
+    /// ([`Self::heard_through`], #4035). That is no news heard, so its
+    /// harness stays open; but a made skill's question in it was said
+    /// aloud, so a yes to it counts (fourteen-P10 on #2814: a yes refused
+    /// after a question said whole with a gap). The gaps are the lamp's own
+    /// word tails, nothing the person did. Call before [`Self::heard_news`],
+    /// which takes the news.
+    fn news_played_through(
+        &self,
+        speaker_pending: &Option<PendingSpeaker>,
+        snapshot: Snapshot,
+    ) -> Vec<String> {
+        if self.news.is_empty()
+            || self.heard_whole(speaker_pending, snapshot)
+            || self.requested_audio_heard_whole(speaker_pending, snapshot)
+            || !self.heard_through(speaker_pending, snapshot)
+        {
+            return Vec::new();
+        }
+        self.news.clone()
+    }
+
     /// The news this turn told, as it ends: all of it when the turn was
     /// heard whole ([`Self::heard_whole`], the proof a say's `spoken`
     /// takes), including a requested recording that also retired whole.
@@ -10351,6 +10374,12 @@ fn conversation_with_gate_inner(
                     walk.invitation_finished(current.owner.boot(), turn, delivery, monotonic_us());
                 }
                 onboarding_invitation_turn = None;
+            }
+            let through = current.news_played_through(&speaker_pending, snapshot);
+            if !through.is_empty()
+                && let Some(news) = task_news.as_ref()
+            {
+                news.played_through(through);
             }
             let heard = current.heard_news(&speaker_pending, snapshot);
             if !heard.is_empty()

@@ -1940,7 +1940,13 @@ happens:
    - The ask is kept beside the package (`offered_at_unix_ms` in
      `made.json`, `made_skill::asked`) when the news is heard whole at the
      lamp, or given in a text, never when it is read: the lamp tells it
-     later, at a good moment. The news is told in the voice's own process,
+     later, at a good moment. It is kept too when the news played through
+     with a gap: every word played, nobody's turn over it
+     (`news_played_through`, `TaskNews::played_through`). That news isn't
+     heard, so its harness stays open, but the question was said, so a yes
+     to it counts (fourteen-P10 on #2814: on lamp-9adf a yes was refused
+     after the question played whole with a gap). A turn cut short, or one
+     with no audio, still asks nothing. The news is told in the voice's own process,
      and the yes comes to the worker that runs the call.
 7. **Put on at a spoken yes** (the lead, 20 Oct 08:37 on #1711: a spoken
    yes bound to the SHA-256, an exception to the 18:33 "only signed
@@ -2017,7 +2023,8 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
 3. **Told aloud.** The hand-over is never kept as typed
    (`task_news::keep_typed`), so its news ("… Shall I put it on the
    lamp?") is told by the spoken task news at a good moment, with someone
-   there, and the ask is dated only when heard whole (`made_skill::asked`).
+   there, and the ask is dated only when heard whole or played through with
+   a gap (`made_skill::asked`, step 6 above).
    A spoken yes within 120 s puts it on (`put_on_made_skill`, and the
    manage helper's own check, #2874); a no, a typed yes or silence leaves
    it off. What the tasks part settles is settled here too, by the task's
