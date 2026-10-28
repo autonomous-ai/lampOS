@@ -37,9 +37,11 @@ writer is unproved.
   ```
 
   It should print `t` and a number of microseconds that, divided by
-  1,000,000, is about `date +%s` at that `back`'s start. If it says nothing
-  or fails (no D-Bus daemon), #4190 counts every failure as before: post it
-  on #4190.
+  1,000,000, is about `date +%s` at that `back`'s start. If it fails (no
+  D-Bus daemon), run it again with `--address=unix:path=/run/systemd/private`
+  right after `busctl`: #4190 asks systemd's own socket next. Post on #4190
+  which of the two answered. If neither does, #4190 counts every failure as
+  before.
 - Follow a test channel signed with a throwaway key, never the production
   head or key. The product carrier's acceptance
   ([product-carrier-20261025](../product-carrier-20261025/README.md),
