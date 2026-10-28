@@ -143,6 +143,19 @@ contents remain signed inline and use the updater's validation. A missing or
 ambiguous source, unsuccessful run, changed asset or unknown signing key
 cannot update the feed.
 
+**The stable release's notes (#3976).** After a promotion over a previous
+stable, the job's next step (`.github/scripts/lampos-stable-notes.py`, never
+a gate: `continue-on-error`) fills the `lampos-stable` release body's
+`### For developers` part. It gives the source release, the runs, the commit
+and the previous stable's, then lists the pull requests merged between the
+two commits: each commit's pull requests into `lamp-voice`, with a train
+opened into the pull requests its title names. If the body already starts
+`## lampOS build <N>` for this build, written by hand, only that last part
+is replaced. Otherwise it is still the previous build's, and the body
+becomes a fresh header with the developers part, ready for the notes in
+plain words. A build's own release body is never touched: the promote tool
+reads its one line as provenance.
+
 The stable feed is
 `https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/lampos-manifest.json`.
 Its envelope is an exact copy of the selected release's signed bytes. The
