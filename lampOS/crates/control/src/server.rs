@@ -305,6 +305,17 @@ impl Shared {
         })
     }
 
+    /// Events for a client's later answers, as `parts` are given them: the
+    /// body lease's `done` for a `look` (`crate::body_lease::hold`).
+    pub fn events(self: &Arc<Self>) -> crate::parts::Events {
+        let shared = Arc::downgrade(self);
+        Arc::new(move |client: &str, event: Value| {
+            if let Some(shared) = shared.upgrade() {
+                shared.send_to(client, event);
+            }
+        })
+    }
+
     /// Sends `event` to every connection of `client`.
     fn send_to(&self, client: &str, event: Value) {
         for open in self.open.lock().expect("open").values() {
@@ -338,6 +349,18 @@ impl Shared {
             .expect("door")
             .leases()
             .holder(crate::protocol::Part::Body, now)
+            .map(str::to_owned)
+    }
+
+    /// The `body` lease held now, by its id: a look asked under one is
+    /// never sent under another (the Reviewer-lead's P3 on #4023).
+    pub fn body_lease(&self) -> Option<String> {
+        let now = self.now_us();
+        self.door
+            .lock()
+            .expect("door")
+            .leases()
+            .holding(crate::protocol::Part::Body, now)
             .map(str::to_owned)
     }
 

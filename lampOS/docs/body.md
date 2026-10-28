@@ -1885,7 +1885,30 @@ answered `refused` with why and closed. Lines of JSON each way
 |-------|----------|
 | `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
 | `{"let_go":true}` | `{"lease":"free"}` |
+| `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive) or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
+
+**A holder's look** (`lease::Looking`, the protocol's `look`): degrees become
+counts, 4,096 a turn, the base right with more and the head up with fewer
+(every measured `--gaze` yaw is positive; lamp-75c9's base turned away from a
+hand on the right with the sign the other way, 28 Oct). They are
+cut to `--reach`'s yaw (or `--gaze-reach`'s, if larger) and to `--reach`'s up
+and down, and said `clamped` when cut. The body eases the head there as the
+gaze's own look, in the gaze's place, and keeps it there while held: nothing
+of the head rests, relaxes or sleeps meanwhile, and every pose's bounds still
+hold. It is `there` once the head and base are within 6 counts (`THERE_WITHIN`)
+of goals that have not moved for 10 steps (`THERE_STEPS`, 0.2 s). A look not
+there in 5 s (`LONGEST_LOOK`, something holds the head), another look, a
+conversation or the lease's end cuts it short. A conversation keeps the aim for
+when the lease is held again; any other end drops it, and the head goes back
+to the pose's own direction. The head is woken to move only when the look
+changes, so once there it arrives and stops being pushed at as any pose does
+(`a_held_look_arrives_and_stops_being_written`). Each look line is answered
+exactly once and in order, so lamp-control pairs answers with its looks by
+order alone: a line that isn't JSON goes to the lease as any other and is
+`{"lease":"refused"}`, and lamp-control only ever sends well-formed looks.
+Tests: `a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go`,
+`the_lease_door_aims_its_holders_look_and_says_when_it_is_there`.
 
 Said unasked when it changes:
 - `{"lease":"suspended","why":"conversation"}` while the mood is listening,

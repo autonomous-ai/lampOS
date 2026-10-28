@@ -285,6 +285,31 @@ def test_the_fake_answers_express_as_lamp_control_does(tmp_path):
     run(go())
 
 
+def test_the_fake_answers_look_as_lamp_control_does(tmp_path):
+    # blue's P2 and P3 on #4023: `face` and `name` refused in parts.rs's
+    # words; an angle taken by the body, its `done` with where it got to.
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                dones = []
+                lamp.on("done", dones.append)
+                async with lamp.lease("body", for_ms=5000):
+                    for at, why in [("face", "not in this release: look at a face or a name"), ("name", "not in this release: look at a face or a name")]:
+                        with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                            await lamp.look(at)
+                        assert why in raised.value.why
+                    assert (await lamp.look(yaw=-10, pitch=5))["to"] == "body"
+                    for _ in range(50):
+                        if dones:
+                            break
+                        await asyncio.sleep(0.01)
+                (done,) = dones
+                assert (done["how"], done["yaw"], done["pitch"], done["clamped"]) == ("finished", -10.0, 5.0, False)
+
+    run(go())
+
+
 def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
     async def go():
         async with FakeLamp() as fake:
@@ -861,7 +886,7 @@ def test_the_fake_checks_the_lease_before_the_routing_refusal(tmp_path):
                 async with lamp.lease("body", for_ms=5000):
                     with pytest.raises(errors.BY_CODE["refused"]) as raised:
                         await lamp.look("face")
-                    assert raised.value.why.startswith("not routed yet")
+                    assert raised.value.why == "the body's lease socket is not on here"
 
     run(go())
 
