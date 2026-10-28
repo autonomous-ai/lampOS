@@ -606,6 +606,28 @@ impl VoiceTurn {
     }
 }
 
+/// A line the voice held as a remark about the lamp in a busy room
+/// (`voice/remarked`, #4175, `LAMP_REMARK_ABOUT_IT`): "That lamp is cute."
+/// said between two people. It gets no words; Expression may answer it with
+/// one small glance, as a living thing that heard itself mentioned would.
+/// Only the request's number: never its words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VoiceRemarked {
+    /// The line's request, as `voice/heard` and `voice/turn` number it.
+    pub request: u64,
+}
+
+impl VoiceRemarked {
+    pub const TYPE: &str = "lamp_msgs/VoiceRemarked";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/remarked";
+
+    /// One a remark held, as it is held: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
 /// The voice's turns' verdicts (#1155), apart from the first topics.
 pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
     vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
@@ -1926,6 +1948,14 @@ mod tests {
             round_trip(&RoomState { state }, &format!("{{\"state\":\"{word}\"}}"));
         }
         assert!(serde_json::from_str::<RoomState>("{\"state\":\"loud\"}").is_err());
+    }
+
+    /// #4175: a remark held, as Expression's glance reads it.
+    #[test]
+    fn a_remark_held_carries_its_request_alone() {
+        round_trip(&VoiceRemarked { request: 7 }, "{\"request\":7}");
+        assert_eq!(VoiceRemarked::declaration().kind, Kind::Event);
+        assert_eq!(VoiceRemarked::TOPIC, "voice/remarked");
     }
 
     /// #1155: a turn's verdict, as the Policy's hello reads it.

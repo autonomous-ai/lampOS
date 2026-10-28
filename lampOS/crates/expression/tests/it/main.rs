@@ -13,6 +13,7 @@ mod program;
 mod recent_playout;
 mod recent_playout_replay;
 mod recent_playout_runtime;
+mod remark_engine;
 mod replay;
 mod rest_engine;
 mod rest_replay;

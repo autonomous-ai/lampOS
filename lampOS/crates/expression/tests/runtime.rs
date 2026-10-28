@@ -155,6 +155,38 @@ fn two_expression_processes_cannot_own_one_bus() {
     assert!(runtime::Service::new(&bus, Catalogue::builtin(), false, "test").is_ok());
 }
 
+#[test]
+fn the_voices_remarks_are_read_only_with_the_remark_glance() {
+    // #4175: off unless `LAMP_REMARK_GLANCE=on`.
+    use lamp_msgs::VoiceRemarked;
+    let root = Root::new();
+    let bus = Bus::new(&root.0).unwrap();
+    let service = runtime::Service::new(&bus, Catalogue::builtin(), false, "test").unwrap();
+    assert!(
+        bus.subscribers(VoiceRemarked::TOPIC)
+            .unwrap_or_default()
+            .is_empty()
+    );
+    let _service = service.with_remark_glance(&bus).unwrap();
+    assert_eq!(bus.subscribers(VoiceRemarked::TOPIC).unwrap().len(), 1);
+}
+
+#[test]
+fn a_remark_is_aged_by_wall_time() {
+    let mut item = message(
+        "voice/remarked",
+        "lamp_msgs/VoiceRemarked",
+        serde_json::json!({"request":7}),
+    );
+    item.header.kind = Kind::Event;
+    let input = runtime::input_from_message(&item, 500_000, 1_020, "test", 3).unwrap();
+    let lamp_expression::Input::Remarked { stamp, value } = input else {
+        panic!("not a remark: {input:?}");
+    };
+    assert_eq!(stamp.at_us, 480_000);
+    assert_eq!(value.request, 7);
+}
+
 fn message(topic: &str, kind: &str, payload: serde_json::Value) -> Message {
     Message {
         header: Header {

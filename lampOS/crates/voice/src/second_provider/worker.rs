@@ -2918,6 +2918,8 @@ pub fn serve(
             files.bus_root.as_deref(),
         ));
     }
+    // The rule's own, for `voice/remarked` below (#4175).
+    let mut remarked_by: Option<Arc<Mutex<Heeding>>> = None;
     if files.attention {
         let heeding = Arc::new(Mutex::new(Heeding::new(
             files.attention_busy,
@@ -3427,6 +3429,7 @@ pub fn serve(
                 Arc::new(move |request| asked.lock().ok()?.unclear(request)),
             );
         }
+        remarked_by = Some(heeding.clone());
         engine = engine.heeding(Arc::new(move |request, said, heard, from| {
             heeding
                 .lock()
@@ -3440,14 +3443,38 @@ pub fn serve(
             Some(call_note(crate::attention::called_by_name_on(words, true)))
         }));
     }
-    // Each judged turn's verdict on the bus, for the Policy's hello (#1155).
+    // Each judged turn's verdict on the bus, for the Policy's hello (#1155),
+    // and a line held as a remark about the lamp for Expression's glance
+    // (`voice/remarked`, #4175, with `LAMP_REMARK_ABOUT_IT=on` only).
     if let Some(root) = files.bus_root.as_deref() {
         match crate::bus_out::TurnOut::on(root) {
             Ok(out) => {
                 let out = Mutex::new(out);
+                let remarks = crate::remark_about_it::on()
+                    .then(|| crate::bus_out::RemarkOut::on(root))
+                    .and_then(|made| {
+                        made.map_err(|error| {
+                            eprintln!(
+                                "lamp-voice second: remarks held are not published on the bus: {error}"
+                            )
+                        })
+                        .ok()
+                    })
+                    .map(Mutex::new);
+                let heeding = remarked_by.clone();
                 engine = engine.telling_verdicts(Arc::new(move |request, verdict| {
+                    let now_us = lamp_ipc::monotonic_us();
                     if let Ok(mut out) = out.lock() {
-                        out.tell(request, verdict, lamp_ipc::monotonic_us());
+                        out.tell(request, verdict, now_us);
+                    }
+                    let remarked = verdict == lamp_msgs::TurnVerdict::HeldBack
+                        && heeding.as_ref().is_some_and(|heeding| {
+                            heeding
+                                .lock()
+                                .is_ok_and(|heeding| heeding.remarked(request))
+                        });
+                    if remarked && let Some(Ok(mut remarks)) = remarks.as_ref().map(Mutex::lock) {
+                        remarks.tell(request, now_us);
                     }
                 }));
             }
@@ -4912,6 +4939,8 @@ pub(crate) struct Heeding {
     busy_called_strict: bool,
     /// `LAMP_REMARK_ABOUT_IT=on` ([`crate::remark_about_it`]).
     remark_about_it: bool,
+    /// The last line held as a remark about the lamp ([`Self::remarked`]).
+    remarked: Option<u64>,
     /// `LAMP_TURNED_SPEAKING=on` ([`Self::counting_only_turned_speakers`]).
     turned_speaking: bool,
     /// `LAMP_TURNED_FACE_SPEAKS=on` ([`Self::needing_the_turned_face_to_speak`]),
@@ -5692,6 +5721,7 @@ impl Heeding {
             said_until_free_us: None,
             busy_called_strict: false,
             remark_about_it: false,
+            remarked: None,
             turned_speaking: false,
             turned_face_speaks: false,
             face_not_speaking: None,
@@ -8076,6 +8106,21 @@ impl Heeding {
 
     /// The verdict on `request`, seen as `seen`, said and kept.
     fn verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
+        let why = self.judged_verdict(request, seen);
+        // The last line held as a remark about the lamp, for `voice/remarked`
+        // (#4175): Expression's small glance.
+        if why == Some(crate::remark_about_it::HELD) {
+            self.remarked = Some(request);
+        }
+        why
+    }
+
+    /// Whether the last line held as a remark about the lamp was `request`.
+    pub(crate) fn remarked(&self, request: u64) -> bool {
+        self.remarked == Some(request)
+    }
+
+    fn judged_verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
         self.marking_the_line(request, seen);
         let someone_else = self.someone_else(seen);
         let attention = &mut self.attention;
@@ -18313,6 +18358,8 @@ mod tests {
                 on.then_some(crate::remark_about_it::HELD),
                 "{on}: d09"
             );
+            // Told on the bus for Expression's glance (`voice/remarked`).
+            assert_eq!(heeding.remarked(909), on, "{on}: d09 remarked");
             for (request, line) in (911..).zip(desk) {
                 let going_on = heeding.called_at.is_some();
                 let held = heeding.judge(
@@ -18347,6 +18394,8 @@ mod tests {
             "Can you dim the lamp a little?",
             "Mainland. Turn off the lamp please.",
             "Make the lamp brighter.",
+            "Shut off the lamp.",
+            "Tilt the lamp up.",
         ] {
             let mut heeding = room_name_heeding(true);
             heeding.holding_remarks_about_it();

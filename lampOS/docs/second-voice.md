@@ -3545,8 +3545,14 @@ after a take-over, but now for every turn:
   alone (its words not calling the lamp) is still answered but opens none:
   no `called_at`, and its answer is put on the chain so it renews none. A
   conversation already going on is renewed as before. "Lamp, is it cute?", a face turned to the
-  lamp, a tap and a quiet room are as before. Nothing reacts to a held
-  remark yet: a small glance would need an expression topic of its own.
+  lamp, a tap and a quiet room are as before. A clause naming the lamp that
+  asks it to move ("Tilt the lamp up.", `MOVES`) or states a need of its
+  light ("The lamp is too bright.", `NEEDS`) is no remark either
+  (Reviewer-three's narrower P2 on #4201). A remark held is said on the bus
+  as `voice/remarked` (`VoiceRemarked`, its request alone; `bus_out::RemarkOut`,
+  from the verdict's own callback, so only a line `voice/turn` says
+  `held_back`), for Expression's one small glance with
+  `LAMP_REMARK_GLANCE=on`.
   Tests (`worker.rs`, `with_remarks_held_a_remark_about_the_lamp_opens_no_conversation`).
 - **A busy room's call by the text, narrowed** (`LAMP_BUSY_CALLED_STRICT=on`;
   with `--attention`). On #1712's branch the busy room let out "Man, that
