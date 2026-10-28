@@ -2352,6 +2352,7 @@ pub fn serve(
     .reading_the_lease_for_the_name(lease_system)
     .checking_sounds(checked)
     .telling_cut_ins(files.cut_in_told)
+    .ending_spoken_stops(files.spoken_stop_ends)
     .holding_hand_on(files.said_as_heard)
     .waiting_with_a_sound(route.wait_cue)
     .sounding_after(cue_after)

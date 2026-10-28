@@ -3959,6 +3959,7 @@ fn provider_arguments(
     arguments.extend(crate::remarks::arguments_from_environment());
     arguments.extend(crate::going_on_asks::arguments_from_environment());
     arguments.extend(crate::cut_in_told::arguments_from_environment());
+    arguments.extend(crate::spoken_stop::arguments_from_environment());
     arguments.extend(crate::misheard_hum::arguments_from_environment());
     arguments.extend(crate::holding_answer::arguments_from_environment());
     arguments.extend(crate::messages::arguments_from_environment());

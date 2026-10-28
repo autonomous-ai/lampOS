@@ -81,6 +81,7 @@ pub mod photo_faces;
 pub mod remember_speaker;
 pub mod scoped_session;
 pub mod sign_in;
+pub mod spoken_stop;
 pub mod turned_away;
 pub use lamp_ipc::log_relay;
 pub mod head_cue;
