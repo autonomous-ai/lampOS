@@ -1,6 +1,7 @@
 //! A product unit the lamp lacks, added by a round (#3689 item 2b): with
-//! its part when the part is new, enabled as `install` enables it, started
-//! when what enables it runs, and taken away again with a build put back.
+//! its part when the part is new, enabled as `install` enables it and, as
+//! install leaves it, not started, and taken away again with a build put
+//! back.
 use super::*;
 
 const MOOD: &str = "lamp-mood.service";
@@ -105,16 +106,20 @@ fn all() -> Vec<(&'static str, String)> {
     ]
 }
 
-fn binaries(mood: &str) -> Vec<(&'static str, String)> {
+fn binaries(eyes: &str, mood: &str) -> Vec<(&'static str, String)> {
     vec![
-        ("lamp-eyes", "eyes 1".into()),
+        ("lamp-eyes", eyes.into()),
         ("lamp-mood", mood.into()),
         ("lamp-records", "records 1".into()),
     ]
 }
 
 fn publish_all(lamp: &mut Lamp, level: u64, mood: &str) {
-    let binaries = binaries(mood);
+    publish_with_eyes(lamp, level, "eyes 1", mood);
+}
+
+fn publish_with_eyes(lamp: &mut Lamp, level: u64, eyes: &str, mood: &str) {
+    let binaries = binaries(eyes, mood);
     let binaries: Vec<(&str, &str)> = binaries
         .iter()
         .map(|(name, text)| (*name, text.as_str()))
@@ -138,7 +143,7 @@ fn without_part_folders(files: BTreeMap<String, Vec<u8>>) -> BTreeMap<String, Ve
 }
 
 #[test]
-fn a_new_part_its_timer_and_a_helper_of_a_part_the_lamp_has_are_added_enabled_and_started() {
+fn a_new_part_its_timer_and_a_helper_of_a_part_the_lamp_has_are_added_and_enabled_not_started() {
     let mut lamp = product_lamp();
     publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
@@ -173,24 +178,18 @@ fn a_new_part_its_timer_and_a_helper_of_a_part_the_lamp_has_are_added_enabled_an
         );
     }
     assert!(!lamp.exists("/etc/systemd/system/multi-user.target.wants"));
-    assert_eq!(
-        lamp.calls(),
-        [
-            "reload",
-            "restart lamp-eyes-camera.socket",
-            "restart lamp-mood.service",
-            "restart lamp-records.timer",
-        ]
-    );
+    // As install leaves them: enabled for the next start, not started now.
+    assert_eq!(lamp.calls(), ["reload"]);
 }
 
 #[test]
-fn an_added_unit_waits_for_what_enables_it_when_that_is_not_running() {
+fn an_added_unit_that_ends_at_once_holds_nothing_back_since_it_is_not_started() {
+    // The waking face, the Wi-Fi restore and recovery end at once when they
+    // have nothing to do; one started and watched would read as stopped.
     let mut lamp = product_lamp();
-    // Setup not done: lampos.target does not run.
-    lamp.systemd.units.remove("lampos.target");
-    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1 which crashes");
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(lamp.exists(&format!("/etc/systemd/system/{MOOD}")));
     assert!(
         link(
             &lamp,
@@ -198,14 +197,20 @@ fn an_added_unit_waits_for_what_enables_it_when_that_is_not_running() {
         )
         .is_some()
     );
-    assert!(!lamp.calls().contains(&format!("restart {MOOD}")));
+    assert_eq!(lamp.calls(), ["reload"]);
 }
 
 #[test]
 fn a_build_put_back_takes_away_every_unit_link_and_part_it_added() {
     let mut lamp = product_lamp();
     let before = without_part_folders(lamp.lamp_files());
-    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1 which crashes");
+    // The eyes' new build is not well: everything goes back.
+    publish_with_eyes(
+        &mut lamp,
+        manifest::ADDS_UPDATER,
+        "eyes 2 which crashes",
+        "mood 1",
+    );
     assert!(
         matches!(
             lamp.round(),
@@ -222,6 +227,37 @@ fn a_build_put_back_takes_away_every_unit_link_and_part_it_added() {
     for unit in [SOCKET, MOOD, RECORDS_TIMER] {
         assert!(lamp.calls().contains(&format!("stop {unit}")), "{unit}");
     }
+}
+
+#[test]
+fn an_enabling_link_already_there_is_left_as_it_is_both_ways() {
+    let mut lamp = product_lamp();
+    let wants = lamp.root.join("etc/systemd/system/timers.target.wants");
+    fs::create_dir_all(&wants).unwrap();
+    std::os::unix::fs::symlink(
+        "/etc/systemd/system/lamp-records.timer",
+        wants.join(RECORDS_TIMER),
+    )
+    .unwrap();
+    publish_with_eyes(
+        &mut lamp,
+        manifest::ADDS_UPDATER,
+        "eyes 2 which crashes",
+        "mood 1",
+    );
+    assert!(
+        matches!(lamp.round(), Outcome::RolledBack { sequence: 2, .. }),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        link(
+            &lamp,
+            &format!("/etc/systemd/system/timers.target.wants/{RECORDS_TIMER}")
+        ),
+        Some(format!("/etc/systemd/system/{RECORDS_TIMER}"))
+    );
+    assert!(!lamp.exists(&format!("/etc/systemd/system/{RECORDS_TIMER}")));
 }
 
 #[test]

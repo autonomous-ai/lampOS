@@ -17,7 +17,8 @@ against it.
 
 ## What exists and what we take
 
-Read on 2026-10-15 at `lamp-voice` `462d04cee`.
+Read on 2026-10-15 at `lamp-voice` `462d04cee`; the updater's entry is
+brought up to date on 2026-10-28 for #4065, a part added over the air.
 
 - **lamp-4ace's units** (`deploy/lamp-4ace/`, 15 units and a timer, the
   controls' and Expression's settings, `RUNBOOK.md`). Every part is its own

@@ -1422,7 +1422,9 @@ for level 8, so an updater of level 7 climbs first. It adds only:
   carries under `product`. So the keeper's helper and the own keys' helper,
   which `install` leaves out until their lamp checks, are not added either.
   A unit the lamp has as a link (a masked one) or anything but nothing is
-  left as it is.
+  left as it is. Only `/etc/systemd/system` is looked in: a unit of the same
+  name in `/lib/systemd/system` or `/run/systemd/system` would be shadowed by
+  the added copy, and lampOS ships none there.
 - **A unit whose users the lamp has:** its `User=`, `Group=` and
   `SupplementaryGroups=` (root needs none). A round can't write
   `/etc/passwd`, so one that runs as a user or a group the lamp lacks is not
@@ -1435,11 +1437,15 @@ made to name it. A part's template, socket or timer is added when its part
 is here or added with it. Each is enabled only if `install` enables it
 (`install::enabled`), and then as `systemctl enable` would: the links its
 `[Install]` asks for (`WantedBy=` in `<target>.wants/`, `RequiredBy=` in
-`<target>.requires/`) are written beside it before the reload. An
+`<target>.requires/`) are written beside it before the reload. One already
+there (an old enable) is left as it is, and stays on the way back too. An
 `[Install]` with anything else (`Alias=`, `Also=`), or a template's, is
-refused. An added unit that is enabled is started with the switch when what
-enables it runs now, so a part of `lampos.target` only once setup is done.
-It is watched as a part is.
+refused. As `install` leaves it, an added unit is enabled for the lamp's
+next start and not started now. Some product units end at once when they
+have nothing to do (the waking face without `LAMP_WAKING_FACE=on`, the
+Wi-Fi restore, recovery). Started and watched, one of those would read as
+stopped, and every build would be put back. The waking face would also
+start mid-day.
 
 All of it rides the switch's journal (`Switching::added`). A build put
 back, or a switch cut short and recovered at the next start, stops each
@@ -1449,7 +1455,11 @@ The empty folder of a part's builds (`/opt/lampOS/<part>/`) stays.
 
 Not shown: any of it on a real systemd or a 7071 lamp. A lamp imaged with
 7071 lacks no product unit of today's `install` list, so the first build
-that adds would add nothing there. The tests use the round's fake systemd.
+that adds adds nothing there. A lamp installed before 22 Oct that runs a
+managed updater lacks some (the waking face, the Wi-Fi restore and
+recovery among them), and gets them enabled for its next start. A stop of
+an added unit systemd never loaded (the switch cut before its reload) is
+taken as done. The tests use the round's fake systemd.
 
 ### Settings and tmpfiles (`LAMP_UPDATE_APPLY`)
 

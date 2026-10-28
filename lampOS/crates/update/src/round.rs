@@ -365,8 +365,6 @@ struct Adding {
     /// For a part new to the lamp: its `current` link, made to name this
     /// build.
     link: Option<(String, String)>,
-    /// Started with the switch: what enables it runs now.
-    start: bool,
 }
 
 impl Adding {
@@ -551,8 +549,6 @@ struct Back {
     /// A unit the switch added: on the way back it is stopped and removed,
     /// with what it added, never written back.
     added: Option<Added>,
-    /// Added and started with the switch.
-    start: bool,
 }
 
 impl Run<'_, '_> {
@@ -654,32 +650,6 @@ impl Run<'_, '_> {
                 }
             }
             Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
-        }
-        // An added unit is started with the switch when what enables it
-        // runs now (lampos.target only once setup is done); else it waits
-        // for that to start.
-        let targets: BTreeSet<String> = changes
-            .iter()
-            .filter_map(|change| change.added.as_ref())
-            .flat_map(|adding| adding.wants.iter().filter_map(|link| added::target(link)))
-            .map(str::to_owned)
-            .collect();
-        if !targets.is_empty() {
-            let targets: Vec<String> = targets.into_iter().collect();
-            let running = match self.world.systemd.states(&targets) {
-                Ok(states) => states,
-                Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
-            };
-            for adding in changes
-                .iter_mut()
-                .filter_map(|change| change.added.as_mut())
-            {
-                adding.start = adding.wants.iter().any(|link| {
-                    running.iter().any(|state| {
-                        Some(state.unit.as_str()) == added::target(link) && state.running()
-                    })
-                });
-            }
         }
         (self.world.phase)("fetching");
         if let Err(outcome) = self.install(&mut state, &manifest, &changes) {
@@ -2119,7 +2089,6 @@ impl Run<'_, '_> {
                     build: link.old.clone(),
                 }),
                 added: change.added.as_ref().map(Adding::added),
-                start: change.added.as_ref().is_some_and(|adding| adding.start),
             })
             .collect();
         // The second route's services, when the build's voice unit names
@@ -2252,8 +2221,7 @@ impl Run<'_, '_> {
         self.say(&format!("switching to build {}", build.sequence));
         let mut watches = Vec::new();
         for at in 0..backs.len() {
-            // An added unit is started only when what enables it runs.
-            if !(backs[at].was_active || backs[at].start) || unrestarted.contains(&backs[at].unit) {
+            if !backs[at].was_active || unrestarted.contains(&backs[at].unit) {
                 continue;
             }
             let back = &backs[at];
@@ -2595,7 +2563,6 @@ impl Run<'_, '_> {
                     before: Before::default(),
                     link: None,
                     added: Some(added.clone()),
-                    start: false,
                 });
                 continue;
             }
@@ -2645,7 +2612,6 @@ impl Run<'_, '_> {
                 before: Before::default(),
                 link: switching.link.clone(),
                 added: None,
-                start: false,
             });
         }
         self.skills_back = journal.skills;
@@ -3424,12 +3390,16 @@ fn add_units(
     changes: &mut Vec<Change>,
 ) -> Result<(), String> {
     let enabled = crate::install::enabled();
+    // Only the links not there yet are the switch's to make and to take
+    // away: one already there (an old enable) is left as it is, both ways.
     let wants = |name: &str, text: &str| -> Result<Vec<String>, String> {
-        if enabled.iter().any(|unit| unit == name) {
-            added::wants(name, text)
-        } else {
-            Ok(Vec::new())
+        if !enabled.iter().any(|unit| unit == name) {
+            return Ok(Vec::new());
         }
+        Ok(added::wants(name, text)?
+            .into_iter()
+            .filter(|link| fs::symlink_metadata(config.on(link)).is_err())
+            .collect())
     };
     let services = adding
         .iter()
@@ -3496,11 +3466,7 @@ fn add_units(
             was_active: false,
             link: None,
             kind: None,
-            added: Some(Adding {
-                wants,
-                link,
-                start: false,
-            }),
+            added: Some(Adding { wants, link }),
         });
     }
     let others = adding
@@ -3559,7 +3525,6 @@ fn add_units(
             added: Some(Adding {
                 wants: wants(name, text)?,
                 link: None,
-                start: false,
             }),
         });
     }
