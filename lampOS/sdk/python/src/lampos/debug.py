@@ -30,9 +30,9 @@ SHOWN = frozenset({
     "asleep", "at", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
-    "mood", "most", "motion", "name", "near", "ok", "op", "open", "parts", "pattern", "paused", "phrase",
+    "mood", "most", "motion", "name", "near", "ok", "on", "op", "open", "parts", "pattern", "paused", "phrase",
     "phrases", "pitch", "presence", "press", "private", "push", "quiet_hours", "re", "refused",
-    "retry_ms", "roll", "say", "say_max_chars", "score", "seen", "shoulder", "side", "size", "skill", "skills",
+    "retry_ms", "roll", "say", "say_max_chars", "score", "seen", "shoulder", "shows", "side", "size", "skill", "skills",
     "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "to", "until", "v", "where",
     "why", "within_ms", "x", "y", "yaw"
 })

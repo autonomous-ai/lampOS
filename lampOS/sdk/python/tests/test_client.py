@@ -383,10 +383,44 @@ def test_get_answers_the_states_asked(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 state = await lamp.get("presence", "lamp")
-            assert state["presence"]["count"] == 2 and state["lamp_state"]["private"] is False
+            # As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
+            assert state == {"presence": {"count": 2, "near": 0.4, "facing": True},
+                             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False}}
 
     run(go())
 
+
+
+def test_the_fakes_light_state_shows_what_the_ring_draws(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                now = [100.0]
+                fake.clock = lambda: now[0]
+                assert await lamp.get("light") == {"light": {}}  # neither: no `shows`
+                fake.state["light"] = {"on": True, "colour": "warm", "level": 3}
+                own = {"on": True, "colour": "warm", "level": 3}
+                assert await lamp.get("light") == {"light": {**own, "shows": own}}
+                await lamp.light("green", 2, 5_000, pattern="breathe")
+                shows = {"on": True, "colour": "green", "level": 2}  # no pattern in it
+                assert await lamp.get("light") == {"light": {**own, "shows": shows}}
+                now[0] += 5.0  # it lapses: the person's own again
+                assert await lamp.get("light") == {"light": {**own, "shows": own}}
+                fake.state["light"] = {}
+                await lamp.light("blue", 4, 2_000)
+                assert await lamp.get("light") == {"light": {"shows": {"on": True, "colour": "blue", "level": 4}}}
+
+    run(go())
+
+
+def test_get_replies_with_light_and_shows_are_the_schemas():
+    jsonschema = pytest.importorskip("jsonschema")
+    validator = jsonschema.Draft202012Validator({**schema.schema(), "$ref": "#/$defs/reply"})
+    own = {"on": True, "colour": "warm", "level": 3}
+    for light in ({}, None, own, {"shows": own}, {**own, "shows": {"on": True, "colour": "green", "level": 2}}):
+        assert not list(validator.iter_errors({"re": 1, "ok": True, "state": {"light": light}})), light
+    assert list(validator.iter_errors({"re": 1, "ok": True, "state": {"light": {"shows": {"on": True}}}}))
 
 def test_the_examples_compile_and_call_only_what_the_client_has():
     import ast

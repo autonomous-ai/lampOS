@@ -95,6 +95,11 @@ await lamp.closed();
   | `time` | your schedule | none |
   | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; the door already refuses `say` and `sound` in quiet hours, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
 
+- **State:** `await lamp.get('presence', 'lamp')` resolves with the states
+  asked, by those names, as lamp-control answers them: `{ presence: {...},
+  lamp: {...} }`. Behaviour change: it used to resolve with the whole reply.
+  `light` is the person's own (`on`, `colour`, `level`) with `shows`, what the
+  ring draws now; the fake's `shows` is the newest light asked while it lasts.
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. Each resolves when the lamp has taken it;
   `{ wait: true }` on a gesture, move or play resolves when it has finished,

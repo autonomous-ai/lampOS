@@ -90,7 +90,7 @@ def test_each_tool_sends_its_one_op(tmp_path):
             assert fake.asked("say") == [{"text": "Build passed."}]
             assert fake.asked("express") == [{"feeling": "glad", "strength": 0.5}]
             state = await session.call_tool("lamp_state", {"which": ["presence"]})
-            assert json.loads(text(state)) == {"presence": {"count": 0}}
+            assert json.loads(text(state)) == {"presence": {"count": 0, "near": 0.0, "facing": False}}
 
     run(go())
 

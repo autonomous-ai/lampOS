@@ -70,9 +70,13 @@ export class FakeLamp {
     this.pings = 0;
     this.leases = new Map();
     this.subscribed = new Map();
-    this.state = { presence: { count: 0 }, light: {}, mood: {}, lamp_state: { talking: false, paused: false, private: false, asleep: false } };
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: {}, mood: {}, lamp: { talking: false, paused: false, private: false, asleep: false } };
     this.refusals = new Map();
     this.nextLease = 1;
+    // The newest light a computer asked for, and until when (the fake's
+    // `clock`, ms): what the ring shows while it lasts (`lightState`).
+    this.shown = null;
+    this.clock = () => Date.now();
   }
 
   async listen() {
@@ -107,6 +111,24 @@ export class FakeLamp {
   emit(event, fields = {}) {
     const frame = JSON.stringify({ ev: event, at: now(), ...fields });
     for (const ws of this.wss.clients) if (this.subscribed.get(ws)?.has(event)) ws.send(frame);
+  }
+
+  // The ring shows a computer's light while it lasts.
+  show(request) {
+    this.shown = { light: { on: true, colour: request.colour, level: request.level }, until: this.clock() + request.for_ms };
+  }
+
+  // `get`'s light, as lamp-control answers it (Nine's light/drawn): the
+  // person's own (`state.light`: on, colour, level) and `shows`, what the ring
+  // draws now. That's the newest light a computer asked for while it lasts,
+  // else the person's own. With neither, no `shows`. No pattern.
+  lightState() {
+    const own = { ...(this.state.light ?? {}) };
+    if (this.shown && this.shown.until > this.clock()) own.shows = { ...this.shown.light };
+    else if (['on', 'colour', 'level'].some((key) => key in own)) {
+      own.shows = Object.fromEntries(['on', 'colour', 'level'].filter((key) => key in own).map((key) => [key, own[key]]));
+    }
+    return own;
   }
 
   // Tell a lease's holder it is `held`, `suspended` or `lost` (and, lost, end it here).
@@ -217,9 +239,13 @@ export class FakeLamp {
         request.events.forEach((e) => this.subscribed.get(ws).delete(e));
         return this.ok(ws, id);
       case 'get': {
-        const asked = new Set(request.state.map((s) => (s === 'lamp' ? 'lamp_state' : s)));
-        return this.ok(ws, id, Object.fromEntries(Object.entries(this.state).filter(([k]) => asked.has(k))));
+        // As lamp-control's session.rs answers `get`: the states under `state`, each by the name asked (`lamp`, not
+        // `lamp.changed`'s `lamp_state`) (harness-reviewer's lamp run on 75c9, 28 Oct).
+        return this.ok(ws, id, { state: Object.fromEntries(request.state.map((k) => [k, k === 'light' ? this.lightState() : this.state[k] ?? null])) });
       }
+      case 'light':
+        this.show(request);
+        return this.ok(ws, id);
       case 'lease.take': {
         const taken = [...this.leases.values()].some((h) => h.parts.some((p) => request.parts.includes(p)));
         if (taken) return this.refuse(ws, id, 'busy', 'another client holds it');
