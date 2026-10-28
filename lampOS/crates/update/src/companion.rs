@@ -41,16 +41,21 @@ pub fn kind(name: &str) -> Option<Kind> {
 /// accepts each connection, else the service of its name. None for a
 /// template, or a name that is not one of a part's.
 pub fn starts(name: &str, text: &str) -> Option<String> {
-    let (stem, key) = match kind(name)? {
+    let (stem, section, key) = match kind(name)? {
         Kind::Template => return None,
-        Kind::Socket => (name.strip_suffix(".socket")?, "Service"),
-        Kind::Timer => (name.strip_suffix(".timer")?, "Unit"),
+        Kind::Socket => (name.strip_suffix(".socket")?, "Socket", "Service"),
+        Kind::Timer => (name.strip_suffix(".timer")?, "Timer", "Unit"),
     };
-    let started = last(text, key).map_or_else(
+    let started = last(text, section, key).map_or_else(
         || {
+            // A boolean, as systemd reads one: in any case.
             let accepts = kind(name) == Some(Kind::Socket)
-                && last(text, "Accept")
-                    .is_some_and(|value| matches!(value, "yes" | "true" | "on" | "1"));
+                && last(text, section, "Accept").is_some_and(|value| {
+                    matches!(
+                        value.to_ascii_lowercase().as_str(),
+                        "yes" | "true" | "on" | "1"
+                    )
+                });
             if accepts {
                 format!("{stem}@.service")
             } else {
@@ -86,14 +91,27 @@ pub fn part<'a>(
     unit::linked(text_of(&started)?)
 }
 
-/// The last value a unit gives `key` (`Unit`), as systemd reads a key set
-/// twice, with or without spaces around its `=`.
-fn last<'t>(text: &'t str, key: &str) -> Option<&'t str> {
-    text.lines()
-        .filter_map(|line| line.split_once('='))
-        .filter(|(name, _)| name.trim() == key)
-        .map(|(_, value)| value.trim())
-        .next_back()
+/// The last value a unit gives `key` in its `[section]` (`Unit` of
+/// `[Timer]`), as systemd reads a key set twice, with or without spaces
+/// around its `=`. A key of another section, or in a comment, is not it.
+fn last<'t>(text: &'t str, section: &str, key: &str) -> Option<&'t str> {
+    let mut within = false;
+    let mut found = None;
+    for line in text.lines().map(str::trim) {
+        if let Some(name) = line
+            .strip_prefix('[')
+            .and_then(|line| line.strip_suffix(']'))
+        {
+            within = name == section;
+        } else if within
+            && !line.starts_with(['#', ';'])
+            && let Some((name, value)) = line.split_once('=')
+            && name.trim() == key
+        {
+            found = Some(value.trim());
+        }
+    }
+    found
 }
 
 #[cfg(test)]

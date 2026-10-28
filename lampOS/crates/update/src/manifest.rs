@@ -33,8 +33,9 @@ pub const SCHEMA: u32 = 1;
 /// own files, `image` (#1369). 5: the reset plan, `reset_plan` (#806).
 /// 6: ordinary product service units carried under [`PRODUCT_LAMP`].
 /// 7: a part's templates, sockets and timers under it too
-/// (crate::companion).
-pub const UPDATER: u64 = 7;
+/// (crate::companion). 8: a product unit the lamp lacks added
+/// (crate::added).
+pub const UPDATER: u64 = 8;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
@@ -42,6 +43,10 @@ pub const PRODUCT_UNITS_UPDATER: u64 = 6;
 /// The level a build that carries a part's templates, sockets or timers
 /// needs: an older updater refuses their names, so it climbs first.
 pub const COMPANIONS_UPDATER: u64 = 7;
+/// The level a build needs for a round to add the product units a lamp
+/// lacks: an older updater takes only the units a lamp has, so it climbs
+/// first. A round adds only from a build that asks for this level.
+pub const ADDS_UPDATER: u64 = 8;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
