@@ -345,7 +345,13 @@ fn the_talk_that_used_a_kept_thing_goes_with_it() {
 fn the_follow_ups_after_a_kept_thing_was_used_go_with_it(fixture: &Fixture) {
     let client = DaysClient::new(fixture.socket.clone()).unwrap();
     let teal = keep_teal(fixture, &client);
-    // Request 2 recalls it; its words share none of teal's.
+    // Request 2 recalls it; its words share none of teal's. With nobody
+    // placed, a spoken recall reaches the room's memory only for a line
+    // about the room (#4196), so its line is held as the voice holds it.
+    lamp_voice::thread::THREAD
+        .lock()
+        .unwrap()
+        .line_of(2, "Lamp, what did we pick here?");
     let (told, ok) = client.run_in(&call(RECALL, json!({"about":"teal"})), BUDGET, None, 2);
     assert!(ok, "{told}");
     assert_eq!(told["found"][0]["source_id"], teal, "{told}");

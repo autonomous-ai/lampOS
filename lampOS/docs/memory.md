@@ -412,6 +412,36 @@ you about myself this week?" matched only their small talk and was answered
 "nothing much about yourself" though they had six kept things (lamp-06c1, 28
 Oct night, R2). Any other word asks as before.
 
+An asker nobody could place (no known face or name) is told nothing kept by
+`recall` when their line has a word about themself
+(`remember::names_the_asker`: "my", "mine", "myself", "me", or "I", "I'm",
+"I'd", "I've" as the asker but not in "can/could/may I ask"; "của tôi",
+"tôi", "mình" or "em" as I), whatever else it says. A line with no such word
+is told nothing kept either, unless it asks about the room or someone else
+(`remember::asks_about_room_or_other`): a word of the room's ("room",
+"office", "here", "we", "our", "us", "team", "meeting", "wifi"/"wi-fi";
+"phòng", "ở đây", "chúng ta", "nhóm"), a pronoun for someone else ("he",
+"she", "they", "his", "her", "their", "him", "them"; "anh ấy", "chị ấy",
+"cô ấy", "ông ấy", "bà ấy", "họ"), or a name (a capitalised word after a
+sentence's first word, other than "I", "Lamp" or "Hey"). The line is the one
+voice held for the spoken request; a spoken request whose line is not
+known (the thread busy, or nothing held) counts as about themself (it fails
+closed). A call with no request is no voice asking (a typed text from the
+app, whose memory is the room's by design, or a direct caller), and this
+does not apply to it. Such a recall does not ask the memory.
+Its answer's note (`remember::UNPLACED_SELF_NOTE`, 215 bytes, only in that
+answer) says to tell them it can't tell who is asking and to ask their name
+or a look at their face, never anything said in the room or anyone else's
+as theirs. The journal says so in a line with no word of the ask. A room
+ask from them ("what's the meeting room called?") is answered from the
+room's memory as before. The session note with nobody known adds
+`remember::UNPLACED_ROOM_RULE` (99 bytes) after the room's rule: never tell
+these as the asker's own, and if they ask about themself, say you can't
+tell who is asking. Before, on lamp-4ace's 8327 round, an unplaced "how do
+I take my coffee?" was told "someone here said you take it green tea",
+another scene's room note (#4196). This is words for the model in the note,
+and a hard stop in `recall`.
+
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:

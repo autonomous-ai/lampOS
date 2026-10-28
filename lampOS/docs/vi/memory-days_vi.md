@@ -168,3 +168,35 @@ là hôm nay. Ghi chú cũ (legacy) ghi cùng ngày ở cuối dòng, «(on Frid
 October)». Không có điều nào có ngày thì ghi chú giữ nguyên như trước. Giới hạn
 1.200 byte của ghi chú không đổi và tính cả `on`; mỗi điều có ngày tốn khoảng
 18–23 byte, câu giải thích khoảng 130 byte, chỉ khi có điều có ngày.
+
+## Người hỏi chưa nhận ra được, hỏi về chính mình
+
+Khi đèn không nhận ra người hỏi (không thấy mặt quen, không biết tên),
+`recall` không trả điều gì đã ghi nhớ khi câu họ nói có một từ về chính họ
+(`remember::names_the_asker`: «my», «mine», «myself», «me», hoặc «I», «I'm»,
+«I'd», «I've» chỉ người hỏi nhưng không phải trong «can/could/may I ask»;
+«của tôi», «tôi», «mình» hay «em» chỉ chính mình), dù câu còn nói gì khác. Một
+câu không có từ như vậy cũng không được trả gì, trừ khi nó hỏi về căn phòng
+hay về người khác (`remember::asks_about_room_or_other`): một từ của căn
+phòng («room», «office», «here», «we», «our», «us», «team», «meeting»,
+«wifi»/«wi-fi»; «phòng», «ở đây», «chúng ta», «nhóm»), một đại từ chỉ người
+khác («he», «she», «they», «his», «her», «their», «him», «them»; «anh ấy»,
+«chị ấy», «cô ấy», «ông ấy», «bà ấy», «họ»), hoặc một cái tên (một từ viết
+hoa không đứng đầu câu, trừ «I», «Lamp», «Hey»). Câu được đọc là câu voice
+giữ cho lượt nói đó; một lượt nói mà không biết câu (luồng đang bận, hoặc
+không có câu nào được giữ) thì coi như hỏi về chính họ (an toàn khi không
+chắc). Một lệnh gọi không có lượt nói thì không có giọng nào đang hỏi (một tin
+nhắn gõ từ ứng dụng, vốn dùng trí nhớ của căn phòng, hoặc một nơi gọi trực
+tiếp), nên quy tắc này không áp dụng. Khi đó memory không được hỏi. Ghi chú trả
+về (`remember::UNPLACED_SELF_NOTE`, 215 byte, chỉ trong câu trả lời đó) bảo
+nói rằng đèn chưa biết ai đang hỏi, xin tên hoặc cho nhìn mặt, và không bao
+giờ kể điều căn phòng hay người khác đã nói như là của người hỏi. Nhật ký ghi
+một dòng không có chữ nào của câu hỏi. Câu hỏi về căn phòng từ họ («what's the
+meeting room called?») vẫn được trả lời từ trí nhớ của căn phòng như trước.
+Ghi chú phiên khi không nhận ra ai thêm `remember::UNPLACED_ROOM_RULE` (99
+byte) sau quy tắc của căn phòng: không kể những điều này như là của người hỏi,
+và nếu họ hỏi về chính mình thì nói đèn chưa biết ai đang hỏi. Trước đây, ở
+vòng kiểm tra bản 8327 trên lamp-4ace, một giọng chưa nhận ra hỏi «how do I
+take my coffee?» và được trả lời «someone here said you take it green tea»,
+một ghi chú của căn phòng từ cảnh khác (#4196). Trong ghi chú đó là lời dặn
+cho mô hình; trong `recall` là một chặn cứng.
