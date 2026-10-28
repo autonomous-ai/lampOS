@@ -34,7 +34,7 @@ notes say. A report for a step the runner has already ended changes nothing.
 
 For how they sound, each invitation is one prompt, said exactly as the runner
 words it: the first names the phrase to say from their usual seat ("Hey Lamp")
-and that it asks a few times; each later one answers the last call ("Got it.
+and that it asks three times; each later one answers the last call ("Got it.
 Once more." or "I didn't catch that. …"). The phrase is never the prompt's
 last words, so the lamp's own voice is not taken for the call. The runner, not a model report, judges each call
 from the name heard and the room microphone's rise; it keeps only those numbers,

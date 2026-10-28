@@ -25,7 +25,7 @@ pub const PRIVACY_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones.\")";
 pub const PRIVACY_DONE_CAMERA: &str = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones and my camera.\")";
 pub const PRIVACY_FAILED: &str = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup.\")";
-pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask a few times.\")";
+pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask three times.\")";
 pub const NEAR_AGAIN: &str = "(Say only this, nothing before or after it: \"Got it. Once more.\")";
 pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")";
 pub const NEAR_DONE: &str =

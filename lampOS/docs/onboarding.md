@@ -128,7 +128,7 @@ said before the next step's invitation:
 |---|---|---|---|---|
 | `touch` | `first`: "Tap the top of my head once, then let go." (`reoffer`: "One more thing: …") | `touch_remind`: "I didn't feel that. Tap a little firmer, right on top of my head." | `touch_done`: "Got it, I felt that." | `touch_failed`: "I didn't feel a tap this time. That's fine, you can redo the setup later." |
 | `where_you_sit` | `first`/`reoffer`: "Hello, I'm glad to meet you. Please sit where you usually sit, and look at me." | `sit_no_face`: "I can't see your face yet. …"; `sit_closer`: "I can see you, but you're a little far. …"; `sit_turn`: "I can see you at the edge of my view. …" | `sit_done`: "Got it, I can see you well there." | `sit_failed`: "I still can't see you well there. That's fine, you can turn me toward your seat later." |
-| `how_you_sound`, the call | `first`/`reoffer`: "Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask a few times."; `near_again`, the prompt after an accepted call (#3702): "Got it. Once more." | `near_missed`, the prompt after a call not caught (#3702): "I didn't catch that. Say 'Hey Lamp' again, from your seat." | `near_done`: "Got it, I know how you call me from there." | `near_failed`: "I couldn't learn how you call me this time. …" |
+| `how_you_sound`, the call | `first`/`reoffer`: "Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask three times."; `near_again`, the prompt after an accepted call (#3702): "Got it. Once more." | `near_missed`, the prompt after a call not caught (#3702): "I didn't catch that. Say 'Hey Lamp' again, from your seat." | `near_done`: "Got it, I know how you call me from there." | `near_failed`: "I couldn't learn how you call me this time. …" |
 | `how_you_sound`, the sentence | `sentence_first`: "Now say a sentence to me from your seat, anything at all, so I get used to your voice." | `sentence_louder`, `sentence_closer`, `sentence_again`: "Say another sentence from your seat, a little louder." and the like | `sentence_done`: "Got it, I hear you well from there." | `sentence_failed`: "I couldn't hear you well enough this time. I'll get used to your voice as we talk." |
 | `privacy`, its result | (its invitation, unchanged) | (a second invitation) | `privacy_done`: "Got it, the switch closes my microphones." (`privacy_done_camera`: "… and my camera.") | `privacy_failed`: "The switch check didn't finish. You can try it again later by redoing the setup." |
 | `giving_way` | `first`/`reoffer`: "My head gives way to your hand. Take it gently, move it a little, then let go." | `give_again`, the second try's invitation within the walk (a re-offer later opens as the first): "I didn't feel my head move. Take it gently, move it a little, then let go." | `give_done`: "Got it, my head moved with your hand." | `give_failed`: "I didn't feel my head move this time. That's fine, you can redo the setup later." |
@@ -547,15 +547,16 @@ says `offered_again`.
 **What each prompt says (#3702).** The tester on lamp-29e7 (28 October)
 said a bare "Lamp" four times, never told what to say or how many calls were
 wanted. The first prompt names the phrase the name detector knows ("Hey
-Lamp", [name.md](name.md)) and says it asks a few times. Each later call
+Lamp", [name.md](name.md)) and says it asks three times (`TRIES`). Each later call
 prompt answers the last try judged in this voice cycle: accepted,
 `near_again` ("Got it. Once more."); not accepted (any refusal, or answered
 early), `near_missed` ("I didn't catch that. Say 'Hey Lamp' again, from your
 seat."), never the first prompt again. Before any try is judged (a first
-prompt cut, or a new voice cycle) the first line is said. The phrase is
+prompt cut, or a new voice cycle), and after the person left, a pause or a
+mute, the first line is said. The phrase is
 never a prompt's last words: a name begun in its last 0.5 s would be taken
 for an early answer. `near_missed` is optional, as #3769's lines are;
-without it `near_again` is said. The sentence part keeps its own prompts.
+without it a miss says the first line. The sentence part keeps its own prompts.
 Tests: `each_call_prompt_answers_the_last_try_and_only_the_first_explains`;
 `every_way_a_person_calls_gets_its_line` ("Hey Lamp", "Hey, Lamp" and a bare
 "Lamp", heard or missed, at a 4, 22 and 30 dB rise, and a sentence without
