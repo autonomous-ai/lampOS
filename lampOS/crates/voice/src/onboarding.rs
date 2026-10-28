@@ -1726,16 +1726,21 @@ impl Onboarding {
                     }
                     led.heard.name = true;
                     false
-                } else if face_kept && led.heard.name && refuses(&words) && words.len() <= 4 {
-                    // The face question's no, after a name: done, the name
-                    // only, no face (the Reviewer-lead's P2 on #3992: taken
-                    // as the name's no, the give-up asked the name again).
-                    // Only a short line that names nobody: "No, it's Mary."
-                    // corrects the name above and keeps the step open.
+                } else if face_kept && led.heard.name && refuses(&words) {
+                    // With a face to keep, a no after a name neither ends the
+                    // step nor erases the name (the Reviewer-lead's P2 on
+                    // #3992): a no to "Marie, right?" ended it before the
+                    // face was asked, and a long face no ("No thanks, I'd
+                    // rather not.") erased the name and the give-up asked it
+                    // again. Like a yes, it restarts the face wait: a
+                    // corrected name comes in through `names_someone` above,
+                    // and the face's no ends it done, the name only, at
+                    // `FACE_SAVE_WAIT_US` after quiet (`tick`).
                     eprintln!(
-                        "lamp-voice: onboarding: who_you_are heard a no to the face: done, no face kept"
+                        "lamp-voice: onboarding: who_you_are heard a no after the name: the face wait restarts"
                     );
-                    true
+                    led.heard.face_answered_us = Some(now_us);
+                    false
                 } else {
                     // "No" to the name the lamp checked: not known.
                     if refuses(&words) && led.heard.name {
@@ -3995,19 +4000,37 @@ mod tests {
         }
     }
 
-    /// The Reviewer-lead's P2s on #3992: with a face to keep, a no to the
-    /// face question ends it done with the name, and a yes with no face saved
+    /// The Reviewer-lead's P2s on #3992: with a face to keep, a face no of
+    /// any length keeps the name and ends it done after `FACE_SAVE_WAIT_US`
+    /// plus quiet, never asking the name again; a yes with no face saved
     /// ends it done after `FACE_SAVE_WAIT_US`, not at the give-up.
     #[test]
     fn with_a_face_to_keep_a_no_or_no_save_still_ends_it_with_the_name() {
-        let mut room = Room::new("face-no");
-        room.walk.face_kept = true;
-        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
-        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
-        room.walk.heard("You can call me, Marie.", room.at);
-        room.walk.heard("No, please don't.", room.at);
-        room.wait(S, Some(NEAR_MIDDLE));
-        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        for no in ["No, please don't.", "No thanks, I'd rather not."] {
+            let mut room = Room::new("face-no");
+            room.walk.face_kept = true;
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            room.walk.heard("You can call me, Marie.", room.at);
+            room.walk.heard("Yes.", room.at);
+            room.wait(4 * S, Some(NEAR_MIDDLE));
+            room.walk.heard(no, room.at);
+            room.wait(FACE_SAVE_WAIT_US - S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), None, "{no}");
+            assert!(
+                room.walk.led.as_ref().is_some_and(|led| led.heard.name),
+                "{no}"
+            );
+            room.wait(START_QUIET_US + 2 * S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done), "{no}");
+            let records = room.walk.take_records();
+            assert!(
+                !records
+                    .iter()
+                    .any(|line| line["kind"] == "onboarding_stopped"),
+                "{no}: {records:?}"
+            );
+        }
 
         let mut room = Room::new("face-unsaved");
         room.walk.face_kept = true;
@@ -4034,6 +4057,29 @@ mod tests {
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), None);
         assert!(room.walk.led.as_ref().is_some_and(|led| led.heard.name));
+        room.walk.heard("Yes.", room.at);
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        face_saved(&room.walk.file);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// The Reviewer-lead's P2 on #3992: with a face to keep, a no to
+    /// "Marie, right?" doesn't end the step before the face is asked; the
+    /// new name, its yes and the save end it, and only the save.
+    #[test]
+    fn with_a_face_to_keep_a_no_to_the_name_waits_for_a_new_name_and_the_face() {
+        let mut room = Room::new("face-name-no");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.walk.heard("No.", room.at);
+        room.wait(3 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        room.walk.heard("Call me Mary.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
         room.walk.heard("Yes.", room.at);
         room.wait(5 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), None);
