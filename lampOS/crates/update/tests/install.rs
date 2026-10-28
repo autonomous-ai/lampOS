@@ -497,8 +497,8 @@ fn a_lamp_update_not_the_builds_own_is_named_and_install_still_writes_the_units(
         updater_said(&lamp),
         [format!(
             "this lamp-update (sha256 {}) is not build 188's ({}): the units written are \
-                 this lamp-update's own, not build 188's; run build 188's, \
-                 /opt/lampOS/update/current/lamp-update install, to write its units",
+                 this lamp-update's own, not build 188's; run build 188's own, \
+                 /opt/lampOS/update/{builds}/lamp-update install, to write its units",
             &older[..12],
             &builds[..12]
         )],

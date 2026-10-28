@@ -1623,7 +1623,9 @@ pub fn install(
 /// writes are the ones it carries, so an older lamp-update installing a
 /// newer build leaves the new binaries under its own older units, as on
 /// lamp-c0a4 on 27 Oct. None when they are the same file. A running file
-/// that cannot be read says only that it could not be checked.
+/// that cannot be read says only that it could not be checked. The
+/// advice names the build's own folder, never `current`, which on a lamp
+/// held below the build's updater is the older lamp-update itself.
 pub fn not_the_builds_updater(
     manifest: &Manifest,
     running: Result<String, String>,
@@ -1649,11 +1651,12 @@ pub fn not_the_builds_updater(
     let short = |sha256: &str| sha256.chars().take(12).collect::<String>();
     Some(format!(
         "this lamp-update (sha256 {}) is not build {sequence}'s ({}): the units written are \
-         this lamp-update's own, not build {sequence}'s; run build {sequence}'s, {}/{} install, \
-         to write its units",
+         this lamp-update's own, not build {sequence}'s; run build {sequence}'s own, \
+         {}{}/{} install, to write its units",
         short(&running),
         short(&builds.sha256),
-        crate::own::CURRENT,
+        crate::own::FOLDER,
+        builds.sha256.to_ascii_lowercase(),
         crate::own::BINARY,
     ))
 }

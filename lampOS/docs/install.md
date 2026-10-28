@@ -1194,8 +1194,11 @@ of the file it runs from (`/proc/self/exe`) with the build's `lamp-update`
 in the manifest. When they differ it says, e.g.
 `lamp-update: this lamp-update (sha256 4f1c09a2be77) is not build 7071's
 (9d3e5b10c4aa): the units written are this lamp-update's own, not build
-7071's; run build 7071's, /opt/lampOS/update/current/lamp-update install,
-to write its units`, and goes on: it does not refuse, and writes the units as before.
+7071's; run build 7071's own, /opt/lampOS/update/<its sha256>/lamp-update
+install, to write its units` (the full sha256 in the path), and goes on: it
+does not refuse, and writes the units as before. It names the build's own
+folder, not `current`: on a lamp held below the build's updater, `current`
+is the older lamp-update itself.
 A running file that cannot be read says only `this lamp-update could not
 be checked against build <N>'s: <why>`. The build's own says nothing, a
 build that carries no `lamp-update` has nothing to check against and says
