@@ -21,6 +21,18 @@ StateDirectoryMode=0700
 ExecStart=/opt/lampOS/setup/current/lamp-setup serve --config /etc/lampOS/setup/serve.json --plan /etc/lampOS/setup/reset-plan.json --enable
 # However it ends, V1's nginx does not stay on.
 ExecStopPost=/usr/bin/systemctl stop nginx
+# Its sandbox (#3710), lamp-setup-recover's for the radio (which moves it the same way) and the reset plan's
+# wipe for the reset it finishes at start (`reset::resume`, in-process). /etc: the Wi-Fi file, the person's
+# settings, /etc/localtime and V1's radio scripts. /run: wpa_supplicant's socket, systemctl. /tmp: wpa_cli's
+# reply socket, which wpa_supplicant must reach, so the real /tmp. /var/lib: the top folder of each of the
+# plan's wipe paths, each missing one skipped; its own state is its StateDirectory. No home, nothing it
+# starts gains privileges, and only local, IP and netlink sockets.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/etc /run /tmp -/var/lib/lampos-memory -/var/lib/lampos-eyes -/var/lib/lampos-tasks -/var/lib/lampos-schedule -/var/lib/lampos-skills-state -/var/lib/lampos-output-caps -/var/lib/lampos-policy -/var/lib/lampos-cloud -/var/lib/lampOS
+ProtectHome=yes
+PrivateTmp=no
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 Restart=on-failure
 # Each start raises the hotspot again, which drops a phone on it: not often.
 RestartSec=20

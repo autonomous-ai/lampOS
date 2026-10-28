@@ -1069,13 +1069,30 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
     assert!(page.contains(&format!("`{condition}`")));
 }
 
+/// What lamp-setup.service may write (#3710), each `-` one skipped when
+/// missing.
+const SETUP_WRITES: &[&str] = &[
+    "/etc",
+    "/run",
+    "/tmp",
+    "-/var/lib/lampos-memory",
+    "-/var/lib/lampos-eyes",
+    "-/var/lib/lampos-tasks",
+    "-/var/lib/lampos-schedule",
+    "-/var/lib/lampos-skills-state",
+    "-/var/lib/lampos-output-caps",
+    "-/var/lib/lampos-policy",
+    "-/var/lib/lampos-cloud",
+    "-/var/lib/lampOS",
+];
+
 /// #3710: each product unit that runs as root has the sandbox its work
 /// needs: a read-only system but for the exact paths it writes, no home,
 /// its own /tmp and no privileges gained. One row a unit, each line once.
 #[test]
 fn root_units_write_only_what_their_work_needs() {
     // (unit, what it writes, its own /tmp)
-    let rows: [(&str, &[&str], bool); 2] = [
+    let rows: [(&str, &[&str], bool); 3] = [
         // The release socket, in its runtime directory, and the ring's
         // device: nothing else (crates/setup/src/wake.rs). No PrivateTmp:
         // it would order this early unit after the /tmp mounts and
@@ -1085,11 +1102,35 @@ fn root_units_write_only_what_their_work_needs() {
         // Its subscriber's socket under the bus; the reset is detached
         // (below), so the wipe is not this unit's to write.
         ("lamp-setup-reset.service", &["/run/lampos-bus"], true),
+        // The radio as lamp-setup-recover moves it (/etc, /run, the real
+        // /tmp for wpa_cli), and the plan's wipe for the reset it finishes
+        // in-process at start: below, every wipe path is under one of these.
+        ("lamp-setup.service", SETUP_WRITES, false),
     ];
     // The reset's wipe, stop and reboot run in a unit of their own
     // (`start_reset`), so watch-reset's sandbox never has to hold them.
     let plan: serde_json::Value = serde_json::from_str(install::RESET_PLAN).unwrap();
     assert_eq!(plan["detach"][0], "/usr/bin/systemd-run");
+    // Setup finishes an interrupted reset itself (`reset::resume` in
+    // `serve`), so its sandbox holds every path the plan wipes, and the
+    // marker's and journal's folder is its StateDirectory.
+    for wiped in plan["wipe"].as_array().unwrap() {
+        let wiped = Path::new(wiped.as_str().unwrap());
+        assert!(
+            SETUP_WRITES
+                .iter()
+                .any(|root| wiped.starts_with(root.trim_start_matches('-'))),
+            "{wiped:?} is wiped by a reset setup finishes, but its sandbox can't write it"
+        );
+    }
+    for kept in ["marker", "journal"] {
+        assert!(
+            plan[kept]
+                .as_str()
+                .unwrap()
+                .starts_with("/var/lib/lampos-setup/")
+        );
+    }
     for (unit, writes, private_tmp) in rows {
         let text = PRODUCT
             .iter()
@@ -1110,7 +1151,7 @@ fn root_units_write_only_what_their_work_needs() {
         }
         let tmp: Vec<&&str> = service
             .iter()
-            .filter(|line| line.starts_with("PrivateTmp="))
+            .filter(|line| **line == "PrivateTmp=yes")
             .collect();
         assert_eq!(
             tmp,
