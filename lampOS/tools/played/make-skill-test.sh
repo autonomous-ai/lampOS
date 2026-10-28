@@ -47,6 +47,7 @@ for line in lines:
 confirm = bool(os.environ.get("FAKE_CONFIRM"))
 kept = os.environ.get("FAKE_KEPT", "yes") == "yes"
 out = {"answered": len(lines), "new": 0, "show": 0, "said": [], "journal": []}
+kept_arm = None
 for n, arm in enumerate(arms):
     # The script reads the journal since its arm began: this arm's lines only.
     out["journal"] = []
@@ -67,10 +68,16 @@ for n, arm in enumerate(arms):
             os.makedirs(made, exist_ok=True)
             open(os.path.join(made, "skill.toml"), "w").write("made")
             out["journal"].append("lamp-voice: a skill made by voice is kept, version 1.0.0, sha256 " + os.environ["FAKE_SHA"])
+            kept_arm = n
             # The news gate (El on #2889): typed in the app, the ask comes only once someone was heard (the greeting)
-            # or is seen (FAKE_FACE).
-            if not app or os.environ.get("FAKE_FACE") or "Hey Lamp, I'm back at my desk." in arm:
+            # or is seen (FAKE_FACE). As on a lamp, it comes after the keep: here, once the script has read the
+            # keep's line.
+            told = os.path.exists(os.path.join(d, "kept-read-%d" % n))
+            if told and (not app or os.environ.get("FAKE_FACE") or "Hey Lamp, I'm back at my desk." in arm):
                 out["said"].append("It breathes the light once an hour. Shall I put it on the lamp?")
+                # The ask is the lamp's own answer, and plays to its end at once here: a count of finished
+                # answers taken only after it is seen would wait for one more that never comes (Third on #4194).
+                out["answered"] += 1
             # FAKE_EARLY: put on before anyone answered, and the yes then refused as already on.
             if os.environ.get("FAKE_EARLY"):
                 open(os.path.join(d, "installed"), "w").close()
@@ -99,6 +106,8 @@ elif what == "said":
         print('{"kind":"transcript","turn":3,"text":"%s"}' % text)
 else:
     print("\n".join(out["journal"]))
+    if kept_arm is not None:
+        open(os.path.join(d, "kept-read-%d" % kept_arm), "w").close()
 EOF
 cat >"$T/lamp_ssh" <<'EOF'
 #!/usr/bin/env bash
@@ -212,6 +221,43 @@ SEED=$(rm -rf "$T/d"; seed; print_of "$T/d/voice")
 SEED_MADE=$(print_of "$T/d/voice/made-skills")
 
 fail=0
+# Every wait reads the lamp at its start, every MAKE_POLL seconds (5 by default) and once more at its deadline: each
+# read is an ssh and a sudo in the lamp's journal, and reads every 1 to 2 s outran lamp-06c1's 5 MB journal in about
+# 6 minutes (#2811). The wait for the lamp's answer to end reads every MAKE_ANSWER_POLL (1), since a spoken yes
+# follows it inside the voice's 8 s follow-up window.
+waits=$(awk '/^(nap|wait_[a-z]+)\(\) \{/,/^}/' "$SCRIPT")
+[[ $(grep -c '^wait_[a-z]*() {' <<<"$waits") == 4 && $(grep -c 'nap "\$until" "\$POLL" || return 1' <<<"$waits") == 3 \
+  && $(grep -c 'nap "\$until" "\$ANSWER_POLL" || return 1' <<<"$waits") == 1 ]] \
+  || { echo "FAIL poll: not every wait naps by its poll"; fail=1; }
+awk '/^wait_answered\(\) \{/,/^}/' "$SCRIPT" | grep -q 'ANSWER_POLL' || { echo "FAIL poll: wait_answered not on its own poll"; fail=1; }
+grep -E '^[[:space:]]+sleep [0-9"]' <<<"$waits" && { echo "FAIL poll: a wait sleeps a fixed time"; fail=1; }
+grep -qx 'POLL=${MAKE_POLL:-5}' "$SCRIPT" && grep -qx 'ANSWER_POLL=${MAKE_ANSWER_POLL:-1}' "$SCRIPT" \
+  || { echo "FAIL poll: the defaults are not 5 and 1 s"; fail=1; }
+# The script's own nap and waits, timed with stand-in reads: a 3 s wait at a 5 s poll reads at 0 s and again at its
+# deadline (3 s), and an answer's 2 s wait at its 1 s poll reads at 0, 1 and 2 s; a hit ends a wait at once.
+reads=$(
+  eval "$waits"
+  POLL=5 ANSWER_POLL=1
+  journal() { date +%s >>"$T/reads"; [[ -e $T/hit ]] && echo "the line"; }
+  answered() { date +%s >>"$T/answers"; echo 0; }
+  start=$(date +%s)
+  wait_for 0 'the line' 3 >/dev/null; got=$?
+  echo "for=$got n=$(wc -l <"$T/reads" | tr -d ' ') last=$(( $(tail -n 1 "$T/reads") - start ))"
+  start=$(date +%s)
+  wait_answered 0 2 >/dev/null; got=$?
+  echo "answered=$got n=$(wc -l <"$T/answers" | tr -d ' ') last=$(( $(tail -n 1 "$T/answers") - start ))"
+  touch "$T/hit"; : >"$T/reads"
+  wait_for 0 'the line' 30 >/dev/null; got=$?
+  echo "hit=$got n=$(wc -l <"$T/reads" | tr -d ' ')"
+)
+# Whole seconds from `date +%s`: a last read may fall in the second after its deadline's own.
+case $reads in
+  $'for=1 n=2 last='[34]$'\nanswered=1 n=3 last='[23]$'\nhit=0 n=1') ;;
+  *) false ;;
+esac \
+  || { echo "FAIL poll: the waits read at the wrong times:"; echo "$reads"; fail=1; }
+rm -f "$T/reads" "$T/answers" "$T/hit"
+
 run() { # NAME ARMS EXPECTED_EXIT GREP...: the script with this test's FAKE_ settings
   local name=$1 arms=$2 want=$3 got out
   shift 3
@@ -228,7 +274,7 @@ run() { # NAME ARMS EXPECTED_EXIT GREP...: the script with this test's FAKE_ set
   esac
   out=$(FAKE_DIR=$T/d FAKE_STATE=$T/state FAKE_SHA=$SHA FAKE_BADCP=$T/badcp FAKE_BADDIGEST=$T/baddigest FAKE_CUTCP=$T/cutcp FAKE_SYSBIN=$T/sysbin MAKE_SAVED=$T/d/saved MAKE_VOICE_DIR=$T/d/voice \
     LAMP_HOST=fake LAMP_SSH=$T/lamp_ssh QUIET_GATE=$T/quiet \
-    SAY=$T/say AFPLAY=$T/afplay PLAYED_OUT=$T/out MAKE_SETTLE=0 NOT_NOW_WAIT=0 LAMP_PLAY_AT_LUNCH=yes \
+    SAY=$T/say AFPLAY=$T/afplay PLAYED_OUT=$T/out MAKE_SETTLE=0 NOT_NOW_WAIT=0 MAKE_POLL=${MAKE_POLL:-1} LAMP_PLAY_AT_LUNCH=yes \
     "$SCRIPT" "$name" "$T/fixture" "$arms" 2>&1)
   got=$?
   [[ $got == "$want" ]] || { echo "FAIL $name: exit $got, wanted $want"; echo "$out"; fail=1; }
@@ -252,6 +298,11 @@ run both both 0 "PASS asked to confirm: not needed" "PASS offered" "PASS handed 
   "PASS installed after the yes, the kept SHA-256" "PASS enabled" "PASS loaded by lamp-skills" "PASS removed" \
   "PASS nothing installed" "18 checks, 0 failed" "put back"
 grep -qx stand-up-nudge "$T/d/removed" || { echo "FAIL both: the skill was not removed by the arm"; fail=1; }
+# Each arm's yes answers the ask at once: its count of finished answers was taken before the ask began (Third's
+# P2 on #4194), so the wait for its end never runs out.
+[[ -s $T/out/scenarios/make-skill-both.txt ]] || { echo "FAIL both: no scenario log"; fail=1; }
+grep -q "the ask's end wasn't seen" "$T/out/scenarios/make-skill-both.txt" \
+  && { echo "FAIL both: an answer came late, after the ask's end was missed"; fail=1; }
 grep -q 'PLAYED_VOICE_ENV=LAMP_MAKE_SKILL=on' "$T/d/setup" || { echo "FAIL both: the switch was not given to the voice"; fail=1; }
 grep -q 'PLAYED_TARGET=auto' "$T/d/setup" || { echo "FAIL both: no targets file for the run"; fail=1; }
 # The put-on's yes is a plain one (the voice's plain_agreement), never "Yes, put it on.", which it refuses.
