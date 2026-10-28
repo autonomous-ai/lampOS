@@ -2949,6 +2949,13 @@ pub fn serve(
         {
             heeding.leaving_others_answers();
         }
+        // A stop said over the lamp's answer is said to the lamp, not a word
+        // or two of the room's (`LAMP_SPOKEN_STOP_ENDS=on`, #3985).
+        if files.spoken_stop_ends
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.hearing_spoken_stops();
+        }
         // A conversation going on holds only for the one the lamp answered
         // (`LAMP_GOING_ON_SAME_ONE=on`, #2191).
         if files.going_on_same_one
@@ -2963,7 +2970,11 @@ pub fn serve(
         {
             heeding.holding_lines_turned_away();
         }
-        if let Some(hook) = hearing_hook(&heeding, hears, files.others_answer || declines) {
+        if let Some(hook) = hearing_hook(
+            &heeding,
+            hears,
+            files.others_answer || files.spoken_stop_ends || declines,
+        ) {
             engine = engine.hearing(hook);
         }
         // The name note, as the Live route gives it (`LAMP_NAME_NOTE=on`).
@@ -4593,6 +4604,9 @@ pub(crate) struct Heeding {
     /// Leave alone a reply that answers nothing the lamp asked, said over its
     /// answer ([`crate::others_answer`]).
     others_answer: bool,
+    /// A stop said over the lamp's answer is not held as a word or two of
+    /// the room's ([`crate::spoken_stop`]).
+    spoken_stops: bool,
     /// In a busy room, a conversation going on holds only for the one the
     /// lamp answered ([`crate::going_on_same_one`]).
     going_on_same_one: bool,
@@ -5402,6 +5416,7 @@ impl Heeding {
             caller_faces: Vec::new(),
             cut_in: None,
             others_answer: false,
+            spoken_stops: false,
             going_on_same_one: false,
             turned_away: false,
             carries: false,
@@ -6676,6 +6691,14 @@ impl Heeding {
         self.others_answer = true;
     }
 
+    /// A stop said over the lamp's answer is said to the lamp
+    /// ([`crate::spoken_stop`], `LAMP_SPOKEN_STOP_ENDS=on`): on lamp-52e6 on
+    /// 28 Oct, "Stop them." over a story was held as a word or two of the
+    /// room's, so the stop line never came.
+    pub(crate) fn hearing_spoken_stops(&mut self) {
+        self.spoken_stops = true;
+    }
+
     /// In a busy room, a conversation going on holds only for the one the
     /// lamp answered ([`crate::going_on_same_one`],
     /// `LAMP_GOING_ON_SAME_ONE=on`).
@@ -7767,7 +7790,10 @@ impl Heeding {
         let mut verdict =
             attention.first_output_busy(request, seen.room, seen.going_on, self.strict, turned);
         let alone = attention.played_on_the_conversation_alone();
-        if alone && lone_words(heard) {
+        let stop_over_the_lamp = self.spoken_stops
+            && self.began_over == Some(request)
+            && crate::spoken_stop::is_stop_request(heard);
+        if alone && lone_words(heard) && !stop_over_the_lamp {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
         }
         // A reply to nothing the lamp asked, said over its answer, is
@@ -20220,6 +20246,27 @@ mod tests {
             let verdict = heeding.judge(9, line, heard, signs(true, false));
             assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{heard}");
             assert_eq!(heeding.conversation_note_for(9).is_some(), !held, "{heard}");
+        }
+        // #3985: "Stop them." over the lamp's answer is said to the lamp
+        // with the spoken-stop switch; without it, or not over the lamp's
+        // voice, it stays the room's.
+        for (switch, over, held) in [
+            (true, true, false),
+            (false, true, true),
+            (true, false, true),
+        ] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if switch {
+                heeding.hearing_spoken_stops();
+            }
+            heeding.began_over = over.then_some(9);
+            let verdict = heeding.judge(9, line, "Stop them.", signs(true, false));
+            assert_eq!(
+                verdict,
+                held.then_some(super::LONE_WORDS),
+                "{switch} {over}"
+            );
         }
         // With a name, a word or two is the lamp's.
         let mut heeding = super::Heeding::new(false, false, None, None);
