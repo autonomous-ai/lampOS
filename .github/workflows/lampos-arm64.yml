@@ -131,7 +131,7 @@ concurrency:
 jobs:
   # Which runner lamp-voice's ARM64 job gets: the internal Mac Studio's
   # trusted slot (org runner group lampos-studio, label studio-trusted: one
-  # 20-vCPU VM, fresh for each job, no cache, only lamp-voice and main) or
+  # 20-vCPU VM, fresh for each job, no cache, only lamp-voice) or
   # GitHub-hosted, as before. lamp-voice's push is the publication build,
   # about 25 minutes here; signing and publishing stay on GitHub-hosted, so the
   # key never reaches the Studio. GitHub-hosted is the default and every doubt
@@ -411,9 +411,9 @@ jobs:
     needs: arm64
     # Off until the owner explicitly activates publication. Manual runs and PRs
     # never enter this job; download-artifact defaults to this successful run.
-    # The ARM64 job's own result, not the implicit success(): route is skipped
-    # on a push, and a skipped job anywhere upstream skips this one too
-    # (probed on devops007/needs-probe, run 40358296675).
+    # The ARM64 job's own result, not the implicit success(): a skipped job
+    # anywhere upstream (route, on other branches) skips this one too (probed on
+    # devops007/needs-probe, run 40358296675).
     if: ${{ !cancelled() && needs.arm64.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on' }}
     # The owner must configure branch-only lamp-voice protection before storing
     # the signing key here; naming an environment does not create its rules.
