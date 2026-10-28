@@ -2262,3 +2262,18 @@ original byte count and compare complete evidence; do not recalculate an
 ownership plan from changed files. This remains a read-only prerequisite:
 exclusion through the mutation boundary, projection dependencies and durable
 independent recovery are separate requirements.
+
+## Save complete ordinary plans without another policy engine (#3689)
+
+Keep the ordinary updater's ownership decisions and the existing bounded
+preimage/Head encodings. V1's software-update script retains present/absent rootfs entries in a
+backup manifest and syncs a pending publication journal before moving live
+paths. Preserve those typed-absence and retain-before-write safeguards. That
+script supplies no exact signed ordinary-plan container to port; its mutable
+paths and backup moves do not establish this protected-context contract. Reuse the pure signed preparation for verification and
+compare deterministic saved decisions/order, rather than adding a second
+planner or decoding wire rows into unchecked mutable steps. A small bounded
+outer frame retains original nested bytes without another base64 expansion.
+No dependency, State loader, filesystem publication or privileged execution
+framework is introduced. The [container contract](ordinary-plan-container.md)
+keeps protected recovery context and durable admission as separate work.
