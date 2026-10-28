@@ -47,8 +47,8 @@ reoffer = "(Say only this, nothing before or after it: \"Now I'll learn how you 
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip how you call me for now.\")"
 
 [onboarding.steps.touch]
-first = "(Say only this, nothing before or after it: \"Next, let's check my touch. Tap the top of my head once with your finger, then let go.\")"
-reoffer = "(Say only this, nothing before or after it: \"One more thing: let's check my touch. Tap the top of my head once with your finger, then let go.\")"
+first = "(Say only this, nothing before or after it: \"OK, next step. Tap the top of my head once, then let go.\")"
+reoffer = "(Say only this, nothing before or after it: \"One more thing: tap the top of my head once, then let go.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip the touch for now.\")"
 
 [onboarding.steps.privacy]
