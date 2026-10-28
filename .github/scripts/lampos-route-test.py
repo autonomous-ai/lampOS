@@ -50,6 +50,12 @@ class Decide(unittest.TestCase):
     def test_a_manual_run_on_lamp_voice_is_eligible(self):
         self.assertTrue(self.studio(env(GITHUB_EVENT_NAME="workflow_dispatch"))[0])
 
+    def test_a_re_run_is_hosted(self):
+        # The sweep re-runs a stuck run: the Studio must not take it again.
+        self.assertTrue(self.studio(env(GITHUB_RUN_ATTEMPT="1"))[0])
+        for attempt in ("2", "3", ""):
+            self.assertEqual(self.studio(env(GITHUB_RUN_ATTEMPT=attempt)), (False, "a re-run"), attempt)
+
     def test_canary_takes_manual_runs_only(self):
         self.assertTrue(self.studio(env(LAMPOS_STUDIO="canary", GITHUB_EVENT_NAME="workflow_dispatch"))[0])
         self.assertEqual(self.studio(env(LAMPOS_STUDIO="canary")), (False, "event not eligible"))

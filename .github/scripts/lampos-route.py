@@ -19,7 +19,7 @@ busy to finish sooner than GitHub-hosted would.
          a line to the run's summary. Never fails: any error routes hosted.
   sweep  cancels and re-runs (whole run, so `route` decides again) every run
          whose Studio job has been queued longer than STUCK_QUEUED or running
-         longer than STUCK_RUNNING. Run by the route job and on a schedule.
+         longer than STUCK_RUNNING; a re-run goes hosted. Run by the route job and on a schedule.
 
 Inputs come from the environment, so the decision is testable offline
 (.github/scripts/lampos-route-test.py):
@@ -27,10 +27,11 @@ Inputs come from the environment, so the decision is testable offline
                       shadow decides and says so but stays hosted, canary
                       takes manual runs only (nothing published), on takes
                       pushes too
-  LAMPOS_STUDIO_BEAT  "v1 <epoch> <pr registered> <pr healthy> <trusted healthy>",
+  LAMPOS_STUDIO_BEAT  "v1 <epoch> <pr registered> <pr healthy> <trusted healthy>"
+                      (the pull-request pool is retired: its two fields are 0),
                       written every 30 s by the Studio host
-  GITHUB_EVENT_NAME, GITHUB_REF, GITHUB_REPOSITORY, GITHUB_RUN_ID, FULL,
-  PROMOTE, GH_TOKEN
+  GITHUB_EVENT_NAME, GITHUB_REF, GITHUB_REPOSITORY, GITHUB_RUN_ID,
+  GITHUB_RUN_ATTEMPT, FULL, PROMOTE, GH_TOKEN
 """
 import json
 import math
@@ -49,10 +50,9 @@ WORKFLOW = "lampos-arm64.yml"
 ROUTE_JOB = "lampOS — choose the ARM64 runner"
 
 BEAT_STALE = 120  # s: the host writes every 30 s
-# lamp-voice's job, cold on the Studio's 20-vCPU VM: about 9 min (estimated
-# from 26 Oct's 6.1-min run of every crate there, with sccache, and a 91-s cold
-# release build), against 24.5 to 25.6 min on GitHub-hosted (28 Oct). So a
-# push waits behind one Studio job, not two.
+# lamp-voice's job, cold on the Studio's 20-vCPU VM: 7.1 min measured (28 Oct,
+# run 40662599577), 9 with margin, against 24.5 to 25.6 min on GitHub-hosted
+# (28 Oct). So a push waits behind one Studio job, not two.
 STUDIO_JOB = 9 * 60  # s
 HOSTED_JOB = 25 * 60  # s
 STUCK_QUEUED = 15 * 60  # s: one job ahead, and some
@@ -134,6 +134,10 @@ def decide(env, now, jobs_of):
         return False, "switch off"
     if not eligible(env, switch):
         return False, "event not eligible"
+    # A re-run is the sweep's rescue or a person's retry: if the Studio was why
+    # the first attempt failed, it would take the re-run too and fail again.
+    if env.get("GITHUB_RUN_ATTEMPT", "1") != "1":
+        return False, "a re-run"
     healthy, why = parse_beat(env.get("LAMPOS_STUDIO_BEAT"), now)
     if why:
         return False, why
