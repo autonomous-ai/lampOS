@@ -38,5 +38,6 @@ pub mod writer_preimages;
 pub mod writer_ready;
 pub mod writer_refresh;
 pub mod writer_settings;
+pub mod writer_unit;
 
 pub use round::{Config, Outcome, World, round};

@@ -2465,3 +2465,32 @@ bare 64-hex name, not a path), and that build's `lamp-update` is a regular
 file holding exactly the bytes of the lamp-update that runs. A lamp-update
 put back while still running, a build changed under its name, or a link to
 anything else is refused, with why. **Unwired:** no command calls it yet.
+
+### The writer's one-shot unit (#3689)
+
+A round's sandbox may write `/etc/systemd/system` but not
+`/usr/local/lib/lampos`, where the fixed settings writer is. So the refresh
+runs as a one-shot unit of its own, `lamp-update-writer.service`, whose text
+is compiled into lamp-update (`writer_unit::TEXT`). The round writes it and
+starts it, and systemd runs `/opt/lampOS/update/current/lamp-update
+writer-refresh` as root under that unit's sandbox: `ProtectSystem=strict`,
+writable only `/usr/local/lib/lampos` and `/var/lib/lampos-update`, the update
+key read-only, no network, 120 s. It has no `[Install]` and is never enabled.
+
+`writer_unit::run` writes the text at `/etc/systemd/system/lamp-update-writer.service`
+(mode 0644), only when it differs, then reloads systemd. A link at the name
+(a masked unit is one) or anything but a regular file is refused and left as
+it is. Before the start it reads systemd's own view of the unit (`Id`,
+`LoadState`, `FragmentPath`, `DropInPaths`, `UnitFileState`). That view must
+be the file written: loaded, from `/etc/systemd/system`, no drop-in, and
+static or disabled. A drop-in, a fragment elsewhere, a masked, enabled,
+runtime or generated unit, a missing or repeated property, or an unknown one
+starts nothing. systemd is asked only for this one unit name, through two
+methods of the `Systemd` trait. A systemd that lacks them refuses. A start
+that runs past its bound ends only the waiting: systemd's job goes on, so
+its result is read from what the command leaves, not from the start.
+
+**Unwired:** no round calls `writer_unit::run` yet, and `writer-refresh` is
+not a command yet. The unit has been checked by its tests' reading of the
+text and a fake systemd, not by a real systemd: neither `systemd-analyze
+verify` nor a start on Bookworm has run.
