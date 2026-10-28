@@ -1418,6 +1418,7 @@ fn run_spoken_call_inner(
         ("the executive", answer, answered)
     } else {
         let (whom, (mut told, answered)) = run_call_with_scope(route, call, request, heard, lease);
+        face_gone_with_everything(settings, route, &told);
         // A similarly named field from another service is never authority and
         // must not leak its private path or ticket into the model's conversation.
         take_requested_audio(&mut told, None);
@@ -1429,6 +1430,20 @@ fn run_spoken_call_inner(
         result
     } else {
         (result.0, ToolAnswer::plain(unavailable()), false)
+    }
+}
+
+/// A person's "forget everything" that forgot their face too
+/// ([`crate::remember::forget_everything_face`], its answer's `face`)
+/// tells the onboarding walk, as `forget_my_face` does, so a face saved
+/// before "who you are" was asked no longer ends it (Reviewer-two's P3 on
+/// #4243).
+fn face_gone_with_everything(settings: &Settings, route: &Route, told: &Value) {
+    if matches!(route, Route::Memory(..))
+        && told["face"] == "forgotten too"
+        && let Some(file) = &settings.onboarding
+    {
+        crate::onboarding::face_forgotten(file);
     }
 }
 
@@ -2196,6 +2211,42 @@ mod tests {
         let _ = run_call(&none, &remember("Sam"), 6, true);
         let _ = forget(&none, "Sam", 7);
         assert_eq!(mailbox().lines().count(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A "forget everything" that forgot the face too tells the onboarding
+    /// walk (Reviewer-two's P3 on #4243); its face kept, another part's
+    /// answer, or no onboarding file tells it nothing.
+    #[test]
+    fn forget_everything_with_the_face_tells_the_onboarding_walk() {
+        let dir = std::env::temp_dir().join(format!("tools-forget-all-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("onboarding.json");
+        let settings = Settings {
+            onboarding: Some(file.clone()),
+            ..Settings::default()
+        };
+        let memory = Route::Memory(dir.join("memory.sock"), None);
+        let mailbox =
+            || std::fs::read_to_string(crate::onboarding::mailbox_of(&file)).unwrap_or_default();
+        let kept = json!({"forgotten": true, "everything": false,
+            "face": crate::remember::MEMORY_FACE_KEPT});
+        face_gone_with_everything(&settings, &memory, &kept);
+        face_gone_with_everything(&settings, &memory, &json!({"forgotten": true}));
+        let gone = json!({"forgotten": true, "face": "forgotten too"});
+        face_gone_with_everything(&settings, &Route::Clock, &gone);
+        face_gone_with_everything(&Settings::default(), &memory, &gone);
+        assert_eq!(mailbox(), "");
+        face_gone_with_everything(&settings, &memory, &gone);
+        assert_eq!(
+            mailbox()
+                .lines()
+                .map(serde_json::from_str::<Value>)
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+            [json!({"face_forgotten": true})]
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
