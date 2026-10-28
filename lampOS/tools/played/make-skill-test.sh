@@ -305,6 +305,7 @@ grep -q "the ask's end wasn't seen" "$T/out/scenarios/make-skill-both.txt" \
   && { echo "FAIL both: an answer came late, after the ask's end was missed"; fail=1; }
 grep -q 'PLAYED_VOICE_ENV=LAMP_MAKE_SKILL=on' "$T/d/setup" || { echo "FAIL both: the switch was not given to the voice"; fail=1; }
 grep -q 'PLAYED_TARGET=auto' "$T/d/setup" || { echo "FAIL both: no targets file for the run"; fail=1; }
+grep -q 'PLAYED_CLOUD_ENV' "$T/d/setup" && { echo "FAIL both: lamp-cloud was touched for a spoken ask"; fail=1; }
 # The put-on's yes is a plain one (the voice's plain_agreement), never "Yes, put it on.", which it refuses.
 grep -qx 'Yes, go ahead.' "$T/d/played" || { echo "FAIL both: the put-on's yes was not a plain one"; fail=1; }
 # The voice's made skills saved, back as saved before each arm, and both put back at the end.
@@ -333,6 +334,8 @@ CLOUD=$T/fixture MAKE_FROM=app run app both 0 "PASS asked by the app" "PASS hand
   "PASS installed after the yes, the kept SHA-256" "PASS the app told it on" "PASS removed" "PASS nothing installed" \
   "PASS the app told it still off" "0 failed" "put back"
 grep -q "LAMP_APP_MAKE_SKILL=on" "$T/d/setup" || { echo "FAIL app: the app's switch was not given to the voice"; fail=1; }
+# The running lamp-cloud gets it too, so the owner's app shows "Make a skill" (fourteen-P11 on #2814).
+grep -q "PLAYED_CLOUD_ENV=LAMP_APP_MAKE_SKILL=on" "$T/d/setup" || { echo "FAIL app: the app's switch was not given to lamp-cloud"; fail=1; }
 grep -q "^Hey Lamp, make me a skill" "$T/d/played" && { echo "FAIL app: the request was spoken"; fail=1; }
 grep -q "python3" "$T/d/calls" && { echo "FAIL app: Python was run on the lamp"; fail=1; }
 grep -q "sudo -n -u lampos .*lamp-cloud make-skill make" "$T/d/calls" || { echo "FAIL app: not asked as lampos"; fail=1; }

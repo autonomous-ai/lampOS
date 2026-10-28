@@ -12,7 +12,11 @@
 #                     that one alias on the fixture's machine with Claude Code, in place of the unit's --targets
 #   PLAYED_VOICE_ENV  more NAME=VALUE for the voice's drop-in, space-separated (calendar.sh: LAMP_TASKS_ACCOUNTS=on,
 #                     make-skill.sh: LAMP_MAKE_SKILL=on)
-#   PLAYED_TASKS      a lamp-tasks for this run only, in place of the unit's own (ask-again.sh's TASKS=)
+#   PLAYED_CLOUD_ENV  NAME=VALUE for a drop-in of lamp-cloud's own, space-separated, and lamp-cloud restarted with
+#                     the others (make-skill.sh with MAKE_FROM=app: LAMP_APP_MAKE_SKILL=on, without which lamp-cloud's
+#                     system.info never names skills.make and the app shows no "Make a skill", fourteen-P11 on
+#                     #2814); unset, lamp-cloud is not touched
+#   PLAYED_TASKS     a lamp-tasks for this run only, in place of the unit's own (ask-again.sh's TASKS=)
 # It runs on a lamp with no Harness CLI too (lamp-06c1): lamp-tasks' drop-in clears the unit's
 # ConditionPathExists=/usr/local/bin/harness, which would have systemd skip it, and needs the stand-in's wrapper
 # instead; the restart starts a lamp-tasks that was skipped, and `out`'s restart leaves it skipped again.
@@ -42,6 +46,7 @@ GUARD_S=${PLAYED_GUARD_S:-3600}
 DROP=zz-played-stand-in.conf
 TASKS_DROP=$UNITS/lamp-tasks.service.d/$DROP
 VOICE_DROP=$UNITS/lamp-voice.service.d/$DROP
+CLOUD_DROP=$UNITS/lamp-cloud.service.d/$DROP
 fail() { echo "stand-in setup: $1" >&2; exit 1; }
 unguard() { $SYSTEMCTL stop $GUARD.timer 2>/dev/null; $SYSTEMCTL reset-failed $GUARD.timer $GUARD.service 2>/dev/null; true; }
 
@@ -59,6 +64,12 @@ in)
     esac
     case "$path" in
       *[!A-Za-z0-9._/-]* | */../* | */.. ) fail "${place%%=*}=$path holds more than letters, digits and . _ - /, or a ..";;
+    esac
+  done
+  for setting in ${PLAYED_CLOUD_ENV:-}; do
+    case "$setting" in
+      [A-Z_]*=*) case "${setting%%=*}" in *[!A-Z0-9_]*) fail "PLAYED_CLOUD_ENV's $setting is not NAME=VALUE";; esac ;;
+      *) fail "PLAYED_CLOUD_ENV's $setting is not NAME=VALUE";;
     esac
   done
   [ -x "$REMOTE/harness-fixture" ] || fail "no stand-in at $REMOTE/harness-fixture"
@@ -142,8 +153,12 @@ in)
   unguard
   restore=""
   [ -z "${PLAYED_RESTORE:-}" ] || restore="[ ! -e $PLAYED_RESTORE ] || { systemctl stop lamp-voice && systemctl is-active lamp-voice | grep -qx -e inactive -e failed && /bin/sh $PLAYED_RESTORE; systemctl start lamp-voice; }; "
+  # lamp-cloud is in the run, its drop-in put back and itself restarted with the others, only with PLAYED_CLOUD_ENV.
+  drops="$TASKS_DROP $VOICE_DROP"
+  restarted="lamp-tasks lamp-voice"
+  [ -z "${PLAYED_CLOUD_ENV:-}" ] || { drops="$drops $CLOUD_DROP"; restarted="$restarted lamp-cloud"; }
   $SYSTEMD_RUN --unit=$GUARD --on-active="${GUARD_S}s" /bin/sh -c \
-    "${restore}rm -f $TASKS_DROP $VOICE_DROP; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $REMOTE${PLAYED_RESTORE:+; [ ! -e $PLAYED_RESTORE ]}" \
+    "${restore}rm -f $drops; systemctl daemon-reload; systemctl restart $restarted; rm -rf $REMOTE${PLAYED_RESTORE:+; [ ! -e $PLAYED_RESTORE ]}" \
     >/dev/null || fail "arming the lamp's guard (systemd-run) failed"
   mkdir -p "$UNITS/lamp-tasks.service.d" "$UNITS/lamp-voice.service.d" || { unguard; fail "mkdir of the drop-in folders failed"; }
   { printf '[Unit]\nConditionPathExists=\n' &&
@@ -154,17 +169,26 @@ in)
     for setting in ${PLAYED_VOICE_ENV:-}; do printf 'Environment=%s\n' "$setting"; done
   } > "$VOICE_DROP" || {
     rm -f "$TASKS_DROP"; unguard; fail "writing the voice's drop-in failed"; }
-  $SYSTEMCTL daemon-reload && $SYSTEMCTL restart lamp-tasks lamp-voice || {
-    rm -f "$TASKS_DROP" "$VOICE_DROP"; $SYSTEMCTL daemon-reload; $SYSTEMCTL restart lamp-tasks lamp-voice; unguard
+  if [ -n "${PLAYED_CLOUD_ENV:-}" ]; then
+    { mkdir -p "$UNITS/lamp-cloud.service.d" &&
+      { printf '[Service]\n'; for setting in $PLAYED_CLOUD_ENV; do printf 'Environment=%s\n' "$setting"; done; } > "$CLOUD_DROP"
+    } || { rm -f $drops; unguard; fail "writing lamp-cloud's drop-in failed"; }
+  fi
+  # $restarted is unit names split on purpose.
+  $SYSTEMCTL daemon-reload && $SYSTEMCTL restart $restarted || {
+    rm -f $drops; $SYSTEMCTL daemon-reload; $SYSTEMCTL restart $restarted; unguard
     fail "restarting with the stand-in failed; put back"; }
   echo "stand-in in: lamp-tasks $tasks as $user:$group, its Harness $REMOTE/harness, its store $store"
   ;;
 out)
   # The guard is stopped last: a session lost before then leaves it to restart both and remove the folder (El's P3
   # on #3936), where stopping it first left nothing to.
-  rm -f "$TASKS_DROP" "$VOICE_DROP"
+  # lamp-cloud only if `in` gave it a drop-in (PLAYED_CLOUD_ENV), whatever this call's settings are.
+  restarted="lamp-tasks lamp-voice"
+  [ ! -e "$CLOUD_DROP" ] || restarted="$restarted lamp-cloud"
+  rm -f "$TASKS_DROP" "$VOICE_DROP" "$CLOUD_DROP"
   $SYSTEMCTL daemon-reload
-  $SYSTEMCTL restart lamp-tasks lamp-voice
+  $SYSTEMCTL restart $restarted
   rm -rf "$REMOTE"
   unguard
   echo "put back: lamp-tasks $($SYSTEMCTL is-active lamp-tasks), lamp-voice $($SYSTEMCTL is-active lamp-voice)"
