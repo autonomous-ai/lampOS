@@ -1181,6 +1181,26 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// A thing the person already keeps, said again, is that kept thing, not a
+/// second one (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): on lamp-06c1 on 28 Oct
+/// the product unit, without it, kept "the meeting room is called orange"
+/// twice (Friday's run on #3504).
+#[test]
+fn the_product_keeps_a_repeated_thing_once() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_MEMORY_REMEMBER_ONCE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

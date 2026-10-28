@@ -110,6 +110,17 @@ sản phẩm nay bật công tắc này cạnh `LAMP_MEMORY_OBSERVE`: phiên k�
 mới, không tiếp nối phiên cũ, ghi nhật ký trở lại, và cuộc trò chuyện kế tiếp có
 lượt quan sát của nó. Vẫn còn nợ một lần kiểm tra trên lamp.
 
+## Một điều đã giữ, nói lại, vẫn là một điều
+
+Khi bật `LAMP_MEMORY_REMEMBER_ONCE` (#2176), `remember` gửi `once` cho bộ nhớ:
+một câu mà chính người đó đã giữ, còn hiệu lực và cùng chữ (không phân biệt
+hoa thường, khoảng trắng và dấu câu cuối), là chính điều đã giữ đó, không ghi
+thêm dòng nào. Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
+điều đã quên hay đã bị thay, không tính là cùng một điều. Unit sản phẩm bật công
+tắc này từ 28/10: trên lamp-06c1, khi không có nó, một câu nói lại đã được giữ
+lần thứ hai (lượt chạy của Friday, #3504). Vẫn còn nợ một lần kiểm tra trên
+lamp: cùng một câu nói hai lần chỉ giữ một điều.
+
 ## Kết thúc cuộc trò chuyện sau một lệnh quên
 
 Khi một cuộc trò chuyện còn mở mà có lệnh quên hoặc `forget_everything`,

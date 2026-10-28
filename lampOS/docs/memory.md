@@ -1200,7 +1200,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     same answers).
 
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
-  client only; off unless set; both voice routes). `remember` asks the
+  client only; off unless set; both voice routes; on in the product unit
+  since 28 Oct, after lamp-06c1 kept a line said again a second time). `remember` asks the
   store with `"once":true`. A held turn whose words were answered a second
   time called `remember` again with the same text (lamp-06c1, the second
   route, build 4142: kept ids 24 and 25). Now a text the person already
