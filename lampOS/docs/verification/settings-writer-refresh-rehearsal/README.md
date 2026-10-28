@@ -27,7 +27,16 @@ writer is unproved.
 
   There should be no `lamp-update-back.prev` and no
   `/etc/systemd/system/lamp-update-writer.service`.
-- For #4190 (a `back` that began before the refresh is waited past), as
+- **Then take the carrier's whole backup** ("Backup and isolation" in
+  [product-carrier-20261025](../product-carrier-20261025/README.md)): every
+  unit and drop-in, enablement and timer states, every part's `current`
+  link, and the build bytes each names, all kept outside any build folder.
+  Also the complete updater records. G, G′, S and B1 are whole builds, so
+  every part's `current` moves off 7071's folder, and a round keeps only its
+  build and the one before. By GOOD step 5, 7071's part folders are gone
+  from the lamp, and only this backup can bring them back (Reviewer-three's
+  P3 1 on #4181).
+- For #4199 (a `back` that began before the refresh is waited past), as
   root, once the timer has run `back`:
 
   ```sh
@@ -39,9 +48,10 @@ writer is unproved.
   It should print `t` and a number of microseconds that, divided by
   1,000,000, is about `date +%s` at that `back`'s start. If it fails (no
   D-Bus daemon), run it again with `--address=unix:path=/run/systemd/private`
-  right after `busctl`: #4190 asks systemd's own socket next. Post on #4190
-  which of the two answered. If neither does, #4190 counts every failure as
-  before.
+  right after `busctl`: #4199 asks systemd's own socket next. Post on #4199
+  which of the two answered. If neither does, #4199 counts every failure as
+  before. Until #4199 lands, the lamp's lamp-update asks neither: this step
+  checks only the lamp's answers.
 - Follow a test channel signed with a throwaway key, never the production
   head or key. The product carrier's acceptance
   ([product-carrier-20261025](../product-carrier-20261025/README.md),
@@ -154,7 +164,8 @@ run it again to get a pass.
 - Remove `lamp-update-back.prev` and `lamp-update-writer.service`, and run
   `systemctl daemon-reload`.
 - Remove the `writer-*` records.
-- Restore the channel, the key and the installed records from the private
-  backup, as the carrier's acceptance does.
-- Verify each against the hashes recorded at the start, then release the
-  lease.
+- Restore from the private backup, as the carrier's acceptance does:
+  every unit, every part's `current` link and the build each names, the
+  channel, the key, and the updater records.
+- Verify each against the backup: every part's binary hash through its
+  `current`, not only `lamp-update-back`'s. Then release the lease.
