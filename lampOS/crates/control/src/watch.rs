@@ -69,6 +69,9 @@ pub struct Watch {
     privacy_us: Option<u64>,
     asleep: bool,
     light: Value,
+    /// What the ring draws now (`light/drawn`): the person's light, or a
+    /// light a computer or a skill asked for over it; none until it says.
+    shows: Option<Value>,
     mood: Value,
     sounds: [bool; 4],
 }
@@ -98,7 +101,7 @@ impl Watch {
                     .as_str()
                     .is_some_and(|state| state != "resting")
             )),
-            "light/state" => Some(
+            "light/state" | "light/drawn" => Some(
                 json!({"on": payload["on"], "colour": payload["colour"], "level": payload["level"]}),
             ),
             "mood/state" => Some(
@@ -185,6 +188,10 @@ impl Watch {
                 self.light = Self::kept_of(topic, payload).unwrap_or_default();
                 Vec::new()
             }
+            "light/drawn" => {
+                self.shows = Self::kept_of(topic, payload);
+                Vec::new()
+            }
             "mood/state" => {
                 self.mood = Self::kept_of(topic, payload).unwrap_or_default();
                 Vec::new()
@@ -222,7 +229,15 @@ impl Watch {
             StateKind::Presence => {
                 json!({"count": self.count, "near": self.near, "facing": self.facing})
             }
-            StateKind::Light => self.light.clone(),
+            // The person's own light as before, and what shows beside it.
+            StateKind::Light => match (&self.light, &self.shows) {
+                (light, None) => light.clone(),
+                (light, Some(shows)) => {
+                    let mut state = light.as_object().cloned().unwrap_or_default();
+                    state.insert("shows".to_owned(), shows.clone());
+                    Value::Object(state)
+                }
+            },
             StateKind::Mood => self.mood.clone(),
             StateKind::Lamp => {
                 json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
@@ -443,6 +458,12 @@ mod tests {
                 json!({"on": true, "colour": "warm", "level": 2}),
             ),
             (
+                "light/drawn",
+                json!({"on": true, "colour": "red", "level": 3, "at": 1}),
+                json!({"on": true, "colour": "red", "level": 3, "at": 2}),
+                json!({"on": true, "colour": "warm", "level": 1}),
+            ),
+            (
                 "mood/state",
                 json!({"energy": 0.5, "warmth": 0.4, "awake": true, "asleep": false, "at": 1}),
                 json!({"energy": 0.5, "warmth": 0.4, "awake": true, "asleep": false, "at": 2}),
@@ -650,6 +671,47 @@ mod tests {
         assert_eq!(
             watch.state(StateKind::Light),
             json!({"on": true, "colour": "warm", "level": 3})
+        );
+    }
+
+    /// `get`'s light: the person's own as before, and what the ring draws
+    /// as `shows` (lamp-a0ae, 29 Oct: light/state warm 1 while light/drawn
+    /// was a computer's red 3).
+    #[test]
+    fn the_light_state_is_the_persons_own_and_what_shows() {
+        let mut watch = Watch::new();
+        assert_eq!(watch.state(StateKind::Light), Value::Null, "nothing heard");
+        let red = json!({"on": true, "colour": "red", "level": 3, "source": "ring"});
+        watch.take("light/drawn", &red, S);
+        assert_eq!(
+            watch.state(StateKind::Light),
+            json!({"shows": {"on": true, "colour": "red", "level": 3}})
+        );
+        watch.take(
+            "light/state",
+            &json!({"on": true, "colour": "warm", "level": 1}),
+            S,
+        );
+        assert_eq!(
+            watch.state(StateKind::Light),
+            json!({"on": true, "colour": "warm", "level": 1, "shows": {"on": true, "colour": "red", "level": 3}})
+        );
+        // A ring that says nothing more leaves its last draw: `shows`
+        // doesn't lapse with light/drawn's 3 s (control.md says so).
+        watch.lapse(60 * S);
+        assert_eq!(
+            watch.state(StateKind::Light)["shows"],
+            json!({"on": true, "colour": "red", "level": 3})
+        );
+        // The request lapses: the ring draws the person's light again.
+        watch.take(
+            "light/drawn",
+            &json!({"on": true, "colour": "warm", "level": 1}),
+            2 * S,
+        );
+        assert_eq!(
+            watch.state(StateKind::Light)["shows"],
+            json!({"on": true, "colour": "warm", "level": 1})
         );
     }
 }
