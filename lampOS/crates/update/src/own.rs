@@ -7,7 +7,8 @@
 //!    link; `serve` then `exec`s the new binary in its own place.
 //! 2. The new binary confirms itself only when it has read the channel's
 //!    manifest and checked its signature, a dry round: then `self.json`
-//!    goes. Until then no round acts.
+//!    goes. A refusal of the lamp's own units' head touch after that check
+//!    does not keep it from confirming (#2853). Until then no round acts.
 //! 3. `lamp-update-back`, at a fixed path that only `install` writes and no
 //!    round can, puts the link back when `self.json` is still there and
 //!    lamp-update has failed (`OnFailure=`) or [`DEADLINE`] has passed (its
@@ -323,9 +324,14 @@ pub fn confirm(
         ..config.clone()
     };
     // Only what this updater is switched to apply counts: a build that
-    // waits for the models switch was read and checked all the same.
+    // waits for the models switch was read and checked all the same, and so
+    // was one the lamp's own head touch units refuse (#2853): the updater
+    // before met that refusal too, and only a newer one's install mends it.
     match round(&dry, world) {
-        Outcome::UpToDate(_) | Outcome::Would(_) | Outcome::WaitsForModels(_) => {}
+        Outcome::UpToDate(_)
+        | Outcome::Would(_)
+        | Outcome::WaitsForModels(_)
+        | Outcome::WaitsForUnits(_) => {}
         other => return Ok(Confirm::NotProven(other.to_string())),
     }
     let records = Records::new(folder.clone());
@@ -359,7 +365,10 @@ fn confirm_unreadable(config: &Config, world: &mut World) -> Result<Confirm, Str
             ..config.clone()
         };
         match round(&dry, world) {
-            Outcome::UpToDate(_) | Outcome::Would(_) | Outcome::WaitsForModels(_) => {}
+            Outcome::UpToDate(_)
+            | Outcome::Would(_)
+            | Outcome::WaitsForModels(_)
+            | Outcome::WaitsForUnits(_) => {}
             other => return Ok(Confirm::NotProven(other.to_string())),
         }
     }

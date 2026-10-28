@@ -262,7 +262,7 @@ fn refused_without_writes(lamp: &mut Lamp) {
     let settings = lamp.state()["settings"].clone();
     let outcome = lamp.round();
     assert!(
-        matches!(outcome, Outcome::Refused(_)),
+        matches!(outcome, Outcome::Refused(_) | Outcome::WaitsForUnits(_)),
         "{outcome:?}; {:?}",
         lamp.said
     );
@@ -336,7 +336,7 @@ fn custom_head_wiring_is_kept_or_the_reader_transition_is_refused() {
                 TouchPinsConfig::load(&lamp.root.join(PINS.trim_start_matches('/'))).unwrap();
             assert!(!pins.legacy_head);
         }
-        Outcome::Refused(_) => {
+        Outcome::Refused(_) | Outcome::WaitsForUnits(_) => {
             assert_eq!(etc_files(&lamp), files);
             assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
         }

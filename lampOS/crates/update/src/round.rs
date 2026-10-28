@@ -150,6 +150,14 @@ pub enum Outcome {
     /// not switched to apply models. Its own switch confirms on it
     /// (crate::own); the build waits for the models switch.
     WaitsForModels(String),
+    /// Refused as [`Outcome::Refused`] is, only because the lamp's head
+    /// touch units do not agree (head_touch::verify): the manifest was read
+    /// and its signature checked, and what refuses is the lamp's own units,
+    /// which the updater before met the same way and an install puts right.
+    /// Its own switch confirms on it (crate::own, #2853), so a lamp whose
+    /// units were edited by hand still climbs to the updater that can mend
+    /// them; the build itself is still refused, nothing written.
+    WaitsForUnits(String),
     /// Without `apply`: what would be done.
     Would(Vec<String>),
     /// Installed beside the old build, or not even that, and not switched:
@@ -239,7 +247,7 @@ impl Outcome {
             Self::Unreachable(_) => "unreachable",
             Self::NothingPublished => "nothing-published",
             Self::UpToDate(_) => "up-to-date",
-            Self::Refused(_) | Self::WaitsForModels(_) => "refused",
+            Self::Refused(_) | Self::WaitsForModels(_) | Self::WaitsForUnits(_) => "refused",
             Self::Would(_) => "would",
             Self::NotQuiet(_) => "not-quiet",
             Self::Switched(_) => "switched",
@@ -258,7 +266,7 @@ impl std::fmt::Display for Outcome {
                 f.write_str("nothing changed: the channel has published no build")
             }
             Self::UpToDate(sequence) => write!(f, "up to date: build {sequence}"),
-            Self::Refused(why) | Self::WaitsForModels(why) => {
+            Self::Refused(why) | Self::WaitsForModels(why) | Self::WaitsForUnits(why) => {
                 write!(f, "refused, nothing switched: {why}")
             }
             Self::Would(lines) => {
@@ -808,7 +816,7 @@ impl Run<'_, '_> {
                 &future_units,
                 &[],
             )
-            .map_err(Outcome::Refused)?;
+            .map_err(Outcome::WaitsForUnits)?;
         }
         if self
             .setting_writes
@@ -1059,7 +1067,7 @@ impl Run<'_, '_> {
                 future_units,
                 if settings { &steps } else { &[] },
             )
-            .map_err(Outcome::Refused)?;
+            .map_err(Outcome::WaitsForUnits)?;
             // Setup's reset plan, over any plan the lamp has (#806).
             if let Some(plan) = &manifest.reset_plan {
                 steps.extend(
