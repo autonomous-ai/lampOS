@@ -941,9 +941,34 @@
       "description": "A refusal. New fields may come; a client ignores what it doesn't know."
     },
     "limits": {
-      "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), and the lease and say bounds.",
+      "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), the lease and say bounds, and this lamp's quiet hours.",
       "type": "object",
       "properties": {
+        "quiet_hours": {
+          "description": "This lamp's quiet hours (lamp-control's --quiet-hours, 22:00 to 07:00 local unless set): `say` and `sound` are refused inside them, local times from `from` up to `to`, across midnight when `to` comes first; or \"off\".",
+          "anyOf": [
+            {
+              "const": "off"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            }
+          ]
+        },
         "joints": {
           "type": "array",
           "items": {

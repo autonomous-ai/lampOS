@@ -155,12 +155,15 @@ pub struct Door {
 /// to root's helper).
 pub const ASKING_MOST: usize = 4;
 
-/// The lamp's quiet hours on the door: `say` and `sound` refused from
-/// 22:00 to 07:00 local (`lamp_local_time::quiet_hours`, one definition
-/// with lamp-skills), and while the lamp's local time isn't known.
+/// The lamp's quiet hours on the door: `say` and `sound` refused inside
+/// this lamp's window (`--quiet-hours`, 22:00 to 07:00 local by default,
+/// `lamp_local_time::QuietWindow`), and while the lamp's local time isn't
+/// known; never with the window `off`.
 pub struct Quiet {
     /// The lamp's zone, or none when it couldn't be read.
     pub local_time: Option<std::sync::Arc<lamp_local_time::LocalTime>>,
+    /// This lamp's window; none when its setting is `off`.
+    pub window: Option<lamp_local_time::QuietWindow>,
     /// When each computer's refusal was last journaled (unix s), so the
     /// journal says it once a night.
     journaled: BTreeMap<String, u64>,
@@ -174,25 +177,28 @@ impl Quiet {
     pub fn new(local_time: Option<std::sync::Arc<lamp_local_time::LocalTime>>) -> Self {
         Self {
             local_time,
+            window: Some(lamp_local_time::QuietWindow::DEFAULT),
             journaled: BTreeMap::new(),
         }
     }
 
+    /// This lamp's own window, or `None` for `off`.
+    pub fn with_window(mut self, window: Option<lamp_local_time::QuietWindow>) -> Self {
+        self.window = window;
+        self
+    }
+
     /// Why `client`'s say or sound is refused at `wall_s`, if it is.
     fn refuses(&mut self, client: &str, wall_s: u64) -> Option<String> {
+        // Off by this lamp's own setting: never quiet.
+        let window = self.window?;
         let why = match &self.local_time {
             Some(local) if wall_s >= CLOCK_SET_AFTER_S => {
                 let minute = local.minute_of_day(wall_s.saturating_mul(1_000));
-                if !lamp_local_time::quiet_hours(minute) {
+                if !window.contains(minute) {
                     return None;
                 }
-                format!(
-                    "quiet hours: {:02}:{:02} to {:02}:{:02} local",
-                    lamp_local_time::QUIET_FROM_MINUTE / 60,
-                    lamp_local_time::QUIET_FROM_MINUTE % 60,
-                    lamp_local_time::QUIET_TO_MINUTE / 60,
-                    lamp_local_time::QUIET_TO_MINUTE % 60
-                )
+                format!("quiet hours: {window} local, this lamp's setting")
             }
             _ => "quiet hours: the lamp's local time isn't known".to_owned(),
         };
@@ -807,7 +813,7 @@ impl Door {
             json!({
                 "lamp": self.lamp,
                 "grants": grants,
-                "limits": limits(),
+                "limits": limits(self.quiet.as_ref().and_then(|quiet| quiet.window)),
             }),
         )
     }
@@ -825,8 +831,9 @@ impl Door {
 /// Why a skill op is refused on a lamp where skill push is off.
 pub const PUSH_OFF: &str = "skill push is not on this lamp";
 
-/// The rates and caps `hello` tells, so a client keeps inside them.
-pub fn limits() -> Value {
+/// The rates and caps `hello` tells, so a client keeps inside them, and
+/// this lamp's quiet hours (`"off"` when none).
+pub fn limits(quiet: Option<lamp_local_time::QuietWindow>) -> Value {
     let class = |class: Class| -> Value {
         class
             .windows()
@@ -847,7 +854,36 @@ pub fn limits() -> Value {
         "hold_max_ms": protocol::HOLD_MAX_MS,
         "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
         "say_max_chars": protocol::SAY_MAX_CHARS,
+        "quiet_hours": quiet_hours_of(quiet),
     })
+}
+
+/// A window as hello tells it: `{"from": "22:00", "to": "07:00"}`, or
+/// `"off"`.
+fn quiet_hours_of(quiet: Option<lamp_local_time::QuietWindow>) -> Value {
+    let hhmm = |minute: u16| format!("{:02}:{:02}", minute / 60, minute % 60);
+    match quiet {
+        Some(window) => json!({"from": hhmm(window.from), "to": hhmm(window.to)}),
+        None => json!("off"),
+    }
+}
+
+/// This lamp's quiet hours from its setting: `--quiet-hours` first, then
+/// `LAMP_CONTROL_QUIET`, else the default, 22:00 to 07:00. `off` only when
+/// one of them says so; a bad value stops lamp-control at its start.
+pub fn quiet_window_of(
+    flag: Option<&str>,
+    env: Option<&str>,
+) -> Result<Option<lamp_local_time::QuietWindow>, String> {
+    match (flag, env) {
+        (Some(flag), _) => {
+            lamp_local_time::QuietWindow::parse(flag).map_err(|e| format!("--quiet-hours {e}"))
+        }
+        (None, Some(env)) => {
+            lamp_local_time::QuietWindow::parse(env).map_err(|e| format!("LAMP_CONTROL_QUIET {e}"))
+        }
+        (None, None) => Ok(Some(lamp_local_time::QuietWindow::DEFAULT)),
+    }
 }
 
 /// A lease change as the event its holder is told.
@@ -1227,7 +1263,7 @@ mod tests {
                 );
                 assert_eq!(
                     reply(&refused)["error"]["why"],
-                    "quiet hours: 22:00 to 07:00 local"
+                    "quiet hours: 22:00 to 07:00 local, this lamp's setting"
                 );
             }
         }
@@ -1254,6 +1290,133 @@ mod tests {
         let unknown = door.handle(&mut session, say, &mut fake, 2 * S, at(12));
         assert_eq!(code_of(&unknown), Some("quiet_hours"));
         assert!(fake.did.is_empty());
+    }
+
+    /// A lamp's own quiet hours (`--quiet-hours`): `off` refuses nothing,
+    /// not even with the time unknown; a window within a day and one across
+    /// midnight refuse inside it only, saying it; hello's limits tell it.
+    #[test]
+    fn a_lamps_own_quiet_hours_are_held_and_told() {
+        use lamp_local_time::QuietWindow;
+        let utc7 = std::sync::Arc::new(lamp_local_time::LocalTime::Offset(7 * 60));
+        const MIDNIGHT_UTC: u64 = 1_793_145_600;
+        let at = |minute_local: u64| MIDNIGHT_UTC + ((minute_local + 1_440 - 420) % 1_440) * 60;
+        let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
+        let hello_limits = |door: &mut Door, fake: &mut Fake, computer: &Computer| {
+            let (mut session, welcome) = door.open();
+            let outcome = door.handle(&mut session, &computer.hello_frame(&welcome), fake, S, 1);
+            reply(&outcome)["limits"]["quiet_hours"].clone()
+        };
+        // A window, local minutes and whether each is quiet, and hello's word.
+        type Case = (Option<QuietWindow>, &'static [(u64, bool)], Value);
+        let cases: [Case; 4] = [
+            (None, &[(23 * 60, false), (3 * 60, false)], json!("off")),
+            (
+                Some(QuietWindow::DEFAULT),
+                &[
+                    (21 * 60 + 59, false),
+                    (22 * 60, true),
+                    (6 * 60 + 59, true),
+                    (7 * 60, false),
+                ],
+                json!({"from": "22:00", "to": "07:00"}),
+            ),
+            (
+                QuietWindow::parse("23:30-06:15").unwrap(),
+                &[
+                    (23 * 60 + 29, false),
+                    (23 * 60 + 30, true),
+                    (6 * 60 + 14, true),
+                    (6 * 60 + 15, false),
+                ],
+                json!({"from": "23:30", "to": "06:15"}),
+            ),
+            (
+                QuietWindow::parse("13:00-14:00").unwrap(),
+                &[
+                    (12 * 60 + 59, false),
+                    (13 * 60, true),
+                    (13 * 60 + 59, true),
+                    (14 * 60, false),
+                    (23 * 60, false),
+                ],
+                json!({"from": "13:00", "to": "14:00"}),
+            ),
+        ];
+        for (n, (window, minutes, told)) in cases.into_iter().enumerate() {
+            let computer = Computer::new(10 + n as u8);
+            let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak]);
+            let mut door =
+                door.with_quiet_hours(Quiet::new(Some(utc7.clone())).with_window(window));
+            assert_eq!(
+                hello_limits(&mut door, &mut fake, &computer),
+                told,
+                "{window:?}"
+            );
+            for (i, (minute, quiet)) in minutes.iter().enumerate() {
+                // Each say a minute apart from the last, inside the rate.
+                let outcome = door.handle(
+                    &mut session,
+                    say,
+                    &mut fake,
+                    (2 + 61 * i as u64) * S,
+                    at(*minute),
+                );
+                if *quiet {
+                    assert_eq!(
+                        code_of(&outcome),
+                        Some("quiet_hours"),
+                        "{window:?} {minute}"
+                    );
+                    let why = format!(
+                        "quiet hours: {} local, this lamp's setting",
+                        window.unwrap()
+                    );
+                    assert_eq!(reply(&outcome)["error"]["why"], json!(why));
+                } else {
+                    assert_eq!(
+                        reply(&outcome)["ok"],
+                        true,
+                        "{window:?} {minute}: {outcome:?}"
+                    );
+                }
+            }
+        }
+        // Off holds even while the lamp's time isn't known.
+        let (door, mut session, mut fake) = paired(&Computer::new(20), &[Grant::Speak]);
+        let mut door = door.with_quiet_hours(Quiet::new(None).with_window(None));
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, 1_000))["ok"],
+            true
+        );
+    }
+
+    /// The setting at start: the flag, else the environment, else the
+    /// default; `off` only when said; a bad value stops lamp-control.
+    #[test]
+    fn the_quiet_hours_setting_is_read_at_start_and_a_bad_one_refused() {
+        use lamp_local_time::QuietWindow;
+        assert_eq!(quiet_window_of(None, None), Ok(Some(QuietWindow::DEFAULT)));
+        assert_eq!(quiet_window_of(None, Some("off")), Ok(None));
+        assert_eq!(quiet_window_of(Some("off"), None), Ok(None));
+        assert_eq!(
+            quiet_window_of(Some("23:00-06:00"), Some("off")),
+            Ok(Some(QuietWindow {
+                from: 23 * 60,
+                to: 6 * 60
+            }))
+        );
+        assert!(
+            quiet_window_of(Some("22-07"), None)
+                .unwrap_err()
+                .starts_with("--quiet-hours ")
+        );
+        assert!(
+            quiet_window_of(None, Some(""))
+                .unwrap_err()
+                .starts_with("LAMP_CONTROL_QUIET ")
+        );
+        assert!(quiet_window_of(Some("08:00-08:00"), None).is_err());
     }
 
     #[test]
