@@ -164,19 +164,24 @@ impl Systemd for Systemctl {
     fn back_began_unix_ms(&mut self) -> Option<u64> {
         // The bus, not `systemctl show`: its value is the microseconds
         // themselves on every systemd, where `systemctl`'s is a date in
-        // words, and `--timestamp=unix` not known to all.
-        let stdout = show_within(
-            Command::new("busctl").args([
-                "get-property",
-                "org.freedesktop.systemd1",
-                &unit_object(crate::writer_swap::BACK_UNIT),
-                "org.freedesktop.systemd1.Service",
-                "ExecMainStartTimestamp",
-            ]),
-            JOURNAL_WITHIN,
-        )
-        .ok()?;
-        began_unix_ms(&stdout)
+        // words, and `--timestamp=unix` not known to all. The system bus
+        // first, then systemd's own socket, which `systemctl` uses as root:
+        // a lamp may run no D-Bus daemon (Reviewer-two's P3 on #4190).
+        let object = unit_object(crate::writer_swap::BACK_UNIT);
+        [None, Some("--address=unix:path=/run/systemd/private")]
+            .into_iter()
+            .find_map(|address| {
+                let mut command = Command::new("busctl");
+                command.args(address).args([
+                    "get-property",
+                    "org.freedesktop.systemd1",
+                    &object,
+                    "org.freedesktop.systemd1.Service",
+                    "ExecMainStartTimestamp",
+                ]);
+                let stdout = show_within(&mut command, JOURNAL_WITHIN).ok()?;
+                began_unix_ms(&stdout)
+            })
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {
