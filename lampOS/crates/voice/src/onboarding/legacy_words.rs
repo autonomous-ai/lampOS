@@ -44,7 +44,7 @@ pub const GIVE_ASK: &str = "(Say only this, nothing before or after it: \"Hold m
 pub const GIVE_AGAIN: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move. Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.\")";
 pub const GIVE_FELT: &str =
     "(Say only this, nothing before or after it: \"That's it, now let go.\")";
-pub const GIVE_PROMPT: &str = "(Say only this, nothing before or after it: \"Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.\")";
+pub const GIVE_PROMPT: &str = "(Say only this, nothing before or after it: \"Hold my base with one hand. With the other, tilt my head gently to one side, then let go.\")";
 pub const GIVE_MORE: &str =
     "(Say only this, nothing before or after it: \"A little more, then let go.\")";
 pub const GIVE_DONE: &str =

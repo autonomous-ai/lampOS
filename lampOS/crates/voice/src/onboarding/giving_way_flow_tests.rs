@@ -719,7 +719,7 @@ fn the_steps_lines_are_the_skills() {
         (GIVE_MORE, "A little more, then let go."),
         (
             GIVE_PROMPT,
-            "Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.",
+            "Hold my base with one hand. With the other, tilt my head gently to one side, then let go.",
         ),
         (GIVE_DONE, "Got it, my head moved with your hand."),
         (
