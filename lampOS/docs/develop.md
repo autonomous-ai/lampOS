@@ -148,6 +148,32 @@ ends this computer's own actions at once, and needs no grant.
 `wait_closed()` returns. Connect again in a loop, with a few seconds'
 pause.
 
+### Everything you can read
+
+Events come by edge, when something changes, never once per reading. The SDK
+READMEs' "Everything you can read" gives each one's fields and an example.
+
+- **`look` grant:**
+  - `person.arrived`: a face while the lamp had nobody (at start, or after `person.left`), with `count` and `near`.
+  - `person.left`: nobody for 5 s.
+  - `person.facing`: someone turns to the lamp, or away.
+  - `person.stood_up`, with `side`.
+  - `hand`: a hand seen, moved, opened, closed or gone, at most 4 a second.
+- **`hear` grant:** `phrase.heard` (only your registered phrase, never the words around it) and `name.heard`.
+- **`sound` grant:** `sound.heard`: `music`, `laughter`, `door` or `footsteps` past 0.5, never speech.
+- **No grant:**
+  - `touch` (`tap`, `pet`) and `button` (`long_press`).
+  - `lamp.changed` (`talking`, `paused`, `private`, `asleep`).
+  - `time` (accepted, not produced yet).
+- **Without subscribing:** `lease` (your lease held, suspended or lost, and why) and `done` (an action that ends later, today `say`).
+- **`get`:**
+  - `presence` (`count`, `near`, `facing`; needs `look`).
+  - `light` (the person's own, and `shows`, what the ring draws now).
+  - `mood` (`energy`, `warmth`, `awake`, `asleep`).
+  - `lamp`.
+  - `air` is planned.
+- **Never:** camera frames, audio, transcripts, the words around a phrase, face prints or names.
+
 ### The same in JavaScript
 
 Node 20.11 or later. In your project, install the SDK as a copy, not a

@@ -435,6 +435,50 @@ def test_the_examples_compile_and_call_only_what_the_client_has():
                 assert hasattr(Lamp, node.attr), f"{example.name}: lamp.{node.attr}"
 
 
+def test_the_readme_reference_names_every_public_call_command_and_option():
+    import argparse
+    import inspect
+
+    from lampos import cli
+    from lampos.client import Lease
+
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
+    reference = readme[readme.index("## Reference"):]
+    for cls in (Lamp, Lease):
+        for name, member in vars(cls).items():
+            if not name.startswith("_") and (callable(member) or isinstance(member, (property, staticmethod, classmethod))):
+                assert f"{name}" in reference and (f".{name}(" in reference or f".{name}`" in reference or f".{name}," in reference), f"{cls.__name__}.{name}"
+    for name in ("info", "grants", "limits", "find", "LAMPOS_HOME"):
+        assert name in reference, name
+    for code in schema.error_codes():
+        assert f"`{code}`" in reference, code
+    for gesture in schema.gestures():
+        assert f"`{gesture}`" in reference, gesture
+    for colour in schema.colours():
+        assert f"`{colour}`" in reference, colour
+    # Every command and option of `lamp`, read from its own parser.
+    def walk(parser, words):
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                for command, sub in action.choices.items():
+                    assert f"lamp {' '.join(words + [command])}" in reference, f"lamp {' '.join(words + [command])}"
+                    walk(sub, words + [command])
+            else:
+                for option in action.option_strings:
+                    if option not in ("-h", "--help"):
+                        assert option in reference, f"lamp {' '.join(words)} {option}"
+
+    walk(cli.parser(), [])
+    # Everything a computer can read: every event the schema lists, the two
+    # that come unasked, and every state `get` answers.
+    readable = readme[readme.index("## Everything you can read"):readme.index("## Reference")]
+    for event in (*schema.events(), "lease", "done"):
+        assert f"| `{event}`" in readable, event
+    for state in schema.states():
+        assert f"| `{state}`" in readable, state
+    assert "### Never readable" in readable
+
+
 def test_off_takes_a_handler_off_and_unsubscribes_the_last(tmp_path):
     async def go():
         async with FakeLamp() as fake:
