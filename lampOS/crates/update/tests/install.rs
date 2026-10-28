@@ -1061,7 +1061,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 24, "{gated:?}");
+    assert_eq!(gated.len(), 25, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -4644,6 +4644,62 @@ fn the_plans_install_shipped_are_listed() {
     unique.sort();
     unique.dedup();
     assert_eq!(unique.len(), install::RESET_PLAN_SHIPPED.len());
+}
+
+/// Every product unit's own state folder (`StateDirectory=`) is wiped by
+/// the 5 s reset, or partly wiped, or kept, each said here with why: a new
+/// part's state can't be missed by the reset (the Reviewer-lead's P2 on
+/// #3876: lamp-control's paired computers would have stayed valid for the
+/// lamp's next owner).
+#[test]
+fn every_units_state_folder_is_wiped_by_a_reset_or_kept_on_purpose() {
+    let plan: serde_json::Value = serde_json::from_str(install::RESET_PLAN).unwrap();
+    let wipe: Vec<&str> = plan["wipe"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|path| path.as_str().unwrap())
+        .collect();
+    // Their person's files are wiped one by one; the rest is the part's own.
+    let partly = [
+        "/var/lib/lampos-eyes",     // people, temporaries and logs; the models stay
+        "/var/lib/lampos-schedule", // the store; the folder is the part's
+        "/var/lib/lampos-tasks",    // Harness's sign-in and the store; Harness itself stays
+    ];
+    // Kept whole, as the lamp's and not the person's.
+    let kept = [
+        "/var/lib/lamp-selftest", // the lamp's own test results
+        "/var/lib/lampos-setup",  // setup's marker and journal, which the plan handles itself
+        "/var/lib/lampos-update", // the builds the lamp has had
+    ];
+    let mut seen = Vec::new();
+    for (name, text) in install::PRODUCT {
+        for line in text.lines().map(str::trim) {
+            let Some(folders) = line.strip_prefix("StateDirectory=") else {
+                continue;
+            };
+            for folder in folders.split_whitespace() {
+                let path = format!("/var/lib/{}", folder.split(':').next().unwrap());
+                let whole = wipe.contains(&path.as_str());
+                let some = wipe.iter().any(|w| w.starts_with(&format!("{path}/")));
+                if partly.contains(&path.as_str()) {
+                    assert!(some && !whole, "{name}: {path} is partly wiped");
+                } else if kept.contains(&path.as_str()) {
+                    assert!(!whole && !some, "{name}: {path} is kept");
+                } else {
+                    assert!(
+                        whole,
+                        "{name}: {path} is neither wiped by a reset nor kept on purpose"
+                    );
+                }
+                seen.push(path);
+            }
+        }
+    }
+    assert!(
+        seen.iter().any(|path| path == "/var/lib/lampos-control"),
+        "{seen:?}"
+    );
 }
 
 /// #2791's product half: a product lamp's look is the eyes' full look, so
