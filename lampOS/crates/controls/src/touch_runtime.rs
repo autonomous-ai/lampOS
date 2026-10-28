@@ -12,7 +12,8 @@ use crate::{
 };
 use lamp_bus::{Bus, Message, Published, Publisher};
 use lamp_msgs::{
-    ControlFault, ControlGesture, ControlsState, Diagnostic, Hand, Level, TouchEvent, TouchState,
+    ControlFault, ControlGesture, ControlsState, Diagnostic, Hand, HeadPet, Level, TouchEvent,
+    TouchState,
 };
 use std::{fs::File, io, path::Path};
 
@@ -69,6 +70,9 @@ pub struct Service<G: PinReader, S: StripReader> {
     primary: Option<Primary>,
     state: Publisher,
     events: Publisher,
+    /// `controls/pet`, declared only with `LAMP_HEAD_PET` on
+    /// ([`Self::head_pet`]).
+    pets: Option<Publisher>,
     diagnostic: Publisher,
     last_report_us: Option<u64>,
     pub counts: Counts,
@@ -291,6 +295,7 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 &TouchEvent::declaration(),
                 "controls",
             )?,
+            pets: None,
             diagnostic: bus.publisher_declared(
                 Diagnostic::TOPIC,
                 &Diagnostic::declaration(),
@@ -343,6 +348,16 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
             return Err(io::Error::other("touch recorder is already attached"));
         }
         self.recorder = Some(crate::record::Recorder::create_touch(path)?);
+        Ok(())
+    }
+
+    /// `LAMP_HEAD_PET` on (#3997): a hand petting the head is said on
+    /// `controls/pet`, and a kept hand's sleep is as `hold` says. Never
+    /// called with it off, so `controls/pet` is not even declared then.
+    pub fn head_pet(&mut self, bus: &Bus, hold: crate::touch::HoldSleeps) -> io::Result<()> {
+        self.pets =
+            Some(bus.publisher_declared(HeadPet::TOPIC, &HeadPet::declaration(), "controls")?);
+        self.engine.set_head_pet(Some(hold));
         Ok(())
     }
 
@@ -596,6 +611,17 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         );
         for event in &output.events {
             account(&mut self.counts, self.events.publish_json(at_us, event));
+        }
+        if let Some(pets) = &mut self.pets {
+            for pet in &output.pets {
+                if pet.petted_us == pet.observed_us {
+                    eprintln!(
+                        "lamp-controls: a head pet (contact {}, {} swaps)",
+                        pet.contact_id, pet.swaps
+                    );
+                }
+                account(&mut self.counts, pets.publish_json(at_us, pet));
+            }
         }
         let privacy_route = self.privacy_route();
         if let Some(primary) = &mut self.primary {

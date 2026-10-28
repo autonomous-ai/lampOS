@@ -242,7 +242,8 @@ fn topic_use(topic: &str) -> &'static str {
         "room/presence" | "room/activity" => "presence",
         "voice/heard" | "name/heard" => "hearing",
         "ears/level" | "ears/sudden" => "room_sound",
-        "controls/touch" | "controls/gesture" => "touch",
+        // A pet on the head (#3997) is a touch, as the head's others are.
+        "controls/touch" | "controls/gesture" | "controls/pet" => "touch",
         "air/state" => "air",
         "schedule/due" => "reminders",
         "tasks/status" => "tasks",
@@ -985,6 +986,20 @@ pub mod tests {
         );
         assert_eq!(rows[2]["can_remove"], true);
         assert_eq!(rows[2]["title"], "Water the plant");
+    }
+
+    /// A skill reading a pet on the head (#3997, Head pat) feels a touch,
+    /// as one reading the head's other touches does.
+    #[test]
+    fn a_pet_on_the_head_is_a_touch() {
+        for topic in ["controls/touch", "controls/gesture", "controls/pet"] {
+            let permissions = Permissions {
+                topics: vec![topic.into()],
+                ..Permissions::default()
+            };
+            let names: Vec<&str> = may_use(&permissions).iter().map(|used| used.name).collect();
+            assert_eq!(names, ["touch"], "{topic}");
+        }
     }
 
     /// The picture is the camera's row whether a skill asks `camera` or

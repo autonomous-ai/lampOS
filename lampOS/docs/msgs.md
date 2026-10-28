@@ -283,8 +283,16 @@ removal or measured handle-close/visible-light latency.
 
 `touch_topics()` declares `controls/touch` (`TouchEvent`, event, 500 ms
 transport lifespan) and `controls/touch_state` (`TouchState`, latest,
-100 ms declared period/300 ms lifespan). `declaration_of` recognizes both;
+100 ms declared period/300 ms lifespan), and `controls/pet` (`HeadPet` v1,
+event, 500 ms lifespan; #3997). `declaration_of` recognizes all three;
 `first_topics()` and the existing `controls_topics()` inventories are unchanged.
+A pet is its own type on its own topic, not a `TouchGesture` value, because
+older readers refuse an unknown gesture and would then refuse the whole
+retained `controls/touch_state`. `HeadPet` ignores additional fields; its
+check holds `began_us <= petted_us <= observed_us <= stamp.at_us`, at least 3
+swaps, `swaps_per_second` from 0 to 25, and `ended` only with `resting`
+([controls.md](controls.md), "A pet"). Only `lamp-controls` with
+`LAMP_HEAD_PET=on` declares and publishes it.
 Only the explicit `lamp-controls --touch` path publishes them: a change at
 once, what only grows while a hand stays at most every 20 ms, events, and
 every 100 ms otherwise ([controls.md](controls.md)). `TouchEvent`,

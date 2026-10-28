@@ -1002,6 +1002,22 @@
         }
       }
     },
+    "say_words": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
     "say": {
       "oneOf": [
         {
@@ -1029,10 +1045,10 @@
           "additionalProperties": false,
           "properties": {
             "text": {
-              "type": "string"
+              "$ref": "#/$defs/say_words"
             },
             "note": {
-              "type": "string"
+              "$ref": "#/$defs/say_words"
             },
             "priority": {
               "type": "integer",
