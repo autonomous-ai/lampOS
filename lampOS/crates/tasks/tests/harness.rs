@@ -2079,6 +2079,45 @@ fn the_sign_in_by_code_reads_harness_lines_and_writes_the_answer() {
     }
 }
 
+/// #2839's played check: with `code_hold_until`, the stand-in keeps its code
+/// the only thing said until the file appears, then asks as before.
+#[test]
+fn the_stand_ins_code_is_held_until_its_release_file_appears() {
+    use lamp_tasks::sign_in::Event;
+    let rig = Rig::new();
+    let release = rig.root.path().join("release");
+    rig.plan(json!({"login":{"code_flow":true,"code_hold_until":release.to_str().unwrap()}}));
+    let mut link = rig.cli().sign_in_by_code().unwrap();
+    let code = Event::Code {
+        code: "12345678".into(),
+        expires_in: 120,
+    };
+    let mut lines = Vec::new();
+    let until = Instant::now() + Duration::from_secs(10);
+    while lines.len() < 2 && Instant::now() < until {
+        match link.poll() {
+            Some(read) => lines.push(read),
+            None => thread::sleep(Duration::from_millis(5)),
+        }
+    }
+    assert_eq!(lines, [Ok(code.clone()), Ok(code)]);
+    // Held: nothing more until the release. This can only pass wrongly,
+    // never fail wrongly, whatever the host's load.
+    let held = Instant::now() + Duration::from_millis(300);
+    while Instant::now() < held {
+        assert_eq!(link.poll(), None, "said while held");
+        thread::sleep(Duration::from_millis(5));
+    }
+    fs::write(&release, b"").unwrap();
+    assert_eq!(
+        sign_in_lines(link.as_mut(), Duration::from_secs(10), false),
+        [Ok(Event::Confirm {
+            email: "someone@example.com".into()
+        })]
+    );
+    link.answer(true).unwrap();
+}
+
 /// #1676: a Harness before 0.4.23 doesn't know `--code`; the sign-in ends
 /// saying so, not merely that it ended. Stopped early, the program goes.
 #[test]
