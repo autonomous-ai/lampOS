@@ -14,7 +14,9 @@ claude mcp add lamp -- lamp-mcp
 `--lamp ID` picks a lamp when this computer is paired with more than one, and
 `--client NAME` names this computer in the lamp's leases and journal. `--verbose` prints every frame to and from the lamp on stderr, with the SDK's
 `LAMPOS_LOG=debug` and its redaction: proofs, signatures, keys, nonces and pins
-never, and a said text only by its length and hash. stdout stays the MCP stream.
+never, and a said text only by its length and a tag keyed for the run. stdout stays the MCP stream.
+Phrases and events' fields are logged as they are, and your MCP client may keep a server's stderr in its own logs
+(Claude Code does), so with `--verbose` the phrases the lamp matched can outlive the session.
 
 ## Tools
 

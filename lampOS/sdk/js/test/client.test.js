@@ -100,13 +100,35 @@ test('the debug log redacts what would pair or hello as this computer', async ()
   for (const field of ['key', 'proof', 'nonce']) assert.equal(shown[field], '<redacted>');
   assert.deepEqual(shown.lamp, { id: 'lamp-1', fp: '<redacted>' });
   assert.deepEqual(shown.nested, [{ sig: '<redacted>' }, { pin: '<redacted>' }]);
-  assert.ok(shown.text.startsWith('<13 chars, sha256 ') && !shown.text.includes('Build'));
+  assert.ok(shown.text.startsWith('<13 chars, tag ') && !shown.text.includes('Build'));
+  // Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.
+  const { createHash } = await import('node:crypto');
+  assert.equal(debug.redact({ text: 'Build passed.' }).text, shown.text);
+  assert.ok(!shown.text.includes(createHash('sha256').update('Build passed.').digest('hex').slice(0, 8)));
   assert.equal(shown.data, '<1000 chars>');
   assert.equal(frame.key, 'K'.repeat(44)); // the frame itself is left as it was
   // A pair request's code is the owner's one-time code; a reply's is a refusal's, kept.
   assert.equal(debug.redact({ id: 1, op: 'pair', code: '12345678' }).code, '<redacted>');
   const refused = { re: 4, ok: false, error: { code: 'no_lease', why: 'take a body lease first' } };
   assert.deepEqual(debug.redact(refused), refused);
+});
+
+test('every field of the protocol is decided for the debug log', async () => {
+  const debug = await import('../src/debug.js');
+  const names = new Set();
+  const walk = (value) => {
+    if (Array.isArray(value)) value.forEach(walk);
+    else if (value && typeof value === 'object') {
+      Object.keys(value.properties ?? {}).forEach((name) => names.add(name));
+      Object.values(value).forEach(walk);
+    }
+  };
+  walk(schema.schema);
+  assert.ok(names.size);
+  // A new field in the schema is put in SECRET, SUMMARISED or SHOWN before it can reach a log.
+  const undecided = [...names].filter((name) => !debug.SECRET.has(name) && !debug.SUMMARISED.has(name) && !debug.SHOWN.has(name));
+  assert.deepEqual(undecided, []);
+  assert.ok([...debug.SHOWN].every((name) => !debug.SECRET.has(name) && !debug.SUMMARISED.has(name)));
 });
 
 test('LAMPOS_LOG=debug logs each frame with its secrets redacted', async () => {
@@ -134,7 +156,7 @@ test('LAMPOS_LOG=debug logs each frame with its secrets redacted', async () => {
     assert.ok(lines.length && lines.every((line) => /^lampos (->|<-) \{/.test(line)));
     const sent = lines.filter((line) => line.startsWith('lampos -> ')).map((line) => JSON.parse(line.slice(10)));
     for (const op of ['pair', 'hello', 'say', 'light']) assert.ok(sent.some((frame) => frame.op === op), op);
-    assert.ok(sent.find((frame) => frame.op === 'say').text.startsWith('<25 chars, sha256 '));
+    assert.ok(sent.find((frame) => frame.op === 'say').text.startsWith('<25 chars, tag '));
     for (const secret of [code, pin, pin.slice(0, 16), key, 'The secret plan']) assert.ok(!err.includes(secret), secret.slice(0, 20));
     for (const field of ['nonce', 'sig', 'proof', 'key']) assert.ok(err.includes(`"${field}":"<redacted>"`), field);
   } finally {
