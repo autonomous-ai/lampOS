@@ -1030,3 +1030,26 @@ def test_asks_are_the_grant_names_a_person_is_shown(rules, asks):
     from lampos.push import asks_of, tomllib
 
     assert asks_of(tomllib.loads(rules)) == asks
+
+
+@pytest.mark.parametrize("path", ["../escape.txt", "/etc/x", "a/../../b", ".hidden", "a//b", "a/b/c/d/e", "back\\slash"])
+def test_a_package_path_outside_its_folder_is_refused_before_anything_is_written(tmp_path, path):
+    import hashlib
+    import io
+    import json
+    import tarfile
+
+    from lampos.push import open_package
+
+    body = b"x"
+    manifest = {"format": 1, "name": "desk-wave", "version": "0.1.0",
+                "files": [{"path": path, "size": 1, "sha256": hashlib.sha256(body).hexdigest()}]}
+    out = io.BytesIO()
+    with tarfile.open(fileobj=out, mode="w", format=tarfile.USTAR_FORMAT) as tar:
+        for name, data in (("lamp-skill.json", json.dumps(manifest).encode()), (f"desk-wave/{path}", body)):
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    with pytest.raises(LampError) as raised:
+        open_package(out.getvalue())
+    assert "a skill's paths are at most 4 parts" in raised.value.why

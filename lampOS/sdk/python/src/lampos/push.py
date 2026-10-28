@@ -172,6 +172,9 @@ def signature_for(manifest: bytes, author: Ed25519PrivateKey) -> bytes:
     return (json.dumps(signed, separators=(",", ":")) + "\n").encode()
 
 
+_NAME = re.compile(r"[a-z0-9-]{1,64}")
+
+
 def _bad(why: str) -> LampError:
     return LampError(f"not a skill package: {why}", code="bad_request")
 
@@ -211,6 +214,12 @@ def open_package(data: bytes) -> Opened:
         name, version, entries = manifest["name"], manifest["version"], manifest["files"]
     except (ValueError, KeyError, TypeError) as error:
         raise _bad(f"{MANIFEST}: {error}") from error
+    if not isinstance(name, str) or not _NAME.fullmatch(name):
+        raise _bad(f"{MANIFEST}: name {name!r} is not a skill's name (1 to 64 of a-z, 0-9 and -)")
+    for entry in entries:
+        if not isinstance(entry, dict) or not path_ok(entry.get("path")):
+            path = entry.get("path") if isinstance(entry, dict) else entry
+            raise _bad(f"{path!r}: a skill's paths are at most {MOST_DEPTH} parts of letters, digits, -, _ and ., none beginning with a dot")
     author = None
     signed = read.pop(SIGNATURE, None)
     if signed is not None:

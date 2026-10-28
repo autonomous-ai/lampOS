@@ -123,6 +123,10 @@ export function openPackage(data) {
   }
   const { name, version, files: listed } = manifest;
   if (typeof name !== 'string' || typeof version !== 'string' || !Array.isArray(listed)) throw bad(`${MANIFEST}: name, version and files`);
+  if (!/^[a-z0-9-]{1,64}$/.test(name)) throw bad(`${MANIFEST}: name ${JSON.stringify(name)} is not a skill's name (1 to 64 of a-z, 0-9 and -)`);
+  for (const entry of listed) {
+    if (!pathOk(entry?.path)) throw bad(`${JSON.stringify(entry?.path)}: a skill's paths are at most ${MOST_DEPTH} parts of letters, digits, -, _ and ., none beginning with a dot`);
+  }
   let author = null;
   const signed = read.get(SIGNATURE);
   if (signed) {
@@ -214,7 +218,7 @@ function topLevel(toml, key) {
 
 // One ustar header and its data, padded to 512 bytes, as the tar crate
 // writes them: mode 0644, mtime 0, owner 0.
-function entry(path, data) {
+export function ustarEntry(path, data) {
   const header = Buffer.alloc(512);
   let name = path;
   let prefix = '';
@@ -275,9 +279,9 @@ export function pack(folder, { author } = {}) {
   };
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
   const data = Buffer.concat([
-    entry(MANIFEST, manifestBytes),
-    ...(author ? [entry(SIGNATURE, signatureFor(manifestBytes, author))] : []),
-    ...[...all].map(([path, bytes]) => entry(`${name}/${path}`, bytes)),
+    ustarEntry(MANIFEST, manifestBytes),
+    ...(author ? [ustarEntry(SIGNATURE, signatureFor(manifestBytes, author))] : []),
+    ...[...all].map(([path, bytes]) => ustarEntry(`${name}/${path}`, bytes)),
     Buffer.alloc(1024),
   ]);
   if (data.length > PACKAGE_MAX) throw new LampError(`the package is ${data.length} bytes: a pushed skill is 1 MiB at most`, { code: 'bad_request' });

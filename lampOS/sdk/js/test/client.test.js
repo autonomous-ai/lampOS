@@ -2,6 +2,7 @@
 // refusals, as docs/control.md says them. No lamp needed.
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -647,4 +648,16 @@ test('a path lamp-skills refuses or no header holds is refused before packing', 
   writeFileSync(file, pack(skill('desk-long', `${'a'.repeat(100)}/w.json`)).data);
   assert.ok(execFileSync('tar', ['-tf', file], { encoding: 'utf8' }).split('\n').includes(`desk-long/${'a'.repeat(100)}/w.json`));
   assert.throws(() => pack(skill('desk-over', `${'a'.repeat(100)}/${'b'.repeat(100)}/c.json`)), (error) => /longer than a tar header holds/.test(error.why));
+});
+
+test('a package path outside its folder is refused before anything is written', async () => {
+  const { openPackage, pathOk, ustarEntry } = await import('../src/push.js');
+  for (const path of ['../escape.txt', '/etc/x', 'a/../../b', '.hidden', 'a//b', 'a/b/c/d/e', 'back\\slash']) {
+    assert.equal(pathOk(path), false, path);
+    const body = Buffer.from('x');
+    const manifest = { format: 1, name: 'desk-wave', version: '0.1.0', files: [{ path, size: 1, sha256: createHash('sha256').update(body).digest('hex') }] };
+    const data = Buffer.concat([ustarEntry('lamp-skill.json', Buffer.from(JSON.stringify(manifest))), ustarEntry(`desk-wave/${path}`, body), Buffer.alloc(1024)]);
+    assert.throws(() => openPackage(data), (error) => /a skill's paths are at most 4 parts/.test(error.why), path);
+  }
+  assert.ok(pathOk('moves/wave.json'));
 });
