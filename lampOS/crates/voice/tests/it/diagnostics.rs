@@ -5,9 +5,11 @@ use sha2::{Digest, Sha256};
 use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf, time::Duration};
 
 static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-struct Private(PathBuf);
+/// The recorder syncs its files, so the folder holds `disk_flush::flushing`.
+struct Private(PathBuf, crate::disk_flush::Flushing);
 impl Private {
     fn new() -> Self {
+        let flushing = crate::disk_flush::flushing();
         let root = std::env::temp_dir().join(format!(
             "lamp-diag-test-{}-{}-{}",
             std::process::id(),
@@ -16,7 +18,7 @@ impl Private {
         ));
         fs::create_dir(&root).unwrap();
         fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
-        Self(root)
+        Self(root, flushing)
     }
     fn config(&self, stream: StreamKind) -> Config {
         Config::new(self.0.join("audio"), BootId::new([7; 16]).unwrap(), stream)

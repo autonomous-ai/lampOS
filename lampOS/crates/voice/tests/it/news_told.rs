@@ -88,10 +88,13 @@ struct Place {
     stop: Arc<AtomicBool>,
     closes: Arc<Mutex<Vec<String>>>,
     serving: Option<JoinHandle<io::Result<()>>>,
+    /// The tasks part syncs its store.
+    _flushing: crate::disk_flush::Flushing,
 }
 
 impl Place {
     fn new(name: &str) -> Self {
+        let flushing = crate::disk_flush::flushing();
         let root = PathBuf::from(format!("/tmp/lvt-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
@@ -126,6 +129,7 @@ impl Place {
             stop: Arc::new(AtomicBool::new(false)),
             closes: Arc::new(Mutex::new(Vec::new())),
             serving: None,
+            _flushing: flushing,
         };
         place.serve();
         place

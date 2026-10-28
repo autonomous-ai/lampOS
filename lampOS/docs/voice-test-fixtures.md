@@ -670,3 +670,28 @@ both before connect and while a partial request's peer stays open. They
 require a joined error or explicit cancellation, rather than a detached
 panic or an EOF standing in for cancellation. Host overruns fail those
 controls; no product timeout or readiness policy changes.
+
+## Timed light calls beside disk flushes
+
+`light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them`
+keeps its 25 ms median for a light call (#1806). On macOS it failed in full
+runs of Voice's `it` binary and passed alone (#3315): its calls took about
+19, 38, 57 ... 164 ms. That is a whole number of `F_FULLFSYNC`s, which
+`File::sync_all` and `sync_data` are on macOS, about 19 ms each on the office
+Mac. The bus writes and renames each topic's `latest` file. Under `/tmp` on
+the Mac's disk, those writes wait for a flush running beside them. Paired with
+each module of the binary in turn, only `diagnostics` (the recorder syncs its
+files) and `news_told` (the tasks part syncs its store) slowed it. Sixteen
+busy processes did not. An outside process doing nothing but `F_FULLFSYNC`
+slowed it the same way, and a plain `fsync` (0.1 ms) did not. A lamp's bus is
+on tmpfs (`/run/lampos-bus`), and Linux has no `F_FULLFSYNC`.
+
+So those tests take turns (`tests/it/disk_flush.rs`). `diagnostics`'
+`Private` and `news_told`'s `Place` hold a shared `disk_flush::flushing()`
+for as long as they exist, so they still run beside each other and every
+other test. A thread takes the shared lock once however many it holds, so a
+test with two folders never waits behind itself. The light-call test holds
+`disk_flush::timing()` alone while it measures. The assertion, the 2 ms ring
+pass and the calls are unchanged. Under `cargo nextest` each test is its own
+process, and the lock orders nothing. A flush from outside the binary, such
+as another build on the same Mac, can still slow the timed calls.

@@ -6,6 +6,7 @@ mod camera_config;
 mod camera_runtime;
 mod capture_hold_worker;
 mod diagnostics;
+mod disk_flush;
 mod end_silence;
 mod endpoint_confirmation;
 mod expression_out;
