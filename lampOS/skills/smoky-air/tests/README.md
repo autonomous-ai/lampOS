@@ -41,17 +41,47 @@ lamp, toast, a candle blown out, a match"). Each holds only its
 `expect.toml`, which says the event and whether the skill should speak:
 the kettle, the candle and the match never; burnt toast, once. A case with
 no recording is counted and not run (`lamp-skills test` says "4 have no
-recording yet"). To fill one, record on a lamp with an air sensor
-(lamp-4ace or lamp-52e6) while the event happens, read only:
-
-    lamp-bus record skills/smoky-air/tests/toast air/state voice/state --seconds 1800
-
-then set the case's `clock` and each call's `at` from it. The skill's
-numbers (the rise, the level, the hold) and any steam or combustion rule
-are decided from those replays, and the skill is installed disabled
-(`install::PRODUCT_SKILLS_OFF`) until then.
+recording yet"). To fill one, record it with `lampOS/tools/air-trace.sh`
+(below). The skill's numbers (the rise, the level, the hold) and any steam
+or combustion rule are decided from those replays, and the skill is
+installed disabled (`install::PRODUCT_SKILLS_OFF`) until then.
 
 What no case shows: the say service's own gates (a line in the first pause,
 never over speech, spent after 2 minutes), the sleeping lamp saying
 nothing, and whether the lift and the breath read as a lamp noticing
 something rather than an alarm: those are for the lamp check.
+
+## Recording the real events (#1684), about 15 minutes
+
+On a lamp whose SEN63C answers (lamp-4ace read one on 17 Oct; lamp-06c1
+and lamp-c0a4 have none), with a window shut and a fan off. The builder
+who holds the lamp runs the tool on the Mac beside it; the person does the
+events. Each run is one case:
+
+    LAMP_HOST=<lamp> lampOS/tools/air-trace.sh EVENT "what was done"
+
+On the lamp it runs only `lamp-bus record air/state voice/state`, as the
+lamp's own user, into a temp folder it removes: no unit stopped, nothing
+changed. It counts down 2 minutes of quiet, takes Enter as the event
+starts and again as it ends, records 5 minutes after, and writes
+`tests/EVENT/` here: the `.jsonl` files as `lamp-bus record` wrote them
+and an `expect.toml` with `clock`, the two marks and the PM2.5 before and
+after. Its verdict is left for the person who saw the event: until it is
+filled in (`none = true`, or the three calls with their `at`),
+`lamp-skills test` fails the case. A placeholder's folder is replaced, its
+event lines kept; any other folder is kept unless `--force`. `--dry-run`
+says what it would do. Its stand-in test is `tools/air-trace-test.sh`.
+
+1. **Kettle**, boiling 50 cm from the base for 1 minute: `kettle-steam`.
+   Then the same at 2 m: `kettle-steam-2m`. The design's done line asks
+   for three runs at 50 cm (`kettle-steam-2`, `kettle-steam-3`) if there
+   is time.
+2. **Toast** browned in a toaster 1 m away: `toast`.
+3. **A candle** burning 1 minute at 50 cm, then blown out (Enter at the
+   blow): `candle-blown-out`.
+4. **A match** struck and blown out at 50 cm (Enter, Enter at once):
+   `match`.
+
+One run of each is enough for provisional numbers. Then fill in each
+verdict, run `lamp-skills test lampOS/skills/smoky-air`, and set the
+numbers from the replays.
