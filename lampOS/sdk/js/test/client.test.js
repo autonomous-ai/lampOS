@@ -88,6 +88,61 @@ test('another certificate than the pinned one is refused', async (t) => {
   await assert.rejects(Lamp.connect(undefined, { keyring }), WrongLamp);
 });
 
+test('the debug log redacts what would pair or hello as this computer', async () => {
+  const debug = await import('../src/debug.js');
+  const frame = {
+    id: 1, op: 'pair', name: 'laptop', key: 'K'.repeat(44), proof: 'P'.repeat(44),
+    lamp: { id: 'lamp-1', fp: 'f'.repeat(16) }, nonce: 'N'.repeat(44),
+    nested: [{ sig: 'S'.repeat(88) }, { pin: 'a'.repeat(64) }],
+    text: 'Build passed.', data: 'D'.repeat(1000),
+  };
+  const shown = debug.redact(frame);
+  for (const field of ['key', 'proof', 'nonce']) assert.equal(shown[field], '<redacted>');
+  assert.deepEqual(shown.lamp, { id: 'lamp-1', fp: '<redacted>' });
+  assert.deepEqual(shown.nested, [{ sig: '<redacted>' }, { pin: '<redacted>' }]);
+  assert.ok(shown.text.startsWith('<13 chars, sha256 ') && !shown.text.includes('Build'));
+  assert.equal(shown.data, '<1000 chars>');
+  assert.equal(frame.key, 'K'.repeat(44)); // the frame itself is left as it was
+  // A pair request's code is the owner's one-time code; a reply's is a refusal's, kept.
+  assert.equal(debug.redact({ id: 1, op: 'pair', code: '12345678' }).code, '<redacted>');
+  const refused = { re: 4, ok: false, error: { code: 'no_lease', why: 'take a body lease first' } };
+  assert.deepEqual(debug.redact(refused), refused);
+});
+
+test('LAMPOS_LOG=debug logs each frame with its secrets redacted', async () => {
+  const { b64 } = await import('../src/keys.js');
+  const written = [];
+  const write = process.stderr.write;
+  process.stderr.write = (chunk, ...rest) => {
+    if (String(chunk).startsWith('lampos ')) { written.push(String(chunk)); return true; }
+    return write.call(process.stderr, chunk, ...rest);
+  };
+  const before = process.env.LAMPOS_LOG;
+  try {
+    delete process.env.LAMPOS_LOG;
+    await withLamp({ grants: ['light', 'speak'] }, async (lamp) => { await lamp.say('The secret plan is ready.'); });
+    assert.equal(written.length, 0); // off by default
+    process.env.LAMPOS_LOG = 'debug';
+    let pin; let key; let code;
+    await withLamp({ grants: ['light', 'speak'] }, async (lamp, fake, keyring) => {
+      pin = fake.pin; key = b64(keyring.public()); code = fake.code;
+      await lamp.say('The secret plan is ready.');
+      await lamp.light('warm', 3, 1000);
+    });
+    const err = written.join('');
+    const lines = err.trim().split('\n');
+    assert.ok(lines.length && lines.every((line) => /^lampos (->|<-) \{/.test(line)));
+    const sent = lines.filter((line) => line.startsWith('lampos -> ')).map((line) => JSON.parse(line.slice(10)));
+    for (const op of ['pair', 'hello', 'say', 'light']) assert.ok(sent.some((frame) => frame.op === op), op);
+    assert.ok(sent.find((frame) => frame.op === 'say').text.startsWith('<25 chars, sha256 '));
+    for (const secret of [code, pin, pin.slice(0, 16), key, 'The secret plan']) assert.ok(!err.includes(secret), secret.slice(0, 20));
+    for (const field of ['nonce', 'sig', 'proof', 'key']) assert.ok(err.includes(`"${field}":"<redacted>"`), field);
+  } finally {
+    process.stderr.write = write;
+    if (before === undefined) delete process.env.LAMPOS_LOG; else process.env.LAMPOS_LOG = before;
+  }
+});
+
 test('connect without a pairing says so', async () => {
   await assert.rejects(Lamp.connect(undefined, { keyring: new Keyring(folder()) }), NotPaired);
 });

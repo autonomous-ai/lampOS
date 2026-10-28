@@ -23,7 +23,7 @@ from typing import Any, Callable
 from websockets.asyncio.client import ClientConnection, connect as ws_connect
 from websockets.exceptions import ConnectionClosed
 
-from . import schema
+from . import debug, schema
 from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
 from .keys import Keyring, Pairing, b64, is_pin, pin_of, proof, unb64
 
@@ -83,6 +83,7 @@ async def _open(host: str, port: int, pin: str) -> ClientConnection:
 
 async def _welcome(ws: ClientConnection) -> dict:
     first = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+    debug.frame("<-", first)
     if first.get("ev") != "welcome" or "nonce" not in first:
         raise LampError("the lamp's first frame was not a welcome", code="bad_welcome")
     try:
@@ -261,8 +262,10 @@ class Lamp:
                 "key": b64(key),
                 "proof": b64(proof(code, bytes.fromhex(pin), key, welcome["nonce_bytes"])),
             }
+            debug.frame("->", ask)
             await ws.send(json.dumps(ask))
             reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+            debug.frame("<-", reply)
         finally:
             await ws.close()
         if not reply.get("ok"):
@@ -298,8 +301,11 @@ class Lamp:
         try:
             welcome = await _welcome(ws)
             sig = keyring.hello(welcome["nonce_bytes"])
-            await ws.send(json.dumps({"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}))
+            hello = {"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}
+            debug.frame("->", hello)
+            await ws.send(json.dumps(hello))
             reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+            debug.frame("<-", reply)
         except BaseException:
             await ws.close()
             raise
@@ -351,7 +357,9 @@ class Lamp:
         future = asyncio.get_running_loop().create_future()
         self._waiting[id_] = future
         try:
-            await self._ws.send(json.dumps({"id": id_, "op": op, **fields}))
+            sent = {"id": id_, "op": op, **fields}
+            debug.frame("->", sent)
+            await self._ws.send(json.dumps(sent))
         except ConnectionClosed as error:
             # The lamp has gone: the same typed `closed` as a request the
             # close cut short, not the socket library's own error. The reader
@@ -401,6 +409,7 @@ class Lamp:
         try:
             async for text in self._ws:
                 frame = json.loads(text)
+                debug.frame("<-", frame)
                 if "re" in frame and "ok" in frame:
                     future = self._waiting.pop(frame["re"], None) if frame["re"] is not None else None
                     if future and not future.done():

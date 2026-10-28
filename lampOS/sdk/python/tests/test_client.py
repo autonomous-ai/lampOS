@@ -103,6 +103,61 @@ def test_another_certificate_than_the_pinned_one_is_refused(tmp_path):
     run(go())
 
 
+def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
+    from lampos import debug
+
+    frame = {
+        "id": 1, "op": "pair", "name": "laptop", "key": "K" * 44, "proof": "P" * 44,
+        "lamp": {"id": "lamp-1", "fp": "f" * 16}, "nonce": "N" * 44,
+        "nested": [{"sig": "S" * 88}, {"pin": "a" * 64}],
+        "text": "Build passed.", "data": "D" * 1000,
+    }
+    shown = debug.redact(frame)
+    for field in ("key", "proof", "nonce"):
+        assert shown[field] == "<redacted>"
+    assert shown["lamp"] == {"id": "lamp-1", "fp": "<redacted>"}
+    assert shown["nested"] == [{"sig": "<redacted>"}, {"pin": "<redacted>"}]
+    assert shown["text"].startswith("<13 chars, sha256 ") and "Build" not in shown["text"]
+    assert shown["data"] == "<1000 chars>"
+    assert frame["key"] == "K" * 44  # the frame itself is left as it was
+    # A pair request's code is the owner's one-time code; a reply's is a refusal's, kept.
+    assert debug.redact({"id": 1, "op": "pair", "code": "12345678"})["code"] == "<redacted>"
+    refused = {"re": 4, "ok": False, "error": {"code": "no_lease", "why": "take a body lease first"}}
+    assert debug.redact(refused) == refused
+
+
+def test_lampos_log_debug_logs_each_frame_with_its_secrets_redacted(tmp_path, monkeypatch, capsys):
+    from lampos.keys import b64
+
+    async def session():
+        async with FakeLamp(grants=("light", "speak", "hear")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                await lamp.say("The secret plan is ready.")
+                await lamp.light("warm", 3, 1_000)
+                await lamp.on("phrase.heard", lambda event: None, phrases=["good night lamp"])
+            return fake, ring
+
+    monkeypatch.delenv("LAMPOS_LOG", raising=False)
+    run(session())
+    assert "lampos " not in capsys.readouterr().err  # off by default
+
+    monkeypatch.setenv("LAMPOS_LOG", "debug")
+    fake, ring = run(session())
+    err = capsys.readouterr().err
+    lines = [line for line in err.splitlines() if line.startswith("lampos ")]
+    assert lines and all(line.startswith(("lampos -> ", "lampos <- ")) for line in lines)
+    sent = [json.loads(line[len("lampos -> "):]) for line in lines if line.startswith("lampos -> ")]
+    assert {"pair", "hello", "say", "light", "subscribe"} <= {frame["op"] for frame in sent}
+    assert any(line.startswith("lampos <- ") and '"ev":"welcome"' in line for line in lines)
+    assert any(frame.get("op") == "say" and frame["text"].startswith("<25 chars, sha256 ") for frame in sent)
+    assert any(frame.get("op") == "light" and frame["colour"] == "warm" for frame in sent)
+    # Nothing that pairs, says hello or pins the lamp, and not the words said.
+    for secret in (fake.code, fake.pin, fake.pin[:16], b64(ring.public()), "The secret plan"):
+        assert secret not in err
+    assert '"nonce":"<redacted>"' in err and '"sig":"<redacted>"' in err and '"proof":"<redacted>"' in err
+
+
 def test_connect_without_a_pairing_says_so(tmp_path):
     with pytest.raises(NotPaired):
         run(Lamp.connect(keyring=Keyring(tmp_path)))
