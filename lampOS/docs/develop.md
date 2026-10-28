@@ -52,7 +52,9 @@ LAMPOS_HOME=/tmp/lampos-try lamp fake
 
 It answers as a lamp does today. `gesture`, `move` and `express` are taken
 (`{"to": "body"}`, and `express` says its move and that it showed the
-light: `{"to": "body", "move": "glad-lift", "light": true}`). `play`, `sound` and `joints` are refused, in
+light: `{"to": "body", "move": "glad-lift", "light": true}`), and `say`
+and `sound` (`hum`, the lamp's own short hum) with `{"to": "voice"}` and
+their `done`. `play` and `joints` are refused, in
 lamp-control's own words ("not routed yet: waits for …"), and `look` with "the
 body's lease socket is not on here", as a product lamp refuses it until its
 unit passes `--lease-socket`.

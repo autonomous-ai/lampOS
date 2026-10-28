@@ -273,7 +273,7 @@ mod tests {
             Some(Class::Say)
         );
         assert_eq!(
-            Class::of(&op(r#"{"id":1,"op":"sound","name":"chime"}"#)),
+            Class::of(&op(r#"{"id":1,"op":"sound","name":"hum"}"#)),
             Some(Class::Say)
         );
         assert_eq!(
