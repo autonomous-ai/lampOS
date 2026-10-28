@@ -63,3 +63,46 @@ fn promotion_is_manual_separate_and_branch_protected() {
     );
     assert!(clippy.contains("cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings"));
 }
+
+/// The stable notes step (#3976) reads the receipt this tool prints, and it
+/// can't fail the job (`continue-on-error`): a field renamed here would leave
+/// the notes unwritten with only a log line. Every key the script takes from
+/// `receipt` is one the receipt has.
+#[test]
+fn the_stable_notes_read_only_fields_the_receipt_has() {
+    let receipt = serde_json::to_value(lampos_promote::Receipt {
+        outcome: "promoted",
+        sequence: 8389,
+        commit: "c".repeat(40),
+        source_run: 1,
+        source_attempt: 1,
+        promotion_run: 2,
+        promotion_attempt: 1,
+        previous_asset: Some(3),
+        stable_asset: 4,
+        envelope_sha256: "0".repeat(64),
+    })
+    .unwrap();
+    let script = include_str!("../../../scripts/lampos-stable-notes.py");
+    let mut read = std::collections::BTreeSet::new();
+    for opening in ["receipt[\"", "receipt['", "receipt.get(\""] {
+        for (at, _) in script.match_indices(opening) {
+            let rest = &script[at + opening.len()..];
+            let name: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_lowercase() || *c == '_')
+                .collect();
+            read.insert(name);
+        }
+    }
+    assert!(
+        read.contains("previous_asset") && read.contains("commit"),
+        "{read:?}"
+    );
+    for name in &read {
+        assert!(
+            receipt.get(name).is_some(),
+            "the notes read {name}, which the receipt lacks"
+        );
+    }
+}
