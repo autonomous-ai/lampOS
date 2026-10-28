@@ -185,3 +185,14 @@ All merged by the train:
 - #4106: Sixth's P3 on #3947.
 
 Ready for lamp-voice: nothing open.
+
+### #4141, every line that asks a person to act (ship week)
+
+Ready for lamp-voice: yes (#4147)
+
+- The table of 20 rows is on #4141. Small fixes are in #4147, tested at `24501cb60d`: setup's page no longer mentions a "joined" light, setup.md names the RESET pinhole, and onboarding.md matches the product's `LAMP_ONBOARDING=on`.
+- `cargo test -p lamp-setup`: 38/0, 166/0, 6/0. No lamp run (none needed).
+- Larger items:
+  - Product lamps have `LAMP_SETTINGS_WIFI` and `LAMP_WIFI_RECOVERY` off, so a lamp whose Wi-Fi changes says nothing. Words for #3020's recovery are proposed to Sixth.
+  - The pinned `wifi_lost` clip still has the old words (#3743).
+  - The app's Head line has gone to Mobile.
