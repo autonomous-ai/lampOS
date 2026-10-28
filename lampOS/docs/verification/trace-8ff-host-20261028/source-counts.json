@@ -1,0 +1,79 @@
+{
+  "head": "8ffae105d151da7444415a7039b734a08d2ff422",
+  "tree": "a2cf587a7e1bddd28e4444ff7ee9278232d52d9c",
+  "authored_base": "e1053be8110e2914da7bc38a2d3f4736fb1e604a",
+  "owned_path_count": 2,
+  "rows": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "a502dd1ede25cb72e0ca581eb7ee4f03b9072a97"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "a502dd1ede25cb72e0ca581eb7ee4f03b9072a97"
+      },
+      "same_as_tested": true,
+      "owned_change": false,
+      "published_sha256": "d773c0acbab4abfefc7c30ffe6ee6b31e893190d3e9ce5c0e13b9b0c8d0923aa"
+    },
+    {
+      "path": "lampOS/crates/voice/src/service_trace.rs",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "bb431507acb476c33eed850ba03f9a83b5d173ca"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "bb431507acb476c33eed850ba03f9a83b5d173ca"
+      },
+      "same_as_tested": true,
+      "owned_change": true,
+      "published_sha256": "c5ab080e1270108c8b1d7a79c06695564b76540a26e5981bf0631097494767ac"
+    },
+    {
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "2b3ea62843a2f8534d4c8a6532ddf167805ab227"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "2b3ea62843a2f8534d4c8a6532ddf167805ab227"
+      },
+      "same_as_tested": true,
+      "owned_change": false,
+      "published_sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+    },
+    {
+      "path": "lampOS/docs/peek.md",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "bede58424757f5bbbfaf695443be6021a05d9161"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "bede58424757f5bbbfaf695443be6021a05d9161"
+      },
+      "same_as_tested": true,
+      "owned_change": true,
+      "published_sha256": "e2897a19afbaa567f6569dd4fa21a9ccb3a543d039f65311ee512261f44138ac"
+    }
+  ],
+  "scope": "Full Voice package on Mac; no Update or Memory runtime",
+  "selected_unique": 4182,
+  "PASS_unique": 4182,
+  "host_required_once": 6,
+  "Linux_conditional_UNRUN_on_host": 6,
+  "Linux_conditional_declared_ignored": 1,
+  "prior_runtime_credit_transferred": false
+}

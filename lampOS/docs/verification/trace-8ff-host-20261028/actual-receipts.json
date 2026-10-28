@@ -1,0 +1,185 @@
+{
+  "head": "8ffae105d151da7444415a7039b734a08d2ff422",
+  "tree": "a2cf587a7e1bddd28e4444ff7ee9278232d52d9c",
+  "authored_base": "e1053be8110e2914da7bc38a2d3f4736fb1e604a",
+  "host": "x86_64-apple-darwin",
+  "status": "Host gate passed; original PR ARM64 and Linux Clippy separately pending.",
+  "compiler": {
+    "native_session": 35493,
+    "actual_exit": 0,
+    "chunk": "c58915",
+    "release_sha256": "e88479ba04b0b2d82afdf563a70f32fdefb3480673f849dfea3bd4a05f208007",
+    "stages": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "actual_exit": 0,
+        "elapsed_seconds": 13.654915322025772,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "metadata",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "metadata",
+          "--offline",
+          "--locked",
+          "--format-version=1"
+        ],
+        "actual_exit": 0,
+        "elapsed_seconds": 1.1062603080063127,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "1",
+          "--workspace",
+          "--all-targets",
+          "--message-format=json",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "actual_exit": 0,
+        "elapsed_seconds": 513.3882506960072,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "workspace-build",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "build",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "1",
+          "--workspace",
+          "--message-format=json"
+        ],
+        "actual_exit": 0,
+        "elapsed_seconds": 521.5750269730343,
+        "owned_session_empty": true
+      }
+    ]
+  },
+  "runtime": {
+    "native_session": 57386,
+    "actual_exit": 0,
+    "chunk": "60809f",
+    "release_sha256": "29cab8e15af7b397686bccb8415fde8586eac2ced245e7f4c7b0fda0070fde82",
+    "counts": {
+      "selected_unique": 4182,
+      "passed_unique": 4182,
+      "failed": 0,
+      "unrun_selected": 0,
+      "all_selected_terminal": true,
+      "required_passed": 6,
+      "counts": {
+        "accounting_valid": true,
+        "all_selected_terminal": true,
+        "selected_cases": 4182,
+        "passed_including_LEAK": 4182,
+        "clean_passed": 4182,
+        "passed_but_LEAK": 0,
+        "failed": 0,
+        "ignored_discovery_and_human_SKIP": 21,
+        "ignored_JSON_terminals": 15,
+        "raw_nextest_exit": 0,
+        "failed_keys": [],
+        "leaky_keys": [],
+        "timeout_case_count": 0,
+        "suite_terminal_rows_retained": 14,
+        "suite_rows_not_independent_test_counts": true
+      },
+      "repeated_selected_cases": 0,
+      "prior_runtime_credit_transferred": false,
+      "only_Voice_runtime": true
+    },
+    "operations": [
+      {
+        "stage": "integration-list",
+        "exit": 0,
+        "elapsed_seconds": 203.52618376497412,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "integration-run",
+        "exit": 0,
+        "elapsed_seconds": 442.6841175730224,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "voice-doctests",
+        "exit": 0,
+        "elapsed_seconds": 3.746181583032012,
+        "owned_session_empty": true
+      }
+    ]
+  },
+  "Voice_doctests_separate": {
+    "actual_exit": 0,
+    "rows": [
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ]
+    ],
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "separate_from_runtime": true
+  },
+  "zero_Voice_doctests_defined": true,
+  "no_old_workspace_four_doctests_credit": true,
+  "source_stable": true,
+  "prior_retained_metadata_unchanged": true,
+  "all_owned_sessions_groups_closed": true,
+  "failed_driver_witnesses_created": 0,
+  "runtime_input_guard_boundary": "before and after the full Voice package integration-run; after-docs input identity not claimed",
+  "original_parent_failure": {
+    "run": 40588908587,
+    "PASS": 6466,
+    "FAIL": 3,
+    "selected_unrun": 1336,
+    "remains_FAILED": true,
+    "cause_claimed": false
+  },
+  "all_historical_failures_preserved": true,
+  "saved_evidence_sha256": {
+    "source-freeze.json": "739e104a622eceee10313ab2b6a37493f746a193dbd3365b38b80d476599b3e3",
+    "source-mtimes.json": "17fe18fba93a6c16243fafded46fee1d8e67d9f4f720abf5af929895716171d3",
+    "runtime-build-inputs.json": "e413204f021efce851ca3a1972ddc88b261cea7b9a6201a48a356aea0ed225bd",
+    "compiler-artifact-provenance.json": "2180230044538c90362ff418cce6a2875e085932ac90dc297197ff9f7c675df7",
+    "union-terminal-ledger.json": "f14bd2c29c1f3d4f84e4e370531cec82efbf6570eb701f868135bec25b40fecc",
+    "required-terminal-ledger.json": "4856f204a3727514e0dd3b8035fe6ace1e6ae80cb7d49f7a8fef6fb8c799abc6",
+    "source-conditional-controls.json": "6615f33601632c94906dadc48475eb75b2a77c4c469e1689e2d19240465f6ace",
+    "voice-doctests-counts.json": "877b93c82b60146b77a4bcdcc063a731ab51a5c26d2b40a180fa79f742436a49"
+  },
+  "limits": [
+    "No previous runtime or documentation counts are transferred.",
+    "Six host controls are a subset of 4,182, not additional tests.",
+    "Linux conditional and ignored cases have no host PASS credit.",
+    "This diagnostic gate does not identify the earlier native timeout cause or waive its failure.",
+    "Proof-packet preparation used saved evidence only; no additional binary execution or current-target read. The recorded gate did execute its tests. No artifact download, deployment, physical latency qualification or readiness transition."
+  ]
+}

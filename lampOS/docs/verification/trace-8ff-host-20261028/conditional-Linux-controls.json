@@ -1,0 +1,90 @@
+{
+  "rows": [
+    {
+      "binary": "lamp-voice",
+      "test": "service_trace::tests::shared_session_rotation_keeps_granted_descriptors_and_private_health",
+      "path": "lampOS/crates/voice/src/service_trace.rs",
+      "declaration_line": 922,
+      "body_sha256": "7505bb2efaa920d32c41826c71ba3917dee4a1fcb93d8ba3f03bd6e1787087ad",
+      "source_sha256": "c5ab080e1270108c8b1d7a79c06695564b76540a26e5981bf0631097494767ac",
+      "platform": "linux",
+      "source_ignored": false,
+      "kind": "trace",
+      "status": "SOURCE_EXPECTED_DISCOVERY_UNRUN",
+      "host_execution": "UNRUN: Linux conditional source",
+      "native_execution": "Not credited by this host packet"
+    },
+    {
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "declaration_line": 320,
+      "body_sha256": "296a3735f5faa311c9955c01ee9cec3d29815b0ffd8326b145f9e46ddc256c38",
+      "source_sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+      "platform": "linux",
+      "source_ignored": true,
+      "kind": "direct-completion-caller",
+      "status": "SOURCE_EXPECTED_DISCOVERY_UNRUN",
+      "host_execution": "UNRUN: Linux conditional source",
+      "native_execution": "Not credited by this host packet"
+    },
+    {
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "declaration_line": 618,
+      "body_sha256": "4593ab2b3e9f22ad9426d8a2311f1cecd0c21da919d41bce389ef28e0cd1d33d",
+      "source_sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+      "platform": "linux",
+      "source_ignored": false,
+      "kind": "direct-completion-caller",
+      "status": "SOURCE_EXPECTED_DISCOVERY_UNRUN",
+      "host_execution": "UNRUN: Linux conditional source",
+      "native_execution": "Not credited by this host packet"
+    },
+    {
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "declaration_line": 752,
+      "body_sha256": "49cb7f6fa66845e304febe8c10c6f9173404c0902c5bd9495fbefe70e6e88836",
+      "source_sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+      "platform": "linux",
+      "source_ignored": false,
+      "kind": "direct-completion-caller",
+      "status": "SOURCE_EXPECTED_DISCOVERY_UNRUN",
+      "host_execution": "UNRUN: Linux conditional source",
+      "native_execution": "Not credited by this host packet"
+    },
+    {
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "declaration_line": 885,
+      "body_sha256": "dc48d0df1ecdc0d7b6aaba08d4fcd5066e773c19f20383d3dc8971be06e35e14",
+      "source_sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+      "platform": "linux",
+      "source_ignored": false,
+      "kind": "direct-completion-caller",
+      "status": "SOURCE_EXPECTED_DISCOVERY_UNRUN",
+      "host_execution": "UNRUN: Linux conditional source",
+      "native_execution": "Not credited by this host packet"
+    },
+    {
+      "binary": "lamp-voice",
+      "test": "coordinator::tests::second_route::a_real_coordinator_transcript_is_projected_before_shared_storage",
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "declaration_line": 5780,
+      "body_sha256": "e8baa1e4c540623d7b87817d943d2bdc536504fb84ab5dc6ef810a34461ddcb1",
+      "source_sha256": "d773c0acbab4abfefc7c30ffe6ee6b31e893190d3e9ce5c0e13b9b0c8d0923aa",
+      "platform": "linux",
+      "source_ignored": false,
+      "kind": "direct-completion-caller",
+      "status": "SOURCE_EXPECTED_DISCOVERY_UNRUN",
+      "host_execution": "UNRUN: Linux conditional source",
+      "native_execution": "Not credited by this host packet"
+    }
+  ],
+  "no_ineligible_or_ignored_PASS_credit": true,
+  "host_platform": "darwin"
+}
