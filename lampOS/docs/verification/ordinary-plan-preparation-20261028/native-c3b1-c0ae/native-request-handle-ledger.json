@@ -1,0 +1,136 @@
+{
+  "all_requests_saved_before_exec": true,
+  "all_matching_handles_drained_exit_zero": true,
+  "observer_exit_alone_not_CI_acceptance": true,
+  "handles": {
+    "ARM": {
+      "native": 77585,
+      "results": [
+        {
+          "chunk_id": "364fe8",
+          "wall_time_seconds": 1.000313,
+          "session_id": 77585,
+          "original_token_count": 0,
+          "output": ""
+        },
+        {
+          "chunk_id": "3e659c",
+          "wall_time_seconds": 30.001726,
+          "session_id": 77585,
+          "original_token_count": 0,
+          "output": ""
+        },
+        {
+          "chunk_id": "5b4ecd",
+          "wall_time_seconds": 30.002668084,
+          "session_id": 77585,
+          "original_token_count": 0,
+          "output": ""
+        },
+        {
+          "chunk_id": "2dc6da",
+          "wall_time_seconds": 5.75e-06,
+          "exit_code": 0,
+          "original_token_count": 48,
+          "output": "{\"run_id\": 40603560943, \"label\": \"ARM\", \"observer_exit_code\": 0, \"head\": \"c3b125455ad00c21c444edd30fee998fdff63a01\", \"required_job_terminal_success_NOT_inferred_from_observer_alone\": true}\n"
+        }
+      ],
+      "original_request": {
+        "cmd": "python3 <private-path> 40603560943 ARM",
+        "workdir": "<private-path>",
+        "sandbox_permissions": "require_escalated",
+        "justification": "Watch only the original ARM CI run for PR #3960; no rerun, cancellation, archive or local Cargo.",
+        "yield_time_ms": 1000,
+        "max_output_tokens": 1500
+      }
+    },
+    "Linux": {
+      "native": 98022,
+      "results": [
+        {
+          "chunk_id": "9b1e2d",
+          "wall_time_seconds": 1.003012333,
+          "session_id": 98022,
+          "original_token_count": 0,
+          "output": ""
+        },
+        {
+          "chunk_id": "3ae002",
+          "wall_time_seconds": 30.001558666,
+          "session_id": 98022,
+          "original_token_count": 0,
+          "output": ""
+        },
+        {
+          "chunk_id": "c30bec",
+          "wall_time_seconds": 6.625e-06,
+          "exit_code": 0,
+          "original_token_count": 48,
+          "output": "{\"run_id\": 40603560988, \"label\": \"Linux\", \"observer_exit_code\": 0, \"head\": \"c3b125455ad00c21c444edd30fee998fdff63a01\", \"required_job_terminal_success_NOT_inferred_from_observer_alone\": true}\n"
+        }
+      ],
+      "original_request": {
+        "cmd": "python3 <private-path> 40603560988 Linux",
+        "workdir": "<private-path>",
+        "sandbox_permissions": "require_escalated",
+        "justification": "Watch only the original Linux CI run for PR #3960; no rerun, cancellation, archive or local Cargo.",
+        "yield_time_ms": 1000,
+        "max_output_tokens": 1500
+      }
+    },
+    "ARM-log": {
+      "native": 87278,
+      "results": [
+        {
+          "chunk_id": "11d55a",
+          "wall_time_seconds": 1.001398458,
+          "session_id": 87278,
+          "original_token_count": 0,
+          "output": ""
+        },
+        {
+          "chunk_id": "1dee9d",
+          "wall_time_seconds": 5.666e-06,
+          "exit_code": 0,
+          "original_token_count": 527,
+          "output": "{\n  \"argv\": [\n    \"gh\",\n    \"run\",\n    \"view\",\n    \"40603560943\",\n    \"--repo\",\n    \"autonomous-ai/lampOS\",\n    \"--log\"\n  ],\n  \"download_exit_code\": 0,\n  \"run_id\": 40603560943,\n  \"workflow_conclusion\": \"success\",\n  \"actual_required_job_id\": 122537382993,\n  \"actual_required_job_status\": \"completed\",\n  \"actual_required_job_conclusion\": \"success\",\n  \"optional_jobs_not_promoted_to_test_acceptance\": [\n    {\n      \"id\": 122537384461,\n      \"name\": \"lampOS \\u2014 promote a tested release to the stable feed\",\n      \"status\": \"completed\",\n      \"conclusion\": \"skipped\"\n    },\n    {\n      \"id\": 122543099853,\n      \"name\": \"lampOS \\u2014 sign and publish the tested lamp-voice artifact\",\n      \"status\": \"completed\",\n      \"conclusion\": \"skipped\"\n    },\n    {\n      \"id\": 122543100042,\n      \"name\": \"report-full-run-failure\",\n      \"status\": \"completed\",\n      \"conclusion\": \"skipped\"\n    }\n  ]\n}\n{\n  \"authored_head\": \"c3b125455ad00c21c444edd30fee998fdff63a01\",\n  \"expected_Main_base\": \"c0ae5afa8376b6282eef1b6bacbe516d924c654b\",\n  \"run_id\": 40603560943,\n  \"run_attempt\": 1,\n  \"required_job\": {\n    \"id\": 122537382993,\n    \"name\": \"lampOS \\u2014 build and test on Linux ARM64 (1/1)\",\n    \"status\": \"completed\",\n    \"conclusion\": \"success\",\n    \"check_run_url\": \"https://api.github.com/repos/autonomous-ai/lampOS/check-runs/122537382993\"\n  },\n  \"workflow_status\": \"completed\",\n  \"workflow_conclusion\": \"success\",\n  \"actual_checkout_from_git_log\": \"1a9e37c145f18cb25556ae5f52e8c68a35a24b22\",\n  \"actual_ordered_parents\": [\n    \"c0ae5afa8376b6282eef1b6bacbe516d924c654b\",\n    \"c3b125455ad00c21c444edd30fee998fdff63a01\"\n  ],\n  \"actual_tree\": \"9b4d58f68067df053e353f49a77c9266a5330661\",\n  \"expected_authored_tree\": \"9b4d58f68067df053e353f49a77c9266a5330661\",\n  \"whole_authored_tree_equal\": true,\n  \"ordered_parents_match_expected\": true,\n  \"setup_event_metadata_not_used_as_checkout\": true,\n  \"complete_log_bytes\": 1970825,\n  \"complete_log_sha256\": \"eedca08c992856e718874a2aa5aae741d9f376152778c1018473d7bbbb3768e9\",\n  \"no_rerun_cancellation_optional_archive\": true,\n  \"clean_test_census_required_separately\": true\n}\n"
+        }
+      ],
+      "original_request": {
+        "cmd": "python3 <private-path> ARM",
+        "workdir": "<private-path>",
+        "sandbox_permissions": "require_escalated",
+        "justification": "Drain the completed original ARM64 run for PR #3960 and verify its required job and actual source checkout; no reruns or archives.",
+        "yield_time_ms": 1000,
+        "max_output_tokens": 3000
+      }
+    },
+    "Linux-log": {
+      "native": 71284,
+      "results": [
+        {
+          "chunk_id": "7b1b49",
+          "wall_time_seconds": 1.001803375,
+          "session_id": 71284,
+          "original_token_count": 0,
+          "output": ""
+        },
+        {
+          "chunk_id": "531863",
+          "wall_time_seconds": 6.125e-06,
+          "exit_code": 0,
+          "original_token_count": 406,
+          "output": "{\n  \"argv\": [\n    \"gh\",\n    \"run\",\n    \"view\",\n    \"40603560988\",\n    \"--repo\",\n    \"autonomous-ai/lampOS\",\n    \"--log\"\n  ],\n  \"download_exit_code\": 0,\n  \"run_id\": 40603560988,\n  \"workflow_conclusion\": \"success\",\n  \"actual_required_job_id\": 122537383387,\n  \"actual_required_job_status\": \"completed\",\n  \"actual_required_job_conclusion\": \"success\",\n  \"optional_jobs_not_promoted_to_test_acceptance\": []\n}\n{\n  \"authored_head\": \"c3b125455ad00c21c444edd30fee998fdff63a01\",\n  \"expected_Main_base\": \"c0ae5afa8376b6282eef1b6bacbe516d924c654b\",\n  \"run_id\": 40603560988,\n  \"run_attempt\": 1,\n  \"required_job\": {\n    \"id\": 122537383387,\n    \"name\": \"lampOS \\u2014 clippy, every crate and target (x86 Linux)\",\n    \"status\": \"completed\",\n    \"conclusion\": \"success\",\n    \"check_run_url\": \"https://api.github.com/repos/autonomous-ai/lampOS/check-runs/122537383387\"\n  },\n  \"workflow_status\": \"completed\",\n  \"workflow_conclusion\": \"success\",\n  \"actual_checkout_from_git_log\": \"1a9e37c145f18cb25556ae5f52e8c68a35a24b22\",\n  \"actual_ordered_parents\": [\n    \"c0ae5afa8376b6282eef1b6bacbe516d924c654b\",\n    \"c3b125455ad00c21c444edd30fee998fdff63a01\"\n  ],\n  \"actual_tree\": \"9b4d58f68067df053e353f49a77c9266a5330661\",\n  \"expected_authored_tree\": \"9b4d58f68067df053e353f49a77c9266a5330661\",\n  \"whole_authored_tree_equal\": true,\n  \"ordered_parents_match_expected\": true,\n  \"setup_event_metadata_not_used_as_checkout\": true,\n  \"complete_log_bytes\": 87030,\n  \"complete_log_sha256\": \"664915aab729eb36867499952b43400e8129ae758d2de742d73c6b14e40e67ba\",\n  \"no_rerun_cancellation_optional_archive\": true,\n  \"clean_test_census_required_separately\": false\n}\n"
+        }
+      ],
+      "original_request": {
+        "cmd": "python3 <private-path> Linux",
+        "workdir": "<private-path>",
+        "sandbox_permissions": "require_escalated",
+        "justification": "Drain the completed original Linux run for PR #3960 and verify its required job and actual source checkout; no reruns or archives.",
+        "yield_time_ms": 1000,
+        "max_output_tokens": 3000
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "initial_comparison_wrongly_required_WIP_git_mode_to_equal_committed_index_mode": true,
+  "actual_bytes_all13_equal": true,
+  "actual_permission_bits_all13_equal": true,
+  "new_test_file_WIP_index_mode_None_to_committed_100644": [
+    {
+      "path": "lampOS/crates/update/src/writer_plan/tests.rs",
+      "execution_git_mode": null,
+      "execution_actual_permissions": 420,
+      "committed_git_mode": "100644",
+      "bytes_equal": true
+    }
+  ],
+  "no_source_change_Cargo_runtime_or_native_credit": true
+}

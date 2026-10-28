@@ -1,0 +1,7 @@
+{
+  "initial_read_failed_before_receipt": "git show c3b:lampOS/crates/update/src/head_touch/tests.rs: path absent",
+  "correction": "null-mask case is in head_touch.rs inline tests, not child head_touch/tests.rs",
+  "GIT_NO_LAZY_FETCH": "1 throughout; resolved local commit, no lazy fetch",
+  "source_mutation_Cargo_target_runtime": false,
+  "no_initial_audit_success_or_native_count_claimed": true
+}

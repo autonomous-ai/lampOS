@@ -1,0 +1,628 @@
+{
+  "authored_head": "c3b125455ad00c21c444edd30fee998fdff63a01",
+  "authored_tree": "9b4d58f68067df053e353f49a77c9266a5330661",
+  "source_derived_pairs": [
+    [
+      "lamp-update",
+      "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record"
+    ],
+    [
+      "lamp-update",
+      "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record"
+    ],
+    [
+      "lamp-update",
+      "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract"
+    ],
+    [
+      "lamp-update",
+      "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request"
+    ],
+    [
+      "lamp-update",
+      "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::both_typed_absences_agree_at_each_first_missing_component"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::common_leaf_fields_and_exact_binary_bytes_cannot_be_substituted"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::decoded_regular_empty_and_unmatched_binary_preserve_artifacts_without_live_io"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::directory_facts_check_types_membership_absence_and_extra_link_bypass"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::every_raw_entry_checks_common_ancestors_even_without_a_matching_head_leaf"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::exact_root_spelling_and_nonempty_raw_root_evidence_are_required"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::negative_kind_suffix_and_no_link_chain_shape_match_the_requested_key"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::signed_device_conversion_refuses_negative_instead_of_reinterpreting_bits"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::unchanged_bytes_with_real_permission_changes_fail_without_snapshot_or_auth_claims"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::coherence::tests::unrelated_head_links_and_null_masks_are_valid_but_raw_overlap_refuses"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::actual_evaluator_replays_closed_after_restart_for_conditional_carried_and_omitted_inputs"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::aggregate_names_raw_link_bytes_and_regular_text_refuse_below_the_encoded_cap"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::closed_restart_keeps_regular_empty_null_and_both_absences_distinct"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::combined_fact_and_witness_aggregate_limits_are_enforced_across_rows"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::encoder_preflight_refuses_combined_fact_and_text_budgets_without_changing_inputs"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::every_native_equality_field_is_selected_and_atime_is_excluded"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::exact_external_hash_and_size_are_checked_and_do_not_authenticate_origin"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::fact_and_witness_quotas_refuse_before_deserializing_the_next_collection"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::future_nonsemantic_bytes_and_escape_spellings_are_retained_exactly"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::hard_link_aliases_keep_two_lexical_keys_and_revalidate_full_content"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::joined_name_matches_the_native_exact_limit_and_refuses_one_over"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::known_variant_payloads_directory_shapes_and_component_bytes_are_strict"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::lexical_and_encoded_bounds_refuse_before_the_json_parser_can_allocate"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::lookup_parse_and_debug_diagnostics_redact_paths_contents_and_unknown_semantics"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::malformed_strings_truncations_and_non_utf8_regular_bytes_never_yield_partial_saved"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::portable_raw_names_and_link_bytes_are_exact_without_a_physical_mac_claim"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::quota_refusal_happens_before_a_base64_allocation_is_invoked"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::relative_aliases_absolute_contained_links_and_raw_unresolved_suffix_replay"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::revalidation_checks_negative_membership_link_and_root_facts_without_mutating_saved_bytes"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::revalidation_compares_membership_as_a_set_and_replay_keeps_encoded_order"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::root_is_not_a_text_or_missing_directory_and_has_one_exact_witness"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::root_slash_retains_the_producers_conservative_extra_separator_cap"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::same_absent_key_is_coherent_across_both_apis_and_conflicts_refuse"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::semantic_versions_ops_kinds_duplicates_and_nullable_shadowing_refuse"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::signed_timestamps_and_portable_widths_refuse_unsupported_values"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::codec::tests::sorted_unique_rooted_keys_and_root_witness_agreement_are_required"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::a_body_calibration_change_after_capture_refuses_even_with_carried_base_units"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::a_fixture_null_spelling_is_regular_text_and_a_real_null_mask_is_metadata_only"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::absence_empty_regular_and_null_are_distinct_and_unknown_keys_are_errors"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::actual_default_file_and_ignored_name_bounds_are_enforced_and_poisoned"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::actual_projection_and_verification_replay_after_the_filesystem_is_gone"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::any_caught_provider_error_poisoned_collection_and_policy_errors_are_redacted"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::cache_keys_and_link_targets_keep_directory_requiring_spellings_distinct"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::custom_pins_and_settings_off_do_not_invent_product_or_body_dependencies"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::dangling_link_appearance_and_missing_ancestor_creation_invalidate"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::directory_membership_including_ignored_names_and_absence_is_rechecked"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::escapes_and_link_loops_refuse_without_an_ordinary_reader_fallback"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::file_aggregate_directory_name_key_and_work_limits_return_no_partial_success"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::file_mutation_and_ancestor_replacement_refuse_before_freeze"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::metadata_only_null_classification_refuses_zero_fifo_and_socket"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::path_component_link_and_repeated_resolution_work_are_bounded"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::regular_hard_links_retain_link_count_and_content_dependencies"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::relative_directory_and_regular_links_and_contained_absolute_links_recheck"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::removal_from_a_captured_directory_invalidates_without_a_text_dependency"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::root_substitution_and_an_unrelated_root_refuse_revalidation"
+    ],
+    [
+      "lamp-update",
+      "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation"
+    ],
+    [
+      "lamp-update",
+      "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence"
+    ],
+    [
+      "lamp-update",
+      "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases"
+    ],
+    [
+      "lamp-update",
+      "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback"
+    ],
+    [
+      "lamp-update",
+      "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error"
+    ],
+    [
+      "lamp-update",
+      "head_touch::plan_output::tests::compact_input_that_expands_past_the_cap_refuses_only_the_new_plan_path"
+    ],
+    [
+      "lamp-update",
+      "head_touch::plan_output::tests::keep_step_has_no_derived_output_and_moves_oversized_existing_text_without_copying"
+    ],
+    [
+      "lamp-update",
+      "head_touch::plan_output::tests::late_provider_failure_returns_no_owned_partial_plan_or_private_diagnostic"
+    ],
+    [
+      "lamp-update",
+      "head_touch::plan_output::tests::ordinary_policy_bytes_hashes_and_request_order_match_all_eight_closed_replays"
+    ],
+    [
+      "lamp-update",
+      "head_touch::plan_output::tests::refusing_an_append_happens_before_buffer_growth_or_partial_write"
+    ],
+    [
+      "lamp-update",
+      "head_touch::plan_output::tests::streaming_pretty_bytes_and_newline_obey_the_exact_utf8_byte_limit"
+    ],
+    [
+      "lamp-update",
+      "head_touch::tests::null_masks_do_not_admit_other_character_devices"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file"
+    ],
+    [
+      "lamp-update",
+      "writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::authentication_and_protected_release_fields_are_independent_checks"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::bounded_caller_context_refuses_without_echoing_values_or_relaxing_paths"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::closed_preparation_retains_exact_signed_and_additive_encoded_bytes"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::decoder_accepted_missing_late_head_dependency_never_returns_a_partial_plan"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::later_same_writer_is_permitted_but_refresh_reuse_and_product_substitution_refuse"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::omitted_signed_pins_are_derived_after_later_rows_with_original_source_retained"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::ordered_paths_selected_records_and_protected_artifacts_cannot_be_rebound_by_bundle"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::ordinary_keep_none_record_and_removed_here_rows_survive_without_qualification"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::reconciliation_refuses_duplicate_foreign_and_non_pins_changes"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::signature_tampering_refuses_even_with_rebound_envelope_and_unchanged_key_identity"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::signed_compact_pins_that_expand_past_the_output_cap_return_no_partial_preparation"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::signed_writer_hash_size_and_each_offered_byte_buffer_are_bound"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::two_decoder_valid_raw_rows_must_agree_even_without_a_head_prefix_fact"
+    ],
+    [
+      "lamp-update",
+      "writer_plan::tests::unsupported_effects_refuse_even_when_selected_settings_would_be_noops"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::actual_capture_keeps_binary_empty_missing_noops_records_and_every_identity_after_publication"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::diagnostic_surfaces_hide_values_and_empty_selection_observes_no_live_root"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::durable_prefix_and_lost_ack_failures_keep_bytes_without_admitting_retry_or_cleanup"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::exact_four_mib_of_binary_old_bytes_and_empty_files_survive_without_truncation"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::expected_identity_and_size_are_checked_before_parse_and_every_failed_load_retains_the_file"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::publication_never_replaces_existing_final_or_unknown_stage_and_load_never_follows_links"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::shape_stamp_base64_and_collection_bounds_are_checked_before_old_byte_allocations"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::unknown_nonsemantic_fields_retain_the_complete_original_encoding_without_reserialization"
+    ],
+    [
+      "lamp-update",
+      "writer_preimages::tests::unknown_semantics_known_duplicates_duplicate_paths_and_invalid_records_block_without_deletion"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission"
+    ],
+    [
+      "lamp-update",
+      "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::revalidation_refuses_new_negative_dependencies_and_replaced_ancestors"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::revalidation_refuses_replaced_roots_links_and_nonregular_leaves"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored"
+    ],
+    [
+      "lamp-update",
+      "writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence"
+    ],
+    [
+      "lamp-update::round",
+      "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records"
+    ],
+    [
+      "lamp-update::round",
+      "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged"
+    ],
+    [
+      "lamp-update::round",
+      "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request"
+    ]
+  ],
+  "required_count": 135,
+  "source_file_identities": {
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/writer_preimages/tests.rs": {
+      "sha256": "6d06b27283543a308d4d4b1ada60406235a10c2ccf28eadc05aa1ac82ea3270f",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+      "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/head_touch/plan_output/tests.rs": {
+      "sha256": "e891b042bf6092ee1a4e18cf229a8bd0685cc263cc75a268cd9a77aca201a495",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs": {
+      "sha256": "9ecbf08d95d0ba71808b79131c06f8456a228f4eadd14a46edecb253a5c259ea",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/writer_plan/tests.rs": {
+      "sha256": "a4caa69b1c3d8c5b15fbd6986044175d50015d08c9a11e1f7b4caea81593d378",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/head_touch/input_tests.rs": {
+      "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/head_touch.rs": {
+      "sha256": "8046a94a819ab03f3d2c00499283f2894d8a1a3b530f81b3c37a065b2cdc740f",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/src/apply.rs": {
+      "sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "blob": "blob",
+      "mode": "100644"
+    },
+    "lampOS/crates/update/tests/round.rs": {
+      "sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422",
+      "blob": "blob",
+      "mode": "100644"
+    }
+  },
+  "matched_actual614_selector_set_exactly": true,
+  "actual614_selector_SHA256": "02c780ead8308c5072611bb745c6369148c616a15b08e9e87ab61acb4429836b",
+  "native_outcome": "UNRUN/unknown until original actual log census; no614credit transfer",
+  "whole_tree_equivalence_to_CI_not_assumed": true,
+  "all13_selector_source_bytes_actual_permissions_match_614_WIP_snapshot": true,
+  "untracked_WIP_to_committed_index_binding": [
+    {
+      "path": "lampOS/crates/update/src/writer_plan/tests.rs",
+      "execution_git_mode": null,
+      "execution_actual_permissions": 420,
+      "committed_git_mode": "100644",
+      "bytes_equal": true
+    }
+  ]
+}

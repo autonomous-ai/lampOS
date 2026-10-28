@@ -1,0 +1,100 @@
+[
+  {
+    "status": "PASS",
+    "ordinal": 2683,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::authentication_and_protected_release_fields_are_independent_checks"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2684,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::bounded_caller_context_refuses_without_echoing_values_or_relaxing_paths"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2685,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::closed_preparation_retains_exact_signed_and_additive_encoded_bytes"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2686,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::decoder_accepted_missing_late_head_dependency_never_returns_a_partial_plan"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2687,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::later_same_writer_is_permitted_but_refresh_reuse_and_product_substitution_refuse"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2688,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::omitted_signed_pins_are_derived_after_later_rows_with_original_source_retained"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2689,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::ordered_paths_selected_records_and_protected_artifacts_cannot_be_rebound_by_bundle"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2690,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::ordinary_keep_none_record_and_removed_here_rows_survive_without_qualification"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2691,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::reconciliation_refuses_duplicate_foreign_and_non_pins_changes"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2692,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::signature_tampering_refuses_even_with_rebound_envelope_and_unchanged_key_identity"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2693,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::signed_compact_pins_that_expand_past_the_output_cap_return_no_partial_preparation"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2694,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::signed_writer_hash_size_and_each_offered_byte_buffer_are_bound"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2695,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::two_decoder_valid_raw_rows_must_agree_even_without_a_head_prefix_fact"
+  },
+  {
+    "status": "PASS",
+    "ordinal": 2696,
+    "total": 7907,
+    "binary": "lamp-update",
+    "name": "writer_plan::tests::unsupported_effects_refuse_even_when_selected_settings_would_be_noops"
+  }
+]

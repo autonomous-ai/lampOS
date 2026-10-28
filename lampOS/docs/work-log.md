@@ -1,3 +1,13 @@
+## 28 October 2026, 07:03 +07 — signed preparation original ARM and Linux close
+
+Ready for lamp-voice: yes (#3960's private preparation slice; Raw/preimage/coherence prerequisite acceptance and two external readers remain separate).
+
+#3960 c3b125455 [original native evidence](verification/ordinary-plan-preparation-20261028/native-c3b1-c0ae/README.md) records **7,907 unique primary ARM passes**, all **135** required controls including **14** new plus the direct install-doc reader, zero bad or selected unrun and54 reported skips. Actual checkout1a9e37c145 has ordered c0ae/c3 parents; complete tree9b4d58f680 matches the authored source. Original ARM40603560943/job122537382993 and Linux40603560988/job122537383387 succeed. Separate documentation4/process13/relay1/promotion25 are not added. No archive, downloaded executable or test-driver-byte claim is supplied.
+
+All original watcher/log handles drain exit0 and direct request/continuation records are retained. Two offline audit-script corrections (inline test path and precommit index-mode representation) are documented without source change, rerun or execution credit. The independently reconciled full terminal ledger and exact selectors bind the actual original run. Twenty-two manifest members and all23 text files are checked in the index and committed tree before push.
+
+The subsequent saved-plan container has passed formatting, strict Update Clippy and compilation on its separate9f32 source. Its first full gate selected621 cases/all142 required with6 ignored and no nonignored filters or excluded binaries; runtime is still in progress here. No claim of durable publication, admission, privileged execution, restoration, promoted build or physical acceptance follows. Existing qualified bases stay in place under the train merged-tree rule; dependency removal follows the train's explicit parent-delivery instruction, not base-only churn.
+
 ## 28 October 2026, 06:46 +07 — first full ordinary preparation gate
 
 Ready for lamp-voice: no (#3960 original native CI and independent reads remain separate).
