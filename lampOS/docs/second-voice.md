@@ -625,7 +625,8 @@ order is kept. A written turn is the same from the chat on.
   check is on the lamp: the day lines' timer and reminder at 4 of 4 runs,
   one confirmation each.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
-  tag** (off unless set; #2901, the lead's proposal on #1711, 22 Oct). The
+  tag** (off unless set, on in the product unit from 28 Oct, the owner's
+  pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
   spoken turns' character is followed by a short note
   (`speech_tags::NOTE`), only when the voice reads tags (below): the voice reads `[laughs]`, `[sighs]`,
   `[whispers]` and `[excited]`, to be used rarely, only where a person
