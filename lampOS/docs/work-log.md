@@ -1,3 +1,13 @@
+## 29 October 2026, 00:25 +07 — #2810 landed, plan A on HOLD and being fixed, three PRs on NEXT TRAIN
+
+Ready for lamp-voice: yes, on NEXT TRAIN: #4171 (the fixed copy, two READ-OKs carried), #4172 (`UPDATER` is 8 in `updates.md`, three READ-OKs) and #4181 (plan A's rehearsal, Tests' READ-OK; BAD 3 added since). No: #4178 (plan A), which is stacked on #4171 and on HOLD.
+
+Landed since 19:55: #4126 (the writer's unit), #4131 (#2810: a build put back is retried once, and only when its put-back and its begin were on different boots), #4144 and #4145 (the saved plan and the product reader), and #4117. Reads given: #4147, #4150, #4152, #4157, #4162, #4165 (the lamp half of Mobile's "Check for update", with Reviewer-two), #4177, #3843 and #4146.
+
+#4178 HOLD, from Reviewer-two (Reviewer-three withdrew a READ-OK). P2: `writer_swap::unproven` asked `put_back.is_none()`, and a refresh carries the last put-back forward. So after one put-back, no later refreshed writer was unproven: the own switch wouldn't wait, and a failed writer wouldn't be put back. The fix drops that condition, since a put-back's own record is `proven: true`. `a_new_writer_that_failed_is_put_back_and_never_asked_again` now refreshes again after the put-back, asserts it is unproven, and proves it. With the old line, the test fails. P3: the stale "Unwired" headers are fixed, and `updates.md` sections my rebases had doubled are removed. The fix is gating on the Mac and goes up as a new commit.
+
+The force-push is still refused in this session, so a rebased PR goes up from a new branch.
+
 ## 28 October 2026, 19:55 +07 — 2b and #4051 landed, four PRs replaced, plan A as #4127
 
 Ready for lamp-voice: yes, on carried reads: #4122, #4124, #4125, #4126 (each the same patch as the PR it replaces). No: #4117 waits on reads; #4127 (plan A) is a draft, stacked on #4126 and #4125.
