@@ -134,6 +134,47 @@ fn a_refreshed_writer_whose_back_failed_is_put_back_by_the_next_round() {
 }
 
 #[test]
+fn a_back_that_began_before_the_refresh_and_failed_is_waited_past_never_put_back_for() {
+    // The copy before's `back` was mid-run when the refresh landed, and
+    // failed after the unit's `reset-failed` (El's P3 on #4178).
+    let mut lamp = refreshed();
+    let done = writer_swap::done(&lamp.records()).unwrap();
+    lamp.systemd.units.insert(
+        writer_swap::BACK_UNIT.into(),
+        Running {
+            active: "failed".into(),
+            sub: "failed".into(),
+            ..Running::default()
+        },
+    );
+    // Began in the refresh's own second: it may be the copy before's.
+    lamp.systemd.back_began = Some(done.at_unix_ms / 1000 * 1000);
+    lamp.round();
+    assert_eq!(lamp.read(BACK), "lamp-update 1");
+    assert_eq!(lamp.read(PREV), "old writer");
+    assert!(writer_swap::unproven(&lamp.root, &lamp.records()));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("began before it was refreshed")),
+        "{:?}",
+        lamp.said
+    );
+    // The new writer's own `back`, begun after, fails: it is put back.
+    lamp.systemd.back_began = Some((done.at_unix_ms / 1000 + 1) * 1000);
+    lamp.round();
+    assert_eq!(lamp.read(BACK), "old writer");
+    assert!(!lamp.exists(PREV));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("is put back (its back failed)")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+#[test]
 fn a_refreshed_writer_whose_back_ended_well_since_is_proved_and_its_prev_removed() {
     let mut lamp = refreshed();
     let done = writer_swap::done(&lamp.records()).unwrap();
