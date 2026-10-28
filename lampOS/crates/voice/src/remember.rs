@@ -7956,6 +7956,7 @@ impl DaysClient {
         zone: Option<&LocalTime>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Option<(Value, Vec<(Option<String>, u64)>)> {
+        let started = Instant::now();
         // #2510 take #4: kept things say since when; history only theirs,
         // and only when it was asked for.
         let dated = self.replaces.load(Ordering::Acquire);
@@ -7983,6 +7984,29 @@ impl DaysClient {
             .into_iter()
             .map(|id| (Some(person.to_owned()), id))
             .collect();
+        // "What have I told you about myself?" (lamp-06c1, 28 Oct night,
+        // R2): its words match their small talk, never what they asked to
+        // keep, so their kept things are told first.
+        if about_themself(request)
+            && let Some(left) = deadline.checked_sub(started.elapsed())
+        {
+            let list = for_person(json!({"op":"kept","max_bytes":NOTE_BYTES}), Some(person));
+            let kept = bounded_exchange_scoped(&self.socket, &list, left, lease)
+                .and_then(|answer| kept_as_found(&answer, &ids, now, zone, dated));
+            if let Some((mut first, kept_ids)) = kept {
+                for item in &mut first {
+                    item["theirs"] = json!(true);
+                }
+                first.append(&mut found);
+                found = first;
+                let mut all: Vec<_> = kept_ids
+                    .into_iter()
+                    .map(|id| (Some(person.to_owned()), id))
+                    .collect();
+                all.append(&mut ids);
+                ids = all;
+            }
+        }
         if let Some(mut room) = room {
             // Nothing of the room's about a person for the rest of the day
             // they forgot everything (#2849, `LAMP_MEMORY_ROOM_AFTER_FORGET`).
@@ -8870,6 +8894,119 @@ fn mark_partial_span(told: &mut Value) {
 /// asked for a person's own history, a replaced one also says `until`
 /// when, from the store's `until_unix_ms`; with `Some(false)` a replaced
 /// one is never told. `None`, as before.
+/// A recall's words that ask only about the person themself, or what they
+/// told: "myself", "what I told you", "về tôi" (lamp-06c1, 28 Oct night,
+/// R2). It names no day.
+const ABOUT_THEMSELF: &[&str] = &[
+    "me",
+    "myself",
+    "mine",
+    "i",
+    "i'm",
+    "im",
+    "about",
+    "told",
+    "tell",
+    "said",
+    "say",
+    "know",
+    "knew",
+    "remember",
+    "things",
+    "thing",
+    "anything",
+    "everything",
+    "what",
+    "you",
+    "this",
+    "week",
+    "lately",
+    "recently",
+    "so",
+    "far",
+    "mình",
+    "tôi",
+    "bản",
+    "thân",
+    "về",
+    "đã",
+    "nói",
+    "kể",
+    "biết",
+    "gì",
+    "những",
+    "điều",
+    "tuần",
+    "này",
+    "nhớ",
+];
+
+/// Whether `request` asks only about the person themself, with no day: a
+/// word of [`ABOUT_THEMSELF`]'s own ("me", "myself", "mình", "tôi", "bản
+/// thân") and none outside it.
+fn about_themself(request: &Value) -> bool {
+    if !request["day"].is_null() || !request["day_from"].is_null() {
+        return false;
+    }
+    let Some(query) = request["query"].as_str() else {
+        return false;
+    };
+    let words: Vec<String> = query
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let own = |word: &String| {
+        matches!(
+            word.as_str(),
+            "me" | "myself" | "mine" | "mình" | "tôi" | "bản" | "thân"
+        )
+    };
+    !words.is_empty()
+        && words.iter().any(own)
+        && words
+            .iter()
+            .all(|word| ABOUT_THEMSELF.contains(&word.as_str()))
+}
+
+/// The `kept` op's answer as recall's found items: at most
+/// [`RECALL_ENTRIES`], none already in `given`.
+fn kept_as_found(
+    answer: &Value,
+    given: &[(Option<String>, u64)],
+    now: u64,
+    zone: Option<&LocalTime>,
+    dated: bool,
+) -> Option<(Vec<Value>, Vec<u64>)> {
+    if answer["ok"] != true {
+        return None;
+    }
+    let entries: Vec<Value> = answer["entries"]
+        .as_array()?
+        .iter()
+        .filter(|entry| {
+            let id = entry["id"].as_u64();
+            !given.iter().any(|(_, given)| Some(*given) == id)
+        })
+        .take(RECALL_ENTRIES as usize)
+        .map(|entry| {
+            let mut entry = entry.clone();
+            entry["kind"] = json!("kept");
+            entry
+        })
+        .collect();
+    if entries.is_empty() {
+        return None;
+    }
+    let (told, ids) = days_answer(
+        &json!({"ok":true,"entries":entries}),
+        now,
+        zone,
+        dated.then_some(false),
+    )?;
+    Some((told["found"].as_array()?.clone(), ids))
+}
+
 fn days_answer(
     answer: &Value,
     now: u64,
@@ -18033,6 +18170,106 @@ mod tests {
         // The writer's journal line and Days' lines go through this.
         let line = json!({"op":"append","at_unix_ms":NOW,"heard":"h","said":"s"});
         assert_eq!(for_person(line.clone(), None).to_string(), line.to_string());
+    }
+
+    #[test]
+    fn a_recall_about_themself_is_told_their_kept_things_first() {
+        for (query, own) in [
+            ("myself", true),
+            ("me", true),
+            ("what I told you about myself this week", true),
+            ("về tôi", true),
+            ("bản thân", true),
+            ("my coffee", false),
+            ("told you", false),
+            ("myself coffee", false),
+            ("", false),
+        ] {
+            let request = json!({"op":"search","query":query,"day":null});
+            assert_eq!(about_themself(&request), own, "{query}");
+        }
+        // A day names something else than themself.
+        assert!(!about_themself(
+            &json!({"op":"search","query":"me","day":"2026-10-28"})
+        ));
+        assert!(!about_themself(
+            &json!({"op":"search","query":"me","day":null,"day_from":"2026-10-22","day_to":"2026-10-28"})
+        ));
+        assert!(!about_themself(
+            &json!({"op":"recall","query":null,"day":null})
+        ));
+
+        const OLIVIA: &str = "p-b2471d941bf88836";
+        let (socket, served) = memory("about-themself", 5, |request| {
+            let theirs = request["person"] == OLIVIA;
+            match request["op"].as_str() {
+                Some("search") if theirs => json!({"ok":true,"entries":[
+                    {"kind":"exchange","id":9,"at_unix_ms":NOW,"heard":"What time is it?","said":"Ten past four."}
+                ]}),
+                Some("search") => json!({"ok":true,"entries":[]}),
+                Some("kept") if theirs => json!({"ok":true,"entries":[
+                    {"id":4,"at_unix_ms":NOW,"text":"favourite drink is hibiscus tea"},
+                    {"id":9,"at_unix_ms":NOW,"text":"already given"}
+                ]}),
+                _ => json!({"ok":false}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let recall = |about: &str| {
+            client.run_at(
+                &call(RECALL, json!({"about": about})),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(OLIVIA),
+            )
+        };
+        let (told, answered) = recall("myself");
+        assert!(answered, "{told}");
+        let found = told["found"].as_array().unwrap();
+        assert_eq!(found.len(), 2, "{told}");
+        assert_eq!(
+            found[0]["asked_to_remember"],
+            "favourite drink is hibiscus tea"
+        );
+        assert_eq!(found[0]["theirs"], true);
+        assert_eq!(found[1]["heard"], "What time is it?");
+        assert_eq!(
+            client
+                .context
+                .lock()
+                .unwrap()
+                .last_given
+                .as_ref()
+                .map(|(given, _)| given.clone()),
+            Some(vec![
+                (Some(OLIVIA.to_owned()), 4),
+                (Some(OLIVIA.to_owned()), 9)
+            ])
+        );
+        // Any other word asks as before: no kept list.
+        let (told, answered) = recall("coffee");
+        assert!(answered, "{told}");
+        assert_eq!(told["found"].as_array().unwrap().len(), 1, "{told}");
+        let read = served.join().unwrap();
+        let ops: Vec<_> = read.iter().map(|line| line["op"].clone()).collect();
+        assert_eq!(
+            ops,
+            [
+                json!("search"),
+                json!("search"),
+                json!("kept"),
+                json!("search"),
+                json!("search")
+            ],
+            "{read:?}"
+        );
+        assert_eq!(
+            read[2],
+            json!({"op":"kept","max_bytes":NOTE_BYTES,"person":OLIVIA})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
     }
 
     #[test]
