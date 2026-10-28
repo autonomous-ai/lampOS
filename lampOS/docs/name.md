@@ -76,9 +76,13 @@ call shows whether it scored about 0.3 or about 0. Runs are held off for
 1 s after each, as hearings are, which in a room that talks all day is
 still a line about every 1.1 s: so at most 10 are written a minute
 (`UNDER_BARS_A_MINUTE`), and the next line written after some were not
-ends `not_written_before=N`. `UnderBars` in `main.rs`; its tests are
-`a_run_under_both_bars_is_one_line_and_one_at_the_near_bar_is_none` and
-`under_its_bars_is_ten_lines_a_minute_at_most`.
+ends `not_written_before=N`. A `--near` at or under 0.2 leaves nothing
+between the floor and the bar, so no such line can be written; the journal
+then says so once, after `started`: `under its bars is off: bar=0.1 is at
+or under its floor 0.2`. `UnderBars` in `main.rs`; its tests are
+`a_run_under_both_bars_is_one_line_and_one_at_the_near_bar_is_none`,
+`under_its_bars_is_ten_lines_a_minute_at_most` and
+`under_its_bars_says_at_start_when_it_is_off`.
 
 **It keeps no sound.** Samples are held for about a fifth of a second,
 until they have been turned into the numbers its models work on, and of
