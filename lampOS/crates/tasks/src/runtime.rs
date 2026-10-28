@@ -436,13 +436,13 @@ impl Adapter for Cli {
 /// and no program at `--harness`, nothing to hand over with. Harness put on
 /// later is used once the part starts again.
 enum Production {
-    Cli(Cli),
+    Cli(Box<Cli>),
     Absent,
 }
 impl Adapter for Production {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         match self {
-            Self::Cli(cli) => Adapter::wait_lane(cli),
+            Self::Cli(cli) => Adapter::wait_lane(&**cli),
             Self::Absent => None,
         }
     }
@@ -489,13 +489,13 @@ impl Adapter for Production {
     }
     fn sign_in_starter(&self) -> Option<Starter> {
         match self {
-            Self::Cli(cli) => Adapter::sign_in_starter(cli),
+            Self::Cli(cli) => Adapter::sign_in_starter(&**cli),
             Self::Absent => Some(Box::new(|| Err("no_harness".into()))),
         }
     }
     fn start_daemon(&self) -> Result<(), String> {
         match self {
-            Self::Cli(cli) => Adapter::start_daemon(cli),
+            Self::Cli(cli) => Adapter::start_daemon(&**cli),
             Self::Absent => Err("no_harness".into()),
         }
     }
@@ -2008,6 +2008,7 @@ pub fn serve<C: Clock>(
     executable: PathBuf,
     as_person: bool,
     folder_missing: bool,
+    engines_ready: bool,
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
@@ -2030,7 +2031,8 @@ pub fn serve<C: Clock>(
         cli.cancel = Some(cancelled);
         cli.as_person = as_person;
         cli.folder_missing = folder_missing;
-        Cli::new(cli, session.into()).map(Production::Cli)
+        cli.engines_ready = engines_ready;
+        Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
 }
 

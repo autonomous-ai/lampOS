@@ -222,6 +222,14 @@ const WAIT_SLACK: Duration = Duration::from_secs(30);
 pub const DAEMON_START_TIMEOUT: Duration = Duration::from_secs(75);
 /// No more agents than this are waited on in one `wait`.
 pub const MOST_WAITED: usize = 64;
+/// How long `harness machines engines` is given (`serve --engines-ready`):
+/// the computer's Harness reads the one engine in its login shell, 5 s at
+/// most there (openharness `engineProbe.ts`), over the machine link.
+pub const ENGINES_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
+/// How long one computer's answer for one engine is kept when it refuses
+/// nothing: a second hand-over within it asks nothing. A refusal is never
+/// kept: the person may sign in at once and ask again.
+pub const ENGINES_KEPT: Duration = Duration::from_secs(300);
 
 /// Strict when stored too: an observation's `digest` is over what this
 /// build would write of it, so a later field would not match it anyway; a
@@ -361,6 +369,14 @@ pub struct CliConfig {
     /// (`serve --folder-missing`, #2840). Off unless set: `uncertain` with
     /// `new_failed`, as any failed `new`.
     pub folder_missing: bool,
+    /// Before each hand-over, the computer is asked whether the named
+    /// engine is signed in and takes a first prompt (`harness machines
+    /// engines`, openharness#1788), an answer that refuses nothing kept
+    /// [`ENGINES_KEPT`]; a known no ends
+    /// the task `not_sent` with `engine_signed_out` or `engine_no_prompt`,
+    /// so the voice can say so (`serve --engines-ready`). Off unless set:
+    /// nothing is asked, and the hand-over goes as before.
+    pub engines_ready: bool,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -379,10 +395,15 @@ impl CliConfig {
             cancel: None,
             as_person: false,
             folder_missing: false,
+            engines_ready: false,
             journal: None,
         }
     }
 }
+
+/// Each computer's answers that refused nothing, by machine id and engine:
+/// when each was had.
+type Kept = BTreeMap<(String, &'static str), Instant>;
 
 pub struct Cli {
     config: CliConfig,
@@ -390,6 +411,8 @@ pub struct Cli {
     operation: Mutex<()>,
     poisoned: AtomicBool,
     executable: ExecutableIdentity,
+    /// Each computer's answer for each engine (`serve --engines-ready`).
+    ready: Mutex<Kept>,
 }
 
 fn invalid(code: &'static str) -> io::Error {
@@ -490,6 +513,7 @@ impl Cli {
             operation: Mutex::new(()),
             poisoned: AtomicBool::new(false),
             executable,
+            ready: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -548,6 +572,11 @@ impl Cli {
             return not_sent("preflight_failed");
         }
         if let Err(code) = machines(&preflight.stdout, &launch.target.machine_id) {
+            return not_sent(code);
+        }
+        if self.config.engines_ready
+            && let Some(code) = self.engine_refusal(&launch.target, seen)
+        {
             return not_sent(code);
         }
         // This is a preflight, not a reservation. Harness resolves the account
@@ -614,6 +643,57 @@ impl Cli {
             Err(error) if error.spawned => uncertain(error.code),
             Err(error) => not_sent(error.code),
         }
+    }
+
+    /// Whether `target`'s computer says its engine can't take this work
+    /// (`serve --engines-ready`), within [`ENGINES_PROBE_TIMEOUT`]. No
+    /// answer, an unknown one or an older Harness without the command is no
+    /// refusal, and is kept [`ENGINES_KEPT`] for that computer and engine,
+    /// so a computer that can't say costs one probe. A refusal is asked
+    /// again at the next hand-over: the person may have signed in meanwhile
+    /// (the Reviewer-lead's P2 on #4033). Called inside a launch, under its
+    /// operation lock.
+    fn engine_refusal(&self, target: &Target, seen: &mut Seen) -> Option<&'static str> {
+        let engine = target.engine.argument();
+        let key = (target.machine_id.to_lowercase(), engine);
+        let mut kept = self.ready.lock().unwrap_or_else(|e| e.into_inner());
+        kept.retain(|_, at| at.elapsed() < ENGINES_KEPT);
+        if kept.contains_key(&key) {
+            return None;
+        }
+        let began = Instant::now();
+        let reply = self.run(
+            &[
+                "machines".into(),
+                "engines".into(),
+                target.machine_id.clone().into(),
+                "--engine".into(),
+                engine.into(),
+                "--json".into(),
+            ],
+            ENGINES_PROBE_TIMEOUT.min(self.config.read_timeout),
+        );
+        seen.took(&reply);
+        let refused = match &reply {
+            Ok(reply) if reply.success => engine_refused(&reply.stdout, &target.machine_id, engine),
+            _ => None,
+        };
+        // One line a probe, so its cost on a lamp can be read from the
+        // journal; never the computer's name.
+        eprintln!(
+            "tasks: asked the computer about {engine}: {}, {} ms",
+            match (&reply, refused) {
+                (_, Some(code)) => code,
+                (Ok(reply), None) if reply.success => "no refusal",
+                (Ok(_), None) => "it could not say",
+                (Err(error), None) => error.code,
+            },
+            began.elapsed().as_millis()
+        );
+        if refused.is_none() {
+            kept.insert(key, Instant::now());
+        }
+        refused
     }
 
     /// The agent's last turn, read on the machine it was started on.
@@ -1352,6 +1432,32 @@ struct CreatedAgent {
 /// `None` (by `default`).
 fn present<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Value>, D::Error> {
     Value::deserialize(deserializer).map(Some)
+}
+
+/// What `harness machines engines --json` says of `engine` on `machine`
+/// (openharness#1888): `engine_no_prompt` for a known `firstPrompt: false`,
+/// `engine_signed_out` for a known `signedIn: false` (read for Claude Code
+/// and Codex only), and nothing for anything else: `null`, no row of that
+/// computer and engine, or a line that isn't one. An older Harness's
+/// `machines` list has no `machineId` row of an engine, so it refuses none.
+fn engine_refused(bytes: &[u8], machine: &str, engine: &str) -> Option<&'static str> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Row {
+        machine_id: String,
+        engine: String,
+        signed_in: Option<bool>,
+        first_prompt: Option<bool>,
+    }
+    let row = String::from_utf8_lossy(bytes)
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Row>(line).ok())
+        .find(|row| row.machine_id.eq_ignore_ascii_case(machine) && row.engine == engine)?;
+    match (row.first_prompt, row.signed_in) {
+        (Some(false), _) => Some("engine_no_prompt"),
+        (_, Some(false)) => Some("engine_signed_out"),
+        _ => None,
+    }
 }
 
 /// Whether a failed `new` says the target's folder isn't on the computer
