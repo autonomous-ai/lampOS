@@ -429,3 +429,105 @@ def test_verbose_turns_the_sdks_debug_log_on_and_stdout_stays_the_mcp_stream(mon
     server_module.main(["--verbose"])
     assert seen["log"] == "debug"
     assert capsys.readouterr().out == ""
+EVERY_GRANT = ("body", "light", "speak", "look", "hear", "sound")
+
+
+def test_an_argument_a_tool_does_not_take_is_refused(tmp_path):
+    """`for_s` for `for_ms` was lit for the default 10 s, silently (a P3
+    from a check on lamp-a0ae): now it is the tool's error, naming what the
+    tool takes, and nothing reaches the lamp. Each schema says so too."""
+
+    async def go():
+        async with connected(tmp_path, grants=EVERY_GRANT) as (fake, _, session):
+            for tool in (await session.list_tools()).tools:
+                assert tool.inputSchema.get("additionalProperties") is False, tool.name
+            wrong = await session.call_tool("lamp_light", {"colour": "warm", "for_s": 5})
+            assert wrong.isError
+            assert text(wrong) == "bad_request: lamp_light takes no for_s; it takes colour, for_ms, level, pattern"
+            assert fake.asked("light") == []
+            stop = await session.call_tool("lamp_stop", {"now": True})
+            assert stop.isError
+            assert text(stop) == "bad_request: lamp_stop takes no now; it takes no arguments"
+            assert fake.asked("stop") == []
+            # What it takes is still taken.
+            assert not (await session.call_tool("lamp_light", {"colour": "warm", "for_ms": 5_000})).isError
+            assert fake.asked("light") == [{"colour": "warm", "level": 3, "for_ms": 5_000}]
+
+    run(go())
+
+
+def readme_rows() -> dict[str, list[list[str]]]:
+    """The README's tools table: each tool's rows, cells stripped."""
+    tools: dict[str, list[list[str]]] = {}
+    current = None
+    lines = (Path(__file__).parents[1] / "README.md").read_text().splitlines()
+    start = lines.index("| tool | parameter | type | allowed | default | grant | lease |")
+    for line in lines[start + 2 :]:
+        if not line.startswith("|"):
+            break
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if cells[0]:
+            current = cells[0].strip("`")
+            tools[current] = []
+        tools[current].append(cells)
+    return tools
+
+
+def test_the_readme_gives_every_tool_its_parameters_defaults_and_every_resource(tmp_path):
+    """The README's table is the server's own: every tool, each of its
+    parameters, a number default as the server has it, and every resource."""
+
+    async def go():
+        rows = readme_rows()
+        readme = (Path(__file__).parents[1] / "README.md").read_text()
+        async with connected(tmp_path, grants=EVERY_GRANT) as (_, _, session):
+            listed = (await session.list_tools()).tools
+            assert {tool.name for tool in listed} == ALL == set(rows)
+            for tool in listed:
+                by_parameter = {row[1].strip("`"): row for row in rows[tool.name]}
+                properties = tool.inputSchema.get("properties", {})
+                if not properties:
+                    assert list(by_parameter) == ["none"], tool.name
+                assert set(properties) <= set(by_parameter), (tool.name, sorted(properties))
+                for name, schema_of in properties.items():
+                    default = schema_of.get("default")
+                    if isinstance(default, (int, float)) and not isinstance(default, bool):
+                        written = by_parameter[name][4].replace(",", "")
+                        assert f"{default:g}" in written, (tool.name, name, default, written)
+            for resource in (await session.list_resources()).resources:
+                assert f"| `{resource.uri}` |" in readme, resource.uri
+
+    run(go())
+
+
+def test_a_call_missing_what_a_tool_needs_is_said_in_the_lamps_form(tmp_path):
+    """Not the validator's "1 validation error for lamp_lightArguments …":
+    the tool's error names what it needs, and nothing reaches the lamp."""
+
+    async def go():
+        async with connected(tmp_path, grants=EVERY_GRANT) as (fake, _, session):
+            missing = await session.call_tool("lamp_light", {"level": 2})
+            assert missing.isError
+            assert text(missing) == "bad_request: lamp_light needs colour"
+            moved = await session.call_tool("lamp_move", {})
+            assert text(moved) == "bad_request: lamp_move needs step_ms, frames"
+            assert fake.asked("light") == [] and fake.asked("move") == []
+
+    run(go())
+
+
+def test_server_info_says_lamp_mcps_own_version(tmp_path):
+    """`serverInfo.version` is lamp-mcp's, not the MCP library's."""
+    from importlib.metadata import version
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                server = build(lamp, client="test laptop")
+                options = server._mcp_server.create_initialization_options()
+                assert options.server_name == "lamp"
+                assert options.server_version == version("lamp-mcp") != version("mcp")
+
+    run(go())

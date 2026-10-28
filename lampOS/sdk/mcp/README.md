@@ -20,19 +20,37 @@ Phrases and events' fields are logged as they are, and your MCP client may keep 
 
 ## Tools
 
-Each is one op, offered only when the lamp granted what it needs.
+Each is one op, offered only when the lamp granted what it needs. Every
+parameter, as `src/lamp_mcp/server.py` declares it:
 
-| tool | op | grant |
-|---|---|---|
-| `lamp_state(which)` | `get`: presence (a count and how near, never who), light, mood, and talking/paused/private/asleep; by default every state the grants allow | none (presence: look) |
-| `lamp_wait_for(events, phrases, timeout_s)` | `subscribe`, the first matching event or `timed_out` (120 s at most), then `unsubscribe`; an event the grants don't allow is refused before anything is sent | the event's: `person.*` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound |
-| `lamp_express(feeling, strength)` | `express` | body, light |
-| `lamp_gesture(name)` | `gesture`: the lamp's own gestures, the schema's list less `idle` and `scanning` | body |
-| `lamp_look(at \| yaw, pitch)` | `look`, under a body lease of its own | body (and look for `face`) |
-| `lamp_move(step_ms, frames)` | `move`, under a body lease of its own | body |
-| `lamp_light(colour, level, for_ms, pattern)` | `light`, 30 s at most | light |
-| `lamp_say(text)` | `say`, 300 characters at most | speak |
-| `lamp_stop()` | `stop`, and every lease let go | none |
+| tool | parameter | type | allowed | default | grant | lease |
+|---|---|---|---|---|---|---|
+| `lamp_state` | `which` | list of strings | some of `presence`, `light`, `mood`, `lamp`; a state the grants don't allow is refused | every state the grants allow | none (`presence`: look) | no |
+| `lamp_wait_for` | `events` | list of strings, required | some of `person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`; one the grants don't allow is refused before anything is sent | — | the event's: `person.*` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound | no |
+| | `phrases` | list of strings | the phrases to listen for; required with `phrase.heard` | none | | |
+| | `timeout_s` | number | 0 to 120; more waits 120 | 60 | | |
+| `lamp_express` | `feeling` | string, required | a feeling of the `feelings` skill: `glad`, `lively` or `low` (the lamp refuses another) | — | body, light | no |
+| | `strength` | number | 0 to 1: from 0.5 up the whole move, a smaller step of it below | 0.5 | | |
+| `lamp_gesture` | `name` | string, required | `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (the schema's gestures less `idle` and `scanning`) | — | body | no |
+| `lamp_look` | `at` | string | `face`, `name` or `ahead` | none: then `yaw` and `pitch` | body (and look for `face`) | yes, 10 s |
+| | `yaw` | number | degrees, right positive, within the head's reach | 0 | | |
+| | `pitch` | number | degrees, up positive, within the head's reach | 0 | | |
+| `lamp_move` | `step_ms` | integer, required | 20 to 1000 | — | body | yes, 10 s |
+| | `frames` | list of lists of integers, required | each 5 joint offsets in counts (pitch, roll, yaw, shoulder, elbow), the first and last all 0; the body checks it | — | | |
+| `lamp_light` | `colour` | string, required | `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm` | — | light | no |
+| | `level` | integer | 1 to 5 | 3 | | |
+| | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
+| | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
+| `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
+| `lamp_stop` | none | | | | none | lets go of every lease this server holds |
+
+**An argument a tool doesn't take is refused**, never read past. Each
+tool's schema says `"additionalProperties": false`, and a call such as
+`lamp_light(colour="warm", for_s=5)` comes back as the tool's error:
+`bad_request: lamp_light takes no for_s; it takes colour, for_ms, level, pattern`.
+Before, it lit the default 10 s. A call missing an argument the tool
+needs is refused the same way, `bad_request: lamp_light needs colour`, never
+in the validator's words. `serverInfo.version` is lamp-mcp's own.
 
 `joints` is left out: a 20 Hz stream isn't something an agent drives turn by
 turn. `play` and `sound` need a skill package.
@@ -49,11 +67,16 @@ so an agent in a loop is slowed before the lamp refuses it.
 
 ## Resources
 
-`lamp://state/presence`, `lamp://state/light`, `lamp://state/mood`,
-`lamp://state/lamp`, `lamp://lease` (the leases this server holds), and
-`lamp://events/recent` (the last 50 events `lamp_wait_for` heard; never a
-transcript: `phrase.heard` says only which registered phrase it was). `lamp://state/presence`
-is listed only when the lamp granted `look`.
+All JSON, read when asked; none takes a parameter.
+
+| resource | what it is | grant |
+|---|---|---|
+| `lamp://state/presence` | who is there: a count and how near, never who | look (listed only with it) |
+| `lamp://state/light` | its light | none |
+| `lamp://state/mood` | its mood | none |
+| `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
+| `lamp://lease` | the leases this server holds now | none |
+| `lamp://events/recent` | the last 50 events `lamp_wait_for` heard, newest last; never a transcript: `phrase.heard` says only which registered phrase it was | none |
 
 ## Tests
 
