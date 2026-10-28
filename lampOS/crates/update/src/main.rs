@@ -28,6 +28,7 @@ lamp-update harness-off
 lamp-update harness-on
 lamp-update back
 lamp-update apply
+lamp-update writer-probe
 lamp-update check-units --cat FILE [--product DIR] [--image DIR [--variant NAME]]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
                      [--min-updater N] [--models FILE] [--settings on|off] [--image DIR]
@@ -67,6 +68,9 @@ apply   lamp-update-apply (lamp-update-back apply, started by a round with
         writes the build's settings and tmpfiles, each only where the lamp still has the
         build's before, keeps a file as it was before its first write, and puts them back
         when asked. Without a request it changes nothing. As root, on the lamp itself.
+writer-probe prints one line, `lamp-update writer-probe 1 <sha256>`, the SHA-256 of the
+        file it runs from, and changes nothing: a copy is run so before it is put at a
+        fixed path (#3689).
 
   --channel-url   the channel's folder, https://.../ or file:///.../, ending in /
   --channel       the channel followed (lamp-voice)
@@ -139,6 +143,7 @@ fn main() -> ExitCode {
         "harness-on" => harness_on(&options),
         "back" => back(&options),
         "apply" => apply(&options),
+        "writer-probe" => writer_probe(&options),
         "check-units" => return check_units(&options),
         "manifest" => make_manifest(&options),
         "sign" => sign(&options),
@@ -463,6 +468,14 @@ fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
         own::Back::Busy => say("another lamp-update is at work; the timer comes again"),
         own::Back::Nothing | own::Back::Waiting => {}
     }
+    Ok(())
+}
+
+/// `lamp-update writer-probe`: a copy of lamp-update says it starts here,
+/// and which bytes it runs from, before it is put at a fixed path (#3689).
+fn writer_probe(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    println!("{}", lamp_update::fixed_copy::own_answer()?);
     Ok(())
 }
 
