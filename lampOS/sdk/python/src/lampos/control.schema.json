@@ -751,7 +751,7 @@
       "additionalProperties": false
     },
     "sound": {
-      "description": "A clip of 3 s or less from the client's installed package.",
+      "description": "One of the lamp's own sounds, by name: in this release only `hum`, the voice's built-in short hum, through the voice's quiet, rarity and privacy gates. Its `done` follows, as a say's does.",
       "type": "object",
       "properties": {
         "id": {
@@ -761,8 +761,9 @@
           "const": "sound"
         },
         "name": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+          "enum": [
+            "hum"
+          ]
         }
       },
       "required": [

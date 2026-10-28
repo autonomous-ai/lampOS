@@ -764,6 +764,8 @@ def test_a_fake_like_lamp_control_refuses_what_it_doesnt_route(tmp_path):
                 await lamp.express("glad")
                 assert (await lamp.gesture("nod"))["to"] == "body"
                 await lamp.light("warm", 3, 1_000)
+                # The hum is routed, as lamp-control's sound.
+                assert (await lamp.sound("hum"))["to"] == "voice"
 
     run(go())
 

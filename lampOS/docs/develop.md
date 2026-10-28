@@ -51,7 +51,9 @@ LAMPOS_HOME=/tmp/lampos-try lamp fake
 
 It answers as a lamp does today. `gesture`, `move` and `express` are taken
 (`{"to": "body"}`, and `express` says its move and that it showed the
-light: `{"to": "body", "move": "glad-lift", "light": true}`). `play`, `sound`, `look` and `joints` are refused, in
+light: `{"to": "body", "move": "glad-lift", "light": true}`), and `say`
+and `sound` (`hum`, the lamp's own short hum) with `{"to": "voice"}` and
+their `done`. `play`, `look` and `joints` are refused, in
 lamp-control's own words ("not routed yet: waits for …").
 `--everything` answers every op instead.
 
