@@ -1,3 +1,22 @@
+## 28 October 2026, 19:55 +07 — 2b and #4051 landed, four PRs replaced, plan A as #4127
+
+Ready for lamp-voice: yes, on carried reads: #4122, #4124, #4125, #4126 (each the same patch as the PR it replaces). No: #4117 waits on reads; #4127 (plan A) is a draft, stacked on #4126 and #4125.
+
+#4065 (2b, a part added over the air, level 8) landed with jarvis's READ-OK and the Reviewer-lead's no-finding read. #4051 (`ready` takes the lock, which knows its folder) landed in train #4072: the train rebases a PR itself when its commits apply cleanly. #4117 has jarvis's three P3s on #4065. A put-back removes the new part's emptied folder, a never-loaded stop is known by exit status 5 too, and users come from passwd and group only. Mac gate: 648 passed, 0 failed.
+
+#3966, #3993, #4007 and #4008 conflicted with lamp-voice in `updates.md`, and #4008 also in `world.rs`, beside 2b's `stop`. The force-push their rebase needs is refused in this session. So each is rebased onto lamp-voice and opened from a new branch, as #4122, #4124, #4125 and #4126. Per file, the changed lines are the same as the reviewed heads. The old PRs are closed with pointers, and their READ-OKs asked to carry. Mac gates: 654/0, 662/0 and 658/0. #4126 had 654/1: `a_round_with_nothing_to_change_only_checks` failed once on the fork-held lock race, and passed 3 of 3 alone.
+
+#3689 item 1, plan A: no answer from First by 18:00, so built.
+- **The round's side:** before it looks at a build, a round that applies asks `writer_ready::ready` under its lock and writes a request naming the running build. Then it starts the writer's one-shot unit.
+- **The unit's side:** `lamp-update writer-refresh` acts only on a fresh request for its own bytes, and takes the lock itself when run by hand. It places the copy with `.prev` kept.
+- **Proof:** the new writer is proved by its own `back` ending well, noted in `writer-back.ok`, and then `.prev` is removed.
+- **Put back:** after a failed `back`, or a failed first `apply` once that apply's undo has run, `.prev` is renamed back over it. No self-switch begins until it is proved.
+- **A bug the tests caught:** the writer's unit starts `update/current`, so `installed_units` took it for a part and moved that link as a part's switch. It is now left out.
+- Seventh's READ-OK on the first head. Four of Seventh's P3s are fixed in #4127; the round test of a failed `apply` is still to come.
+- Mac gate: 680 passed, 0 failed.
+
+Owner's read given: #4087 (the updater's quiet-wait line), which landed. #2810: a narrower retry rule (only a build put back across a reboot) is proposed on the Queue, and waits on the first builder.
+
 ## 28 October 2026, 16:35 +07 — 2a landed, 2b in reads, five PRs wait on a push
 
 Ready for lamp-voice: no. #4065 waits on reads (its ARM64 and Linux Clippy are green). #3966, #3993, #4007, #4008 and #4051 are rebased and gated, but not pushed: the session's permission check refuses `--force-with-lease`, and that waits on the owner.
