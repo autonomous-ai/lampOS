@@ -58,8 +58,14 @@ pub enum Placed {
     /// The fixed path already held these bytes: nothing was written.
     Already,
     /// The new copy is at the fixed path. `before` is the SHA-256 of the
-    /// copy it replaced, none when there was none.
-    Replaced { before: Option<String> },
+    /// copy it replaced, none when there was none. `synced` is false when
+    /// the folder could not be synced after the rename: the new copy is in
+    /// place, though a power cut could still bring the old one back. It is
+    /// not "nothing replaced" (jarvis's P3 on #4007).
+    Replaced {
+        before: Option<String>,
+        synced: bool,
+    },
 }
 
 /// Puts `bytes` at `path`, executable, only once a copy of them beside it
@@ -133,9 +139,9 @@ pub fn place(
         remove(&candidate);
         return Err(format!("{}: {error}: nothing was replaced", path.display()));
     }
-    sync_parent(path).map_err(|error| format!("{}: {error}", path.display()))?;
     Ok(Placed::Replaced {
         before: before.map(|(old, _)| sha256_hex(&old)),
+        synced: sync_parent(path).is_ok(),
     })
 }
 
