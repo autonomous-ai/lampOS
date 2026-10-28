@@ -176,3 +176,12 @@ test('the kept indexes are the person\'s alone, a moved URL is said, and an olde
   assert.equal(older('1.0.0-beta', '1.0.1'), true);
   assert.equal(older('one', '1.0.0'), null);
 });
+
+test('a redirect to another host is said, and a URL with a name or password is refused', async () => {
+  const { hostsSaid } = await import('../src/indexes.js');
+  const { fetchFrom } = await import('../src/push.js');
+  assert.equal(hostsSaid('https://a.example/i.json', 'https://a.example/j.json'), 'a.example');
+  assert.equal(hostsSaid('https://gist.example/x', 'https://raw.gist.example/x'), 'raw.gist.example, redirected from gist.example');
+  assert.equal(hostsSaid('https://a.example/i.json', ''), 'a.example');
+  await assert.rejects(fetchFrom('https://me:secret@a.example/i.json'), /name or password/);
+});

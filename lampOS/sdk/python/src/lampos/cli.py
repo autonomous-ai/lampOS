@@ -178,18 +178,18 @@ def _older(version: str, than: str) -> bool | None:
 
 
 async def _skill_install(args) -> int:
-    from .index import Indexes, find, host_of, read_source
+    from .index import Indexes, find, hosts_said as _hosts, read_source_at
     from .push import _NAME, GRANTS_ASKED, asks_of, open_package, tomllib
 
     # A URL is fetched over https only; a file here is read; a skill's name
     # is looked up in the indexes kept here and checked against its entry.
     if "://" not in args.source and not Path(args.source).exists() and _NAME.fullmatch(args.source):
         listing, entry, data = find(Indexes(Keyring().folder), args.source, args.from_index)
-        print(f"from index {listing.name}, published by key {listing.publisher}, not the Store; fetched from {host_of(entry.url)}")
+        print(f"from index {listing.name}, published by key {listing.publisher}, not the Store; fetched from {_hosts(entry.url, entry.fetched_from)}")
     else:
-        data = read_source(args.source)
+        data, came_from = read_source_at(args.source)
         if "://" in args.source:
-            print(f"fetched from {host_of(args.source)}")
+            print(f"fetched from {_hosts(args.source, came_from)}")
     # What the person reads comes from the package itself, never from an index's entry.
     opened = open_package(data)
     asks = asks_of(tomllib.loads(opened.files.get("skill.toml", b"").decode("utf-8", "replace")))
@@ -237,15 +237,16 @@ async def _skill_index(args) -> int:
         _show_index(open_index(data))
         print(f"written to {out}")
     elif args.index_command == "add":
-        from .index import host_of
+        from .index import hosts_said, read_source_at
 
-        listing = open_index(read_source(args.url))
+        data, came_from = read_source_at(args.url)
+        listing = open_index(data)
         held = indexes.all().get(listing.name)
         if held and held["public"] != listing.public:
             raise LampError(f"an index named {listing.name} is kept already, by key {held['key']}: remove it first", code="refused")
         _show_index(listing)
         if "://" in args.url:
-            print(f"  from {host_of(args.url)}")
+            print(f"  from {hosts_said(args.url, came_from)}")
         if held and held["url"] != args.url:
             print(f"  index {listing.name} is kept from {held['url']}: now from {args.url}")
         if not args.yes:

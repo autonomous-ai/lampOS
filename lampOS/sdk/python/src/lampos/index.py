@@ -31,6 +31,7 @@ copies as they are.
 from __future__ import annotations
 
 import base64
+import dataclasses
 import hashlib
 import json
 import os
@@ -71,6 +72,8 @@ class Entry:
     asks: list[str]
     #: The author's whole key, base64 of its 32 bytes: compared in full, `author` is for showing.
     public: str = ""
+    #: Where the package came from after any redirect, once fetched (`find`): shown when its host isn't the url's.
+    fetched_from: str = ""
 
 
 @dataclass
@@ -95,6 +98,14 @@ def url_ok(url: object) -> bool:
 
 def host_of(url: str) -> str:
     return urllib.parse.urlsplit(url).hostname or url
+
+
+def hosts_said(url: str, came_from: str) -> str:
+    """The host a fetch reached, and the one asked when a redirect moved it:
+    a redirect to another host is said, never followed quietly (Fourteen on
+    #3997)."""
+    asked, there = host_of(url), host_of(came_from or url)
+    return asked if there == asked else f"{there}, redirected from {asked}"
 
 
 def _entry(raw: object) -> Entry:
@@ -292,12 +303,18 @@ def read_kept(indexes: Indexes, name: str, data: bytes) -> Listing:
 def read_source(source: str, fetch=None) -> bytes:
     """An index or package from an https URL (the SDK's capped fetch) or a
     file here, 1 MiB at most either way."""
-    from .push import fetch as fetch_https, read_capped
+    return read_source_at(source, fetch)[0]
+
+
+def read_source_at(source: str, fetch=None) -> tuple[bytes, str]:
+    """`read_source`, and where the bytes came from after any redirect (the
+    source itself for a file, or for a `fetch` given in its place)."""
+    from .push import fetch_from, read_capped
 
     if "://" in source:
-        return (fetch or fetch_https)(source)
+        return (fetch(source), source) if fetch else fetch_from(source)
     with open(source, "rb") as file:
-        return read_capped(file)
+        return read_capped(file), source
 
 
 def _fetched(indexes: Indexes, name: str, fetch) -> bytes | str:
@@ -344,6 +361,6 @@ def find(indexes: Indexes, name: str, from_index: str | None = None, fetch=None)
         names = ", ".join(listing.name for listing, _ in found)
         raise LampError(f"{name} is listed by {names}: say which with --from", code="bad_request")
     listing, entry = found[0]
-    data = read_source(entry.url, fetch)
+    data, came_from = read_source_at(entry.url, fetch)
     check_package(entry, data)
-    return listing, entry, data
+    return listing, dataclasses.replace(entry, fetched_from=came_from), data

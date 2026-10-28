@@ -243,3 +243,11 @@ def test_an_older_version_is_told_apart():
     assert _older("1.0.0", "1.0.0") is False
     assert _older("1.0.0-beta", "1.0.1") is True
     assert _older("one", "1.0.0") is None
+
+
+def test_a_redirect_to_another_host_is_said():
+    assert index.hosts_said("https://a.example/i.json", "https://a.example/j.json") == "a.example"
+    assert index.hosts_said("https://gist.example/x", "https://raw.gist.example/x") == "raw.gist.example, redirected from gist.example"
+    assert index.hosts_said("https://a.example/i.json", "") == "a.example"
+    with pytest.raises(LampError, match="name or password"):
+        push.fetch_from("https://me:secret@a.example/i.json")

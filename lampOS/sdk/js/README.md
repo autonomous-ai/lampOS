@@ -176,4 +176,8 @@ FPR16, not the Store", never "verified".
 - Nothing is fetched or installed in the background: an index is read when you
   run `browse` or `install`, and a skill goes on only on your yes.
 - `seq` stops an older copy of the index, but not someone serving an old one
-  frozen. A publisher can't withdraw a version yet.
+  frozen. A publisher can't withdraw a version yet. A format 1 listing refuses
+  any field it doesn't know, so a later `withdrawn` list comes as format 2,
+  which an older SDK refuses rather than reads past.
+- A fetch that is redirected to another host says so: "fetched from B,
+  redirected from A".

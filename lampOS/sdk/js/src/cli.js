@@ -21,7 +21,7 @@ import { fake } from './fake.js';
 import { LampError } from './errors.js';
 import { Keyring } from './keys.js';
 import { GRANTS_ASKED, asksOf, fingerprint, openPackage, pack } from './push.js';
-import { Indexes, find as findInIndexes, hostOf, makeIndex, older, openIndex, readSource, refresh } from './indexes.js';
+import { Indexes, find as findInIndexes, hostsSaid, makeIndex, older, openIndex, readSource, readSourceAt, refresh } from './indexes.js';
 import { parse as parseToml } from 'smol-toml';
 
 const { values, positionals } = parseArgs({
@@ -144,11 +144,12 @@ async function index(sub, rest) {
     showIndex(openIndex(data));
     console.log(`written to ${out}`);
   } else if (sub === 'add' && rest[0]) {
-    const listing = openIndex(await readSource(rest[0]));
+    const got = await readSourceAt(rest[0]);
+    const listing = openIndex(got.data);
     const held = indexes.all()[listing.name];
     if (held && held.public !== listing.public) throw new LampError(`an index named ${listing.name} is kept already, by key ${held.key}: remove it first`, { code: 'refused' });
     showIndex(listing);
-    if (rest[0].includes('://')) console.log(`  from ${hostOf(rest[0])}`);
+    if (rest[0].includes('://')) console.log(`  from ${hostsSaid(rest[0], got.url)}`);
     if (held && held.url !== rest[0]) console.log(`  index ${listing.name} is kept from ${held.url}: now from ${rest[0]}`);
     if (!values.yes && !(await ask(`Keep index ${listing.name}, and trust only key ${listing.publisher} to change it? [y/N] `))) {
       console.log('not added');
@@ -174,11 +175,12 @@ async function install(source, lampId) {
   // looked up in the indexes kept here and checked against its entry.
   if (!source.includes('://') && !existsSync(source) && /^[a-z0-9-]{1,64}$/.test(source)) {
     const found = await findInIndexes(new Indexes(new Keyring().folder), source, { fromIndex: values.from });
-    console.log(`from index ${found.listing.name}, published by key ${found.listing.publisher}, not the Store; fetched from ${hostOf(found.entry.url)}`);
+    console.log(`from index ${found.listing.name}, published by key ${found.listing.publisher}, not the Store; fetched from ${hostsSaid(found.entry.url, found.entry.fetchedFrom)}`);
     data = found.data;
   } else {
-    data = await readSource(source);
-    if (source.includes('://')) console.log(`fetched from ${hostOf(source)}`);
+    const got = await readSourceAt(source);
+    data = got.data;
+    if (source.includes('://')) console.log(`fetched from ${hostsSaid(source, got.url)}`);
   }
   // What the person reads comes from the package itself, never from an index's entry.
   const opened = openPackage(data);

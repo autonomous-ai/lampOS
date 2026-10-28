@@ -19,7 +19,7 @@ import { chmodSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
 import { LampError } from './errors.js';
-import { PACKAGE_MAX, asksOf, fetchPackage, fingerprint, openPackage, rawPublic } from './push.js';
+import { PACKAGE_MAX, asksOf, fetchFrom, fingerprint, openPackage, rawPublic } from './push.js';
 
 export const FORMAT = 1;
 const NAME = /^[a-z0-9-]{1,64}$/;
@@ -39,6 +39,14 @@ export function urlOk(url) {
 }
 
 export const hostOf = (url) => { try { return new URL(url).hostname; } catch { return url; } };
+
+// The host a fetch reached, and the one asked when a redirect moved it: a
+// redirect to another host is said, never followed quietly (Fourteen on #3997).
+export function hostsSaid(url, cameFrom) {
+  const asked = hostOf(url);
+  const there = hostOf(cameFrom || url);
+  return there === asked ? asked : `${there}, redirected from ${asked}`;
+}
 const bad = (why) => new LampError(`not a skill index: ${why}`, { code: 'bad_request' });
 const refused = (why) => new LampError(why, { code: 'refused' });
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -188,10 +196,20 @@ export class Indexes {
 
 // An index or package from an https URL (the SDK's capped fetch) or a file
 // here, 1 MiB at most either way.
-export async function readSource(source, fetch = fetchPackage) {
-  if (source.includes('://')) return Buffer.from(await fetch(source));
+export async function readSource(source, fetch) {
+  return (await readSourceAt(source, fetch)).data;
+}
+
+// readSource, and where the bytes came from after any redirect (the source
+// itself for a file, or for a `fetch` given in its place).
+export async function readSourceAt(source, fetch) {
+  if (source.includes('://')) {
+    if (fetch) return { data: Buffer.from(await fetch(source)), url: source };
+    const got = await fetchFrom(source);
+    return { data: Buffer.from(got.data), url: got.url };
+  }
   if (statSync(source).size > PACKAGE_MAX) throw new LampError(`${source}: more than ${PACKAGE_MAX} bytes: a shared skill is 1 MiB at most`, { code: 'bad_request' });
-  return readFileSync(source);
+  return { data: readFileSync(source), url: source };
 }
 
 // A kept index fetched again: held to its pinned key and last seq, which is
@@ -249,9 +267,9 @@ export async function find(indexes, name, { fromIndex, fetch } = {}) {
   if (!found.length) throw new LampError(`${name} is in no index kept here`, { code: 'bad_request' });
   if (found.length > 1) throw new LampError(`${name} is listed by ${found.map(({ listing }) => listing.name).join(', ')}: say which with --from`, { code: 'bad_request' });
   const { listing, entry } = found[0];
-  const data = await readSource(entry.url, fetch);
+  const { data, url: fetchedFrom } = await readSourceAt(entry.url, fetch);
   checkPackage(entry, data);
-  return { listing, entry, data };
+  return { listing, entry: { ...entry, fetchedFrom }, data };
 }
 
 // Whether dotted-number `version` is older than `than`; null when either isn't one.
