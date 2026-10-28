@@ -5276,6 +5276,26 @@ async fn spoken(
             .is_ok_and(|said| crate::spoken_stop::could_be_echo(&text, &said.1))
     {
         drop(prepared.take());
+        // Still a turn for the forget hold (Reviewer-three's P1 on #4004): a
+        // held forget is let go and this line asked nothing, as `answer()`
+        // does for any line that is not a yes, so a later "Yes." runs nothing.
+        let asker = forget_asker(scope.as_ref());
+        let _ = asked_just_before(
+            &shared,
+            request,
+            true,
+            forgets_asked(&text),
+            asker.as_ref(),
+            (shared.clock)(),
+        );
+        let _ = take_held_forget(
+            &shared,
+            request,
+            true,
+            &text,
+            asker.as_ref(),
+            (shared.clock)(),
+        );
         eprintln!(
             "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)",
             crate::spoken_stop::LINE
