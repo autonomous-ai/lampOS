@@ -3474,6 +3474,13 @@ struct Stall {
     /// they began.
     steps: u16,
     at: u16,
+    /// Where it was when it began to be pressed off its goal, this time:
+    /// a hand carries it from there, away from the goal; a joint short of
+    /// its goal under its own weight, or against a shelf, stays.
+    pressed_from: Option<u16>,
+    /// The stop just made was of a joint carried away from its goal while
+    /// pressed, more than `STALL_SLACK`: a hand moved it.
+    pub(crate) carried: bool,
     /// Told to stop pushing: the goal wanted of it then, and where it is
     /// held instead.
     hold: Option<(u16, u16)>,
@@ -3510,6 +3517,11 @@ impl Stall {
         });
         self.pressed = is.load > bound;
         let pushing = goal.abs_diff(is.position) > STALL_SLACK && self.pressed;
+        self.pressed_from = if pushing {
+            self.pressed_from.or(Some(is.position))
+        } else {
+            None
+        };
         let away = self
             .last_at
             .is_some_and(|at| at.abs_diff(is.position) > STALL_SLACK);
@@ -3531,6 +3543,10 @@ impl Stall {
             return false;
         }
         self.steps = 0;
+        self.carried = self.pressed_from.is_some_and(|from| {
+            is.position.abs_diff(from) > STALL_SLACK
+                && goal.abs_diff(is.position) > goal.abs_diff(from)
+        });
         self.hold = Some((wanted, is.position));
         self.held = 0;
         self.again = self
@@ -6399,6 +6415,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // told to stop: its goal becomes where it is. Never torque off.
         // The joints told so on this step, in servo order.
         let mut stopped_pushing = [false; 5];
+        // Counted down on every step, whatever else this one does.
+        stalled_hand = stalled_hand.map(|left| left.saturating_sub(1));
         if limits.give_way.is_some() && leaving.is_none() {
             for index in 0..3 {
                 // A joint that gave way and may be in a hand is not pushing
@@ -6415,13 +6433,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // alone, under the load that eases it (lamp-29e7 on 8080:
                 // the roll put 34 counts over a minute at 100 to 144, its
                 // bound 150, and no hand was ever said): giving way here is
-                // to a hand too, said for `STALL_HAND_STEPS` from the stop.
-                // Not a rest found at the same place again (`again`).
-                stalled_hand[index] = if stopped && !stalls[index].again {
-                    STALL_HAND_STEPS
-                } else {
-                    stalled_hand[index].saturating_sub(1)
-                };
+                // to a hand too, said for `STALL_HAND_STEPS` from the stop,
+                // when it was carried away from its goal (`Stall::carried`).
+                // Not a joint stuck short where it was, nor a rest found at
+                // the same place again (`again`).
+                if stopped && stalls[index].carried && !stalls[index].again {
+                    stalled_hand[index] = STALL_HAND_STEPS;
+                }
                 if stopped {
                     if !stalls[index].again {
                         report.stalls[index] = report.stalls[index].saturating_add(1);
