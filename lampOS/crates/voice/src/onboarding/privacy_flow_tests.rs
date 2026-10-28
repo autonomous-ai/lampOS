@@ -172,7 +172,8 @@ fn unplayed_invitation_never_arms_and_restarts_use_only_one_retry() {
     pump(&mut third, 3 * T);
     third.tick(3 * T, START_QUIET_US, true, false, face(), true);
     pump(&mut third, 3 * T);
-    assert_eq!(third.kept().steps["privacy"].outcome, Outcome::Skipped);
+    // Both invitations spent with no close seen: later (#3996).
+    assert_eq!(third.kept().steps["privacy"].outcome, Outcome::Later);
 }
 
 #[test]
@@ -412,6 +413,7 @@ fn stalled_old_done_cannot_overwrite_redo_or_publish_its_acknowledgement() {
             at_unix_s: 1,
             framing: None,
             offered_at_unix_s: None,
+            later_offers: 0,
         },
     );
     walk.desired.privacy_done_attempt = Some(BootId::new([9; 16]).unwrap());
@@ -454,6 +456,7 @@ fn older_completion_never_replaces_a_newer_desired_snapshot() {
             at_unix_s: 1,
             framing: None,
             offered_at_unix_s: None,
+            later_offers: 0,
         },
     );
     walk.save();
@@ -467,6 +470,7 @@ fn older_completion_never_replaces_a_newer_desired_snapshot() {
             at_unix_s: 2,
             framing: None,
             offered_at_unix_s: None,
+            later_offers: 0,
         },
     );
     walk.save();
@@ -553,6 +557,7 @@ fn a_storage_failure_retries_no_write_until_an_explicit_mailbox_redo() {
             at_unix_s: 1,
             framing: None,
             offered_at_unix_s: None,
+            later_offers: 0,
         },
     );
     walk.save();
@@ -617,6 +622,7 @@ fn a_consumed_redo_mailbox_batch_is_not_replayed_by_the_next_voice_cycle() {
             at_unix_s: 2,
             framing: None,
             offered_at_unix_s: None,
+            later_offers: 0,
         },
     );
     first.save();

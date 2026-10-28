@@ -506,6 +506,16 @@ impl Onboarding {
     /// One reading from the body. Judged as it comes, on the loop, without
     /// waiting for storage: the outcome is kept by the storage worker after.
     pub(crate) fn giving_way_felt(&mut self, felt: Felt, now_us: u64) {
+        // Any push while the step is led is an attempt, inside a try's
+        // window or not: one with none is `later`, never `failed` (#3996).
+        if matches!(felt, Felt::Hand { pushed: true, .. })
+            && self
+                .led
+                .as_ref()
+                .is_some_and(|led| led.step == Step::GivingWay)
+        {
+            self.mark_tried(Step::GivingWay);
+        }
         let Some(window) = self.giving.window.as_ref() else {
             return;
         };
@@ -751,6 +761,12 @@ fn flow_end(walk: &mut Onboarding, now_us: u64) {
         walk.giving.retry_after_us = now_us.saturating_add(1_000_000);
         return;
     }
-    walk.finish(Step::GivingWay, Outcome::Failed, None, now_us);
-    walk.owed = Some(walk.definition.words.give_failed.clone());
+    if walk.was_tried(Step::GivingWay) {
+        walk.finish(Step::GivingWay, Outcome::Failed, None, now_us);
+        walk.owed = Some(walk.definition.words.give_failed.clone());
+    } else {
+        // No push felt in either try: later, said so (#3996).
+        walk.finish(Step::GivingWay, Outcome::Later, None, now_us);
+        walk.owed = Some(walk.definition.later_line());
+    }
 }
