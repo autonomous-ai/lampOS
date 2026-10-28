@@ -203,6 +203,11 @@ class Lease:
         await self.release()
 
 
+
+# How long a push waits out a `rate` answer before saying it, and how often.
+RATE_WAIT_MOST_MS = 15_000
+RATE_TRIES = 3
+
 class Lamp:
     """A connection to one paired lamp."""
 
@@ -598,6 +603,14 @@ class Lamp:
         if beyond:
             code, why = beyond
             raise BY_CODE[code](why)
+        if opened.author:
+            # The lamp pins a name to its first signer and refuses another
+            # (`signer_changed`); said here, before a byte is sent (Eighth,
+            # #3997). Only this computer's own pushes are listed to it.
+            for kept in await self.skills():
+                if kept.get("name") == opened.name and kept.get("author") != opened.author:
+                    held = f"signed by key {kept['author']}" if kept.get("author") else "pushed unsigned"
+                    raise LampError(f"{opened.name} is {held} on this lamp: remove it first", code="signer_changed")
         return await self._send_package(Package(opened.name, opened.version, data), asks=asks_of(rules))
 
     async def _send_package(self, package, asks: list[str] | None = None) -> dict:
@@ -605,16 +618,18 @@ class Lamp:
         reply: dict = {}
         for part, data in enumerate(parts):
             extra = {"asks": asks} if part == 0 and asks is not None else {}
-            reply = await self.request(
-                "skill.push",
-                name=package.name,
-                sha256=package.sha256,
-                size=len(package.data),
-                part=part,
-                parts=len(parts),
-                data=data,
-                **extra,
-            )
+            fields = dict(name=package.name, sha256=package.sha256, size=len(package.data), part=part, parts=len(parts), data=data, **extra)
+            for tries_left in range(RATE_TRIES - 1, -1, -1):
+                try:
+                    reply = await self.request("skill.push", **fields)
+                    break
+                except LampError as refused:
+                    # A push is counted once, at part 0 (1 each 10 s, 20 an
+                    # hour): a short wait is waited out, a long one said (Nine, #3997).
+                    wait = refused.retry_ms
+                    if refused.code != "rate" or part != 0 or not tries_left or wait is None or wait > RATE_WAIT_MOST_MS:
+                        raise
+                    await asyncio.sleep(wait / 1000)
         return reply.get("skill", {})
 
     async def skills(self) -> list[dict]:

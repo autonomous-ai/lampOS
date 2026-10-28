@@ -120,3 +120,27 @@ test('lamp skill index make, add, list, browse and remove run as the Python CLI\
   assert.equal((await lamp('', 'skill', 'index', 'remove', 'desk-things')).said, 'index desk-things removed');
   assert.equal((await lamp('', 'skill', 'browse')).said, '');
 });
+
+test('a push waits out a short rate, says a long one, and a name kept under another signer is refused before a byte', async () => {
+  const m = made();
+  const otherDir = join(folder(), 'desk-wave');
+  mkdirSync(otherDir);
+  writeFileSync(join(otherDir, 'SKILL.md'), '---\nname: desk-wave\ndescription: A test skill.\n---\n');
+  writeFileSync(join(otherDir, 'skill.toml'), 'version = "1.0.1"\n[permissions]\nlight = true\nspeak = true\n');
+  const impostor = pack(otherDir, { author: new Keyring(folder()).authorKey({ make: true }) }).data;
+  const fake = await FakeLamp.start({ grants: ['light', 'speak', 'skills'] });
+  const keyring = new Keyring(folder());
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring });
+    const lamp = await Lamp.connect(undefined, { keyring });
+    try {
+      fake.refuseNext('skill.push', 'rate', '1 each 10 s', 50);
+      assert.equal((await lamp.installPackage(m.wave)).name, 'desk-wave');
+      fake.refuseNext('skill.push', 'rate', '20 an hour', 600_000);
+      await assert.rejects(lamp.installPackage(m.wave), (e) => e.code === 'rate' && e.retryMs === 600_000);
+      const pushed = fake.asked('skill.push').length;
+      await assert.rejects(lamp.installPackage(impostor), (e) => e.code === 'signer_changed' && e.message.includes(`desk-wave is signed by key ${openPackage(m.wave).author} on this lamp: remove it first`));
+      assert.equal(fake.asked('skill.push').length, pushed);
+    } finally { await lamp.close(); }
+  } finally { await fake.stop(); }
+});

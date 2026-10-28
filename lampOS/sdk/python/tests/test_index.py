@@ -161,3 +161,38 @@ def test_lamp_skill_index_make_add_list_browse_and_remove(made, tmp_path):
     assert code == 0 and said.startswith("desk-wave\t1.0.0\tsigned by key ") and said.endswith("\tasks light, speak\tindex desk-things"), said
     assert lamp("skill", "index", "remove", "desk-things")[1] == "index desk-things removed"
     assert lamp("skill", "browse")[1] == ""
+
+
+def test_a_push_waits_out_a_short_rate_and_says_a_long_one(made, tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light", "speak", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                fake.refuse_next("skill.push", "rate", "1 each 10 s", retry_ms=50)
+                assert (await lamp.install_package(made["wave"]))["name"] == "desk-wave"
+                fake.refuse_next("skill.push", "rate", "20 an hour", retry_ms=600_000)
+                with pytest.raises(LampError) as raised:
+                    await lamp.install_package(made["wave"])
+                assert (raised.value.code, raised.value.retry_ms) == ("rate", 600_000)
+
+    run(go())
+
+
+def test_a_name_kept_under_another_signer_is_refused_before_a_byte(made, tmp_path):
+    other = Keyring(tmp_path / "other").author_key(make=True)
+    impostor = _package(tmp_path / "x", "desk-wave", 'version = "1.0.1"\n[permissions]\nlight = true\nspeak = true\n', other)
+
+    async def go():
+        async with FakeLamp(grants=("light", "speak", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                await lamp.install_package(made["wave"])
+                pushed = len(fake.asked("skill.push"))
+                with pytest.raises(LampError) as raised:
+                    await lamp.install_package(impostor)
+                fpr = push.open_package(made["wave"]).author
+                assert raised.value.code == "signer_changed"
+                assert f"desk-wave is signed by key {fpr} on this lamp: remove it first" in str(raised.value)
+                assert len(fake.asked("skill.push")) == pushed
+
+    run(go())

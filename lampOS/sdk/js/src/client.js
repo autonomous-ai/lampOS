@@ -142,6 +142,11 @@ export class Lease {
   }
 }
 
+
+// How long a push waits out a `rate` answer before saying it, and how often.
+const RATE_WAIT_MOST_MS = 15_000;
+const RATE_TRIES = 3;
+
 export class Lamp {
   // A ping this often keeps a connection that only listens open: the lamp
   // closes one quiet for 2 minutes (lamp-control's QUIET_MAX, #3778). A ping
@@ -419,16 +424,39 @@ export class Lamp {
     const parts = [];
     for (let at = 0; at < data.length; at += PART_BYTES) parts.push(data.subarray(at, at + PART_BYTES).toString('base64'));
     const sha256 = createHash('sha256').update(data).digest('hex');
+    if (opened.author) {
+      // The lamp pins a name to its first signer and refuses another
+      // (signer_changed); said here, before a byte is sent (Eighth, #3997).
+      // Only this computer's own pushes are listed to it.
+      for (const kept of await this.skills()) {
+        if (kept.name === opened.name && kept.author !== opened.author) {
+          const held = kept.author ? `signed by key ${kept.author}` : 'pushed unsigned';
+          throw new LampError(`${opened.name} is ${held} on this lamp: remove it first`, { code: 'signer_changed' });
+        }
+      }
+    }
     return this.#sendPackage({ name: opened.name, sha256, data, parts }, asksOf(rules));
   }
 
   async #sendPackage(pkg, asks) {
     let reply = {};
     for (const [part, data] of pkg.parts.entries()) {
-      reply = await this.request('skill.push', {
+      const fields = {
         name: pkg.name, sha256: pkg.sha256, size: pkg.data.length, part, parts: pkg.parts.length, data,
         ...(part === 0 && asks ? { asks } : {}),
-      });
+      };
+      for (let triesLeft = RATE_TRIES - 1; ; triesLeft -= 1) {
+        try {
+          reply = await this.request('skill.push', fields);
+          break;
+        } catch (refused) {
+          // A push is counted once, at part 0 (1 each 10 s, 20 an hour): a
+          // short wait is waited out, a long one said (Nine, #3997).
+          const wait = refused.retryMs;
+          if (refused.code !== 'rate' || part !== 0 || !triesLeft || wait === undefined || wait > RATE_WAIT_MOST_MS) throw refused;
+          await new Promise((resolve) => setTimeout(resolve, wait));
+        }
+      }
     }
     return reply.skill ?? {};
   }
