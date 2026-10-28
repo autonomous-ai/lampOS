@@ -456,7 +456,12 @@ fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
 #[test]
 fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
     assert!(NEAR_FIRST.contains("say 'Hey Lamp'"), "{NEAR_FIRST}");
-    assert!(NEAR_FIRST.contains("I'll ask a few times."), "{NEAR_FIRST}");
+    assert!(NEAR_FIRST.contains("I'll ask three times."), "{NEAR_FIRST}");
+    assert_eq!(
+        lamp_near_call::TRIES,
+        3,
+        "the line says how many calls it takes"
+    );
     assert!(
         NEAR_AGAIN.contains("\"Got it. Once more.\""),
         "{NEAR_AGAIN}"
@@ -569,6 +574,43 @@ fn a_call_over_the_prompt_is_asked_again_with_the_same_line() {
     assert_eq!(call(&mut walk, 20 * S, 22.0, 2)["accepted"], true);
     assert_eq!(cut(&mut walk, 40 * S, 3), NEAR_AGAIN);
     assert_eq!(next_words(&mut walk, 50 * S), NEAR_AGAIN);
+}
+
+/// The Reviewer-lead's P2 on #4001: an accepted call, then the person leaves
+/// and comes back, or the step is paused: the next prompt names the phrase
+/// and the count again, never "Got it. Once more." for a call long past.
+#[test]
+fn after_an_absence_or_a_pause_the_prompt_names_the_phrase_again() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    assert_eq!(call(&mut walk, 10 * S, 22.0, 1)["accepted"], true);
+    nobody(&mut walk, 20 * S + GONE_US);
+    assert_eq!(
+        next_words(&mut walk, 60 * S),
+        NEAR_FIRST,
+        "after an absence"
+    );
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    assert_eq!(call(&mut walk, 10 * S, 22.0, 1)["accepted"], true);
+    // A pause or a mute, as the walk takes it: everything in flight dropped.
+    walk.invalidate_near();
+    assert_eq!(next_words(&mut walk, 30 * S), NEAR_FIRST, "after a pause");
+}
+
+/// An older skill file without `near_missed` answers a miss with the first
+/// line, never "Got it. Once more." (the Reviewer-lead's P3 on #4001).
+#[test]
+fn without_a_missed_line_a_miss_says_the_first_line() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let mut definition = (*walk.definition).clone();
+    definition.words.near_missed = None;
+    walk.definition = std::sync::Arc::new(definition);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 2_400, 22.0);
+    assert_eq!(judge(&mut walk, &prompt)["accepted"], false);
+    assert_eq!(next_words(&mut walk, 20 * S), NEAR_FIRST);
 }
 
 /// The voice holds its reply to the name heard from the prompt's end to 7 s

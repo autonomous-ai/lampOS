@@ -246,9 +246,9 @@ pub(crate) struct NearFlow {
     unsaid: u8,
     /// Whether the last call try judged in this voice cycle was accepted:
     /// the next call prompt says "Got it. Once more." (`near_again`) or "I
-    /// didn't catch that." (`near_missed`). None until one is judged: the
-    /// step's first line, which says the phrase and that it asks a few
-    /// times, so a prompt cut before any try says it again (#3702).
+    /// didn't catch that." (`near_missed`). None until one is judged, and
+    /// again after an absence, a pause or a mute: the step's first line,
+    /// which says the phrase and that it asks three times (#3702).
     last: Option<bool>,
 }
 
@@ -540,17 +540,13 @@ impl Onboarding {
         }
         // The name part's stored bar stands: the sentence part goes on. The
         // prompts offered again stay counted, so absence can't renew them.
-        let (named, reoffered, unsaid, last) = (
-            self.near.named,
-            self.near.reoffered,
-            self.near.unsaid,
-            self.near.last,
-        );
+        // The last try is forgotten: after an absence, a pause or a mute the
+        // next prompt names the phrase again, never "Got it" (#3702).
+        let (named, reoffered, unsaid) = (self.near.named, self.near.reoffered, self.near.unsaid);
         self.forget_near();
         self.near.named = named;
         self.near.reoffered = reoffered;
         self.near.unsaid = unsaid;
-        self.near.last = last;
     }
 
     /// The committed-to-be prompt count of a part.
@@ -614,17 +610,16 @@ impl Onboarding {
             match (offer.sentence, offer.prompt, self.near.short) {
                 // Each call prompt answers the last try (#3702).
                 (false, _, _) => match self.near.last {
-                    None => self.definition.note(
+                    Some(true) => self.definition.words.near_again.as_str(),
+                    // An older file without `near_missed` says the first line,
+                    // never "Got it" for a miss.
+                    Some(false) if self.definition.words.near_missed.is_some() => {
+                        self.definition.words.near_missed.as_deref().unwrap()
+                    }
+                    _ => self.definition.note(
                         Step::HowYouSound,
                         self.desired.steps.contains_key(Step::HowYouSound.name()),
                     ),
-                    Some(true) => self.definition.words.near_again.as_str(),
-                    Some(false) => self
-                        .definition
-                        .words
-                        .near_missed
-                        .as_deref()
-                        .unwrap_or(&self.definition.words.near_again),
                 },
                 (true, 1, _) => self.definition.words.sentence_first.as_str(),
                 (true, _, Some(Short::Level)) => self.definition.words.sentence_louder.as_str(),

@@ -42,8 +42,8 @@ after_answers = 1
 words = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)"
 
 [onboarding.steps.how_you_sound]
-first = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask a few times.\")"
-reoffer = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask a few times.\")"
+first = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask three times.\")"
+reoffer = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask three times.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip how you call me for now.\")"
 
 [onboarding.steps.touch]
