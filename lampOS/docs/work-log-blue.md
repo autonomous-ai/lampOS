@@ -768,3 +768,5 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 08:47: #3978 READ-OK from Fourteen (f667a2bbb); #3979 being read. openharness#1488 merged 27 Oct, nothing owed.
 - Carried skill-push onto #3910 4c2fbcf02 (Nine's P2 fix: limits.manage, generations): conflicts with lamp-voice's fake tests resolved by keeping both. Pushed blue/sdk-skill-push 56b9f0a128 (Python 76, JS 40) and blue/sdk-skill-sign 4419386d96 (Python 79, JS 43).
 - Ten's install request shape on #3931 (skill.push + asks on part 0, asks_differ, signer_changed, author FPR16): answered yes. Asked for one lamp definition of asks to mirror with a shared table, and for the codes to land in the schema with both SDK copies.
+- 08:50: #3979 READ-OK from Fourteen with a P3 (format = 2.0 passed the check, the lamp's u32 refuses it): folded as 6ea995f384, carry asked. #3978 and #3979 clippy green, ARM64 running.
+- skill-sign: asks_of (body/light/speak; look for presence or format 2's look; camera for the picture) and rules_beyond, for install. The skill.push schema is additionalProperties false, so sending asks waits on its schema line (Nine's door PR or mine, asked on #3931).
