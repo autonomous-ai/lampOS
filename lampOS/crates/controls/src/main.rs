@@ -881,6 +881,15 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
     };
     let mut service =
         touch_runtime::Service::new(&bus, config, wiring.clone(), gpio, None::<Worker>, clock)?;
+    // A pet on the head (#3997): off unless LAMP_HEAD_PET=on, and then only
+    // with head pads to read.
+    let pet = std::env::var(lamp_controls::touch::HEAD_PET_ENV).ok();
+    if let Some(hold) = lamp_controls::touch::head_pet(pet.as_deref())
+        && !wiring.head_pads.is_empty()
+    {
+        eprintln!("lamp-controls: head pets on (controls/pet), a kept hand's sleep: {hold:?}");
+        service.head_pet(&bus, hold)?;
+    }
     if let Some(lines) = head_lines {
         eprintln!("lamp-controls: head pads: {}", lines.said());
         service.head_probed(lines);

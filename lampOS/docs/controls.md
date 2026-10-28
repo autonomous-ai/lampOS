@@ -96,7 +96,8 @@ of the lamp's current state or of an action applied.
 | Qualified head touch (20 ms) | Stop if speaking, Notice (nothing asked) if quiet | No request |
 | Head tap: qualified, let go from 120 ms to 1 s after its first acquisition | Attend | Wake |
 | Head hand kept 1 s | Stroke | Wake |
-| Head hand kept 3 s | Sleep, except while onboarding is under way | No request |
+| Head hand kept 3 s | Sleep, except while onboarding is under way, and (with `LAMP_HEAD_PET=on`) never for a contact told apart as a pet | No request |
+| Head pads taking turns alone, 3 swaps within 1.2 s (`LAMP_HEAD_PET=on` only) | A pet on `controls/pet`, never a `controls/touch` gesture; that contact's `held_us` reads none from then on | The same (the Stroke at 1 s has woken it) |
 | Qualified three-pad base touch | Stop if speaking, Attend if quiet | Wake |
 | Stationary qualified base held two seconds | Sleep | Wake |
 | Moving base contact | Slide; an eligible slow movement also emits Stroke | No further request |
@@ -118,6 +119,62 @@ kept a second also clears the restart guard's mute (#960), as a tap did,
 since that mute wakes as sleep does. A pad that drifts high on a level read
 (#1764), or something resting on the head, now wakes a sleeping lamp after a
 second. Before, a drift held 3 s would have put an awake one to sleep.
+
+### A pet (#3997, `LAMP_HEAD_PET=on`, off unless on)
+
+A pet is a hand sliding left and right across the head, so the head pads are
+touched by turns. A tap and a still hand never do that: on lamp-06c1 (28 Oct,
+read-only) a still hand held both pads together all through, and a tap was
+one pad, or both, for 120 to 150 ms. With the switch on, Controls counts the
+pads taking turns alone within one contact (`touch::Head::count_turns`):
+
+- a pad counts once it has been touched alone `PET_ALONE_MIN_US` (40 ms), so
+  the 10-20 ms single-pad slivers of a still hand shifting never do (the
+  pet's alone turns on lamp-06c1 were 90 ms and longer);
+- a swap is the other pad counted alone next; both pads at once, or a short
+  release under the gap, between them do not break it (A, both, B is one);
+- a pet is `HEAD_PET_SWAPS` (3) swaps within `HEAD_PET_WITHIN_US` (1.2 s),
+  from the first counted swap to the third, in a contact whose touch counted.
+
+On lamp-06c1's measured pet the swaps came at +0.16, +1.13 and +1.23 s, so
+the pet is told apart at about 1.2 s, after the Stroke at 1 s. So a pet never
+skips the Stroke: the lean, and a sleeping lamp's wake by a kept hand, stay.
+From the pet on, that contact asks no Hold, and its `held_us` reads none, as
+a pushed head's does, so neither the ring's countdown nor the voice's sleep
+breath plays toward a sleep that will not come. Expression lets its lean go
+as for a hand let go. A pet let go under a second is never a Tap.
+
+`lamp_msgs/HeadPet` v1 on `controls/pet` (Event, 500 ms lifespan) is its own
+type on its own topic, so a reader of `controls/touch` or `controls/touch_state`
+sees no new value: a new `TouchGesture` would make older readers refuse the
+whole retained `touch_state`. It is said when the pet is told apart, again at
+most every `PET_EVERY_US` (100 ms) while the contact lasts, and once more,
+`ended`, when it is let go. A reader fault that drops the contact sends no
+`ended`: the last message simply runs out. Its fields:
+
+| Field | Meaning |
+|---|---|
+| `contact_id`, `began_us` | The head contact, as `controls/touch` names it |
+| `petted_us` | When the pet was told apart (its third swap); equal to `observed_us` in its first message |
+| `observed_us` | The acquisition this message says |
+| `swaps` | Swaps counted in the contact so far, 3 or more |
+| `swaps_per_second` | Swaps over the contact's length so far, 0 to 25: how lively the pet is, for a light or a purr to follow |
+| `resting` | No swap for `PET_RESTING_US` (400 ms), or let go: the hand is still between strokes |
+| `ended` | The contact was let go: the last message of this pet (always `resting`) |
+
+`touch::HEAD_PET_HOLD` is the one line that decides a kept hand's sleep with
+the switch on: `HoldSleeps::PetOnly` (a pet's contact asks no Hold, any other
+still does, as today) or `HoldSleeps::Never` (no head contact asks sleep,
+#4133's design; a still hand keeps its `held_us` and its lean). It is
+`PetOnly` until the design owner and the growth lead say yes on a lamp.
+
+With the switch off (unset, as on every lamp), `controls/pet` is not even
+declared, `TouchOutput` carries no `pets` (a replay's frames are byte for
+byte as before) and every head gesture and `held_us` is as before; the test
+`head_pet::the_switch_off_is_identical_to_today` replays lamp-06c1's whole
+timeline through both. The response to a pet is the installable skill
+`head-pat` (`skills/head-pat`), never Controls'. Tests:
+`crates/controls/tests/it/head_pet.rs`.
 
 **Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on).** "Lamp, go
 to sleep" is the voice's own function `go_to_sleep`, on both routes. The
@@ -955,6 +1012,7 @@ all actuator contracts are unchanged.
 | `controls/gesture`, `ControlGesture` v1 | Event, 500 ms lifespan | Source, gesture, one-way intent, original release/duration, enabled flag and stable event identity |
 | `controls/state`, `ControlsState` v1 | Latest, declared 100 ms heartbeat, 300 ms lifespan | Input health, observed button/base hold feedback, head activity, independent retained Stop and mute records; optional independent physical privacy evidence |
 | `diagnostics`, `Diagnostic` | Event, once a second | Reader faults, counts, drops, publication/recording errors and explicit lack of physical confirmation |
+| `controls/pet`, `HeadPet` v1 | Event, 500 ms lifespan; only with `LAMP_HEAD_PET=on` | A pet on the head, its intensity, and its end ("A pet", above) |
 
 State is also published on feedback transitions and gestures. Its session is
 published before that step's event; consumers still handle loss and order.
