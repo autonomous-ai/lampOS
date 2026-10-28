@@ -47,6 +47,11 @@ pub const ECHO_BEFORE_MS: u64 = 500;
 /// begun inside the line, however far in (a slow "Hey, … Lamp", or a
 /// cough before it that speech to text left out).
 pub const ONE_CALL_MS: u64 = 1_000;
+/// The detector heard one "Hey Lamp" twice, 1.1 s apart (c0a4, 28 Oct,
+/// #3923): hearings that began at most this far apart, or both inside one
+/// line heard as the name alone, are one call, at the first one's start and
+/// the surer one's score. Two calls said apart stay two.
+pub const ONE_HEARING_MS: u64 = 1_500;
 /// Tries accepted for a result.
 pub const TRIES: usize = 3;
 /// Prompts at most, accepted or not.
@@ -207,16 +212,34 @@ pub fn near_try_with_said(
     spoke: &[Spoke],
 ) -> Result<Try, Rejected> {
     let window = prompt_ended_ms..=prompt_ended_ms.saturating_add(WINDOW_MS);
-    let heard: Vec<Hearing> = hearings
-        .iter()
-        .filter(|hearing| window.contains(&hearing.began_ms))
-        .copied()
-        .collect();
     let said: Vec<Said> = said
         .iter()
         .filter(|line| window.contains(&line.began_ms))
         .copied()
         .collect();
+    let mut in_window: Vec<Hearing> = hearings
+        .iter()
+        .filter(|hearing| window.contains(&hearing.began_ms))
+        .copied()
+        .collect();
+    in_window.sort_by_key(|hearing| hearing.began_ms);
+    // The detector firing twice on one call is that call once.
+    let inside = |line: &Said, at: u64| (line.began_ms..=line.ended_ms).contains(&at);
+    let mut heard: Vec<Hearing> = Vec::new();
+    for hearing in in_window {
+        match heard.last_mut() {
+            Some(call)
+                if hearing.began_ms - call.began_ms <= ONE_HEARING_MS
+                    || said.iter().any(|line| {
+                        inside(line, call.began_ms) && inside(line, hearing.began_ms)
+                    }) =>
+            {
+                // `max` keeps the one that is a number.
+                call.score = call.score.max(hearing.score);
+            }
+            _ => heard.push(hearing),
+        }
+    }
     let one_call = |hearing: &Hearing, line: &Said| {
         hearing.began_ms.abs_diff(line.began_ms) <= ONE_CALL_MS
             || (line.began_ms..=line.ended_ms).contains(&hearing.began_ms)
@@ -572,6 +595,46 @@ mod tests {
                 ENDED,
                 &[heard(3_200, 0.98)],
                 &[said_for(2_000, 1_000)],
+                &room,
+                &[]
+            ),
+            Err(Rejected::TwoHearings)
+        );
+        // c0a4, prompt 5: the detector heard one "Hey Lamp" twice, 1.1 s
+        // apart: one call, at the first start and the surer score, with or
+        // without its line; inside one long line, even further apart.
+        let room = levels(0, 6_000, 1_900, 21.0);
+        for lines in [&[][..], &[said_for(1_600, 1_500)][..]] {
+            assert_eq!(
+                near_try_with_said(
+                    ENDED,
+                    &[heard(1_711, 0.98), heard(2_830, 0.99)],
+                    lines,
+                    &room,
+                    &[]
+                ),
+                Ok(Try {
+                    rise_db: 21.0,
+                    score: Some(0.99),
+                    heard_by: HeardBy::Name,
+                })
+            );
+        }
+        assert!(
+            near_try_with_said(
+                ENDED,
+                &[heard(1_000, 0.98), heard(2_800, 0.99)],
+                &[said_for(900, 2_200)],
+                &room,
+                &[]
+            )
+            .is_ok()
+        );
+        assert_eq!(
+            near_try_with_said(
+                ENDED,
+                &[heard(1_000, 0.98), heard(2_800, 0.99)],
+                &[],
                 &room,
                 &[]
             ),

@@ -589,9 +589,11 @@ heard each bare "Lamp". So a line told the second route as the step's call
 (`StepCall`, below) whose words were the lamp's name alone (`name_alone`:
 "Lamp", "Lamp.", "Hey Lamp", "Hey, Lamp.", "Hey Lamp!") is told back as
 `ProviderOutput::StepCallHeard`, before its idle `TurnComplete`. The
-coordinator kept when that line's speech began and ended (its first and last
-speech blocks, at its End) and hands them to the step (`Onboarding::near_text_call`; record
-`onboarding_text_call` with `taken`), which maps it to the Unix clock by the
+coordinator kept when that line's speech began and ended (its candidate's
+trigger, and its End; not the oldest speech block kept, which can be a sound
+from before the line: on c0a4 that start was 2.5 s early) and hands them to the step (`Onboarding::near_text_call`; record
+`onboarding_text_call` with `taken`, and `began_unix_ms` or the `why` it was
+not taken), which maps it to the Unix clock by the
 prompt's end read on both clocks, as `holds_reply` does, and keeps it as
 evidence only while the name part listens for a call. `near_try_with_said`
 then counts it as a hearing: the same 6 s window, one call a try (two
@@ -600,7 +602,10 @@ and the rise from mic1's largest level over its quiet in the second after the
 line began, `own_voice` readings left out. A line and a hearing begun within
 1 s of each other (`ONE_CALL_MS`), or a hearing begun inside the line however
 far in (a slow "Hey, … Lamp", or a cough before it that speech to text left
-out), are one call: a hearing at 0.95 or more
+out), are one call; so are two hearings of the detector begun within 1.5 s
+(`ONE_HEARING_MS`), or both inside one such line (c0a4: one "Hey Lamp" heard
+twice, 1.1 s apart), at the first one's start and the surer score; calls
+said further apart stay two: a hearing at 0.95 or more
 stays the detector's (`heard_by: name`, its score kept); one under 0.95 that
 the line confirms counts as `heard_by: text`. A hearing under 0.95 with no
 such line is still refused as unsure: the detector's bar is not lowered. A
@@ -616,8 +621,8 @@ near 6 s has its words back about a second later; once its turn ends
 without `StepCallHeard` (its words were more than the name, or none), the try
 waits no longer. Only that turn's own end clears it: a finished transcript
 names no line, and an earlier line's late words would have emptied the call
-line's place (the Reviewer-lead on #4006). Known limit: a call heard only by text starts at the line's first
-speech block, so a breath or a sound just before "Lamp" moves its rise
+line's place (the Reviewer-lead on #4006). Known limit: a call heard only by text starts at the line's trigger,
+a few blocks into its speech, so a breath or a sound just before "Lamp" moves its rise
 window earlier, and the call's loudest moment may fall past it. Tests:
 `lamp_near_call::tests::a_line_heard_as_the_name_alone_counts_with_its_rise`,
 `without_a_line_of_the_name_alone_the_detectors_bar_is_unchanged`,

@@ -5778,6 +5778,33 @@ fn a_call_whose_words_come_back_after_the_next_line_began_still_reaches_the_step
     assert_eq!(first[0]["taken"], true, "{calls:?}");
 }
 
+/// c0a4, 28 October (#3923): a call's text start mapped 2.5 s before the
+/// detector's hearing of the same word, from speech blocks kept from before
+/// the line, and later calls were refused for beginning well before their
+/// prompt ended. A sound before the line (a murmur, too short to be a turn)
+/// leaves the line's own start, its trigger, as the call's.
+#[test]
+fn a_calls_start_is_its_own_lines_not_a_sound_before_it() {
+    let _one = super::pilot_faults::one_session();
+    const UNIX: u64 = 1_760_000_000_000;
+    let run = run(Script {
+        second: false,
+        only: true,
+        near_window_ms: Some(0),
+        murmur: Some(When::Settled(0)),
+        speech_from: 150,
+        second_hears: Some("Hey Lamp"),
+        heard_as_call: true,
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    let calls = run.events("onboarding_text_call");
+    assert_eq!(calls.len(), 1, "{}", run.summary());
+    assert_eq!(calls[0]["taken"], true, "{calls:?}");
+    let began = calls[0]["began_unix_ms"].as_u64().unwrap() - UNIX;
+    assert!((1_400..=2_000).contains(&began), "{began} ms: {calls:?}");
+}
+
 /// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):
 /// with the second route alone, a line whose words end before a name ("Hey
 /// Lamp, my name is"), its answer held, and speech again as soon as its End
