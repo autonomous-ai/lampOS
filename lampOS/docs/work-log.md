@@ -1,3 +1,17 @@
+## 29 October 2026, 04:05 +07 — #3689 item 1 all on lamp-voice; the lamp rehearsal at 09:30
+
+Ready for lamp-voice: #4221 (comments and docs: no round writes the fixed writer itself, and the writer's one-shot unit refreshes it), with Reviewer-three's READ-OK, waiting on ARM64.
+
+Landed: #4199 and #4181 (train 328), and #4203 and #4206 (train 329). Item 1's code and docs are all on lamp-voice `d007de2a6`. Tests runs the GOOD/BAD rehearsal on lamp-52e6 at 09:30. G is `d007de2a6`'s ARM64 build, and B1 (`back` fails at its start) is #4198.
+
+#4203 came from Reviewer-three's P2 on #4199, shown in a Bookworm container with systemd 252 and no D-Bus daemon: both `busctl` reads failed, and `systemctl show --timestamp=unix` answered. So the back unit's start is read with `systemctl`, in whole seconds. A `back` begun in the refresh's own second is waited past one tick. The web search I'd relied on couldn't confirm `--timestamp=unix` on 252; the container did.
+
+Reads: HOLD then READ-OK on #4213 (Mobile). Its shortened `app_check` test failed 3 of 150 runs on the Mac, asserting exactly 3 looks in a 120 ms wait. Mobile's `74b548af75` asks their shape, and it passed 150 of 150.
+
+Flakes: three full runs each of `lamp-update` (715/0) and `lamp-setup` (215/0) on `d007de2a6`, all clean.
+
+Waiting on the first builder: #3689 item 2c (build it after the rehearsal, hold it, or build it now) and #2810's attended cut.
+
 ## 29 October 2026, 02:05 +07 — plan A landed; its follow-up in reads, its rehearsal NEXT TRAIN
 
 Ready for lamp-voice: yes, NEXT TRAIN: #4181 (the rehearsal, Reviewer-three's READ-OK on its head). No: #4199 waits on two reads.
