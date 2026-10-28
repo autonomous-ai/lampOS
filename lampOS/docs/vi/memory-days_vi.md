@@ -137,9 +137,23 @@ thoại mới hơn, để một ngày bận không che hết các ghi chú cũ (
 một dị ứng ghi ngày 21/10 bị sáu lượt mới che mất). Kết quả vẫn trả theo thứ tự
 thời gian.
 
-Với một khoảng ngày (`day_from`), câu trả lời có thêm `more` (#3627); mọi câu trả lời khác giữ nguyên từng byte như trước: `true` khi còn bản ghi khớp vượt quá
+Với một khoảng ngày (`day_from`), câu trả lời có thêm `more` (#3627); các câu trả lời không có khoảng ngày không có trường `more`: `true` khi còn bản ghi khớp vượt quá
 `limit`, hoặc `max_bytes` đã bỏ bớt một bản ghi; trình đọc cũ bỏ qua trường này.
 Voice báo câu trả lời là `partial` (chưa đủ) khi phần của người đó hoặc của căn
 phòng có `more`; với memory cũ không có `more`, khi hai phần cộng lại đủ sáu kết
 quả; và khi phần của căn phòng không được hỏi vì phần của người đó đã dùng hết
 hạn mức. Khi đó mô hình không được nói những ngày còn lại không có gì.
+
+## Ngày của một điều đã ghi nhớ trong ghi chú phiên
+
+Một ghi chú hay quan sát có ngày sự kiện (`event_days`) nay mang `on`
+(`YYYY-MM-DD`) trong ghi chú phiên (`session_open`) và trong câu trả lời của
+`recall`, như `kept` và `search` đã có (#3987). Voice đọc ngày đó theo cách
+người ta nói («Friday 30 October») và thêm một câu: đó là ngày sự việc diễn
+ra, không phải ngày nó được nói, hãy tính từ ngày hôm nay và chỉ nói «hôm nay»
+khi đúng là hôm nay. Trước đây một phiên mở sau khi khởi động lại chỉ thấy
+«nha sĩ vào thứ Sáu» cạnh ngày mới, nên một cuộc hẹn thứ Sáu từng bị nói như
+là hôm nay. Ghi chú cũ (legacy) ghi cùng ngày ở cuối dòng, «(on Friday 30
+October)». Không có điều nào có ngày thì ghi chú giữ nguyên như trước. Giới hạn
+1.200 byte của ghi chú không đổi và tính cả `on`; mỗi điều có ngày tốn khoảng
+18–23 byte, câu giải thích khoảng 130 byte, chỉ khi có điều có ngày.

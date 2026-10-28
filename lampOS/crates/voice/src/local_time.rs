@@ -73,6 +73,11 @@ pub(crate) fn day_said(days: i64) -> String {
     format!("{} {day} {}", weekday(days), MONTHS[month - 1])
 }
 
+/// Whether a word is a weekday as [`day_said`] names it.
+pub(crate) fn is_weekday(word: &str) -> bool {
+    DAYS.contains(&word)
+}
+
 /// The weekday of a count of days since 1970-01-01.
 pub(crate) fn weekday(days: i64) -> &'static str {
     DAYS[days.rem_euclid(7) as usize]
