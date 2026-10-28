@@ -14,10 +14,14 @@
 #                                       RESET=yes answers a passed one's reset
 #   factory-lamp.sh collect TARGET...   every lamp's record and status in one
 #                                       table ($STATE/factory-records.csv)
+#   factory-lamp.sh calibrate ID        an unset lamp whose servos were never
+#                                       calibrated, a person at it: V1's servo
+#                                       settings, then a hand sweep of every
+#                                       joint, the plan shown, written on a yes
 #
 # TARGET is a bench-network IP or a lamp ID (found as lamp-ID.local; an unset
 # lamp is read over its hotspot). The unset run, on the lamp:
-#   checks (r2, 4b camera, 4e build, 4f, 4g) → the head onto its stop →
+#   checks (r2, 4b camera, 4e build, 4f, 4g, the servos) → the head onto its stop →
 #   step 1, the arm stand → every input in one window (input-check.py: 30 s
 #   to touch both head pads, press the button and the reset briefly, any
 #   order; then 30 s hands off) → step 3, the key → 4d, --gaze
@@ -30,7 +34,8 @@
 # so each gets its own known_hosts and its hostname is read before anything
 # runs. Environment: LAMP_PASS (required), STEPS (steps.sh from lamp-voice),
 # STEPS_SHA (its sha256, insisted on), PROMPTS (from make-prompts.sh),
-# STATE (default ~/.factory-lamp), RESET=yes (selftest), GAZE, NUDGE_TARGET.
+# STATE (default ~/.factory-lamp), RESET=yes (selftest), GAZE, NUDGE_TARGET,
+# SWEEP_S (calibrate, default 120).
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -42,9 +47,9 @@ STATE=${STATE:-$HOME/.factory-lamp}
 mkdir -p "$STATE/records"
 say() { echo "factory-lamp: $*"; }
 die() { echo "factory-lamp: FAILED: $*" >&2; exit 1; }
-usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
-[[ $MODE =~ ^(start|follow|selftest|collect)$ && $# -ge 1 ]] || usage
-if [[ $MODE == start || $MODE == selftest ]]; then
+usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+[[ $MODE =~ ^(start|follow|selftest|collect|calibrate)$ && $# -ge 1 ]] || usage
+if [[ $MODE == start || $MODE == selftest || $MODE == calibrate ]]; then
   [[ -f $STEPS ]] || die "no steps.sh at $STEPS"
   [[ -z ${STEPS_SHA:-} || $(shasum -a 256 "$STEPS" | cut -c1-64) == "$STEPS_SHA" ]] || die "steps.sh is not $STEPS_SHA"
 fi
@@ -98,10 +103,10 @@ kit() {
   local stage want; stage=$(mktemp -d); cp "$STEPS" "$stage/steps.sh"
   want=$(shasum -a 256 "$STEPS" | cut -c1-64)
   put "$stage/steps.sh" "$HERE/factory-run.sh" "$HERE/factory-voice.py" "$HERE/head-nudge.py" \
-      "$HERE/input-check.py" "$HERE/ring-check.py" "$PROMPTS"/factory_*.wav >/dev/null || { rm -rf "$stage"; return 1; }
+      "$HERE/input-check.py" "$HERE/ring-check.py" "$HERE/servo-calib.py" "$PROMPTS"/factory_*.wav >/dev/null || { rm -rf "$stage"; return 1; }
   rm -rf "$stage"
   lamp "mkdir -p /var/lib/lamp-test/prompts && mv /tmp/factory_*.wav /var/lib/lamp-test/prompts/ &&
-        mv /tmp/steps.sh /tmp/factory-run.sh /tmp/factory-voice.py /tmp/head-nudge.py /tmp/input-check.py /tmp/ring-check.py /home/orangepi/ &&
+        mv /tmp/steps.sh /tmp/factory-run.sh /tmp/factory-voice.py /tmp/head-nudge.py /tmp/input-check.py /tmp/ring-check.py /tmp/servo-calib.py /home/orangepi/ &&
         chmod 0755 /home/orangepi/steps.sh /home/orangepi/factory-run.sh &&
         sha256sum /home/orangepi/steps.sh | grep -q ^$want" >/dev/null
 }
@@ -171,7 +176,7 @@ collect)
     say "$n: $(grep -c . "$STATE/records/$n.env") lines in records/$n.env"
     rows+=("$n")
   done
-  cols=(LAMP_ID BUILD HEAD_PAD_LINES BUTTON_PRIMARY RESET_BUTTON PRIVACY_SWITCH HEAD_REST FACTORY_4C1 FACTORY_4C2 FACTORY_4C3 FACTORY_4D RESULT_UNSET RESULT_SELFTEST SELFTEST_FAILED SET_UP STATUS)
+  cols=(LAMP_ID BUILD SERVOS HEAD_PAD_LINES BUTTON_PRIMARY RESET_BUTTON PRIVACY_SWITCH HEAD_REST FACTORY_4C1 FACTORY_4C2 FACTORY_4C3 FACTORY_4D RESULT_UNSET RESULT_SELFTEST SELFTEST_FAILED SET_UP STATUS)
   csv=$STATE/factory-records.csv
   (IFS=,; echo "${cols[*]}") > "$csv"
   printf '| %s ' "${cols[@]}"; echo '|'; printf '|---%.0s' "${cols[@]}"; echo '|'
@@ -182,4 +187,20 @@ collect)
     printf '| %s ' "${vals[@]}"; echo '|'
   done
   say "table: $csv" ;;
+calibrate)
+  # The servos' own settings, in their EEPROM (servo-calib.py): nothing is
+  # driven; the person moves each joint by hand and says yes to the plan.
+  id=$1; [[ $id =~ ^[0-9a-f]{4}$ ]] || die "$id: not a lamp ID"
+  hotspot "$id" || die "lamp-$id: its hotspot can't be joined (set up already, or off?)"
+  [[ $(name) == "lamp-$id" ]] || die "the lamp at $HOST is not lamp-$id"
+  kit || die "lamp-$id: the kit could not be copied"
+  lamp "systemctl is-active -q lamp-body factory-run && echo BUSY" | grep -q BUSY && die "lamp-$id: lamp-body or a factory run is driving the servos"
+  lamp "python3 /home/orangepi/servo-calib.py configure" || die "lamp-$id: V1's servo settings were not kept"
+  say "lamp-$id: fold it at rest, head on its stop, and keep it still; when the sweep starts, move each joint end to end by hand (base turn, shoulder, elbow, head roll, head pitch) and fold it back within ${SWEEP_S:-120} s"
+  read -r -p "factory-lamp: start the sweep? [y/N] " a; [[ $a == y ]] || die "not started"
+  ssh_once "python3 -u /home/orangepi/servo-calib.py sweep ${SWEEP_S:-120}" || die "lamp-$id: the sweep did not give a plan that fits: sweep again"
+  read -r -p "factory-lamp: write this plan into lamp-$id's servos? [y/N] " a; [[ $a == y ]] || die "nothing written"
+  lamp "python3 /home/orangepi/servo-calib.py apply" || die "lamp-$id: the servos did not keep the plan"
+  lamp "python3 /home/orangepi/servo-calib.py check" | tail -2
+  say "lamp-$id: calibrated; next: factory-lamp.sh start $id" ;;
 esac

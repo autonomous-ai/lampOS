@@ -145,7 +145,7 @@ tools/factory-lamp.sh collect 3e83 29e7 75c9   # one table: factory-records.csv
 ```
 
 **The unset run, on the lamp:**
-1. **Checks:** r2 (no `country_code`), 4b (camera `01da:5875@3-1.1.4`), 4f, 4g, and that the lamp is unset.
+1. **Checks:** r2 (no `country_code`), 4b (camera `01da:5875@3-1.1.4`), 4f, 4g, that the lamp is unset, and the servos (`servo-calib.py check`, below): V1's settings are stored when missing; servos never calibrated stop the run before anything moves.
 2. **The head onto its stop:** `head-nudge.py`, when the rest read refuses.
 3. **Step 1, the arm stand.**
 4. **Every input in one window** (`input-check.py`, below).
@@ -169,6 +169,29 @@ The person answers nothing: each question is said, then "Starting in five second
 - `factory-run.status` — `RUNNING <step>`, `PASS <mode>` or `FAIL <mode>: <why>`.
 
 **The Mac:** each unset lamp is at `192.168.100.1`, so each gets its own `known_hosts` (in `STATE`, default `~/.factory-lamp`), and its hostname is read before anything runs. A re-flashed card's new host key is accepted once, and that hostname check decides. `follow` and `collect` use the bench network first, and a lamp's hotspot only when it is unset.
+
+## `tools/servo-calib.py`: the servos' own settings
+
+A lamp whose servos never ran V1 HAL (every V2-only image) has neither of
+V1's two settings, and the stand fails without them (lamp-220c, 28 Oct):
+
+| | As the servos come | V1 (lamp-3e83) | Effect when missing |
+|---|---|---|---|
+| Max acceleration (EEPROM 85), P (21) | 50, 32 | 254, 16 | the body asks for acceleration 60, reads back 50, and refuses the stand |
+| Zero (31), limits (9, 11) | one shared offset, 0–4095 | each joint its own; limits on yaw, roll, pitch | the head reads off its stop; lamp-4ace's stand drove lamp-220c's elbow into its body |
+
+V1 stored the first at every start (lerobot `configure_motors`, `hal/follower/hal_follower.py`) and the second once by hand (`hal.calibrate`). All of it is in the servos' EEPROM: it survives a reflash, an update and the reset, and is redone only for a new servo or a remounted horn.
+
+```bash
+tools/factory-lamp.sh calibrate 220c   # an unset lamp, a person at it: configure, sweep, the plan, then yes to write
+sudo python3 servo-calib.py check      # read only: exit 0 calibrated, 3 not configured, 4 not calibrated
+```
+
+- **Nothing is driven.** Torque must be off (lamp-body stopped); every write refuses otherwise.
+- **The sweep:** the lamp starts folded at rest, head on its stop; the person moves each joint end to end by hand (base turn, shoulder, elbow, head roll, head pitch) and folds it back. A joint moved under 400 counts refuses the plan.
+- **The plan** matches lamp-3e83: folded, the shoulder and elbow read 2047 and the head pitch 2010 (in the body's home range); yaw and roll have their swept range centred on 2047. Limits sit 30 counts inside the sweep on yaw, roll and pitch, so a joint is never sent into its hard stop; the shoulder and elbow keep 0–4095, as on lamp-3e83. lamp-220c calibrated this way stands at 2629,2564; lamp-3e83 at 2630,2562.
+- **The factory run** checks before the head is nudged: it stores V1's settings itself (nothing moves) and stops a lamp never calibrated with "factory-lamp.sh calibrate ID". Records `SERVOS` and `SERVO_OFFSETS`.
+- **Test:** `tools/servo-calib-test.py` runs it against stand-in servos on a pty (no lamp).
 
 ## `tools/input-check.py`: every input in one window
 
