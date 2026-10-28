@@ -1359,6 +1359,22 @@ pub mod tests {
             "",
             "kind = \"core\"\n[permissions]\ncamera = true",
         );
+        // Format 2's `look` is presence alone (#3822's gap 7): no camera,
+        // so no yes is asked of it, as format 1's `look` would be.
+        skill(
+            &places,
+            "watcher",
+            "Watcher",
+            "",
+            "format = 2\nkind = \"installable\"\n[permissions]\nlook = true\nbody = true",
+        );
+        skill(
+            &places,
+            "watcher-1",
+            "Watcher",
+            "",
+            "kind = \"installable\"\n[permissions]\nlook = true\nbody = true",
+        );
         let allowed = |reply: &Value, name: &str| {
             reply["skills"]
                 .as_array()
@@ -1372,6 +1388,8 @@ pub mod tests {
         assert_eq!(allowed(&page, "eyes"), json!(false));
         assert_eq!(allowed(&page, "seer"), json!(true));
         assert_eq!(allowed(&page, "tutor"), Value::Null);
+        assert_eq!(allowed(&page, "watcher"), Value::Null);
+        assert_eq!(allowed(&page, "watcher-1"), json!(false));
         let reply = camera(&places, &json!({"name": "eyes", "allow": true})).unwrap();
         assert_eq!(reply, list(&places).unwrap());
         assert_eq!(allowed(&reply, "eyes"), json!(true));

@@ -494,6 +494,42 @@ fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
     assert_eq!(store.join().unwrap(), 4);
 }
 
+/// Format 2 (#3822's gap 7): `look` is presence alone, so a Store package
+/// that asks only it is no camera package. It installs with no yes kept,
+/// and none is written for it.
+#[test]
+fn a_format_2_presence_package_installs_with_no_camera_yes() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = skills(dir.path());
+    let camera = skills
+        .with_extension("state")
+        .join(lamp_skills::CAMERA_FILE);
+    fs::remove_file(&camera).unwrap();
+    let source = dir.path().join("src").join("presence");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(
+        source.join("SKILL.md"),
+        "---\nname: presence\ndescription: A test.\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        source.join("skill.toml"),
+        "format = 2\nversion = \"1.0.0\"\n[permissions]\nlook = true\nlight = true\n\
+         [trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n\
+         [ask]\npolicy = \"nudge\"\n[[do]]\nlight = { colour = \"warm\", level = 2, for = \"20s\" }\n",
+    )
+    .unwrap();
+    let channel = key(1);
+    let key_file = key_file(dir.path(), &channel);
+    let path = package::pack_signed(&source, &dir.path().join("out"), Some(&channel)).unwrap();
+    let (port, store) = serve(vec![ok(&fs::read(path).unwrap())]);
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(done, "{answer}");
+    assert_eq!(left(&skills), ["dance", "presence"]);
+    assert!(!camera.exists());
+    assert_eq!(store.join().unwrap(), 1);
+}
+
 /// Unsigned, signed with another key, a signature that is not one, a
 /// manifest changed after it was signed, a file changed, and a package
 /// whose bytes are not the `sha256` asked for: each refused with the skills
