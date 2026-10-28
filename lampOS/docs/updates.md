@@ -2806,17 +2806,18 @@ bound. Until the refreshed writer is proved:
 - **A failed `back` that began before the refresh** is not the new
   writer's. The copy before's `back` may be mid-run when the refresh lands,
   and fail after the unit's `reset-failed`. So a `failed` counts only when
-  the back unit's `ExecMainStartTimestamp`, read from the bus (`busctl
-  get-property`, in microseconds), is after the refresh's `at_unix_ms`.
-  It is asked of the system bus, then of systemd's own socket
-  (`/run/systemd/private`, as `systemctl` uses as root), since a lamp may
-  run no D-Bus daemon. It is asked only of a `failed` unit.
-  The refresh's `at_unix_ms` is taken once the copy is in place, after
+  the back unit's `ExecMainStartTimestamp` is after the refresh's
+  `at_unix_ms`. It is read with `systemctl show --timestamp=unix`, in whole
+  seconds, and asked only of a `failed` unit. As root, `systemctl` asks
+  systemd's own socket, so it answers on a lamp with no D-Bus daemon,
+  where `busctl` doesn't (Reviewer-three's P2 on #4199, shown on systemd
+  252).
+- **The refresh's `at_unix_ms`** is taken once the copy is in place, after
   its writes, its probe (up to 20 s) and the rename. So every `back` that
   began of the copy before began by it (Reviewer-three's P3 on #4190).
-  One in the refresh's own millisecond or before is waited past, to the
-  next `back`, and said (`… back failed in a
-  run that began before it was refreshed: the next back judges it`). When
+- **A failure in the refresh's own second, or before,** is waited past to
+  the next `back`, about 2 minutes on, and said (`… back failed in a run
+  that began before it was refreshed: the next back judges it`). When
   systemd can't say, it counts (El's P3 on #4178).
 
 `installed_units` leaves out the writer's unit, as it leaves out
