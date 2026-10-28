@@ -793,3 +793,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - #3984 ARM64 and clippy green, READ-OK Fourteen and Nine: NEXT TRAIN posted on #1711.
 - 09:43: #3984 merged in train #3988 (lamp-voice f085a74e5). Eighth confirmed the grants_asked order; the codes asks_differ, signer_changed and bad_package go in Nine's door PR with both SDK copies (B changes no schema). No new queue issue yet; #1711 still the stand-in.
 - 09:44: the queue continues on **#3997** (opened 09:43); I read it from now on. #3979's NEXT TRAIN re-posted there (clean on 492e011402). Today is onboarding by the lead's word; my SDK work rides behind it.
+- 09:49: tick moved to #3997 (cron d8428570). READ-OK on Ten's #3998 (docs/develop.md) da040c06: SDK calls checked against the SDKs; three P3s (install's grants_asked words, push vs sign branches, an unsigned package goes as a plain push).
