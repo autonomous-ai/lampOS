@@ -64,6 +64,7 @@ class FakeCommands:
         # GitHub's 5xx, by call, how many times more (#4103). A read's comes
         # before it is answered; "create" and "upload" come after the change.
         self.server_errors = {}
+        self.deleted = []
         if sequence is not None:
             release = self.release(P.HEAD, "b" * 40)
             self.add(release, P.ENVELOPE, old_envelope(sequence))
@@ -138,6 +139,12 @@ class FakeCommands:
                 release = next(release for release in self.release_map.values() if release["id"] == identifier)
                 release["body"] = words[words.index("-f") + 1].removeprefix("body=")
                 return self.json_result({"id": identifier, "body": release["body"]})
+            if "DELETE" in words:
+                _, asset = self.asset(int(endpoint.rsplit("/", 1)[1]))
+                release = next(release for release in self.release_map.values() if asset["name"] in release["assets"] and release["assets"][asset["name"]] is asset)
+                self.deleted.append(asset["name"])
+                del release["assets"][asset["name"]]
+                return b""
             if "PATCH" not in words:
                 self.server_error("releases" if endpoint.startswith("releases?") else "refs" if endpoint.startswith("git/") else "assets")
             if endpoint.startswith("releases?"):
@@ -265,6 +272,10 @@ class FakeCommands:
                     raise P.Refused("fake partial immutable upload")
                 if tag != P.HEAD and index == 2 and self.server_errors.get("create-partial", 0) > 0:
                     self.server_error("create-partial")
+                if tag != P.HEAD and index == 2 and self.server_errors.get("create-open", 0) > 0:
+                    # A failed upload: GitHub keeps the name, its asset not `uploaded`.
+                    self.add(release, file.name, file.read_bytes()[:3])["state"] = "open"
+                    self.server_error("create-open")
                 if self.fail == "missing-upload" and tag != P.HEAD and index == 1:
                     continue
                 data = file.read_bytes()
@@ -803,6 +814,43 @@ class PublicationTests(unittest.TestCase):
                 uploads = [call for call in self.fake.calls if call[:4] == ["gh", "release", "upload", "lampos-lamp-voice-10"]]
                 self.assertEqual(len(uploads), 1)
                 self.assertEqual(result["resumed"], case == "rerun")
+
+    def test_an_upload_github_left_unfinished_is_deleted_and_uploaded_again(self):
+        # In this run (a 504 mid-upload) and on a re-run (Fourteen's P3 on #4121).
+        for rerun in (False, True):
+            with self.subTest(rerun=rerun):
+                self.fake = FakeCommands()
+                self.env["GITHUB_RUN_ATTEMPT"] = "1"
+                self.fake.server_errors["create-open"] = 1
+                if rerun:
+                    original = self.fake.release_command
+                    def refusing(words, original=original):
+                        try:
+                            return original(words)
+                        except P.ServerError as error:
+                            raise P.Refused(str(error).replace("504", "403"))
+                    self.fake.release_command = refusing
+                    self.refused_unchanged()
+                    self.fake.release_command = original
+                    self.env["GITHUB_RUN_ATTEMPT"] = "2"
+                result = self.publish()
+                release = self.fake.release_map["lampos-lamp-voice-10"]
+                self.assertEqual(len(self.fake.deleted), 1)
+                self.assertTrue(all(asset["state"] == "uploaded" for asset in release["assets"].values()))
+                assert_release_subset(self, self.artifact, release["assets"])
+                self.assertEqual(self.fake.canonical(), release["assets"][P.ENVELOPE]["data"])
+                self.assertEqual(result["resumed"], rerun)
+
+    def test_an_unfinished_asset_that_is_not_this_builds_is_refused_and_kept(self):
+        self.fake.release("lampos-lamp-voice-10", SHA)
+        self.fake.add(self.fake.release_map["lampos-lamp-voice-10"], "lamp-stranger", b"x")["state"] = "open"
+        self.refused_unchanged("uploaded asset inventory differs")
+        self.assertEqual(self.fake.deleted, [])
+
+    def test_elsewhere_an_unfinished_asset_is_still_uncertain(self):
+        self.fake.add(self.fake.release_map[P.HEAD], "lampos-manifest-staged-9.json", b"x")["state"] = "open"
+        self.refused_unchanged("uncertain release assets")
+        self.assertEqual(self.fake.deleted, [])
 
     def test_a_short_release_with_a_changed_asset_is_not_completed(self):
         self.fake.fail = "create-upload"

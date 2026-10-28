@@ -391,10 +391,12 @@ class Publisher:
         require(isinstance(refs, list) and all(isinstance(ref, dict) and isinstance(ref.get("ref"), str) for ref in refs), "uncertain tag inventory")
         require(not any(ref["ref"] == f"refs/tags/{tag}" for ref in refs), "immutable tag already exists")
 
-    def assets(self, release):
+    def assets(self, release, unfinished=False):
+        """The release's assets by name, every one `uploaded`; with
+        `unfinished`, one GitHub left in another state too (a failed upload)."""
         require(positive(release.get("id")), "invalid release ID")
         entries = self.api(f"releases/{release['id']}/assets?per_page=100", pages=True)
-        require(all(isinstance(asset, dict) and positive(asset.get("id")) and isinstance(asset.get("name"), str) and NAME.fullmatch(asset["name"]) and type(asset.get("size")) is int and asset["size"] >= 0 and asset.get("state") == "uploaded" for asset in entries), "uncertain release assets")
+        require(all(isinstance(asset, dict) and positive(asset.get("id")) and isinstance(asset.get("name"), str) and NAME.fullmatch(asset["name"]) and type(asset.get("size")) is int and asset["size"] >= 0 and isinstance(asset.get("state"), str) and (unfinished or asset["state"] == "uploaded") for asset in entries), "uncertain release assets")
         require(len({asset["id"] for asset in entries}) == len(entries) and len({asset["name"] for asset in entries}) == len(entries), "duplicate release assets")
         return {asset["name"]: asset for asset in entries}
 
@@ -475,8 +477,19 @@ class Publisher:
         """This release's assets whole: one cut short by a 5xx inside `gh
         release create` gets only its missing ones, and only once every one
         it has is this build's, byte for byte (Reviewer-two's P3 on #4121)."""
-        assets = self.assets(release)
+        assets = self.assets(release, unfinished=True)
         require(set(assets) <= set(inventory), "uploaded asset inventory differs")
+        # An upload GitHub never finished holds its name, so it can't be
+        # uploaded again: deleted, then uploaded as a missing one. Only one
+        # of this build's names here, never a finished asset (Fourteen's P3
+        # on #4121).
+        unfinished = sorted(name for name, asset in assets.items() if asset["state"] != "uploaded")
+        for name in unfinished:
+            print(f"{tag}: {name} was left {assets[name]['state']}; deleting it to upload it again", file=sys.stderr)
+            self.command("gh", "api", "--method", "DELETE", f"repos/{REPO}/releases/assets/{assets[name]['id']}")
+        if unfinished:
+            assets = self.assets(release)
+            require(not set(unfinished) & set(assets), "unfinished asset was not deleted")
         missing = sorted(set(inventory) - set(assets))
         if not missing:
             self.verify_assets(release, inventory)
