@@ -1,0 +1,532 @@
+﻿2026-10-27T23:50:42.9777690Z Current runner version: '2.338.0'
+2026-10-27T23:50:42.9800763Z ##[group]Runner Image Provisioner
+2026-10-27T23:50:42.9801506Z Hosted Compute Agent
+2026-10-27T23:50:42.9802034Z Version: 20261021.618
+2026-10-27T23:50:42.9802562Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-10-27T23:50:42.9803456Z Build Date: 2026-10-21T00:45:21Z
+2026-10-27T23:50:42.9804042Z Worker ID: {cb63c204-9879-49c5-ae59-d30b744d02e7}
+2026-10-27T23:50:42.9804603Z Region: eastus
+2026-10-27T23:50:42.9805188Z Cloud: Azure
+2026-10-27T23:50:42.9805651Z ##[endgroup]
+2026-10-27T23:50:42.9806913Z ##[group]Operating System
+2026-10-27T23:50:42.9807434Z Ubuntu
+2026-10-27T23:50:42.9807859Z 22.04.5
+2026-10-27T23:50:42.9808383Z LTS
+2026-10-27T23:50:42.9808825Z ##[endgroup]
+2026-10-27T23:50:42.9809517Z ##[group]Runner Image
+2026-10-27T23:50:42.9810295Z Image: ubuntu-22.04
+2026-10-27T23:50:42.9810987Z Version: 20261025.340.1
+2026-10-27T23:50:42.9812629Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261025.340/images/ubuntu/Ubuntu2204-Readme.md
+2026-10-27T23:50:42.9814380Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261025.340
+2026-10-27T23:50:42.9815206Z ##[endgroup]
+2026-10-27T23:50:42.9816259Z ##[group]GITHUB_TOKEN Permissions
+2026-10-27T23:50:42.9817821Z Contents: read
+2026-10-27T23:50:42.9818360Z Metadata: read
+2026-10-27T23:50:42.9818928Z Packages: read
+2026-10-27T23:50:42.9819396Z ##[endgroup]
+2026-10-27T23:50:42.9821134Z Secret source: Actions
+2026-10-27T23:50:42.9821908Z Cache mode: write
+2026-10-27T23:50:42.9822569Z Prepare workflow directory
+2026-10-27T23:50:43.0086180Z Prepare all required actions
+2026-10-27T23:50:43.0124613Z Getting action download info
+2026-10-27T23:50:43.1899527Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-27T23:50:43.3511304Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-10-27T23:50:43.5645986Z Complete job name: lampOS — clippy, every crate and target (x86 Linux)
+2026-10-27T23:50:43.6268598Z ##[group]Run sudo apt-get update
+2026-10-27T23:50:43.6269116Z [36;1msudo apt-get update[0m
+2026-10-27T23:50:43.6269767Z [36;1msudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \[0m
+2026-10-27T23:50:43.6270678Z [36;1m  ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev[0m
+2026-10-27T23:50:43.6337075Z shell: /usr/bin/bash -e {0}
+2026-10-27T23:50:43.6337828Z ##[endgroup]
+2026-10-27T23:50:43.7243398Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-10-27T23:50:43.7566437Z Get:6 https://packages.microsoft.com/ubuntu/22.04/prod jammy InRelease [3632 B]
+2026-10-27T23:50:43.7653645Z Hit:2 http://azure.archive.ubuntu.com/ubuntu jammy InRelease
+2026-10-27T23:50:43.7676675Z Get:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+2026-10-27T23:50:43.7716321Z Get:4 http://azure.archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+2026-10-27T23:50:43.7747525Z Get:5 http://azure.archive.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+2026-10-27T23:50:43.8216844Z Get:7 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main arm64 Packages [693 kB]
+2026-10-27T23:50:43.8374559Z Get:8 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main amd64 Packages [957 kB]
+2026-10-27T23:50:43.9728202Z Get:9 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [3909 kB]
+2026-10-27T23:50:43.9945077Z Get:10 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main Translation-en [576 kB]
+2026-10-27T23:50:44.0004038Z Get:11 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1289 kB]
+2026-10-27T23:50:44.0041469Z Get:12 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe Translation-en [326 kB]
+2026-10-27T23:50:44.1310482Z Get:13 http://azure.archive.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3643 kB]
+2026-10-27T23:50:44.1466087Z Get:14 http://azure.archive.ubuntu.com/ubuntu jammy-security/main Translation-en [510 kB]
+2026-10-27T23:50:44.1498692Z Get:15 http://azure.archive.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1055 kB]
+2026-10-27T23:50:44.1551298Z Get:16 http://azure.archive.ubuntu.com/ubuntu jammy-security/universe Translation-en [238 kB]
+2026-10-27T23:50:50.8006735Z Fetched 13.6 MB in 1s (10.1 MB/s)
+2026-10-27T23:50:51.9695779Z Reading package lists...
+2026-10-27T23:50:52.0294763Z Reading package lists...
+2026-10-27T23:50:52.2862675Z Building dependency tree...
+2026-10-27T23:50:52.2871483Z Reading state information...
+2026-10-27T23:50:52.4439485Z build-essential is already the newest version (12.9ubuntu3).
+2026-10-27T23:50:52.4440303Z build-essential set to manually installed.
+2026-10-27T23:50:52.4441057Z ca-certificates is already the newest version (20260816ubuntu0.22.04.1).
+2026-10-27T23:50:52.4441737Z curl is already the newest version (7.81.0-1ubuntu1.30).
+2026-10-27T23:50:52.4442367Z git is already the newest version (1:2.56.0-0ppa1~ubuntu22.04.2).
+2026-10-27T23:50:52.4443264Z The following additional packages will be installed:
+2026-10-27T23:50:52.4447400Z   libclang-14-dev
+2026-10-27T23:50:52.4454001Z Suggested packages:
+2026-10-27T23:50:52.4454333Z   libasound2-doc
+2026-10-27T23:50:52.4624945Z The following packages will be REMOVED:
+2026-10-27T23:50:52.4625849Z   pkgconf r-base-dev
+2026-10-27T23:50:52.4626286Z The following NEW packages will be installed:
+2026-10-27T23:50:52.4631269Z   clang libasound2-dev libclang-14-dev libclang-dev pkg-config
+2026-10-27T23:50:52.4780258Z 0 upgraded, 5 newly installed, 2 to remove and 15 not upgraded.
+2026-10-27T23:50:52.4780963Z Need to get 25.4 MB of archives.
+2026-10-27T23:50:52.4781477Z After this operation, 246 MB of additional disk space will be used.
+2026-10-27T23:50:52.4781862Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-10-27T23:50:52.5200639Z Get:2 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 pkg-config amd64 0.29.2-1ubuntu3 [48.2 kB]
+2026-10-27T23:50:52.5402746Z Get:3 http://azure.archive.ubuntu.com/ubuntu jammy/universe amd64 clang amd64 1:14.0-55~exp2 [3558 B]
+2026-10-27T23:50:52.5555256Z Get:4 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasound2-dev amd64 1.2.6.1-1ubuntu1.2 [110 kB]
+2026-10-27T23:50:52.5716553Z Get:5 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-14-dev amd64 1:14.0.0-1ubuntu1.1 [25.2 MB]
+2026-10-27T23:50:52.7880129Z Get:6 http://azure.archive.ubuntu.com/ubuntu jammy/universe amd64 libclang-dev amd64 1:14.0-55~exp2 [3138 B]
+2026-10-27T23:50:53.0845067Z Fetched 25.4 MB in 0s (79.2 MB/s)
+2026-10-27T23:50:53.1207662Z (Reading database ... 
+2026-10-27T23:50:53.1208235Z (Reading database ... 5%
+2026-10-27T23:50:53.1208680Z (Reading database ... 10%
+2026-10-27T23:50:53.1208987Z (Reading database ... 15%
+2026-10-27T23:50:53.1209234Z (Reading database ... 20%
+2026-10-27T23:50:53.1209464Z (Reading database ... 25%
+2026-10-27T23:50:53.1209694Z (Reading database ... 30%
+2026-10-27T23:50:53.1209916Z (Reading database ... 35%
+2026-10-27T23:50:53.1210136Z (Reading database ... 40%
+2026-10-27T23:50:53.1210451Z (Reading database ... 45%
+2026-10-27T23:50:53.1210695Z (Reading database ... 50%
+2026-10-27T23:50:53.1835118Z (Reading database ... 55%
+2026-10-27T23:50:53.4216992Z (Reading database ... 60%
+2026-10-27T23:50:53.6409227Z (Reading database ... 65%
+2026-10-27T23:50:53.7225890Z (Reading database ... 70%
+2026-10-27T23:50:53.9470013Z (Reading database ... 75%
+2026-10-27T23:50:54.1354454Z (Reading database ... 80%
+2026-10-27T23:50:54.2965799Z (Reading database ... 85%
+2026-10-27T23:50:54.4810716Z (Reading database ... 90%
+2026-10-27T23:50:54.6720728Z (Reading database ... 95%
+2026-10-27T23:50:54.6721135Z (Reading database ... 100%
+2026-10-27T23:50:54.6721687Z (Reading database ... 263321 files and directories currently installed.)
+2026-10-27T23:50:54.6780077Z Removing r-base-dev (4.6.1-6.2204.0) ...
+2026-10-27T23:50:54.7313783Z dpkg: pkgconf: dependency problems, but removing anyway as you requested:
+2026-10-27T23:50:54.7314373Z  php8.1-dev depends on pkg-config; however:
+2026-10-27T23:50:54.7315241Z   Package pkg-config is not installed.
+2026-10-27T23:50:54.7315688Z   Package pkgconf which provides pkg-config is to be removed.
+2026-10-27T23:50:54.7316159Z  mono-devel depends on pkg-config; however:
+2026-10-27T23:50:54.7316546Z   Package pkg-config is not installed.
+2026-10-27T23:50:54.7316979Z   Package pkgconf which provides pkg-config is to be removed.
+2026-10-27T23:50:54.7317318Z  libmagickwand-6.q16-dev:amd64 depends on pkg-config; however:
+2026-10-27T23:50:54.7317610Z   Package pkg-config is not installed.
+2026-10-27T23:50:54.7317877Z   Package pkgconf which provides pkg-config is to be removed.
+2026-10-27T23:50:54.7318200Z  libmagickcore-6.q16-dev:amd64 depends on pkg-config; however:
+2026-10-27T23:50:54.7318489Z   Package pkg-config is not installed.
+2026-10-27T23:50:54.7318750Z   Package pkgconf which provides pkg-config is to be removed.
+2026-10-27T23:50:54.7319040Z  libglib2.0-dev:amd64 depends on pkg-config; however:
+2026-10-27T23:50:54.7319331Z   Package pkg-config is not installed.
+2026-10-27T23:50:54.7319589Z   Package pkgconf which provides pkg-config is to be removed.
+2026-10-27T23:50:54.7319894Z  libfontconfig-dev:amd64 depends on pkg-config; however:
+2026-10-27T23:50:54.7320247Z   Package pkg-config is not installed.
+2026-10-27T23:50:54.7320568Z   Package pkgconf which provides pkg-config is to be removed.
+2026-10-27T23:50:54.7320762Z 
+2026-10-27T23:50:54.7364187Z Removing pkgconf (1.8.0-1) ...
+2026-10-27T23:50:54.7883405Z Removing 'diversion of /usr/bin/pkg-config to /usr/bin/pkg-config.real by pkgconf'
+2026-10-27T23:50:54.7991297Z Removing 'diversion of /usr/share/aclocal/pkg.m4 to /usr/share/aclocal/pkg.real.m4 by pkgconf'
+2026-10-27T23:50:54.8097691Z Removing 'diversion of /usr/share/man/man1/pkg-config.1.gz to /usr/share/man/man1/pkg-config.real.1.gz by pkgconf'
+2026-10-27T23:50:54.8208285Z Removing 'diversion of /usr/share/pkg-config-crosswrapper to /usr/share/pkg-config-crosswrapper.real by pkgconf'
+2026-10-27T23:50:54.8782535Z Selecting previously unselected package pkg-config.
+2026-10-27T23:50:54.8853993Z (Reading database ... 
+2026-10-27T23:50:54.8854492Z (Reading database ... 5%
+2026-10-27T23:50:54.8854785Z (Reading database ... 10%
+2026-10-27T23:50:54.8855171Z (Reading database ... 15%
+2026-10-27T23:50:54.8855459Z (Reading database ... 20%
+2026-10-27T23:50:54.8855738Z (Reading database ... 25%
+2026-10-27T23:50:54.8856012Z (Reading database ... 30%
+2026-10-27T23:50:54.8856287Z (Reading database ... 35%
+2026-10-27T23:50:54.8856760Z (Reading database ... 40%
+2026-10-27T23:50:54.8857086Z (Reading database ... 45%
+2026-10-27T23:50:54.8857361Z (Reading database ... 50%
+2026-10-27T23:50:54.8881334Z (Reading database ... 55%
+2026-10-27T23:50:54.8902161Z (Reading database ... 60%
+2026-10-27T23:50:54.8995727Z (Reading database ... 65%
+2026-10-27T23:50:54.9023509Z (Reading database ... 70%
+2026-10-27T23:50:54.9152074Z (Reading database ... 75%
+2026-10-27T23:50:54.9212158Z (Reading database ... 80%
+2026-10-27T23:50:54.9413074Z (Reading database ... 85%
+2026-10-27T23:50:54.9619229Z (Reading database ... 90%
+2026-10-27T23:50:54.9717526Z (Reading database ... 95%
+2026-10-27T23:50:54.9717824Z (Reading database ... 100%
+2026-10-27T23:50:54.9718229Z (Reading database ... 263299 files and directories currently installed.)
+2026-10-27T23:50:54.9771689Z Preparing to unpack .../pkg-config_0.29.2-1ubuntu3_amd64.deb ...
+2026-10-27T23:50:54.9780661Z Unpacking pkg-config (0.29.2-1ubuntu3) ...
+2026-10-27T23:50:55.0001832Z Selecting previously unselected package clang.
+2026-10-27T23:50:55.0179891Z Preparing to unpack .../clang_1%3a14.0-55~exp2_amd64.deb ...
+2026-10-27T23:50:55.0186822Z Unpacking clang (1:14.0-55~exp2) ...
+2026-10-27T23:50:55.0383665Z Selecting previously unselected package libasound2-dev:amd64.
+2026-10-27T23:50:55.0563349Z Preparing to unpack .../libasound2-dev_1.2.6.1-1ubuntu1.2_amd64.deb ...
+2026-10-27T23:50:55.0593013Z Unpacking libasound2-dev:amd64 (1.2.6.1-1ubuntu1.2) ...
+2026-10-27T23:50:55.0878148Z Selecting previously unselected package libclang-14-dev.
+2026-10-27T23:50:55.1059564Z Preparing to unpack .../libclang-14-dev_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+2026-10-27T23:50:55.1066412Z Unpacking libclang-14-dev (1:14.0.0-1ubuntu1.1) ...
+2026-10-27T23:50:56.6526179Z Selecting previously unselected package libclang-dev.
+2026-10-27T23:50:56.6713469Z Preparing to unpack .../libclang-dev_1%3a14.0-55~exp2_amd64.deb ...
+2026-10-27T23:50:56.6720774Z Unpacking libclang-dev (1:14.0-55~exp2) ...
+2026-10-27T23:50:56.7215643Z Setting up clang (1:14.0-55~exp2) ...
+2026-10-27T23:50:56.7465644Z Setting up pkg-config (0.29.2-1ubuntu3) ...
+2026-10-27T23:50:56.7745954Z Setting up libclang-14-dev (1:14.0.0-1ubuntu1.1) ...
+2026-10-27T23:50:56.7765032Z Setting up libasound2-dev:amd64 (1.2.6.1-1ubuntu1.2) ...
+2026-10-27T23:50:56.7783716Z Setting up libclang-dev (1:14.0-55~exp2) ...
+2026-10-27T23:50:56.7810195Z Processing triggers for man-db (2.10.2-1) ...
+2026-10-27T23:50:56.7829946Z Not building database; man-db/auto-update is not 'true'.
+2026-10-27T23:50:57.2814543Z 
+2026-10-27T23:50:57.2815128Z Running kernel seems to be up-to-date.
+2026-10-27T23:50:57.2815454Z 
+2026-10-27T23:50:57.2815582Z No services need to be restarted.
+2026-10-27T23:50:57.2815804Z 
+2026-10-27T23:50:57.2823689Z No containers need to be restarted.
+2026-10-27T23:50:57.2823930Z 
+2026-10-27T23:50:57.2824084Z No user sessions are running outdated binaries.
+2026-10-27T23:50:57.2824605Z 
+2026-10-27T23:50:57.2824854Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026-10-27T23:50:58.4791483Z ##[group]Run actions/checkout@v4
+2026-10-27T23:50:58.4791708Z with:
+2026-10-27T23:50:58.4791893Z   repository: autonomous-ai/lampOS
+2026-10-27T23:50:58.4794447Z   token: ***
+2026-10-27T23:50:58.4794621Z   ssh-strict: true
+2026-10-27T23:50:58.4794792Z   ssh-user: git
+2026-10-27T23:50:58.4794961Z   persist-credentials: true
+2026-10-27T23:50:58.4795154Z   clean: true
+2026-10-27T23:50:58.4795329Z   sparse-checkout-cone-mode: true
+2026-10-27T23:50:58.4795532Z   fetch-depth: 1
+2026-10-27T23:50:58.4795693Z   fetch-tags: false
+2026-10-27T23:50:58.4795863Z   show-progress: true
+2026-10-27T23:50:58.4796027Z   lfs: false
+2026-10-27T23:50:58.4796178Z   submodules: false
+2026-10-27T23:50:58.4796346Z   set-safe-directory: true
+2026-10-27T23:50:58.4796550Z   allow-unsafe-pr-checkout: false
+2026-10-27T23:50:58.4796751Z ##[endgroup]
+2026-10-27T23:50:58.6361958Z Syncing repository: autonomous-ai/lampOS
+2026-10-27T23:50:58.6363359Z ##[group]Getting Git version info
+2026-10-27T23:50:58.6363715Z Working directory is '/home/runner/work/lampOS/lampOS'
+2026-10-27T23:50:58.6364161Z [command]/usr/bin/git version
+2026-10-27T23:50:58.6408684Z git version 2.56.0
+2026-10-27T23:50:58.6425063Z ##[endgroup]
+2026-10-27T23:50:58.6437798Z Temporarily overriding HOME='/home/runner/work/_temp/c7ae7a0f-3eb8-4aec-bdd2-20351541d3dc' before making global git config changes
+2026-10-27T23:50:58.6438910Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-27T23:50:58.6442013Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lampOS/lampOS
+2026-10-27T23:50:58.6475655Z Deleting the contents of '/home/runner/work/lampOS/lampOS'
+2026-10-27T23:50:58.6480631Z ##[group]Initializing the repository
+2026-10-27T23:50:58.6484065Z [command]/usr/bin/git init /home/runner/work/lampOS/lampOS
+2026-10-27T23:50:58.6552749Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-27T23:50:58.6553751Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-27T23:50:58.6554506Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-27T23:50:58.6555110Z hint: call:
+2026-10-27T23:50:58.6555547Z hint:
+2026-10-27T23:50:58.6563577Z hint: 	git config --global init.defaultBranch <name>
+2026-10-27T23:50:58.6563998Z hint:
+2026-10-27T23:50:58.6564373Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-27T23:50:58.6565044Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-27T23:50:58.6565998Z hint:
+2026-10-27T23:50:58.6566263Z hint: 	git branch -m <name>
+2026-10-27T23:50:58.6566552Z hint:
+2026-10-27T23:50:58.6566958Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-27T23:50:58.6567623Z Initialized empty Git repository in /home/runner/work/lampOS/lampOS/.git/
+2026-10-27T23:50:58.6568869Z [command]/usr/bin/git remote add origin https://github.com/autonomous-ai/lampOS
+2026-10-27T23:50:58.6599101Z ##[endgroup]
+2026-10-27T23:50:58.6599612Z ##[group]Disabling automatic garbage collection
+2026-10-27T23:50:58.6602797Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-27T23:50:58.6631468Z ##[endgroup]
+2026-10-27T23:50:58.6631919Z ##[group]Setting up auth
+2026-10-27T23:50:58.6638052Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-27T23:50:58.6670176Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-27T23:50:58.7159734Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-27T23:50:58.7192974Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-27T23:50:58.7408585Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-27T23:50:58.7442686Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-27T23:50:58.7664497Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-27T23:50:58.7705807Z ##[endgroup]
+2026-10-27T23:50:58.7706289Z ##[group]Fetching the repository
+2026-10-27T23:50:58.7714020Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4c2030b36cf9a825977a13657f60d853d07cc01e:refs/remotes/pull/3545/merge
+2026-10-27T23:51:04.5026740Z From https://github.com/autonomous-ai/lampOS
+2026-10-27T23:51:04.5027295Z  * [new ref]         4c2030b36cf9a825977a13657f60d853d07cc01e -> pull/3545/merge
+2026-10-27T23:51:04.5031646Z ##[endgroup]
+2026-10-27T23:51:04.5032149Z ##[group]Determining the checkout info
+2026-10-27T23:51:04.5035225Z ##[endgroup]
+2026-10-27T23:51:04.5040627Z [command]/usr/bin/git sparse-checkout disable
+2026-10-27T23:51:04.5085384Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-27T23:51:04.5114214Z ##[group]Checking out the ref
+2026-10-27T23:51:04.5116967Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/3545/merge
+2026-10-27T23:51:05.6622334Z Updating files:  84% (9233/10923)
+2026-10-27T23:51:05.6766591Z Updating files:  85% (9285/10923)
+2026-10-27T23:51:05.6839329Z Updating files:  86% (9394/10923)
+2026-10-27T23:51:05.6883385Z Updating files:  87% (9504/10923)
+2026-10-27T23:51:05.6931300Z Updating files:  88% (9613/10923)
+2026-10-27T23:51:05.6974497Z Updating files:  89% (9722/10923)
+2026-10-27T23:51:05.7045144Z Updating files:  90% (9831/10923)
+2026-10-27T23:51:05.7114302Z Updating files:  91% (9940/10923)
+2026-10-27T23:51:05.7163316Z Updating files:  92% (10050/10923)
+2026-10-27T23:51:05.7213627Z Updating files:  93% (10159/10923)
+2026-10-27T23:51:05.7265626Z Updating files:  94% (10268/10923)
+2026-10-27T23:51:05.7320436Z Updating files:  95% (10377/10923)
+2026-10-27T23:51:05.7369083Z Updating files:  96% (10487/10923)
+2026-10-27T23:51:05.7424456Z Updating files:  97% (10596/10923)
+2026-10-27T23:51:05.7490934Z Updating files:  98% (10705/10923)
+2026-10-27T23:51:05.7547513Z Updating files:  99% (10814/10923)
+2026-10-27T23:51:05.7547889Z Updating files: 100% (10923/10923)
+2026-10-27T23:51:05.7548230Z Updating files: 100% (10923/10923), done.
+2026-10-27T23:51:05.7653340Z Note: switching to 'refs/remotes/pull/3545/merge'.
+2026-10-27T23:51:05.7653669Z 
+2026-10-27T23:51:05.7654172Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-27T23:51:05.7654776Z changes and commit them, and you can discard any commits you make in this
+2026-10-27T23:51:05.7655460Z state without impacting any branches by switching back to a branch.
+2026-10-27T23:51:05.7655806Z 
+2026-10-27T23:51:05.7656050Z If you want to create a new branch to retain commits you create, you may
+2026-10-27T23:51:05.7656604Z do so (now or later) by using -c with the switch command. Example:
+2026-10-27T23:51:05.7656870Z 
+2026-10-27T23:51:05.7656967Z   git switch -c <new-branch-name>
+2026-10-27T23:51:05.7657104Z 
+2026-10-27T23:51:05.7657185Z Or undo this operation with:
+2026-10-27T23:51:05.7657314Z 
+2026-10-27T23:51:05.7657384Z   git switch -
+2026-10-27T23:51:05.7657488Z 
+2026-10-27T23:51:05.7657652Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-27T23:51:05.7657886Z 
+2026-10-27T23:51:05.7658156Z HEAD is now at 4c2030b Merge 4be3182e2a0ee84cffca8aca1b445fb70b90852e into 9f32ec194015b422562c2e8f757dc4c6e53e2415
+2026-10-27T23:51:05.8433252Z ##[endgroup]
+2026-10-27T23:51:05.8480320Z [command]/usr/bin/git log -1 --format=%H
+2026-10-27T23:51:05.8507235Z 4c2030b36cf9a825977a13657f60d853d07cc01e
+2026-10-27T23:51:05.8644707Z ##[group]Run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
+2026-10-27T23:51:05.8645515Z [36;1mcurl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt[0m
+2026-10-27T23:51:05.8645993Z [36;1mecho "$HOME/.cargo/bin" >> "$GITHUB_PATH"[0m
+2026-10-27T23:51:05.8701456Z shell: /usr/bin/bash -e {0}
+2026-10-27T23:51:05.8701666Z ##[endgroup]
+2026-10-27T23:51:05.9331771Z info: downloading installer
+2026-10-27T23:51:06.1087988Z warn: it looks like you have an existing rustup settings file at:
+2026-10-27T23:51:06.1088490Z warn: /home/runner/.rustup/settings.toml
+2026-10-27T23:51:06.2315826Z info: profile set to minimal
+2026-10-27T23:51:06.2316269Z info: default host tuple is x86_64-unknown-linux-gnu
+2026-10-27T23:51:06.2323078Z info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu
+2026-10-27T23:51:06.3120155Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+2026-10-27T23:51:06.3120638Z info: downloading 5 components
+2026-10-27T23:51:13.4784950Z info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu
+2026-10-27T23:51:13.4785218Z 
+2026-10-27T23:51:13.4874108Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)
+2026-10-27T23:51:13.4874534Z 
+2026-10-27T23:51:13.4875376Z 
+2026-10-27T23:51:13.4875534Z Rust is installed now. Great!
+2026-10-27T23:51:13.4875743Z 
+2026-10-27T23:51:13.4875948Z To get started you may need to restart your current shell.
+2026-10-27T23:51:13.4876457Z This would reload your PATH environment variable to include
+2026-10-27T23:51:13.4876936Z Cargo's bin directory ($HOME/.cargo/bin).
+2026-10-27T23:51:13.4877196Z 
+2026-10-27T23:51:13.4877376Z To configure your current shell, you need to source the
+2026-10-27T23:51:13.4877799Z corresponding env file under $HOME/.cargo.
+2026-10-27T23:51:13.4878042Z 
+2026-10-27T23:51:13.4878305Z Consider running the right command for your shell (note the leading DOT):
+2026-10-27T23:51:13.4878782Z . "$HOME/.cargo/env"     # For sh/ash/dash/pdksh/bash
+2026-10-27T23:51:13.4879031Z . "$HOME/.cargo/env.ps1" # For pwsh
+2026-10-27T23:51:13.4879303Z cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+2026-10-27T23:51:13.4879559Z CC_x86_64-unknown-linux-gnu = None
+2026-10-27T23:51:13.4879796Z cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+2026-10-27T23:51:13.4880043Z CC_x86_64_unknown_linux_gnu = None
+2026-10-27T23:51:13.4880319Z cargo:rerun-if-env-changed=HOST_CC
+2026-10-27T23:51:13.4880586Z HOST_CC = None
+2026-10-27T23:51:13.4880826Z cargo:rerun-if-env-changed=CC
+2026-10-27T23:51:13.4881127Z CC = None
+2026-10-27T23:51:13.4881419Z cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+2026-10-27T23:51:13.5152144Z cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+2026-10-27T23:51:13.5152571Z CRATE_CC_NO_DEFAULTS = None
+2026-10-27T23:51:13.5153026Z cargo:rerun-if-env-changed=CFLAGS
+2026-10-27T23:51:13.5153350Z CFLAGS = None
+2026-10-27T23:51:13.5153545Z cargo:rerun-if-env-changed=HOST_CFLAGS
+2026-10-27T23:51:13.5153754Z HOST_CFLAGS = None
+2026-10-27T23:51:13.5153974Z cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+2026-10-27T23:51:13.5154382Z CFLAGS_x86_64_unknown_linux_gnu = None
+2026-10-27T23:51:13.5154767Z cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+2026-10-27T23:51:13.5155086Z CFLAGS_x86_64-unknown-linux-gnu = None
+2026-10-27T23:51:13.5404839Z ##[group]Run cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+2026-10-27T23:51:13.5405334Z [36;1mcargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check[0m
+2026-10-27T23:51:13.5405837Z [36;1mcargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings[0m
+2026-10-27T23:51:13.5463539Z shell: /usr/bin/bash -e {0}
+2026-10-27T23:51:13.5463754Z ##[endgroup]
+2026-10-27T23:51:13.6668236Z     Updating crates.io index
+2026-10-27T23:51:13.7950280Z  Downloading crates ...
+2026-10-27T23:51:13.8995343Z   Downloaded version_check v0.9.5
+2026-10-27T23:51:13.9014908Z   Downloaded zmij v1.0.23
+2026-10-27T23:51:13.9040071Z   Downloaded zeroize v1.9.1
+2026-10-27T23:51:13.9054273Z   Downloaded cfg-if v1.0.5
+2026-10-27T23:51:13.9069588Z   Downloaded itoa v1.0.18
+2026-10-27T23:51:13.9086910Z   Downloaded block-buffer v0.10.4
+2026-10-27T23:51:13.9099794Z   Downloaded untrusted v0.9.0
+2026-10-27T23:51:13.9115425Z   Downloaded generic-array v0.14.7
+2026-10-27T23:51:13.9130749Z   Downloaded sha2 v0.10.9
+2026-10-27T23:51:13.9164559Z   Downloaded tempfile v3.27.0
+2026-10-27T23:51:13.9189954Z   Downloaded unicode-ident v1.0.26
+2026-10-27T23:51:13.9214962Z   Downloaded bitflags v2.13.2
+2026-10-27T23:51:13.9254017Z   Downloaded serde_derive v1.0.229
+2026-10-27T23:51:13.9280572Z   Downloaded serde_core v1.0.229
+2026-10-27T23:51:13.9304455Z   Downloaded quote v1.0.47
+2026-10-27T23:51:13.9327917Z   Downloaded find-msvc-tools v0.1.14
+2026-10-27T23:51:13.9344928Z   Downloaded fastrand v2.5.0
+2026-10-27T23:51:13.9356745Z   Downloaded digest v0.10.7
+2026-10-27T23:51:13.9373924Z   Downloaded rustls-webpki v0.103.15
+2026-10-27T23:51:13.9401376Z   Downloaded getrandom v0.2.17
+2026-10-27T23:51:13.9426824Z   Downloaded crypto-common v0.1.7
+2026-10-27T23:51:13.9434642Z   Downloaded subtle v2.6.1
+2026-10-27T23:51:13.9444665Z   Downloaded shlex v2.0.1
+2026-10-27T23:51:13.9455735Z   Downloaded rustls-pki-types v1.15.1
+2026-10-27T23:51:13.9477941Z   Downloaded cc v1.7.0
+2026-10-27T23:51:13.9509475Z   Downloaded base64 v0.22.1
+2026-10-27T23:51:13.9542641Z   Downloaded once_cell v1.21.4
+2026-10-27T23:51:13.9565313Z   Downloaded httparse v1.10.1
+2026-10-27T23:51:13.9587511Z   Downloaded errno v0.3.14
+2026-10-27T23:51:13.9600492Z   Downloaded cpufeatures v0.2.17
+2026-10-27T23:51:13.9644504Z   Downloaded proc-macro2 v1.0.107
+2026-10-27T23:51:13.9669974Z   Downloaded getrandom v0.4.3
+2026-10-27T23:51:13.9710062Z   Downloaded typenum v1.20.1
+2026-10-27T23:51:13.9746376Z   Downloaded syn v3.0.7
+2026-10-27T23:51:13.9849982Z   Downloaded memchr v2.8.3
+2026-10-27T23:51:13.9911246Z   Downloaded serde_json v1.0.151
+2026-10-27T23:51:13.9987278Z   Downloaded serde v1.0.229
+2026-10-27T23:51:14.0023023Z   Downloaded webpki-roots v1.0.9
+2026-10-27T23:51:14.0064179Z   Downloaded rustls v0.23.45
+2026-10-27T23:51:14.0176385Z   Downloaded rustix v1.1.5
+2026-10-27T23:51:14.0425134Z   Downloaded libc v0.2.190
+2026-10-27T23:51:14.0873892Z   Downloaded ring v0.17.14
+2026-10-27T23:51:14.1270823Z   Downloaded linux-raw-sys v0.12.1
+2026-10-27T23:51:14.2322275Z    Compiling proc-macro2 v1.0.107
+2026-10-27T23:51:14.2322827Z    Compiling libc v0.2.190
+2026-10-27T23:51:14.2323668Z     Checking cfg-if v1.0.5
+2026-10-27T23:51:14.2324180Z    Compiling version_check v0.9.5
+2026-10-27T23:51:14.2614268Z    Compiling find-msvc-tools v0.1.14
+2026-10-27T23:51:14.4214018Z    Compiling shlex v2.0.1
+2026-10-27T23:51:14.4270586Z    Compiling generic-array v0.14.7
+2026-10-27T23:51:14.5107669Z    Compiling quote v1.0.47
+2026-10-27T23:51:14.5127405Z    Compiling unicode-ident v1.0.26
+2026-10-27T23:51:14.5489442Z    Compiling cc v1.7.0
+2026-10-27T23:51:14.6673972Z    Compiling serde_core v1.0.229
+2026-10-27T23:51:14.8358246Z     Checking typenum v1.20.1
+2026-10-27T23:51:15.2131820Z    Compiling zmij v1.0.23
+2026-10-27T23:51:15.3767063Z    Compiling syn v3.0.7
+2026-10-27T23:51:15.8103836Z    Compiling serde v1.0.229
+2026-10-27T23:51:15.9679723Z    Compiling ring v0.17.14
+2026-10-27T23:51:15.9734370Z     Checking zeroize v1.9.1
+2026-10-27T23:51:16.0514206Z    Compiling serde_json v1.0.151
+2026-10-27T23:51:16.1572780Z     Checking rustls-pki-types v1.15.1
+2026-10-27T23:51:16.3823946Z     Checking block-buffer v0.10.4
+2026-10-27T23:51:16.4452087Z     Checking crypto-common v0.1.7
+2026-10-27T23:51:16.4973828Z     Checking getrandom v0.2.17
+2026-10-27T23:51:16.7633850Z     Checking itoa v1.0.18
+2026-10-27T23:51:16.8356464Z     Checking memchr v2.8.3
+2026-10-27T23:51:16.9096128Z    Compiling rustix v1.1.5
+2026-10-27T23:51:17.0762562Z     Checking untrusted v0.9.0
+2026-10-27T23:51:17.1674076Z     Checking digest v0.10.7
+2026-10-27T23:51:17.2544051Z    Compiling serde_derive v1.0.229
+2026-10-27T23:51:17.2652214Z     Checking bitflags v2.13.2
+2026-10-27T23:51:17.3594120Z    Compiling httparse v1.10.1
+2026-10-27T23:51:17.5393878Z     Checking cpufeatures v0.2.17
+2026-10-27T23:51:17.5621214Z    Compiling getrandom v0.4.3
+2026-10-27T23:51:17.6397778Z    Compiling rustls v0.23.45
+2026-10-27T23:51:17.6784025Z     Checking linux-raw-sys v0.12.1
+2026-10-27T23:51:17.7253865Z     Checking once_cell v1.21.4
+2026-10-27T23:51:17.8255733Z     Checking sha2 v0.10.9
+2026-10-27T23:51:18.0218177Z     Checking subtle v2.6.1
+2026-10-27T23:51:18.2883462Z     Checking webpki-roots v1.0.9
+2026-10-27T23:51:18.3324043Z     Checking base64 v0.22.1
+2026-10-27T23:51:18.4589552Z     Checking fastrand v2.5.0
+2026-10-27T23:51:19.4111195Z     Checking lamp-bus v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/bus)
+2026-10-27T23:51:19.4904518Z     Checking tempfile v3.27.0
+2026-10-27T23:51:19.7244719Z     Checking rustls-webpki v0.103.15
+2026-10-27T23:51:19.7617566Z     Checking lamp-msgs v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/msgs)
+2026-10-27T23:51:22.3606269Z     Checking lamp-update v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/update)
+2026-10-27T23:51:24.3546174Z     Checking lampos-promote v0.1.0 (/home/runner/work/lampOS/lampOS/.github/tools/lampos-promote)
+2026-10-27T23:51:24.8621113Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.22s
+2026-10-27T23:51:24.8910989Z ##[group]Run cargo +1.96.0 fmt --all --check
+2026-10-27T23:51:24.8911280Z [36;1mcargo +1.96.0 fmt --all --check[0m
+2026-10-27T23:51:24.8965541Z shell: /usr/bin/bash -e {0}
+2026-10-27T23:51:24.8965757Z ##[endgroup]
+2026-10-27T23:51:33.6466084Z ##[group]Run actions/cache/restore@v4
+2026-10-27T23:51:33.6466345Z with:
+2026-10-27T23:51:33.6466565Z   path: ~/.cargo/registry
+~/.cargo/git
+lampOS/target
+
+2026-10-27T23:51:33.6466976Z   key: lampos-clippy-u2204-a19c22f7cda4a6976462902300ebf32b6f61c5825fe3bbf2a5a0ee8ebfb06a13
+2026-10-27T23:51:33.6467379Z   restore-keys: lampos-clippy-u2204-
+
+2026-10-27T23:51:33.6467612Z   enableCrossOsArchive: false
+2026-10-27T23:51:33.6467818Z   fail-on-cache-miss: false
+2026-10-27T23:51:33.6468008Z   lookup-only: false
+2026-10-27T23:51:33.6468178Z ##[endgroup]
+2026-10-27T23:51:33.7342336Z (node:3419) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-27T23:51:33.7343265Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-27T23:51:33.7954345Z Cache hit for: lampos-clippy-u2204-a19c22f7cda4a6976462902300ebf32b6f61c5825fe3bbf2a5a0ee8ebfb06a13
+2026-10-27T23:51:33.8080529Z (node:3419) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-27T23:51:34.8961797Z Received 268435456 of 6262740430 (4.3%), 240.4 MBs/sec
+2026-10-27T23:51:35.8952130Z Received 536870912 of 6262740430 (8.6%), 247.8 MBs/sec
+2026-10-27T23:51:36.9001504Z Received 809500672 of 6262740430 (12.9%), 251.5 MBs/sec
+2026-10-27T23:51:37.9026729Z Received 1107296256 of 6262740430 (17.7%), 259.3 MBs/sec
+2026-10-27T23:51:38.9041943Z Received 1379926016 of 6262740430 (22.0%), 259.4 MBs/sec
+2026-10-27T23:51:39.9051069Z Received 1660944384 of 6262740430 (26.5%), 260.8 MBs/sec
+2026-10-27T23:51:40.9065629Z Received 1908408320 of 6262740430 (30.5%), 257.2 MBs/sec
+2026-10-27T23:51:41.9166565Z Received 2151677952 of 6262740430 (34.4%), 253.7 MBs/sec
+2026-10-27T23:51:42.9174226Z Received 2449473536 of 6262740430 (39.1%), 257.0 MBs/sec
+2026-10-27T23:51:43.9179402Z Received 2684354560 of 6262740430 (42.9%), 253.8 MBs/sec
+2026-10-27T23:51:44.9180405Z Received 2948595712 of 6262740430 (47.1%), 253.6 MBs/sec
+2026-10-27T23:51:45.9255897Z Received 3116367872 of 6262740430 (49.8%), 245.7 MBs/sec
+2026-10-27T23:51:46.9263874Z Received 3351248896 of 6262740430 (53.5%), 244.0 MBs/sec
+2026-10-27T23:51:47.9263846Z Received 3485466624 of 6262740430 (55.7%), 235.8 MBs/sec
+2026-10-27T23:51:48.9266797Z Received 3569352704 of 6262740430 (57.0%), 225.5 MBs/sec
+2026-10-27T23:51:50.3112128Z Received 3623878656 of 6262740430 (57.9%), 209.7 MBs/sec
+2026-10-27T23:51:51.3088725Z Received 3867148288 of 6262740430 (61.7%), 211.0 MBs/sec
+2026-10-27T23:51:52.7092232Z Received 3892314112 of 6262740430 (62.2%), 196.6 MBs/sec
+2026-10-27T23:51:53.8923586Z Received 4160749568 of 6262740430 (66.4%), 197.8 MBs/sec
+2026-10-27T23:51:54.8904294Z Received 4420796416 of 6262740430 (70.6%), 200.2 MBs/sec
+2026-10-27T23:51:55.8942460Z Received 4580179968 of 6262740430 (73.1%), 198.0 MBs/sec
+2026-10-27T23:51:56.8948039Z Received 4823449600 of 6262740430 (77.0%), 199.4 MBs/sec
+2026-10-27T23:51:57.9044391Z Received 4966055936 of 6262740430 (79.3%), 196.7 MBs/sec
+2026-10-27T23:51:59.0964680Z Received 5234491392 of 6262740430 (83.6%), 197.6 MBs/sec
+2026-10-27T23:52:00.1004447Z Received 5460983808 of 6262740430 (87.2%), 198.2 MBs/sec
+2026-10-27T23:52:01.0996332Z Received 5645533184 of 6262740430 (90.1%), 197.4 MBs/sec
+2026-10-27T23:52:02.2066617Z Received 5905580032 of 6262740430 (94.3%), 198.5 MBs/sec
+2026-10-27T23:52:03.2047827Z Received 6144655360 of 6262740430 (98.1%), 199.5 MBs/sec
+2026-10-27T23:52:03.9552526Z Received 6262740430 of 6262740430 (100.0%), 198.3 MBs/sec
+2026-10-27T23:52:03.9554862Z Cache Size: ~5973 MB (6262740430 B)
+2026-10-27T23:52:03.9586273Z [command]/usr/bin/tar -xf /home/runner/work/_temp/980d3a06-536a-42b1-95de-50c337daf2fc/cache.tzst -P -C /home/runner/work/lampOS/lampOS --use-compress-program unzstd
+2026-10-27T23:53:27.9734533Z Cache restored successfully
+2026-10-27T23:53:28.2678460Z Cache restored from key: lampos-clippy-u2204-a19c22f7cda4a6976462902300ebf32b6f61c5825fe3bbf2a5a0ee8ebfb06a13
+2026-10-27T23:53:28.3023784Z ##[group]Run python3 -I .github/scripts/lampos-source-times.py
+2026-10-27T23:53:28.3024176Z [36;1mpython3 -I .github/scripts/lampos-source-times.py[0m
+2026-10-27T23:53:28.3969518Z shell: /usr/bin/bash -e {0}
+2026-10-27T23:53:28.3969766Z ##[endgroup]
+2026-10-27T23:53:30.9402401Z 7415 of 7481 source files are as the cached build had them and get its times back; 66 changed or new keep the checkout's time.
+2026-10-27T23:53:30.9469301Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings
+2026-10-27T23:53:30.9469734Z [36;1mcargo clippy --locked --workspace --all-targets -- -D warnings[0m
+2026-10-27T23:53:30.9522152Z shell: /usr/bin/bash -e {0}
+2026-10-27T23:53:30.9522365Z ##[endgroup]
+2026-10-27T23:53:31.9092394Z     Checking lamp-update v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/update)
+2026-10-27T23:53:31.9294958Z     Checking lamp-name v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/name)
+2026-10-27T23:53:34.9145500Z     Checking lamp-keeper v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/keeper)
+2026-10-27T23:53:34.9146513Z     Checking lamp-setup v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/setup)
+2026-10-27T23:53:35.5312996Z     Checking lamp-body v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/body)
+2026-10-27T23:53:35.7154318Z     Checking lamp-peek v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/peek)
+2026-10-27T23:53:39.5561875Z     Checking lamp-voice v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice)
+2026-10-27T23:53:39.5562684Z     Checking lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)
+2026-10-27T23:53:41.8543994Z     Checking lamp-lean v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/lean)
+2026-10-27T23:54:02.2765503Z     Checking lamp-skills v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/skills)
+2026-10-27T23:54:02.2766568Z     Checking lamp-voice-eval v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice-eval)
+2026-10-27T23:54:02.2769429Z     Checking lamp-memory v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/memory)
+2026-10-27T23:54:06.8504377Z     Checking lamp-cloud v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/cloud)
+2026-10-27T23:54:46.5417992Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 15s
+2026-10-27T23:54:46.6904136Z Post job cleanup.
+2026-10-27T23:54:46.7662033Z [command]/usr/bin/git version
+2026-10-27T23:54:46.7697952Z git version 2.56.0
+2026-10-27T23:54:46.7731354Z Temporarily overriding HOME='/home/runner/work/_temp/77680c7c-7753-4a8f-8892-ac8e56b3bdc9' before making global git config changes
+2026-10-27T23:54:46.7747125Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-27T23:54:46.7752300Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lampOS/lampOS
+2026-10-27T23:54:46.7773981Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-27T23:54:46.7806558Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-27T23:54:46.8074266Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-27T23:54:46.8098290Z http.https://github.com/.extraheader
+2026-10-27T23:54:46.8108601Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-27T23:54:46.8144755Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-27T23:54:46.8405744Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-27T23:54:46.8444094Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-27T23:54:46.8870507Z Cleaning up orphan processes
+2026-10-27T23:54:46.9257760Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

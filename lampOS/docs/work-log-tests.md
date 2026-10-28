@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-28 07:32 — current Mood/Skills originals and Reader delivery
+
+Ready for lamp-voice: yes (#3545 and #3623); Reader #3543 delivered in train #3964. Source-read carries remain requested; the train's merged-tree ARM run supplies final base verification.
+
+[Current Mood6a40 and Skills4be native proof](verification/tests-mood-skills-current-native-20261028/) records both original ARM/Linux pairs successful: **7,868 unique passes each, zero bad or selected unrun, 54 skips**. Mood has341 Expression/both required controls once. Skills has561 passes, required3 once and9declared ignores unrun: oldMac557 plus3Linux and1actual upstream format-2 case. The global12-case increase is11Voice plus1Skills, no removals. Actual parents are9f32;41 material Rust/docs/schema/SDK paths differ from authored c0ae, not SDK-only drift. Skills addonRust blob matches; skills.md fullblob differs, with the effective owned patch preserved. All367 private entries and eight published payloads were verified; full primary logs accompany both complete audits. Reprints/auxiliary counts stay separate, with no newMac or whole-authored-tree equality claim.
+
+Reader fcf2 is delivered by train3964 at9bde74414, with original train ARM40606118693/Linux40606118631 green and the complete Reader Rust blob preserved. Restart3572's one dependency carry is prepared on9bde as2b1a8ad19; no new runtime/push claim yet. Further base chasing is parked under First6456076191.
+
+The quoted fixture's V1 full suite passed557/0/9, but final source review found that Main's Done writer can finish after SAY. V2 now requires both proposal-correlated complete lines before the privacy snapshot within the same2.2-second envelope. Its final control/full gates remain pending; V1 results are not finalV2 qualification. No product, ARM build on Mac or device action.
+
 ## 2026-10-28 07:02 — c0ae Mood/Skills maintenance and Skills 913 native proof
 
 Ready for lamp-voice: no for the new Mood6a40/Skills4be heads pending their own original gates and carried reads. Reader3543 publishedfcf2 is ready with Reviewer-two's exact-head READ-OK. Under [First's current rule](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6456076191), the train's own merged-tree ARM64 run is the final base check; base-only HOLDs become READ-OKs. Further manual base carries are parked. Earlier entries retain their capture-time conditions.

@@ -1,0 +1,1609 @@
+{
+  "subject": "Skills",
+  "API_head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+  "authored_parent": [
+    "c0ae5afa8376b6282eef1b6bacbe516d924c654b"
+  ],
+  "authored_tree": "b649baa79c46710e486b061761a7efbd88e0f813",
+  "qualification_scope": "PASS exact4be original native selected scope; prior913/898 Mac557 remains separate; no new Mac execution",
+  "original_runs": {
+    "ARM64": {
+      "id": 40604863162,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604863162",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T23:50:38Z",
+      "updated_at": "2026-10-28T00:05:21Z"
+    },
+    "Linux-clippy": {
+      "id": 40604863351,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604863351",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T23:50:38Z",
+      "updated_at": "2026-10-27T23:54:48Z"
+    }
+  },
+  "actual_source": {
+    "ARM64": {
+      "raw_log": "ARM64-job-122541717920.log",
+      "raw_log_SHA256": "91868413107f1600eab6483fa2c73bcf37adc46d627ee248aff78260835adc18",
+      "raw_checkout": {
+        "sha": "4c2030b36cf9a825977a13657f60d853d07cc01e",
+        "command_line": 290,
+        "sha_line": 291
+      },
+      "actual_preview": "4c2030b36cf9a825977a13657f60d853d07cc01e",
+      "ordered_parents": [
+        "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+        "4be3182e2a0ee84cffca8aca1b445fb70b90852e"
+      ],
+      "actual_tree": "9f99bb134d2dd6a8338aad813c0641e070dd60e7",
+      "authored_tree": "b649baa79c46710e486b061761a7efbd88e0f813",
+      "whole_tree_equal_authored": false,
+      "input_bindings": [
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "git_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "mode": "100644",
+          "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+          "bytes": 5523,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "git_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "mode": "100644",
+          "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+          "bytes": 20708,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "git_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "mode": "100644",
+          "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+          "bytes": 4721,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.cargo/config.toml",
+          "git_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "mode": "100644",
+          "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+          "bytes": 210,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "mode": "100644",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+          "bytes": 5157,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "git_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "mode": "100644",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+          "bytes": 122953,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "git_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "mode": "100644",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+          "bytes": 1442,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/Cargo.toml",
+          "git_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "mode": "100644",
+          "sha256": "2164868d15498af30ed9824833f0db630861f5ccd229ef853c9b6c2897e6be5c",
+          "bytes": 2926,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/examples/render_relaxing_music.rs",
+          "git_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "mode": "100644",
+          "sha256": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+          "bytes": 11692,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/addon.rs",
+          "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "mode": "100644",
+          "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+          "bytes": 8608,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/clock.rs",
+          "git_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "mode": "100644",
+          "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a",
+          "bytes": 5386,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/daily.rs",
+          "git_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "mode": "100644",
+          "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916",
+          "bytes": 48107,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/glow.rs",
+          "git_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "mode": "100644",
+          "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe",
+          "bytes": 35303,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/known.rs",
+          "git_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "mode": "100644",
+          "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b",
+          "bytes": 4782,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/lib.rs",
+          "git_blob": "849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+          "mode": "100644",
+          "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566",
+          "bytes": 337151,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "fa7741fc1f2066269a64edc95385834f3d0ed449",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/crates/skills/src/limits.rs",
+          "git_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "mode": "100644",
+          "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c",
+          "bytes": 24655,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/main.rs",
+          "git_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "mode": "100644",
+          "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0",
+          "bytes": 216548,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/package.rs",
+          "git_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "mode": "100644",
+          "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4",
+          "bytes": 89836,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/requested_audio.rs",
+          "git_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "mode": "100644",
+          "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+          "bytes": 40941,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/routine.rs",
+          "git_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "mode": "100644",
+          "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4",
+          "bytes": 123713,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/unplug.rs",
+          "git_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "mode": "100644",
+          "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8",
+          "bytes": 14918,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/visits.rs",
+          "git_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "mode": "100644",
+          "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b",
+          "bytes": 43434,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/watch.rs",
+          "git_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "mode": "100644",
+          "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f",
+          "bytes": 126817,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "git_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "mode": "100644",
+          "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+          "bytes": 31421,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/call_wait.rs",
+          "git_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "mode": "100644",
+          "sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f",
+          "bytes": 6766,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/daily_engine.rs",
+          "git_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "mode": "100644",
+          "sha256": "181d2f1d4fd5d853a3b1056c91a947e9a5577c821f4d74ca07e27c84eb52d359",
+          "bytes": 58923,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/format.rs",
+          "git_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+          "mode": "100644",
+          "sha256": "abc826f03b24058eb59040f5ea9825b22b6fa35e88874c5374c00d79a2712362",
+          "bytes": 13834,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "62db834a2ea73e360310608b1095aee887de0fb7",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/journal_output.rs",
+          "git_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "mode": "100644",
+          "sha256": "0ffc955cc126ab95b1cb614575bcb634d25358df2c2ba7e5a90e3f36142cba9e",
+          "bytes": 10751,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/made.rs",
+          "git_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "mode": "100644",
+          "sha256": "1cc3c3ee270332e00c1af2269907ffad52f77ab04fd0710842bd0812ae070a75",
+          "bytes": 20703,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/main.rs",
+          "git_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "mode": "100644",
+          "sha256": "e667da6f6199a72de54e9408f2eeaf86b6a829e67f6fb4b431ffb4f7df94b905",
+          "bytes": 1504,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/night_sleep.rs",
+          "git_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "mode": "100644",
+          "sha256": "899356a2a4b9a0e7252f87ac7a66b930116dcf1fbfc3b19b24722b576bb3f6b1",
+          "bytes": 38664,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/package.rs",
+          "git_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "mode": "100644",
+          "sha256": "0946eb63a6240d31c3c469b0c5fbad6e347e3d79b2498266ac92f7623abbaa93",
+          "bytes": 55704,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/routine_service.rs",
+          "git_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "mode": "100644",
+          "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+          "bytes": 20877,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/shared.rs",
+          "git_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "mode": "100644",
+          "sha256": "de452b22905338bba8a591359f52094fdf965df15575a7601f8c08bab41fa574",
+          "bytes": 8034,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/skills.rs",
+          "git_blob": "122c7826095eed08a39216e67ee395b254527d81",
+          "mode": "100644",
+          "sha256": "712b9e2709f46580020cd8f3e896bb7957cada1e5de8f099be534225a2a9561d",
+          "bytes": 505714,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8c4fec7f08eb969424cde38e8894df7bdd16ae75",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/store.rs",
+          "git_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "mode": "100644",
+          "sha256": "6b5c4ab32d319166a2ec75e261f849885db8e7cb1dd5552d4c1517ee46446a1e",
+          "bytes": 45508,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/welcome_stuck.rs",
+          "git_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "mode": "100644",
+          "sha256": "fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192",
+          "bytes": 9418,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair.rs",
+          "git_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "mode": "100644",
+          "sha256": "a3203635e3f3275384da2340280cdf66020269ddddb039165f894eba64cfeed2",
+          "bytes": 2136,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/fixture.rs",
+          "git_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "mode": "100644",
+          "sha256": "33c4ffcf5642c9a6b260805f9eb4abc73caabf8127fd72f45acb2bed4535f744",
+          "bytes": 34856,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/package.rs",
+          "git_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "mode": "100644",
+          "sha256": "93033533c5bbc26809a85463949a5e7fab72afbf0194c8a62831b395d1459920",
+          "bytes": 24585,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/rested.rs",
+          "git_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "mode": "100644",
+          "sha256": "8f86b89847f78a59880c3e1b65b17d55f8830c468b74469f2547e9ef46a916d4",
+          "bytes": 33709,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/requested_audio.rs",
+          "git_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "mode": "100644",
+          "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36",
+          "bytes": 62489,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "git_blob": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "mode": "100644",
+          "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d",
+          "bytes": 216663,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "git_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "mode": "100644",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+          "bytes": 86,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        }
+      ],
+      "all_fetched_source_equal_authored": false,
+      "full_tree_delta_entries": 41,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "authored": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "authored": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "actual": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc",
+            "size": 216889,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc"
+          },
+          "equal": false
+        }
+      ],
+      "both_complete_owned_blobs_equal": false
+    },
+    "Linux-clippy": {
+      "raw_log": "Linux-clippy-job-122541718591.log",
+      "raw_log_SHA256": "c01d99b19b8e869066843f3ddef71bf88896a98484b47b102d4101526c7e6629",
+      "raw_checkout": {
+        "sha": "4c2030b36cf9a825977a13657f60d853d07cc01e",
+        "command_line": 292,
+        "sha_line": 293
+      },
+      "actual_preview": "4c2030b36cf9a825977a13657f60d853d07cc01e",
+      "ordered_parents": [
+        "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+        "4be3182e2a0ee84cffca8aca1b445fb70b90852e"
+      ],
+      "actual_tree": "9f99bb134d2dd6a8338aad813c0641e070dd60e7",
+      "authored_tree": "b649baa79c46710e486b061761a7efbd88e0f813",
+      "whole_tree_equal_authored": false,
+      "input_bindings": [
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "git_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "mode": "100644",
+          "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+          "bytes": 5523,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "git_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "mode": "100644",
+          "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+          "bytes": 20708,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "git_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "mode": "100644",
+          "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+          "bytes": 4721,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.cargo/config.toml",
+          "git_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "mode": "100644",
+          "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+          "bytes": 210,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "mode": "100644",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+          "bytes": 5157,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "git_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "mode": "100644",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+          "bytes": 122953,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "git_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "mode": "100644",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+          "bytes": 1442,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/Cargo.toml",
+          "git_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "mode": "100644",
+          "sha256": "2164868d15498af30ed9824833f0db630861f5ccd229ef853c9b6c2897e6be5c",
+          "bytes": 2926,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/examples/render_relaxing_music.rs",
+          "git_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "mode": "100644",
+          "sha256": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+          "bytes": 11692,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/addon.rs",
+          "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "mode": "100644",
+          "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+          "bytes": 8608,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/clock.rs",
+          "git_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "mode": "100644",
+          "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a",
+          "bytes": 5386,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/daily.rs",
+          "git_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "mode": "100644",
+          "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916",
+          "bytes": 48107,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/glow.rs",
+          "git_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "mode": "100644",
+          "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe",
+          "bytes": 35303,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/known.rs",
+          "git_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "mode": "100644",
+          "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b",
+          "bytes": 4782,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/lib.rs",
+          "git_blob": "849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+          "mode": "100644",
+          "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566",
+          "bytes": 337151,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "fa7741fc1f2066269a64edc95385834f3d0ed449",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/crates/skills/src/limits.rs",
+          "git_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "mode": "100644",
+          "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c",
+          "bytes": 24655,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/main.rs",
+          "git_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "mode": "100644",
+          "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0",
+          "bytes": 216548,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/package.rs",
+          "git_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "mode": "100644",
+          "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4",
+          "bytes": 89836,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/requested_audio.rs",
+          "git_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "mode": "100644",
+          "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+          "bytes": 40941,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/routine.rs",
+          "git_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "mode": "100644",
+          "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4",
+          "bytes": 123713,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/unplug.rs",
+          "git_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "mode": "100644",
+          "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8",
+          "bytes": 14918,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/visits.rs",
+          "git_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "mode": "100644",
+          "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b",
+          "bytes": 43434,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/watch.rs",
+          "git_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "mode": "100644",
+          "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f",
+          "bytes": 126817,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "git_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "mode": "100644",
+          "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+          "bytes": 31421,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/call_wait.rs",
+          "git_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "mode": "100644",
+          "sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f",
+          "bytes": 6766,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/daily_engine.rs",
+          "git_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "mode": "100644",
+          "sha256": "181d2f1d4fd5d853a3b1056c91a947e9a5577c821f4d74ca07e27c84eb52d359",
+          "bytes": 58923,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/format.rs",
+          "git_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+          "mode": "100644",
+          "sha256": "abc826f03b24058eb59040f5ea9825b22b6fa35e88874c5374c00d79a2712362",
+          "bytes": 13834,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "62db834a2ea73e360310608b1095aee887de0fb7",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/journal_output.rs",
+          "git_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "mode": "100644",
+          "sha256": "0ffc955cc126ab95b1cb614575bcb634d25358df2c2ba7e5a90e3f36142cba9e",
+          "bytes": 10751,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/made.rs",
+          "git_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "mode": "100644",
+          "sha256": "1cc3c3ee270332e00c1af2269907ffad52f77ab04fd0710842bd0812ae070a75",
+          "bytes": 20703,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/main.rs",
+          "git_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "mode": "100644",
+          "sha256": "e667da6f6199a72de54e9408f2eeaf86b6a829e67f6fb4b431ffb4f7df94b905",
+          "bytes": 1504,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/night_sleep.rs",
+          "git_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "mode": "100644",
+          "sha256": "899356a2a4b9a0e7252f87ac7a66b930116dcf1fbfc3b19b24722b576bb3f6b1",
+          "bytes": 38664,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/package.rs",
+          "git_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "mode": "100644",
+          "sha256": "0946eb63a6240d31c3c469b0c5fbad6e347e3d79b2498266ac92f7623abbaa93",
+          "bytes": 55704,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/routine_service.rs",
+          "git_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "mode": "100644",
+          "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+          "bytes": 20877,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/shared.rs",
+          "git_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "mode": "100644",
+          "sha256": "de452b22905338bba8a591359f52094fdf965df15575a7601f8c08bab41fa574",
+          "bytes": 8034,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/skills.rs",
+          "git_blob": "122c7826095eed08a39216e67ee395b254527d81",
+          "mode": "100644",
+          "sha256": "712b9e2709f46580020cd8f3e896bb7957cada1e5de8f099be534225a2a9561d",
+          "bytes": 505714,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8c4fec7f08eb969424cde38e8894df7bdd16ae75",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/store.rs",
+          "git_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "mode": "100644",
+          "sha256": "6b5c4ab32d319166a2ec75e261f849885db8e7cb1dd5552d4c1517ee46446a1e",
+          "bytes": 45508,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/welcome_stuck.rs",
+          "git_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "mode": "100644",
+          "sha256": "fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192",
+          "bytes": 9418,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair.rs",
+          "git_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "mode": "100644",
+          "sha256": "a3203635e3f3275384da2340280cdf66020269ddddb039165f894eba64cfeed2",
+          "bytes": 2136,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/fixture.rs",
+          "git_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "mode": "100644",
+          "sha256": "33c4ffcf5642c9a6b260805f9eb4abc73caabf8127fd72f45acb2bed4535f744",
+          "bytes": 34856,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/package.rs",
+          "git_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "mode": "100644",
+          "sha256": "93033533c5bbc26809a85463949a5e7fab72afbf0194c8a62831b395d1459920",
+          "bytes": 24585,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/rested.rs",
+          "git_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "mode": "100644",
+          "sha256": "8f86b89847f78a59880c3e1b65b17d55f8830c468b74469f2547e9ef46a916d4",
+          "bytes": 33709,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/requested_audio.rs",
+          "git_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "mode": "100644",
+          "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36",
+          "bytes": 62489,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "git_blob": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "mode": "100644",
+          "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d",
+          "bytes": 216663,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc",
+          "actual_mode": "100644",
+          "equal_authored": false
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "git_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "mode": "100644",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+          "bytes": 86,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        }
+      ],
+      "all_fetched_source_equal_authored": false,
+      "full_tree_delta_entries": 41,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "authored": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "authored": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "actual": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc",
+            "size": 216889,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc"
+          },
+          "equal": false
+        }
+      ],
+      "both_complete_owned_blobs_equal": false
+    }
+  },
+  "whole_tree_deltas": {
+    "ARM64": 41,
+    "Linux-clippy": 41
+  },
+  "all_CI_input_bindings": "all-tracked-CI-input-bindings.json",
+  "current_subject_census": "subject-case-audit.json",
+  "Reader_actual_source_ordinary": 14,
+  "Reader_all_PASS_once": true,
+  "Trace_actual_source_ordinary": 7,
+  "Trace_all_PASS_once": true,
+  "ignored_DAC_no_runtime_credit": true,
+  "execution_window": {
+    "starting_line": 845,
+    "summary_line": 8715,
+    "following_group_line": 9132,
+    "start_raw": "2026-10-28T00:01:56.4106970Z     Starting 7868 tests across 70 binaries (54 tests and 120 binaries skipped)",
+    "summary_raw": "2026-10-28T00:04:55.1674576Z      Summary [ 178.757s] 7868 tests run: 7868 passed, 54 skipped",
+    "selected": 7868,
+    "binaries": 70,
+    "aggregate_skips": 54,
+    "skipped_binaries": 120,
+    "execution_records": 7868,
+    "unique_identities": 7868,
+    "unique_ordinals": 7868,
+    "outcomes": {
+      "PASS": 7868
+    },
+    "unobserved_selected": 0,
+    "duplicate_execution_identities": [],
+    "post_summary_reprints": 34,
+    "outside_records": [],
+    "retry_flaky_records": [],
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "picked_raw": [
+      813,
+      "2026-10-27T23:56:19.9556944Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+    ]
+  },
+  "final_output_reprints": "final-reprints.json",
+  "auxiliary_separate_totals": {
+    "promoter": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_docs": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "summary_groups": 47
+    },
+    "process": {
+      "line": 9448,
+      "passed": 13,
+      "failed": 0
+    },
+    "relay_ok_line": 9430,
+    "offline_Python": [
+      {
+        "line": 347,
+        "count": 49
+      },
+      {
+        "line": 417,
+        "count": 12
+      },
+      {
+        "line": 793,
+        "count": 7
+      }
+    ],
+    "added_to_nextest": false
+  },
+  "artifact_metadata_only": [
+    {
+      "id": 12780887445,
+      "name": "lampos-arm64-4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "size_in_bytes": 118807889,
+      "digest": "sha256:a87f783d72383ffa35ecf313ad0a0e9065f3efd4b462a558a02ae9a6595b77e1",
+      "expired": false,
+      "workflow_run": {
+        "id": 40604863162,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "tests/1806-addon-journal-e1",
+        "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e"
+      },
+      "API_digest_in_upload_log": true,
+      "API_size_and_id_in_upload_log": true,
+      "archive_downloaded": false,
+      "individual_payload_or_checksum_downloaded": false,
+      "API_digest_independently_rehashed": false
+    }
+  ],
+  "export_metadata": {
+    "binaries": 48,
+    "examples": 2,
+    "files_uploaded": 51
+  },
+  "local_host_source_specific_reference": {
+    "head": "913b4222c563ba478ad3965680aec91d6fe78139",
+    "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "terminal_status": "PASS",
+    "protected_count": 208,
+    "actual_count": 7,
+    "source_unchanged": true,
+    "scope": "Fresh full unfiltered serial Skills Cargo package including docs/custom cases",
+    "receipt_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/terminal.json",
+        "bytes": 1873,
+        "sha256": "7646dbca10e39994785a24908b7ac5fa144552335bb5f6444f1e1f9852daa536"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/native-controller-result.json",
+        "bytes": 472,
+        "sha256": "c7054dec1b5cbc88d31694768b92243d2c891f4dd14b7c17a1f958b0375aaa3a"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/source-before.json",
+        "bytes": 2459971,
+        "sha256": "374c52b150b64b81ce02819f5c29888e7a1737e255e2ae9accce0fdeacb88f4d"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/source-after.json",
+        "bytes": 2459971,
+        "sha256": "374c52b150b64b81ce02819f5c29888e7a1737e255e2ae9accce0fdeacb88f4d"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/protected-after.json",
+        "bytes": 88828,
+        "sha256": "d825934aecfe0bdb3388c25df5bb1b2ecaec856316772be044f78be87357544c"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/actual-after.json",
+        "bytes": 11391,
+        "sha256": "09a5743eff573a257963718a43a1d64ad034680803a47d48aef85d8aea7adea7"
+      }
+    ],
+    "no_binary_or_target_rehash_in_this_audit": true,
+    "counts": {
+      "passed": 557,
+      "failed": 0,
+      "ignored": 9
+    },
+    "runtime_reuse": false,
+    "drivers": 5,
+    "helpers": 2,
+    "compiled_census": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/compiled-census.json",
+      "bytes": 48658,
+      "sha256": "17c28e73e8277074cd80b279d27975d1b33fe1dfddd2041b82ed1510c712efb9"
+    }
+  },
+  "native_release_and_Mac_debug_profiles_distinct": true,
+  "effective_owned_patch_comparison": {
+    "ARM64": [
+      {
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "authored": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "actual": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "equal": true
+      },
+      {
+        "path": "lampOS/docs/skills.md",
+        "authored": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "size": 216663,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+        },
+        "actual": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc",
+          "size": 216889,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc"
+        },
+        "equal": false
+      }
+    ],
+    "Linux-clippy": [
+      {
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "authored": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "actual": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "equal": true
+      },
+      {
+        "path": "lampOS/docs/skills.md",
+        "authored": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "size": 216663,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+        },
+        "actual": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc",
+          "size": 216889,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc"
+        },
+        "equal": false
+      }
+    ]
+  },
+  "exact_API_head_checks": [
+    {
+      "id": 122547109535,
+      "name": "report-full-run-failure",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604863162/job/122547109535"
+    },
+    {
+      "id": 122547109509,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604863162/job/122547109509"
+    },
+    {
+      "id": 122541719587,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604863162/job/122541719587"
+    },
+    {
+      "id": 122541718591,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604863351/job/122541718591"
+    },
+    {
+      "id": 122541717920,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604863162/job/122541717920"
+    },
+    {
+      "id": 122541688893,
+      "name": "Web (system/web) \u2014 typecheck \u00b7 build \u00b7 lint",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604854600/job/122541688893"
+    },
+    {
+      "id": 122541688818,
+      "name": "Python (hal) \u2014 unit tests \u00b7 syntax",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604854600/job/122541688818"
+    },
+    {
+      "id": 122541688792,
+      "name": "Image builder \u2014 signatures \u00b7 bootstrap \u00b7 output",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604854600/job/122541688792"
+    },
+    {
+      "id": 122541688578,
+      "name": "Go (system) \u2014 build \u00b7 vet \u00b7 test",
+      "head_sha": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40604854600/job/122541688578"
+    }
+  ],
+  "branch_protection_requirements_audited": false,
+  "retained_failure_scope": "retained-failure-and-control-scope.json",
+  "latest_base_policy_question": "Exact4be original scope; frozen base under First6456076191, final train merged-tree ARM and current reads remain separate.",
+  "no_local_compiler_runtime_target_source_ref_GHwrite_or_ARM_payload_access": true,
+  "collected_utc": "2026-10-28T00:14:34.326851+00:00",
+  "collection_manifest": "collection-manifest.json",
+  "post_close_verification": "collection-manifest-verification.json",
+  "effective_owned_patches_after_only_hunk_line_number_normalization": {
+    "API_head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+    "actual_preview": "4c2030b36cf9a825977a13657f60d853d07cc01e",
+    "authored_base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+    "actual_base": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+    "rows": [
+      {
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "authored_file": {
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "status": "modified",
+          "additions": 55,
+          "deletions": 11,
+          "changes": 66,
+          "patch": "@@ -611,6 +611,14 @@ fn only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted() {\n /// dropped by the judge first or not decided at all, then the four's\n /// trigger again: what the fifth did, in the journal.\n fn a_fifth_say(drop_the_four: bool) -> String {\n+    use std::io::Read;\n+\n+    #[derive(Debug)]\n+    struct Completion {\n+        skill: String,\n+        why: String,\n+    }\n+\n     let dir = tempfile::Builder::new()\n         .prefix(\"ad\")\n         .tempdir_in(\"/tmp\")\n@@ -626,7 +634,6 @@ fn a_fifth_say(drop_the_four: bool) -> String {\n     );\n     let bus = Bus::new(root.join(\"bus\")).unwrap();\n     let mut proposals = bus.subscribe(AddonProposal::TOPIC, \"judge\").unwrap();\n-    let mut events = bus.subscribe(SkillEvent::TOPIC, \"test\").unwrap();\n     let mut command = Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"));\n     for (flag, path) in [\n         (\"--dir\", root.join(\"skills\")),\n@@ -659,30 +666,67 @@ fn a_fifth_say(drop_the_four: bool) -> String {\n     // The probe budget is shorter than the unchanged ten-second proposal\n     // limit and starts before any of the first four can be admitted.\n     let completion_deadline = Instant::now() + Duration::from_secs(8);\n+    // This cursor belongs to all phases. A completed phase consumes its\n+    // journal lines before the next voice publication can start another.\n+    let mut journal_seen = Vec::<u8>::new();\n+    let mut journal_cursor = 0;\n     let mut completed = |names: &[&str], phase: &str| {\n-        let mut seen = Vec::<SkillEvent>::new();\n+        let mut seen = Vec::<Completion>::new();\n         while seen.len() < names.len() {\n             let left = completion_deadline.saturating_duration_since(Instant::now());\n             let status = running.0.try_wait().unwrap();\n             assert!(\n                 !left.is_zero() && status.is_none(),\n                 \"waiting for {phase}: child {status:?}, completions {seen:?}; journal:\\n{}\",\n-                std::fs::read_to_string(root.join(\"stderr\")).unwrap()\n+                String::from_utf8_lossy(&journal_seen)\n             );\n-            if let Some(message) = events.recv(left.min(Duration::from_millis(100))).unwrap() {\n-                let event = message.parse::<SkillEvent>().unwrap();\n-                if event.stage == lamp_msgs::SkillStage::Done\n-                    && names.contains(&event.skill.as_str())\n-                    && !seen.iter().any(|old| old.skill == event.skill)\n+            let mut journal = Vec::new();\n+            std::fs::File::open(root.join(\"stderr\"))\n+                .unwrap()\n+                .take(1_048_577)\n+                .read_to_end(&mut journal)\n+                .unwrap();\n+            assert!(\n+                journal.len() <= 1_048_576,\n+                \"the fixture journal exceeded 1 MiB\"\n+            );\n+            assert!(\n+                journal.starts_with(&journal_seen),\n+                \"the fixture journal stopped being append-only during {phase}\"\n+            );\n+            journal_seen = journal;\n+            while let Some(end) = journal_seen[journal_cursor..]\n+                .iter()\n+                .position(|byte| *byte == b'\\n')\n+            {\n+                let end = journal_cursor + end + 1;\n+                let line = std::str::from_utf8(&journal_seen[journal_cursor..end - 1])\n+                    .expect(\"complete fixture journal lines are UTF-8\");\n+                journal_cursor = end;\n+                if let Some((skill, why)) = line\n+                    .strip_prefix(\"lamp-skills: \")\n+                    .and_then(|line| line.split_once(\" Done: \"))\n+                    && names.contains(&skill)\n+                    && !seen.iter().any(|old| old.skill == skill)\n                 {\n-                    seen.push(event);\n+                    seen.push(Completion {\n+                        skill: skill.to_owned(),\n+                        why: why.to_owned(),\n+                    });\n                 }\n             }\n+            if seen.len() < names.len() {\n+                std::thread::sleep(\n+                    completion_deadline\n+                        .saturating_duration_since(Instant::now())\n+                        .min(Duration::from_millis(10)),\n+                );\n+            }\n         }\n         assert!(\n             Instant::now() < completion_deadline,\n             \"the completion budget expired during {phase}; journal:\\n{}\",\n-            std::fs::read_to_string(root.join(\"stderr\")).unwrap()\n+            String::from_utf8_lossy(&journal_seen)\n         );\n         seen\n     };\n@@ -755,7 +799,7 @@ fn a_fifth_say(drop_the_four: bool) -> String {\n     voice\n         .publish_json(3, &serde_json::json!({ \"state\": \"resting\" }))\n         .unwrap();\n-    // The program writes each journal line before publishing its Done.\n+    // Only new complete lines from this final trigger can finish this phase.\n     completed(&names, \"the final four refusals\");\n     let journal = std::fs::read_to_string(root.join(\"stderr\")).unwrap();\n     match fifth {"
+        },
+        "actual_file": {
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "status": "modified",
+          "additions": 55,
+          "deletions": 11,
+          "changes": 66,
+          "patch": "@@ -611,6 +611,14 @@ fn only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted() {\n /// dropped by the judge first or not decided at all, then the four's\n /// trigger again: what the fifth did, in the journal.\n fn a_fifth_say(drop_the_four: bool) -> String {\n+    use std::io::Read;\n+\n+    #[derive(Debug)]\n+    struct Completion {\n+        skill: String,\n+        why: String,\n+    }\n+\n     let dir = tempfile::Builder::new()\n         .prefix(\"ad\")\n         .tempdir_in(\"/tmp\")\n@@ -626,7 +634,6 @@ fn a_fifth_say(drop_the_four: bool) -> String {\n     );\n     let bus = Bus::new(root.join(\"bus\")).unwrap();\n     let mut proposals = bus.subscribe(AddonProposal::TOPIC, \"judge\").unwrap();\n-    let mut events = bus.subscribe(SkillEvent::TOPIC, \"test\").unwrap();\n     let mut command = Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"));\n     for (flag, path) in [\n         (\"--dir\", root.join(\"skills\")),\n@@ -659,30 +666,67 @@ fn a_fifth_say(drop_the_four: bool) -> String {\n     // The probe budget is shorter than the unchanged ten-second proposal\n     // limit and starts before any of the first four can be admitted.\n     let completion_deadline = Instant::now() + Duration::from_secs(8);\n+    // This cursor belongs to all phases. A completed phase consumes its\n+    // journal lines before the next voice publication can start another.\n+    let mut journal_seen = Vec::<u8>::new();\n+    let mut journal_cursor = 0;\n     let mut completed = |names: &[&str], phase: &str| {\n-        let mut seen = Vec::<SkillEvent>::new();\n+        let mut seen = Vec::<Completion>::new();\n         while seen.len() < names.len() {\n             let left = completion_deadline.saturating_duration_since(Instant::now());\n             let status = running.0.try_wait().unwrap();\n             assert!(\n                 !left.is_zero() && status.is_none(),\n                 \"waiting for {phase}: child {status:?}, completions {seen:?}; journal:\\n{}\",\n-                std::fs::read_to_string(root.join(\"stderr\")).unwrap()\n+                String::from_utf8_lossy(&journal_seen)\n             );\n-            if let Some(message) = events.recv(left.min(Duration::from_millis(100))).unwrap() {\n-                let event = message.parse::<SkillEvent>().unwrap();\n-                if event.stage == lamp_msgs::SkillStage::Done\n-                    && names.contains(&event.skill.as_str())\n-                    && !seen.iter().any(|old| old.skill == event.skill)\n+            let mut journal = Vec::new();\n+            std::fs::File::open(root.join(\"stderr\"))\n+                .unwrap()\n+                .take(1_048_577)\n+                .read_to_end(&mut journal)\n+                .unwrap();\n+            assert!(\n+                journal.len() <= 1_048_576,\n+                \"the fixture journal exceeded 1 MiB\"\n+            );\n+            assert!(\n+                journal.starts_with(&journal_seen),\n+                \"the fixture journal stopped being append-only during {phase}\"\n+            );\n+            journal_seen = journal;\n+            while let Some(end) = journal_seen[journal_cursor..]\n+                .iter()\n+                .position(|byte| *byte == b'\\n')\n+            {\n+                let end = journal_cursor + end + 1;\n+                let line = std::str::from_utf8(&journal_seen[journal_cursor..end - 1])\n+                    .expect(\"complete fixture journal lines are UTF-8\");\n+                journal_cursor = end;\n+                if let Some((skill, why)) = line\n+                    .strip_prefix(\"lamp-skills: \")\n+                    .and_then(|line| line.split_once(\" Done: \"))\n+                    && names.contains(&skill)\n+                    && !seen.iter().any(|old| old.skill == skill)\n                 {\n-                    seen.push(event);\n+                    seen.push(Completion {\n+                        skill: skill.to_owned(),\n+                        why: why.to_owned(),\n+                    });\n                 }\n             }\n+            if seen.len() < names.len() {\n+                std::thread::sleep(\n+                    completion_deadline\n+                        .saturating_duration_since(Instant::now())\n+                        .min(Duration::from_millis(10)),\n+                );\n+            }\n         }\n         assert!(\n             Instant::now() < completion_deadline,\n             \"the completion budget expired during {phase}; journal:\\n{}\",\n-            std::fs::read_to_string(root.join(\"stderr\")).unwrap()\n+            String::from_utf8_lossy(&journal_seen)\n         );\n         seen\n     };\n@@ -755,7 +799,7 @@ fn a_fifth_say(drop_the_four: bool) -> String {\n     voice\n         .publish_json(3, &serde_json::json!({ \"state\": \"resting\" }))\n         .unwrap();\n-    // The program writes each journal line before publishing its Done.\n+    // Only new complete lines from this final trigger can finish this phase.\n     completed(&names, \"the final four refusals\");\n     let journal = std::fs::read_to_string(root.join(\"stderr\")).unwrap();\n     match fifth {"
+        },
+        "equal_effective_patch_after_only_hunk_line_number_normalization": true,
+        "full_blob_equal": true
+      },
+      {
+        "path": "lampOS/docs/skills.md",
+        "authored_file": {
+          "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "status": "modified",
+          "additions": 19,
+          "deletions": 9,
+          "changes": 28,
+          "patch": "@@ -621,15 +621,25 @@ skills\".)\n   original assertions, including the real 10 s proposal limit.\n   Timings and regression controls are recorded in the\n   [add-on completion verification](verification/skills-addon-completion-20261021/README.md).\n-  The add-on hour-budget fixture (`a_fifth_say`, #1806) waits for each\n-  `skills/events` Done before sending another trigger. After dropping four\n-  says, it waits until all four report their actual 300 s drop hold before\n-  asking a fifth add-on. One eight-second host watchdog starts before the\n-  first proposals: this probe budget is below the unchanged ten-second\n-  proposal allowance, and expiry fails the fixture. Final Done events fence\n-  the journal read, because each line is written before its event. The\n-  undecided case retains its full three-second no-proposal observation;\n-  the product's hour budget and drop hold are unchanged.\n+  The add-on hour-budget fixture (`a_fifth_say`, #1806) waits for new,\n+  complete Done journal lines before sending another trigger. One byte\n+  cursor advances across every phase, so a preceding phase's lines are\n+  consumed once. After dropping four says, it waits until all four report\n+  their actual 300 s drop hold before asking a fifth add-on. One eight-second\n+  host watchdog starts before the first proposals, below the unchanged\n+  ten-second proposal allowance; expiry fails the fixture. The observer\n+  checks the child and compares observed bytes with the previous prefix,\n+  limiting each pending read to one MiB. The fixture owns a regular file\n+  without rotation; a same-prefix replacement or truncate-and-rewrite\n+  between polls is not detected. It polls only while a phase lacks its\n+  expected completions. Final diagnostics and local I/O remain subject to\n+  the outer process watchdog. The fixture's\n+  proposal-only runs report Done through the main loop, which clears their\n+  busy state before consuming the next voice input. This test observes its\n+  journal assertions; it does not require delivery of nondurable bus events.\n+  The undecided case retains its full three-second no-proposal observation;\n+  the product's hour budget and drop hold are unchanged. Neither event loss\n+  nor any other historical failure cause has been established.\n \n `lamp-update install` puts it on a home lamp (#811): the product unit\n `deploy/product/lamp-skills.service`, every product skill in"
+        },
+        "actual_file": {
+          "sha": "6eb9cc0c990ddd533cf5e4a9c5816b2b317a30fc",
+          "status": "modified",
+          "additions": 19,
+          "deletions": 9,
+          "changes": 28,
+          "patch": "@@ -622,15 +622,25 @@ skills\".)\n   original assertions, including the real 10 s proposal limit.\n   Timings and regression controls are recorded in the\n   [add-on completion verification](verification/skills-addon-completion-20261021/README.md).\n-  The add-on hour-budget fixture (`a_fifth_say`, #1806) waits for each\n-  `skills/events` Done before sending another trigger. After dropping four\n-  says, it waits until all four report their actual 300 s drop hold before\n-  asking a fifth add-on. One eight-second host watchdog starts before the\n-  first proposals: this probe budget is below the unchanged ten-second\n-  proposal allowance, and expiry fails the fixture. Final Done events fence\n-  the journal read, because each line is written before its event. The\n-  undecided case retains its full three-second no-proposal observation;\n-  the product's hour budget and drop hold are unchanged.\n+  The add-on hour-budget fixture (`a_fifth_say`, #1806) waits for new,\n+  complete Done journal lines before sending another trigger. One byte\n+  cursor advances across every phase, so a preceding phase's lines are\n+  consumed once. After dropping four says, it waits until all four report\n+  their actual 300 s drop hold before asking a fifth add-on. One eight-second\n+  host watchdog starts before the first proposals, below the unchanged\n+  ten-second proposal allowance; expiry fails the fixture. The observer\n+  checks the child and compares observed bytes with the previous prefix,\n+  limiting each pending read to one MiB. The fixture owns a regular file\n+  without rotation; a same-prefix replacement or truncate-and-rewrite\n+  between polls is not detected. It polls only while a phase lacks its\n+  expected completions. Final diagnostics and local I/O remain subject to\n+  the outer process watchdog. The fixture's\n+  proposal-only runs report Done through the main loop, which clears their\n+  busy state before consuming the next voice input. This test observes its\n+  journal assertions; it does not require delivery of nondurable bus events.\n+  The undecided case retains its full three-second no-proposal observation;\n+  the product's hour budget and drop hold are unchanged. Neither event loss\n+  nor any other historical failure cause has been established.\n \n `lamp-update install` puts it on a home lamp (#811): the product unit\n `deploy/product/lamp-skills.service`, every product skill in"
+        },
+        "equal_effective_patch_after_only_hunk_line_number_normalization": true,
+        "full_blob_equal": false
+      }
+    ],
+    "no_full_docs_blob_equality_claim": true
+  },
+  "new_Skills_format2_case_declaration": {
+    "actual_base": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+    "new_tests": [
+      {
+        "binary": "lamp-skills::it",
+        "identity": "skills::in_format_2_look_is_presence_alone_and_camera_the_only_picture",
+        "path": "lampOS/crates/skills/tests/it/skills.rs",
+        "line": 660,
+        "attributes": "#[test]",
+        "function_new_to_actual_main": true,
+        "actual_git_blob": "8c4fec7f08eb969424cde38e8894df7bdd16ae75",
+        "source_SHA256": "8363546599c696fa344eae9d79e1e32f05dfc18536681a240b616ba465ac2335"
+      }
+    ],
+    "new_library_tests": 0,
+    "format_test_updated_internal_assertions_not_new_Rust_rows": true
+  },
+  "global_source_case_delta": {
+    "old_API_head": "913b4222c563ba478ad3965680aec91d6fe78139",
+    "new_API_head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+    "old": 7856,
+    "new": 7868,
+    "added": [
+      [
+        "lamp-skills::it",
+        "skills::in_format_2_look_is_presence_alone_and_camera_the_only_picture"
+      ],
+      [
+        "lamp-voice",
+        "coordinator::tests::say::a_sleep_asked_aloud_is_asked_once_its_line_is_heard_whole"
+      ],
+      [
+        "lamp-voice",
+        "coordinator::tests::say::a_sleep_asked_aloud_is_dropped_when_its_turn_has_no_audio"
+      ],
+      [
+        "lamp-voice",
+        "coordinator::tests::say::a_sleep_asked_aloud_is_dropped_when_the_person_cuts_in"
+      ],
+      [
+        "lamp-voice",
+        "coordinator::tests::say::at_its_cap_a_sleep_is_asked_only_if_its_line_has_sounded"
+      ],
+      [
+        "lamp-voice",
+        "hand_controls::tests::a_sleep_asked_aloud_is_a_hands_sleep_but_never_during_onboarding"
+      ],
+      [
+        "lamp-voice",
+        "sleep_asked::tests::it_is_declared_only_where_a_tap_can_wake_it"
+      ],
+      [
+        "lamp-voice",
+        "sleep_asked::tests::only_on_declares_it"
+      ],
+      [
+        "lamp-voice",
+        "sleep_asked::tests::only_the_marked_request_is_during_onboarding"
+      ],
+      [
+        "lamp-voice",
+        "sleep_asked::tests::the_model_is_told_the_line_or_not_now"
+      ],
+      [
+        "lamp-voice",
+        "sleep_asked::tests::the_tool_is_the_voices_own"
+      ],
+      [
+        "lamp-voice",
+        "tools::tests::go_to_sleep_is_the_voices_own_and_says_its_line_or_not_now"
+      ]
+    ],
+    "removed": [],
+    "observed_added_Voice": 11,
+    "observed_added_Skills": 1,
+    "not_all12_Skills": true
+  },
+  "build_warning_audit": "build-warning-audit.json",
+  "build_warning_records": {
+    "ARM64": 10,
+    "Linux-clippy": 1
+  },
+  "watcher_started": true,
+  "single_bounded_watcher": "watch-terminal.json",
+  "current_policy": {
+    "First_comment": "6456076191",
+    "leave_base_frozen": true,
+    "base_only_HOLD_disposed": true,
+    "actual_train_ARM_merged_tree_final_gate": true,
+    "no_human_read_carry_inferred": true
+  },
+  "current_native_scope_is_actual_preview_not_old_Mac_or_authored_whole_tree": true
+}

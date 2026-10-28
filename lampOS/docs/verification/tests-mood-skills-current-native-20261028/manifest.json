@@ -1,0 +1,87 @@
+{
+  "status": "PRIVATE_PREPARED_PUBLIC_TEXT_ONLY_ROOT_REVIEW_REQUIRED",
+  "payloads": {
+    "ARM64-job-122541677724.log": {
+      "bytes": 1388388,
+      "sha256": "c88e313bff9bf9bfd791ef93be19755a2f2a548014c8b666432f6ab5e56a79d7"
+    },
+    "ARM64-job-122541717920.log": {
+      "bytes": 1387923,
+      "sha256": "91868413107f1600eab6483fa2c73bcf37adc46d627ee248aff78260835adc18"
+    },
+    "Linux-clippy-job-122541677462.log": {
+      "bytes": 49879,
+      "sha256": "bf34571b7479f9bc41ea695a209118d26228c500d5128e34379eb6a4d1db3f7e"
+    },
+    "Linux-clippy-job-122541718591.log": {
+      "bytes": 40321,
+      "sha256": "c01d99b19b8e869066843f3ddef71bf88896a98484b47b102d4101526c7e6629"
+    },
+    "Mood-audit.json": {
+      "bytes": 58248,
+      "sha256": "170f25f0b2d5de05f2ce0d0a13bba3464462b276297373b25a4184d06c0e0359"
+    },
+    "README.md": {
+      "bytes": 4146,
+      "sha256": "73a135e1d88b9c1ee7a7770d9021dce381d8a4acdf6d8b75c7db807864c4e787"
+    },
+    "Skills-audit.json": {
+      "bytes": 81407,
+      "sha256": "dc2b0c79bae61921737c50d2d585c097ef8a5d7988c4d2f007e8859a7274ebbb"
+    },
+    "source-additions-and-owned-patch-limits.json": {
+      "bytes": 1072333,
+      "sha256": "6a838052e68e6067dd0709bbe450d7d2099a136f9b1bf478551b43047b000158"
+    }
+  },
+  "file_count_including_manifest": 9,
+  "source_collections": [
+    {
+      "collection": "mood-6a40-original-native-20261028",
+      "manifest": {
+        "source_evidence": "mood-6a40-original-native-20261028/collection-manifest.json",
+        "bytes": 28507,
+        "sha256": "0584897f6a84ca8b4f8bc354c2c25117f76d9f600a7d15b2a38074673206586b"
+      },
+      "verification": {
+        "source_evidence": "mood-6a40-original-native-20261028/collection-manifest-verification.json",
+        "bytes": 234,
+        "sha256": "b97be87585c844355c91f4da5dd66f068b8f47df385c0cce723ee85b31b3baed"
+      },
+      "entries_checked": 173,
+      "mismatches": [],
+      "unlisted_nonexcluded": [],
+      "explicit_source_self_reference_exclusions": [
+        "collection-manifest.json",
+        "collection-manifest-verification.json"
+      ]
+    },
+    {
+      "collection": "skills-4be-original-native-20261028",
+      "manifest": {
+        "source_evidence": "skills-4be-original-native-20261028/collection-manifest.json",
+        "bytes": 31786,
+        "sha256": "7a85f335c7f010b06e2095f8ece68b4991514ce64026f8533d927b7682538d42"
+      },
+      "verification": {
+        "source_evidence": "skills-4be-original-native-20261028/collection-manifest-verification.json",
+        "bytes": 234,
+        "sha256": "37e07a88658c01aeb6b51193064fa1129662a22fbda59571c942456593e0eb09"
+      },
+      "entries_checked": 194,
+      "mismatches": [],
+      "unlisted_nonexcluded": [],
+      "explicit_source_self_reference_exclusions": [
+        "collection-manifest.json",
+        "collection-manifest-verification.json"
+      ]
+    }
+  ],
+  "all367_source_entries_reverified": true,
+  "all_payload_copies_byte_exact_where_declared": true,
+  "no_L_GH_push_source_target_or_Cargo_action": true,
+  "explicit_output_self_reference_exclusion": [
+    "manifest.json"
+  ],
+  "created_utc": "2026-10-28T00:30:29.688708+00:00"
+}

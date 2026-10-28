@@ -1,0 +1,20 @@
+# Current Mood and Skills original native proof
+
+Both offered c0ae-based heads have original attempt-1 SUCCESS ARM/Linux runs. Each selected nextest execution contains **7,868 unique PASS, zero FAIL/LEAK/TIMEOUT, zero selected unrun and 54 aggregate skips**. The 34 configured final-output reprints are outside each execution window, individually classified rather than blindly deduplicated.
+
+| Offered head | Original ARM / Linux | Actual checkout and ordered parents | Actual tree |
+| --- | --- | --- | --- |
+| Mood `6a40ceed7c8d38f80eaab65ca56f297bf9496c39` | 40604851254 / 40604851267 | `baa25530ead68d44c123a7d1d151e00bb0183a2a` = `[9f32ec194015b422562c2e8f757dc4c6e53e2415, 6a40ceed7c8d38f80eaab65ca56f297bf9496c39]` | `fdf5cf4fd046464e50663106e542d647309a4fbb` |
+| Skills `4be3182e2a0ee84cffca8aca1b445fb70b90852e` | 40604863162 / 40604863351 | `4c2030b36cf9a825977a13657f60d853d07cc01e` = `[9f32ec194015b422562c2e8f757dc4c6e53e2415, 4be3182e2a0ee84cffca8aca1b445fb70b90852e]` | `9f99bb134d2dd6a8338aad813c0641e070dd60e7` |
+
+Mood's **341 Expression identities** and both required controls PASS once. Skills has **561 ordinary PASS** across five exact driver sets: library 160, binary 23, integration 345, release-pair 2 and requested-audio 31. That is prior Mac 557 plus three Linux-only binary cases and one source-declared new actual 9f32 format2 integration case. The add-on caller and both Routine controls PASS once; two Boolean helper checks are internal to one add-on Rust identity. Nine declared Skills ignores stay unrun. Actual Reader 14/Trace 7 each PASS once per cohort; privileged DAC remains ignored. Aggregate skips do not provide a complete named skipped inventory.
+
+The actual 9f32 previews differ from authored c0ae trees in **41 material upstream paths**, including Voice sleep-asked/Skills format2 Rust, Cloud, docs/schemas and SDKs. This is not SDK-only drift or authored whole-tree equality. The global increase from earlier 7,856 is 12 identities: 11 Voice and 1 Skills, with no removals. Source-addition declarations, complete per-package cases, full tree deltas, CI-input metadata and reprint classification are consolidated in the source-limits JSON.
+
+Mood's complete owned blobs/modes match actual checkout; equality of its 47 fetched inputs is scoped to that subset. Skills' addon.rs complete blob/mode matches, but its skills.md complete blob differs because Main added format2 documentation. The authored and actual owned two-file effective patches match after **only hunk line-number normalization**; the full-doc inequality is retained. The earlier 913 actual 62c→authored 4be whole-tree bridge is separate historical provenance and does not equate current 4c20 to authored 4be.
+
+Old local Mac results remain **341/0/0 plus docs 0 on 29f/2b73** and **557/0/9 plus docs 0 on 913/898**; no new Mac execution is claimed here. Original Mood 337/3, Skills 521/1/9, old full-Voice failures and matched Main native 0/Rust 101 retain their exact scopes and outcomes. No cause or failure waiver is inferred.
+
+Separate current auxiliary outcomes are promoter 25/0/0, workspace docs 4/0/0 across 47 groups, process 13/0, relay OK and Python 49/12/7. Artifact metadata IDs/sizes/digests match original upload logs. No archive, ARM payload, checksum payload or executable was downloaded, executed or independently rehashed. Raw checkout output establishes provenance; a current API merge SHA is not substituted.
+
+The two complete audit JSON files and all four primary ARM/Linux job logs are exact copies of sealed inputs. Original log filenames are preserved, so audit raw-log references resolve directly. The compact manifest reverified **all 367 sealed source entries** and binds every one of the eight bundle payload files; its own hash is reported separately to avoid self-reference. Source addition/patch records are copies of audited projections, with no replay. Under First's Queue 6456076191 policy the base stays fixed and actual train merged-tree ARM remains the final latest gate. Later Main/train states and Ready decisions are separate. This preparation made no L/GitHub/source/ref/target/Cargo mutation.
