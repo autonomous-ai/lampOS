@@ -3579,8 +3579,11 @@ after a take-over, but now for every turn:
   `known_with_boot`, as the held forget's sight, #3037), so after the eyes
   restart a reused `f1` is not the known person's (Second's P1 on #3437),
   or, with no face seen speaking it, when the known face, theirs, was the
-  only face in view through the line, in at least 3 of the eyes' looks, and
-  its mouth read still in under half of them
+  only face in view through the line, in at least 3 of the eyes' looks, its
+  mouth read speaking in at least one of them and still in under half (a
+  mouth only ever unread is no evidence: an off-camera guest or a
+  television while they read their phone stays the room's, the
+  Reviewer-lead's P1 on #4090)
   (`SpeakingFaces::alone_in_view`): `request N: no face was seen speaking
   it, the known person's face alone in view (LAMP_PERSON_SCOPE_SEEN): told
   and kept as theirs`. On lamp-3e83 (stable 8163, 28 Oct 16:30) the known
@@ -3599,8 +3602,9 @@ after a take-over, but now for every turn:
   narrows (`remember::forget_everything` and `forget_face_memory`, the
   thread's exchanges, `tools.rs`' `keeper_within` and `run_scoped_for`), and
   a narrowed lease never widens (`ScopeLease::late_open`). Risk: an owner
-  whose speaking read misses with another face in view, or with their own
-  mouth read still, gets the room's scope for that line, so a
+  whose speaking read misses with another face in view, or alone with
+  their mouth never read speaking in it, gets the room's scope for that
+  line, so a
   personal keep or forget is not done as theirs: `forget_everything`
   refuses, and a keep is the room's, or withheld with
   `LAMP_MEMORY_PERSONAL_NEEDS_FACE`.

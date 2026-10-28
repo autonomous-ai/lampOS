@@ -465,11 +465,14 @@ impl SpeakingFaces {
     }
 
     /// Whether the face `face` (`boot/f3`, [`Self::known_with_boot`]) was
-    /// the only face in view through a line from `from` to `to`, and not
-    /// read still: in each of at least [`FEWEST_LOOKS`] of the eyes' own
-    /// looks it was the one face tracked, and its mouth read still in under
-    /// half of them (a voice off camera while they sit silent is not
-    /// theirs). On lamp-3e83 (stable 8163, 28 Oct
+    /// the only face in view through a line from `from` to `to`, and seen
+    /// speaking in it at least once: in each of at least [`FEWEST_LOOKS`] of
+    /// the eyes' own looks it was the one face tracked, its mouth read
+    /// speaking (`yes`) in at least one, and still in under half. A mouth
+    /// never read speaking (only `unknown`, turned away, or still) is no
+    /// evidence it was theirs: a voice off camera or a television while
+    /// they read their phone stays the room's (the Reviewer-lead's P1 on
+    /// #4090). On lamp-3e83 (stable 8163, 28 Oct
     /// 16:30) the known person alone at the lamp had about half their lines
     /// read with no face speaking (a mouth not read often enough), so kept
     /// as the room's, and the lamp forgot their name (#3437's follow-up).
@@ -491,6 +494,7 @@ impl SpeakingFaces {
             && during
                 .iter()
                 .all(|look| look.tracked.len() == 1 && own(look, &look.tracked))
+            && during.iter().any(|look| own(look, &look.speaking))
             && still * 2 < during.len()
     }
 
@@ -866,8 +870,9 @@ mod tests {
     /// lamp, their mouth not read speaking often enough, had about half
     /// their lines kept as the room's. Their face the one in view through
     /// the line, not read still, keeps the line theirs; another face in any
-    /// look, too few looks, their face read still, another person known, or
-    /// a face seen speaking that isn't theirs does not.
+    /// look, too few looks, their face read still or never read speaking,
+    /// another person known, or a face seen speaking that isn't theirs does
+    /// not.
     #[test]
     fn a_line_no_face_was_seen_speaking_is_theirs_when_their_face_alone_was_in_view() {
         let lan = crate::known_faces::memory_person("A");
@@ -910,6 +915,14 @@ mod tests {
         // Too few looks.
         let (eyes, from, to) = seen(&[&[("f1", Unknown)], &[("f1", Unknown)]]);
         assert!(!eyes.alone_in_view("b/f1", from, to));
+        // The owner silent, their mouth never read speaking, only unread,
+        // while another voice speaks off camera or a television plays: the
+        // room's (the Reviewer-lead's P1 on #4090).
+        let (eyes, from, to) = seen(&[&[("f1", Unknown)][..]; 4]);
+        assert!(eyes.speakers_with_boot(from, to).is_empty());
+        let alone = eyes.alone_in_view("b/f1", from, to);
+        assert!(!alone);
+        assert!(not_theirs(&[], &lan, known(), true, alone));
         // Their mouth read still through most of it: a voice off camera.
         let (eyes, from, to) = seen(&[
             &[("f1", No)],
