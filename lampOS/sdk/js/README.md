@@ -89,7 +89,7 @@ await lamp.closed();
   | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
-  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; the door already refuses `say` and `sound` in quiet hours with the error `quiet_hours`) | none |
+  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; the door already refuses `say` and `sound` in quiet hours, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
 
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. Each resolves when the lamp has taken it;
