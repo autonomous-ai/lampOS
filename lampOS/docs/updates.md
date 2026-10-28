@@ -2571,3 +2571,14 @@ its result is read from what the command leaves, not from the start.
 not a command yet. The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
+
+### Bounded saved ordinary plans (#3689)
+
+The private [plan container](ordinary-plan-container.md) explicitly encodes a
+successfully prepared result and reopens it against an externally protected
+plan identity and the original expected context. Exact envelope/preimage/Head
+bytes, all signed decisions and projected order remain separate and immutable.
+Bounded framing and deterministic replay comparison refuse semantic changes;
+accepted nonsemantic metadata stays in the original container bytes. This is
+checked data without a State/live-file reader, durable publication, journal
+admission, apply grant, executor or restoration.
