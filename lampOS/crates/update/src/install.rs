@@ -3318,25 +3318,38 @@ mod tests {
 
     /// Install's own commands are bounded: one that stalls, or ends while a
     /// child it left holds its pipes, is an error within the bound naming
-    /// the command, never a hang.
+    /// the command, never a hang. The four waits run at once (#1806), each
+    /// timed on its own thread: one after another they took 4 s.
     #[test]
     fn install_commands_never_wait_past_their_bound() {
         let second = Duration::from_secs(1);
-        for script in ["sleep 30", "sleep 30 & echo ok"] {
-            let started = Instant::now();
-            let why = output_of_within(&sh(script), second).unwrap_err();
-            assert!(started.elapsed() < Duration::from_secs(3), "{script}");
-            assert_eq!(
-                why,
-                format!(
-                    "sh -c {script}: did not end within 1 s: it ran on, or a child it left held its output"
-                )
-            );
-            let started = Instant::now();
-            let why = run_within(Command::new("sh").args(["-c", script]), second).unwrap_err();
-            assert!(started.elapsed() < Duration::from_secs(3), "{script}");
-            assert!(why.contains("did not end within 1 s"), "{why}");
-            assert!(why.starts_with("\"sh\" \"-c\""), "{why}");
+        let checks: Vec<_> = ["sleep 30", "sleep 30 & echo ok"]
+            .into_iter()
+            .flat_map(|script| {
+                let output = std::thread::spawn(move || {
+                    let started = Instant::now();
+                    let why = output_of_within(&sh(script), second).unwrap_err();
+                    assert!(started.elapsed() < Duration::from_secs(3), "{script}");
+                    assert_eq!(
+                        why,
+                        format!(
+                            "sh -c {script}: did not end within 1 s: it ran on, or a child it left held its output"
+                        )
+                    );
+                });
+                let run = std::thread::spawn(move || {
+                    let started = Instant::now();
+                    let why =
+                        run_within(Command::new("sh").args(["-c", script]), second).unwrap_err();
+                    assert!(started.elapsed() < Duration::from_secs(3), "{script}");
+                    assert!(why.contains("did not end within 1 s"), "{why}");
+                    assert!(why.starts_with("\"sh\" \"-c\""), "{why}");
+                });
+                [output, run]
+            })
+            .collect();
+        for check in checks {
+            check.join().unwrap();
         }
     }
 
