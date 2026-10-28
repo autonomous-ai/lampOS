@@ -47,4 +47,8 @@ policy = "hello"
 [[do]]
 body = { look_at = "face" }
 light = "warm_glow"
-say = "They are back at their desk. Greet them in one short line, by name if you know it."
+# The hello lives a minute, as the chance does (`wait`): a room line the lamp
+# answers as it is asked, and the voice's 15 s quiet after that turn, take
+# more than the say's own 30 s (#2861, round 2 on lamp-06c1, 27 Oct). One say
+# a skill and the 20-minute cooldown keep it to one hello an arrival.
+say = { note = "They are back at their desk. Greet them in one short line, by name if you know it.", expires = "60s" }
