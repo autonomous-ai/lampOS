@@ -145,6 +145,19 @@ test('a phrase under the lamp\'s floor is refused before sending', async () => {
   });
 });
 
+// blue's P2 on #4020: the skill's three feelings, each its move, and any
+// other name bad_request.
+test('the fake answers express as lamp-control does', async () => {
+  await withLamp({}, async (lamp) => {
+    const { to, move, light } = await lamp.express('glad');
+    assert.deepEqual({ to, move, light }, { to: 'body', move: 'glad-lift', light: true });
+    assert.equal((await lamp.express('glad', 0.25)).move, 'glad-lift-50');
+    assert.equal((await lamp.express('low', 0.25)).move, 'low-droop-75');
+    assert.equal((await lamp.express('glad', 0.0625)).move, 'glad-lift-25');
+    await assert.rejects(lamp.express('happy'), (error) => error.code === 'bad_request' && error.why === 'feeling: one of glad, lively, low');
+  });
+});
+
 test('actions send the schema\'s fields and wait for done', async () => {
   await withLamp({}, async (lamp, fake) => {
     await lamp.light('warm', 3, 10_000, 'breathe');
@@ -436,7 +449,10 @@ test('a waiting action whose socket drops before the reply leaves no rejection u
 test('a fake like lamp-control refuses what it does not route yet', async () => {
   const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
   await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
-    await assert.rejects(lamp.express('glad'), (error) => error.code === 'refused' && error.why === 'not routed yet: waits for the feelings skill');
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.play('wave'), (error) => error.code === 'refused' && error.why === 'not routed yet: waits for client packages');
+    });
+    await lamp.express('glad');
     assert.equal((await lamp.gesture('nod')).to, 'body');
     await lamp.light('warm', 3, 1000);
   });
