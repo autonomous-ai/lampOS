@@ -429,7 +429,20 @@ also fails, the job fails with the release and retained asset IDs for
 owner repair. An interrupted or externally changed channel can therefore
 remain without a canonical envelope; the helper does not claim an atomic
 replacement or guaranteed recovery from a lost runner. The old bytes are
-retained and no automatic deletion follows.
+retained.
+
+**The channel release stays under GitHub's cap.** GitHub allows [at most
+1000 assets on one release](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases),
+and every promotion leaves a `lampos-manifest-previous-*` backup on
+`lampos-lamp-voice`: 214 by 28 Oct, about 37 a day, so it would have been
+full around 18 Nov. Once a switch is verified, the helper deletes the
+backups beyond the newest 20 (`KEEP_BACKUPS`; this switch's own, and any of
+a later sequence, are always kept) and the stages left by older sequences,
+oldest first and 250 at most a run (`MOST_PRUNED`). It never deletes the
+head, deletes nothing after a failed or put-back switch, and a cleanup that
+fails is said in the log, leaving the build published and the rest for the
+next run. Not done yet: the stable feed's release (`lampos-stable`) gains
+backups the same way at its slower pace of a few promotes a day.
 
 **GitHub's 5xx and a re-run (#4103).** On 28 Oct GitHub answered 504 three
 times in this job and in a promotion, each after the release was already
