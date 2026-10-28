@@ -2,7 +2,8 @@
 
 A lamp in a home is set up by its person, with a phone and no engineer: the
 home's Wi-Fi, the voice's service, the person's name and time zone. Holding the
-reset button for 5 s takes it back to setup and wipes the person's data. The
+reset pinhole (RESET, on the back of the base) with a paperclip for 5 s and
+letting go takes it back to setup and wipes the person's data. The
 first builder decided (2026-10-15) that V2 ships with **V1's setup flow**, not
 a new one. This page studies that flow and says, part by part, what V2 takes.
 
@@ -810,7 +811,7 @@ ARM64 run and the keeper's `--setup-marker` (#816):
    an accent and one with a `"`. Each failure must leave the previous Wi-Fi file,
    and the ring amber until the next try.
 5. **Reset.** Controls with `--touch` and a `reset` line in its pins file. Hold
-   the reset button 5 s and release: the lamp pauses, folds, reboots into the
+   the RESET pinhole 5 s with a paperclip and release: the lamp pauses, folds, reboots into the
    hotspot, and every path in the plan is empty. Once, cut the power during the
    wipe: setup must finish it at the next start.
 
