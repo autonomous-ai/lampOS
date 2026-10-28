@@ -949,7 +949,14 @@ build could carry it units or settings.
    once a dry round (nothing applied) has fetched the channel's manifest and
    checked its signature, and it has read `state.json` under the lock; then
    `self.json` goes. A binary that cannot reach the channel or refuses the
-   manifest waits and tries again every 30 s, and doesn't confirm.
+   manifest waits and tries again every 30 s, and doesn't confirm. A dry
+   round refused only because the lamp's own head touch units disagree
+   (`WaitsForUnits`, "refused" in `log.jsonl`: Voice's head touch and
+   `--controls-mute` beside Expression's `--head-touch`) still confirms, as
+   one waiting for the models switch does: the manifest was read and its
+   signature checked, the updater before met the same refusal, and only a
+   newer updater's install puts the units right (#2853). The build itself
+   stays refused, with nothing written.
 3. **Back.** `lamp-update-back` is a copy of the installed build's
    `lamp-update` at `/usr/local/lib/lampos/lamp-update-back`. Only `install`
    writes it, and it is outside `lamp-update.service`'s `ReadWritePaths`, so

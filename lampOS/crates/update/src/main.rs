@@ -659,6 +659,7 @@ fn status(outcome: &Outcome) -> u8 {
         Outcome::NotQuiet(_) => 4,
         Outcome::Refused(_)
         | Outcome::WaitsForModels(_)
+        | Outcome::WaitsForUnits(_)
         | Outcome::RolledBack { .. }
         | Outcome::Failed(_) => 1,
     }

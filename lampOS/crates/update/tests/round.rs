@@ -3950,6 +3950,60 @@ fn with_models_off_a_new_updater_confirms_and_the_build_waits_for_models() {
     assert_eq!(lamp.own_build(), new);
 }
 
+/// #2853, lamp-06c1: a lamp whose units disagree on head touch (Voice with
+/// it on, Expression without `--head-touch`, as a hand edit leaves them).
+/// The new updater its climb takes still confirms itself: its dry round read
+/// and checked the manifest, and what refused is the lamp's own units, met
+/// the same way by the old updater and put right by an install. Before, every
+/// new updater was refused for good, so the lamp never climbed. The build
+/// itself stays refused with nothing of the parts written.
+#[test]
+fn a_head_touch_mismatch_on_the_lamp_does_not_keep_a_new_updater_from_confirming() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let expression = lamp.root.join("etc/systemd/system/lamp-expression.service");
+    let text = fs::read_to_string(&expression).unwrap();
+    assert!(text.contains(" --head-touch"));
+    fs::write(&expression, text.replace(" --head-touch", "")).unwrap();
+    let old = lamp.own_build();
+    let parts = parts_files(&lamp);
+    let build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let new = sha("lamp-update 2");
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: 2,
+            from: old,
+            to: new.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+
+    lamp.config.updater = 2;
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Confirmed,
+        "{:?}",
+        lamp.said
+    );
+    assert!(lamp.pending().is_none());
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Nothing
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::WaitsForUnits(why) if why.contains("head touch")),
+        "{outcome:?}"
+    );
+    assert_eq!(outcome.kind(), "refused");
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(parts_files(&lamp), parts);
+}
+
 /// The controls' settings at their product path, as install wrote and
 /// recorded them, the controls reading them, and lamp-update-apply ready:
 /// what a product lamp has (#1680).
