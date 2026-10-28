@@ -974,8 +974,10 @@ an invitation not said, `MOST_UNSAID` times at most, then the step is
 is the lead's: when the step is led anew (offered again later, or asked once
 the person is back) it starts again, and a re-offer is dated
 (`offered_at_unix_s`) so the next waits `reoffer_after_s`, as any step's
-(Third's P3 on #4045). Test:
-`a_step_left_for_later_by_gaps_counts_its_unsaid_anew_when_offered_again`. A newer line owed replaces one not yet said (done replaces the felt
+(Third's P3 on #4045). A re-offer that ends `not_available` again keeps that
+date, for every step (the Reviewer-lead's P2 on #4045). Tests:
+`a_step_left_for_later_by_gaps_counts_its_unsaid_anew_when_offered_again`,
+`a_re_offer_left_for_later_again_waits_the_skills_interval`. A newer line owed replaces one not yet said (done replaces the felt
 line). The words are the skill's (optional, as #3769's: an older file says
 none of them). Latency from the body's push to the line: the body says the hand
 on its next offered step (every 80 ms); the voice drains the bus at most every
