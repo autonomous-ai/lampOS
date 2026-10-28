@@ -17,6 +17,7 @@ come through `lamp_wait_for`, and the state through resources.
 import argparse
 import asyncio
 import collections
+import importlib.metadata
 import os
 import socket
 import time
@@ -115,6 +116,52 @@ class Limits:
         sent.append(now)
 
 
+def own_version() -> str:
+    """lamp-mcp's own version, as installed."""
+    try:
+        return importlib.metadata.version("lamp-mcp")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0"
+
+
+class StrictMCP(FastMCP):
+    """FastMCP, with lamp-mcp's own version in `serverInfo` (FastMCP gives
+    the MCP library's), and refusing a call whose arguments the tool doesn't
+    take. FastMCP's own argument models read past an unknown one, so
+    `lamp_light(for_s=5)` lit the default 10 s, silently (a P3 from a check
+    on lamp-a0ae). Each tool's schema says `additionalProperties: false`; a
+    call naming another argument, or missing one the tool needs, is the
+    tool's error in the lamp's own form, never the validator's."""
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        # `_mcp_server` is FastMCP's private low-level server: FastMCP 1.x
+        # passes it no version, so it says the MCP library's. Check this
+        # still holds on any upgrade of `mcp` (pinned below 2, pyproject.toml).
+        self._mcp_server.version = own_version()
+
+    async def list_tools(self):
+        tools = await super().list_tools()
+        for tool in tools:
+            tool.inputSchema = {**tool.inputSchema, "additionalProperties": False}
+        return tools
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]):
+        tool = next((tool for tool in await super().list_tools() if tool.name == name), None)
+        if tool is not None:
+            takes = sorted(tool.inputSchema.get("properties", {}))
+            unknown = sorted(set(arguments or {}) - set(takes))
+            if unknown:
+                raise ToolError(
+                    f"bad_request: {name} takes no {', '.join(unknown)}; "
+                    + (f"it takes {', '.join(takes)}" if takes else "it takes no arguments")
+                )
+            missing = [needed for needed in tool.inputSchema.get("required", []) if needed not in (arguments or {})]
+            if missing:
+                raise ToolError(f"bad_request: {name} needs {', '.join(missing)}")
+        return await super().call_tool(name, arguments)
+
+
 def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> FastMCP:
     """The MCP server for one connected `lamp`. Tools the lamp's grants
     don't allow are not listed at all."""
@@ -133,7 +180,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         for lease in [lease for lease, lapses in leases.items() if lapses <= now]:
             del leases[lease]
         return sorted(leases)
-    server = FastMCP(
+    server = StrictMCP(
         "lamp",
         instructions=(
             f"A lampOS lamp, {lamp.info.get('name') or lamp.info.get('id', 'paired')}, on the person's desk. "
