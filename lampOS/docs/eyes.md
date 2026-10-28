@@ -595,11 +595,10 @@ as before.
   its `authorized` 0, then 1 half a second later, as an unplug and a plug
   would, and answers one line: `{"reauthorized":true}`, or `false` with why
   (`too_soon` with `ago_s`, `no_device`, `not_the_camera`, `several`,
-  `error`). The product's helper unit still names `01da:5875@3-1.1.4`: it
-  comes from the updater's own build and the helper from the channel's, and
-  a helper older than #4074 exits 2 without a port. A second step drops the
-  port once every channel carries this lamp-eyes; until then a lamp whose
-  camera is on another port is not re-authorized, though its eyes open it.
+  `error`). The product's helper unit names `01da:5875` with no port, as
+  the eyes do: every channel carries a helper that takes the ids alone since
+  stable 8250 (#4091), so a lamp whose camera is on another port is
+  re-authorized too.
 - **Narrow:** it reads nothing from whoever connects, so it can't be pointed
   at another device; a port that isn't digits, `-` and `.` makes no path; at
   most once a minute by the time it keeps in `/run/lampos-eyes-camera/last`,
@@ -2674,8 +2673,8 @@ camera with those ids at port 3-1.1.4", say), and tried again every five
 seconds; with a port named, a camera at another port is never taken instead.
 "camera found at /dev/videoN on port P" is said when it is found, or found
 on another port. **The product unit** gives `--usb 01da:5875` with no port
-and no `--device` (#4074), and its helper the same ids, still at
-`3-1.1.4` for now (below; the install test holds both): the camera's port differs by unit, `3-1.1.4` on
+and no `--device` (#4074), and its helper the same ids, no port either
+(below; the install test holds both): the camera's port differs by unit, `3-1.1.4` on
 lamp-4ace and lamp-52e6 but `3-1.3.4` on lamp-a63e and lamp-dbda, and the
 hardware can't change that. Every lamp-eyes since 20 Oct (#2190) takes
 `--usb` with the ids alone, so an older binary beside this unit opens the

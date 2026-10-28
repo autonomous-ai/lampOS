@@ -187,10 +187,9 @@ lamp-a63e's and lamp-dbda's is `3-1.3.4`, and the hardware can't change
 that. So the product's eyes name the camera by its ids alone, `--usb
 01da:5875`, with no port and no `--device`, and take the one camera with
 those ids on whichever port it is, refusing none or two (eyes.md, #2190,
-#4074). Their camera helper keeps `01da:5875@3-1.1.4` until every channel
-carries a lamp-eyes whose helper takes no port, since these units come from
-the updater's own build and an older helper exits 2 without one. The
-install test holds both units to it.
+#4074). Their camera helper names `01da:5875` with no port too, which every
+channel's helper takes since stable 8250 (#4091). The install test holds
+both units to it.
 
 **Different: one lamp behind the other.** lamp-4ace has switches lamp-52e6
 lacks: the voice's `LAMP_TASKS_DIR`, `LAMP_SCHEDULE_TOOLS`,
