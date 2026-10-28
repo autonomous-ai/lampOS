@@ -12,7 +12,7 @@ pub const PREFERENCES_NUDGE: &str = "(They have answered. Call setup_step with s
 pub const WHO_AGAIN: &str =
     "(That was not their name. Ask exactly this: \"Sorry, what should I call you?\")";
 pub const ROOM_SOUNDS_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"May I notice music and laughter in the room? Nothing is recorded. Just say yes or no.\" Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
-pub const FACE_EXPRESSIONS_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"May I notice when people look happy or upset, so I can answer more warmly? I never say it aloud and keep no pictures. Just say yes or no.\" Then call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
+pub const FACE_EXPRESSIONS_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"May I notice when people look happy or upset, so I can answer more warmly? A yes covers everyone at this lamp. I never say it aloud and keep no pictures. Just say yes or no.\" Then call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
 pub const TOUCH_NOTE: &str =
     "(Say only this, nothing before or after it: \"Tap the top of my head once, then let go.\")";
 pub const TOUCH_OFFER: &str = "(Say only this, nothing before or after it: \"One more thing: tap the top of my head once, then let go.\")";
