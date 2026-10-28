@@ -7,6 +7,8 @@ use std::io;
 
 #[test]
 fn direct_control_remains_usable_when_actual_render_socket_is_full() {
+    // Its peers really close (`spawns`).
+    let _sockets = crate::spawns::closing_sockets();
     let dir = SessionDirectory::create().unwrap();
     let speaker_boot = new_boot().unwrap();
     let capture_boot = new_boot().unwrap();
@@ -72,6 +74,8 @@ fn direct_control_remains_usable_when_actual_render_socket_is_full() {
 
 #[test]
 fn trusted_reference_peer_boot_cannot_be_learned_from_incoming_messages() {
+    // Its peers really close (`spawns`).
+    let _sockets = crate::spawns::closing_sockets();
     let dir = SessionDirectory::create().unwrap();
     let actual = new_boot().unwrap();
     let expected = new_boot().unwrap();
@@ -100,6 +104,8 @@ fn trusted_reference_peer_boot_cannot_be_learned_from_incoming_messages() {
 
 #[test]
 fn terminal_notice_survives_capture_closing_first_without_relaxing_live_sends() {
+    // Its peers really close (`spawns`).
+    let _sockets = crate::spawns::closing_sockets();
     let dir = SessionDirectory::create().unwrap();
     let speaker_boot = new_boot().unwrap();
     let capture_boot = new_boot().unwrap();
@@ -139,6 +145,8 @@ fn terminal_notice_survives_capture_closing_first_without_relaxing_live_sends() 
 
 #[test]
 fn terminal_notice_reaches_capture_when_speaker_closes_first() {
+    // Its peers really close (`spawns`).
+    let _sockets = crate::spawns::closing_sockets();
     let dir = SessionDirectory::create().unwrap();
     let speaker_boot = new_boot().unwrap();
     let capture_boot = new_boot().unwrap();
@@ -172,6 +180,8 @@ fn terminal_notice_reaches_capture_when_speaker_closes_first() {
 
 #[test]
 fn terminal_notice_never_connects_an_unconnected_control_socket() {
+    // Its peers really close (`spawns`).
+    let _sockets = crate::spawns::closing_sockets();
     let dir = SessionDirectory::create().unwrap();
     let speaker_boot = new_boot().unwrap();
     let capture_boot = new_boot().unwrap();
@@ -210,6 +220,8 @@ fn terminal_notice_never_connects_an_unconnected_control_socket() {
 
 #[test]
 fn terminal_notice_uses_an_existing_control_connection_without_connecting_data() {
+    // Its peers really close (`spawns`).
+    let _sockets = crate::spawns::closing_sockets();
     let dir = SessionDirectory::create().unwrap();
     let speaker_boot = new_boot().unwrap();
     let capture_boot = new_boot().unwrap();

@@ -502,6 +502,8 @@ fn startup_stop_and_no_turn_never_invent_readiness_color() {
 
 #[test]
 fn late_startup_black_write_is_reported_once_on_stderr() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
     // The report is on stderr, so the scenario runs in a child copy of this
     // test binary and the parent reads what it printed.
     const CHILD: &str = "LAMP_RING_LATE_STARTUP_CHILD";
