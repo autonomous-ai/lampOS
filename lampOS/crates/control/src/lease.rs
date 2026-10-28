@@ -183,6 +183,14 @@ impl Leases {
         })
     }
 
+    /// The id of the lease that holds `part` now, if any.
+    pub fn holding(&self, part: Part, now_us: u64) -> Option<&str> {
+        self.held
+            .iter()
+            .find(|lease| lease.parts.contains(&part) && lease.until_us > now_us)
+            .map(|lease| lease.id.as_str())
+    }
+
     /// Who holds `part` now, if anyone.
     pub fn holder(&self, part: Part, now_us: u64) -> Option<&str> {
         self.held
@@ -319,6 +327,21 @@ mod tests {
     use super::*;
 
     const S: u64 = 1_000_000;
+
+    /// The Reviewer-lead's P3 on #4023: let go and taken again is another
+    /// lease, by id, even for the same client.
+    #[test]
+    fn the_lease_holding_a_part_is_named_by_its_own_id() {
+        let mut leases = Leases::new();
+        assert_eq!(leases.holding(Part::Body, 0), None);
+        let first = leases.take("c_1", &[Part::Body], 30_000, 0).unwrap().lease;
+        assert_eq!(leases.holding(Part::Body, S), Some(first.as_str()));
+        leases.release("c_1", &first, S).unwrap();
+        let again = leases.take("c_1", &[Part::Body], 30_000, S).unwrap().lease;
+        assert_ne!(first, again);
+        assert_eq!(leases.holding(Part::Body, S), Some(again.as_str()));
+        assert_eq!(leases.holding(Part::Light, S), None);
+    }
 
     #[test]
     fn one_client_holds_a_part_at_a_time_and_a_free_part_is_given() {

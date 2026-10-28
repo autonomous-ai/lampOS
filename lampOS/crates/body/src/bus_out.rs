@@ -830,6 +830,7 @@ mod tests {
             arm_loads: [310, 250],
             arm_temperatures: [44, 43],
             look: [0.0, 0.0],
+            look_aimed: None,
             face: None,
             gesture: None,
             released: 0,
