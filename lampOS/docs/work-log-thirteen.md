@@ -207,3 +207,13 @@ Ready for lamp-voice: yes (#4157)
 - No lamp run: a product voice refuses a test clip, and the production render needs a person to listen first.
 - The notices release waits for a build that has both #4094 and #4157.
 - #4147: READ-OK from Second, Reviewer-two and Reviewer-three; ARM64 green; NEXT TRAIN posted.
+
+### #3945, second c0a4 run from the Mac
+
+Ready for lamp-voice: yes (#4170, docs only)
+
+- Run on lamp-c0a4, 16:08–16:13Z: a local ARM64 build of lamp-voice `08fd8f9e2b` as a /run drop-in with `LAMP_NAME_SAID_TO_A_PERSON=on`. Six synthetic voices played from the Mac, three "Ma'am/Sir" lines each, plus one control.
+- 1 of 18 heard at 0.92 and answered; the hold didn't fire. Three more were answered as a conversation going on. The control was answered.
+- Restored after, lock released, Twelve told.
+- A real person at a distance is still needed (Not verified on #4170).
+- #3743: asked the first builder about the production render and its listen.
