@@ -43,6 +43,14 @@ struct HearingTrail {
     capture: String,
     residual: String,
     residual_explained: String,
+    /// The render at the matched alignment over the block (10 ms), a letter
+    /// a block like the levels; how far it is under its own peak over the
+    /// last 150 ms, a letter for every 3 dB; and the alignment's age, in
+    /// tens of blocks. #4035: logged for the tail guard; not used in
+    /// Hearing::heard until 52e6 trails prove it.
+    render: String,
+    render_drop: String,
+    alignment_age: String,
     /// Loudest block before cancellation since the trail began, in tenths
     /// of a decibel: with the lamp speaking alone, its own voice at its
     /// microphone.
@@ -207,6 +215,15 @@ impl SessionState {
             self.hearing.residual_explained.push(tenth(
                 echo.map(|echo| f32::from(echo.residual_explained) / 100.0),
             ));
+            self.hearing.render.push(echo.map_or('-', |echo| {
+                level_letter(echo.render_block_level.tenths_of_db())
+            }));
+            self.hearing.render_drop.push(echo.map_or('-', |echo| {
+                level_letter(-(echo.render_drop.min(i16::MAX as u16) as i16))
+            }));
+            self.hearing.alignment_age.push(echo.map_or('-', |echo| {
+                char::from(b'0' + (echo.alignment_age_blocks / 10).min(9) as u8)
+            }));
         }
         if self.hearing.heard.len() >= TRAIL_BLOCKS || (!speaking && !self.hearing.heard.is_empty())
         {
@@ -217,9 +234,11 @@ impl SessionState {
                 "explained":trail.explained,"floor":trail.floor,
                 "capture_level":trail.capture,"residual_level":trail.residual,
                 "residual_explained":trail.residual_explained,
+                "render_level":trail.render,"render_drop":trail.render_drop,
+                "alignment_age":trail.alignment_age,
                 "loudest_capture_db":trail.loudest.map(|tenths| f32::from(tenths) / 10.0),
                 "person_db":levels_db.0,"own_db":levels_db.1,
-                "boundary":"one character per 10 ms capture block while a reply had something to yield; heard: 0 still, 1 clear, 2 under, 3 own, 4 over, 5 unknown; the rest in tenths; - where not judged; capture_level and residual_level are the level before and after cancellation, a letter for every 3 dB down from full scale (a is 0 to -3 dBFS); levels in dBFS before cancellation: the loudest block of this trail, and the slow averages of a person heard in the clear and of the lamp's own voice let through"}))?;
+                "boundary":"one character per 10 ms capture block while a reply had something to yield; heard: 0 still, 1 clear, 2 under, 3 own, 4 over, 5 unknown; the rest in tenths; - where not judged; capture_level and residual_level are the level before and after cancellation, a letter for every 3 dB down from full scale (a is 0 to -3 dBFS); render_level is the lamp's render at the matched alignment over the block, lettered the same; render_drop is how far it is under its own peak over the last 150 ms, a letter for every 3 dB (c and on is 6 dB or more); alignment_age is the blocks since that alignment last held, in tens (9 for 90 or more); levels in dBFS before cancellation: the loudest block of this trail, and the slow averages of a person heard in the clear and of the lamp's own voice let through"}))?;
         }
         Ok(())
     }
@@ -366,7 +385,9 @@ mod tests {
                 capture_explained: explained,
                 residual_explained: 10,
                 residual_playback_floor: floor,
-                alignment_age_blocks: 0,
+                alignment_age_blocks: 12,
+                render_block_level: level,
+                render_drop: 70,
             }),
             silent_at_echo: None,
         }
@@ -408,6 +429,11 @@ mod tests {
         assert_eq!(state[0]["capture_level"], "g".repeat(TRAIL_BLOCKS));
         assert_eq!(state[0]["residual_level"], "g".repeat(TRAIL_BLOCKS));
         assert_eq!(state[0]["residual_explained"], "1".repeat(TRAIL_BLOCKS));
+        // The render at -20 dBFS, 7 dB under its peak (the third letter),
+        // and an alignment twelve blocks old (one ten).
+        assert_eq!(state[0]["render_level"], "g".repeat(TRAIL_BLOCKS));
+        assert_eq!(state[0]["render_drop"], "c".repeat(TRAIL_BLOCKS));
+        assert_eq!(state[0]["alignment_age"], "1".repeat(TRAIL_BLOCKS));
         // The levels as they stood when the second was written.
         assert_eq!(state[0]["loudest_capture_db"], -20.0);
         assert_eq!(
