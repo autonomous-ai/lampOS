@@ -1672,12 +1672,20 @@ fn run_call_with_scope(
                 lease.face_remembered();
             }
             // A face saved while the walk leads "who you are" ends that step
-            // (#3740), through the mailbox `setup_step` writes.
+            // (#3740), through the mailbox `setup_step` writes; one saved
+            // before it is asked ends it when it comes up, unless a face is
+            // forgotten first (#3640).
             if call.name == crate::known_faces::REMEMBER
                 && told.0["ok"] == true
                 && let Some(file) = onboarding
             {
                 crate::onboarding::face_saved(file);
+            }
+            if call.name == crate::known_faces::FORGET
+                && told.0["ok"] == true
+                && let Some(file) = onboarding
+            {
+                crate::onboarding::face_forgotten(file);
             }
             // A face saved in a line of the room's: the caller's own lines
             // before it follow them (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
@@ -2092,7 +2100,8 @@ mod tests {
     }
 
     /// A face the eyes saved tells the onboarding walk (#3740), through the
-    /// mailbox `setup_step` writes; a refused one tells it nothing.
+    /// mailbox `setup_step` writes, and so does one forgotten (#3640); a
+    /// refused one tells it nothing.
     #[test]
     fn a_face_saved_tells_the_onboarding_walk() {
         let dir = std::env::temp_dir().join(format!("tools-face-saved-{}", std::process::id()));
@@ -2104,7 +2113,13 @@ mod tests {
             for mut stream in listener.incoming().flatten() {
                 let mut line = String::new();
                 BufReader::new(&stream).read_line(&mut line).unwrap();
-                let answer = if line.contains("Sam") {
+                let answer = if line.contains("\"forget\"") {
+                    if line.contains("Sam") {
+                        "{\"forgot\":true}\n"
+                    } else {
+                        "{\"forgot\":false}\n"
+                    }
+                } else if line.contains("Sam") {
                     "{\"remembered\":\"Sam\"}\n"
                 } else {
                     "{\"error\":\"busy\"}\n"
@@ -2134,10 +2149,53 @@ mod tests {
             lines,
             [json!({"step": "who_you_are", "outcome": "done", "by": "remember_my_face"})]
         );
+        // A face forgotten tells it too, from the person's own scope (a
+        // forget is theirs only); one refused, or a name the eyes didn't
+        // know, nothing.
+        let forget = |route: &Route, name: &str, request: u64| {
+            use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+            let owner = RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                ScopeSnapshot::of(name),
+            );
+            let call = ToolCall {
+                id: String::new(),
+                name: crate::known_faces::FORGET.into(),
+                args: json!({"name": name}),
+            };
+            run_call_scoped(route, &call, request, true, &owner.lease())
+                .1
+                .0
+        };
+        let unscoped = ToolCall {
+            id: String::new(),
+            name: crate::known_faces::FORGET.into(),
+            args: json!({"name": "Sam"}),
+        };
+        let (_, (told, _)) = run_call(&route, &unscoped, 3, true);
+        assert_ne!(told["ok"], true, "{told}");
+        let told = forget(&route, "Alex", 4);
+        assert_ne!(told["ok"], true, "{told}");
+        assert_eq!(mailbox().lines().count(), 1);
+        let told = forget(&route, "Sam", 5);
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(
+            mailbox()
+                .lines()
+                .nth(1)
+                .map(serde_json::from_str::<Value>)
+                .and_then(Result::ok),
+            Some(json!({"face_forgotten": true}))
+        );
         // With no onboarding file, a save writes nothing anywhere.
         let none = Route::Faces(socket.clone(), Default::default(), None);
-        let _ = run_call(&none, &remember("Sam"), 3, true);
-        assert_eq!(mailbox().lines().count(), 1);
+        let _ = run_call(&none, &remember("Sam"), 6, true);
+        let _ = forget(&none, "Sam", 7);
+        assert_eq!(mailbox().lines().count(), 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
