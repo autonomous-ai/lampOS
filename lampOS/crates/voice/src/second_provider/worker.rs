@@ -2186,6 +2186,25 @@ pub fn serve(
         ),
         _ => {}
     }
+    // The owner named by default in a reply (`LAMP_PERSON_NAME_BY_DEFAULT`,
+    // #3884): unless the faces in view, the eyes' known file or another
+    // voice in the conversation (the rule's own sign, below) say someone
+    // else is there now.
+    let by_default = crate::person::by_default_from_environment()
+        .then(crate::person::from_environment)
+        .flatten()
+        .map(|name| {
+            let bus = files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok());
+            eprintln!(
+                "lamp-voice second: a reply is told the person speaking is most likely the one who set the lamp up, unless someone else is seen or heard now; nothing personal is kept on it (LAMP_PERSON_NAME_BY_DEFAULT)"
+            );
+            (name, bus)
+        });
+    let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let another_voice_told = another_voice.clone();
     let told_for = memory_context(
         sessions,
         socket,
@@ -2210,7 +2229,26 @@ pub fn serve(
                 crate::local_time::place_told(place.as_deref()),
             );
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
+            let named_by_default = by_default
+                .as_ref()
+                .map(|(name, bus)| {
+                    let faces = bus.as_ref().and_then(crate::known_faces::faces_in_view);
+                    let known_now = who.as_deref().and_then(crate::known_faces::known_now);
+                    let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
+                    match crate::person::someone_else_now(name, faces, known_now.as_deref(), another)
+                    {
+                        Some(why) => {
+                            eprintln!(
+                                "lamp-voice second: the owner is not named by default: {why} (LAMP_PERSON_NAME_BY_DEFAULT)"
+                            );
+                            String::new()
+                        }
+                        None => format!("\n\n{}", crate::person::by_default(name)),
+                    }
+                })
+                .unwrap_or_default();
             let facts = facts(session_fact && !going_on, room)
+                + &named_by_default
                 + &health_fact(health.as_deref())
                 // A line narrowed to the room whose person's face was alone
                 // in view is told their name only (`ScopeLease::named_for_reply`,
@@ -2887,6 +2925,9 @@ pub fn serve(
             files.bus_root.as_deref(),
             thread.clone(),
         )));
+        if let Ok(mut heeding) = heeding.lock() {
+            heeding.telling_another_voice(another_voice.clone());
+        }
         let quiet_same_one =
             std::env::var(crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT)
                 .is_ok_and(|value| value == "on");
@@ -4906,6 +4947,10 @@ pub(crate) struct Heeding {
     /// [`crate::same_voice::DIFFERENT_BELOW`] against it, or seen spoken by
     /// two faces. Gone when a line is judged with no conversation going on.
     another_person: Option<u64>,
+    /// [`Self::another_person`] told to the reply's owner-by-default rule
+    /// (`LAMP_PERSON_NAME_BY_DEFAULT`, #3884): set while the conversation
+    /// has shown another person.
+    another_voice: Option<Arc<std::sync::atomic::AtomicBool>>,
     /// `LAMP_FIRST_SECONDS_QUIET` ([`Self::showing_the_first_seconds_quiet`]),
     /// and whether another person was heard or seen speaking in any line
     /// since the start: never cleared, unlike [`Self::another_person`].
@@ -5650,6 +5695,7 @@ impl Heeding {
             rooms: None,
             in_view: None,
             another_person: None,
+            another_voice: None,
             first_seconds_quiet: false,
             another_since_start: false,
             held_since_start: false,
@@ -6133,6 +6179,12 @@ impl Heeding {
         }
         if another {
             self.another_person = Some(request);
+        }
+        if let Some(flag) = &self.another_voice {
+            flag.store(
+                self.another_person.is_some(),
+                std::sync::atomic::Ordering::Release,
+            );
         }
     }
 
@@ -6893,6 +6945,12 @@ impl Heeding {
     /// (`room_told::RoomTold::carried`).
     pub(crate) fn carrying_the_same_speaker(&mut self) {
         self.carries = true;
+    }
+
+    /// Tell `flag` whether the conversation has shown another person
+    /// ([`Self::another_person`]), for `LAMP_PERSON_NAME_BY_DEFAULT` (#3884).
+    pub(crate) fn telling_another_voice(&mut self, flag: Arc<std::sync::atomic::AtomicBool>) {
+        self.another_voice = Some(flag);
     }
 
     /// Leave alone a reply that answers nothing the lamp asked, said over
@@ -19505,6 +19563,29 @@ mod tests {
     /// view, two faces seen speaking, another voice heard in the
     /// conversation, or a privacy change since: no join. The journal's why
     /// is counts only.
+    /// #3884: the rule's own sign of another person in the conversation
+    /// reaches the reply's owner-by-default flag, and goes when a line is
+    /// judged with no conversation going on.
+    #[test]
+    fn another_person_in_the_conversation_is_told_to_the_owner_by_default_flag() {
+        use std::sync::atomic::Ordering;
+        let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.keeping_line_rooms();
+        heeding.telling_another_voice(flag.clone());
+        heeding.keep_line_room(1, crate::room_told::Room::Quiet, true, false);
+        assert!(!flag.load(Ordering::Acquire), "one voice");
+        heeding.keep_line_room(2, crate::room_told::Room::Quiet, true, true);
+        assert!(
+            flag.load(Ordering::Acquire),
+            "another voice in the conversation"
+        );
+        heeding.keep_line_room(3, crate::room_told::Room::Quiet, true, false);
+        assert!(flag.load(Ordering::Acquire), "still this conversation's");
+        heeding.keep_line_room(4, crate::room_told::Room::Quiet, false, false);
+        assert!(!flag.load(Ordering::Acquire), "a new conversation");
+    }
+
     #[test]
     fn with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short() {
         use crate::room_told::Room::{Busy, Quiet, Unknown};

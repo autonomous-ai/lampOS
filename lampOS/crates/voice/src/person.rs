@@ -420,6 +420,57 @@ pub fn told(name: &str) -> String {
     )
 }
 
+/// `on` exactly: a second-route reply is told by default that the person
+/// speaking is most likely the one who set the lamp up ([`by_default`]),
+/// unless there is a sign of someone else now ([`someone_else_now`]). For
+/// the reply only: nothing is kept, recalled or forgotten for them on it
+/// (#4090's rule stands). The first builder's call on #3884 (28 Oct 20:14):
+/// on lamp-29e7 (8250) and lamp-3e83 the owner alone at their desk lamp
+/// asked "what's my name?" right after setup and was not answered, the
+/// camera reading their mouth on 2 of 18 lines. Off unless set.
+pub const BY_DEFAULT_ENVIRONMENT: &str = "LAMP_PERSON_NAME_BY_DEFAULT";
+
+/// Whether [`BY_DEFAULT_ENVIRONMENT`] is exactly `on`.
+pub fn by_default_from_environment() -> bool {
+    std::env::var(BY_DEFAULT_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Why the owner `name` is not told by default now, or `None` when they
+/// may be ([`BY_DEFAULT_ENVIRONMENT`], #3884): another voice in the
+/// conversation (`another_voice`, the second route's own sign), more than
+/// one face in view, one face the eyes don't know as the owner (an unknown
+/// face, or a known face that isn't theirs), or the eyes knowing someone
+/// else. No face in view, or no look at all, is no sign: the owner looking
+/// away is still the owner.
+pub fn someone_else_now(
+    name: &str,
+    faces: Option<usize>,
+    known_now: Option<&str>,
+    another_voice: bool,
+) -> Option<&'static str> {
+    let owner = crate::known_faces::memory_person(name);
+    let theirs = known_now.map(|known| crate::known_faces::memory_person(known) == owner);
+    if another_voice {
+        Some("another voice in the conversation")
+    } else if faces.is_some_and(|faces| faces > 1) {
+        Some("more than one face in view")
+    } else if theirs == Some(false) {
+        Some("a known face that isn't theirs")
+    } else if faces == Some(1) && theirs.is_none() {
+        Some("an unknown face in view")
+    } else {
+        None
+    }
+}
+
+/// What a reply is told when the owner `name` may be named by default
+/// ([`someone_else_now`]).
+pub fn by_default(name: &str) -> String {
+    format!(
+        "(For you to know, not to answer: no one else is seen or heard at the lamp now, so the person speaking is most likely “{name}”, who set it up. If they ask who they are, that is their name.)"
+    )
+}
+
 /// What a skill's note is told of someone who comes by often (#1670, Mood's
 /// `familiar`): one beat warmer.
 pub const OFTEN: &str = "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)";
@@ -482,6 +533,46 @@ mod tests {
     /// #2831: the record says a who-skill's note was told, with Mood's
     /// level; any other say, or nobody at the lamp, false and null. The
     /// name is never in it.
+    /// #3884, the first builder's call: the owner alone, looking away or
+    /// seen, is named by default; a stranger's face, a known face that
+    /// isn't theirs, two faces or another voice names no one.
+    #[test]
+    fn the_owner_is_named_by_default_unless_someone_else_is_there() {
+        let owner = "Example Name";
+        let at = |faces, known: Option<&str>, voice| someone_else_now(owner, faces, known, voice);
+        // Alone, the face turned away or out of view, or no look at all.
+        assert_eq!(at(Some(0), None, false), None);
+        assert_eq!(at(None, None, false), None);
+        // Alone and seen as themselves.
+        assert_eq!(at(Some(1), Some(owner), false), None);
+        assert_eq!(at(Some(0), Some(owner), false), None);
+        // A stranger's face in view.
+        assert_eq!(at(Some(1), None, false), Some("an unknown face in view"));
+        // A known face that isn't theirs, in view or just known.
+        assert_eq!(
+            at(Some(1), Some("Someone Else"), false),
+            Some("a known face that isn't theirs")
+        );
+        assert_eq!(
+            at(Some(0), Some("Someone Else"), false),
+            Some("a known face that isn't theirs")
+        );
+        // Two faces, theirs among them.
+        assert_eq!(
+            at(Some(2), Some(owner), false),
+            Some("more than one face in view")
+        );
+        // Another voice in the conversation, whatever the eyes see.
+        for (faces, known) in [(Some(0), None), (Some(1), Some(owner)), (None, None)] {
+            assert_eq!(
+                at(faces, known, true),
+                Some("another voice in the conversation"),
+                "{faces:?} {known:?}"
+            );
+        }
+        assert!(by_default(owner).contains("“Example Name”"));
+    }
+
     #[test]
     fn a_says_record_keeps_the_level_its_note_was_told_and_no_name() {
         use lamp_msgs::FamiliarLevel;
