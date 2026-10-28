@@ -47,7 +47,8 @@ example runs this way: `greet.py`, `follow.py`, `phrase.py`, `pomodoro.py`,
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light,
-and `play`, `sound`, `look` and `joints` refused (`refused`,
+`look` refused as "the body's lease socket is not on here" (no product
+unit passes it yet), and `play`, `sound` and `joints` refused (`refused`,
 "not routed yet: waits for …"), in lamp-control's own words, so a program
 built against it meets the same refusals on a lamp. `--everything` answers
 every op instead.

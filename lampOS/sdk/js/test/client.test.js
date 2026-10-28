@@ -235,6 +235,24 @@ test('the fake answers express as lamp-control does', async () => {
   });
 });
 
+// blue's P2 and P3 on #4023: `face` and `name` refused in parts.rs's words;
+// an angle taken by the body, its `done` with where it got to.
+test('the fake answers look as lamp-control does', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp) => {
+    const dones = [];
+    lamp.on('done', (done) => dones.push(done));
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
+      await assert.rejects(lamp.look('name'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
+      assert.equal((await lamp.look({ yaw: -10, pitch: 5 })).to, 'body');
+      for (let i = 0; i < 50 && !dones.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    assert.equal(dones.length, 1);
+    const { how, yaw, pitch, clamped } = dones[0];
+    assert.deepEqual({ how, yaw, pitch, clamped }, { how: 'finished', yaw: -10, pitch: 5, clamped: false });
+  });
+});
+
 test('actions send the schema\'s fields and wait for done', async () => {
   await withLamp({}, async (lamp, fake) => {
     await lamp.light('warm', 3, 10_000, 'breathe');
@@ -593,7 +611,7 @@ test('the fake checks the lease before the routing refusal', async () => {
   await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
     await assert.rejects(lamp.look('face'), (error) => error.code === 'no_lease');
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why.startsWith('not routed yet'));
+      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === "the body's lease socket is not on here");
     });
   });
 });
