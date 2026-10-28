@@ -1200,6 +1200,31 @@ impl UpdateStatus {
     }
 }
 
+/// The app's Check for update (`update/check`, #4153): lamp-cloud asks
+/// `lamp-update serve` for its next round now instead of after its wait.
+/// It carries nothing: the round keeps its own rules (the same lock, a
+/// quiet moment before any switch, `--apply` as set). Said once for each
+/// ask lamp-cloud takes; `serve` reads it only between rounds, drops one
+/// that came while a round ran, and takes at most one a minute. An older
+/// lamp-update never subscribes, so it never hears one.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateCheck {}
+
+impl UpdateCheck {
+    pub const TYPE: &str = "lamp_msgs/UpdateCheck";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "update/check";
+    /// The least time between two checks that start a round, on either
+    /// side: lamp-cloud refuses an ask sooner, and `serve` drops one.
+    pub const AGAIN_AFTER: Duration = Duration::from_secs(60);
+
+    /// A stream with no period: nothing is kept, so a lamp-update that
+    /// starts later never takes an old ask for a new one.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
 /// Whether a hand is pushing the lamp now (`body/hand`), as the body feels
 /// it: a head or base joint that met resistance and is held where it gave
 /// way, for as long as it is held. `since_us` is the body's own clock
@@ -2594,6 +2619,22 @@ mod tests {
             declaration_of(SpeakerState::TOPIC),
             Some(SpeakerState::declaration())
         );
+    }
+
+    /// #4153: the app's check carries nothing and is a stream, kept by
+    /// nobody, so a lamp-update that starts later reads no old one; a later
+    /// field is read as before.
+    #[test]
+    fn an_update_check_is_an_empty_stream_and_nothing_is_kept() {
+        round_trip(&UpdateCheck {}, "{}");
+        let declared = UpdateCheck::declaration();
+        assert_eq!(
+            (declared.type_name.as_str(), declared.kind),
+            (UpdateCheck::TYPE, Kind::Event)
+        );
+        assert_eq!(declared.period(), None);
+        assert_ne!(UpdateCheck::TOPIC, UpdateStatus::TOPIC);
+        assert_eq!(UpdateCheck::AGAIN_AFTER, Duration::from_secs(60));
     }
 
     #[test]
