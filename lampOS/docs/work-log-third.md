@@ -1,3 +1,11 @@
+## 2026-10-28 13:05 — #3990 merged, publishing works, #4037 up
+
+- **#3990** (the two-face fixture repair, part of #3544) was pushed at 09:24 as `fb4245df30`, read OK by Reviewer-two and Reviewer-three, and merged in train 289 (#4024, lamp-voice `33ec91df6`). Reviewer-two's P3: no real-bus test sends many looks now.
+- **#4037** `88b3e5272`, that P3: 7 two-face looks 300 ms apart through the actual reader; 3 aren't persistence, 7 are. Mac: fmt and strict Voice Clippy clean, `two_faces` 12/12 in six runs. A mutated `look()` that keeps one look fails the new test and passes the two older reader tests. ARM64 running.
+- **#3906:** lamp-voice publishes with the built-in token, 17 of 19 since 27 Oct 22:40Z. The others were a correct stale-sequence refusal (`1f0cd957c`) and a network drop (`72413e99b`, stream CANCEL). The 403s (7 of 9 publishes, 27 Oct 19:15–22:30Z) are still unexplained. They don't fit the workflow-file cause I gave: every commit differs from main in the same 13 workflow files, refused or not. Same pusher, all still on lamp-voice, and two superseded heads published fine in that window. githubstatus.com shows no incident then. Posted on #3906 (proposal: close) and #3934 (stays draft; no release token needed).
+- **Reads:** carried READ-OK on #3876 to `e592379c0` (09:24, byte-identical lines). READ-OK #3972 `bc2a07e36`: its two journal strings checked against `main.rs`.
+- **Idle 09:27–12:46** because the session ended its turn. A loop now checks every 20 minutes.
+
 ## 2026-10-28 07:16 — requested Reader and Mood source carries read
 
 READ-OK #3543 fcf2c5c91 for source/original required-row scope in [current carry proof](verification/third-reader-mood-carries-20261028/reader-fcf2-source.json). Two authored blobs/preimages/payload and eleven contexts match92; Root compares complete Voice/Bus/IPC/Msgs/lock/config plus owned doc: empty diff. Original ARM40598411153/Linux40598411121 succeed at actualb5c85b49a [2b73/fcf2], six Update-only overlays, Reader15+Trace7 current names once PASS. No duplicate full7857 census or producer3885 ownership; earlier ECC10 staysECC, old539/matched-Main failures unwaived. All source/text handles close, no local test/bank/device.
