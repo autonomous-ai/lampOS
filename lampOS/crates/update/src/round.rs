@@ -594,7 +594,7 @@ impl Run<'_, '_> {
             let proved = done
                 .as_ref()
                 .is_some_and(|done| crate::writer_swap::proved(&folder, done));
-            // A `back` that began by the second of the refresh may be the
+            // A `back` that began by the millisecond of the refresh may be the
             // copy before's, which a refresh landing mid-run leaves to fail
             // after the unit's `reset-failed`: waited past, to the next
             // `back`, never put back for. Not known, it counts (El's P3 on

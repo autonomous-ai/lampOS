@@ -48,7 +48,7 @@ pub trait Systemd {
         Err("this systemd cannot start the writer's unit".to_owned())
     }
     /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
-    /// milliseconds to the second below (`ExecMainStartTimestamp`): none
+    /// milliseconds (`ExecMainStartTimestamp`): none
     /// when it never began, or when systemd cannot say. A `failed` from a
     /// `back` that began before a refresh is the copy before's, not the new
     /// writer's (El's P3 on #4178).
@@ -162,14 +162,16 @@ impl Systemd for Systemctl {
     }
 
     fn back_began_unix_ms(&mut self) -> Option<u64> {
+        // The bus, not `systemctl show`: its value is the microseconds
+        // themselves on every systemd, where `systemctl`'s is a date in
+        // words, and `--timestamp=unix` not known to all.
         let stdout = show_within(
-            Command::new("systemctl").args([
-                "show",
-                "--timestamp=unix",
-                "--property=ExecMainStartTimestamp",
-                "--value",
-                "--",
-                crate::writer_swap::BACK_UNIT,
+            Command::new("busctl").args([
+                "get-property",
+                "org.freedesktop.systemd1",
+                &unit_object(crate::writer_swap::BACK_UNIT),
+                "org.freedesktop.systemd1.Service",
+                "ExecMainStartTimestamp",
             ]),
             JOURNAL_WITHIN,
         )
@@ -355,19 +357,33 @@ pub fn output_within(command: &mut Command, within: Duration) -> Option<String> 
     String::from_utf8(bytes).ok()
 }
 
+/// systemd's bus object of `unit`: each byte but a letter or a digit as
+/// `_` and its two hex digits (`sd_bus_path_encode`).
+fn unit_object(unit: &str) -> String {
+    let mut path = "/org/freedesktop/systemd1/unit/".to_owned();
+    for byte in unit.bytes() {
+        if byte.is_ascii_alphanumeric() {
+            path.push(byte as char);
+        } else {
+            path.push_str(&format!("_{byte:02x}"));
+        }
+    }
+    path
+}
+
+/// `busctl get-property`'s `t MICROSECONDS`, in milliseconds; none for
+/// `t 0`, a unit that never began, or words that are not one.
+fn began_unix_ms(value: &str) -> Option<u64> {
+    let micros: u64 = value.trim().strip_prefix("t ")?.parse().ok()?;
+    (micros > 0).then_some(micros / 1000)
+}
+
 /// What `command` printed, if it ended well within `within`, both of its
 /// pipes read to their end by then, its process group owned throughout
 /// (`query::output_and_stderr_within`). Otherwise an error says why: it could
 /// not start, it ran on or a child it left held its pipes (the group is
 /// killed), its output passed 1 MiB, or it failed, in its own trimmed words
 /// on stderr. A stalled query never holds its caller past `within`.
-/// `systemctl show --timestamp=unix`'s `@SECONDS`, in milliseconds; none
-/// for the empty value of a unit that never began.
-fn began_unix_ms(value: &str) -> Option<u64> {
-    let seconds: u64 = value.trim().strip_prefix('@')?.parse().ok()?;
-    seconds.checked_mul(1000)
-}
-
 fn show_within(command: &mut Command, within: Duration) -> Result<String, String> {
     let stdout = query::output_and_stderr_within(command, Instant::now() + within).map_err(
         |error| match error.kind() {
@@ -671,10 +687,17 @@ mod tests {
     }
 
     #[test]
-    fn a_units_last_start_is_read_from_systemds_unix_seconds() {
-        assert_eq!(began_unix_ms("@1761670800\n"), Some(1_761_670_800_000));
+    fn a_units_last_start_is_read_from_the_bus_in_microseconds() {
+        assert_eq!(
+            unit_object("lamp-update-back.service"),
+            "/org/freedesktop/systemd1/unit/lamp_2dupdate_2dback_2eservice"
+        );
+        assert_eq!(
+            began_unix_ms("t 1761670800123456\n"),
+            Some(1_761_670_800_123)
+        );
         // A unit that never began, and words that are not a time.
-        assert_eq!(began_unix_ms("\n"), None);
+        assert_eq!(began_unix_ms("t 0\n"), None);
         assert_eq!(began_unix_ms("Tue 2026-10-28 17:00:00 UTC"), None);
     }
 

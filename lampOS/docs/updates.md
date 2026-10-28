@@ -2806,9 +2806,10 @@ bound. Until the refreshed writer is proved:
 - **A failed `back` that began before the refresh** is not the new
   writer's. The copy before's `back` may be mid-run when the refresh lands,
   and fail after the unit's `reset-failed`. So a `failed` counts only when
-  systemd's `ExecMainStartTimestamp` of the back unit (whole seconds) is
-  after the refresh's `at_unix_ms`. One in the refresh's own second or
-  before is waited past, to the next `back`, and said (`… back failed in a
+  the back unit's `ExecMainStartTimestamp`, read from the bus (`busctl
+  get-property`, in microseconds), is after the refresh's `at_unix_ms`.
+  One in the refresh's own millisecond or before is waited past, to the
+  next `back`, and said (`… back failed in a
   run that began before it was refreshed: the next back judges it`). When
   systemd can't say, it counts (El's P3 on #4178).
 
