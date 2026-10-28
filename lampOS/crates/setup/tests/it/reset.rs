@@ -1450,3 +1450,30 @@ fn check_reads_the_product_plan_install_places() {
         assert!(wipe.iter().any(|path| path == store), "{store}: {wipe:?}");
     }
 }
+
+/// #3710: lamp-setup-reset.service is read-only but the bus, so an enabled
+/// watcher whose plan has no `detach` would run the reset in there and wipe
+/// nothing after the button. It is refused at start instead, before the bus
+/// is touched (Fourteen's P3 on #4048).
+#[test]
+fn an_enabled_watcher_refuses_a_plan_without_detach_at_its_start() {
+    let root = Root::new();
+    let mut plan: serde_json::Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.as_object_mut().unwrap().remove("detach");
+    let file = root.path("reset-plan.json");
+    fs::write(&file, serde_json::to_vec(&plan).unwrap()).unwrap();
+    let bus = root.path("bus");
+    let out = Command::new(PROGRAM)
+        .args(["watch-reset", "--plan"])
+        .arg(&file)
+        .arg("--bus-root")
+        .arg(&bus)
+        .arg("--enable")
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "{out:?}");
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(said.contains("needs the plan's detach"), "{said}");
+    assert!(!bus.exists(), "the bus was touched before the refusal");
+}
