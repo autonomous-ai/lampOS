@@ -40,10 +40,11 @@ pub const SENTENCE_AGAIN: &str =
 pub const SENTENCE_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I hear you well from there.\")";
 pub const SENTENCE_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't hear you well enough this time. I'll get used to your voice as we talk.\")";
-pub const GIVE_ASK: &str = "(Say only this, nothing before or after it: \"Hold my head and tilt it gently to one side. Let go when I say so.\")";
-pub const GIVE_AGAIN: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move. Hold my head and tilt it gently to one side. Let go when I say so.\")";
-pub const GIVE_FELT: &str = "(Say only this, nothing before or after it: \"I feel your hand. Tilt me gently, then let go.\")";
-pub const GIVE_PROMPT: &str = "(Say only this, nothing before or after it: \"Hold my head and tilt it gently to one side. Let go when I say so.\")";
+pub const GIVE_ASK: &str = "(Say only this, nothing before or after it: \"Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.\")";
+pub const GIVE_AGAIN: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move. Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.\")";
+pub const GIVE_FELT: &str =
+    "(Say only this, nothing before or after it: \"That's it, now let go.\")";
+pub const GIVE_PROMPT: &str = "(Say only this, nothing before or after it: \"Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.\")";
 pub const GIVE_MORE: &str =
     "(Say only this, nothing before or after it: \"A little more, then let go.\")";
 pub const GIVE_DONE: &str =
