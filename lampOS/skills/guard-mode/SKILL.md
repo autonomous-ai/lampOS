@@ -32,10 +32,11 @@ said yes to being named is named: "Minh and someone the lamp knows came in
 at 18:10". Nobody is ever named from their voice, and someone who takes
 back their yes isn't named again, not even in a text still to go.
 
-**Someone coming in.** Where the lamp allows it, a door or footsteps count
-as someone coming in, but only when a face or a voice follows within half
-a minute: a door alone texts nothing. The text then says they came in:
-"Someone I don't know came in at 14:31 and was here for about 2 minutes."
+**Someone coming in.** Where the lamp allows it, a door (opened, shut or
+knocked on) or footsteps count as someone coming in, but only when a face
+or a voice follows within half a minute: a door alone texts nothing. The
+text then says they came in: "Someone I don't know came in at 14:31 and was
+here for about 2 minutes."
 
 **What it uses.** Whether anyone is at the lamp (counts and times only), the
 size and place of the faces in view, whether a face is one the lamp knows,

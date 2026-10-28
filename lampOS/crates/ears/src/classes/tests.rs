@@ -112,6 +112,29 @@ fn stable_sigmoid_is_multilabel_and_bounded() {
     assert!((sigmoid(2.0) + sigmoid(-2.0) - 1.0).abs() < 1e-6);
 }
 
+/// #2562: a knock is AudioSet's Knock (353), not Door (348). The door score
+/// is the highest of Door, Sliding door (351), Slam (352) and Knock, and
+/// Tap (354) and Doorbell (349) raise nothing.
+#[test]
+fn a_knock_a_slam_or_a_sliding_door_is_the_door_and_a_tap_is_not() {
+    let quiet = vec![-10.0_f32; CLASSES];
+    assert!(door(&quiet) < 0.001);
+    for index in [348, 351, 352, 353] {
+        let mut logits = quiet.clone();
+        logits[index] = 2.0;
+        assert_eq!(door(&logits), sigmoid(2.0), "index {index}");
+    }
+    for index in [349, 350, 354, FOOTSTEPS] {
+        let mut logits = quiet.clone();
+        logits[index] = 2.0;
+        assert!(door(&logits) < 0.001, "index {index}");
+    }
+    let mut knock = quiet.clone();
+    knock[353] = 1.0;
+    knock[348] = -1.0;
+    assert_eq!(door(&knock), sigmoid(1.0), "the highest of the group");
+}
+
 #[test]
 fn capture_handoff_is_bounded_and_never_waits_for_a_slow_classifier() {
     let (handoff, intake) = handoff();

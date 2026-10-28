@@ -1,7 +1,7 @@
 # #2562: asked at 14:20 and the desk empty from 49 s; a real knock at 14:31,
-# ESC-50 1-103999-A-30 scored by the pinned YAMNet, door 0.648 at 660 s, then
-# a face the lamp does not know 8.5 s after, who stays at the desk until
-# 739 s: one arrival. The head turns to the face once, and one text when they
+# ESC-50 1-103999-A-30 scored by the pinned YAMNet, door 0.944 at 660 s
+# (Knock; Door alone 0.648), then a face the lamp does not know 8.5 s after,
+# who stays at the desk until 739 s: one arrival. The head turns to the face once, and one text when they
 # go says they came in, from the knock.
 clock = "14:20"
 

@@ -1,6 +1,7 @@
 //! Room sound classes on `ears/classes` (#1669): speech, music and laughter
-//! scores from YAMNet over mic1, and a door and footsteps (#2562). Off unless `LAMP_EARS_CLASSES=on`, and only
-//! with `LAMP_PRIVACY_CONTROLS=on` (docs/sound-events.md).
+//! scores from YAMNet over mic1, and a door (a door, a sliding door, a slam
+//! or a knock) and footsteps (#2562). Off unless `LAMP_EARS_CLASSES=on`, and
+//! only with `LAMP_PRIVACY_CONTROLS=on` (docs/sound-events.md).
 //!
 //! Capture hands each admitted 20 ms block to a bounded queue and never waits:
 //! a full queue drops the block and marks the window overloaded. One worker
@@ -113,13 +114,18 @@ const GRAPH_SHA256: &str = "970ea63f4dc1aa33c86ef7d61d854319fdfe6bdd078f5b3d674e
 pub const DATA_NAME: &str = "yamnet.data";
 const DATA_BYTES: u64 = 14_915_108;
 const DATA_SHA256: &str = "1d6dff488da4712190e10f1c841252aa58011381132d0126dcd5ee56a4e7ed31";
-/// AudioSet indices in the bundled label map: Speech, Music, Laughter, and
-/// Door and "Walk, footsteps" (`yamnet_class_map.csv`, #2562).
+/// AudioSet indices in the bundled label map (`yamnet_class_map.csv`, as
+/// qai-hub-models v0.59.0's `labels/yamnet_labels.txt`): Speech, Music,
+/// Laughter, and "Walk, footsteps" (#2562).
 const SPEECH: usize = 0;
 const MUSIC: usize = 132;
 const LAUGHTER: usize = 13;
-const DOOR: usize = 348;
 const FOOTSTEPS: usize = 48;
+/// The door group, whose highest score is `door` (#2562): Door (348),
+/// Sliding door (351), Slam (352) and Knock (353). A knock on a door is
+/// AudioSet's Knock, not Door. Tap (354) is left out: desk taps and typing
+/// raise it all day.
+const DOOR_GROUP: [usize; 4] = [348, 351, 352, 353];
 const CLASSES: usize = 521;
 
 pub const FFT: usize = 512;
@@ -319,6 +325,14 @@ impl Frontend {
     }
 }
 
+/// The door group's highest score, from the model's 521 logits.
+fn door(logits: &[f32]) -> f32 {
+    DOOR_GROUP
+        .iter()
+        .map(|&index| sigmoid(logits[index]))
+        .fold(0.0, f32::max)
+}
+
 /// Logits get independent sigmoids: scores are multi-label, never a softmax.
 pub fn sigmoid(logit: f32) -> f32 {
     if logit >= 0.0 {
@@ -438,7 +452,7 @@ impl Model {
             laughter: sigmoid(logits[LAUGHTER]),
             // Guard mode's arrivals by sound (#2562), read only with
             // LAMP_GUARD_SOUNDS=on in lamp-skills.
-            door: sigmoid(logits[DOOR]),
+            door: door(logits),
             footsteps: sigmoid(logits[FOOTSTEPS]),
         })
     }
