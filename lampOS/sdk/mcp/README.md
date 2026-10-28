@@ -23,7 +23,7 @@ Each is one op, offered only when the lamp granted what it needs.
 | `lamp_state(which)` | `get`: presence (a count and how near, never who), light, mood, and talking/paused/private/asleep; by default every state the grants allow | none (presence: look) |
 | `lamp_wait_for(events, phrases, timeout_s)` | `subscribe`, the first matching event or `timed_out` (120 s at most), then `unsubscribe`; an event the grants don't allow is refused before anything is sent | the event's: `person.*` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound |
 | `lamp_express(feeling, strength)` | `express` | body, light |
-| `lamp_gesture(name)` | `gesture`: the lamp's 17 own gestures (not `idle` or `scanning`) | body |
+| `lamp_gesture(name)` | `gesture`: the lamp's own gestures, the schema's list less `idle` and `scanning` | body |
 | `lamp_look(at \| yaw, pitch)` | `look`, under a body lease of its own | body (and look for `face`) |
 | `lamp_move(step_ms, frames)` | `move`, under a body lease of its own | body |
 | `lamp_light(colour, level, for_ms, pattern)` | `light`, 30 s at most | light |
