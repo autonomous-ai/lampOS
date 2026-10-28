@@ -465,6 +465,9 @@ pub fn run(
                 };
                 std::thread::sleep(LOOK_EVERY);
                 let claim_started = Instant::now();
+                // A lost reply may hide a grant, which is never refunded, so
+                // the news won't tell it: say so, and a new heard START asks
+                // again (`a_lost_grant_reply_is_not_refunded_…`).
                 let Some(read) = ask(
                     &socket,
                     &json!({"op": "sign_in_take_code", "id": id}),
@@ -473,6 +476,13 @@ pub fn run(
                     return (crate::tools::unavailable(), false);
                 };
                 if refused(&read) {
+                    // A busy or timed-out owner granted nothing, and the
+                    // session stays open, so the news may still tell the
+                    // code: say it is coming, never that the sign-in failed
+                    // (the Reviewer-lead's P3 on #4070).
+                    if matches!(read["error"].as_str(), Some("timeout" | "busy")) {
+                        break;
+                    }
                     return (start_refused(&read), true);
                 }
                 match read["claim"].as_str() {
@@ -643,8 +653,8 @@ pub fn news(
                 .filter(|claim| {
                     claim["ok"] == true && claim["claim"] == "granted" && claim["id"] == id
                 }) && let Some(until) = code_until(&claim, claim_started)
+                    && let Some(code) = claim["code"].as_str()
                 {
-                    let code = claim["code"].as_str().unwrap();
                     keep_said(Some(code), None);
                     news.push(SignInNews {
                         key: key(id, "code"),
@@ -2382,6 +2392,28 @@ mod tests {
                 ],
                 vec!["sign_in_state", "sign_in_start", "sign_in_take_code"],
                 "no longer available",
+                false,
+            ),
+            // A busy or timed-out owner while Harness is still starting:
+            // nothing was granted, so the code is said to be coming.
+            (
+                vec![
+                    capable.clone(),
+                    starting.clone(),
+                    json!({"ok":false,"error":"busy"}),
+                ],
+                vec!["sign_in_state", "sign_in_start", "sign_in_take_code"],
+                "read it out in a moment",
+                false,
+            ),
+            (
+                vec![
+                    capable.clone(),
+                    starting.clone(),
+                    json!({"ok":false,"error":"timeout"}),
+                ],
+                vec!["sign_in_state", "sign_in_start", "sign_in_take_code"],
+                "read it out in a moment",
                 false,
             ),
             (
