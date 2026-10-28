@@ -376,6 +376,11 @@ pub struct Progress {
     /// published (#1800): at most two, so a rebuilt walk cannot ask again.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub giving_way_tries: u8,
+    /// "Where you sit" was asked this setup/redo: its intro is said once,
+    /// and every later ask (nobody there, a pause, a restart) says the
+    /// step's short `reoffer` line. An older build reads past it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub opened: bool,
 }
 
 fn is_zero(value: &u8) -> bool {
@@ -2252,7 +2257,12 @@ impl Onboarding {
                     self.owed = Some(self.definition.note(step, true).to_owned());
                     return None;
                 }
-                return Some(self.definition.note(step, false).into());
+                let opened = step == Step::WhereYouSit && self.desired.opened;
+                if step == Step::WhereYouSit && !opened {
+                    self.desired.opened = true;
+                    self.save();
+                }
+                return Some(self.definition.note(step, opened).into());
             }
             return None;
         };
@@ -5169,12 +5179,23 @@ mod tests {
         assert!(!room.walk.leading());
         assert!(room.walk.kept().steps.is_empty());
         room.at = 44 * S;
-        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        // The intro is said once a walk: asked again, the short line.
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
         // They leave: after half a minute the step is dropped, and asked
-        // again when they are back.
+        // again when they are back, with the short line too.
         room.wait(31 * S, None);
         assert!(!room.walk.leading());
-        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
+        // A restart mid-step keeps that the intro was said.
+        let mut restarted = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        assert!(restarted.walk.kept().opened);
+        assert_eq!(restarted.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
         // Not at rest: nothing is begun.
         let mut busy = Onboarding::at(file("busy"));
         for at in 0..20 {
