@@ -51,6 +51,19 @@ pub const LEAST_LOOKS: usize = 5;
 /// at 1280 by 960, so a face seated at the desk (eyes about 20 detector
 /// pixels apart, `unknown (small)` on every look before) is read.
 pub const LEAST_EYES_PX: f32 = 24.0;
+/// `LAMP_EYES_MESH_LEAST_EYES_PX=N` (a number, 8 to 24): a window the mesh
+/// read on every look is judged from this many pixels between the eyes,
+/// instead of [`LEAST_EYES_PX`] (#1711, lamp-29e7: a person seated at the
+/// desk has about 18 to 20 detector pixels, so every look was `unknown
+/// (small)`). The corners' bar is unchanged. Unset: [`LEAST_EYES_PX`].
+pub const MESH_LEAST_ENVIRONMENT: &str = "LAMP_EYES_MESH_LEAST_EYES_PX";
+/// [`MESH_LEAST_ENVIRONMENT`]'s value, if it is a number from 8 to
+/// [`LEAST_EYES_PX`].
+pub fn mesh_least_from(value: Option<&str>) -> Option<f32> {
+    value
+        .and_then(|value| value.trim().parse::<f32>().ok())
+        .filter(|least| (8.0..=LEAST_EYES_PX).contains(least))
+}
 /// A face turned further than this hides one corner behind the other.
 pub const MOST_TURN_DEG: f32 = 30.0;
 /// The eye line bending by more than this, in radians from one look to the
@@ -81,6 +94,7 @@ const FORGET_US: u64 = 3_000_000;
 pub fn from_environment() -> Option<Mouths> {
     (std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")).then(|| Mouths {
         drop_outliers: std::env::var(OUTLIER_ENVIRONMENT).ok().as_deref() == Some("on"),
+        mesh_least: mesh_least_from(std::env::var(MESH_LEAST_ENVIRONMENT).ok().as_deref()),
         ..Mouths::default()
     })
 }
@@ -116,6 +130,8 @@ pub struct Mouths {
     drop_outliers: bool,
     /// [`Mouths::set_mesh_scale`]; `None` is 1.
     mesh_scale: Option<f32>,
+    /// [`MESH_LEAST_ENVIRONMENT`]; `None` is [`LEAST_EYES_PX`].
+    mesh_least: Option<f32>,
 }
 
 const UNKNOWN: Speaking = Speaking {
@@ -279,7 +295,12 @@ impl Mouths {
             .map(|look| if all_meshed { look.5 } else { look.2 })
             .sum::<f32>()
             / (looks.len().max(1) as f32);
-        let small = mean_eyes < LEAST_EYES_PX;
+        let least = if all_meshed {
+            self.mesh_least.unwrap_or(LEAST_EYES_PX)
+        } else {
+            LEAST_EYES_PX
+        };
+        let small = mean_eyes < least;
         if let Some(detail) = diagnostic.as_deref_mut() {
             detail.eyes_px = Some(eyes);
             detail.window_mean_eyes_px = Some(mean_eyes);
@@ -926,6 +947,24 @@ mod diagnostic_tests {
         assert!(!detail.mesh_current);
         assert_eq!(detail.reason, Reason::Corners);
         assert_eq!(said.from, Some(SpeakingFrom::Corners));
+    }
+
+    /// #1711: the mesh window's least eye distance from the environment,
+    /// a number from 8 to the corners' bar only; anything else is unset.
+    #[test]
+    fn the_mesh_windows_least_eye_distance_is_a_number_from_8_to_24() {
+        assert_eq!(mesh_least_from(Some("18")), Some(18.0));
+        assert_eq!(mesh_least_from(Some(" 24 ")), Some(24.0));
+        for value in [
+            None,
+            Some(""),
+            Some("7.9"),
+            Some("25"),
+            Some("on"),
+            Some("NaN"),
+        ] {
+            assert_eq!(mesh_least_from(value), None, "{value:?}");
+        }
     }
 
     #[test]
