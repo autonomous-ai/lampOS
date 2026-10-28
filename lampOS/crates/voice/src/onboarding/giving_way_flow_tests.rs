@@ -60,6 +60,7 @@ impl Store {
                     at_unix_s: 1,
                     framing: None,
                     offered_at_unix_s: None,
+                    later_offers: 0,
                 },
             );
         }
@@ -305,7 +306,8 @@ fn with_the_file_from_before_3769_a_second_try_asks_as_the_first() {
     let played = play_saying(&mut walk, now + 2 * S, 2, |_| first);
     let now = played.at(60_000);
     assert_eq!(settle(&mut walk, now).len(), 1);
-    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    // No push felt in either try: later, never failed (#3996).
+    assert_eq!(outcome(&walk), Some(Outcome::Later));
 }
 
 #[test]
@@ -323,12 +325,13 @@ fn a_rebuilt_walk_keeps_its_invitations_and_does_not_ask_a_third_time() {
     assert_eq!(walk.pending().invitations[0].attempt, 2);
     let played = play(&mut walk, now, 2);
     assert_eq!(walk.kept().giving_way_tries, 2);
-    // Rebuilt again with both spent: failed, and never asked a third time.
+    // Rebuilt again with both spent, and no push felt: later (#3996),
+    // and never asked a third time.
     drop(walk);
     let now = played.at(1_000);
     let mut walk = store.cycle(now);
-    assert_eq!(settle(&mut walk, now), [GIVE_FAILED]);
-    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert_eq!(settle(&mut walk, now), [crate::onboarding::skill::LATER]);
+    assert_eq!(outcome(&walk), Some(Outcome::Later));
     assert!(walk.pending().invitations.is_empty());
     assert_eq!(walk.kept().giving_way_tries, 2);
 }
@@ -895,7 +898,7 @@ fn a_late_push_near_the_trys_end_is_done() {
 /// second invitation says what didn't work, and the end is the plain fail
 /// line, never a silent minute.
 #[test]
-fn no_push_at_all_is_prompted_each_try_then_failed_plainly() {
+fn no_push_at_all_is_prompted_each_try_then_left_for_later() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
     let mut played = play(&mut walk, 10 * S, 1);
@@ -909,8 +912,12 @@ fn no_push_at_all_is_prompted_each_try_then_failed_plainly() {
             played = play(&mut walk, now, 2);
         }
     }
-    assert_eq!(said, [GIVE_PROMPT, GIVE_PROMPT, GIVE_FAILED]);
-    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    // No push felt in either try is no attempt: later, said so (#3996).
+    assert_eq!(
+        said,
+        [GIVE_PROMPT, GIVE_PROMPT, crate::onboarding::skill::LATER]
+    );
+    assert_eq!(outcome(&walk), Some(Outcome::Later));
 }
 
 /// The person pushes and talks over the invitation ("like this?"), which

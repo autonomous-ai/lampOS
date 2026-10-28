@@ -56,6 +56,7 @@ impl Store {
                     at_unix_s: 1,
                     framing: None,
                     offered_at_unix_s: None,
+                    later_offers: 0,
                 },
             );
         }
@@ -800,6 +801,7 @@ fn persisted_samples_are_validated_on_load() {
                     at_unix_s: 1,
                     framing: None,
                     offered_at_unix_s: None,
+                    later_offers: 0,
                 },
             );
         },

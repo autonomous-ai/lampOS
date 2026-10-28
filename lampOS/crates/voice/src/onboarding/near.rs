@@ -846,6 +846,9 @@ impl Onboarding {
         }
         let listening = self.near.listening.take().expect("open");
         let line = self.near.line.take();
+        if line.is_some() {
+            self.mark_tried(Step::HowYouSound);
+        }
         self.near.seen.clear();
         let bar = self.sentence_bar();
         let close = |line: &Line| line.rise_db.is_some_and(|rise| rise >= bar);
@@ -883,15 +886,21 @@ impl Onboarding {
     }
 
     fn sentence_finished(&mut self, outcome: Outcome, now_us: u64) {
+        // Nothing heard in either part, call or sentence: later (#3996).
+        // A call the name part took, kept from before a restart, counts.
+        let called = self.near.named == Some(Outcome::Done);
+        let outcome = if outcome == Outcome::Failed && !called && !self.was_tried(Step::HowYouSound)
+        {
+            Outcome::Later
+        } else {
+            outcome
+        };
         self.finish(Step::HowYouSound, outcome, None, now_us);
-        self.owed = Some(
-            if outcome == Outcome::Done {
-                self.definition.words.sentence_done.as_str()
-            } else {
-                self.definition.words.sentence_failed.as_str()
-            }
-            .to_owned(),
-        );
+        self.owed = Some(match outcome {
+            Outcome::Done => self.definition.words.sentence_done.clone(),
+            Outcome::Later => self.definition.later_line(),
+            _ => self.definition.words.sentence_failed.clone(),
+        });
     }
 
     /// Judge the try being listened for, once its evidence is all in. Pure
@@ -934,6 +943,9 @@ impl Onboarding {
             }
             _ => false,
         });
+        if !heard.is_empty() {
+            self.mark_tried(Step::HowYouSound);
+        }
         let (hearings, levels, mut spoke, spoiled) = self.near.take_evidence();
         // The prompt itself: the lamp spoke until its end.
         spoke.push(Spoke {
