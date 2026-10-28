@@ -779,3 +779,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 08:58: quiet on GitHub. skill-sign: JS pushSkill now pre-checks rulesBeyond as Python's push_skill does (no_grant, raw topic refused before any byte); JS 46.
 - 09:01: quiet on GitHub. skill-sign: both fakes open a pushed package with open_package/openPackage (signature, paths, files) and answer asks plus author (FPR16) when signed, on the answer and in skill.list; `lamp skill list` prints "signed by key FPR". Python 94, JS 46.
 - 09:04: quiet for me (Ten's 75c9 body start under way). skill-sign: fakes refuse a signed push with no asks on part 0 (bad_request, until Nine names the lamp's code). Python 94, JS 46.
+- 09:04: quiet for me; #3979 ARM64 still running. skill-sign: control.md gets a "Shared skills, signed" bullet (keygen, pack --sign, check, install FILE|URL, asks on part 0 and what it does and doesn't do), 075bae2c5b.
