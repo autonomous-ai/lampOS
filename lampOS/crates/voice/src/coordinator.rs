@@ -5708,6 +5708,9 @@ fn conversation_with_gate_inner(
     // (#3923). Not the oldest speech block kept: blocks are kept from
     // outside any turn too, and on c0a4 that start was 2.5 s early.
     let mut line_began: Option<(u64, u64)> = None;
+    // The newest turn told the second route as the step's call: a turn is
+    // told once, even after its words took its place in `step_call_lines`.
+    let mut step_call_told: u64 = 0;
     // Its words as they come, in memory only, until the last piece: on
     // Live they come in pieces, all of which are counted.
     let mut sentence_heard: Option<String> = None;
@@ -8636,10 +8639,12 @@ fn conversation_with_gate_inner(
             if matches!(step, AdmissionStep::Audio(_) | AdmissionStep::End(_))
                 && let Some(current) = reply.as_ref()
                 && !current.local_input_ended
+                && current.owner.turn() > step_call_told
                 && sentence_turn != Some(current.owner.turn())
-                && !step_call_lines
-                    .iter()
-                    .any(|(turn, _)| *turn == current.owner.turn())
+                // Its End sent early: nothing more goes for it.
+                && early
+                    .as_ref()
+                    .is_none_or(|early| !early.holds(current.owner.turn()))
                 && step_call(onboarding.as_ref())
             {
                 let turn = current.owner.turn();
@@ -8648,6 +8653,7 @@ fn conversation_with_gate_inner(
                     privacy_generation: snapshot.microphone_generation(),
                 });
                 step_call_lines.push_back((turn, None));
+                step_call_told = turn;
                 if step_call_lines.len() > STEP_CALL_LINES {
                     step_call_lines.pop_front();
                 }
@@ -9441,6 +9447,7 @@ fn conversation_with_gate_inner(
                             privacy_generation: snapshot.microphone_generation(),
                         });
                         step_call_lines.push_back((current.owner.turn(), None));
+                        step_call_told = current.owner.turn();
                         if step_call_lines.len() > STEP_CALL_LINES {
                             step_call_lines.pop_front();
                         }
@@ -9549,6 +9556,16 @@ fn conversation_with_gate_inner(
                                 took_over_turn == Some(turn),
                             )?;
                             early.send(turn, sent_at, captured_at_us);
+                            // A call's line ended to the route here: its
+                            // words may come back before the lamp is sure
+                            // (#3923, a slow "Hey, … Lamp").
+                            if let Some((_, spoken)) =
+                                step_call_lines.iter_mut().find(|(told, _)| *told == turn)
+                                && let Some((_, began)) = line_began.filter(|(of, _)| *of == turn)
+                            {
+                                *spoken = Some((began, captured_at_us.max(began)));
+                                near_call_line_ended(onboarding.as_mut(), began);
+                            }
                             // The request's sound has ended, for the floor,
                             // the second look and the room. The lamp's own
                             // authority still says it is listening.
@@ -9607,6 +9624,12 @@ fn conversation_with_gate_inner(
                                     controls.as_ref(),
                                     onboarding.as_ref(),
                                 );
+                                // The same line going on: its start is the
+                                // line given up's (a slow "Hey, … Lamp"), or
+                                // the opening's first block (#3923).
+                                let line_start = line_began
+                                    .map(|(_, at)| at)
+                                    .or_else(|| opening.first().map(|block| block.captured_at_us));
                                 snapshot = continue_after_early_end(
                                     owner,
                                     reply,
@@ -9621,6 +9644,10 @@ fn conversation_with_gate_inner(
                                     trace,
                                     |state| rig.publish(state),
                                 )?;
+                                line_began = reply
+                                    .as_ref()
+                                    .zip(line_start)
+                                    .map(|(current, at)| (current.owner.turn(), at));
                                 if not_now {
                                     onboarding_marked =
                                         reply.as_ref().map(|current| current.owner.turn());
