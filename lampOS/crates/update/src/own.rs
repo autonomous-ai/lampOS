@@ -55,6 +55,13 @@ pub const DEADLINE: Duration = Duration::from_secs(600);
 pub const VERSION: u32 = 1;
 const PENDING: &str = "self.json";
 const REFUSED: &str = "self-refused";
+/// The builds put back once and tried once more (#2810): put back again,
+/// one stays refused for good.
+const RETRIED: &str = "self-retried";
+/// The build a switch began to, and the boot it began on (#2810).
+const BEGAN: &str = "self-began";
+/// The kernel's id of this boot, new at every start.
+pub const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
 
 /// Whether the switch is on, from its value.
 pub fn on(value: Option<&str>) -> bool {
@@ -265,14 +272,96 @@ fn end(records: &Path) -> io::Result<()> {
     }
 }
 
-/// The binaries put back, by SHA-256: never switched to again.
+/// The binaries put back, by SHA-256: never switched to again, unless
+/// once more ([`refused_for_good`]).
 pub fn refused(records: &Path) -> Vec<String> {
-    fs::read_to_string(records.join(REFUSED))
+    builds_in(&records.join(REFUSED))
+}
+
+/// The binaries put back once and tried once more ([`retry`]).
+pub fn retried(records: &Path) -> Vec<String> {
+    builds_in(&records.join(RETRIED))
+}
+
+fn builds_in(path: &Path) -> Vec<String> {
+    fs::read_to_string(path)
         .unwrap_or_default()
         .lines()
         .filter(|line| is_build(line))
         .map(str::to_owned)
         .collect()
+}
+
+/// Whether a build put back is never taken again (#2810). A put-back says
+/// only that the switch was not confirmed in time. A power cut or a reboot
+/// in its ten minutes reads the same as a build that can't run, and on a
+/// lamp with no clock of its own the jump of its clock at the next boot can
+/// pass the deadline before the confirming round runs. So a build whose
+/// switch began on a boot that has since ended is tried once more. One put
+/// back on the boot it began on, or put back a second time, stays refused.
+pub fn refused_for_good(records: &Path, root: &Path, build: &str) -> bool {
+    refused(records).iter().any(|known| known == build)
+        && (retried(records).iter().any(|known| known == build)
+            || !began_on_a_boot_since_ended(records, root, build))
+}
+
+/// This boot's id under `root`, when the kernel gives one.
+pub fn boot_id(root: &Path) -> Option<String> {
+    let id = fs::read_to_string(on_root(root, BOOT_ID)).ok()?;
+    let id = id.trim();
+    (!id.is_empty() && id.len() <= 64).then(|| id.to_owned())
+}
+
+/// Noted as a switch to `build` begins: the boot it begins on. Nothing is
+/// noted when the boot is not known, and then no retry is ever made.
+pub(crate) fn note_began(records: &Path, root: &Path, build: &str) -> io::Result<()> {
+    let Some(boot) = boot_id(root) else {
+        return Ok(());
+    };
+    write_whole(
+        &records.join(BEGAN),
+        format!("{build} {boot}\n").as_bytes(),
+        0o600,
+    )
+}
+
+fn began_on_a_boot_since_ended(records: &Path, root: &Path, build: &str) -> bool {
+    let Ok(text) = fs::read_to_string(records.join(BEGAN)) else {
+        return false;
+    };
+    let Some((began, boot)) = text.trim().split_once(' ') else {
+        return false;
+    };
+    began == build && boot_id(root).is_some_and(|now| now != boot)
+}
+
+/// A build put back once, taken again: written to `self-retried` first,
+/// then taken out of `self-refused`, so a cut between the two leaves it
+/// refused for good rather than tried for ever. When `lamp-update-back`
+/// puts it back again it writes it to `self-refused` again, as it always
+/// has. Nothing for a build not refused.
+pub(crate) fn retry(records: &Path, build: &str) -> io::Result<bool> {
+    let refused = refused(records);
+    if !refused.iter().any(|known| known == build) {
+        return Ok(false);
+    }
+    let mut retried = retried(records);
+    if !retried.iter().any(|known| known == build) {
+        retried.push(build.to_owned());
+        write_whole(
+            &records.join(RETRIED),
+            format!("{}\n", retried.join("\n")).as_bytes(),
+            0o600,
+        )?;
+    }
+    let left: Vec<String> = refused.into_iter().filter(|known| known != build).collect();
+    let text = if left.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", left.join("\n"))
+    };
+    write_whole(&records.join(REFUSED), text.as_bytes(), 0o600)?;
+    Ok(true)
 }
 
 fn link_names(root: &Path, build: &str) -> bool {
