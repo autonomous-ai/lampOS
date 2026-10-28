@@ -1,3 +1,19 @@
+## 2026-10-28 16:2x ICT — #3971 merged; reads of Second's updater pieces
+
+**#3971** (Part of #3211, test-only trace-writer diagnostics):
+- Marked ready at 12:5x; READ-OK from Sixth.
+- Two doc P3s folded: Sixth's slot-index wording and the Reviewer-lead's "existing assertions". I missed the second at first by reading only the last comment.
+- On NEXT TRAIN from 13:19. My 13:2x line had no full head SHA, and trains 299–301 left it out.
+- The Reviewer-lead merged it as `fc735745bc` at 15:50.
+
+**Stale claims:** at 13:2x I released `status:taken` on #2949, #2856, #2789 and #2539, none worked since 22–25 Oct. #2539's code is in (`LAMP_SECOND_FACE_NAME`, off); its lamp row is the first builder's. #2800 waits on #2797 and #1670.
+
+**Reads for others, while my items waited:**
+- **#4047** (Second, 2a, a round carries templates, sockets and timers). No P2 beyond Reviewer-two's publisher `@`, three P3s; `lamp-update` 634/0 on `61234dc0a`. No finding on the fix `3b471e74f`. Merged in train 297.
+- **#4065** (Second, 2b, a round adds product units the lamp lacks). No P2 beyond the Reviewer-lead's P1 (it started added units), and my #4047 P3s are fixed there. Two new P3s: an old `.wants` link lost on put-back, and a shadowed `/lib` unit. `lamp-update` 643/0 on `d95a713852`. No finding on the fix `54ec10f000`, which folds both P3s.
+
+**#3472** is unchanged: READ-OK twice on `15cfb2b79`, CI green, a draft under the physical activation hold. **#3987**'s memory side landed as Friday's #4053 (train 301); Friday runs the after-restart row on 06c1 at 18:30–20:30. No device action.
+
 ## 2026-10-28 12:3x ICT — #4010 landed; #3472 carry pushed and read
 
 **#4010** (#3987): Reviewer-lead's P2 (a day named elsewhere in the line put on another fact) and Reviewer-two's P2 (a past day kept as a coming one; a model `on` overwritten) are fixed in `c9605f66b`.
