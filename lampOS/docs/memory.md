@@ -766,7 +766,11 @@ passed. Tests: the notes' exact texts in `remember::tests`.
       hear the name in keeps a name that opens it, word for word. Known
       cost: someone addressed at the line's start ("Tom, …") just as
       lamp-name hears the lamp's name has that word left out of what is
-      kept. Tests: `second_provider::tests::wake_not_name`,
+      kept. A line that opens by calling the lamp by its name as itself
+      ("Hey, Lamp. …", "Lamp, …", past one greeting, "Hello. Hey Lamp,
+      …") is held without the call too, and the model is told nothing
+      (`second_provider::name_call_rest`; 28 Oct night run on lamp-06c1
+      kept "They said: Hey, Lamp. …"). Tests: `second_provider::tests::wake_not_name`,
       `worker::tests::lamp_name_s_hearing_in_a_line_is_known_with_or_without_the_note`.
   - **With `LAMP_MEMORY_REMEMBER_ONCE`:** an answer that already carries a
     `note` or `"existing": true` (nothing new written) is left as it is;
@@ -2406,8 +2410,11 @@ then use that person's scope:
     runs against what the room remembers. Older room observations can contain
     a guest's own words, so the lamp may remove a matching room item and
     tells the speaker that only the room's memory was changed. If nothing
-    matches, it says so; it never claims to have cleared a person's private
-    memory. The second voice route waits up to 300 ms for a late face before
+    matches, it says so, and that it looked in what the room remembers: the
+    forget's own note carries the room's words as well as `scope_note`,
+    since the model follows the note's example (lamp-06c1, 28 Oct: "Nothing
+    was kept about pork", no word of the room). It never claims to have
+    cleared a person's private memory. The second voice route waits up to 300 ms for a late face before
     choosing between that person's scope and the room's. A request to forget
     everything about a person still needs a known face.
   - **The journal** says, with no words: "a remember about a person was not

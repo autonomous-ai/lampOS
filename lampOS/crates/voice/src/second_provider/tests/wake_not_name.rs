@@ -278,3 +278,65 @@ fn keep_heard_keeps_the_line_without_the_wake() {
     assert!(!kept.contains("Edeland"), "{kept}");
     assert!(kept.contains("my dog is called Moe"), "{kept}");
 }
+
+/// lamp-06c1, 28 Oct (night run): with `LAMP_MEMORY_KEEP_HEARD`, a line
+/// that called the lamp by its name as itself was kept with the call
+/// ("They said: Hey, Lamp. …"). The line is now held without it, and the
+/// model is told nothing; a line without the name heard, or with the switch
+/// off, is held as it was said.
+#[test]
+fn a_line_that_calls_the_lamp_by_name_is_held_without_the_call() {
+    let now = Instant::now();
+    for (request, heard, rest) in [
+        (
+            9_904_601,
+            "Hey, Lamp. Remember I went to the dentist last Friday.",
+            "Remember I went to the dentist last Friday.",
+        ),
+        (
+            9_904_602,
+            "Lamp, please remember this. I went to the dentist.",
+            "please remember this. I went to the dentist.",
+        ),
+        (
+            9_904_603,
+            "Hello. Hey Lamp, guess what? I changed jobs.",
+            "guess what? I changed jobs.",
+        ),
+    ] {
+        assert_eq!(wake_not_a_name(request, heard, true, true), None, "{heard}");
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.line_of(request, heard);
+        assert_eq!(
+            thread.heard_for(request, now).as_deref(),
+            Some(rest),
+            "{heard}"
+        );
+    }
+    for (request, heard, named, keep_heard) in [
+        (9_904_604, "Hey, Lamp. My dog is called Moe.", false, true),
+        (9_904_605, "Hey, Lamp. My dog is called Moe.", true, false),
+        // A person greeted by name keeps theirs; the call is not the opening.
+        (
+            9_904_606,
+            "Hello, Anna. Lamp, remember Anna's birthday.",
+            true,
+            true,
+        ),
+        // The call alone is all there is.
+        (9_904_607, "Hey, Lamp.", true, true),
+    ] {
+        assert_eq!(
+            wake_not_a_name(request, heard, named, keep_heard),
+            None,
+            "{heard}"
+        );
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.line_of(request, heard);
+        assert_eq!(
+            thread.heard_for(request, now).as_deref(),
+            Some(heard),
+            "{heard}"
+        );
+    }
+}
