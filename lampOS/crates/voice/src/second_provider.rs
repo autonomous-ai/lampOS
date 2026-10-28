@@ -5136,9 +5136,26 @@ async fn spoken(
                 // reviewer-three's P2 on #4090).
                 named = shared.scope_seen
                     && crate::speaking_faces::named_alone(&speakers, &person, pair.as_ref(), alone);
+                let known_face = pair.as_ref().map(|(_, face)| face.clone());
                 let theirs =
                     !crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen);
-                let note = crate::speaking_faces::seen_speaking_note(&speakers, theirs);
+                let note = crate::speaking_faces::seen_speaking_note(
+                    &speakers,
+                    theirs,
+                    known_face.as_deref(),
+                )
+                // With no face seen speaking it, what the eyes' looks held, in
+                // counts (lamp-29e7: 18 of 20 lines so, nothing to say why).
+                .map(|note| {
+                    if speakers.is_empty() && shared.scope_seen {
+                        format!(
+                            "{note} [{}]",
+                            eyes.sight_told(known_face.as_deref(), begun, finishing)
+                        )
+                    } else {
+                        note
+                    }
+                });
                 // Kept as theirs: one line saying whose face it was, so a
                 // journal with two faces in view tells which one it went to.
                 if theirs && let Some(note) = &note {
