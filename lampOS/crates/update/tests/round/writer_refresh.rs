@@ -147,7 +147,7 @@ fn a_back_that_began_before_the_refresh_and_failed_is_waited_past_never_put_back
             ..Running::default()
         },
     );
-    // Began in the refresh's own millisecond: it may be the copy before's.
+    // Began at the refresh's own time: it may be the copy before's.
     lamp.systemd.back_began = Some(done.at_unix_ms);
     lamp.round();
     assert_eq!(lamp.read(BACK), "lamp-update 1");
