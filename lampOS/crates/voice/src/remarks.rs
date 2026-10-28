@@ -201,6 +201,21 @@ pub fn asks(heard: &str) -> bool {
     })
 }
 
+/// Whether one sentence or clause asks or tells whoever hears it something:
+/// it ends in a `?`, says "you" or "please", or past its leading words
+/// begins as a question or with a word that tells them to do something.
+/// Unlike [`asks`], "your", "thanks" and the lamp's name alone ask nothing
+/// here, so a remark about the lamp ("I love your lamp") is not a request
+/// (#4175, Fourth's P2 on #4201: "Turn off the lamp.", "Can you dim the
+/// lamp?").
+pub fn asks_in(clause: &str) -> bool {
+    clause.trim_end().ends_with('?')
+        || words(clause).any(|word| word == "you" || word == "please")
+        || past_leading(clause).next().is_some_and(|first| {
+            QUESTION_WORDS.contains(&first.as_str()) || DOING_WORDS.contains(&first.as_str())
+        })
+}
+
 /// Whether a line is a question, or names the lamp: a `?`, a sentence that
 /// begins with a question word or a helping verb (after one "and", "so",
 /// "but" or "then" at most: "And how long would that take by train" with no

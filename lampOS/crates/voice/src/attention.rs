@@ -1230,13 +1230,13 @@ impl Attention {
         self.name_stays = on;
     }
 
-    /// Whether the words heard of the request in hand call the lamp by name
-    /// ("Lamp.", "Hey Lamp, …"), not someone else.
     /// Whether the lamp's head was tapped for the request in hand.
     pub fn tapped(&self) -> bool {
         self.tapped
     }
 
+    /// Whether the words heard of the request in hand call the lamp by name
+    /// ("Lamp.", "Hey Lamp, …"), not someone else.
     pub fn called_in_its_words(&self) -> bool {
         called_by_name_on(&self.heard, self.stand_alone_ins)
     }

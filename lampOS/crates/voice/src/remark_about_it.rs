@@ -21,7 +21,11 @@
 //!   on, so the next line needs a sign of its own.
 //!
 //! A line said to the lamp ("Lamp, is it cute?", "Hey lamp") keeps its call:
-//! its "lamp" follows no determiner. Without the switch, as before.
+//! its "lamp" follows no determiner. So does one that asks or tells it
+//! something with the lamp as its object ("Turn off the lamp.", "Can you dim
+//! the lamp?", "Is the lamp on?"): a clause that names the lamp and asks
+//! anything is no remark ([`crate::remarks::asks_in`]). Without the switch,
+//! as before.
 
 /// Where the second route reads the switch.
 pub const ENVIRONMENT: &str = "LAMP_REMARK_ABOUT_IT";
@@ -41,10 +45,36 @@ const ABOUT: &[&str] = &[
 ];
 
 /// Whether `heard` names the lamp only as a thing talked about: it says
-/// "lamp" at least once, and every "lamp" follows one of [`ABOUT`]. A line
-/// with no "lamp" in its words is not judged here: its call may have been
-/// lost in the hearing.
+/// "lamp" at least once, every "lamp" follows one of [`ABOUT`], and no
+/// sentence or clause that names it asks or tells anything
+/// ([`crate::remarks::asks_in`]): "Turn off the lamp." and "Can you dim the
+/// lamp?" are said to it (Fourth's and the Reviewer-three's P2 on #4201). A
+/// line with no "lamp" in its words is not judged here: its call may have
+/// been lost in the hearing.
 pub fn talked_about(heard: &str) -> bool {
+    let asked = heard
+        .split_inclusive(['.', '!', '?', ';', ','])
+        .filter(|clause| named(clause))
+        .any(crate::remarks::asks_in);
+    !asked && only_about(heard)
+}
+
+/// Whether a clause says "lamp" or "lamb" (one or many, or its own).
+fn named(clause: &str) -> bool {
+    clause
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .map(str::to_lowercase)
+        .any(|word| {
+            matches!(
+                word.trim_end_matches("'s"),
+                "lamp" | "lamps" | "lamb" | "lambs"
+            )
+        })
+}
+
+/// Whether `heard` says "lamp" (or "lamb") and every one follows one of
+/// [`ABOUT`].
+fn only_about(heard: &str) -> bool {
     let words: Vec<String> = heard
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
         .filter(|word| !word.is_empty())
@@ -53,7 +83,9 @@ pub fn talked_about(heard: &str) -> bool {
     let mut said = false;
     for (index, word) in words.iter().enumerate() {
         let word = word.trim_end_matches("'s");
-        if word != "lamp" && word != "lamps" {
+        // "Lamb" is the name's own mishearing (`called_by_real_name`; the
+        // Tests lane's P3 on #4201).
+        if !matches!(word, "lamp" | "lamps" | "lamb" | "lambs") {
             continue;
         }
         said = true;
@@ -74,9 +106,10 @@ mod tests {
         for heard in [
             "That lamp is cute.",
             "That lamp is cute, where did you get it?",
-            "Is the lamp on?",
             "I love your lamp's light.",
-            "Where did you get this lamp? And that lamp?",
+            "That lamp is so cute, where did you get it?",
+            "That lamp is cute. Where did you get it?",
+            "That lamb is cute.",
         ] {
             assert!(talked_about(heard), "{heard}");
         }
@@ -90,6 +123,15 @@ mod tests {
             "Lamp what's the weather",
             "Thanks lamp.",
             "That lamp is cute. Lamp, are you listening?",
+            // Said to it, the lamp as the thing to act on (#4201's P2).
+            "Turn off the lamp.",
+            "Can you dim the lamp?",
+            "Can you dim the lamp a little?",
+            "Mainland. Turn off the lamp please.",
+            "Make the lamp brighter, please.",
+            "Make the lamp brighter.",
+            "Dim the lamp, please.",
+            "Is the lamp on?",
             "Do you want confidence? Going downstairs.",
             "Yes, please. A latte. No sugar.",
             "",
