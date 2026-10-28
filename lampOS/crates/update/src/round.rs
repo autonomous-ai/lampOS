@@ -2660,7 +2660,7 @@ impl Run<'_, '_> {
         if !self.config.self_switch
             || !ours
             || !newer
-            || own::refused(self.records.folder()).contains(&carried.sha256)
+            || own::refused_for_good(self.records.folder(), &self.config.root, &carried.sha256)
         {
             return Outcome::Refused(why);
         }
@@ -2745,7 +2745,7 @@ impl Run<'_, '_> {
         let old = old.to_string_lossy().into_owned();
         if !unit::is_build_folder(&unit::folder(own::FOLDER, &old))
             || file_sha256(&link.join(own::BINARY)).is_ok_and(|sha| sha == file.sha256)
-            || own::refused(self.records.folder()).contains(&file.sha256)
+            || own::refused_for_good(self.records.folder(), &self.config.root, &file.sha256)
         {
             return Ok(None);
         }
@@ -2796,6 +2796,17 @@ impl Run<'_, '_> {
                 unit::folder(own::FOLDER, &old)
             ));
         }
+        // One put back across a reboot is tried once more (#2810), said.
+        if own::retry(self.records.folder(), &file.sha256)
+            .map_err(|error| format!("self-refused cannot be written: {error}"))?
+        {
+            self.say(&format!(
+                "lamp-update's build {} was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final",
+                &file.sha256[..12]
+            ));
+        }
+        own::note_began(self.records.folder(), &self.config.root, &file.sha256)
+            .map_err(|error| format!("self-began cannot be written: {error}"))?;
         own::begin(self.records.folder(), &old, &file.sha256)
             .map_err(|error| format!("self.json cannot be written: {error}"))?;
         replace_link(&link, &file.sha256).map_err(|error| {
