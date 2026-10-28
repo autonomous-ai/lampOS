@@ -976,6 +976,35 @@ async fn call(app: &axum::Router, method: &str, path: &str, body: Value) -> (Sta
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn the_recovery_hotspot_takes_a_network_only_with_the_lamps_own_key() {
+    let (app, status, started, root) = app(false);
+    let credential = root.config(false).credential;
+    std::fs::write(&credential, "AIza-key_1\n").unwrap();
+    status.lock().unwrap().runtime_phase = lamp_setup::recover::RECOVERING.into();
+    // The sticker's suffix, another key and no key are all refused.
+    for key in ["4ace", "AIza-key_2", ""] {
+        let mut request = good();
+        request["llm_api_key"] = json!(key);
+        let (code, body) = call(&app, "POST", "/api/device/setup", request).await;
+        assert_eq!(code, StatusCode::FORBIDDEN, "{key:?}");
+        assert!(body["message"].as_str().unwrap().contains("own key"));
+    }
+    assert!(started.lock().unwrap().is_empty());
+    assert_eq!(status.lock().unwrap().phase, Phase::Idle);
+    // The owner's key, as the account page passes it, starts the run.
+    let (code, _) = call(&app, "POST", "/api/device/setup", good()).await;
+    assert_eq!(code, StatusCode::OK);
+    assert_eq!(started.lock().unwrap().len(), 1);
+    // A lamp without its key file refuses even a matching one.
+    std::fs::remove_file(&credential).unwrap();
+    assert!(!lamp_setup::serve::recovery_key_matches(
+        "AIza-key_1",
+        &credential
+    ));
+    assert!(!lamp_setup::serve::recovery_key_matches("", &credential));
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn v1s_routes_answer_in_v1s_shapes() {
     let (app, status, started, _root) = app(false);
     let (code, body) = call(&app, "GET", "/api/device/setup/status", Value::Null).await;

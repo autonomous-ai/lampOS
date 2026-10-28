@@ -1003,12 +1003,22 @@ its only way back once its package carries the unit.
   any join. The status's `share_reports` is the answer the last setup
   kept, read as lamp-cloud reads that record, never the request's. **The
   network is the one thing such a request sets.** Joined, recovery ends.
-  **What it cannot stop** (the Reviewer-lead on #3024): the hotspot is
-  open, as at first setup, so someone in radio range while it is up can
-  set **their own** network; the key, the backend link and the
-  person's data stay, but the lamp's traffic then crosses their network.
-  The first builder signs off before `LAMP_WIFI_RECOVERY` goes on anywhere
-  (the sticker's password on a recovery request is the proposed guard).
+  **Only the owner's key sets it** (#3020): the hotspot is open, as at
+  first setup, and its name ends in the sticker's suffix, so the sticker
+  proves nothing. A request there must carry, as `llm_api_key`, the voice
+  key already on the lamp (`serve::recovery_key_matches`, compared in
+  constant time, before any other check); the owner's signed-in account
+  page passes it, as at first setup. Any other gets 403, "this lamp's own
+  key is needed to set its Wi-Fi again", and one journal line without the
+  key; a lamp without its key file refuses every one. Without it, someone
+  in radio range could set **their own** network (the Reviewer-lead on
+  #3024). The first builder signs off before `LAMP_WIFI_RECOVERY` goes on
+  anywhere.
+- **The switch takes effect at the next start.** `lamp-setup-recover` is
+  enabled and, as docs/updates.md's "A part added over the air" says of
+  every unit that ends at once with nothing to do, never started by a
+  round: a lamp updated to a build with `recover`, or given the switch,
+  watches from its next start.
 - **Said:** the journal (`lamp-setup-recover`) says when it opens and why,
   each retry, and when recovery ends; lamp-cloud's `system.info` says
   `"recovery": true` while it runs with its switch on, so the app names the

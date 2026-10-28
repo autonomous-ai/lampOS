@@ -581,6 +581,20 @@ pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String
     })
 }
 
+/// Whether a request to the recovery hotspot (#3020) carries the voice key
+/// already on the lamp. That hotspot is open and its name ends in the
+/// sticker's suffix, so the sticker proves nothing; the key comes only from
+/// the owner's signed-in account page, as at the first setup. Compared in
+/// constant time; a lamp without its key file refuses every one.
+pub fn recovery_key_matches(given: &str, credential: &Path) -> bool {
+    use subtle::ConstantTimeEq;
+    let Ok(kept) = fs::read_to_string(credential) else {
+        return false;
+    };
+    let (given, kept) = (given.trim().as_bytes(), kept.trim().as_bytes());
+    !kept.is_empty() && bool::from(given.ct_eq(kept))
+}
+
 /// The own keys a request names (#2094), each fitted or why not. A key that
 /// doesn't fit never fails setup: its answer says so, and the relay stays.
 pub fn own_keys(
