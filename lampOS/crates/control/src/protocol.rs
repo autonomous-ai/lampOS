@@ -120,6 +120,9 @@ pub enum EventKind {
     PersonStoodUp,
     #[serde(rename = "person.facing")]
     PersonFacing,
+    /// A hand in view, where it is and whether it is open; or gone.
+    #[serde(rename = "hand")]
+    Hand,
     #[serde(rename = "phrase.heard")]
     PhraseHeard,
     #[serde(rename = "name.heard")]
@@ -140,9 +143,11 @@ impl EventKind {
     /// The grant a subscription to it needs, if any.
     pub fn needs(self) -> Option<Grant> {
         match self {
-            Self::PersonArrived | Self::PersonLeft | Self::PersonStoodUp | Self::PersonFacing => {
-                Some(Grant::Look)
-            }
+            Self::PersonArrived
+            | Self::PersonLeft
+            | Self::PersonStoodUp
+            | Self::PersonFacing
+            | Self::Hand => Some(Grant::Look),
             Self::PhraseHeard | Self::NameHeard => Some(Grant::Hear),
             Self::SoundHeard => Some(Grant::Sound),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
@@ -178,7 +183,8 @@ impl StateKind {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum LookAt {
-    /// The face in view, the voice that called, or straight ahead.
+    /// The face in view, the hand in view (followed), the voice that
+    /// called, or straight ahead.
     Target(LookTarget),
     /// Degrees from straight ahead: yaw right positive, pitch up positive.
     Angles(Angles),
@@ -203,6 +209,8 @@ pub const GESTURES_REFUSED: [&str; 2] = ["idle", "scanning"];
 #[serde(rename_all = "snake_case")]
 pub enum LookTarget {
     Face,
+    /// The hand in view, followed by the body while the lease holds.
+    Hand,
     Name,
     Ahead,
 }
@@ -365,7 +373,9 @@ impl Op {
                 vec![Grant::Body]
             }
             Self::Look { at } => match at {
-                LookAt::Target(LookTarget::Face) => vec![Grant::Body, Grant::Look],
+                LookAt::Target(LookTarget::Face | LookTarget::Hand) => {
+                    vec![Grant::Body, Grant::Look]
+                }
                 _ => vec![Grant::Body],
             },
             Self::Light { .. } => vec![Grant::Light],
@@ -1048,6 +1058,10 @@ mod tests {
         );
         assert_eq!(
             needs(r#"{"id":1,"op":"look","at":"face"}"#),
+            [Grant::Body, Grant::Look]
+        );
+        assert_eq!(
+            needs(r#"{"id":1,"op":"look","at":"hand"}"#),
             [Grant::Body, Grant::Look]
         );
         assert_eq!(needs(r#"{"id":1,"op":"look","at":"ahead"}"#), [Grant::Body]);

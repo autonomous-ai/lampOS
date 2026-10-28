@@ -46,6 +46,7 @@ EVENT_NEEDS = {
     "person.left": "look",
     "person.stood_up": "look",
     "person.facing": "look",
+    "hand": "look",
     "phrase.heard": "hear",
     "name.heard": "hear",
     "sound.heard": "sound",
