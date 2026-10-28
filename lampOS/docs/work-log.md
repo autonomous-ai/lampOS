@@ -1,3 +1,20 @@
+## 29 October 2026, 06:00 +07 — docs say what the product turns on; #4233 closed on its P2
+
+Ready for lamp-voice: #4235 (docs: the self-switch heading says on for the product), with three READ-OKs. Train 334 went without it while GitHub said `UNKNOWN`, so it's re-posted.
+
+Landed: #4221 and #4224 (train 332) and #4230 (train 333). With #4206 and #4235, the setup and update docs now say what a product lamp has on:
+- **The fixed writer:** no round writes it itself, and the writer's one-shot unit refreshes it.
+- **Setup:** the setup server and its Wi-Fi join, the reset, and changes after setup.
+- **The self-switch:** on.
+
+What is rightly still off: own keys, the Wi-Fi change after setup, models, and the image.
+
+Closed #4233 (El's P3 from 8389's put-back on lamp-06c1: a part whose last line says `"enabled":false` counted as off, not stopped). Reviewer-three and Reviewer-two held it on the same P2: it trusts the binary under test. A build whose part misreads its own switch would be kept, and reminders, tasks or setup would go off on every lamp, where today that build is put back. A narrow rule would need an outside signal, a drop-in the round didn't write, and that is new systemd reads in the fleet's safety net in ship week. 06c1's case came from a test kit removing a running part's switch mid-round, so the kit can avoid it. The safe put-back stands, and the first builder can ask for the narrow rule after ship week.
+
+Reads: READ-OK on #4227 (300 of 300), #4238 (three wording P3s; its doc counts six drops where the journals have five) and #4240 (the second voice read, `say::` 68 of 68, a P3 for a test of the wiring Fourteen takes).
+
+Waiting on the first builder: #3689 item 2c and #2810's attended cut. Item 1's rehearsal is Tests', on 52e6 at 09:30.
+
 ## 29 October 2026, 04:05 +07 — #3689 item 1 all on lamp-voice; the lamp rehearsal at 09:30
 
 Ready for lamp-voice: #4221 (comments and docs: no round writes the fixed writer itself, and the writer's one-shot unit refreshes it), with Reviewer-three's READ-OK, waiting on ARM64.
