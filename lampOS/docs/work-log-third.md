@@ -1,3 +1,15 @@
+## 2026-10-29 00:55 — the update path through ship eve
+
+- **Publishing.** Every publish from 11:53Z was refused (403). The owner's token went in, and #3934 merged (by Leo's word, right after train 318) as `34fbd2c8f`. 8311 made its release, then hit a 504. 8327, 8335 and 8349 published clean. #3906 proposed closed.
+- **#4103 → #4121** (`9894fac43`): a 5xx read is asked again (5/15/30 s), a change is never repeated blind, and a re-run goes on over its own byte-identical release. Its notes then name the finishing attempt. P3s folded: Fourteen's (head checked before notes, stderr drained) and Reviewer-two's (a half-made release completed). **#4146**: an unfinished upload in our own release is deleted and uploaded again.
+- **#4161** (found by counting: 219 of GitHub's 1000 release assets used, about 37 a day). **#4160**: the channel keeps 20 backups. Its first real run, in 8349, deleted 201 and left 21. **#4164**: the same for `lampos-stable`.
+- **#4099 → #4116**: `can` names `skills.camera`/`off`/`on`, and `skills.camera` reads back `{name, allowed}`. Answered Mobile's four questions on #4100.
+- **#3976 → #4177**: a promotion fills the stable notes' "For developers" part. Fourteen held a P2 (`| tee` under `bash -e` without pipefail); fixed. Lesson saved.
+- **#4096**: #4055's refusal moved before `watch_options`, which reads /proc, so its test passes on a Mac.
+- **Reads:** #4014, #4045 (twice), #4044 (twice), #4049 (twice), #4054, #4055, #4068 (twice), #4071, #4080, #4094, #4106, #4105, #4159, #4173, #4081, #4182 (and a correction), #4189, #3972, #3982, #4039.
+- **Corrections I posted:** on #3906 ("no token needed" was wrong) and on #4182 (an unverified claim about the generic unit's fill).
+- Stale build rows (three skills at 0.00) reported; the first builder fixed them, to 90.6%.
+
 ## 2026-10-28 13:05 — #3990 merged, publishing works, #4037 up
 
 - **#3990** (the two-face fixture repair, part of #3544) was pushed at 09:24 as `fb4245df30`, read OK by Reviewer-two and Reviewer-three, and merged in train 289 (#4024, lamp-voice `33ec91df6`). Reviewer-two's P3: no real-bus test sends many looks now.
