@@ -644,11 +644,61 @@ fn the_same_turn_with_the_hand_never_said_is_not_done() {
 /// The invitation is offered, taken and bound, and its turn ends with no
 /// audio at all (`no_audio_answer`): the voice never said it (#3754).
 fn unsaid(walk: &mut Onboarding, now: u64, turn: u64) {
+    finished(walk, now, turn, Delivery::Unsaid);
+}
+
+/// The invitation is offered, taken and bound, and its turn ends so.
+fn finished(walk: &mut Onboarding, now: u64, turn: u64, delivery: Delivery) {
     let token = offer(walk, now);
     assert_eq!(walk.take_invitation(token, now).unwrap(), GIVE_ASK);
     let boot = BootId::new([4; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
-    walk.invitation_finished(boot, turn, Delivery::Unsaid, now);
+    walk.invitation_finished(boot, turn, delivery, now);
+}
+
+/// lamp-52e6, 28 Oct 12:47:56 and 12:48:09 (#4035): the invitation was
+/// said through a yield to the lamp's own voice, or cut, with no push begun,
+/// and the step failed with no push asked for. Neither spends a try: it is
+/// said again, under the unsaid bound, and done on the person's push.
+#[test]
+fn an_invitation_cut_with_no_push_is_said_again_and_spends_no_try() {
+    for delivery in [Delivery::Gapped, Delivery::Cut] {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        finished(&mut walk, 10 * S, 1, delivery);
+        walk.drain_storage_for_test(10 * S);
+        assert_eq!(outcome(&walk), None, "{delivery:?}");
+        assert_eq!(walk.kept().giving_way_tries, 0, "{delivery:?}");
+        let row = walk
+            .take_records()
+            .into_iter()
+            .rfind(|row| row["kind"] == "onboarding_giving_way_try")
+            .unwrap();
+        assert_eq!(row["offered_again"], true, "{delivery:?}: {row}");
+        finished(&mut walk, 12 * S, 2, delivery);
+        walk.drain_storage_for_test(12 * S);
+        assert_eq!(walk.kept().giving_way_tries, 0, "{delivery:?}");
+        // The third, under the same bound as one never said: the step is
+        // left for later, never failed.
+        let played = play(&mut walk, 14 * S, 3);
+        assert_eq!(walk.kept().giving_way_tries, 1, "{delivery:?}");
+        push(&mut walk, &played, 2_000, 30.0, 30.0, true);
+        assert_eq!(settle(&mut walk, played.at(3_000)), [GIVE_DONE]);
+        assert_eq!(outcome(&walk), Some(Outcome::Done), "{delivery:?}");
+    }
+    // Past the bound, not available, never failed.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for turn in 1..=3 {
+        finished(&mut walk, (8 + 2 * turn) * S, turn, Delivery::Gapped);
+    }
+    walk.drain_storage_for_test(16 * S);
+    for _ in 0..2 {
+        walk.tick(16 * S, START_QUIET_US, true, false, face(), true);
+        walk.drain_storage_for_test(16 * S);
+    }
+    assert_eq!(outcome(&walk), Some(Outcome::NotAvailable));
+    assert_eq!(walk.kept().giving_way_tries, 0);
 }
 
 #[test]

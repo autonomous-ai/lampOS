@@ -446,6 +446,46 @@ fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
     assert_eq!(call(&mut walk, 80 * S, 22.0, 4)["prompt"], 2);
 }
 
+/// lamp-52e6, 28 Oct 12:10 (#4035): prompt 1 was said through a yield to
+/// the lamp's own voice three times, nobody's turn taken over it, and the
+/// cut prompts' two re-offers were spent on it. Said with a gap, a prompt is
+/// offered again as one never said is: none of the budget is spent, and
+/// past [`MOST_UNSAID`] the step is left for later, never failed.
+#[test]
+fn a_prompt_said_with_a_gap_and_no_call_over_it_spends_nothing() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let boot = BootId::new([3; 16]).unwrap();
+    let gapped = |walk: &mut Onboarding, at: u64, turn: u64| {
+        let token = offer(walk, at);
+        let attempt = walk.pending().invitations[0].attempt;
+        walk.take_invitation(token, at).unwrap();
+        assert!(walk.bind_invitation(token, boot, turn));
+        walk.invitation_finished(boot, turn, Delivery::Gapped, at);
+        walk.drain_storage_for_test(at);
+        let row = walk
+            .take_records()
+            .into_iter()
+            .rfind(|row| row["kind"] == "onboarding_near_try")
+            .unwrap();
+        assert_eq!(row["why"], "the prompt was played with a gap", "{row}");
+        (attempt, row["offered_again"].clone())
+    };
+    assert_eq!(gapped(&mut walk, 10 * S, 1), (1, json!(true)));
+    assert_eq!(gapped(&mut walk, 20 * S, 2), (1, json!(true)));
+    assert_eq!(walk.kept().near_call_prompts, 0);
+    // The cut prompts' own re-offers are still there for a person over one.
+    assert_eq!(call(&mut walk, 30 * S, 22.0, 3)["prompt"], 1);
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for turn in 1..=3 {
+        gapped(&mut walk, turn * 10 * S, turn);
+    }
+    settle(&mut walk, 40 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::NotAvailable));
+    assert_eq!(walk.kept().near_call_prompts, 0);
+}
+
 /// The tester on lamp-29e7, 28 October (#3702): the lamp never said what
 /// to say or how many calls it wanted, so a bare "Lamp" four times felt like
 /// being asked over and over. The first prompt names the phrase and says it

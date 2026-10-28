@@ -1125,10 +1125,14 @@ impl Reply {
     /// The output portion of whole-turn delivery. Current ownership and
     /// microphone permission still have to be checked at completion.
     fn whole_provider_output(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
+        self.provider_output_played(speaker_pending) && self.playback_gaps == 0
+    }
+
+    /// [`Self::whole_provider_output`], whatever gaps its playback had.
+    fn provider_output_played(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
         self.settled(speaker_pending)
             && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
             && self.had_audio
-            && self.playback_gaps == 0
             && self.notice.origin() == SpeechOrigin::Provider
     }
 
@@ -1136,9 +1140,37 @@ impl Reply {
     /// settled and complete, its audio played with no gap, nobody else
     /// owning the turn, and the mic allowed.
     fn heard_whole(&self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) -> bool {
-        self.whole_provider_output(speaker_pending)
+        self.heard_through(speaker_pending, snapshot) && self.playback_gaps == 0
+    }
+
+    /// [`Self::heard_whole`], whatever gaps its playback had: every word
+    /// played and nobody's turn taken over it, as after a yield that resumed
+    /// (#4035).
+    fn heard_through(&self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) -> bool {
+        self.provider_output_played(speaker_pending)
             && snapshot.owner().is_none()
             && snapshot.microphone_permission() == Permission::Allowed
+    }
+
+    /// How an onboarding invitation's turn ended, as it completes. Nothing
+    /// of it played is no ask at all (#3754); played through with a gap is
+    /// no ask either, but said (#4035).
+    fn invitation_delivery(
+        &self,
+        speaker_pending: &Option<PendingSpeaker>,
+        snapshot: Snapshot,
+        sounded: bool,
+    ) -> crate::onboarding::Delivery {
+        use crate::onboarding::Delivery;
+        if self.heard_whole(speaker_pending, snapshot) {
+            Delivery::Whole
+        } else if self.heard_through(speaker_pending, snapshot) {
+            Delivery::Gapped
+        } else if !self.reached_speaker() && !sounded {
+            Delivery::Unsaid
+        } else {
+            Delivery::Cut
+        }
     }
 
     fn complete_reminder(&mut self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) {
@@ -10105,14 +10137,11 @@ fn conversation_with_gate_inner(
             sleep_owed.turn_ended(current, &speaker_pending, snapshot);
             if onboarding_invitation_turn == Some((current.owner.boot(), turn)) {
                 if let Some(walk) = onboarding.as_mut() {
-                    // Nothing of it played is no ask at all (#3754).
-                    let delivery = if current.heard_whole(&speaker_pending, snapshot) {
-                        crate::onboarding::Delivery::Whole
-                    } else if !current.reached_speaker() && !onboarding_invitation_audio {
-                        crate::onboarding::Delivery::Unsaid
-                    } else {
-                        crate::onboarding::Delivery::Cut
-                    };
+                    let delivery = current.invitation_delivery(
+                        &speaker_pending,
+                        snapshot,
+                        onboarding_invitation_audio,
+                    );
                     walk.invitation_finished(current.owner.boot(), turn, delivery, monotonic_us());
                 }
                 onboarding_invitation_turn = None;

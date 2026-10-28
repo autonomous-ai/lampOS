@@ -1188,6 +1188,38 @@ fn a_sleep_asked_aloud_is_asked_once_its_line_is_heard_whole() {
     assert_eq!(sleep.due(None, monotonic_us()), None, "once");
 }
 
+/// lamp-52e6, 28 Oct (#4035): an onboarding invitation played to its end
+/// through a yield that resumed, with a playback gap and nobody's turn
+/// taken over it, is `Gapped`: not heard whole, and not cut either.
+#[test]
+fn an_invitation_played_through_with_a_gap_is_gapped_not_cut() {
+    use crate::onboarding::Delivery;
+    for gaps in [0, 1] {
+        let mut test = Test::new();
+        let first = test.generation(17);
+        test.accept(&first, 240);
+        test.provider_complete();
+        test.retire(&first);
+        let current = test.reply.as_mut().unwrap();
+        current.playback_gaps = gaps;
+        assert!(current.settled(&test.pending));
+        test.owner.complete_turn(now(), current.owner).unwrap();
+        test.snapshot = test.owner.snapshot(now()).unwrap();
+        let delivery = current.invitation_delivery(&test.pending, test.snapshot, true);
+        let expected = if gaps == 0 {
+            Delivery::Whole
+        } else {
+            Delivery::Gapped
+        };
+        assert_eq!(delivery, expected, "{gaps} gap(s)");
+        assert_eq!(
+            current.heard_whole(&test.pending, test.snapshot),
+            gaps == 0,
+            "a gap is still no whole line for every other reader"
+        );
+    }
+}
+
 /// The person cuts in ("wait, no") while the lamp says its line: the turn
 /// is cancelled, and no sleep is ever asked.
 #[test]
