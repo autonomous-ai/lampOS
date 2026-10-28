@@ -2277,3 +2277,17 @@ outer frame retains original nested bytes without another base64 expansion.
 No dependency, State loader, filesystem publication or privileged execution
 framework is introduced. The [container contract](ordinary-plan-container.md)
 keeps protected recovery context and durable admission as separate work.
+
+## Project original product facts without loader fallback (#3689)
+
+Keep the current State field meanings and ordinary ownership decisions. Its
+Records loaders intentionally rename/default corrupt data or return defaults
+on read failure; those behaviors cannot authenticate a retained recovery input.
+V1's pending-update journal and present/absent backup manifest similarly
+separate retained recovery facts from current version detection. Preserve that
+separation, but do not port mutable-path recovery as source authentication.
+Reuse the existing Head codec's lexical resource scan technique locally with
+this projection's narrower explicit budgets, followed by authoritative serde
+seeds. Retain complete original bytes and copy only selected facts. No new JSON
+parser, State store, dependency, missing-file inference, filesystem reader or
+shared privileged framework is introduced. See the [projection profile](ordinary-product-context.md).
