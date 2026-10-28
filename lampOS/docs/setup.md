@@ -290,7 +290,7 @@ unknown `wipe` kind or field refused with nothing touched, an extra path
 wiped, an unknown `keep_back` entry dropped and wiped), the command line, and the
 example plan covering every store of the person's listed above.
 
-## Joining the home's Wi-Fi (built, not yet served)
+## Joining the home's Wi-Fi (served by the setup server, on for the product)
 
 `lamp_setup::wifi` is V1's join (`system/network/service.go`, `SetupNetwork`;
 `setup_failure.go`) in Rust, with V1's numbers: up to 60 s for the named
@@ -337,7 +337,7 @@ listener that never speaks TLS and one that answers in plain text are not the
 Internet, a real handshake on this machine is, a lookup that never answers
 holds no check past its time, and three attempts in a row start one lookup.
 
-## The setup server (built, off unless set)
+## The setup server (on for the product)
 
 Its `GET /api/device/setup/status` answers V1's fields, plus one of its own: `"generation": "lamp-v2"`. The backend keeps one device type, `lamp`, for both generations, so the Autonomous app sets both up as one Lamp product and learns which Lamp it set up from this field; `lamp-cloud` says the same on every MQTT reply (#1396, decided 19 Oct, replacing the two products decided on 17 Oct).
 
@@ -346,6 +346,11 @@ It also says `"share_reports"`, read only: true only when the last setup kept th
 ```sh
 lamp-setup serve --config SERVE.json --plan PLAN.json --enable
 ```
+
+Without `--enable` it only reads its config, says `{"enabled": false,
+"reason": "--enable was not set"}` and exits. The product's
+`lamp-setup.service` passes it (`deploy/product/lamp-setup.service`), so on a
+product lamp the server, and the Wi-Fi join it serves, are on.
 
 The keeper starts it, as `lamp-setup.service`, only when the setup marker is
 missing (#702). In order, it finishes an interrupted reset, refuses to run on
