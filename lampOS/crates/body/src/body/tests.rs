@@ -14615,3 +14615,50 @@ fn a_head_joint_given_way_under_a_gentle_hand_is_said_as_a_hand() {
     assert_eq!(report.stalls, [0; 5], "{report:?}");
     assert!(hand.is_empty(), "{hand:?}");
 }
+
+/// A pitch that rests a few counts short of each goal under its weight,
+/// then stalls short of a lift, was never carried: no hand (the
+/// Reviewer-lead's case on #4056). A hand that turns it away from where it
+/// rests, however slowly, is.
+#[test]
+fn a_stall_is_carried_only_away_from_where_the_joint_last_rested() {
+    let at = |position: u16, load: u16| Sample {
+        position,
+        load,
+        temperature: 40,
+        status: 0,
+    };
+    let stall_on = |stall: &mut Stall, goal: u16, is: Sample| {
+        (0..u32::from(STALL_STEPS) + 1).any(|_| stall.step(goal, is, goal))
+    };
+    let mut stall = Stall::default();
+    // Held at 1800, then a look to 1600 that trails it by 5 and rests at
+    // 1605, unpressed (inside what counts as arrived, over the jitter).
+    for _ in 0..50 {
+        assert!(!stall.step(1_800, at(1_800, 30), 1_800));
+    }
+    for step in 0..50u16 {
+        let goal = 1_800 - (step * 4).min(200);
+        assert!(!stall.step(goal, at(goal + 5, 30), goal));
+    }
+    // Lifted to 2100, it comes up to 1700 and stalls there under its weight.
+    for step in 0..24u16 {
+        let goal = 1_600 + (step * 20).min(500);
+        assert!(!stall.step(goal, at(1_605 + step * 4, 60), goal));
+    }
+    assert!(stall_on(&mut stall, 2_100, at(1_700, 150)));
+    assert!(!stall.carried, "{stall:?}");
+    // At rest at 2044, a hand turns it a count a second to 2030 and holds
+    // it: a stop on the way is carried.
+    let mut stall = Stall::default();
+    for _ in 0..50 {
+        assert!(!stall.step(2_044, at(2_044, 30), 2_044));
+    }
+    let mut carried = false;
+    for count in 1..=14u16 {
+        for _ in 0..50 {
+            carried |= stall.step(2_044, at(2_044 - count, 120), 2_044) && stall.carried;
+        }
+    }
+    assert!(carried, "{stall:?}");
+}

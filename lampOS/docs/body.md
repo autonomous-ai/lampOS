@@ -3192,7 +3192,9 @@ stop pushing (`--give-way`: over 100 for 1.5 s without moving, its goal
 then where it is) is said as a push too, for half a second
 (`STALL_HAND_STEPS`), when it was carried more than 6 counts away from
 its goal from where it last stood there unpressed (within 2 counts, a
-held servo's jitter) or was last held, however slowly and whatever its
+held servo's jitter, or wherever it was when its goal moved on while
+unpressed, so a joint resting a few counts short under its weight starts
+each move from where it rested) or was last held, however slowly and whatever its
 load did on the way (the tester's roll on 29e7 went about a count a
 second): a joint stuck short
 of its goal under its own weight or against a shelf, never moved, is not,
