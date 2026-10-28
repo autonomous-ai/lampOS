@@ -2371,7 +2371,7 @@ busy, so a person alone with it needs the name.
 
 On c0a4 a real "Ma'am, could you pass me the salt please?", said to a
 person, was heard by `lamp-name` at 0.95 to 0.99 at the line's start, and
-the lamp answered it: with `LAMP_NAME_SECOND_SIGN=on` (the product) a
+the lamp answered it: with the product's second sign of the name asked a
 hearing at the line's start is its own second sign (second-voice.md). With
 `LAMP_NAME_SAID_TO_A_PERSON=on` as well, on the second route, it is not
 when the line's first word, set off as a name is (past a greeting, followed
