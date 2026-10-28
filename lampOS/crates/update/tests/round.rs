@@ -2535,6 +2535,10 @@ impl lamp_update::install::Host for InstallHost {
     fn running_sha256(&mut self) -> Result<String, String> {
         Err("not asked of this lamp".into())
     }
+
+    fn hand_over(&mut self, _: &std::path::Path) -> String {
+        "not asked of this lamp".into()
+    }
 }
 
 /// Every binary the product starts, and the voice's worker, each the line
