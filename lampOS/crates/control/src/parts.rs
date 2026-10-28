@@ -20,9 +20,15 @@
 //! more than `skill`. With the parts' own caller check (#3720, Ten's caps)
 //! the body and the ring hold `lamp-control` to `skill` as well.
 //!
-//! Not routed yet, each refused with what it waits for: `look` and `joints`
-//! (the body's lease socket, Ten's piece 4), `play` and `sound` (a client's
-//! package, with the Store's packaging). State and events from the bus come in their own piece.
+//! - `look` at `ahead` or `{yaw, pitch}` → the body's lease socket, under
+//!   the lease the door holds for the computer (`crate::body_lease`); its
+//!   end comes later as a `done` event, with the angles the head reached.
+//!
+//! Not routed yet, each refused with what it waits for: `look` at `face`
+//! (the body following a face under a lease) and at `name` (who's who),
+//! `joints` (a goal stream on the lease socket), `play` and `sound` (a
+//! client's package, with the Store's packaging). State and events from the
+//! bus come in their own piece.
 
 use std::collections::HashMap;
 use std::io::{BufReader, Write as _};
@@ -35,7 +41,7 @@ use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority}
 use serde_json::{Value, json};
 
 use crate::feelings;
-use crate::protocol::{Error, ErrorCode, Op, Pattern, StateKind};
+use crate::protocol::{Angles, Error, ErrorCode, LookAt, LookTarget, Op, Pattern, StateKind};
 use crate::session::Parts;
 
 /// How long a `say` may wait to begin before the voice lets it go.
@@ -70,6 +76,9 @@ pub struct Lamp {
     /// The boot's id, which a light request's clock names.
     pub clock_id: String,
     pub events: Events,
+    /// Where a `look` goes: the body's lease socket, through the door's
+    /// hold of it (`--lease-socket`).
+    looks: Option<crate::body_lease::Looks>,
     /// Each client's light still asked for, to give back at its `stop`.
     lights: HashMap<String, (Light, u64)>,
     /// What the bus says, for `get` (docs/control.md, "Events").
@@ -96,6 +105,7 @@ impl Lamp {
             clock_id,
             events,
             lights: HashMap::new(),
+            looks: None,
             watch: None,
             // Never blocking under the door's lock: a full mood queue is
             // the body busy, said (the Reviewer-lead's P3 on #3805).
@@ -109,6 +119,12 @@ impl Lamp {
     /// Another clock for claims, for tests.
     pub fn with_clock(mut self, clock: fn() -> u64) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// Sends a `look` to the body's lease socket through the door's hold.
+    pub fn looking(mut self, looks: crate::body_lease::Looks) -> Self {
+        self.looks = Some(looks);
         self
     }
 
@@ -202,6 +218,31 @@ impl Lamp {
             Err(why) => answer["light"] = json!(why),
         }
         Ok(answer)
+    }
+
+    fn look(&self, client: &str, re: u64, at: &LookAt) -> Result<Value, Error> {
+        let look = match at {
+            LookAt::Angles(Angles { yaw, pitch }) => json!({"yaw": yaw, "pitch": pitch}),
+            LookAt::Target(LookTarget::Ahead) => json!("ahead"),
+            LookAt::Target(LookTarget::Face) => {
+                return Err(waits_for("the body following a face under a lease"));
+            }
+            LookAt::Target(LookTarget::Name) => return Err(waits_for("who's who")),
+        };
+        let Some(looks) = &self.looks else {
+            return Err(Error::new(
+                ErrorCode::Refused,
+                "the body's lease socket is not on here",
+            ));
+        };
+        looks
+            .send(crate::body_lease::Look {
+                client: client.to_owned(),
+                re,
+                line: json!({ "look": look }).to_string(),
+            })
+            .map_err(|_| not_here("the body's lease"))?;
+        Ok(json!({"to": "body"}))
     }
 
     fn ask_ring(
@@ -332,7 +373,8 @@ impl Parts for Lamp {
                 for_ms,
             } => self.light(client, colour, *level, *pattern, *for_ms),
             Op::Say { text } => self.say(client, re, text),
-            Op::Look { .. } | Op::Joints { .. } => Err(waits_for("the body's lease socket")),
+            Op::Look { at } => self.look(client, re, at),
+            Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength),
             Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
@@ -621,11 +663,43 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// `look` goes to the door's hold of the body's lease, as a line the
+    /// body reads, with who asked and the request it answers.
+    #[test]
+    fn a_look_goes_on_the_bodys_lease_as_its_line() {
+        let (looks, mut looked) = tokio::sync::mpsc::unbounded_channel();
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet()).looking(looks);
+        assert_eq!(
+            lamp.act(
+                "c_1",
+                10,
+                &op(r#"{"id":10,"op":"look","at":{"yaw":-10,"pitch":5}}"#),
+                0
+            )
+            .unwrap(),
+            json!({"to": "body"})
+        );
+        let look = looked.try_recv().unwrap();
+        assert_eq!((look.client.as_str(), look.re), ("c_1", 10));
+        assert_eq!(
+            serde_json::from_str::<Value>(&look.line).unwrap(),
+            json!({"look": {"yaw": -10.0, "pitch": 5.0}})
+        );
+        lamp.act("c_1", 11, &op(r#"{"id":11,"op":"look","at":"ahead"}"#), 0)
+            .unwrap();
+        assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"ahead"}"#);
+    }
+
     #[test]
     fn what_is_not_routed_yet_says_what_it_waits_for() {
         let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
         for (frame, waits) in [
-            (r#"{"id":1,"op":"look","at":"ahead"}"#, "lease socket"),
+            (
+                r#"{"id":1,"op":"look","at":"ahead"}"#,
+                "lease socket is not on",
+            ),
+            (r#"{"id":1,"op":"look","at":"face"}"#, "following a face"),
+            (r#"{"id":1,"op":"look","at":"name"}"#, "who's who"),
             (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
         ] {
             let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();

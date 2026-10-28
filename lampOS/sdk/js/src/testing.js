@@ -27,12 +27,19 @@ const now = () => new Date().toISOString();
 // `express`'s feelings and their moves, as lamp-control's feelings.rs.
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
 
+// `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
+export const LOOK_WAITS = {
+  face: 'not routed yet: waits for the body following a face under a lease',
+  name: "not routed yet: waits for who's who",
+};
+
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
 // lamp does now. `lamp fake` does.
 export const LAMP_CONTROL_REFUSES = Object.freeze({
-  look: "not routed yet: waits for the body's lease socket",
-  joints: "not routed yet: waits for the body's lease socket",
+  // No product unit passes --lease-socket yet (docs/control.md).
+  look: "the body's lease socket is not on here",
+  joints: "not routed yet: waits for a goal stream on the body's lease socket",
   play: 'not routed yet: waits for client packages',
   sound: 'not routed yet: waits for client packages',
 });
@@ -243,6 +250,18 @@ export class FakeLamp {
         const step = rounded === 0 ? 0 : Math.max(rounded, request.feeling === 'low' ? 3 : 1);
         const move = step === 0 ? null : step === 4 ? name : `${name}-${step * 25}`;
         return this.ok(ws, id, { to: 'body', move, light: true });
+      }
+      case 'look': {
+        // As lamp-control with --lease-socket (parts.rs `look`): `face` and
+        // `name` aren't routed; the body takes the rest, and its `done` says
+        // where the head got to.
+        if (typeof request.at === 'string' && LOOK_WAITS[request.at]) return this.refuse(ws, id, 'refused', LOOK_WAITS[request.at]);
+        this.ok(ws, id, { to: 'body' });
+        if (this.autoDone) {
+          const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
+          ws.send(JSON.stringify({ ev: 'done', re: id, how: 'finished', yaw, pitch, clamped: false }));
+        }
+        return undefined;
       }
       case 'gesture':
       case 'move':

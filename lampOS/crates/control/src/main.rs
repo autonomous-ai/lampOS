@@ -159,8 +159,17 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         })
         .unwrap_or_default();
     let watching = watch.clone();
+    // The body's own lease, and a computer's `look` on it, with
+    // `--lease-socket` only (lamp-body --lease-socket).
+    let lease_socket = option(arguments, "--lease-socket").map(PathBuf::from);
+    let (looks, looked) = tokio::sync::mpsc::unbounded_channel();
+    let looking = lease_socket.is_some().then_some(looks);
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
-        Box::new(parts::Lamp::new(body, light, say, clock_id, events).watching(watching))
+        let lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
+        Box::new(match looking {
+            Some(looks) => lamp.looking(looks),
+            None => lamp,
+        })
     });
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
@@ -201,10 +210,12 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         // The body's own lease, so the lamp's own life stands back while a
         // computer holds `body` (lamp-body --lease-socket).
-        if let Some(path) = option(arguments, "--lease-socket") {
+        if let Some(path) = lease_socket {
             tokio::spawn(lamp_control::body_lease::hold(
-                PathBuf::from(path),
+                path,
                 shared.clone(),
+                shared.events(),
+                looked,
             ));
         }
         tokio::select! {
