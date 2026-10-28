@@ -144,7 +144,7 @@ A known older deployment using another progress path requires an explicit
 migration; arbitrary legacy environment paths are not imported, and old progress
 alone is not proof that the privacy exercise was completed.
 
-## The reset (built, off unless set)
+## The reset (on for the product)
 
 `crates/setup` builds `lamp-setup`. Its first slice is the reset. The safe
 shutdown (`lamp-setup shutdown`, #3697) reuses its stop and its own unit, and is
@@ -538,7 +538,7 @@ setup the app changes them through root's keys helper,
 `lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
 [own-keys.md](own-keys.md).
 
-## Changed after setup (#1959, built, off unless set)
+## Changed after setup (#1959, on for the product)
 
 The person changes their name, the lamp's name in the app or the time zone
 from the app, without a reset. The app's side is `lamp-cloud`'s
