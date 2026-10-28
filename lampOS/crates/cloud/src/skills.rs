@@ -450,7 +450,9 @@ pub fn turn(places: &Places, data: &Value, off: bool) -> Result<Value, String> {
 /// manage helper, which keeps it in `lamp-skills`' `camera`
 /// ([`lamp_skills::package::camera`]); the name need not be on the lamp
 /// yet, as a Store package that asks the camera installs only once it is
-/// given. The reply is the page as it now is, [`list`]'s.
+/// given. The reply is the page as it now is, [`list`]'s, with
+/// `"camera": {"name", "allowed"}`: what the helper kept for that name,
+/// on the lamp or not (#4099).
 pub fn camera(places: &Places, data: &Value) -> Result<Value, String> {
     let name = data
         .get("name")
@@ -462,7 +464,15 @@ pub fn camera(places: &Places, data: &Value) -> Result<Value, String> {
         .and_then(Value::as_bool)
         .ok_or("allow must be true or false")?;
     let way = if allow { "camera" } else { "camera_off" };
-    changed(places, "skills.camera", &json!({ way: name }), ASK_TIMEOUT)
+    let mut page = changed(places, "skills.camera", &json!({ way: name }), ASK_TIMEOUT)?;
+    // What the helper kept, read back from its one file, so a yes given
+    // before the install reads back with no row for it (#4099); null only
+    // when the file can't be read now.
+    let kept = lamp_skills::read_names(&places.off.with_file_name(lamp_skills::CAMERA_FILE))
+        .ok()
+        .map(|yes| yes.contains(name));
+    page["camera"] = json!({"name": name, "allowed": kept});
+    Ok(page)
 }
 
 /// `request` asked of the manage helper for the app's `kind`, waiting at
@@ -1390,13 +1400,19 @@ pub mod tests {
         assert_eq!(allowed(&page, "tutor"), Value::Null);
         assert_eq!(allowed(&page, "watcher"), Value::Null);
         assert_eq!(allowed(&page, "watcher-1"), json!(false));
-        let reply = camera(&places, &json!({"name": "eyes", "allow": true})).unwrap();
+        let mut reply = camera(&places, &json!({"name": "eyes", "allow": true})).unwrap();
+        // The page, and what was kept for the name (#4099).
+        assert_eq!(
+            reply.as_object_mut().unwrap().remove("camera"),
+            Some(json!({"name": "eyes", "allowed": true}))
+        );
         assert_eq!(reply, list(&places).unwrap());
         assert_eq!(allowed(&reply, "eyes"), json!(true));
         let kept = places.off.with_file_name(lamp_skills::CAMERA_FILE);
         assert_eq!(fs::read_to_string(&kept).unwrap(), "eyes\n");
         let reply = camera(&places, &json!({"name": "eyes", "allow": false})).unwrap();
         assert_eq!(allowed(&reply, "eyes"), json!(false));
+        assert_eq!(reply["camera"], json!({"name": "eyes", "allowed": false}));
         assert_eq!(fs::read_to_string(&kept).unwrap(), "");
         assert_eq!(
             camera(&places, &json!({"name": "../eyes", "allow": true})),
