@@ -288,11 +288,14 @@ request leaves out the search's `fetch_page`, then `the_time` (asked only
 for elsewhere), then the skills' functions that are not a core skill's,
 the last first, then `web_search`; a Live session only the skills'
 not a core skill's. Core skills say theirs in the skills' tools file's
-`core` list (`lamp_skills::tools_file`). With `LAMP_REPORTS=on` (two more
-of the voice's own) a chat request leaves out the fetch, the time and the
-search and keeps `dance`; a Live session's own and Dance's alone are 33,
-which the voice says on an error line, leaving out the actions part's
-last (`with_reports_on_dance_stays_at_the_bound`). The built-in
+`core` list (`lamp_skills::tools_file`). The product's voice has
+`LAMP_REPORTS=on` (#2862), two more of the voice's own, `reports_stop` and
+`reports_state`: 37 of the lamp's own in all on the product's route, which
+offers every one, the fetch among them
+(`a_product_lamp_declares_every_function_it_has_within_the_bound`). A Live
+session (a per-lamp drop-in, not the product's route) is cut to 32, and its
+error line names `reports_state`; `reports_stop` and `dance` stay
+(`with_reports_on_dance_stays_at_the_bound`). The built-in
 instruction tells the model its head sits on an arm that moves and that a
 dance is a call (lamp-0c89, 21 Oct, answered "I've no legs to dance with"
 with `dance` given; `crates/voice/src/config.rs`). The voice leaves out by that order what

@@ -256,6 +256,9 @@ Environment=LAMP_ACTIONS_DIR=/run/lampos-actions
 # The skills' functions, in lamp-skills' own folder; the old one inside the actions part's is still
 # read after it for one release.
 Environment=LAMP_SKILLS_DIR=/run/lampos-skills
+# "Stop sending reports" and asking whether they're sent (#2862, reports_stop.rs): the voice can only
+# turn them off, never on.
+Environment=LAMP_REPORTS=on
 Environment=LAMP_TASKS_DIR=/run/lampos-tasks
 # The tasks part runs only with Harness (its unit's condition): without it the voice says work
 # can't be handed on yet, not that a part failed (#811).

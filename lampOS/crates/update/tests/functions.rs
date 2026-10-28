@@ -31,13 +31,14 @@ const CHAT: &str = "chat: ";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 16 (with
-/// onboarding's two and memory's `forget_everything` since 25 Oct), the
-/// actions part's 17 and the skills' 2 (Dance's, and the wellbeing nudges'
-/// one `wellbeing_nudges`), before the search and the look. A change to it
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 19 (with
+/// onboarding's two and memory's `forget_everything` since 25 Oct, and
+/// reports' `reports_stop` and `reports_state` since #2862), the
+/// actions part's 17 and the skills' 1 (Dance's `dance`), before the search
+/// and the look. The test prints this split. A change to it
 /// is a change to what every session is told: say in its pull request what
 /// is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 35;
+const PRODUCT_FUNCTIONS: usize = 37;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
@@ -235,12 +236,14 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     );
     assert!(chat.len() <= lamp_voice::second_provider::MAX_TOOLS);
     assert_eq!(lamps.len(), PRODUCT_FUNCTIONS, "{chat:?}");
-    assert!(
-        !chat
-            .iter()
-            .any(|name| name == lamp_voice::reports_stop::NAME
-                || name == lamp_voice::reports_stop::STATE_NAME)
-    );
+    // The product's voice has `LAMP_REPORTS=on` (#2862): the person can stop
+    // reports and ask about them on the product's route.
+    for name in [
+        lamp_voice::reports_stop::NAME,
+        lamp_voice::reports_stop::STATE_NAME,
+    ] {
+        assert!(chat.iter().any(|told| told == name), "{name}: {chat:?}");
+    }
 }
 
 /// A product lamp's chat request (lamp-0c89, 21 Oct: "Lamp. Please dance
