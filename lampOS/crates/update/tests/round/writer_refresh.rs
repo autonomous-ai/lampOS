@@ -182,6 +182,8 @@ fn a_refreshed_writer_whose_back_ended_well_since_is_proved_and_its_prev_removed
     lamp.round();
     assert_eq!(lamp.read(BACK), "lamp-update 1");
     assert!(!lamp.exists(PREV));
+    // A `back` that didn't fail: its start is never asked.
+    assert!(!lamp.calls().contains(&"back began".to_owned()));
     assert!(!writer_swap::unproven(&lamp.root, &lamp.records()));
     assert!(
         lamp.said
