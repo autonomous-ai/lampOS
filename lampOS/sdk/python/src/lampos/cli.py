@@ -4,7 +4,7 @@ it all with no lamp.
     lamp find
     lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
     lamp hello [LAMP_ID]
-    lamp fake [--every 10] [--cycles N]
+    lamp fake [--every 10] [--cycles N] [--everything] [--hands]
     lamp skill check FOLDER...
 """
 
@@ -41,11 +41,16 @@ async def _fake(args) -> int:
     """A fake lamp on this computer, with every grant, paired here at once,
     that says a person arrived, a phrase heard and the person left, every
     `--every` seconds, and prints what it is asked. Try an example against
-    it in another terminal, with the same LAMPOS_HOME."""
+    it in another terminal, with the same LAMPOS_HOME. With `--hands`, a
+    hand waves for 3 s after each arrival (examples/follow_hand.py)."""
     from .keys import Keyring
-    from .testing import LAMP_CONTROL_REFUSES, FakeLamp
+    from .testing import LAMP_CONTROL_REFUSES, FakeLamp, hand_track
 
-    refuses = {} if getattr(args, "everything", False) else LAMP_CONTROL_REFUSES
+    hands = getattr(args, "hands", False)
+    refuses = {} if getattr(args, "everything", False) else dict(LAMP_CONTROL_REFUSES)
+    if hands:
+        # A lamp with the body's lease socket, which a look at the hand needs.
+        refuses.pop("look", None)
     async with FakeLamp(grants=schema.grants(), name="Fake lamp (lamp fake)", refuses=refuses) as fake:
         pairing = await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring())
         print(f"a fake lamp at {fake.host}:{fake.port}, paired as {pairing.client} in {Keyring().folder}", flush=True)
@@ -62,6 +67,9 @@ async def _fake(args) -> int:
                 await asyncio.sleep(args.every / 3)
                 await fake.emit(event, **fields)
                 print(f"said {event}", flush=True)
+                if hands and event == "person.arrived":
+                    await fake.emit_hand_track(hand_track("wave", seconds=3, seed=cycle), realtime=True)
+                    print("said a hand waving for 3 s, then gone", flush=True)
                 for request in fake.requests[shown:]:
                     print("  asked", json.dumps({k: v for k, v in request.items() if k != "id"}), flush=True)
                 shown = len(fake.requests)
@@ -116,6 +124,11 @@ def parser() -> argparse.ArgumentParser:
         "--everything",
         action="store_true",
         help="answer every op; by default it refuses what lamp-control doesn't route yet, as a lamp does",
+    )
+    fake.add_argument(
+        "--hands",
+        action="store_true",
+        help="a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket (follow_hand.py)",
     )
     fake.set_defaults(run=_fake)
     hello = commands.add_parser("hello", help="connect to a paired lamp and show its grants")

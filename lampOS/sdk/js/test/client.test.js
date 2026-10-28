@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { Keyring, Lamp, LampError, NotPaired, WrongLamp, byCode, fromReply, schema } from '../src/index.js';
-import { FakeLamp } from '../src/testing.js';
+import { FakeLamp, HAND_PATHS, handEvents, handTrack } from '../src/testing.js';
 
 // A move the body plays (and lamp-control takes): 4 frames of 500 ms, 1.5 s in
 // all, from rest and back, well inside each joint's reach and speed.
@@ -721,5 +721,143 @@ test('a second pulse within a minute shows without its pulse, and a refused ligh
     assert.deepEqual([fake.pulsesPlayed.length, fake.pulsesDropped.length], [1, 1]);
     await assert.rejects(lamp.light('green', 1, 30000, 'breathe'), byCode.refused); // refused: never shown
     assert.equal((await lamp.get('light')).light.shows.colour, 'blue');
+  });
+});
+
+
+test('hand events need the look grant and carry only where the hand is', async () => {
+  await withLamp({ grants: ['body'] }, async (lamp) => {
+    await assert.rejects(lamp.on('hand', () => {}), byCode.no_grant);
+  });
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    const seen = [];
+    await lamp.on('hand', (event) => seen.push(event));
+    const track = handTrack('circle', { seconds: 2, hz: 15 });
+    const said = handEvents(track).map(([, event]) => event);
+    await fake.emitHandTrack(track);
+    await until(() => seen.length === said.length);
+    assert.deepEqual(seen.map(({ ev, at, ...hand }) => hand), said);
+    assert.deepEqual(Object.keys(said[0]).sort(), ['confidence', 'open', 'seen', 'size', 'x', 'y']);
+    assert.deepEqual(said.at(-1), { seen: false });
+  });
+});
+
+test('hand events are told by change, four a second at most, and gone after a second', () => {
+  const track = handTrack('still', { seconds: 2, hz: 15 });
+  const still = handEvents(track);
+  assert.deepEqual(still.map(([, e]) => e.seen), [true, false]);
+  assert.ok(still[1][0] - track.at(-1).t >= 1_000_000 && still[1][0] - track.at(-1).t < 1_250_000);
+  const told = handEvents(handTrack('wave', { seconds: 2, hz: 15 })).filter(([, e]) => e.seen);
+  assert.ok(told.length >= 6);
+  for (let n = 1; n < told.length; n++) assert.ok(told[n][0] - told[n - 1][0] >= 250_000);
+  const closing = [...handTrack('still', { seconds: 1, hz: 10 }), ...handTrack('still', { seconds: 1, hz: 10, open: false, t0: 1_000_000 })];
+  assert.deepEqual(handEvents(closing).filter(([, e]) => e.seen).map(([, e]) => e.open), [true, false]);
+  const gap = [...handTrack('still', { seconds: 0.5, hz: 10 }), ...handTrack('still', { seconds: 0.5, hz: 10, t0: 3_000_000 })];
+  assert.deepEqual(handEvents(gap).map(([, e]) => e.seen), [true, false, true, false]);
+  assert.deepEqual(handEvents(handTrack('still', { seconds: 1 }).map((h) => ({ ...h, confidence: 0.3 }))), []);
+});
+
+test('synthetic hand tracks are in the topic\'s shape and repeat by seed', () => {
+  for (const path of HAND_PATHS) {
+    const track = handTrack(path, { seconds: 2, hz: 15, seed: 3 });
+    assert.equal(track.length, 30);
+    assert.deepEqual(track, handTrack(path, { seconds: 2, hz: 15, seed: 3 }));
+    assert.deepEqual(Object.keys(track[0]).sort(), ['confidence', 'open', 'size', 't', 'x', 'y']);
+    assert.equal(track[1].t - track[0].t, Math.round(1_000_000 / 15));
+    for (const hand of track) {
+      assert.ok(hand.x >= 0 && hand.x <= 1 && hand.y >= 0 && hand.y <= 1 && hand.size > 0 && hand.size < 1);
+      assert.ok(hand.confidence >= 0.5 && hand.confidence <= 1 && Number.isInteger(hand.t));
+    }
+  }
+  const xs = handTrack('wave', { seconds: 2 }).map((h) => h.x);
+  assert.ok(Math.max(...xs) - Math.min(...xs) > 0.5);
+  assert.throws(() => handTrack('scan'));
+});
+
+// The same track and the same events in both SDKs' tests (and lamp-control's
+// watch.rs): across, closed, then gone.
+const FIXED_TRACK = Array.from({ length: 40 }, (_, n) => ({ x: 0.1 + n * 0.02, y: 0.5, size: 0.125, open: n < 30, confidence: 0.875, t: n * 66_667 }));
+const FIXED_EVENTS = [[0, {"seen": true, "x": 0.1, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [250000, {"seen": true, "x": 0.16, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [500000, {"seen": true, "x": 0.24, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [750000, {"seen": true, "x": 0.32, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [1000000, {"seen": true, "x": 0.38, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [1250000, {"seen": true, "x": 0.46, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [1500000, {"seen": true, "x": 0.54, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [1750000, {"seen": true, "x": 0.62, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [2000000, {"seen": true, "x": 0.68, "y": 0.5, "size": 0.13, "open": true, "confidence": 0.88}], [2250000, {"seen": true, "x": 0.76, "y": 0.5, "size": 0.13, "open": false, "confidence": 0.88}], [2500000, {"seen": true, "x": 0.84, "y": 0.5, "size": 0.13, "open": false, "confidence": 0.88}], [3750000, {"seen": false}]];
+
+test('a fixed track tells the same hand events in both SDKs', () => {
+  assert.deepEqual(handEvents(FIXED_TRACK), FIXED_EVENTS);
+});
+
+test('followHand follows under its own lease and waits while the hand is gone', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    const following = await lamp.followHand({ forMs: 1000, why: 'test' }).start();
+    assert.ok(following.following && fake.following.size === 1);
+    await fake.emitHandTrack(handTrack('wave', { seconds: 0.5 }));
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(following.following && fake.following.size === 1);
+    await lamp.look('ahead');
+    assert.deepEqual(await following.wait(), { how: 'cut_short', why: 'another look' });
+    assert.ok(!following.following);
+    await following.stop();
+    await until(() => fake.leases.size === 0);
+    assert.equal(fake.following.size, 0);
+    assert.deepEqual(fake.asked('look'), [{ at: 'hand' }, { at: 'ahead' }]);
+    assert.deepEqual(fake.asked('lease.take'), [{ parts: ['body'], for_ms: 1000, why: 'test' }]);
+  });
+});
+
+test('followHand stops when asked, at a stop, or when the lamp takes the body back', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    let following = await lamp.followHand().start();
+    assert.equal((await following.stop()).how, 'finished');
+    assert.equal(fake.leases.size, 0);
+    assert.equal(fake.following.size, 0);
+    following = await lamp.followHand().start();
+    await lamp.stop();
+    assert.equal((await following.wait()).why, 'stop');
+    await following.stop();
+    following = await lamp.followHand().start();
+    fake.loseLease(following.lease.id, 'hand');
+    assert.deepEqual(await following.wait(), { how: 'cut_short', why: 'hand' });
+    await following.stop();
+    assert.deepEqual(fake.asked('lease.release'), [{ lease: 'l_1' }, { lease: 'l_2' }]);
+  });
+});
+
+test('a look at the hand is answered as lamp-control does, with no done', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      const reply = await lamp.request('look', { at: 'hand' });
+      assert.deepEqual([reply.to, reply.follow], ['body', 'hand']);
+      assert.equal(fake.following.size, 1);
+      await lamp.request('look', { at: 'ahead' });
+      assert.equal(fake.following.size, 0);
+    });
+  });
+});
+
+test('followHand needs the look grant and lets go of its lease when refused', async () => {
+  await withLamp({ grants: ['body'] }, async (lamp, fake) => {
+    await assert.rejects(lamp.followHand().start(), byCode.no_grant);
+    await until(() => fake.leases.size === 0);
+  });
+});
+
+test('followHand lets go on a lamp that takes the look without following', async () => {
+  await withLamp({ grants: ['body', 'look'], followsHand: false }, async (lamp, fake) => {
+    await assert.rejects(lamp.followHand().start(), (error) => error instanceof byCode.refused && /doesn't follow a hand yet/.test(error.message));
+    await until(() => fake.leases.size === 0);
+    assert.equal(fake.following.size, 0);
+    assert.deepEqual(fake.asked('lease.release'), [{ lease: 'l_1' }]);
+  });
+});
+
+test('a look at the hand needs the body\'s lease socket, as other looks do', async () => {
+  // lamp-control without --lease-socket refuses every look, `hand` too
+  // (parts.rs: "the body's lease socket"), and followHand lets go of its lease.
+  const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
+  await withLamp({ grants: ['body', 'look'], refuses: LAMP_CONTROL_REFUSES }, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      for (const at of ['ahead', 'hand']) {
+        await assert.rejects(lamp.look(at), (error) => error instanceof byCode.refused && /lease socket/.test(error.message));
+      }
+    });
+    await assert.rejects(lamp.followHand().start(), byCode.refused);
+    assert.equal(fake.leases.size, 0);
   });
 });

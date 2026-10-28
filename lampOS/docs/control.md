@@ -620,6 +620,12 @@ who arrives:
 lamp.on("person.arrived", lambda e: lamp.gesture("greeting"))
 ```
 
+Following a hand is `follow_hand()` (Python) or `followHand()` (JS): `look`
+at `hand` under a body lease of its own, with `hand` events for where it is,
+and a fake lamp that says synthetic hand tracks in `humans/hands/tracked`'s
+shape (`lamp fake --hands`); lamp-mcp's `lamp_follow_hand` is the same for an
+agent.
+
 They run on the developer's computer, never on a lamp. Until `lamp-control`
 is built they are tested against a fake server that speaks this schema.
 

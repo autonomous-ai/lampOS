@@ -36,6 +36,8 @@ REFUSED_GESTURES = ("idle", "scanning")
 ACTION_LEASE_MS = 10_000
 # The body actions lamp-control ends with a `done` after its `{"to": "body"}`.
 DONE_FOLLOWS = {"look"}
+# The longest `lamp_follow_hand` follows, in one call.
+MOST_FOLLOW_S = 60
 # The longest `lamp_wait_for` waits, so one call can't hold an agent's turn.
 MOST_WAIT_S = 120
 # What `lamp://events/recent` keeps.
@@ -183,6 +185,11 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # action never ended is listed only until then (the Reviewer-lead's P3
     # on #3802).
     leases: dict[str, float] = {}
+    # Each `lamp_follow_hand` running, so `lamp_stop` ends it.
+    # The one `lamp_follow_hand` running, if any (a `Following`, or True while
+    # it starts): a second is `busy`, and `lamp_follow_stop` or `lamp_stop`
+    # ends it (folded from Nine's nine/mcp-follow).
+    follow_now: list = []
 
     def held() -> list[str]:
         now = clock()
@@ -424,9 +431,86 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             await act("say", text=text)
             return "said"
 
+    if allowed("body", "look"):
+
+        @server.tool()
+        async def lamp_follow_hand(seconds: float = 10) -> dict:
+            """Turn the head after the hand the lamp sees, for up to `seconds` (60 at most), and say how it
+            ended: the hand gone (none in view for 1 s), the time up, or the lamp taking its body back
+            (someone touched or talked to it). Says how many times the lamp told where the hand was and where
+            it last was, as shares of the picture: never a picture or whose hand. lamp_follow_stop, called
+            meanwhile, ends it."""
+            if follow_now:
+                raise ToolError("busy: already following a hand; lamp_follow_stop ends it")
+            # Held before the first await, so two calls at once can't both start one.
+            follow_now.append(True)
+            try:
+                return await follow(seconds)
+            finally:
+                follow_now.clear()
+
+        async def follow(seconds: float) -> dict:
+            limits.take("look")
+            seen: list[dict] = []
+            gone: asyncio.Future = asyncio.get_running_loop().create_future()
+
+            def hand(event: dict) -> None:
+                if event.get("seen"):
+                    seen.append(event)
+                elif seen and not gone.done():
+                    # Only a hand seen first, then gone, ends it: a follow
+                    # started with no hand in view waits for one.
+                    gone.set_result({"how": "finished", "why": "the hand is gone"})
+
+            started = clock()
+            following = lamp.follow_hand(why=why)
+            try:
+                await lamp.on("hand", hand)
+                # A refused look, or a lamp that took it without following
+                # (before #4183), lets go of its lease in the SDK.
+                await following.start()
+            except LampError as error:
+                lamp.off("hand", hand)
+                raise refused(error) from error
+            follow_now[:] = [following]
+            # Its lease is this server's while it follows (`lamp://lease`).
+            leases[following.lease.id] = clock() + min(max(seconds, 0), MOST_FOLLOW_S)
+            try:
+                ending = asyncio.ensure_future(following.wait())
+                done, _ = await asyncio.wait(
+                    {ending, gone}, timeout=min(max(seconds, 0), MOST_FOLLOW_S), return_when=asyncio.FIRST_COMPLETED
+                )
+                ending.cancel()
+                ended = next(iter(done)).result() if done else {"how": "finished", "why": "time up"}
+            finally:
+                lamp.off("hand", hand)
+                leases.pop(following.lease.id, None)
+                await following.stop()
+            last = seen[-1] if seen else None
+            return {
+                "how": ended.get("how"),
+                "why": ended.get("why"),
+                "seconds": round(clock() - started, 1),
+                "hands_seen": len(seen),
+                "last": {k: last[k] for k in ("x", "y", "size", "open")} if last else None,
+            }
+
+        @server.tool()
+        async def lamp_follow_stop() -> str:
+            """Stop following the hand (lamp_follow_hand then says it ended), and let go of the body."""
+            return "stopped following" if await end_follow() else "not following"
+
+    async def end_follow() -> bool:
+        """End the follow running now, if any: its lease is let go of, and the lamp then stops following."""
+        running = [following for following in follow_now if following is not True]
+        for following in running:
+            await following.stop()
+        return bool(running)
+
     @server.tool()
     async def lamp_stop() -> str:
         """Stop everything this computer asked of the lamp, now, and let go of the body."""
+        await end_follow()
         await act("stop")
         for lease in held():
             leases.pop(lease, None)
