@@ -154,7 +154,9 @@ impl Systemd for Systemctl {
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {
-        run(&["start", crate::writer_unit::UNIT], self.restart_within)
+        // Beyond the unit's own TimeoutStartSec (120 s), so a wait that ends
+        // means the unit did (Seventh's P3 on #4107).
+        run(&["start", crate::writer_unit::UNIT], WRITER_WITHIN)
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
@@ -385,6 +387,10 @@ pub fn clean_line(line: &str) -> String {
 }
 
 /// `systemctl` with these words, waiting at most `within` for it.
+/// How long a start of the writer's one-shot is waited for: past its own
+/// `TimeoutStartSec=120`.
+const WRITER_WITHIN: Duration = Duration::from_secs(150);
+
 fn run(words: &[&str], within: Duration) -> Result<(), String> {
     let mut child = Command::new("systemctl")
         .args(words)

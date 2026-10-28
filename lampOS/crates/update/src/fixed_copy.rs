@@ -43,13 +43,18 @@ pub fn answer(sha256: &str) -> String {
 /// On Linux that is the running file itself (`/proc/self/exe`), even if
 /// another has since been put at its path.
 pub fn own_answer() -> Result<String, String> {
+    Ok(answer(&sha256_hex(&own_bytes()?)))
+}
+
+/// The bytes of the file this program runs from: on Linux the running file
+/// itself (`/proc/self/exe`), within [`MOST_BYTES`].
+pub fn own_bytes() -> Result<Vec<u8>, String> {
     let exe = if cfg!(target_os = "linux") {
         PathBuf::from("/proc/self/exe")
     } else {
         std::env::current_exe().map_err(|error| format!("its own file: {error}"))?
     };
-    let bytes = read_bounded(&exe)?;
-    Ok(answer(&sha256_hex(&bytes)))
+    read_bounded(&exe)
 }
 
 /// What [`place`] did.
