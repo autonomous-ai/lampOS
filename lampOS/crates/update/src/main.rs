@@ -29,6 +29,7 @@ lamp-update harness-on
 lamp-update back
 lamp-update apply
 lamp-update writer-probe
+lamp-update writer-refresh
 lamp-update check-units --cat FILE [--product DIR] [--image DIR [--variant NAME]]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
                      [--min-updater N] [--models FILE] [--settings on|off] [--image DIR]
@@ -71,6 +72,10 @@ apply   lamp-update-apply (lamp-update-back apply, started by a round with
 writer-probe prints one line, `lamp-update writer-probe 1 <sha256>`, the SHA-256 of the
         file it runs from, and changes nothing: a copy is run so before it is put at a
         fixed path (#3689).
+writer-refresh puts this lamp-update at the settings writer's fixed path, the copy
+        there kept as lamp-update-back.prev, once a copy beside it answers writer-probe.
+        Run as root by lamp-update-writer.service, which a round starts; by hand only
+        with no round at work (#3689).
 
   --channel-url   the channel's folder, https://.../ or file:///.../, ending in /
   --channel       the channel followed (lamp-voice)
@@ -144,6 +149,7 @@ fn main() -> ExitCode {
         "back" => back(&options),
         "apply" => apply(&options),
         "writer-probe" => writer_probe(&options),
+        "writer-refresh" => writer_refresh(&options),
         "check-units" => return check_units(&options),
         "manifest" => make_manifest(&options),
         "sign" => sign(&options),
@@ -442,13 +448,15 @@ fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
         .find(|state| state.unit == unit)
         .unwrap_or_default();
     let mut say = |line: &str| eprintln!("lamp-update-back: {line}");
-    match own::back(
+    let back = own::back(
         records,
         Path::new("/"),
         lamp_update::records::unix_ms(),
         &state,
         &mut say,
-    )? {
+    )?;
+    let busy = back == own::Back::Busy;
+    match back {
         // A self.json set aside leaves lamp-update to be started too: it
         // may have failed on it.
         own::Back::PutBack(_) | own::Back::Unreadable(_) => {
@@ -468,6 +476,20 @@ fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
         own::Back::Busy => say("another lamp-update is at work; the timer comes again"),
         own::Back::Nothing | own::Back::Waiting => {}
     }
+    // A `back` that ended well proves a refreshed writer (#3689): noted with
+    // its own bytes, which a round reads before it removes the copy kept.
+    // One that found the lock held ran no more than its start, which
+    // proves nothing (Seventh's P3 on #4107).
+    if !busy
+        && let Ok(own_bytes) = lamp_update::fixed_copy::own_bytes()
+        && let Err(error) = lamp_update::writer_swap::note_back(
+            records,
+            &own_bytes,
+            lamp_update::records::unix_ms(),
+        )
+    {
+        say(&format!("{}: {error}", lamp_update::writer_swap::BACK_OK));
+    }
     Ok(())
 }
 
@@ -476,6 +498,42 @@ fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
 fn writer_probe(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
     println!("{}", lamp_update::fixed_copy::own_answer()?);
+    Ok(())
+}
+
+/// `lamp-update writer-refresh`: the running lamp-update put at the settings
+/// writer's fixed path, the copy there kept (#3689). Run as root by
+/// `lamp-update-writer.service`, which a round starts; by hand only when no
+/// round is at work.
+fn writer_refresh(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let running = lamp_update::fixed_copy::own_bytes()?;
+    let done = lamp_update::writer_swap::refresh(
+        Path::new("/"),
+        Path::new(lamp_update::install::RECORDS),
+        &running,
+        lamp_update::records::unix_ms(),
+        &mut |path: &Path| lamp_update::fixed_copy::run_probe(path),
+    )?;
+    // A new writer is judged by its own `back` only: a failure systemd
+    // still shows from the copy before is cleared (Seventh's P3 on #4107).
+    if done.before.is_some() && !done.proven {
+        let _ = Command::new("systemctl")
+            .args(["reset-failed", lamp_update::writer_swap::BACK_UNIT])
+            .status();
+    }
+    let build = &done.build[..12];
+    match (&done.before, done.synced) {
+        (None, _) => println!("the settings writer already is build {build}"),
+        (Some(before), true) => println!(
+            "the settings writer is build {build}, and build {} is kept at {}",
+            &before[..12],
+            lamp_update::writer_swap::PREV
+        ),
+        (Some(_), false) => {
+            println!("the settings writer is build {build}, but its folder could not be synced")
+        }
+    }
     Ok(())
 }
 
@@ -643,6 +701,9 @@ fn config(
         settings,
         product_settings,
         image: lamp_update::image::on(std::env::var(lamp_update::image::SWITCH).ok().as_deref()),
+        writer_from: lamp_update::fixed_copy::own_bytes()
+            .ok()
+            .map(lamp_update::writer_swap::Running::new),
     };
     Ok((
         config,
