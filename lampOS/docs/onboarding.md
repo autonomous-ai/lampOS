@@ -307,9 +307,16 @@ its end's silence or the wait for an answer (on lamp-52e6 on 21 October the
 lamp's fan had kept the privacy step from ever being offered). A walk left half done (they walked off,
 the voice restarted) goes on at the first step with no outcome.
 
-"Lamp, let's redo the setup": the model calls `redo_setup`, every outcome
-is forgotten, and the walk begins again at the next rest. Skipping one
-step is `setup_step … skipped`; skipping the rest is that for each step.
+`redo_setup` names what to do again. "Lamp, let's redo the setup" is
+`step: all`: every outcome is forgotten, and the walk begins again at the
+next rest. "Can we redo the touch step?" is `step: touch`: only that step's
+outcome and its own counts (how you sound's prompts and tries, giving way's
+tries) go, and every other step keeps what it ended with. Privacy is never
+redone alone; it goes with `all`. A call that names no step, or a step the
+walk doesn't know, reopens nothing and tells the model to ask which (on
+lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
+reopened every step). Skipping one step is `setup_step … skipped`; skipping
+the rest is that for each step.
 
 ## Where it is kept
 
