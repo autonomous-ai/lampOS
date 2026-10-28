@@ -17,6 +17,7 @@ come through `lamp_wait_for`, and the state through resources.
 import argparse
 import asyncio
 import collections
+import os
 import socket
 import time
 from typing import Any, Literal
@@ -413,7 +414,15 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="lamp-mcp", description="One paired lampOS lamp as MCP tools.")
     parser.add_argument("--lamp", help="the lamp's id, when this computer is paired with more than one")
     parser.add_argument("--client", help="how this computer is named in the lamp's leases and journal")
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="every frame to and from the lamp on stderr, secrets redacted (LAMPOS_LOG=debug)",
+    )
     args = parser.parse_args(argv)
+    if args.verbose:
+        # The SDK reads it at each frame; stderr, since stdout is the MCP stream.
+        os.environ["LAMPOS_LOG"] = "debug"
     try:
         asyncio.run(serve(args.lamp, args.client))
     except LampError as error:

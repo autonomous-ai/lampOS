@@ -410,3 +410,22 @@ def test_an_unpaired_computer_is_told_in_one_line(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     with pytest.raises(SystemExit, match=r"^lamp-mcp: not_paired: .*lamp pair"):
         main([])
+
+
+def test_verbose_turns_the_sdks_debug_log_on_and_stdout_stays_the_mcp_stream(monkeypatch, capsys):
+    import lamp_mcp.server as server_module
+
+    seen = {}
+
+    async def serve(lamp_id, client):
+        import os
+
+        seen["log"] = os.environ.get("LAMPOS_LOG")
+
+    monkeypatch.delenv("LAMPOS_LOG", raising=False)
+    monkeypatch.setattr(server_module, "serve", serve)
+    server_module.main([])
+    assert seen["log"] is None  # off by default
+    server_module.main(["--verbose"])
+    assert seen["log"] == "debug"
+    assert capsys.readouterr().out == ""

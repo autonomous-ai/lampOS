@@ -121,6 +121,15 @@ it pins them.
 Tests: `PYTHONPATH=src python3 -m pytest tests` (needs `pytest`; with
 `jsonschema`, the fake lamp checks every request against the schema).
 
+**Seeing every frame:** with `LAMPOS_LOG=debug`, every frame to and from the
+lamp is printed to stderr, one line each (`lampos -> {...}` sent, `lampos <-
+{...}` received). It's off by default. Nothing that would pair or say hello as
+this computer, or give away the lamp's pin, is printed: `proof`, `sig`, `key`,
+`nonce`, `pin` and `fp` show as `<redacted>`, and so does a pair request's
+`code`. A said `text` shows only as its
+length and the start of its SHA-256, and a pushed skill part's `data` only as
+its length.
+
 ## Check a skill folder
 
 A skill is a folder the lamp runs without code: its rules in `skill.toml`
