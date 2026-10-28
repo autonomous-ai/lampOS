@@ -303,8 +303,26 @@ test('get answers the states asked', async () => {
   await withLamp({ grants: ['look'] }, async (lamp, fake) => {
     fake.state.presence = { count: 2, near: 0.4, facing: true };
     const state = await lamp.get('presence', 'lamp');
-    assert.equal(state.presence.count, 2);
-    assert.equal(state.lamp_state.private, false);
+    // As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
+    assert.deepEqual(state, { presence: { count: 2, near: 0.4, facing: true }, lamp: { talking: false, paused: false, private: false, asleep: false } });
+  });
+});
+
+test('the fake light state shows what the ring draws', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    assert.deepEqual(await lamp.get('light'), { light: {} }); // neither: no `shows`
+    const own = { on: true, colour: 'warm', level: 3 };
+    fake.state.light = { ...own };
+    assert.deepEqual(await lamp.get('light'), { light: { ...own, shows: own } });
+    await lamp.light('green', 2, 5000, 'breathe');
+    assert.deepEqual(await lamp.get('light'), { light: { ...own, shows: { on: true, colour: 'green', level: 2 } } });
+    now += 5000; // it lapses: the person's own again
+    assert.deepEqual(await lamp.get('light'), { light: { ...own, shows: own } });
+    fake.state.light = {};
+    await lamp.light('blue', 4, 2000);
+    assert.deepEqual(await lamp.get('light'), { light: { shows: { on: true, colour: 'blue', level: 4 } } });
   });
 });
 

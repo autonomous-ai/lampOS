@@ -23,6 +23,7 @@ import math
 import os
 import ssl
 import tempfile
+import time
 from collections import defaultdict
 from typing import Any
 
@@ -134,12 +135,16 @@ class FakeLamp:
         # Every frame that arrived, taken or refused.
         self.received: list[dict] = []
         self.leases: dict[str, dict] = {}
+        # The newest light a computer asked for, and until when (the fake's
+        # `clock`): what the ring shows while it lasts (`light_state`).
+        self.shown: tuple[dict, float] | None = None
+        self.clock = time.monotonic
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
-            "presence": {"count": 0},
+            "presence": {"count": 0, "near": 0.0, "facing": False},
             "light": {},
             "mood": {},
-            "lamp_state": {"talking": False, "paused": False, "private": False, "asleep": False},
+            "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
         }
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
         self._connections: set[ServerConnection] = set()
@@ -191,6 +196,23 @@ class FakeLamp:
         for ws in list(self._connections):
             if event in self.subscribed[id(ws)]:
                 await ws.send(frame)
+
+    def _show(self, request: dict) -> None:
+        """The ring shows a computer's light while it lasts."""
+        light = {"on": True, "colour": request["colour"], "level": request["level"]}
+        self.shown = (light, self.clock() + request["for_ms"] / 1000)
+
+    def light_state(self) -> dict:
+        """`get`'s light, as lamp-control answers it (Nine's light/drawn): the
+        person's own (`state["light"]`: on, colour, level) and `shows`, what the
+        ring draws now. That's the newest light a computer asked for while it
+        lasts, else the person's own. With neither, no `shows`. No pattern."""
+        own = dict(self.state.get("light") or {})
+        if self.shown is not None and self.shown[1] > self.clock():
+            own["shows"] = dict(self.shown[0])
+        elif any(key in own for key in ("on", "colour", "level")):
+            own["shows"] = {key: own[key] for key in ("on", "colour", "level") if key in own}
+        return own
 
     async def lease_event(self, lease: str, state: str, why: str | None = None) -> None:
         """Tell a lease's holder its lease is `held`, `suspended` or `lost`
@@ -338,8 +360,12 @@ class FakeLamp:
             self.subscribed[id(ws)].difference_update(request["events"])
             await self._ok(ws, id_)
         elif op == "get":
-            asked = {("lamp_state" if s == "lamp" else s) for s in request["state"]}
-            await self._ok(ws, id_, **{k: v for k, v in self.state.items() if k in asked})
+            # As lamp-control's session.rs answers `get`: the states under `state`, each by the name asked (`lamp`, not
+            # `lamp.changed`'s `lamp_state`) (harness-reviewer's lamp run on 75c9, 28 Oct).
+            await self._ok(ws, id_, state={k: self.light_state() if k == "light" else self.state.get(k) for k in request["state"]})
+        elif op == "light":
+            self._show(request)
+            await self._ok(ws, id_)
         elif op == "lease.take":
             if any(set(request["parts"]) & set(h["parts"]) for h in self.leases.values()):
                 await self._refuse(ws, id_, "busy", "another client holds it")
