@@ -199,6 +199,9 @@ pub struct Angles {
 /// own ask (blue on #3504, 27 Oct).
 pub const GESTURES_REFUSED: [&str; 2] = ["idle", "scanning"];
 
+/// The sounds a computer may ask for: the voice's built-in hum.
+pub const SOUNDS: [&str; 1] = ["hum"];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LookTarget {
@@ -517,8 +520,15 @@ impl Op {
                     return Err(format!("name: {name} is the lamp's own, not a client's"));
                 }
             }
-            Self::Play { name } | Self::Sound { name } => {
+            Self::Play { name } => {
                 plain_name(name, "name")?;
+            }
+            // The lamp's own short hum, its one built-in chime; the
+            // recorded notices (no Wi-Fi) are never a computer's to play.
+            Self::Sound { name } => {
+                if name != SOUNDS[0] {
+                    return Err(format!("name: {} only, in this release", SOUNDS[0]));
+                }
             }
             Self::Look { at } => {
                 if let LookAt::Angles(Angles { yaw, pitch }) = at
@@ -871,7 +881,7 @@ mod tests {
             r#"{"id":12,"op":"joints","lease":"l_81","targets":{"pitch":4.0,"yaw":-12.0},"within_ms":300}"#.to_owned(),
             r#"{"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}"#.to_owned(),
             r#"{"id":14,"op":"say","text":"Build passed."}"#.to_owned(),
-            r#"{"id":15,"op":"sound","name":"chime"}"#.to_owned(),
+            r#"{"id":15,"op":"sound","name":"hum"}"#.to_owned(),
             r#"{"id":16,"op":"play","name":"wave-hello"}"#.to_owned(),
             r#"{"id":17,"op":"stop"}"#.to_owned(),
         ];
@@ -940,6 +950,11 @@ mod tests {
             r#"{"id":1,"op":"express","feeling":"glad","strength":1.5}"#.to_owned(),
             r#"{"id":1,"op":"express","feeling":"Glad"}"#.to_owned(),
             r#"{"id":1,"op":"gesture","name":"../nod"}"#.to_owned(),
+            // The hum only, in this release: no other sound, and never a
+            // recorded notice (wifi_lost) or a path.
+            r#"{"id":1,"op":"sound","name":"chime"}"#.to_owned(),
+            r#"{"id":1,"op":"sound","name":"wifi_lost"}"#.to_owned(),
+            r#"{"id":1,"op":"sound","name":"../hum"}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":200,"pitch":0}}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":10,"pitch":5,"roll":30}}"#.to_owned(),
             r#"{"id":1,"op":"stop","lease":"l_1"}"#.to_owned(),

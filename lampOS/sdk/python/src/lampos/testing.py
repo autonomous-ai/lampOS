@@ -70,7 +70,6 @@ LAMP_CONTROL_REFUSES = {
     "look": "not routed yet: waits for the body's lease socket",
     "joints": "not routed yet: waits for the body's lease socket",
     "play": "not routed yet: waits for client packages",
-    "sound": "not routed yet: waits for client packages",
 }
 
 
@@ -367,8 +366,9 @@ class FakeLamp:
                 await self._refuse(ws, id_, "bad_request", "feeling: one of glad, lively, low")
                 return
             await self._ok(ws, id_, to="body", move=_feeling_move(request), light=True)
-        elif op == "say":
-            # As lamp-control: the voice takes it, and its `done` follows.
+        elif op in ("say", "sound"):
+            # As lamp-control: the voice takes it (a sound is its hum), and
+            # its `done` follows.
             await self._ok(ws, id_, to="voice")
             if self.auto_done:
                 await self.done(id_)

@@ -1216,7 +1216,7 @@ mod tests {
             };
         }
         let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
-        let sound = r#"{"id":4,"op":"sound","name":"chime"}"#;
+        let sound = r#"{"id":4,"op":"sound","name":"hum"}"#;
         for hour in [22, 23, 0, 3, 6] {
             for frame in [say, sound] {
                 let refused = send!(door, frame, at(hour));

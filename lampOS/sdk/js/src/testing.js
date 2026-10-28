@@ -34,7 +34,6 @@ export const LAMP_CONTROL_REFUSES = Object.freeze({
   look: "not routed yet: waits for the body's lease socket",
   joints: "not routed yet: waits for the body's lease socket",
   play: 'not routed yet: waits for client packages',
-  sound: 'not routed yet: waits for client packages',
 });
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const LEASE_OPS = new Set(['look', 'move', 'play', 'joints']);
@@ -250,7 +249,9 @@ export class FakeLamp {
         // follows.
         return this.ok(ws, id, { to: 'body' });
       case 'say':
-        // As lamp-control: the voice takes it, and its `done` follows.
+      case 'sound':
+        // As lamp-control: the voice takes it (a sound is its hum), and
+        // its `done` follows.
         this.ok(ws, id, { to: 'voice' });
         if (this.autoDone) this.done(id);
         return undefined;

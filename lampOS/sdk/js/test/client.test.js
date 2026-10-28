@@ -455,6 +455,8 @@ test('a fake like lamp-control refuses what it does not route yet', async () => 
     await lamp.express('glad');
     assert.equal((await lamp.gesture('nod')).to, 'body');
     await lamp.light('warm', 3, 1000);
+    // The hum is routed, as lamp-control's sound.
+    assert.equal((await lamp.sound('hum')).to, 'voice');
   });
 });
 
