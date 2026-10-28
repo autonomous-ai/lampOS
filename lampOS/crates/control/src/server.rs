@@ -124,8 +124,15 @@ fn tell_until_answered(socket: &std::path::Path, request: &Value) {
                     );
                     std::thread::sleep(*wait);
                 }
+                // An unanswered ask may still have reached the helper (a
+                // read that timed out after the write), so the journal says
+                // it may be served; asking again is harmless, as each change
+                // sets a computer's state (the Reviewer-lead's P3 on #4027).
                 None => {
-                    eprintln!("lamp-control: gave up telling the helper {request}: {error}");
+                    eprintln!(
+                        "lamp-control: gave up telling the helper {request} after {} tries: {error}; it may still be served",
+                        RETRY_AFTER.len() + 1
+                    );
                     return;
                 }
             },
