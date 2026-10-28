@@ -10,7 +10,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 # The MCP SDK's 1.x line: 2.x renamed FastMCP and changed its API.
-dependencies = ["lampos>=0.1", "mcp>=1.12,<2"]
+# 1.22 at least: 1.21 and older don't import with today's pydantic (2.14,
+# `eval_type_backport`), and lamp-mcp's tests pass on 1.22 and 1.30 (El's P3
+# on #4215).
+dependencies = ["lampos>=0.1", "mcp>=1.22,<2"]
 
 [project.optional-dependencies]
 test = ["pytest>=8", "jsonschema>=4.20"]

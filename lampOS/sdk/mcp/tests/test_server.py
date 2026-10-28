@@ -531,3 +531,74 @@ def test_server_info_says_lamp_mcps_own_version(tmp_path):
                 assert options.server_version == version("lamp-mcp") != version("mcp")
 
     run(go())
+
+
+def test_a_required_argument_given_as_null_is_missing(tmp_path):
+    """harness-reviewer's P3 on #4215: `colour: null` is refused in the
+    lamp's form too, never in the validator's words."""
+
+    async def go():
+        async with connected(tmp_path, grants=EVERY_GRANT) as (fake, _, session):
+            refused = await session.call_tool("lamp_light", {"colour": None, "level": 2})
+            assert refused.isError
+            assert text(refused) == "bad_request: lamp_light needs colour"
+            assert fake.asked("light") == []
+
+    run(go())
+
+
+GRANT_WORDS = {"body", "light", "speak", "look", "hear", "sound"}
+
+
+def readme_grants(cell: str) -> set[str]:
+    """The grants a README grant cell says the tool is offered with: its
+    words before any parenthesis; "none" and "the event's" need none."""
+    if cell.startswith(("none", "the event's")):
+        # Offered with none: `lamp_wait_for` asks each event's own grant.
+        return set()
+    head = cell.split("(")[0]
+    return {word.strip(" ,`") for word in head.split()} & GRANT_WORDS
+
+
+def test_the_readme_grant_column_is_the_servers_own(tmp_path):
+    """harness-reviewer's P3 on #4215: each tool is offered with exactly the
+    grants its README row names, and not with any one of them missing."""
+    rows = readme_rows()
+
+    async def offered(folder, grants) -> set[str]:
+        async with connected(folder, grants=tuple(grants)) as (_, _, session):
+            return {tool.name for tool in (await session.list_tools()).tools}
+
+    async def go():
+        for n, (tool, tool_rows) in enumerate(sorted(rows.items())):
+            needs = readme_grants(tool_rows[0][5])
+            assert tool in await offered(tmp_path / f"{n}-all", needs), (tool, needs)
+            for m, grant in enumerate(sorted(needs)):
+                without = await offered(tmp_path / f"{n}-{m}", needs - {grant})
+                assert tool not in without, (tool, grant)
+
+    run(go())
+
+
+def test_the_readme_lease_column_is_the_servers_own(tmp_path):
+    """A tool the README says takes a lease takes a body lease when called;
+    one it says doesn't, doesn't."""
+    rows = readme_rows()
+    calls = {
+        "lamp_look": {"at": "ahead"},
+        "lamp_move": {"step_ms": 100, "frames": [[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]]},
+        "lamp_gesture": {"name": "nod"},
+        "lamp_light": {"colour": "warm"},
+        "lamp_express": {"feeling": "glad"},
+        "lamp_say": {"text": "Hello."},
+        "lamp_state": {},
+    }
+
+    async def go():
+        for n, (tool, arguments) in enumerate(calls.items()):
+            takes = rows[tool][0][6].startswith("yes")
+            async with connected(tmp_path / str(n), grants=EVERY_GRANT) as (fake, _, session):
+                await session.call_tool(tool, arguments)
+                assert bool(fake.asked("lease.take")) == takes, (tool, takes)
+
+    run(go())
