@@ -203,6 +203,7 @@ sudo python3 servo-calib.py check      # read only: exit 0 calibrated, 3 not con
 ```
 
 - **Nothing is driven.** Torque must be off (lamp-body stopped); every write refuses otherwise.
+- **`check` reads the lamp folded:** each joint its own offset, limits on yaw, roll and pitch, and the shoulder and elbow within 300 counts of 2047, the fleet's folded pose. lamp-9adf (28 Oct) had its own calibration but folded at 3151,3765: lamp-body refused the stand; `check` now stops such a lamp first, to be swept again.
 - **The sweep:** the lamp starts folded at rest, head on its stop; the person moves each joint end to end by hand (base turn, shoulder, elbow, head roll, head pitch) and folds it back. A joint moved under 400 counts refuses the plan.
 - **The plan** matches lamp-3e83: folded, the shoulder and elbow read 2047 and the head pitch 2010 (in the body's home range); yaw and roll have their swept range centred on 2047. Limits sit 30 counts inside the sweep on yaw, roll and pitch, so a joint is never sent into its hard stop; the shoulder and elbow keep 0–4095, as on lamp-3e83. lamp-220c calibrated this way stands at 2629,2564; lamp-3e83 at 2630,2562.
 - **`start`** checks every lamp's servos before its run and calibrates one never calibrated (`servos_ready`); a lamp left uncalibrated is skipped, never run.

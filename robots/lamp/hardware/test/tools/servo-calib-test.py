@@ -144,6 +144,18 @@ with tempfile.TemporaryDirectory() as tmp:
         p = tool(dev, "check", plan=plan)
         expect("calibrated: check passes (exit 0)", p.returncode == 0 and "RECORD SERVOS=PASS" in p.stdout, p.stdout + p.stderr)
 
+        # Calibrated, but not as the fleet (lamp-9adf: folded shoulder and
+        # elbow at 3151,3765): check refuses it.
+        kept = {s: bytes(servos.mem[s][31:33]) for s in (2, 3)}
+        for sid, reads in ((2, 3151), (3, 3765)):
+            o = servos.actual[sid] - reads
+            servos.mem[sid][31:33] = ((0x800 | -o) if o < 0 else o).to_bytes(2, "little")
+        p = tool(dev, "check", plan=plan)
+        expect("calibrated off the fleet (folded 3151,3765): not calibrated (exit 4)", p.returncode == 4
+               and "not as the fleet" in p.stdout and "RECORD SERVOS=not calibrated" in p.stdout, p.stdout + p.stderr)
+        for sid, b in kept.items():
+            servos.mem[sid][31:33] = b
+
         # A joint barely moved: the plan is refused.
         h = threading.Thread(target=hand, args=(servos, {1: (-50, 50)}, 1.0)); h.start()
         p = tool(dev, "sweep", "2", plan=plan); h.join()

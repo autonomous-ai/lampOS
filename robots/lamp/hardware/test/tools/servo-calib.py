@@ -8,8 +8,10 @@
 # Everything here is in the servos' EEPROM and survives a reflash and a reset.
 # Torque stays off throughout; nothing is driven.
 #
-#   servo-calib.py check               read only: exit 0 calibrated, 3 not
-#                                      configured, 4 not calibrated
+#   servo-calib.py check               read only, the lamp folded: exit 0
+#                                      calibrated as the fleet, 3 not
+#                                      configured, 4 not calibrated (or not
+#                                      in the fleet's coordinates)
 #   servo-calib.py configure           store max acceleration 254 and P 16
 #   servo-calib.py sweep SECONDS       a person moves each joint end to end by
 #                                      hand, from folded at rest back to it;
@@ -30,6 +32,7 @@ REST_TARGET = {2: 2047, 3: 2047, 5: 2010}  # the folded rest reads these
 MID_TARGET = {1: 2047, 4: 2047}            # the swept range's middle reads these
 LIMITED = (1, 4, 5)                         # angle limits, as on lamp-3e83
 MARGIN = 30                                 # counts inside the sweep, ~3 degrees
+FOLDED_TOLERANCE = 300                      # folded shoulder/elbow from 2047 (3e83: 2049,2084; 220c: 2028,1999)
 MAX_ACCELERATION, P_COEFFICIENT = 254, 16   # V1's (lerobot configure_motors, hal_follower)
 # Control table: EEPROM below 40 and at 85, RAM from 40.
 MIN_LIMIT, MAX_LIMIT, P_REG, OFFSET, TORQUE, LOCK, POSITION, MAX_ACC = 9, 11, 21, 31, 40, 55, 56, 85
@@ -112,6 +115,15 @@ def check(bus):
     # that have stops; servos never calibrated share one offset and none.
     calibrated = (len({s["offset"] for s in st.values()}) == len(st)
                   and all(st[sid]["limits"] != [0, 4095] for sid in LIMITED))
+    # And in the fleet's coordinates: folded, the shoulder and elbow read
+    # near 2047, or the body's stand pose points elsewhere (lamp-9adf, 28 Oct:
+    # its own calibration, folded at 3151,3765; lamp-body refused the stand).
+    off_fleet = [NAMES[sid] for sid in REST_TARGET if sid != 5
+                 and abs(st[sid]["position"] - REST_TARGET[sid]) > FOLDED_TOLERANCE]
+    if calibrated and off_fleet:
+        print(f"folded, {', '.join(off_fleet)} read more than {FOLDED_TOLERANCE} from {REST_TARGET[2]}: "
+              "calibrated, but not as the fleet (or the arm is not folded)")
+        calibrated = False
     verdict = "PASS" if configured and calibrated else ("not configured" if not configured else "not calibrated")
     print(f"RECORD SERVOS={verdict}")
     print(f"RECORD SERVO_OFFSETS={','.join(str(st[sid]['offset']) for sid in NAMES)}")
