@@ -717,7 +717,7 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 15] = [
+pub const TOPICS: [&str; 16] = [
     "humans/faces/tracked",
     "humans/hands/tracked",
     "room/stood_up",
@@ -731,6 +731,7 @@ pub const TOPICS: [&str; 15] = [
     "voice/mute",
     "voice/privacy",
     "light/state",
+    "light/drawn",
     "mood/state",
     "controls/touch",
 ];
