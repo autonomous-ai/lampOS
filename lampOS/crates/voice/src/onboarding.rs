@@ -2589,11 +2589,22 @@ impl Onboarding {
         kept.offered_at_unix_s = Some(unix_ms() / 1_000);
         match step {
             Step::GivingWay => self.desired.giving_way_tries = 0,
-            Step::Privacy => self.desired.privacy_invitation_tries = 0,
+            Step::Privacy => {
+                self.desired.privacy_invitation_tries = 0;
+                // Its invitations left unsaid are counted anew, as giving
+                // way's are (Seventh's P3 1 on #4192).
+                self.privacy_flow.unsaid = 0;
+            }
             Step::HowYouSound => {
                 self.desired.near_call_tries.clear();
                 self.desired.near_call_prompts = 0;
                 self.desired.sentence_prompts = 0;
+                // The whole step again, from its call part: the part is
+                // chosen by whether the name part ended (`near.named`),
+                // which a silent first walk left failed in this process, so
+                // the re-offer went straight to the sentence (Seventh's P2
+                // on #4192). Its answers and unsaid prompts start anew too.
+                self.forget_near();
             }
             _ => {}
         }
