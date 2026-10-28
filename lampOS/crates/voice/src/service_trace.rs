@@ -230,8 +230,172 @@ impl SharedMetadata {
     }
 }
 
+// Test-only, constant-space observations; never an acknowledgement or authority.
+#[cfg(test)]
+mod progress {
+    use super::Report;
+    use std::{
+        fmt,
+        sync::atomic::{AtomicU64, Ordering},
+        time::{Duration, Instant},
+    };
+
+    const NAMES: [&str; 17] = [
+        "created",
+        "started",
+        "waiting",
+        "event",
+        "warning",
+        "segment_header",
+        "segment_write",
+        "health_write",
+        "finish",
+        "segment_sync",
+        "final_health_write",
+        "health_sync",
+        "error_report",
+        "returning",
+        "returned",
+        "acknowledging",
+        "ack_returned",
+    ];
+    #[derive(Clone, Copy)]
+    #[repr(u8)]
+    pub(super) enum Phase {
+        Started = 1,
+        Waiting = 2,
+        Event = 3,
+        Warning = 4,
+        SegmentHeader = 5,
+        SegmentWrite = 6,
+        HealthWrite = 7,
+        Finish = 8,
+        SegmentSync = 9,
+        FinalHealthWrite = 10,
+        HealthSync = 11,
+        ErrorReport = 12,
+        Returning = 13,
+        Returned = 14,
+        Acknowledging = 15,
+        AckReturned = 16,
+    }
+
+    pub(super) struct Writer {
+        began: Instant,
+        // One acquire load gives a phase, segment and its original entry time.
+        // High 48 bits: elapsed microseconds; then slot (255 = none), then phase.
+        phase: AtomicU64,
+        counts: [AtomicU64; NAMES.len()],
+        acknowledgement: AtomicU64,
+    }
+    impl Default for Writer {
+        fn default() -> Self {
+            Self {
+                began: Instant::now(),
+                phase: AtomicU64::new(255 << 8),
+                counts: std::array::from_fn(|index| AtomicU64::new(u64::from(index == 0))),
+                acknowledgement: AtomicU64::new(0),
+            }
+        }
+    }
+    fn micros(duration: Duration) -> u64 {
+        duration.as_micros().min(u128::from(u64::MAX)) as u64
+    }
+    impl Writer {
+        pub(super) fn mark(&self, phase: Phase, slot: Option<u8>) {
+            self.counts[phase as usize].fetch_add(1, Ordering::Relaxed);
+            let at = micros(self.began.elapsed()).min(u64::MAX >> 16);
+            self.phase.store(
+                (at << 16) | (u64::from(slot.unwrap_or(255)) << 8) | phase as u64,
+                Ordering::Release,
+            );
+        }
+        pub(super) fn acknowledged(&self, sent: bool) {
+            self.acknowledgement
+                .store(if sent { 1 } else { 2 }, Ordering::Release);
+            self.mark(Phase::AckReturned, None);
+        }
+        pub(super) fn failure(&self, failed: WaitFailed, health: Report) -> Observation {
+            let phase = self.phase.load(Ordering::Acquire);
+            Observation {
+                outcome: failed.outcome,
+                wait_us: micros(failed.wait),
+                waited_us: micros(failed.waited),
+                phase: NAMES[(phase & 255) as usize],
+                segment: match (phase >> 8) & 255 {
+                    255 => None,
+                    slot => Some(slot as u8),
+                },
+                phase_started_us: phase >> 16,
+                observed_us: micros(self.began.elapsed()),
+                phase_counts: std::array::from_fn(|index| {
+                    self.counts[index].load(Ordering::Acquire)
+                }),
+                acknowledgement: match self.acknowledgement.load(Ordering::Acquire) {
+                    0 => "pending",
+                    1 => "sent",
+                    _ => "refused",
+                },
+                health,
+            }
+        }
+    }
+    pub(super) struct WaitFailed {
+        pub(super) outcome: &'static str,
+        pub(super) wait: Duration,
+        pub(super) waited: Duration,
+    }
+    pub(super) struct Observation {
+        pub(super) outcome: &'static str,
+        wait_us: u64,
+        waited_us: u64,
+        pub(super) phase: &'static str,
+        segment: Option<u8>,
+        phase_started_us: u64,
+        observed_us: u64,
+        pub(super) phase_counts: [u64; NAMES.len()],
+        pub(super) acknowledgement: &'static str,
+        pub(super) health: Report,
+    }
+    impl fmt::Debug for Observation {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("WriterCompletion")
+                .field("outcome", &self.outcome)
+                .field("wait_us", &self.wait_us)
+                .field("waited_us", &self.waited_us)
+                .field("phase", &self.phase)
+                .field("segment", &self.segment)
+                .field("phase_started_us", &self.phase_started_us)
+                .field("observed_us", &self.observed_us)
+                .field("phase_counts", &self.phase_counts)
+                .field("acknowledgement", &self.acknowledgement)
+                .field(
+                    "health",
+                    &[
+                        ("acknowledged", u64::from(self.health.acknowledged)),
+                        ("finish_attempted", u64::from(self.health.finish_attempted)),
+                        ("degraded", u64::from(self.health.degraded)),
+                        ("writer_failed", u64::from(self.health.writer_failed)),
+                        (
+                            "initialization_failed",
+                            u64::from(self.health.initialization_failed),
+                        ),
+                        ("dropped_events", self.health.dropped_events),
+                        ("oversized_events", self.health.oversized_events),
+                        ("written_events", self.health.written_events),
+                        ("unconfirmed_events", self.health.unconfirmed_events),
+                        ("rotations", self.health.rotations),
+                    ],
+                )
+                .finish()
+        }
+    }
+}
+
 #[derive(Default)]
 struct Health {
+    #[cfg(test)]
+    progress: progress::Writer,
     closed: AtomicBool,
     failed: AtomicBool,
     dropped: AtomicU64,
@@ -331,8 +495,17 @@ impl ServiceTrace {
         let handle = thread::Builder::new()
             .name("lamp-service-trace".into())
             .spawn(move || {
+                #[cfg(test)]
+                shared.progress.mark(progress::Phase::Started, None);
                 writer_loop(consumer, store, &shared);
+                #[cfg(test)]
+                shared.progress.mark(progress::Phase::Returned, None);
+                #[cfg(test)]
+                shared.progress.mark(progress::Phase::Acknowledging, None);
+                #[cfg(not(test))]
                 let _ = tx.try_send(());
+                #[cfg(test)]
+                shared.progress.acknowledged(tx.try_send(()).is_ok());
             })?;
         let writer = handle.thread().clone();
         // Deliberately detach: filesystem calls cannot be preempted by Rust.
@@ -387,12 +560,36 @@ impl ServiceTrace {
     /// immutable report returned at the production finish deadline.
     #[cfg(test)]
     pub(crate) fn observe_completion_for_test(&self, first: &Report, wait: Duration) -> Report {
-        if !first.acknowledged {
-            self.done
-                .recv_timeout(wait)
-                .expect("test writer completion");
+        self.completion_for_test(first, wait)
+            .unwrap_or_else(|failed| {
+                let observation = self
+                    .health
+                    .progress
+                    .failure(failed, self.health.report(false, true));
+                panic!("test writer completion: {observation:?}");
+            })
+    }
+    #[cfg(test)]
+    fn completion_for_test(
+        &self,
+        first: &Report,
+        wait: Duration,
+    ) -> Result<Report, progress::WaitFailed> {
+        let began = std::time::Instant::now();
+        if !first.acknowledged
+            && let Err(error) = self.done.recv_timeout(wait)
+        {
+            let outcome = match error {
+                mpsc::RecvTimeoutError::Timeout => "timeout",
+                mpsc::RecvTimeoutError::Disconnected => "disconnected",
+            };
+            return Err(progress::WaitFailed {
+                outcome,
+                wait,
+                waited: began.elapsed(),
+            });
         }
-        self.health.report(true, true)
+        Ok(self.health.report(true, true))
     }
     pub(crate) fn finish(&mut self, wait: Duration) -> Report {
         self.queue.take();
@@ -418,6 +615,8 @@ fn writer_loop(mut queue: Consumer<Packet>, mut store: impl Store, health: &Heal
     let result = (|| -> io::Result<()> {
         let mut warned = false;
         loop {
+            #[cfg(test)]
+            health.progress.mark(progress::Phase::Waiting, None);
             let packet = match queue.pop() {
                 Ok(packet) => packet,
                 Err(_) if health.closed.load(Ordering::Acquire) => {
@@ -435,20 +634,31 @@ fn writer_loop(mut queue: Consumer<Packet>, mut store: impl Store, health: &Heal
             };
             if !warned && health.dropped.load(Ordering::Acquire) > 0 {
                 warned = true;
+                #[cfg(test)]
+                health.progress.mark(progress::Phase::Warning, None);
                 eprintln!(
                     "lamp-voice serve: metadata events dropped; conversation authority is unaffected"
                 );
             }
+            #[cfg(test)]
+            health.progress.mark(progress::Phase::Event, None);
             store.event(&packet.bytes[..packet.len], health)?;
             health.written.fetch_add(1, Ordering::Release);
         }
+        #[cfg(test)]
+        health.progress.mark(progress::Phase::Finish, None);
         store.finish(health)
     })();
     if result.is_err() {
         health.failed.store(true, Ordering::Release);
         // At most one bounded line; stderr backpressure stalls only this worker.
+        #[cfg(test)]
+        health.progress.mark(progress::Phase::ErrorReport, None);
         eprintln!("lamp-voice serve: metadata writer failed; conversation authority is unaffected");
     }
+    // Includes the queue/store destructors before the outer Returned mark.
+    #[cfg(test)]
+    health.progress.mark(progress::Phase::Returning, None);
 }
 
 struct Files {
@@ -498,6 +708,15 @@ impl Files {
         Ok(())
     }
     fn health(&mut self, health: &Health, finished: bool) -> io::Result<()> {
+        #[cfg(test)]
+        health.progress.mark(
+            if finished {
+                progress::Phase::FinalHealthWrite
+            } else {
+                progress::Phase::HealthWrite
+            },
+            None,
+        );
         self.health_file.seek(SeekFrom::Start(0))?;
         self.health_file.set_len(0)?;
         serde_json::to_writer(&mut self.health_file, &serde_json::json!({
@@ -519,6 +738,10 @@ fn private_file(path: &Path) -> io::Result<File> {
 impl Store for Files {
     fn event(&mut self, bytes: &[u8], health: &Health) -> io::Result<()> {
         if self.bytes == 0 {
+            #[cfg(test)]
+            health
+                .progress
+                .mark(progress::Phase::SegmentHeader, Some(self.slot as u8));
             self.header()?;
         }
         if self.bytes + bytes.len() as u64 > self.limit {
@@ -527,9 +750,17 @@ impl Store for Files {
                 .generation
                 .checked_add(1)
                 .ok_or_else(|| io::Error::other("trace generation exhausted"))?;
+            #[cfg(test)]
+            health
+                .progress
+                .mark(progress::Phase::SegmentHeader, Some(self.slot as u8));
             self.header()?;
             health.rotations.fetch_add(1, Ordering::Release);
         }
+        #[cfg(test)]
+        health
+            .progress
+            .mark(progress::Phase::SegmentWrite, Some(self.slot as u8));
         self.segments[self.slot].write_all(bytes)?;
         self.bytes += bytes.len() as u64;
         self.events = self.events.saturating_add(1);
@@ -539,10 +770,20 @@ impl Store for Files {
         Ok(())
     }
     fn finish(&mut self, health: &Health) -> io::Result<()> {
+        #[cfg(test)]
+        for (slot, file) in self.segments.iter().enumerate() {
+            health
+                .progress
+                .mark(progress::Phase::SegmentSync, Some(slot as u8));
+            file.sync_all()?;
+        }
+        #[cfg(not(test))]
         for file in &self.segments {
             file.sync_all()?;
         }
         self.health(health, true)?;
+        #[cfg(test)]
+        health.progress.mark(progress::Phase::HealthSync, None);
         self.health_file.sync_all()
     }
 }
@@ -643,11 +884,27 @@ mod tests {
         // A zero control-path budget is deterministic; no widened timeout/sleep.
         let report = writer.finish(Duration::ZERO);
         assert!(!report.acknowledged && report.degraded);
+        let bounded = serde_json::to_value(report).unwrap();
+        let failed = writer
+            .completion_for_test(&report, Duration::ZERO)
+            .unwrap_err();
+        let diagnostic = writer
+            .health
+            .progress
+            .failure(failed, writer.health.report(false, true));
+        assert_eq!(diagnostic.outcome, "timeout");
+        assert_eq!(diagnostic.phase, "event");
+        assert_eq!(diagnostic.phase_counts[progress::Phase::Event as usize], 1);
+        assert_eq!(diagnostic.acknowledgement, "pending");
+        assert_eq!(diagnostic.health.written_events, 0);
+        assert!(!diagnostic.health.acknowledged && diagnostic.health.degraded);
+        assert_eq!(serde_json::to_value(report).unwrap(), bounded);
         release.send(()).unwrap();
         let completed = writer.observe_completion_for_test(&report, Duration::from_secs(2));
         assert!(completed.acknowledged && !completed.writer_failed);
         // A late writer exit cannot rewrite the already returned timed-out report.
         assert!(!report.acknowledged && report.degraded);
+        assert_eq!(serde_json::to_value(report).unwrap(), bounded);
     }
     #[test]
     fn oversized_event_is_dropped_not_truncated_into_a_misleading_record() {

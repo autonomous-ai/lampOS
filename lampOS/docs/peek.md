@@ -133,6 +133,21 @@ per record for record admission, projection and enqueue, measured separately
 from asynchronous file writing. This is not a filesystem or device latency
 bound. The permission setup still runs only at service startup.
 
+Voice's service-trace tests keep a constant-size, per-writer phase snapshot
+only in test builds. A failed completion observation reports fixed phase
+labels, counts, microseconds relative to writer creation, segment slot indexes (0..n, not generations) and numeric health;
+it carries no event values, words, identities or paths. The phases distinguish
+event/header writes, segment syncs, final health write/sync, the writer-loop
+and destructor return boundary, and acknowledgement. Counts are concurrent
+observations, not a filesystem latency or scheduling diagnosis. Production
+has no diagnostic fields or calls, and keeps its 500 ms finish limit. Test
+observation budgets and the existing assertions stay unchanged: a timeout
+still fails.
+The stalled-writer handshake checks that a zero-budget observation reports
+failure before release, cannot rewrite the original bounded report, and only
+reports completion after the real acknowledgement. These diagnostics do not
+explain or waive the earlier ARM64 timeout.
+
 Before granting parent traversal, the installer must verify that every other
 immediate child is an owned private 0700 directory or single-link 0600 file,
 with no ACL. A known filename can be opened through a search-only parent
