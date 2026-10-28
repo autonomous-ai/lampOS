@@ -61,6 +61,9 @@ class FakeCommands:
         self.head_mutations = []
         self.updater_calls = []
         self.api_fail = False
+        # GitHub's 5xx, by call, how many times more (#4103). A read's comes
+        # before it is answered; "create" and "upload" come after the change.
+        self.server_errors = {}
         if sequence is not None:
             release = self.release(P.HEAD, "b" * 40)
             self.add(release, P.ENVELOPE, old_envelope(sequence))
@@ -100,6 +103,11 @@ class FakeCommands:
             value = [[public(item) for item in page] for page in value]
         return json.dumps(value).encode()
 
+    def server_error(self, kind):
+        if self.server_errors.get(kind, 0) > 0:
+            self.server_errors[kind] -= 1
+            raise P.ServerError("gh api failed (exit 1): HTTP 504: We couldn't respond to your request in time")
+
     def run(self, words, output=None):
         words = [str(word) for word in words]
         self.calls.append(words)
@@ -114,6 +122,7 @@ class FakeCommands:
             if self.api_fail:
                 raise P.Refused("fake API auth/network error")
             if "application/octet-stream" in " ".join(words):
+                self.server_error("download")
                 endpoint = words[2]
                 _, asset = self.asset(int(endpoint.rsplit("/", 1)[1]))
                 output.write(asset["data"])
@@ -121,8 +130,16 @@ class FakeCommands:
             endpoint = words[-1]
             prefix = f"repos/{P.REPO}"
             if endpoint == prefix:
+                self.server_error("repository")
                 return self.json_result({"full_name": P.REPO, "private": False})
             endpoint = endpoint.removeprefix(prefix + "/")
+            if "PATCH" in words and endpoint.count("/") == 1 and endpoint.startswith("releases/"):
+                identifier = int(endpoint.split("/")[1])
+                release = next(release for release in self.release_map.values() if release["id"] == identifier)
+                release["body"] = words[words.index("-f") + 1].removeprefix("body=")
+                return self.json_result({"id": identifier, "body": release["body"]})
+            if "PATCH" not in words:
+                self.server_error("releases" if endpoint.startswith("releases?") else "refs" if endpoint.startswith("git/") else "assets")
             if endpoint.startswith("releases?"):
                 if self.fail == "release-lookup":
                     raise P.Refused("fake release lookup HTTP 503")
@@ -246,26 +263,31 @@ class FakeCommands:
             for index, file in enumerate(files):
                 if self.fail == "create-upload" and tag != P.HEAD and index == 1:
                     raise P.Refused("fake partial immutable upload")
+                if tag != P.HEAD and index == 2 and self.server_errors.get("create-partial", 0) > 0:
+                    self.server_error("create-partial")
                 if self.fail == "missing-upload" and tag != P.HEAD and index == 1:
                     continue
                 data = file.read_bytes()
                 if self.fail == "corrupt-upload" and tag != P.HEAD and index == 1:
                     data = bytes([data[0] ^ 1]) + data[1:]
                 self.add(release, file.name, data)
+            if tag != P.HEAD:
+                self.server_error("create")
             if self.fail == "changed-head" and tag != P.HEAD:
                 asset = self.release_map[P.HEAD]["assets"][P.ENVELOPE]
                 asset["data"] = old_envelope(11)
                 asset["size"] = len(asset["data"])
             return b"created\n"
-        assert action == "upload" and tag == P.HEAD and "--clobber" not in words
-        if self.fail == "stage-upload":
+        assert action == "upload" and "--clobber" not in words
+        if self.fail == "stage-upload" and tag == P.HEAD:
             raise P.Refused("fake stage upload failed")
         release = self.release_map[tag]
         for file in files:
             data = file.read_bytes()
-            if self.fail == "corrupt-stage":
+            if self.fail == "corrupt-stage" and tag == P.HEAD:
                 data = data[:-1] + bytes([data[-1] ^ 1])
             self.add(release, file.name, data)
+        self.server_error("upload")
         return b"uploaded\n"
 
 
@@ -321,6 +343,21 @@ class CommandsTests(unittest.TestCase):
                 self.assertEqual(message, label + " failed (exit 17): HTTP 403: denied")
                 for value in ("private-title", "private-local-file", "second-line-secret"):
                     self.assertNotIn(value, message)
+
+    def test_github_5xx_is_a_server_error_and_4xx_is_not(self):
+        for stderr in (b"HTTP 504: We couldn't respond to your request in time", b"gh: Server Error (HTTP 500)", b"HTTP 502: Bad Gateway", b"HTTP 503: unavailable"):
+            with self.subTest(stderr=stderr):
+                result = P.subprocess.CompletedProcess(["gh", "api"], 1, b"", stderr)
+                with mock.patch.object(P.subprocess, "run", return_value=result), mock.patch.object(P.sys, "stderr", io.StringIO()):
+                    with self.assertRaises(P.ServerError):
+                        P.Commands({}).run(["gh", "api", "x"])
+        for stderr in (b"HTTP 403: Resource not accessible by integration", b"HTTP 404: Not Found", b"HTTP 422: Validation Failed", b"HTTP 5040", b"stream error: CANCEL"):
+            with self.subTest(stderr=stderr):
+                result = P.subprocess.CompletedProcess(["gh", "api"], 1, b"", stderr)
+                with mock.patch.object(P.subprocess, "run", return_value=result), mock.patch.object(P.sys, "stderr", io.StringIO()):
+                    with self.assertRaises(P.Refused) as caught:
+                        P.Commands({}).run(["gh", "api", "x"])
+                    self.assertNotIsInstance(caught.exception, P.ServerError)
 
     def test_configured_secrets_and_split_private_key_are_redacted(self):
         environ = {"GH_TOKEN": "q7!", P.SECRET: "-----BEGIN PRIVATE KEY-----\nshort-pem-body\n-----END PRIVATE KEY-----", "SERVICE_PASSWORD": "password-demo", "OTHER_CREDENTIAL_VALUE": "credential-demo"}
@@ -450,7 +487,10 @@ class PublicationTests(unittest.TestCase):
         (self.artifact / "SHA256SUMS").write_text(sums)
 
     def publish(self):
-        return P.Publisher(self.artifact, self.root, self.env, self.fake).run()
+        publisher = P.Publisher(self.artifact, self.root, self.env, self.fake)
+        self.pauses = []
+        publisher.sleep = self.pauses.append
+        return publisher.run()
 
     def refused_unchanged(self, pattern=None, canonical=True):
         original = P.tree_info(self.artifact)
@@ -662,10 +702,127 @@ class PublicationTests(unittest.TestCase):
         self.refused_unchanged("tag already")
         self.assertEqual(self.fake.head_mutations, [])
 
-    def test_existing_immutable_release_refuses(self):
-        self.fake.release("lampos-lamp-voice-10", SHA)
-        self.refused_unchanged("release already")
+    def test_existing_immutable_release_that_is_not_this_build_refuses(self):
+        self.fake.release("lampos-lamp-voice-10", "c" * 40)
+        self.refused_unchanged("immutable release identity differs")
         self.assertEqual(self.fake.head_mutations, [])
+        self.assertNotIn("body", self.fake.release_map["lampos-lamp-voice-10"])
+
+    def test_github_5xx_on_each_read_is_read_again_then_goes_on(self):
+        for kind in ("repository", "releases", "refs", "assets", "download"):
+            with self.subTest(kind=kind):
+                self.fake = FakeCommands()
+                self.fake.server_errors[kind] = 1
+                result = self.publish()
+                self.assertEqual(self.pauses, [5])
+                self.assertEqual(self.fake.server_errors[kind], 0)
+                self.assertFalse(result["resumed"])
+                self.assertEqual(self.fake.canonical(), self.fake.release_map["lampos-lamp-voice-10"]["assets"][P.ENVELOPE]["data"])
+
+    def test_a_read_still_failing_after_three_pauses_refuses(self):
+        self.fake.server_errors["releases"] = 99
+        self.refused_unchanged("HTTP 504")
+        self.assertEqual(self.pauses, [5, 15, 30])
+        self.assertEqual(self.fake.head_mutations, [])
+
+    def test_a_4xx_is_never_read_again(self):
+        self.fake.api_fail = True
+        self.refused_unchanged("auth/network")
+        self.assertEqual(self.pauses, [])
+
+    def test_a_5xx_after_the_release_or_stage_was_made_goes_on_without_repeating_it(self):
+        for kind in ("create", "upload"):
+            with self.subTest(kind=kind):
+                self.fake = FakeCommands()
+                self.fake.server_errors[kind] = 1
+                result = self.publish()
+                self.assertEqual(self.pauses, [])
+                self.assertEqual(self.fake.server_errors[kind], 0)
+                self.assertEqual(result["published"], "lampos-lamp-voice-10")
+                self.assertEqual(sum(call[:3] == ["gh", "release", kind] for call in self.fake.calls), 1)
+                self.assertEqual(self.fake.canonical(), self.fake.release_map["lampos-lamp-voice-10"]["assets"][P.ENVELOPE]["data"])
+
+    def test_rerun_over_its_own_identical_release_finishes_and_names_its_attempt(self):
+        self.fake.fail = "rename-candidate"
+        self.refused_unchanged("previous canonical envelope restored")
+        self.assertIn("lampos-lamp-voice-10", self.fake.release_map)
+        self.fake.fail = None
+        self.env["GITHUB_RUN_ATTEMPT"] = "2"
+        result = self.publish()
+        self.assertTrue(result["resumed"])
+        self.assertEqual(sum(call[:3] == ["gh", "release", "create"] for call in self.fake.calls), 1)
+        release = self.fake.release_map["lampos-lamp-voice-10"]
+        self.assertEqual(self.fake.canonical(), release["assets"][P.ENVELOPE]["data"])
+        self.assertIn("attempt 2, sequence 10.", release["body"])
+        assert_release_subset(self, self.artifact, release["assets"])
+
+    def test_rerun_after_the_channel_switched_finishes_without_touching_it(self):
+        self.publish()
+        mutations = list(self.fake.head_mutations)
+        head = self.fake.canonical()
+        self.env["GITHUB_RUN_ATTEMPT"] = "2"
+        result = self.publish()
+        self.assertTrue(result["resumed"])
+        self.assertEqual(self.fake.head_mutations, mutations)
+        self.assertEqual(self.fake.canonical(), head)
+        self.assertIn("attempt 2,", self.fake.release_map["lampos-lamp-voice-10"]["body"])
+
+    def test_rerun_over_a_switched_head_that_is_not_this_build_leaves_the_notes(self):
+        self.publish()
+        # A head at sequence 10, validly signed, that is not this build's.
+        asset = self.fake.release_map[P.HEAD]["assets"][P.ENVELOPE]
+        asset["data"] = old_envelope(10)
+        asset["size"] = len(asset["data"])
+        self.env["GITHUB_RUN_ATTEMPT"] = "2"
+        with self.assertRaisesRegex(P.Refused, "channel head at this sequence is not this build"):
+            self.publish()
+        # Refused before the notes were touched: no PATCH of the release.
+        self.assertNotIn("body", self.fake.release_map["lampos-lamp-voice-10"])
+        self.assertFalse(any("PATCH" in call and any(word.startswith("body=") for word in call) for call in self.fake.calls))
+
+    def test_a_release_missing_assets_gets_only_those_after_the_rest_are_checked(self):
+        # Silently short, cut short by a 5xx inside `gh release create`, or
+        # cut short by a refusal and then run again (Reviewer-two's P3 on #4121).
+        for case in ("missing-upload", "create-partial", "rerun"):
+            with self.subTest(case=case):
+                self.fake = FakeCommands()
+                self.env["GITHUB_RUN_ATTEMPT"] = "1"
+                if case == "missing-upload":
+                    self.fake.fail = "missing-upload"
+                elif case == "create-partial":
+                    self.fake.server_errors["create-partial"] = 1
+                else:
+                    self.fake.fail = "create-upload"
+                    self.refused_unchanged("partial immutable upload")
+                    self.fake.fail = None
+                    self.env["GITHUB_RUN_ATTEMPT"] = "2"
+                result = self.publish()
+                release = self.fake.release_map["lampos-lamp-voice-10"]
+                assert_release_subset(self, self.artifact, release["assets"])
+                self.assertEqual(self.fake.canonical(), release["assets"][P.ENVELOPE]["data"])
+                uploads = [call for call in self.fake.calls if call[:4] == ["gh", "release", "upload", "lampos-lamp-voice-10"]]
+                self.assertEqual(len(uploads), 1)
+                self.assertEqual(result["resumed"], case == "rerun")
+
+    def test_a_short_release_with_a_changed_asset_is_not_completed(self):
+        self.fake.fail = "create-upload"
+        self.refused_unchanged("partial immutable upload")
+        self.fake.fail = None
+        asset = next(iter(self.fake.release_map["lampos-lamp-voice-10"]["assets"].values()))
+        asset["data"] = b"X" + asset["data"][1:]
+        self.env["GITHUB_RUN_ATTEMPT"] = "2"
+        self.refused_unchanged("uploaded asset hash differs")
+        self.assertFalse(any(call[:4] == ["gh", "release", "upload", "lampos-lamp-voice-10"] for call in self.fake.calls))
+
+    def test_rerun_over_a_release_that_differs_refuses(self):
+        self.fake.fail = "rename-candidate"
+        self.refused_unchanged("previous canonical envelope restored")
+        self.fake.fail = None
+        asset = self.fake.release_map["lampos-lamp-voice-10"]["assets"]["lamp-voice"]
+        asset["data"] = b"X" + asset["data"][1:]
+        self.env["GITHUB_RUN_ATTEMPT"] = "2"
+        self.refused_unchanged("uploaded asset hash differs")
+        self.assertNotIn("body", self.fake.release_map["lampos-lamp-voice-10"])
 
     def test_stale_or_repeated_sequence_never_mutates_head(self):
         for sequence in (10, 11):
@@ -675,8 +832,8 @@ class PublicationTests(unittest.TestCase):
                 self.assertEqual(self.fake.head_mutations, [])
                 self.assertNotIn("lampos-lamp-voice-10", self.fake.release_map)
 
-    def test_failed_incomplete_or_corrupt_build_upload_never_mutates_head(self):
-        for failure in ("create-upload", "missing-upload", "corrupt-upload"):
+    def test_failed_or_corrupt_build_upload_never_mutates_head(self):
+        for failure in ("create-upload", "corrupt-upload"):
             with self.subTest(failure=failure):
                 self.fake = FakeCommands()
                 self.fake.fail = failure

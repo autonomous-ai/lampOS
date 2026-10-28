@@ -16,6 +16,47 @@ use std::{
 
 const MAX_JSON: u64 = 64 * 1024 * 1024;
 const COMMAND_LIMIT: Duration = Duration::from_secs(600);
+/// The most of the CLI's error text read, only to tell GitHub's 5xx: it is
+/// never printed or kept.
+const MOST_STDERR: u64 = 64 * 1024;
+/// GitHub's own 500, 502, 503 or 504 (#4103: three 504s on 28 Oct) is
+/// asked again after these pauses, for a read only. A change is never
+/// repeated blind; a promotion that failed is run again whole.
+const RETRY_PAUSES: [Duration; 3] = [
+    Duration::from_secs(5),
+    Duration::from_secs(15),
+    Duration::from_secs(30),
+];
+const SERVER_FAILED: &str = "GitHub answered 5xx; remote state may need inspection";
+/// Whether the CLI's error text says GitHub answered 500, 502, 503 or 504.
+fn server_error(stderr: &[u8]) -> bool {
+    stderr.windows(8).enumerate().any(|(at, window)| {
+        let digit_after = stderr.get(at + 8).is_some_and(u8::is_ascii_digit);
+        let word_before = at > 0 && stderr[at - 1].is_ascii_alphanumeric();
+        matches!(
+            window,
+            b"HTTP 500" | b"HTTP 502" | b"HTTP 503" | b"HTTP 504"
+        ) && !digit_after
+            && !word_before
+    })
+}
+/// `attempt` again after each of `pauses` while it fails with GitHub's 5xx.
+fn retried<T>(
+    pauses: &[Duration],
+    mut sleep: impl FnMut(Duration),
+    mut attempt: impl FnMut() -> Result<T>,
+) -> Result<T> {
+    for pause in pauses {
+        match attempt() {
+            Err(why) if why == SERVER_FAILED => {
+                eprintln!("{why}; read again in {} s", pause.as_secs());
+                sleep(*pause);
+            }
+            done => return done,
+        }
+    }
+    attempt()
+}
 #[derive(Clone, Copy)]
 enum Output {
     Bytes(u64),
@@ -57,17 +98,41 @@ fn consume(mut source: impl Read, output: Output) -> Result<Answer> {
         }),
     })
 }
+/// One `gh` call, read again on GitHub's 5xx when it is a GET.
 fn command(arguments: &[String], output: Output) -> Result<Answer> {
+    let read_only = arguments
+        .windows(2)
+        .any(|pair| pair[0] == "--method" && pair[1] == "GET");
+    if read_only {
+        retried(&RETRY_PAUSES, thread::sleep, || {
+            command_once(arguments, output)
+        })
+    } else {
+        command_once(arguments, output)
+    }
+}
+fn command_once(arguments: &[String], output: Output) -> Result<Answer> {
     let mut child = Command::new("gh")
         .args(arguments)
         .env("GH_HOST", "github.com")
         .env_remove("LAMPOS_UPDATE_KEY")
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|_| "cannot start GitHub CLI")?;
     let stdout = child.stdout.take().ok_or("GitHub CLI has no output pipe")?;
+    let mut stderr = child.stderr.take().ok_or("GitHub CLI has no error pipe")?;
+    // Read whole so the CLI never blocks or gets EPIPE on it, kept only up
+    // to its bound (Fourteen's P3 on #4121).
+    let errors = thread::spawn(move || {
+        let mut kept = Vec::new();
+        let _ = Read::by_ref(&mut stderr)
+            .take(MOST_STDERR)
+            .read_to_end(&mut kept);
+        let _ = std::io::copy(&mut stderr, &mut std::io::sink());
+        kept
+    });
     let (sender, receiver) = mpsc::sync_channel(1);
     let reader = thread::spawn(move || {
         let _ = sender.send(consume(stdout, output));
@@ -90,6 +155,20 @@ fn command(arguments: &[String], output: Output) -> Result<Answer> {
         match child.try_wait() {
             Ok(Some(status)) => {
                 if !status.success() {
+                    // Its error pipe closes as it exits; a moment to read it.
+                    let read_by = Instant::now() + Duration::from_secs(2);
+                    while !errors.is_finished() && Instant::now() < read_by {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    if !errors.is_finished() {
+                        // Left to end with the pipe; said, not taken as a 5xx
+                        // (Reviewer-two's P3 on #4121).
+                        break Err("GitHub CLI failed and its error pipe stayed open".to_owned());
+                    }
+                    let said = errors.join().unwrap_or_default();
+                    if server_error(&said) {
+                        break Err(SERVER_FAILED.to_owned());
+                    }
                     break Err("GitHub CLI failed; remote state may need inspection".to_owned());
                 }
                 break answer.take().unwrap_or_else(|| {
@@ -295,6 +374,71 @@ mod tests {
         .unwrap();
         assert!(release.body.is_empty());
         assert!(crate::notes(&release, 10).is_err());
+    }
+    #[test]
+    fn github_5xx_is_told_and_4xx_is_not() {
+        for said in [
+            &b"HTTP 504: We couldn't respond to your request in time"[..],
+            b"gh: Server Error (HTTP 500)",
+            b"x\nHTTP 502: Bad Gateway",
+            b"HTTP 503",
+        ] {
+            assert!(server_error(said), "{}", String::from_utf8_lossy(said));
+        }
+        for said in [
+            &b"HTTP 403: Resource not accessible by integration"[..],
+            b"HTTP 404: Not Found",
+            b"HTTP 5040",
+            b"XHTTP 504",
+            b"stream error: CANCEL",
+            b"",
+        ] {
+            assert!(!server_error(said), "{}", String::from_utf8_lossy(said));
+        }
+    }
+    #[test]
+    fn a_5xx_read_is_asked_again_after_each_pause_and_nothing_else_is() {
+        let pauses = [Duration::from_secs(1), Duration::from_secs(2)];
+        // Two 5xx, then an answer.
+        let (mut slept, mut left) = (Vec::new(), 2);
+        let answer = retried(
+            &pauses,
+            |pause| slept.push(pause),
+            || {
+                if left > 0 {
+                    left -= 1;
+                    Err(SERVER_FAILED.to_owned())
+                } else {
+                    Ok(7)
+                }
+            },
+        );
+        assert_eq!(answer, Ok(7));
+        assert_eq!(slept, pauses);
+        // Always 5xx: asked once more than the pauses, then the 5xx.
+        let (mut slept, mut asked) = (Vec::new(), 0);
+        let answer: Result<u8> = retried(
+            &pauses,
+            |pause| slept.push(pause),
+            || {
+                asked += 1;
+                Err(SERVER_FAILED.to_owned())
+            },
+        );
+        assert_eq!(answer, Err(SERVER_FAILED.to_owned()));
+        assert_eq!((asked, slept.len()), (3, 2));
+        // Any other failure is never asked again.
+        let (mut slept, mut asked) = (Vec::new(), 0);
+        let answer: Result<u8> = retried(
+            &pauses,
+            |pause| slept.push(pause),
+            || {
+                asked += 1;
+                Err("GitHub CLI failed; remote state may need inspection".to_owned())
+            },
+        );
+        assert!(answer.is_err());
+        assert_eq!((asked, slept.len()), (1, 0));
     }
     #[test]
     fn stream_hash_is_bounded_and_matches_bytes() {
