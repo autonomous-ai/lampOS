@@ -645,6 +645,20 @@ skills".)
   The undecided case retains its full three-second no-proposal observation;
   the product's hour budget and drop hold are unchanged. Neither event loss
   nor any other historical failure cause has been established.
+  The quoted-say fixture (`a_say_decided_told`, #1806) owns its stand-in
+  listener on the test thread, with no detached accept worker. A complete
+  request still has two seconds after the decision is published; a late
+  request fails. Positive cases answer it and wait for both complete
+  journal lines naming that exact add-on and proposal: the SAY outcome and
+  Main's `Done: proposed say as ... on addon/proposal`. These writers may
+  finish in either order; both are observed before closing the child,
+  rather than sleeping 200 ms.
+  The observation envelope remains two seconds plus 200 ms. Negative cases
+  watch all of it for an unexpected request, retaining the original full
+  two-second absence check and the privacy snapshot boundary. Partial input
+  and output keep those same deadlines. The original quoted fields, wrong
+  judge/drop refusals, unsaid outcome and no-words assertions are unchanged;
+  the child is closed before the final journal snapshot.
 
 `lamp-update install` puts it on a home lamp (#811): the product unit
 `deploy/product/lamp-skills.service`, every product skill in
