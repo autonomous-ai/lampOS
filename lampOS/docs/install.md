@@ -1189,13 +1189,22 @@ An install run by an older `lamp-update` therefore writes that build's
 units around the newest build's binaries: any lamp-voice build up to 3505
 (19 Oct, before #1815 at `fe277b92a`) writes the `lamp-cloud.service` that
 is off unless a drop-in turns it on, the state lamp-c0a4 was found in on
-27 Oct (#3733; which `lamp-update` ran there is not known). Install with
-the newest build's own `lamp-update`.
+27 Oct (#3733; which `lamp-update` ran there is not known). Since #3733's
+hand-over, below, install does this itself.
 
-**Install says when it is not the build's own `lamp-update`** (#3733).
-Once steps 1 to 4 are done, just before the units, it compares the sha256
-of the file it runs from (`/proc/self/exe`) with the build's `lamp-update`
-in the manifest. When they differ it says, e.g.
+**Install hands over to the build's own `lamp-update`** (#3733). Once
+steps 1 to 4 are done, just before the units, it compares the sha256 of
+the file it runs from (`/proc/self/exe`) with the build's `lamp-update` in
+the manifest. When they differ, it says `handing over to build 7071's own
+lamp-update, /opt/lampOS/update/<its sha256>/lamp-update, to write its
+units` and runs that file, just placed in step 4, in its own place
+(`exec`) with the same arguments and `LAMP_UPDATE_HANDED_OVER=1`. The
+records' lock is let go at the `exec`, and the build's own `lamp-update`
+installs again: the binaries and links are already there, so it writes
+only what is missing, then the build's own units. A run with
+`LAMP_UPDATE_HANDED_OVER` set never hands over again. A hand-over that
+cannot happen says `could not hand over: <why>`, and install goes on with
+its own units, as before #3733's hand-over, and says, e.g.
 `lamp-update: this lamp-update (sha256 4f1c09a2be77) is not build 7071's
 (9d3e5b10c4aa): the units written are this lamp-update's own, not build
 7071's; run build 7071's own, /opt/lampOS/update/<its sha256>/lamp-update
@@ -1206,10 +1215,13 @@ is the older lamp-update itself.
 A running file that cannot be read says only `this lamp-update could not
 be checked against build <N>'s: <why>`. The build's own says nothing, a
 build that carries no `lamp-update` has nothing to check against and says
-nothing, and an install that ends before its units says nothing of it. Shown only in
+nothing, and an install that ends before its units says nothing of it.
+None of these hands over: only a running file known to be another. Shown only in
 tests (`crates/update/tests/install.rs`,
 `a_lamp_update_not_the_builds_own_is_named_and_install_still_writes_the_units`
-and the four beside it), not yet on a lamp.
+and the four beside it, and the hand-over in
+`another_lamp_update_hands_over_to_the_builds_own_before_any_unit`), not
+yet on a lamp.
 
 So a unit can meet a binary older than itself. `lamp-actions` and
 `lamp-skills` exit 2 on an option they don't know, and with

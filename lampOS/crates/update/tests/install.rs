@@ -222,6 +222,12 @@ impl Host for FakeHost {
     fn running_sha256(&mut self) -> Result<String, String> {
         self.running.clone()
     }
+
+    fn hand_over(&mut self, exe: &std::path::Path) -> String {
+        // A real hand-over never comes back; here it is only recorded.
+        self.calls.push(format!("hand over {}", exe.display()));
+        "faked".into()
+    }
 }
 
 struct Lamp {
@@ -485,6 +491,55 @@ fn updater_said(lamp: &Lamp) -> Vec<&str> {
         .collect()
 }
 
+/// The hand-overs install asked of the host (#3733).
+fn handed(lamp: &Lamp) -> Vec<&str> {
+    lamp.host
+        .calls
+        .iter()
+        .map(String::as_str)
+        .filter(|call| call.starts_with("hand over "))
+        .collect()
+}
+
+#[test]
+fn another_lamp_update_hands_over_to_the_builds_own_before_any_unit() {
+    let mut lamp = Lamp::new(188, &[]);
+    let builds = lamp.host.running.clone().unwrap();
+    lamp.host.running = Ok(sha256_hex(b"lamp-update of build 120\n"));
+    lamp.install().unwrap();
+    let own = format!("/opt/lampOS/update/{builds}/lamp-update");
+    let placed = lamp.on(&own);
+    assert_eq!(
+        handed(&lamp),
+        [format!("hand over {}", placed.display())],
+        "{:?}",
+        lamp.host.calls
+    );
+    // The file handed over to is the build's own, placed before the units.
+    assert_eq!(sha256_hex(&fs::read(&placed).unwrap()), builds);
+    let at = |prefix: &str| {
+        lamp.host
+            .calls
+            .iter()
+            .position(|call| call.starts_with(prefix))
+    };
+    assert!(at("hand over ") < at("enable "), "{:?}", lamp.host.calls);
+    assert!(
+        lamp.said.iter().any(|line| line
+            == &format!("handing over to build 188's own lamp-update, {own}, to write its units")),
+        "{:?}",
+        lamp.said
+    );
+    // A hand-over that comes back is said, and install writes its own.
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line == "could not hand over: faked"),
+        "{:?}",
+        lamp.said
+    );
+}
+
 #[test]
 fn a_lamp_update_not_the_builds_own_is_named_and_install_still_writes_the_units() {
     let mut lamp = Lamp::new(188, &[]);
@@ -525,6 +580,7 @@ fn the_builds_own_lamp_update_says_nothing_of_itself() {
     lamp.host.running = Ok(lamp.host.running.clone().unwrap().to_uppercase());
     lamp.install().unwrap();
     assert_eq!(updater_said(&lamp), Vec::<&str>::new(), "{:?}", lamp.said);
+    assert_eq!(handed(&lamp), Vec::<&str>::new());
 }
 
 #[test]
@@ -541,6 +597,8 @@ fn a_lamp_update_that_cannot_be_read_says_it_could_not_be_checked() {
         "{:?}",
         lamp.said
     );
+    // Not known to be another: no hand-over.
+    assert_eq!(handed(&lamp), Vec::<&str>::new());
 }
 
 #[test]
@@ -550,6 +608,7 @@ fn an_install_that_ends_before_its_units_says_nothing_of_the_lamp_update() {
     let why = lamp.install().unwrap_err();
     assert!(why.starts_with(install::UNITS_NOT_WRITTEN), "{why}");
     assert_eq!(updater_said(&lamp), Vec::<&str>::new(), "{:?}", lamp.said);
+    assert_eq!(handed(&lamp), Vec::<&str>::new());
 }
 
 #[test]
