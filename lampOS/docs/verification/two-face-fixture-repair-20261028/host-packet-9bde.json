@@ -1,0 +1,648 @@
+{
+  "authored_payload_and_author_message_preserved": true,
+  "compiler": {
+    "elapsed_seconds": 273.0495864749828,
+    "identity": {
+      "base": "9bde7441477c7d61e1d523fc9694aa00a69c966e",
+      "committed_clean": true,
+      "head": "397b2c587d5fc88bd90fa4dfbcd7aeb96a752933",
+      "patch_sha256": "383a7a4d3675153c6621fa4c7996ed3fc19667b55d4b5a55d6a5826072c5d5f7",
+      "source_files": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": "3bfc13acc49de3477a3d6f978e8f684ca8f7b3d9839908e4db5bfa65e2af79b9",
+        "lampOS/docs/verification/two-face-fixture-repair-20261028/README.md": "0cd739e28e74edae9c4a91c9129025bd3137a3d50897a3245eb89ed709706a5d"
+      },
+      "tree": "c652a60110db6184213aaa58ed8ca602b5505231"
+    },
+    "ok": true,
+    "source_raw_helpers_saved196_match": true,
+    "stages": [
+      {
+        "cleanup": [],
+        "elapsed_seconds": 12.667633445002139,
+        "error": null,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "ok": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "fmt",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 0.08234297001035884,
+        "error": null,
+        "log_sha256": "c5dbea80ec13c73dc153882fe98f8652857600bbece8a88cfe09dfd8f926cff4",
+        "ok": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "metadata",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 91.42212925100466,
+        "error": null,
+        "log_sha256": "bec206f2380de1c7682d13783cf0f8d8dcff73961a2b93ff568bc87d3741d701",
+        "ok": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "strictVoice",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 125.30356692100759,
+        "error": null,
+        "log_sha256": "a4ba3ff0c692d7111a6707f34edf1a931497edcd1791272f9b36635969f81ffa",
+        "ok": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "compileVoiceLib",
+        "timed_out": false
+      }
+    ]
+  },
+  "counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 6
+  },
+  "current_driver": {
+    "actual_path": "[workspace]/.claude/worktrees/third-store-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "compiler_emission": {
+      "executable": "[workspace]/.claude/worktrees/third-store-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "features": [],
+      "filenames": [
+        "[workspace]/.claude/worktrees/third-store-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+      ],
+      "fresh": false,
+      "line": 328,
+      "manifest_path": "[workspace]/.claude/worktrees/third-two-face-diagnostic/lampOS/crates/voice/Cargo.toml",
+      "package_id": "path+file://[workspace]/.claude/worktrees/third-two-face-diagnostic/lampOS/crates/voice#lamp-voice@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "reason": "compiler-artifact",
+      "stage": "compileVoiceLib",
+      "target": {
+        "crate_types": [
+          "lib"
+        ],
+        "doc": true,
+        "doctest": true,
+        "edition": "2024",
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "[workspace]/.claude/worktrees/third-two-face-diagnostic/lampOS/crates/voice/src/lib.rs",
+        "test": true
+      }
+    },
+    "depinfo": {
+      "path": "[workspace]/.claude/worktrees/third-store-target/debug/deps/lamp_voice-6d619bbdd1df3a0d.d",
+      "retained_path": "retained-depinfo/lamp_voice-6d619bbdd1df3a0d.d",
+      "retained_sha256": "867f2f91f2ee05a89279eecbf3c1be2b76d01808ecae047debc28b30f920b6b3",
+      "sha256": "867f2f91f2ee05a89279eecbf3c1be2b76d01808ecae047debc28b30f920b6b3"
+    },
+    "depinfo_source_count": 298,
+    "saved_path": "preimages/aaaeda25c277f0808f0475b9/lamp_voice-6d619bbdd1df3a0d",
+    "sha256": "40a898b86dc20b7baff51c590e1db595937883208544a21a9434c46b8da133d7"
+  },
+  "custody": {
+    "new_saved_count": 1,
+    "post_saved_preservation_sha256": "e44b1bb54c5a8183e8717269e1ceb971be7549ba1dd142a009811b72102e3673",
+    "prior196_unchanged": true,
+    "total_saved": 197
+  },
+  "first_compiler_failure": {
+    "controller_exit": 125,
+    "groups_closed": true,
+    "original_record_preserved": true,
+    "raw_log_sha256": "74063ba5dab758d0406133019f21095f351ff99cea861f8231daff0cc286d94d",
+    "reason": "Unused cfg(test) Scope::report; removed without suppression",
+    "runtime_count": 0,
+    "strict_exit": 101
+  },
+  "gate": {
+    "all_gate_children_common_run_reaped": true,
+    "compiler_stages_completed": 4,
+    "elapsed_seconds": 471.5866299109766,
+    "error": null,
+    "identity": {
+      "base": "9bde7441477c7d61e1d523fc9694aa00a69c966e",
+      "committed_clean": true,
+      "head": "397b2c587d5fc88bd90fa4dfbcd7aeb96a752933",
+      "patch_sha256": "383a7a4d3675153c6621fa4c7996ed3fc19667b55d4b5a55d6a5826072c5d5f7",
+      "source_files": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": "3bfc13acc49de3477a3d6f978e8f684ca8f7b3d9839908e4db5bfa65e2af79b9",
+        "lampOS/docs/verification/two-face-fixture-repair-20261028/README.md": "0cd739e28e74edae9c4a91c9129025bd3137a3d50897a3245eb89ed709706a5d"
+      },
+      "tree": "c652a60110db6184213aaa58ed8ca602b5505231"
+    },
+    "ok": true,
+    "phase": "complete",
+    "runtime_groups_completed": 6,
+    "source_raw_helper_saved196_final_guard": true
+  },
+  "identity": {
+    "base": "9bde7441477c7d61e1d523fc9694aa00a69c966e",
+    "committed_clean": true,
+    "head": "397b2c587d5fc88bd90fa4dfbcd7aeb96a752933",
+    "patch_sha256": "383a7a4d3675153c6621fa4c7996ed3fc19667b55d4b5a55d6a5826072c5d5f7",
+    "source_files": {
+      "lampOS/crates/voice/src/second_provider/worker.rs": "3bfc13acc49de3477a3d6f978e8f684ca8f7b3d9839908e4db5bfa65e2af79b9",
+      "lampOS/docs/verification/two-face-fixture-repair-20261028/README.md": "0cd739e28e74edae9c4a91c9129025bd3137a3d50897a3245eb89ed709706a5d"
+    },
+    "tree": "c652a60110db6184213aaa58ed8ca602b5505231"
+  },
+  "independent_admission_sha256": "1160516b36f8637f3abeb195482b12a01597d0c4bb85ec7aa915ea4f9af57340",
+  "independent_final_sha256": "402eacd52c79975daa35f0e4ec06f17e8ec1b337638851a93fc0038c2fe6ff54",
+  "integration_source_partition": {
+    "all_under_Voice_worktree": true,
+    "changed": 23,
+    "total297": 297,
+    "unchanged": 274
+  },
+  "limits": [
+    "Original3544 ARM6466PASS/3FAIL/1336unrun remains failed; old cause not established",
+    "3955 diagnostic is a separate prerequisite, not this repair runtime",
+    "Model latest non-expiring excludes expiry there; actual expiry has its own control",
+    "Loop-exit ACK and exact socket-path absence are not OS-thread join or closed-FD proof",
+    "Explicit unwind runtime not executed; disconnect/unwind source-reviewed only",
+    "No production policy or clock API change; no device/provider/broad-suite acceptance",
+    "No native repair gate result yet; original six passes remain eaac-only, current six are9bde integration-only"
+  ],
+  "normal_build_roots": [],
+  "normal_children": [],
+  "normal_projection_equal": true,
+  "normal_projection_equal_newMain9bde": true,
+  "processes": 6,
+  "qualified_eaac_host6_result_not_transferred": true,
+  "receipts": {
+    "async": [
+      {
+        "admitted": {
+          "cutoff_us": 236768193667,
+          "epoch": 2,
+          "event": "admitted",
+          "fields": {},
+          "looks": [
+            {
+              "at_us": 236769194546,
+              "expires_ms": 2000,
+              "faces": 2
+            }
+          ],
+          "now_us": 236769195710,
+          "observed_at": {
+            "mono_us": 236769195740,
+            "unix_ms": 1793148447478
+          }
+        },
+        "calling_thread": {
+          "dropped": 0,
+          "events": [
+            {
+              "at": {
+                "mono_us": 236768190986,
+                "unix_ms": 1793148446473
+              },
+              "epoch": 0,
+              "event": "before_receive_ack",
+              "turn": 0
+            },
+            {
+              "after": {
+                "mono_us": 236768191864,
+                "unix_ms": 1793148446474
+              },
+              "at_us_argument": 236768191373,
+              "before": {
+                "mono_us": 236768191371,
+                "unix_ms": 1793148446473
+              },
+              "delivered": 1,
+              "dropped": 0,
+              "event": "publish_return",
+              "meaning": "queue delivery only; match at_us with actual ingestion/header receipts",
+              "removed": 0
+            },
+            {
+              "at": {
+                "mono_us": 236768191899,
+                "unix_ms": 1793148446474
+              },
+              "epoch": 0,
+              "event": "release_receive",
+              "turn": 0
+            },
+            {
+              "at": {
+                "mono_us": 236768193635,
+                "unix_ms": 1793148446475
+              },
+              "epoch": 0,
+              "event": "before_receive_ack",
+              "turn": 1
+            },
+            {
+              "at": {
+                "mono_us": 236768193676,
+                "unix_ms": 1793148446475
+              },
+              "epoch": 0,
+              "event": "release_receive",
+              "turn": 1
+            },
+            {
+              "at": {
+                "mono_us": 236769194525,
+                "unix_ms": 1793148447476
+              },
+              "epoch": 2,
+              "event": "before_receive_ack",
+              "turn": 2
+            },
+            {
+              "after": {
+                "mono_us": 236769195507,
+                "unix_ms": 1793148447477
+              },
+              "at_us_argument": 236769194546,
+              "before": {
+                "mono_us": 236769194544,
+                "unix_ms": 1793148447476
+              },
+              "delivered": 1,
+              "dropped": 0,
+              "event": "publish_return",
+              "meaning": "queue delivery only; match at_us with actual ingestion/header receipts",
+              "removed": 0
+            },
+            {
+              "at": {
+                "mono_us": 236769195554,
+                "unix_ms": 1793148447477
+              },
+              "epoch": 2,
+              "event": "release_receive",
+              "turn": 2
+            },
+            {
+              "at": {
+                "mono_us": 236769197876,
+                "unix_ms": 1793148447480
+              },
+              "event": "reader_loop_exit_ack"
+            }
+          ]
+        },
+        "captured_socket_path": "[tmp]/ltfr-15862-a/humans/faces/tracked/subs/second_faces.15862.1.sock",
+        "control": "fresh_current_epoch",
+        "deque_len": 1,
+        "exact_socket_path_removed": true,
+        "reader_loop_exit_observed": true,
+        "received": {
+          "cutoff_us": 236768193667,
+          "epoch": 2,
+          "event": "received_after_parse",
+          "fields": {
+            "at_unix_ms": 1793148447476,
+            "at_us": 236769194546,
+            "expired": false,
+            "expires_ms": 2000,
+            "receive_epoch": 2,
+            "seq": 2
+          },
+          "looks": [],
+          "now_us": 236769195658,
+          "observed_at": {
+            "mono_us": 236769195684,
+            "unix_ms": 1793148447477
+          }
+        }
+      },
+      {
+        "calling_thread": {
+          "dropped": 0,
+          "events": [
+            {
+              "at": {
+                "mono_us": 236787683297,
+                "unix_ms": 1793148465965
+              },
+              "epoch": 0,
+              "event": "before_receive_ack",
+              "turn": 0
+            },
+            {
+              "after": {
+                "mono_us": 236787684140,
+                "unix_ms": 1793148465966
+              },
+              "at_us_argument": 236787683722,
+              "before": {
+                "mono_us": 236787683721,
+                "unix_ms": 1793148465965
+              },
+              "delivered": 1,
+              "dropped": 0,
+              "event": "publish_return",
+              "meaning": "queue delivery only; match at_us with actual ingestion/header receipts",
+              "removed": 0
+            },
+            {
+              "at": {
+                "mono_us": 236787684164,
+                "unix_ms": 1793148465966
+              },
+              "epoch": 0,
+              "event": "release_receive",
+              "turn": 0
+            },
+            {
+              "at": {
+                "mono_us": 236787686015,
+                "unix_ms": 1793148465968
+              },
+              "event": "reader_loop_exit_ack"
+            }
+          ]
+        },
+        "captured_socket_path": "[tmp]/ltfr-16065-x/humans/faces/tracked/subs/second_faces.16065.1.sock",
+        "control": "cross_epoch_rejection",
+        "deque_len": 0,
+        "exact_socket_path_removed": true,
+        "owner_alive_at_stop": true,
+        "reader_loop_exit_observed": true,
+        "received": {
+          "cutoff_us": 236787683716,
+          "epoch": 2,
+          "event": "received_after_parse",
+          "fields": {
+            "at_unix_ms": 1793148465966,
+            "at_us": 236787683722,
+            "expired": false,
+            "expires_ms": 2000,
+            "receive_epoch": 0,
+            "seq": 1
+          },
+          "looks": [],
+          "now_us": 236787684344,
+          "observed_at": {
+            "mono_us": 236787684374,
+            "unix_ms": 1793148465966
+          }
+        },
+        "rejected": {
+          "cutoff_us": 236787683716,
+          "epoch": 2,
+          "event": "rejected_privacy",
+          "fields": {},
+          "looks": [],
+          "now_us": 236787684398,
+          "observed_at": {
+            "mono_us": 236787684429,
+            "unix_ms": 1793148465966
+          }
+        }
+      }
+    ],
+    "expiry": [
+      {
+        "actual_latest_expired": true,
+        "drift_classified": false,
+        "expires_ms": 0,
+        "final_host_bracket_us": [
+          51275,
+          51276
+        ],
+        "final_wall_ms": 1793148484491,
+        "grace_ms": 50,
+        "header_at_unix_ms": 1793148484439,
+        "host_elapsed_us": 51748,
+        "independent_due_unix_ms": 1793148484490,
+        "initial_host_bracket_us": [
+          1,
+          6
+        ],
+        "initial_wall_ms": 1793148484439,
+        "observed_unix_ms": 1793148484491
+      }
+    ],
+    "loop_ACK_not_join": true,
+    "model": [
+      {
+        "fresh_after_privacy": null,
+        "held": "a busy room: someone is turned to the lamp, but nothing else shows it was called",
+        "held_on": true,
+        "latest_non_expiring": true,
+        "looks": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "privacy": false,
+        "query_us": 600000000,
+        "room": "Busy"
+      },
+      {
+        "fresh_after_privacy": null,
+        "held": null,
+        "held_on": true,
+        "latest_non_expiring": true,
+        "looks": [
+          1,
+          1,
+          1,
+          2
+        ],
+        "privacy": false,
+        "query_us": 600000000,
+        "room": "Unknown"
+      },
+      {
+        "fresh_after_privacy": null,
+        "held": null,
+        "held_on": true,
+        "latest_non_expiring": true,
+        "looks": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1
+        ],
+        "privacy": false,
+        "query_us": 600000000,
+        "room": "Unknown"
+      },
+      {
+        "fresh_after_privacy": {
+          "admitted_at_us": 600002000,
+          "cutoff_us": 600000000,
+          "deque_len": 1,
+          "epoch": 2
+        },
+        "held": null,
+        "held_on": true,
+        "latest_non_expiring": true,
+        "looks": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "privacy": true,
+        "query_us": 600002000,
+        "room": "Unknown"
+      },
+      {
+        "fresh_after_privacy": null,
+        "held": "a busy room: someone is turned to the lamp, but nothing else shows it was called",
+        "held_on": false,
+        "latest_non_expiring": true,
+        "looks": [
+          2
+        ],
+        "privacy": false,
+        "query_us": 600002000,
+        "room": "Busy"
+      }
+    ],
+    "unwind_runtime_executed": false
+  },
+  "required_names": [
+    "lamp-voice::lamp_voice::second_provider::worker::tests::two_faces_latest_expiry_refuses_turned_and_count_on_the_real_bus",
+    "lamp-voice::lamp_voice::second_provider::worker::tests::two_faces_reader_admits_a_fresh_current_epoch_look_from_the_real_bus",
+    "lamp-voice::lamp_voice::second_provider::worker::tests::two_faces_reader_rejects_a_post_privacy_look_taken_across_the_old_wait",
+    "lamp-voice::lamp_voice::second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+    "lamp-voice::lamp_voice::second_provider::worker::tests::with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room",
+    "lamp-voice::lamp_voice::second_provider::worker::tests::with_two_faces_held_two_faces_must_stay"
+  ],
+  "retries": 0,
+  "runtime": {
+    "all_command_groups_ok": true,
+    "elapsed_seconds": 114.74712854798418,
+    "groups": [
+      {
+        "cleanup": [],
+        "elapsed_seconds": 0.05171089299255982,
+        "error": null,
+        "log_sha256": "94ae309d7c49b0d4ee249af459f750fe2a0ee7ab5515fcfb09860301d5f1fc14",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-01-lamp-voice",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 1.0626158009981737,
+        "error": null,
+        "log_sha256": "4b06d877a226f5b38d05bbcf1a92fa956a7a089c07a926fe6d2caa2b934db549",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-02-lamp-voice",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 0.05639355498715304,
+        "error": null,
+        "log_sha256": "4cd6c5b5a1562fdb57d378f6e53195fd2e85fbb1d1f1793e1422e1ad62722aee",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-03-lamp-voice",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 0.09883889800403267,
+        "error": null,
+        "log_sha256": "4bd727e69ec6d43cdd6777c5bff7f952e7c77ebe0a9a4a4d7d54179c3916fdf6",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-04-lamp-voice",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 0.025450281013036147,
+        "error": null,
+        "log_sha256": "f225ee2e7d8c43513d3c5c03c15b141e6d5d29cc0bb34925f28a1d5cd72433d8",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-05-lamp-voice",
+        "timed_out": false
+      },
+      {
+        "cleanup": [],
+        "elapsed_seconds": 0.026029898988781497,
+        "error": null,
+        "log_sha256": "62d191a6f6c608caae1348f51673cb458f14f6a435800b1bd2a2e3c8320a2b5f",
+        "ok": true,
+        "post_guard": true,
+        "process_group": "absent",
+        "reaped": true,
+        "returncode": 0,
+        "stage": "runtime-06-lamp-voice",
+        "timed_out": false
+      }
+    ],
+    "identity": {
+      "base": "9bde7441477c7d61e1d523fc9694aa00a69c966e",
+      "committed_clean": true,
+      "head": "397b2c587d5fc88bd90fa4dfbcd7aeb96a752933",
+      "patch_sha256": "383a7a4d3675153c6621fa4c7996ed3fc19667b55d4b5a55d6a5826072c5d5f7",
+      "source_files": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": "3bfc13acc49de3477a3d6f978e8f684ca8f7b3d9839908e4db5bfa65e2af79b9",
+        "lampOS/docs/verification/two-face-fixture-repair-20261028/README.md": "0cd739e28e74edae9c4a91c9129025bd3137a3d50897a3245eb89ed709706a5d"
+      },
+      "tree": "c652a60110db6184213aaa58ed8ca602b5505231"
+    },
+    "unrun_labels": []
+  },
+  "scope": "Host six-control two-face fixture repair, new source only; pending Root review/native gates",
+  "single_thread": true,
+  "six_function_hashes_unchanged_after_prerequisite_removal": true,
+  "source_static_sha256": "77336b2732e0a92bbaf4d0fcd895bc082c1a274f33c55aa634fb683dd83a6e4a",
+  "strict_roots": [
+    "lamp-voice"
+  ],
+  "unrun": 0
+}
