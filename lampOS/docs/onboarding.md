@@ -29,7 +29,7 @@ ready, not paused) and a face is in front of it.
 | 3 | `how_you_sound` | the core onboarding skill requests a short prompt: from their usual seat, say "Hey Lamp" the way they'd get its attention, a few times, each later prompt answering the last call (#1803, #3702, below); then one to say a sentence from there in their own words | the name part: three accepted calls make a bar and its file is written; five prompts can't reach three, or the calls spread over 10 dB: no bar. Then the sentence part, whose outcome is the step's: a line heard with words, said close, its words covering it: done; short of that, coached once ("a little louder" or "a little closer"), then done or failed | the prompts and accepted tries (`rise_db`, `score`); the bar in `/var/lib/lampOS/voice/near-call.json`; the sentence's prompt count only |
 | 4 | `touch` | says exactly "Tap the top of my head once, then let go." (see "Exact lines" below), then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder, "I didn't feel that. Tap a little firmer, right on top of my head."; 60 s after the ask: failed. Either end is said (`touch_done`, `touch_failed`) before the next step is asked. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |
 | 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | an invitation begun, a fresh physical close (even while it is said), the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; with eyes that give receipts on the bus, also their receipt that the camera closed for this close (#1802) | bounded attempt evidence and completion identity |
-| 6 | `giving_way` | the core onboarding skill requests a short invitation, exactly "Take my head and tilt it gently to one side, then let go. I'll tell you when."; a second try's is `give_again`, "I didn't feel my head move. …" (#1800, below). A push is answered at once ("That's it, now let go."), and a minute with none a few seconds in is prompted once (#3702) | from the invitation's start to a minute after its playback, the body says a hand pushed it, a head joint moved more than the body's `HAND_MOVED` (15 counts) from where it was asked to be with its goal held there, and then the hand let go: done; two invitations without that: failed; no body, or the keeper's pause while it is led: `not_available` | the outcome only |
+| 6 | `giving_way` | the core onboarding skill requests a short invitation, exactly "Take my head and tilt it gently to one side, then let go. I'll tell you when."; a second try's is `give_again`, "I didn't feel my head move. …" (#1800, below). A push is answered at once ("That's it, now let go."), and a minute with none a few seconds in is prompted once (#3702) | from the invitation's start to a minute after its playback, the body says a hand pushed it, a head joint moved more than the body's `HAND_MOVED` (15 counts) from where it was asked to be with its goal held there, or a shoulder or elbow moved that far, or the hand said for 200 ms (`FELT_MS`, a push the arm took, lamp-29e7), and then the hand let go: done; two invitations without that: failed; no body, or the keeper's pause while it is led: `not_available` | the outcome only |
 | 6½ | `room_sounds` | only on a lamp with no privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`, exactly): asks once whether it may notice music and laughter, with the line "the lamp notices music and laughter, nothing is recorded" (see "Room sounds" below); elsewhere `not_available`, unspoken | the model calls `setup_step`: `done` only after a clear yes, `skipped` for a no; never reported, `failed` after 90 s as any step | a yes alone, as `/var/lib/lampOS/consent/room-sounds.json` |
 | 6¾ | `face_expressions` | only with `LAMP_FACE_EXPRESSIONS_ASK=on` (a lamp whose eyes read how a face seems): asks once whether it may notice whether people look happy or upset, to answer more warmly, with the line "a yes covers everyone at this lamp, you never say it aloud, and no picture of a face is kept" (see "Face expressions" below); elsewhere `not_available`, unspoken | as `room_sounds`: `done` only after a clear yes, `skipped` for a no, `failed` after 90 s | a yes alone, as `/var/lib/lampOS/consent/face-expressions.json` |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | both answers heard: the quiet hours (a time, a part of the day but not one right after "good", so "Good evening, Lamp." is a greeting, "after"/"before", or any no word, "no idea" included, which counts as "none") and the hello (a line with "hello", "hellos", "hi" or "greet" and a yes or a no in it, "Yes, say hello", "Please don't greet me"; or a yes or a no once the quiet hours are in, where a line that greets takes only a plain yes, so "That's fine." answers and "Hi, I'm fine." doesn't. A greeting or an opener, "Hello, Lamp.", "Hi, how are you?", is someone saying hello, not an answer: on lamp-52e6 on 27 October "Hello, Lamp." ended the step and the lamp asked again); the walk ends the step itself (`onboarding_heard`). Or the model calls `setup_step` as soon as it has heard the second answer, before it says anything else (row 10 on lamp-52e6: asked and answered, never reported) | the rules, in memory |
@@ -859,6 +859,21 @@ so the invitation names no direction ("any way you like").
    that pushes back keeps its goal and is not counted).
 4. `body/hand` says not pushed: done, and the lamp says so.
 
+**A push the arm took counts too** (lamp-29e7, 28 Oct): a tester steadied
+the head and pushed it gently without holding the base. The arm took the
+push (its loads rose to 228 and 304, about 140 standing), no head joint moved
+`HAND_MOVED`, and the step failed a person who did push. So, besides step 3,
+a push is given way when, released, either a shoulder or elbow (also read
+from `body/joint_states`) ended more than `HAND_MOVED` from its goal before
+(by its move alone: the body moves the arm's goal only after 1.5 s of
+pushing), or the body said the hand for at least `FELT_MS` (200 ms, the
+body's own arm push bound, 0.2 s over its standing load) with no joint moved
+that far. A hand said more briefly with nothing moved is a bump; no hand
+said at all is still no, however the joints read. The body's side (it says
+`pushed` for a standing arm joint over its standing load) is a separate
+change. The words still say "my head moved"; the invitation's words are
+#4016's.
+
 **Never a silent minute** (#3702): on a tester's lamp the ring sat orange and
 the lamp silent through the minute while the person did not know whether it
 felt them. The first push of a try owes `give_felt` at once; a try's minute
@@ -893,15 +908,18 @@ else is being said, so at most about 100 ms plus the provider's first audio;
 a push during the invitation is answered as soon as it ends.
 
 The journal says what the step saw, as `lamp-voice: giving_way: ...`: the
-try opening, each push the body says, and on its release the decision with
-the head joint farthest from its goal before (one held where the hand has it
-first), in counts: where it is, how far, its goal before and its goal now; and
+try opening, each push the body says, and on its release how long the hand
+was said and the decision with the joint farthest from its goal before (one
+moved by the hand first), in counts: where it is, how far, its goal before
+and its goal now, or "the hand was felt N ms; the arm took it, no joint
+moved past 15 counts". A done try's record (`onboarding_giving_way_try`)
+carries the same as `seen`; and
 a minute ending with how many pushes the body said; the try opening says how
 many came while the invitation was said. A try that fails says
 whether the body never said a hand, or a hand that did not move the head that
 far or was not held there.
 
-A push that does not move the head that far (a bump), a hand still on it when
+A hand said under `FELT_MS` that moves no joint that far (a bump), a hand still on it when
 the minute ends, a reading from before the invitation ended, from another
 publisher, unparseable, non-finite or with a missing head joint, a body that
 began again or lost a message mid-push (that push is not judged), and a Unix
@@ -936,9 +954,12 @@ on 27 Oct, with the hand said from the second hold as the body says it since
 #3676: done after two holds and after the day's five to 1,744, and not done
 while the body never says the hand; #3702's: a push while the invitation is
 said is the try's, done let go before or after it ends; nothing felt is
-prompted once at 8 s and nothing else is said in the minute; a push that did
-not move the head is answered and asked for a little more; each of the
-three head joints done and the arm alone not; a late push a second before
+prompted once at 8 s and nothing else is said in the minute; a push that
+moved nothing, said under 200 ms, is answered and asked for a little more;
+each of the three head joints, the shoulder and the elbow done and a brief
+push moving none not; lamp-29e7's push the arm took, the head moved 8
+counts, done; the shoulder moved 30 counts with the head still done; no
+hand said at all, the arm loaded, no verdict; a late push a second before
 the minute's end done; no push at all prompted each try, then the plain fail
 line; each line pinned). The record is in
 [verification/onboarding-giving-way-host-20261019](verification/onboarding-giving-way-host-20261019/README.md).

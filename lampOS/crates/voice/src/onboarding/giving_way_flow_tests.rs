@@ -401,9 +401,11 @@ fn a_head_not_moved_far_or_not_held_where_the_hand_put_it_is_not_done() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
     let played = play(&mut walk, 10 * S, 1);
-    // Ten counts: under the body's HAND_MOVED, a bump.
+    // Ten counts, said 160 ms: under the body's HAND_MOVED and FELT_MS,
+    // a bump.
     push(&mut walk, &played, 1_000, 10.0, 10.0, true);
-    // Thirty counts but its goal left where it was: the body pushed back.
+    // Thirty counts but its goal left where it was, said 160 ms: the body
+    // pushed back, and the hand was too brief to count as felt.
     push(&mut walk, &played, 3_000, 30.0, 0.0, true);
     // A body restarting mid-push spoils that push.
     walk.giving_way_felt(joints(played.ended_ms + 5_000, 0.0, 0.0), played.at(5_000));
@@ -905,11 +907,12 @@ fn a_push_that_did_not_move_the_head_is_answered_then_prompted_once() {
     let played = play(&mut walk, 10 * S, 1);
     push(&mut walk, &played, 2_000, 10.0, 10.0, false);
     assert_eq!(settle(&mut walk, played.at(2_200)), [GIVE_FELT]);
-    // Released 4 counts from where it was: a bump.
-    walk.giving_way_felt(joints(played.ended_ms + 3_000, 4.0, 4.0), played.at(3_000));
-    walk.giving_way_felt(hand(played.ended_ms + 3_000, false), played.at(3_000));
+    // Released 4 counts from where it was, 190 ms after the hand was said:
+    // under FELT_MS, a bump (a longer one is the arm taking it, below).
+    walk.giving_way_felt(joints(played.ended_ms + 2_265, 4.0, 4.0), played.at(2_265));
+    walk.giving_way_felt(hand(played.ended_ms + 2_270, false), played.at(2_270));
     let mut said = Vec::new();
-    for tenth in 31..600 {
+    for tenth in 23..600 {
         said.extend(settle(&mut walk, played.at(tenth * 100)));
     }
     assert_eq!(said, [GIVE_MORE, GIVE_PROMPT]);
@@ -939,15 +942,18 @@ fn one_joint(at_ms: u64, moved: &str, position: f64, goal: f64) -> Felt {
 
 /// A person moves the head whichever way they like (#3702): the base
 /// turned (lamp-52e6), the head tilted (lamp-29e7's pass) or rolled is
-/// done; the arm moved alone is not the head, and the lamp says plainly
-/// how to do it.
+/// done; so is the shoulder or elbow moved with the head still, as a base
+/// nobody holds lets the arm take the push (lamp-29e7, 28 Oct), its goal
+/// not following a short push. Nothing moved in a push that brief is a bump.
 #[test]
-fn any_head_joint_moved_by_hand_is_done_and_the_arm_alone_is_not() {
+fn any_joint_moved_by_hand_is_done_and_a_brief_push_moving_none_is_not() {
     for (joint, done) in [
         ("base_yaw", true),
         ("head_pitch", true),
         ("head_roll", true),
-        ("shoulder", false),
+        ("shoulder", true),
+        ("elbow", true),
+        ("none", false),
     ] {
         let store = Store::new(None);
         let mut walk = store.cycle(S);
@@ -1045,4 +1051,102 @@ fn a_push_across_the_minutes_end_is_waited_for() {
     walk.giving_way_felt(hand(played.ended_ms + 61_000, false), played.at(61_000));
     assert_eq!(settle(&mut walk, played.at(61_100)), [GIVE_DONE]);
     assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+/// The arm's loads as `body/joint_states` says them (effort = load / 1000),
+/// the base turned `yaw` counts and the shoulder `shoulder`.
+fn arm_loaded(at_ms: u64, yaw: f64, shoulder: f64, loads: [f64; 2]) -> Felt {
+    Felt::joints(
+        at_ms,
+        "body",
+        &lamp_msgs::JointState {
+            name: ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"]
+                .map(str::to_owned)
+                .to_vec(),
+            position: vec![radians(yaw), radians(shoulder), 0.0, 0.0, 0.0],
+            velocity: Vec::new(),
+            effort: vec![0.1, loads[0] / 1_000.0, loads[1] / 1_000.0, 0.1, 0.1],
+            commanded: vec![0.0; 5],
+        },
+    )
+}
+
+/// Lamp-29e7, 28 Oct: the head steadied and pushed gently with the base not
+/// held. The arm took it (loads 228 and 304, standing about 140), the head
+/// moved 8 counts, under HAND_MOVED; the body said the hand, then let go:
+/// given way, recorded as the arm taking it.
+#[test]
+fn a_felt_push_the_arm_took_with_the_head_barely_moved_is_done() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    let at = |after: u64| played.ended_ms + after;
+    walk.giving_way_felt(
+        arm_loaded(at(2_000), 0.0, 0.0, [140.0, 140.0]),
+        played.at(2_000),
+    );
+    walk.giving_way_felt(hand(at(2_080), true), played.at(2_080));
+    for step in 0..10 {
+        let after = 2_160 + step * 80;
+        walk.giving_way_felt(
+            arm_loaded(at(after), 8.0, 3.0, [228.0, 304.0]),
+            played.at(after),
+        );
+    }
+    walk.giving_way_felt(hand(at(3_000), false), played.at(3_000));
+    let seen = walk
+        .take_records()
+        .iter()
+        .find(|row| row["kind"] == "onboarding_giving_way_try")
+        .map(|row| row["seen"].as_str().unwrap().to_owned())
+        .unwrap();
+    assert!(
+        seen.contains("the arm took it, no joint moved past 15"),
+        "{seen}"
+    );
+    assert_eq!(settle(&mut walk, played.at(3_100)), [GIVE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+/// The shoulder moved 30 counts with the head still: the arm took the push.
+#[test]
+fn a_shoulder_moved_30_counts_with_the_head_still_is_done() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    let at = |after: u64| played.ended_ms + after;
+    walk.giving_way_felt(one_joint(at(2_000), "shoulder", 0.0, 0.0), played.at(2_000));
+    walk.giving_way_felt(hand(at(2_080), true), played.at(2_080));
+    walk.giving_way_felt(
+        one_joint(at(2_120), "shoulder", 30.0, 0.0),
+        played.at(2_120),
+    );
+    walk.giving_way_felt(hand(at(2_160), false), played.at(2_160));
+    let records = walk.take_records();
+    assert!(
+        records.iter().any(|row| row["seen"]
+            .as_str()
+            .is_some_and(|seen| seen.starts_with("shoulder"))),
+        "{records:?}"
+    );
+    assert_eq!(settle(&mut walk, played.at(2_200)), [GIVE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+/// No hand said at all, the arm loaded and the shoulder moved: no verdict.
+#[test]
+fn no_hand_at_all_gives_no_verdict() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    for step in 0..20 {
+        let after = 2_000 + step * 80;
+        walk.giving_way_felt(
+            arm_loaded(played.ended_ms + after, 8.0, 30.0, [228.0, 304.0]),
+            played.at(after),
+        );
+    }
+    walk.giving_way_felt(hand(played.ended_ms + 4_000, false), played.at(4_000));
+    assert_eq!(settle(&mut walk, played.at(4_100)), Vec::<String>::new());
+    assert_eq!(outcome(&walk), None);
 }
