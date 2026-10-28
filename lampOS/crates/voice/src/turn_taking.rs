@@ -1711,6 +1711,8 @@ mod tests {
                 residual_explained: 10,
                 residual_playback_floor,
                 alignment_age_blocks: 0,
+                render_block_level: Level::FLOOR,
+                render_drop: 0,
             }),
             silent_at_echo: None,
         }

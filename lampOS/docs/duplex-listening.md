@@ -673,7 +673,16 @@ cancellation, in dBFS: the loudest block of that second
 (`loudest_capture_db`: with the lamp speaking alone, its own voice at its
 microphone) and the two slow averages the margin is made of, a person
 heard with the lamp silent (`person_db`) and the lamp's own voice where
-the canceller let it through (`own_db`). No audio and nothing audio can be rebuilt from.
+the canceller let it through (`own_db`). Three more strings say what the
+render was doing under each block (#4035): `render_level`, the render at
+the matched alignment over that 10 ms block, lettered like the levels;
+`render_drop`, how far it is under its own peak over the last 150 ms, a
+letter for each 3 dB (`c` and on is 6 dB or more down: the lamp has just
+stopped a word and the room still rings with it); and `alignment_age`, the
+blocks since that alignment last held, in tens (`4` is the 40-block bar
+past which a block is unknown). They are there to show whether the render
+was falling at each yield that nobody asked for, as a guard against a
+word's tail would assume; nothing decides on them yet. No audio and nothing audio can be rebuilt from.
 It is there because a yield that comes late, or never, cannot be explained
 from the yield events alone. A finite directed session does not write it:
 it can record the audio itself.
