@@ -1,0 +1,40 @@
+name: lampOS Studio watchdog
+
+# Rescues lampOS ARM64 runs the Mac Studio runners left stuck: a Studio job
+# queued over 8 minutes or running over 25 (they take 5 to 7) is cancelled
+# and its whole run started again, so its route job sends it to
+# GitHub-hosted (.github/scripts/lampos-route.py sweep). Each route job
+# sweeps too; this catches a stuck job when no new run comes along.
+#
+# Scheduled workflows run from the default branch only, so this file and the
+# script must be on main as well as lamp-voice.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: lampos-studio-watchdog
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  sweep:
+    if: >-
+      github.repository == 'autonomous-ai/lampOS'
+      && contains(fromJSON('["shadow","canary","on"]'), vars.LAMPOS_STUDIO)
+    name: lampOS — rescue stuck Studio runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: sweep
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/lampos-route.py sweep

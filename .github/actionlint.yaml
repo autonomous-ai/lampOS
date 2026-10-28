@@ -1,0 +1,5 @@
+self-hosted-runner:
+  # The Mac Studio runners (org group lampos-studio): pull requests and the cache warming.
+  labels:
+    - studio
+    - studio-trusted
