@@ -9,7 +9,9 @@ it all with no lamp.
     lamp skill keygen
     lamp skill pack FOLDER [--sign] [--out DIR]
     lamp skill push FOLDER [LAMP_ID]
-    lamp skill install FILE|URL [LAMP_ID] [--yes]
+    lamp skill install FILE|URL|NAME [LAMP_ID] [--from INDEX] [--yes]
+    lamp skill index make NAME PACKAGE... --url-base URL --seq N | add URL | list | remove NAME
+    lamp skill browse [QUERY]
     lamp skill list [LAMP_ID]
     lamp skill remove NAME [LAMP_ID]
 """
@@ -164,14 +166,16 @@ async def _skill_push(args) -> int:
 
 
 async def _skill_install(args) -> int:
-    from .push import GRANTS_ASKED, asks_of, fetch, open_package, read_capped, tomllib
+    from .index import Indexes, find, read_source
+    from .push import _NAME, GRANTS_ASKED, asks_of, open_package, tomllib
 
-    # A URL is fetched over https only; anything else is a file here.
-    if "://" in args.source:
-        data = fetch(args.source)
+    # A URL is fetched over https only; a file here is read; a skill's name
+    # is looked up in the indexes kept here and checked against its entry.
+    if "://" not in args.source and not Path(args.source).exists() and _NAME.fullmatch(args.source):
+        listing, _, data = find(Indexes(Keyring().folder), args.source, args.from_index)
+        print(f"from index {listing.name}, published by key {listing.publisher}, not the Store")
     else:
-        with open(args.source, "rb") as file:
-            data = read_capped(file)
+        data = read_source(args.source)
     opened = open_package(data)
     asks = asks_of(tomllib.loads(opened.files.get("skill.toml", b"").decode("utf-8", "replace")))
     # Integrity, not trust: anyone can make a key (Fourteen, #3504).
@@ -190,6 +194,59 @@ async def _skill_install(args) -> int:
         skill = await lamp.install_package(data)
     held = f", held: {skill['held']}" if skill.get("held") else ""
     print(f"{skill.get('name')} {skill.get('version')} installed, {'on' if skill.get('on') else 'off'}{held}")
+    return 0
+
+
+def _show_index(listing) -> None:
+    # Integrity, not trust: anyone can make a key (Fourteen, #3504).
+    print(f"index {listing.name}, published by key {listing.publisher}, not the Store, seq {listing.seq}, {len(listing.skills)} skills")
+
+
+async def _skill_index(args) -> int:
+    from .index import Indexes, make_index, open_index, read_source
+
+    indexes = Indexes(Keyring().folder)
+    if args.index_command == "make":
+        publisher = Keyring().author_key()
+        if publisher is None:
+            raise LampError("no author key to publish with: make one with `lamp skill keygen`", code="bad_request")
+        packages = [read_source(path) for path in args.packages]
+        data = make_index(args.name, packages, args.url_base, args.seq, publisher)
+        out = Path(args.out)
+        out.write_bytes(data)
+        _show_index(open_index(data))
+        print(f"written to {out}")
+    elif args.index_command == "add":
+        listing = open_index(read_source(args.url))
+        held = indexes.all().get(listing.name)
+        if held and held["public"] != listing.public:
+            raise LampError(f"an index named {listing.name} is kept already, by key {held['key']}: remove it first", code="refused")
+        _show_index(listing)
+        if not args.yes:
+            answer = input(f"Keep index {listing.name}, and trust only key {listing.publisher} to change it? [y/N] ").strip().lower()
+            if answer not in ("y", "yes"):
+                print("not added")
+                return 1
+        indexes.keep(args.url, listing)
+        print(f"index {listing.name} added")
+    elif args.index_command == "list":
+        for name, held in sorted(indexes.all().items()):
+            print(f"{name}\tkey {held['key']}\tseq {held['seq']}\t{held['url']}")
+    else:
+        indexes.remove(args.name)
+        print(f"index {args.name} removed")
+    return 0
+
+
+async def _skill_browse(args) -> int:
+    from .index import Indexes, refresh
+
+    query = (args.query or "").lower()
+    for listing in refresh(Indexes(Keyring().folder)):
+        for entry in listing.skills:
+            if query in entry.name.lower():
+                asks = ", ".join(entry.asks) or "nothing"
+                print(f"{entry.name}\t{entry.version}\tsigned by key {entry.author}\tasks {asks}\tindex {listing.name}")
     return 0
 
 
@@ -255,11 +312,30 @@ def main(argv: list[str] | None = None) -> int:
     skill_push.add_argument("folder")
     skill_push.add_argument("lamp", nargs="?")
     skill_push.set_defaults(run=_skill_push)
-    skill_install = skill_commands.add_parser("install", help="put a shared package (a .tar file or an https URL) on your paired lamp, after showing what it asks")
-    skill_install.add_argument("source", help="a package file, or an https:// URL (1 MiB at most)")
+    skill_install = skill_commands.add_parser("install", help="put a shared package (a .tar file, an https URL, or a name from your indexes) on your paired lamp, after showing what it asks")
+    skill_install.add_argument("source", help="a package file, an https:// URL (1 MiB at most), or a skill's name in an index kept here")
     skill_install.add_argument("lamp", nargs="?")
+    skill_install.add_argument("--from", dest="from_index", help="the index to take NAME from, when more than one lists it")
     skill_install.add_argument("--yes", action="store_true", help="don't ask: you have read what it asks")
     skill_install.set_defaults(run=_skill_install)
+    skill_index = skill_commands.add_parser("index", help="shared-skill indexes: signed lists of signed packages to install from")
+    index_commands = skill_index.add_subparsers(dest="index_command", required=True)
+    index_make = index_commands.add_parser("make", help="sign an index of your signed packages with your author key")
+    index_make.add_argument("name", help="the index's name: a-z, 0-9 and -")
+    index_make.add_argument("packages", nargs="+", help="signed packages (lamp skill pack --sign)")
+    index_make.add_argument("--url-base", required=True, help="the https:// folder the packages are served from")
+    index_make.add_argument("--seq", type=int, required=True, help="this listing's number, higher than the last one published")
+    index_make.add_argument("--out", default="lamp-index.json")
+    index_add = index_commands.add_parser("add", help="keep an index (an https URL or a file), pinning its publisher's key")
+    index_add.add_argument("url")
+    index_add.add_argument("--yes", action="store_true", help="don't ask: you trust this publisher's key")
+    index_commands.add_parser("list", help="the indexes kept here")
+    index_remove = index_commands.add_parser("remove", help="stop keeping an index")
+    index_remove.add_argument("name")
+    skill_index.set_defaults(run=_skill_index)
+    skill_browse = skill_commands.add_parser("browse", help="the skills your indexes list, fetched again now")
+    skill_browse.add_argument("query", nargs="?", help="a part of a skill's name")
+    skill_browse.set_defaults(run=_skill_browse)
     skill_list = skill_commands.add_parser("list", help="the skills this computer has pushed")
     skill_list.add_argument("lamp", nargs="?")
     skill_list.set_defaults(run=_skill_list)
