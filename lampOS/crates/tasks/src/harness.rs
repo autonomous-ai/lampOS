@@ -652,8 +652,14 @@ impl Cli {
     /// so a computer that can't say costs one probe. A refusal is asked
     /// again at the next hand-over: the person may have signed in meanwhile
     /// (the Reviewer-lead's P2 on #4033). Called inside a launch, under its
-    /// operation lock.
+    /// operation lock: a read for another task waits for it, 8 s at most.
     fn engine_refusal(&self, target: &Target, seen: &mut Seen) -> Option<&'static str> {
+        // Devin Cloud isn't one of Harness's engines (`ENGINES`): `--engine
+        // devin-cloud` is a usage error there, so it is never asked (Ten's
+        // P3 on #4033).
+        if target.engine == EngineKind::DevinCloud {
+            return None;
+        }
         let engine = target.engine.argument();
         let key = (target.machine_id.to_lowercase(), engine);
         let mut kept = self.ready.lock().unwrap_or_else(|e| e.into_inner());
