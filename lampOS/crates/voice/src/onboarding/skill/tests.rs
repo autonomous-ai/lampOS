@@ -483,7 +483,9 @@ fn lines_of(step: Step) -> Vec<String> {
 #[test]
 fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
     // (step, what to do, didn't work, worked), each in the step's own lines.
-    // Giving way is parked (#4063) and left as it is.
+    // Giving way is parked (#4063) and left as it is. who_you_are's "worked"
+    // is the model's own greeting by name, so it has no fixed line (El's P2
+    // on #4151: a fixed one would be a third greeting).
     let three = [
         (
             Step::WhereYouSit,
@@ -495,7 +497,7 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
             Step::WhoYouAre,
             "What should I call you?",
             "Sorry, what should I call you?",
-            "Nice to meet you.",
+            "",
         ),
         (
             Step::HowYouSound,
@@ -536,7 +538,10 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
     ];
     for (step, todo, again, worked) in three {
         let lines = lines_of(step);
-        for line in [todo, again, worked] {
+        for line in [todo, again, worked]
+            .into_iter()
+            .filter(|line| !line.is_empty())
+        {
             assert!(
                 lines.iter().any(|said| said.contains(line)),
                 "{} lacks {line:?}",
@@ -544,6 +549,11 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
             );
         }
     }
+    assert!(
+        lines_of(Step::WhoYouAre)
+            .iter()
+            .all(|line| !line.contains("Nice to meet you."))
+    );
     // Touch says "head" only.
     assert!(
         lines_of(Step::Touch)
