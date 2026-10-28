@@ -260,7 +260,7 @@ pub(crate) struct NearFlow {
     /// Prompts the voice never said, offered again ([`MOST_UNSAID`]).
     unsaid: u8,
     /// Whether the last call try judged in this voice cycle was accepted:
-    /// the next call prompt says "Got it. Once more." (`near_again`) or "I
+    /// the next call prompt says "Got it. Say 'Hey Lamp' once more." (`near_again`) or "I
     /// didn't catch that." (`near_missed`). None until one is judged, and
     /// again after an absence, a pause or a mute: the step's first line,
     /// which says the phrase and that it asks three times (#3702).
