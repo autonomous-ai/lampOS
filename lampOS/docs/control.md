@@ -1,5 +1,7 @@
 # Control: programming the lamp from your own code
 
+**New here?** [develop.md](develop.md) is the quick-start: pair, a first program in Python or JavaScript, lamp-mcp, and a skill pushed and shared, in 10 minutes.
+
 The lamp's programming protocol, v1: what a developer's code, an agent or a
 skill may ask of the lamp, and what the lamp tells it. Designed by Nine on
 #3504 ([12:24](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6434496168),

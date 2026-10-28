@@ -7,6 +7,8 @@ messages in
 Same names as the Python SDK, in camelCase, with promises. It runs on your
 computer, never on a lamp. Node 20.11 or later.
 
+**New here?** [docs/develop.md](../../docs/develop.md) is the 10-minute quick-start: the fake lamp, a first program, pairing, lamp-mcp and skills.
+
 **Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
 (#3504). Until then, try it with the fake lamp below.
 
