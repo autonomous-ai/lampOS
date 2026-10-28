@@ -2832,7 +2832,8 @@ bound. Until the refreshed writer is proved:
 - **Put back:** when `lamp-update-back.service` has failed, or this round's
   first `apply` by the new writer failed, the round asks the unit to rename
   `.prev` back over it (`Op::PutBack`). The apply's own undo runs first,
-  with the writer that made it. The build put back is kept in
+  with the writer that made it, when it wrote anything; a writer that
+  failed before its first write is put back all the same. The build put back is kept in
   `writer-refresh.done` and never asked to be the writer again.
 
 `installed_units` leaves out the writer's unit, as it leaves out
@@ -2840,5 +2841,4 @@ lamp-update's own. It starts `update/current` too, and taken for a part it
 would move that link as a part's switch, outside the self-switch and its way
 back. A test pins that. Not shown on a real systemd or a 7071 lamp: the tests
 run the unit's program in-process, and a writer's failed `back` is a fake
-systemd's failed state. No round test yet puts back a writer whose first
-`apply` failed: the tests take the `back` path.
+systemd's failed state.
