@@ -40,9 +40,11 @@ Environment=LAMP_EYES_SPEAKING=on
 # across, kept in look.jpg for 15 s (LAMP_LOOK_FULL in the voice). The sight file's working frame is
 # encoded from the look's own decoded picture (--sight-from-look, #2748). On lamp-75c9 it cost about
 # 12 ms a look (125 to 137.5 ms, an empty desk; #2791's product half).
+# The camera is taken by its ids on whichever USB port it is (#4074: 3-1.1.4 on lamp-4ace and
+# lamp-52e6, 3-1.3.4 on lamp-a63e and lamp-dbda), found at each open; none or two is refused.
 # A camera that stops opening (#2892, lamp-52e6 after a voice restart) is re-authorized by
 # lamp-eyes-camera.socket's root helper, asked after three failed opens, at most once a minute.
-ExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --lock-directory /run/lampos-locks/camera --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx --full-look 1280x960 --full-look-file /run/lampos-eyes/look.jpg --sight-from-look on --camera-helper /run/lampos-eyes-camera/camera.sock
+ExecStart=/opt/lampOS/eyes/current/lamp-eyes --lock-directory /run/lampos-locks/camera --usb 01da:5875 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx --full-look 1280x960 --full-look-file /run/lampos-eyes/look.jpg --sight-from-look on --camera-helper /run/lampos-eyes-camera/camera.sock
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

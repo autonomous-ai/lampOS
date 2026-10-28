@@ -580,16 +580,22 @@ while they go on failing (`camera_helper::ask_now`), and say its answer once
 ("its helper asked to re-authorize its USB device: …"). The reset above runs
 as before.
 - **The helper** is `lamp-eyes reauthorize-camera --usb
-  VENDOR:PRODUCT@TOPOLOGY`, root's, started by `lamp-eyes-camera.socket`
+  VENDOR:PRODUCT[@TOPOLOGY]`, root's, started by `lamp-eyes-camera.socket`
   (`deploy/product/`, root and the group `lampos` may connect) for each ask
-  as `lamp-eyes-camera@.service`, with the same camera and port as
-  lamp-eyes' own unit (`01da:5875@3-1.1.4` in the product, held by the
-  install test, #3504); it acts at that port only, never at a camera with
-  the same ids elsewhere. It checks that the device at that port under
-  `/sys/bus/usb/devices` has that `idVendor` and `idProduct`, writes its
-  `authorized` 0, then 1 half a second later, as an unplug and a plug would,
-  and answers one line: `{"reauthorized":true}`, or `false` with why
-  (`too_soon` with `ago_s`, `no_device`, `not_the_camera`, `error`).
+  as `lamp-eyes-camera@.service`, with the same camera as lamp-eyes' own
+  unit (`01da:5875` in the product, held by the install test). With a port
+  named it acts at that port only, never at a camera with the same ids
+  elsewhere, and checks that the device there under `/sys/bus/usb/devices`
+  has that `idVendor` and `idProduct`. With none (the product, #4074: the
+  camera is on `3-1.1.4` on lamp-4ace and lamp-52e6, `3-1.3.4` on lamp-a63e
+  and lamp-dbda), it finds the one USB device with those ids on any port,
+  looking only at devices' own entries (not a root hub's `usbN`, not an
+  interface's `3-1.1.4:1.0`), and touches none when there is none or two
+  (`camera_helper::reauthorize_any`), the eyes' own rule. Then it writes
+  its `authorized` 0, then 1 half a second later, as an unplug and a plug
+  would, and answers one line: `{"reauthorized":true}`, or `false` with why
+  (`too_soon` with `ago_s`, `no_device`, `not_the_camera`, `several`,
+  `error`).
 - **Narrow:** it reads nothing from whoever connects, so it can't be pointed
   at another device; a port that isn't digits, `-` and `.` makes no path; at
   most once a minute by the time it keeps in `/run/lampos-eyes-camera/last`,
@@ -2663,16 +2669,13 @@ refused and said once in the journal ("camera 01da:5875 not opened: no
 camera with those ids at port 3-1.1.4", say), and tried again every five
 seconds; with a port named, a camera at another port is never taken instead.
 "camera found at /dev/videoN on port P" is said when it is found, or found
-on another port. **The product unit** gives `--usb 01da:5875@3-1.1.4`, and
-its helper below names the same `ids@port` (the install test holds both to
-it, #3504). It still passes `--device /dev/video0` until every channel
-carries a lamp-eyes that takes `--usb` with a port alone: an older one
-exits 2 without `--device`, and the updater installs units from its own
-build beside the channel's binaries ([install.md](install.md)). Then a
-second step drops `--device`, so a second camera on another port that
-enumerated first as `/dev/video0` is never used, and adds lamp-eyes to
-`product_units_pass_only_options_an_older_binary_takes`. On lamp-dbda the camera is on `3-1.3.4`; the ids alone are for a
-lamp that differs. The per-lamp units (`deploy/units/`, lamp-4ace,
+on another port. **The product unit** gives `--usb 01da:5875` with no port
+and no `--device` (#4074), and its helper names the same ids (the install
+test holds both to it): the camera's port differs by unit, `3-1.1.4` on
+lamp-4ace and lamp-52e6 but `3-1.3.4` on lamp-a63e and lamp-dbda, and the
+hardware can't change that. Every lamp-eyes since 20 Oct (#2190) takes
+`--usb` with the ids alone, so an older binary beside this unit opens the
+camera too; a second camera with the same ids is refused, never guessed. The per-lamp units (`deploy/units/`, lamp-4ace,
 lamp-52e6) still give `--device` with the port, checked at open as before. The
 lock directory must be private to the user it runs as. A camera that does not open, or fails, is tried again every five
 seconds while permission lasts. A start is given a 2 s budget (`OPEN_BUDGET_US`)
