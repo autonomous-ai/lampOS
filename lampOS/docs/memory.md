@@ -736,7 +736,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
       `called::LEAST_SCORE` or more from `called::BEFORE_US` before the
       line to its end, the name note's rule, with or without
       `LAMP_NAME_NOTE`; the name note given counts too), the first word
-      past a greeting set off as a name is ("Ramon. …", "Edeland, …"), not
+      past a greeting set off as a name is ("Ramon. …", "Edeland, …", and
+      past one greeting of the line's own set off before it, "Hello. Gaswa,
+      …", "Good morning, …", "Xin chào, …": `GREETINGS`, N4b), not
       "Lamp", not a common opener ("Yes,", "Well,", "Please,", "Vâng," …;
       `OPENS_SET_OFF`), not a time, day, request verb or discourse word
       ("Tomorrow,", "Today,", "Remember,", "Honestly,", "Mai,", "Nhớ," …;

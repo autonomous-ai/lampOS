@@ -1445,8 +1445,11 @@ const OPENS_SET_OFF: &[&str] = &[
 /// place), is none of [`OPENS_SET_OFF`], and more is said after it. Text
 /// alone can't tell the misheard name from a person's (Ramon, Ilan and Elan
 /// are names too), so this is read only on such a line. The word, and the
-/// line after it.
+/// line after it. N4b (lamp-06c1, 28 Oct): a line may open with one
+/// greeting of its own before it, set off too ("Hello. Gaswa, I changed
+/// jobs."), which [`GREETINGS`] passes over.
 pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
+    let text = past_greeting(text);
     let (start, end) = first_word_set_off(text)?;
     let word = &text[start..end];
     let lower = unicode_normalization::UnicodeNormalization::nfc(word)
@@ -1456,6 +1459,52 @@ pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
     let named = lower == "lamp" || lower == "lamb";
     let common = OPENS_SET_OFF.contains(&lower.as_str()) || NOT_A_NAME.contains(&lower.as_str());
     (!rest.is_empty() && !named && !common).then_some((word, rest))
+}
+
+/// Greetings a line may open with, set off by a comma or a stop, before
+/// the lamp's name as heard ([`wake_heard_as`]), NFC lower case. "Hey",
+/// "hi" and "ok" alone are passed over already by [`first_word_set_off`].
+const GREETINGS: &[&str] = &[
+    "hello",
+    "hey",
+    "hi",
+    "ok",
+    "okay",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "xin ch\u{e0}o",
+    "ch\u{e0}o",
+    "alo",
+];
+
+/// `text` past one greeting of [`GREETINGS`] set off by a comma or a stop
+/// ("Hello. …", "Good morning, …"), with what follows it; `text` itself
+/// when it opens with none, or the greeting is all there is.
+fn past_greeting(text: &str) -> &str {
+    let lead = text.trim_start();
+    let lower = unicode_normalization::UnicodeNormalization::nfc(lead)
+        .collect::<String>()
+        .to_lowercase();
+    for greeting in GREETINGS {
+        let Some(after) = lower.strip_prefix(greeting) else {
+            continue;
+        };
+        if !after.starts_with([',', '.', '!', ';', ':']) {
+            continue;
+        }
+        // Lower casing and NFC may change byte lengths: walk the original
+        // by characters as many as the greeting has.
+        let chars = greeting.chars().count();
+        let Some((cut, _)) = lead.char_indices().nth(chars) else {
+            continue;
+        };
+        let rest = lead[cut..].trim_start_matches(|c: char| !c.is_alphanumeric());
+        if !rest.is_empty() {
+            return rest;
+        }
+    }
+    text
 }
 
 /// Words that open a line set off and are said, never a name heard for the
