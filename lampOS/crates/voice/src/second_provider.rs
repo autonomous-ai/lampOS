@@ -1449,7 +1449,14 @@ const OPENS_SET_OFF: &[&str] = &[
 /// greeting of its own before it, set off too ("Hello. Gaswa, I changed
 /// jobs."), which [`GREETINGS`] passes over.
 pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
-    let text = past_greeting(text);
+    let greeted = past_greeting(text);
+    // Past a greeting, a line that still says the name as itself had its
+    // first word heard right: "Hello, Anna. Lamp, …" opens with a person's
+    // name (Reviewer-three's P2 on #4069).
+    if greeted.len() < text.len() && says_the_name(greeted) {
+        return None;
+    }
+    let text = greeted;
     let (start, end) = first_word_set_off(text)?;
     let word = &text[start..end];
     let lower = unicode_normalization::UnicodeNormalization::nfc(word)
@@ -1463,13 +1470,10 @@ pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
 
 /// Greetings a line may open with, set off by a comma or a stop, before
 /// the lamp's name as heard ([`wake_heard_as`]), NFC lower case. "Hey",
-/// "hi" and "ok" alone are passed over already by [`first_word_set_off`].
+/// "hi", "ok" and "okay" are passed over by [`first_word_set_off`] itself,
+/// as lamp-voice reads them today.
 const GREETINGS: &[&str] = &[
     "hello",
-    "hey",
-    "hi",
-    "ok",
-    "okay",
     "good morning",
     "good afternoon",
     "good evening",
@@ -1480,31 +1484,46 @@ const GREETINGS: &[&str] = &[
 
 /// `text` past one greeting of [`GREETINGS`] set off by a comma or a stop
 /// ("Hello. …", "Good morning, …"), with what follows it; `text` itself
-/// when it opens with none, or the greeting is all there is.
+/// when it opens with none, or the greeting is all there is. The cut is at
+/// a character boundary of `text` whose NFC lower-case prefix is the
+/// greeting, so a decomposed accent ("chào" written as "cha" and a
+/// combining grave) is never split (the Reviewer-lead's P3 on #4069).
 fn past_greeting(text: &str) -> &str {
     let lead = text.trim_start();
-    let lower = unicode_normalization::UnicodeNormalization::nfc(lead)
-        .collect::<String>()
-        .to_lowercase();
     for greeting in GREETINGS {
-        let Some(after) = lower.strip_prefix(greeting) else {
+        let Some(cut) = lead
+            .char_indices()
+            .map(|(at, _)| at)
+            .chain([lead.len()])
+            .skip(1)
+            .take(2 * greeting.chars().count() + 2)
+            .find(|&at| {
+                unicode_normalization::UnicodeNormalization::nfc(&lead[..at])
+                    .collect::<String>()
+                    .to_lowercase()
+                    == *greeting
+                    && !lead[at..]
+                        .starts_with(|c: char| unicode_normalization::char::is_combining_mark(c))
+            })
+        else {
             continue;
         };
-        if !after.starts_with([',', '.', '!', ';', ':']) {
+        if !lead[cut..].starts_with([',', '.', '!', ';', ':']) {
             continue;
         }
-        // Lower casing and NFC may change byte lengths: walk the original
-        // by characters as many as the greeting has.
-        let chars = greeting.chars().count();
-        let Some((cut, _)) = lead.char_indices().nth(chars) else {
-            continue;
-        };
         let rest = lead[cut..].trim_start_matches(|c: char| !c.is_alphanumeric());
         if !rest.is_empty() {
             return rest;
         }
     }
     text
+}
+
+/// Whether `text` says the lamp's name as itself, "Lamp" or "Lamb", as a
+/// word of its own.
+fn says_the_name(text: &str) -> bool {
+    text.split(|c: char| !c.is_alphanumeric())
+        .any(|word| word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb"))
 }
 
 /// Words that open a line set off and are said, never a name heard for the
