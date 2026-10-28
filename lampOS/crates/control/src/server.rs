@@ -754,6 +754,7 @@ pub const TOPICS: [&str; 15] = [
     "voice/mute",
     "voice/privacy",
     "light/state",
+    "light/drawn",
     "mood/state",
     "controls/touch",
 ];
