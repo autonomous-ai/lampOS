@@ -21,6 +21,9 @@ pub(super) struct FailureNotices {
     /// The Wi-Fi helper's line with no network (#1959): played only when
     /// asked through the say service ([`crate::say::Recordings`]).
     wifi_lost: std::result::Result<Arc<Recording>, Missing>,
+    /// The recovery hotspot's line (#3743, #3020): played only when
+    /// `lamp-setup recover` asks for it through the say service.
+    wifi_recovering: std::result::Result<Arc<Recording>, Missing>,
     /// With a notices folder configured, what a failed line plays when its
     /// recording can't be loaded (#2943 part 3): the lamp's own sigh, made
     /// here, so a lamp whose files are missing never meets a question it
@@ -70,6 +73,7 @@ impl FailureNotices {
             back_online: get(NoticeKind::BackOnline),
             service_down: get(NoticeKind::VoiceServiceUnreachable),
             wifi_lost: get(NoticeKind::WifiLost),
+            wifi_recovering: get(NoticeKind::WifiRecovering),
             fallback: Some(Arc::new(Recording {
                 info: None,
                 samples: crate::head_cue::breath(FALLBACK_DBFS).into_boxed_slice(),
@@ -84,6 +88,7 @@ impl FailureNotices {
             back_online: Err(Missing::NoDirectory),
             service_down: Err(Missing::NoDirectory),
             wifi_lost: Err(Missing::NoDirectory),
+            wifi_recovering: Err(Missing::NoDirectory),
             fallback: None,
             language: None,
         }
@@ -109,23 +114,27 @@ impl FailureNotices {
             capability["back_online"] = state(&self.back_online);
             capability["service_down"] = state(&self.service_down);
             capability["wifi_lost"] = state(&self.wifi_lost);
+            capability["wifi_recovering"] = state(&self.wifi_recovering);
         }
         capability
     }
     /// What the say service may play by name (#1959): the samples, or the
     /// loader's reason as its snake_case name.
     pub(super) fn recordings(&self) -> crate::say::Recordings {
-        let loaded = self
-            .wifi_lost
-            .as_ref()
-            .map(|recording| Arc::<[i16]>::from(&recording.samples[..]))
-            .map_err(|missing| {
-                serde_json::to_value(missing)
-                    .ok()
-                    .and_then(|value| value.as_str().map(str::to_owned))
-                    .unwrap_or_else(|| "unavailable".into())
-            });
-        crate::say::Recordings::none().with("wifi_lost", loaded)
+        let loaded = |selected: &std::result::Result<Arc<Recording>, Missing>| {
+            selected
+                .as_ref()
+                .map(|recording| Arc::<[i16]>::from(&recording.samples[..]))
+                .map_err(|missing| {
+                    serde_json::to_value(missing)
+                        .ok()
+                        .and_then(|value| value.as_str().map(str::to_owned))
+                        .unwrap_or_else(|| "unavailable".into())
+                })
+        };
+        crate::say::Recordings::none()
+            .with("wifi_lost", loaded(&self.wifi_lost))
+            .with("wifi_recovering", loaded(&self.wifi_recovering))
     }
 }
 
@@ -576,6 +585,7 @@ impl FailureNotices {
             back_online: Err(Missing::NotProvisioned),
             service_down: Err(Missing::NotProvisioned),
             wifi_lost: Err(Missing::NotProvisioned),
+            wifi_recovering: Err(Missing::NotProvisioned),
             // The other tests' catalog stays silent on a missing line.
             fallback: None,
             language: Some("en-US".into()),
@@ -679,6 +689,27 @@ mod loading_tests {
             info: None,
             samples: vec![99_i16; 7_200].into_boxed_slice(),
         }));
+        assert_eq!(
+            catalog.recordings().samples("wifi_lost"),
+            Ok(vec![99_i16; 7_200])
+        );
+        // The recovery hotspot's line goes the same way, on its own (#3743).
+        assert_eq!(
+            catalog.recordings().samples("wifi_recovering"),
+            Err("the recording is not there: not_provisioned".into())
+        );
+        assert_eq!(
+            only_turn_lost.capability()["wifi_recovering"]["missing"],
+            "not_provisioned"
+        );
+        catalog.wifi_recovering = Ok(Arc::new(Recording {
+            info: None,
+            samples: vec![77_i16; 7_200].into_boxed_slice(),
+        }));
+        assert_eq!(
+            catalog.recordings().samples("wifi_recovering"),
+            Ok(vec![77_i16; 7_200])
+        );
         assert_eq!(
             catalog.recordings().samples("wifi_lost"),
             Ok(vec![99_i16; 7_200])

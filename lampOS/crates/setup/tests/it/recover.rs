@@ -1,7 +1,8 @@
 //! #3020: the policy that opens setup's hotspot when a set-up lamp's saved
 //! network is gone (`lamp_setup::recover`), on a clock and looks of its own.
 use lamp_setup::recover::{
-    Act, JOIN_WAIT_MS, LOSS_GRACE_MS, PHONE_HOLDS_MS, RETRY_EVERY_MS, Recovery, Seen, State, on,
+    Act, JOIN_WAIT_MS, LOSS_GRACE_MS, PHONE_HOLDS_MS, RECORDING_OPENED, RETRY_EVERY_MS, Recovery,
+    SAY_OPENED, Seen, State, on, says_opened,
 };
 
 const GONE: Seen = Seen {
@@ -32,6 +33,46 @@ fn the_network_gone_90_s_opens_the_hotspot_once() {
     assert_eq!(acts[0], (5_000 + LOSS_GRACE_MS, Act::OpenHotspot));
     assert!(policy.recovering());
     assert_eq!(acts.len(), 1, "{acts:?}");
+}
+
+/// #3743 (agreed with Sixth on #3020): the hotspot's line is said once a
+/// loss, as it first opens; not at its reopening after a failed try of the
+/// saved network, and again only for a new loss.
+#[test]
+fn the_hotspots_line_is_said_once_a_loss() {
+    let mut policy = Recovery::default();
+    let mut said = Vec::new();
+    let mut look = |policy: &mut Recovery, at: u64, seen: Seen| {
+        let was = policy.recovering();
+        let act = policy.step(at, seen);
+        if says_opened(was, act) {
+            said.push(at);
+        }
+        act
+    };
+    for at in (0..=LOSS_GRACE_MS).step_by(5_000) {
+        look(&mut policy, at, GONE);
+    }
+    // A try that doesn't join, and the hotspot opened again: nothing said.
+    let retry = LOSS_GRACE_MS + RETRY_EVERY_MS;
+    for at in (LOSS_GRACE_MS + 5_000..=retry + JOIN_WAIT_MS).step_by(5_000) {
+        look(&mut policy, at, GONE);
+    }
+    assert!(policy.recovering());
+    // Back, then gone again: a new loss, said again at its own 90 s.
+    let back = retry + JOIN_WAIT_MS + 5_000;
+    assert_eq!(look(&mut policy, back, BACK), None);
+    for at in (back + 5_000..=back + 5_000 + LOSS_GRACE_MS).step_by(5_000) {
+        look(&mut policy, at, GONE);
+    }
+    assert_eq!(said, [LOSS_GRACE_MS, back + 5_000 + LOSS_GRACE_MS]);
+    // The recording's name and words, and the words fit any loader's 10 s.
+    assert_eq!(RECORDING_OPENED, "wifi_recovering");
+    assert_eq!(
+        SAY_OPENED,
+        "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app."
+    );
+    assert!(!SAY_OPENED.contains("reset") && !SAY_OPENED.contains("erase"));
 }
 
 #[test]

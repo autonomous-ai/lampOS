@@ -474,7 +474,9 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
         };
         let was = policy.recovering();
         let now_ms = u64::try_from(begun.elapsed().as_millis()).unwrap_or(u64::MAX);
-        match policy.step(now_ms, seen) {
+        let act = policy.step(now_ms, seen);
+        let say_opened = lamp_setup::recover::says_opened(was, act);
+        match act {
             Some(Act::OpenHotspot) => {
                 eprintln!(
                     "lamp-setup: recover: off every known network for {} s and not joining one: opening setup's hotspot",
@@ -484,6 +486,16 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
                     open.close();
                 }
                 open = Some(Recovering::open(&config));
+                if say_opened {
+                    // No network, so the recording only, never words for
+                    // the model (#3743). Not played: journalled, and the
+                    // hotspot stays open all the same.
+                    if let Some(why) = lamp_setup::wifi_change::SayService::product()
+                        .play_recording(lamp_setup::recover::RECORDING_OPENED)
+                    {
+                        eprintln!("lamp-setup: recover: {why}");
+                    }
+                }
             }
             Some(Act::Rejoin) => {
                 eprintln!("lamp-setup: recover: no phone on the hotspot: trying the saved network");
