@@ -7324,19 +7324,13 @@ fn conversation_with_gate_inner(
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
             }
-            // A call's line ended and its words came back as more than the
-            // name (the second route tells only the name alone, as
-            // `StepCallHeard`), or its turn ended without them (#3923): the
-            // step's try waits for nothing more.
+            // A call's line whose own turn ended without `StepCallHeard`
+            // (#3923): its words were more than the name, or none, and the
+            // step's try waits for nothing more. Only its own turn's end: a
+            // finished transcript names no line, and an earlier line's late
+            // words would empty this one's slot (the Reviewer-lead on #4006).
             if let Some((turn, Some(_))) = step_call_line
-                && (matches!(
-                    &event,
-                    ProviderOutput::Transcript {
-                        request: None,
-                        finished: true,
-                        ..
-                    }
-                ) || matches!(&event, ProviderOutput::TurnComplete { request, .. } if *request == turn))
+                && matches!(&event, ProviderOutput::TurnComplete { request, .. } if *request == turn)
             {
                 step_call_line = None;
                 near_call_words_back(onboarding.as_mut());
@@ -8608,6 +8602,23 @@ fn conversation_with_gate_inner(
                 if speech_levels.len() > usize::from(crate::activity::CALL_SPEECH_BLOCKS) {
                     near_call_turn = None;
                 }
+            }
+            // On the second route a call told as the step's (`StepCall`) is
+            // not held (#3923): the route itself never answers the name
+            // alone, and its End must go on for its words to come back as
+            // the step's call by text. Held, the line had no words (c0a4,
+            // requests 3 and 5), and its kept sound was carried into the
+            // next line, which then was no bare name and was answered
+            // (request 7, "Hey Lamp"). On Live the hold stands.
+            if near_call_turn.is_some()
+                && near_call_turn == step_call_line.map(|(turn, _)| turn)
+                && (rig.provider.role == "second"
+                    || rig
+                        .second
+                        .as_ref()
+                        .is_some_and(second::Route::second_active))
+            {
+                near_call_turn = None;
             }
             match step {
                 AdmissionStep::None => {}

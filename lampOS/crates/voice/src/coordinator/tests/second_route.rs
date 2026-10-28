@@ -238,9 +238,14 @@ struct Script {
     /// were the lamp's name alone (#3923): the route says so
     /// (`StepCallHeard`) and ends it idle, as the engine does.
     heard_as_call: bool,
+    /// With `heard_as_call`, an earlier line's words come back late, just
+    /// before the call's own `StepCallHeard` (the Reviewer-lead on #4006).
+    late_words_first: bool,
     /// Capture frames of speech in the person's first utterance, from frame
     /// 20 (60: 0.6 s, as long as a call).
     speech_frames: u64,
+    /// The capture frame the person's first utterance begins at (20).
+    speech_from: u64,
     /// Onboarding's sentence window is open over these milliseconds
     /// from the scenario's start (#1803).
     sentence_window_ms: Option<(u64, u64)>,
@@ -307,7 +312,9 @@ impl Script {
             live_says: None,
             near_name_ms: None,
             heard_as_call: false,
+            late_words_first: false,
             speech_frames: 60,
+            speech_from: 20,
             echo_evidence: false,
         }
     }
@@ -540,7 +547,8 @@ impl Peers {
 
     fn speech(&self, frame: u64) -> bool {
         !self.script.silent
-            && ((20..20 + self.script.speech_frames).contains(&frame)
+            && ((self.script.speech_from..self.script.speech_from + self.script.speech_frames)
+                .contains(&frame)
                 || self
                     .speech_offset
                     .is_some_and(|offset| (offset..offset + 60).contains(&frame))
@@ -1113,6 +1121,13 @@ impl Peers {
                         })
                     {
                         let queued = &mut self.peers[index].queued;
+                        if self.script.late_words_first {
+                            queued.push_back(ProviderOutput::Transcript {
+                                request: None,
+                                text: "an earlier line".into(),
+                                finished: true,
+                            });
+                        }
                         queued.push_back(ProviderOutput::StepCallHeard { request });
                         queued.push_back(ProviderOutput::TurnComplete {
                             request,
@@ -5497,15 +5512,27 @@ fn a_call_in_the_near_call_window_is_not_answered_on_either_route() {
             near_window_ms: Some(0),
             near_name_ms: Some(200),
             mute_at_frame: Some(300),
+            second_hears: Some("Lamp."),
+            heard_as_call: true,
             ..Script::question(Live::Answer(12))
         });
         held.assert_clean();
         assert!(held.played(1).is_empty(), "{only}: {}", held.summary());
-        assert_eq!(held.finished(1)["outcome"], "onboarding_near_call");
         let endpoint = held.events("local_endpoint");
         assert_eq!(endpoint.len(), 1, "{endpoint:?}");
-        assert!(endpoint[0]["onboarding_near_call"].is_string());
         assert!(endpoint[0].get("not_speech").is_none());
+        if only {
+            // The second route is told it is the step's call and never
+            // answers the name alone, so its End goes on for its words
+            // (#3923): they reach the step as its call by text.
+            assert!(endpoint[0].get("onboarding_near_call").is_none());
+            let calls = held.events("onboarding_text_call");
+            assert_eq!(calls.len(), 1, "{}", held.summary());
+            assert_eq!(calls[0]["taken"], true);
+        } else {
+            assert_eq!(held.finished(1)["outcome"], "onboarding_near_call");
+            assert!(endpoint[0]["onboarding_near_call"].is_string());
+        }
     }
 }
 
@@ -5588,13 +5615,16 @@ fn a_line_begun_while_the_step_waits_for_a_call_is_told_the_second_route() {
 #[test]
 fn a_bare_name_heard_by_text_reaches_the_step_as_its_call() {
     let _one = super::pilot_faults::one_session();
-    for window in [Some(0), None] {
+    // An earlier line's words coming back late, after this line became the
+    // call's, leave its place to it (the Reviewer-lead on #4006).
+    for (window, late_words_first) in [(Some(0), false), (Some(0), true), (None, false)] {
         let run = run(Script {
             second: false,
             only: true,
             near_window_ms: window,
             second_hears: Some("Lamp."),
             heard_as_call: true,
+            late_words_first,
             ..Script::question(Live::Answer(12))
         });
         run.assert_clean();
@@ -5608,6 +5638,45 @@ fn a_bare_name_heard_by_text_reaches_the_step_as_its_call() {
             assert!(calls.is_empty(), "{calls:?}");
         }
     }
+}
+
+/// c0a4, head 9d4d3e0d9 (#3923): each call began about 0.8 s after its
+/// prompt ended, and lamp-name heard something of it. The line was held as
+/// a near call and dropped at its End, so on the second route its words
+/// never came back (no "at the line's end") and nothing reached the step.
+/// A line begun 0.8 s after the prompt's end, heard by the detector, is
+/// told the second route as the step's call, its End goes on, and its words
+/// reach the step as a call by text; nothing is played.
+#[test]
+fn a_call_begun_after_the_prompt_and_heard_by_the_detector_still_reaches_the_step_by_text() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        second: false,
+        only: true,
+        near_window_ms: Some(0),
+        near_name_ms: Some(800),
+        speech_from: 80,
+        second_hears: Some("Hey Lamp"),
+        heard_as_call: true,
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    assert_eq!(
+        run.events("onboarding_step_call").len(),
+        1,
+        "{}",
+        run.summary()
+    );
+    assert!(run.played(1).is_empty(), "{}", run.summary());
+    let ended = run
+        .seen
+        .second
+        .iter()
+        .any(|input| matches!(input, ProviderInput::End { request: 1, .. }));
+    assert!(ended, "{}", run.summary());
+    let calls = run.events("onboarding_text_call");
+    assert_eq!(calls.len(), 1, "{}", run.summary());
+    assert_eq!(calls[0]["taken"], true, "{calls:?}");
 }
 
 /// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):
