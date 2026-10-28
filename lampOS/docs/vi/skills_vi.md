@@ -69,7 +69,9 @@ Diễn ra như sau:
      (`news_played_through`, `TaskNews::played_through`). Tin đó chưa tính
      là đã nghe nên vẫn được kể lại, nhưng câu hỏi đã được nói, nên một lời
      "có" vẫn được nhận (fourteen-P10 trên #2814). Lượt bị cắt ngang hoặc
-     không có tiếng thì vẫn không tính là đã hỏi.
+     không có tiếng thì vẫn không tính là đã hỏi. Khi một lời "có" đã cài
+     kỹ năng lên đèn, tin về nó không được kể lại nữa
+     (`made_skill::is_on`): không còn gì để hỏi.
 7. **Cài khi người dùng nói "có" thành tiếng** (quyết định của trưởng nhóm,
    20/10 08:37 trên #1711: lời đồng ý bằng giọng nói gắn với SHA-256, một
    ngoại lệ của quy định 18:33 chỉ cho kỹ năng tạo trên đèn; ứng dụng không
