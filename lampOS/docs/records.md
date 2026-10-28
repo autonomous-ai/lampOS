@@ -607,11 +607,17 @@ writer. Memory retention remains entirely the memory component's business.
 
 The three templates are beside the crate under
 [systemd/](../crates/records/systemd/): an hourly timer, a one-shot cleanup
-service, and the persistent diagnostic reporter. They are **not installed**.
-Keeping them here follows the builders' prohibition on editing `deploy/`;
-First can place the reviewed copies into deployment ownership.
+service, and the persistent diagnostic reporter. The timer and the cleanup
+service are now product units ([deploy/product/](../deploy/product/README.md):
+`lamp-records.service` and `lamp-records.timer`, hourly, outside the target),
+run as `/opt/lampOS/records/current/lamp-records` with
+`/etc/lampOS/records.json`, which the product's settings set to
+`enabled: true` and `max_bytes` 2,000,000,000
+(`deploy/product/settings/records.json`). The reporter is still only a
+template (below). The rest of this section is the first lamp check as it was
+written before those units, kept as its procedure.
 
-Build the crate for the qualified Linux ARM64 release. The templates use
+For that check: build the crate for the qualified Linux ARM64 release. The templates use
 `/opt/lampOS/bin/lamp-records`; First chooses and installs the versioned binary
 behind that path, installs the sample as `/etc/lampOS/records.json`, and
 keeps `enabled` false. Adapt `ReadWritePaths` if a root or bus path changes.
@@ -793,7 +799,8 @@ The voice's processes are now named once, in
 [`lamp-voice-processes`](../crates/voice-processes/src/lib.rs): its
 commands (`serve`, `directed`, `directed-fixture`, `camera-inspect`,
 `provider-check`, `schedule-consumer`, `worker`, and the read-only reports
-run by hand, `short-turns`, `stt-check`, `marked`, `turn-times`), its worker
+run by hand, `short-turns`, `stt-check`, `marked`, `turn-times`, `stalls`,
+`probe-cascade`, `probe-cache`, `probe-tools`), its worker
 roles
 (`capture`, `speaker`, `provider`, `second`, `camera`, `ring`, `privacy`,
 `probe`) and its helpers (`lamp-turn-end`). Both crates use that list:
@@ -807,7 +814,7 @@ roles
   refuses an unlisted role before its arguments are read. A role added to
   the voice and not to the list fails the voice's own tests on the
   builder's machine (`a_worker_role_not_on_the_voices_list_is_never_started`
-  in `crates/voice/tests/process.rs`), never first a cleanup on a lamp.
+  in `crates/voice/tests/it/process.rs`), never first a cleanup on a lamp.
 - **The guard** knows exactly the listed commands and roles. Its
   role-specific reading stays in the guard: `capture` and `speaker` name a
   `--diagnostics` folder, `schedule-consumer` takes no other argument, and
