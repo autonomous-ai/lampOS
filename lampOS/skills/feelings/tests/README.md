@@ -17,6 +17,15 @@ A relative light's case names its `for` and, with a breath, its
 shown as the run begins, which a replay has none of. That the ring keeps it
 under the night's caps is `ring_caps`' host test in `crates/voice`.
 
+A case names a move only (`body.move`); its frames are held to the body's
+caps and speed limits (`lamp_body::moves::check`) when the skill loads, so
+any case run checks them. Their sizes come from the #3691 lamp check: the
+head-pitch servo lifting the head's weight loses about 30 to 50 counts, so
+glad lifts 110 and lively 90, and low's return eases to 25 counts above rest
+for one frame before rest. Glad holds its peak 3 frames (0.4 s) and low's
+overshoot 1, so neither pushes still for the body's 1.5 s stall rule. Whether they read on the lamp is that lamp check's, not these
+cases'.
+
 **Run** with `lamp-skills test lampOS/skills/feelings` (or `cargo test -p
 lamp-skills`, which runs every skill's cases).
 

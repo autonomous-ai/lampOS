@@ -102,22 +102,33 @@ after_ignored = 3
 [ask]
 policy = "nudge"
 
-# Glad: a small lift of the head (the body's look_up, 3.2 s), and warmth and a
-# slow breath at the person's level for 12 s, never brighter (the first builder's 2).
+# Glad: a small lift of the head (110 counts, 3.4 s: eased up, held 0.4 s,
+# eased back; sized for the head-pitch servo, which loses about 30 to 50 counts
+# lifting the head's weight, #3691). The hold is short so the head pushes still
+# for about 1.0 s, under the body's 1.5 s stall rule, which on 06c1 latched a
+# 1.4 s hold up and lost the return. Then warmth and a slow breath at the
+# person's level for 12 s, never brighter (the first builder's 2).
 [[do]]
 on = "glad"
 body = { move = "glad-lift" }
 light = { relative = { warmer = 1, dimmer = 1 }, for = "12s", pattern = { kind = "breathe", period = "6s" } }
 
-# Lively: the same lift, quicker (about 2 s), and a quicker breath for 8 s.
+# Lively: a smaller lift (90 counts), quicker (about 2.5 s), and a quicker
+# breath for 8 s.
 [[do]]
 on = "lively"
 body = { move = "perk" }
 light = { relative = { warmer = 1, dimmer = 1 }, for = "8s", pattern = { kind = "breathe", period = "4s" } }
 
-# Low: a slow, small lowering of the head (40 counts, 4.8 s: less than Stuffy
-# air's sleepy droop, the first builder's 3), and warmer and one level dimmer,
-# steady, for 20 s.
+# Low: a slow, small lowering of the head (40 counts: less than Stuffy air's
+# sleepy droop, the first builder's 3), eased back slowly to 25 counts above
+# rest for one frame and then to rest (7.2 s), so the lift back leads the servo
+# instead of stalling short and snapping up (#3691), and warmer and one level
+# dimmer, steady, for 20 s. The overshoot stays because on 06c1 the head only
+# began to lift once its goal led it by about 47 counts, and a return straight
+# to rest gives at most 37; on a lamp whose pitch follows true it ends about 2°
+# above rest for a moment. It can go, with low returning straight to rest,
+# once the body leads a gesture's lift as it leads a wake and a glance.
 [[do]]
 on = "low"
 body = { move = "low-droop" }
