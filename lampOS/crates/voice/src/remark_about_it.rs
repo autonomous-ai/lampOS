@@ -56,7 +56,19 @@ pub fn talked_about(heard: &str) -> bool {
         .split_inclusive(['.', '!', '?', ';', ','])
         .filter(|clause| named(clause))
         .any(|clause| crate::remarks::asks_in(clause) || moves_or_needs(clause));
-    !asked && only_about(heard)
+    // "Please" asks across its whole sentence, set off by a comma or not
+    // ("The lamp, off please."; Reviewer-three's P3 on #4219). "You" and a
+    // `?` stay with their clause: "That lamp is cute, where did you get it?"
+    // asks the colleague, not the lamp.
+    let pleased = heard
+        .split_inclusive(['.', '!', '?', ';'])
+        .filter(|sentence| named(sentence))
+        .any(|sentence| {
+            sentence
+                .split(|c: char| !c.is_alphanumeric())
+                .any(|word| word.eq_ignore_ascii_case("please"))
+        });
+    !asked && !pleased && only_about(heard)
 }
 
 /// Words that ask the lamp to move when a clause begins with them ("Tilt
@@ -65,19 +77,29 @@ pub fn talked_about(heard: &str) -> bool {
 /// narrower P2 on #4201).
 const MOVES: &[&str] = &[
     "lower", "raise", "lift", "tilt", "point", "aim", "move", "face", "nod", "lean", "angle",
-    "bend", "swing", "rotate", "bring", "shine", "light",
+    "bend", "swing", "rotate", "bring", "shine", "light", "wake",
 ];
 
-/// Words that state a need of the lamp's light or place anywhere in a
-/// clause ("The lamp is too bright.", "I need the lamp brighter."): a
-/// missed request costs more in a busy room than a reply to a remark.
-const NEEDS: &[&str] = &[
-    "too", "need", "needs", "want", "wants", "brighter", "dimmer", "darker", "lighter", "warmer",
-    "cooler", "higher",
+/// Light or place words that state a need after "too" ("The lamp is too
+/// bright."). Bare "too" is no need: "That lamp is cute too.", "That lamp is
+/// way too cute." (Thirteen's P2 on #4219).
+const TOO_WHAT: &[&str] = &[
+    "bright", "dim", "dark", "high", "low", "close", "far", "warm", "cold", "harsh", "hot",
+    "yellow", "blue", "white", "strong", "weak",
+];
+
+/// Comparatives of its light or place that state a need when they come
+/// after the lamp ("I need the lamp brighter."). "Lighter" is left out: it
+/// is said of weight too ("My lamp is lighter than yours."), and a bare
+/// "need" or "want" is no need ("I want that lamp.", "We need a lamp like
+/// that.").
+const MORE: &[&str] = &[
+    "brighter", "dimmer", "darker", "warmer", "cooler", "higher", "lower", "closer",
 ];
 
 /// Whether a clause naming the lamp asks it to move, or states a need of
-/// its light or place.
+/// its light or place: "too" before a light or place word ([`TOO_WHAT`]),
+/// or a comparative after the lamp ([`MORE`]).
 fn moves_or_needs(clause: &str) -> bool {
     let mut words = clause
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
@@ -90,13 +112,28 @@ fn moves_or_needs(clause: &str) -> bool {
             )
         })
         .peekable();
+    // A move word first errs toward answering: "Light from that lamp is
+    // nice." is answered too (Thirteen's P3 on #4219), the cheaper side.
     if words
         .peek()
         .is_some_and(|first| MOVES.contains(&first.as_str()))
     {
         return true;
     }
-    words.any(|word| NEEDS.contains(&word.as_str()))
+    let words: Vec<String> = words.collect();
+    let too = words
+        .windows(2)
+        .any(|pair| pair[0] == "too" && TOO_WHAT.contains(&pair[1].as_str()));
+    let after_the_lamp = words
+        .iter()
+        .position(|word| {
+            matches!(
+                word.trim_end_matches("'s"),
+                "lamp" | "lamps" | "lamb" | "lambs"
+            )
+        })
+        .is_some_and(|at| words[at..].iter().any(|word| MORE.contains(&word.as_str())));
+    too || after_the_lamp
 }
 
 /// Whether a clause says "lamp" or "lamb" (one or many, or its own).
@@ -150,6 +187,13 @@ mod tests {
             "That lamp is so cute, where did you get it?",
             "That lamp is cute. Where did you get it?",
             "That lamb is cute.",
+            // Thirteen's P2 on #4219: "too", "want", "need" and "lighter"
+            // alone are no request.
+            "That lamp is cute too.",
+            "That lamp is way too cute.",
+            "I want that lamp.",
+            "We need a lamp like that.",
+            "My lamp is lighter than yours.",
         ] {
             assert!(talked_about(heard), "{heard}");
         }
@@ -173,6 +217,8 @@ mod tests {
             "Dim the lamp, please.",
             "Shut off the lamp.",
             "Shut the lamp off.",
+            "Wake up the lamp.",
+            "The lamp, off please.",
             "Is the lamp on?",
             // Its moves and a stated need (Reviewer-three's narrower P2 on
             // #4201).
