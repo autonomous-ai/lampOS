@@ -24,13 +24,15 @@ import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 
 const now = () => new Date().toISOString();
 
+// `express`'s feelings and their moves, as lamp-control's feelings.rs.
+export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
+
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
 // lamp does now. `lamp fake` does.
 export const LAMP_CONTROL_REFUSES = Object.freeze({
   look: "not routed yet: waits for the body's lease socket",
   joints: "not routed yet: waits for the body's lease socket",
-  express: 'not routed yet: waits for the feelings skill',
   play: 'not routed yet: waits for client packages',
   sound: 'not routed yet: waits for client packages',
 });
@@ -230,6 +232,16 @@ export class FakeLamp {
       case 'lease.release':
         this.leases.delete(request.lease);
         return this.ok(ws, id);
+      case 'express': {
+        // As lamp-control's feelings.rs: the feelings skill's three, its
+        // move to the body (smaller below strength 0.5) and its light; no
+        // `done` follows. The fake always shows the light.
+        const name = FEELING_MOVES[request.feeling];
+        if (!name) return this.refuse(ws, id, 'bad_request', 'feeling: one of glad, lively, low');
+        const step = Math.round(Math.min(Math.max((request.strength ?? 0.5) / 0.5, 0), 1) * 4);
+        const move = step === 0 ? null : step === 4 ? name : `${name}-${step * 25}`;
+        return this.ok(ws, id, { to: 'body', move, light: true });
+      }
       case 'gesture':
       case 'move':
         // As lamp-control routes them: the body takes them, and no `done`

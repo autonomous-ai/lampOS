@@ -185,6 +185,23 @@ def test_a_phrase_under_the_lamps_floor_is_refused_before_sending(tmp_path):
     run(go())
 
 
+def test_the_fake_answers_express_as_lamp_control_does(tmp_path):
+    # blue's P2 on #4020: the skill's three feelings, each its move, and any
+    # other name bad_request.
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                answer = await lamp.express("glad")
+                assert (answer["to"], answer["move"], answer["light"]) == ("body", "glad-lift", True)
+                assert (await lamp.express("low", 0.25))["move"] == "low-droop-50"
+                with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                    await lamp.express("happy")
+                assert raised.value.why == "feeling: one of glad, lively, low"
+
+    run(go())
+
+
 def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
     async def go():
         async with FakeLamp() as fake:
@@ -658,8 +675,10 @@ def test_a_fake_like_lamp_control_refuses_what_it_doesnt_route(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 with pytest.raises(errors.BY_CODE["refused"]) as raised:
-                    await lamp.express("glad")
-                assert raised.value.why == "not routed yet: waits for the feelings skill"
+                    async with lamp.lease("body", for_ms=5000):
+                        await lamp.play("wave")
+                assert raised.value.why == "not routed yet: waits for client packages"
+                await lamp.express("glad")
                 assert (await lamp.gesture("nod"))["to"] == "body"
                 await lamp.light("warm", 3, 1_000)
 
