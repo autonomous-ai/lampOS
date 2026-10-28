@@ -134,12 +134,12 @@ pub struct EchoMatch {
     pub alignment_age_blocks: u16,
     /// Level of the render at the matched alignment over the newest capture
     /// block alone (10 ms), where `render_level` covers 120 ms.
-    // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+    // #4035: logged with the tail guard's render_drop; Hearing::heard does not read it
     pub render_block_level: Level,
     /// How far `render_block_level` is under its own peak over the last
     /// 150 ms at the alignment held, in tenths of a decibel: high on the
     /// tail of a word the lamp just stopped, near zero while it holds.
-    // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+    // #4035: Hearing::heard's tail guard (Hearing::tail_drop_tenths)
     pub render_drop: u16,
 }
 
@@ -431,7 +431,7 @@ impl EchoObserver {
         self.blocks = self.blocks.saturating_add(1);
         let (raw_energy, clean_energy) = (self.raw.energy(), self.clean.energy());
         let echo = self.matched(raw_energy);
-        // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+        // #4035: render_drop, for Hearing::heard's tail guard
         let block = self.alignment.as_ref().map_or(Level::FLOOR, |alignment| {
             self.render_block(alignment.offset)
         });

@@ -73,6 +73,16 @@ pub struct Hearing {
     /// more than this, in percent, holds a person plainly: the lamp's own
     /// voice is next to nothing in it.
     pub plain_percent: u8,
+    /// A block that is not plain ([`Self::plain_percent`]) is the lamp's own
+    /// voice when the render at the alignment has fallen at least this far,
+    /// in tenths of a decibel, under its peak over the last 150 ms
+    /// ([`crate::evidence::EchoMatch::render_drop`]): the lamp has just
+    /// stopped a word and the room still rings with it, a tail the 4 ms fit
+    /// cannot model, so the render explains only 30% to 75% of it. On
+    /// lamp-52e6 such tails made the lamp yield to its own voice with
+    /// nobody speaking (#4035). A plain block is never a tail: "Stop." just
+    /// after a word still stops the lamp.
+    pub tail_drop_tenths: u16,
     /// Blocks since the render last explained half of the microphone at the
     /// alignment in use, beyond which a block says nothing about who is
     /// speaking. When the lamp starts to speak its sound has not reached the
@@ -103,6 +113,7 @@ impl Hearing {
         floor_percent: 80,
         clear_after_blocks: 30,
         plain_percent: 20,
+        tail_drop_tenths: 60,
         fresh_blocks: 40,
         silence_heard: false,
     };
@@ -131,7 +142,9 @@ impl Hearing {
             Some(echo) if echo.alignment_age_blocks > self.fresh_blocks => Heard::Unknown,
             Some(echo)
                 if echo.capture_explained <= self.explained_percent
-                    && echo.residual_playback_floor <= self.floor_percent =>
+                    && echo.residual_playback_floor <= self.floor_percent
+                    && (echo.capture_explained <= self.plain_percent
+                        || echo.render_drop < self.tail_drop_tenths) =>
             {
                 Heard::Over
             }
@@ -797,6 +810,65 @@ mod tests {
             HEARING.heard(0.9, &evidence(64, Some((99, 99)))),
             Heard::Clear
         );
+    }
+
+    /// A speech-like block over the lamp, `explained` percent of it the
+    /// render's, with the render `drop` tenths of a decibel under its peak
+    /// over the last 150 ms.
+    fn falling(explained: u8, drop: u16) -> EchoEvidence {
+        let mut block = evidence(0, Some((explained, 0)));
+        block.echo.as_mut().unwrap().render_drop = drop;
+        block
+    }
+
+    /// Blocks fed one after another until the lamp yields, if it does.
+    fn yields_on(block: &EchoEvidence, score: f32) -> Option<usize> {
+        let mut interruption = Interruption::new(Confirmation::EVALUATED);
+        (0..200).find(|_| {
+            let heard = HEARING.heard(score, block);
+            let plain = HEARING.plain(heard, block);
+            interruption.observe(heard, plain, true) == Step::Yield
+        })
+    }
+
+    /// #4035: on lamp-52e6 the lamp yielded to the ringing of its own last
+    /// word, half explained by the render, speech-like, with nobody there.
+    #[test]
+    fn a_lamp_words_reverberant_tail_is_not_a_person() {
+        let tail = falling(50, 80);
+        assert_eq!(HEARING.heard(0.9, &tail), Heard::Own);
+        assert_eq!(yields_on(&tail, 0.9), None);
+        // The bar is the 6 dB it says.
+        assert_eq!(HEARING.heard(0.9, &falling(50, 60)), Heard::Own);
+        assert_eq!(HEARING.heard(0.9, &falling(50, 59)), Heard::Over);
+    }
+
+    /// A person over the lamp while its render holds is heard as before,
+    /// however much of them the render seems to explain.
+    #[test]
+    fn a_person_over_held_render_still_yields() {
+        let over = falling(50, 10);
+        assert_eq!(HEARING.heard(0.9, &over), Heard::Over);
+        assert_eq!(
+            yields_on(&over, 0.9),
+            Some(Confirmation::EVALUATED.early_onset_blocks as usize - 1)
+        );
+        assert_eq!(HEARING.heard(0.9, &falling(75, 59)), Heard::Over);
+    }
+
+    /// A word the render does not explain is a person even as the lamp's
+    /// own word ends: "Stop." just after a word still stops it.
+    #[test]
+    fn a_plain_word_after_the_lamps_word_still_yields() {
+        let stop = falling(10, 120);
+        assert_eq!(HEARING.heard(0.9, &stop), Heard::Over);
+        assert!(HEARING.plain(Heard::Over, &stop));
+        assert_eq!(
+            yields_on(&stop, 0.9),
+            Some(Confirmation::EVALUATED.early_onset_blocks as usize - 1)
+        );
+        assert_eq!(HEARING.heard(0.9, &falling(20, 120)), Heard::Over);
+        assert_eq!(HEARING.heard(0.9, &falling(21, 120)), Heard::Own);
     }
 
     #[test]

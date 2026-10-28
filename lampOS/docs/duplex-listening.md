@@ -338,7 +338,21 @@ reads it together with the detector's score (`Hearing::heard`):
 Speech-like is a detector score of 0.5 or more. The render accounts for a
 block when it explains more than 75 % of the microphone's energy before
 cancellation, or when more than 80 % of the cancelled signal has to be
-playback by energy accounting. Neither a score nor a level decides
+playback by energy accounting. It also accounts for a block the lamp's
+own word is just ending in (#4035): one of which the render explains more
+than 20 % (not plain, below) while the render at the alignment has fallen
+6 dB or more under its own peak over the last 150 ms (`render_drop`,
+`Hearing::tail_drop_tenths`). That is the room still ringing with a word
+the lamp has stopped, a tail the 4 ms fit cannot model: on lamp-52e6 such
+blocks were 30 % to 79 % explained, speech-like, about 6 dB under the
+lamp's own voice, and seven to ten of them made the lamp yield with nobody
+speaking. A block of 20 % or less is never taken for a tail, so "Stop."
+just after a word still stops the lamp, and a person over a render that
+holds is heard as before. What it costs: a person who starts in the 150 ms
+after one of the lamp's words, and whom the render seems to explain by more
+than 20 %, is not counted until the render rises again or the word is
+heard plainly. `duplex_policy` records the bar as `tail_drop_tenths` (60).
+Neither a score nor a level decides
 anything alone: a score of 0.99 with the render explaining the block is
 the lamp. The 300 ms is the longest the microphone took to fall back to
 its floor after a reply stopped, 270 ms over sixteen recorded stops, and
@@ -623,7 +637,9 @@ explained under 20%:
 
 Ten of those fourteen held none at all, and two more held two and seven:
 the render still explained 30% to 75% of them, as it does when the
-canceller lets the lamp through at the end of a word. The two that would
+canceller lets the lamp through at the end of a word (since #4035 those
+blocks are the lamp's own when the render has fallen 6 dB under its peak:
+see the decision above). The two that would
 have stopped the lamp were 160 ms and 170 ms of something speech-like
 that the render did not explain at all,
 in an office at night with nobody in it; what they were is not known. At
@@ -681,8 +697,9 @@ letter for each 3 dB (`c` and on is 6 dB or more down: the lamp has just
 stopped a word and the room still rings with it); and `alignment_age`, the
 blocks since that alignment last held, in tens (`4` is the 40-block bar
 past which a block is unknown). They are there to show whether the render
-was falling at each yield that nobody asked for, as a guard against a
-word's tail would assume; nothing decides on them yet. No audio and nothing audio can be rebuilt from.
+was falling at each yield that nobody asked for. `render_drop` decides
+one thing: the tail guard of the decision above (`c` and on, with the block
+not plain, is the lamp's own). No audio and nothing audio can be rebuilt from.
 It is there because a yield that comes late, or never, cannot be explained
 from the yield events alone. A finite directed session does not write it:
 it can record the audio itself.
@@ -1396,6 +1413,11 @@ them is one number per block: the score the detector is given.
 
 ## Not established
 
+- **The tail guard on a lamp (#4035).** It is chosen from the 52e6 trails
+  that showed the false yields' explained shares and levels, before those
+  trails carried `render_drop`. That the render is falling 6 dB at each
+  false yield, and that the -6, 0 and +6 dB cut-in clips on lamp-4ace stop
+  the lamp as often as before, are not yet measured.
 - **Anything on a lamp.** No device run of either flag. Emulated ARM64 is a
   build and a test run, not device time, and nothing here is acoustic.
 - **A person.** Every positive is a loudspeaker prompt mixed in software.

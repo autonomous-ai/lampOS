@@ -6373,6 +6373,7 @@ fn conversation_with_gate_inner(
             "resume_after_still_blocks":Confirmation::EVALUATED.silence_blocks,
             "resume_deadline_blocks":Confirmation::EVALUATED.deadline_blocks,
             "plain_percent":Hearing::EVALUATED.plain_percent,
+            "tail_drop_tenths":Hearing::EVALUATED.tail_drop_tenths,
             "commit_on_stillness_after_plain_blocks":Confirmation::EVALUATED.plain_blocks,
             "fruitless_yields_before_fallback":FRUITLESS_YIELDS,
             "fruitless_yield_forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000,
