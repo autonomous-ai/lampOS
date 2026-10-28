@@ -1996,6 +1996,7 @@ four rows, "Without it" is what `off` leaves.
 | `--caller-caps on` | who asks is the kernel's word: a gesture or a move is held to its unit's most, and the gaze socket takes sights from the eyes, skills or root only (see "Who asks, from the kernel") | as before: any process in group `lampos` may ask at any priority and send a sight | on or off |
 | `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
+| `--head-stall-load LOAD` | the head pitch's stall bound, this lamp's own (see "Giving way to a hand": a head that holds more than 100 to stand) | 100 | 100 to 230 |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
 | `--pitch-window LOW,HIGH` | the window the head's pitch goal is kept in while the head is beside the base, this lamp's own; checked at start against the head pitch servo's own limits (registers 9 and 11), and the run refused with nothing written if it is not inside them | lamp-4ace's, 1,740 to 2,030, and the servo's limits are not read | LOW at least 1,670 (the head's floor) and under HIGH, and around `--home`'s pitch |
 
@@ -2573,6 +2574,15 @@ numbers:
   that is the arm dropping), so this acts first. Heat comes from minutes
   of pushing, not seconds: the elbow on lamp-4ace reached 69 °C one day
   with the head resting on the base.
+- A head whose own make holds more than 100 to stand is given its own
+  bound for its pitch, in its `lamp.env`: `--head-stall-load LOAD`, 100 to
+  230, under the head's own load bound (240 for six steps), so a head pushed
+  hard is still stopped by that. lamp-75c9's head stood up holds 140 short
+  of its goal: at 100 it was told to stop pushing 20 counts low each time it
+  stood (28 Oct, 11:01 to 11:22), and at 230 it reached its goals with no
+  stall in 18 minutes of following a hand (18:13 to 18:31). The same bound
+  is the one a head that gave way is judged pushed by under `--give-way`. A
+  hand that is light on the head (under the bound) is not felt as one there.
 - 100 of 1,000 is over what a joint at rest at its goal reads on
   lamp-4ace (the head 68, the base resting short 44 to 72) and under the
   100 to 150 that lamp-52e6's shoulder pushes with for as long as it
@@ -2584,7 +2594,8 @@ numbers:
   (elbow 23) and its own weight made 426 shoulder `stalls` in 3 h 50 min
   at rest. 100 over is twice the 50 lamp-52e6's standing shoulder wanders
   (100 to 150) and far under a hand stopping the arm, which reads hundreds
-  (the arm's own bound, `--arm-load`, is 950). The head keeps 100.
+  (the arm's own bound, `--arm-load`, is 950). The head keeps 100,
+  unless its lamp's `--head-stall-load` says more (above).
   That load is learned only while it reads 200 (100 + 100) or less, over
   what a free-standing arm carries (lamp-52e6 100 to 150, lamp-4ace 112):
   an arm already held by a hand or an obstacle when `stand` settles reads

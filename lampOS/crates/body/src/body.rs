@@ -753,6 +753,10 @@ fn head_share(stand: f32) -> f32 {
 /// outside this process can widen them.
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct Limits {
+    /// The head pitch's stall bound (`STALL_LOAD` unless a lamp's own
+    /// `--head-stall-load` says more): a head that holds more than 100 to
+    /// stand on a lamp of its own make is not pushed by a hand for that.
+    pub head_stall_load: u16,
     /// The head's pitch must be found inside this window to start at all.
     pub pitch_home: (u16, u16),
     /// And is never commanded outside this one, whatever the reach allows.
@@ -976,6 +980,7 @@ impl Limits {
         // does not move is now put to rest within half a second whatever
         // it reads, so the bound only has to catch what is pushed hard.
         load: [240, 150, 220],
+        head_stall_load: STALL_LOAD,
         load_steps: 6,
         start_load: [170, 150, 150],
         tracking: 30,
@@ -3511,6 +3516,9 @@ struct Stall {
     /// It read a load over its stall bound on the last step: something,
     /// most likely a hand, is still on it.
     pressed: bool,
+    /// Its own stall bound, when not `STALL_LOAD`: the head's pitch, from
+    /// `Limits::head_stall_load`.
+    least: Option<u16>,
 }
 
 impl Stall {
@@ -3518,9 +3526,11 @@ impl Stall {
     /// wanted. True when it has just been told to stop pushing; `again`
     /// then says whether that was where it last stopped (not to be counted).
     fn step(&mut self, goal: u16, is: Sample, wanted: u16) -> bool {
-        let bound = self.carries.map_or(STALL_LOAD, |load| {
-            STALL_LOAD.max(load.saturating_add(ARM_STALL_MARGIN))
-        });
+        let bound = self
+            .carries
+            .map_or(self.least.unwrap_or(STALL_LOAD), |load| {
+                STALL_LOAD.max(load.saturating_add(ARM_STALL_MARGIN))
+            });
         self.pressed = is.load > bound;
         let pushing = goal.abs_diff(is.position) > STALL_SLACK && self.pressed;
         // At its goal, give or take a held servo's jitter, and not pressed:
@@ -4936,6 +4946,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut over_full = [false; 3];
     let mut kept = [0.0f32; 3];
     let mut stalls = [Stall::default(); 5];
+    stalls[0].least = Some(limits.head_stall_load);
     let contact_floor = [
         CONTACT_FLOOR[0],
         CONTACT_FLOOR[1],
@@ -6797,9 +6808,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             } else {
                 stuck[index].saturating_add(1)
             };
+            let stall_load = if index == 0 {
+                limits.head_stall_load
+            } else {
+                STALL_LOAD
+            };
             let pushed = in_a_hand
                 && off_track[index] >= limits.load_steps.max(1)
-                && is.load > STALL_LOAD
+                && is.load > stall_load
                 && !following;
             if over_load[index] >= limits.load_steps.max(1) || pushed || touched {
                 // Something resists. A living thing stops pushing; it does
