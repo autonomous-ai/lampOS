@@ -24,11 +24,15 @@ class FakeGh:
         self.body = body
         self.calls = []
         self.patched = None
+        merged = "2026-10-28T19:20:19Z"
         self.pulls = pulls if pulls is not None else {
-            "1" * 40: [{"number": 4163, "title": "lampOS: merge train 321: #4160, #4116", "base": {"ref": "lamp-voice"}}],
-            "2" * 40: [{"number": 3934, "title": "lampOS: require protected release authorization", "base": {"ref": "lamp-voice"}}],
-            "3" * 40: [{"number": 3934, "title": "lampOS: require protected release authorization", "base": {"ref": "lamp-voice"}},
-                       {"number": 9, "title": "elsewhere", "base": {"ref": "main"}}],
+            "1" * 40: [{"number": 4163, "title": "lampOS: merge train 321: #4160, #4116", "base": {"ref": "lamp-voice"}, "merged_at": merged},
+                       # Open, and closed unmerged, PRs whose branch holds the commit, as GitHub names them.
+                       {"number": 3729, "title": "lampOS: still open", "base": {"ref": "lamp-voice"}, "merged_at": None},
+                       {"number": 4146, "title": "lampOS: closed as carried", "base": {"ref": "lamp-voice"}, "merged_at": None}],
+            "2" * 40: [{"number": 3934, "title": "lampOS: require protected release authorization", "base": {"ref": "lamp-voice"}, "merged_at": merged}],
+            "3" * 40: [{"number": 3934, "title": "lampOS: require protected release authorization", "base": {"ref": "lamp-voice"}, "merged_at": merged},
+                       {"number": 9, "title": "elsewhere", "base": {"ref": "main"}, "merged_at": merged}],
         }
         self.titles = titles or {"4160": "lampOS: the channel release stays under 1000 assets", "4116": "lampOS: can names skills.camera"}
         self.total = total
@@ -68,7 +72,8 @@ class StableNotesTests(unittest.TestCase):
         self.assertNotIn("An older developers part", fake.patched)
         self.assertIn("Promoted unchanged from lampos-lamp-voice-8335; source ARM64 run 77, attempt 1; promotion run 88, attempt 2.", section)
         self.assertIn(f"Commit `{NEW[:9]}`, after 8327's `{OLD[:9]}`.", section)
-        # The train is opened into what it carried; a PR seen twice is listed once; another base is left out.
+        # The train is opened into what it carried; a PR seen twice is listed once; another base,
+        # and a PR never merged whose branch holds a commit, are left out.
         self.assertEqual([line for line in section.splitlines() if line.startswith("- ")], [
             "- #4160 lampOS: the channel release stays under 1000 assets",
             "- #4116 lampOS: can names skills.camera",
