@@ -3158,6 +3158,14 @@ pub fn serve(
             std::env::var(crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT)
                 .is_ok_and(|value| value == "on"),
         );
+        if crate::remark_about_it::on() {
+            eprintln!(
+                "lamp-voice second: in a busy room, a remark about the lamp is held, and an answer let out for its name in the room's sound alone opens no conversation (LAMP_REMARK_ABOUT_IT)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.holding_remarks_about_it();
+            }
+        }
         // A face turned to the lamp but seen silent is nobody turned to it
         // (`LAMP_TURNED_SPEAKING=on`).
         if std::env::var(crate::second_provider::TURNED_SPEAKING_ENVIRONMENT)
@@ -4902,6 +4910,8 @@ pub(crate) struct Heeding {
     said_until_free_us: Option<u64>,
     /// `LAMP_BUSY_CALLED_STRICT=on` ([`crate::attention::Attention::narrow_the_call`]).
     busy_called_strict: bool,
+    /// `LAMP_REMARK_ABOUT_IT=on` ([`crate::remark_about_it`]).
+    remark_about_it: bool,
     /// `LAMP_TURNED_SPEAKING=on` ([`Self::counting_only_turned_speakers`]).
     turned_speaking: bool,
     /// `LAMP_TURNED_FACE_SPEAKS=on` ([`Self::needing_the_turned_face_to_speak`]),
@@ -5681,6 +5691,7 @@ impl Heeding {
             chain: Vec::new(),
             said_until_free_us: None,
             busy_called_strict: false,
+            remark_about_it: false,
             turned_speaking: false,
             turned_face_speaks: false,
             face_not_speaking: None,
@@ -5863,6 +5874,13 @@ impl Heeding {
     /// (`LAMP_BUSY_CALLED_STRICT=on`).
     pub(crate) fn narrowing_busy_calls(&mut self) {
         self.busy_called_strict = true;
+    }
+
+    /// In a busy room, a remark about the lamp is held, and an answer let
+    /// out for the name in the room's sound alone opens no conversation
+    /// (`LAMP_REMARK_ABOUT_IT=on`, [`crate::remark_about_it`]).
+    pub(crate) fn holding_remarks_about_it(&mut self) {
+        self.remark_about_it = true;
     }
 
     /// A face turned to the lamp counts as nobody turned to it when the eyes
@@ -8099,6 +8117,29 @@ impl Heeding {
                 crate::going_on_same_one::HELD,
             ));
         }
+        // In a busy room, the lamp talked about is not the lamp talked to
+        // (#4175): "That lamp is cute." between two colleagues, let out for
+        // the name heard, with no face turned to it, no tap and no call in
+        // its words, gets no words.
+        let name_alone = busy
+            && (attention.played_for_its_name() || attention.played_for_near())
+            && !attention.called_in_its_words()
+            && !attention.tapped()
+            && turned != Some(true)
+            && !seen.named_faced
+            && !lamp_asked;
+        if self.remark_about_it
+            && name_alone
+            && !seen.going_on
+            && crate::remark_about_it::talked_about(heard)
+        {
+            verdict = Some(crate::attention::Verdict::Hold(
+                crate::remark_about_it::HELD,
+            ));
+        }
+        // An answer let out for the name in the room's sound alone opens no
+        // conversation (#4175): the next line needs a sign of its own.
+        let opens_nothing = self.remark_about_it && name_alone && attention.played_for_its_name();
         // In a busy room, a line going on that turns to someone else ends
         // the conversation for that line (#3882): "Can you pass me the
         // charger?" to a colleague, after the lamp's answer. A reply to the
@@ -8192,6 +8233,7 @@ impl Heeding {
         // conversation may carry on ([`Self::carrying_the_same_speaker`]).
         // A face alone is no call with `LAMP_NAME_OR_FOLLOW_UP`.
         let called = played
+            && !opens_nothing
             && (attention.called_for_itself()
                 || attention.face_shows(seen.room, turned)
                 || seen.named_faced);
@@ -8262,7 +8304,10 @@ impl Heeding {
         // follow-up, and its answer renews the window as without the switch
         // (the first builder at 01:02 on Queue #1722). An answer to a line
         // said to the lamp ends the chain.
-        if self.not_own && self.alone.is_some() {
+        if played && opens_nothing {
+            // Its words renew no conversation going on (#4175).
+            self.chain.push(request);
+        } else if self.not_own && self.alone.is_some() {
             if someone_else {
                 self.chain.push(request);
             }
@@ -18229,6 +18274,101 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// #4175, d09 to d12 of build 8327's busy_day check on lamp-4ace on
+    /// 2026-10-28: two colleagues at a desk, a busy room. "That lamp is
+    /// cute." with the name heard at the line's start (a call, as
+    /// `with_a_second_sign_asked_the_name_at_a_lines_start_counts` pins)
+    /// was let out, and the desk lines after it ("Do you want confidence?
+    /// Going downstairs.", "Yes, please. A latte. No sugar.") out as the
+    /// conversation going on. With `LAMP_REMARK_ABOUT_IT=on` the remark is
+    /// held, so nothing opens and the two are held too; a line let out for
+    /// the name in the room's sound alone, its words not saying it, is
+    /// answered but opens nothing. Without the switch, as before.
+    #[test]
+    fn with_remarks_held_a_remark_about_the_lamp_opens_no_conversation() {
+        use crate::room_told::Room;
+        let at_start = vec![(10_200_000, 0.977)];
+        let desk = [
+            "Do you want confidence? Going downstairs.",
+            "Yes, please. A latte. No sugar.",
+        ];
+        for on in [false, true] {
+            let mut heeding = room_name_heeding(true);
+            if on {
+                heeding.holding_remarks_about_it();
+            }
+            let first = heeding.judge(
+                909,
+                (10_000_000, 11_500_000),
+                "That lamp is cute.",
+                room_name_signs(Room::Busy, false, None, false, at_start.clone()),
+            );
+            assert_eq!(
+                first,
+                on.then_some(crate::remark_about_it::HELD),
+                "{on}: d09"
+            );
+            for (request, line) in (911..).zip(desk) {
+                let going_on = heeding.called_at.is_some();
+                let held = heeding.judge(
+                    request,
+                    (20_000_000, 21_500_000),
+                    line,
+                    room_name_signs(Room::Busy, going_on, None, false, Vec::new()),
+                );
+                assert_eq!(held.is_none(), !on, "{on}: {line}");
+            }
+            // Its words lost the call: answered, and opens a conversation
+            // only without the switch.
+            let mut heeding = room_name_heeding(true);
+            if on {
+                heeding.holding_remarks_about_it();
+            }
+            let lost = heeding.judge(
+                913,
+                (10_000_000, 11_500_000),
+                "Mainland. Good morning.",
+                room_name_signs(Room::Busy, false, None, false, at_start.clone()),
+            );
+            assert_eq!(lost, None, "{on}: words lost");
+            assert_eq!(heeding.called_at.is_some(), !on, "{on}: words lost");
+        }
+        // Said to the lamp, or with a face turned to it: as without the
+        // switch (the turned face's remark is held by the busy room's
+        // rule, as it asks nothing).
+        for (heard, turned) in [
+            ("Lamp, is it cute?", None),
+            ("That lamp is cute.", Some(true)),
+        ] {
+            let judged = |on: bool| {
+                let mut heeding = room_name_heeding(true);
+                if on {
+                    heeding.holding_remarks_about_it();
+                }
+                heeding.judge(
+                    914,
+                    (10_000_000, 11_500_000),
+                    heard,
+                    room_name_signs(Room::Busy, false, turned, false, at_start.clone()),
+                )
+            };
+            assert_eq!(judged(true), judged(false), "{heard} {turned:?}");
+        }
+        assert_eq!(
+            {
+                let mut heeding = room_name_heeding(true);
+                heeding.holding_remarks_about_it();
+                heeding.judge(
+                    914,
+                    (10_000_000, 11_500_000),
+                    "Lamp, is it cute?",
+                    room_name_signs(Room::Busy, false, None, false, at_start.clone()),
+                )
+            },
+            None
+        );
     }
 
     /// With `LAMP_NAME_SECOND_SIGN=on`, the name heard only in the

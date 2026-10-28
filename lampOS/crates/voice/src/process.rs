@@ -1586,6 +1586,8 @@ fn second_route_worker_environment(
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
+        // A remark about the lamp held in a busy room (#4175).
+        crate::remark_about_it::ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
         // Read by the second worker, which tells the coordinator (#3026).
@@ -1708,6 +1710,7 @@ mod tests {
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
+            crate::remark_about_it::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
@@ -2338,6 +2341,7 @@ mod tests {
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
+                    || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
                     || name == crate::unfinished_words::ENVIRONMENT
@@ -2483,6 +2487,7 @@ mod tests {
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
+                    "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",
