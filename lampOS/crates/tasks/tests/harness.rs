@@ -102,6 +102,7 @@ impl Rig {
             cancel: None,
             as_person: false,
             folder_missing: false,
+            engines_ready: false,
             journal: None,
         };
         let rig = Self {
@@ -902,6 +903,204 @@ fn a_missing_folder_after_new_is_not_sent_with_the_switch_and_never_retried() {
     rig.config.folder_missing = true;
     rig.new_step(json!({"stdout":"{\"ok\":false,\"error\":\"CWD_NOT_FOUND\"}\n"}));
     assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
+}
+
+/// `harness machines engines`' row for this computer and Codex
+/// (openharness#1888), with these readiness fields.
+fn engines_row(fields: Value) -> Value {
+    let mut row = json!({"machineId":MACHINE,"engine":"codex","installed":true,"installable":true});
+    row.as_object_mut()
+        .unwrap()
+        .extend(fields.as_object().unwrap().clone());
+    json!({"stdout":format!("{row}\n")})
+}
+
+fn engines_asked(rig: &Rig) -> usize {
+    rig.calls()
+        .iter()
+        .filter(|call| call["args"][0] == "machines" && call["args"][1] == "engines")
+        .count()
+}
+
+fn news(rig: &Rig) -> usize {
+    rig.calls()
+        .iter()
+        .filter(|call| call["args"][0] == "new")
+        .count()
+}
+
+/// With `--engines-ready` (openharness#1788), a computer's known no ends
+/// the hand-over before `new`: `signedIn: false` as `engine_signed_out`,
+/// `firstPrompt: false` as `engine_no_prompt`. Anything else it says, or
+/// nothing it can say, hands the work over as before; so does the switch
+/// off, which asks nothing.
+#[test]
+fn a_known_no_from_the_computer_is_not_sent_and_anything_else_hands_over() {
+    let created = LaunchOutcome::Created {
+        agent_id: AGENT.into(),
+    };
+    let other_machine = format!(
+        "{}\n",
+        json!({"machineId":"fedcba9876543210fedcba9876543210","engine":"codex","signedIn":false})
+    );
+    let other_engine = format!(
+        "{}\n",
+        json!({"machineId":MACHINE,"engine":"claude","signedIn":false})
+    );
+    for (engines, outcome) in [
+        (
+            engines_row(json!({"signedIn":false,"firstPrompt":true})),
+            not_sent("engine_signed_out"),
+        ),
+        (
+            engines_row(json!({"signedIn":true,"firstPrompt":false})),
+            not_sent("engine_no_prompt"),
+        ),
+        (
+            engines_row(json!({"signedIn":false,"firstPrompt":false})),
+            not_sent("engine_no_prompt"),
+        ),
+        // The machine id as another Harness may print it.
+        (
+            json!({"stdout":format!("{}\n", json!({"machineId":MACHINE.to_uppercase(),"engine":"codex","signedIn":false}))}),
+            not_sent("engine_signed_out"),
+        ),
+        (
+            engines_row(json!({"signedIn":true,"firstPrompt":true})),
+            created.clone(),
+        ),
+        (
+            engines_row(json!({"signedIn":null,"firstPrompt":null})),
+            created.clone(),
+        ),
+        (engines_row(json!({})), created.clone()),
+        (json!({"stdout":other_machine}), created.clone()),
+        (json!({"stdout":other_engine}), created.clone()),
+        // An older Harness: no such command, or its machine list.
+        (
+            json!({"exit":2,"stderr":"Usage: harness machines [--json]\n"}),
+            created.clone(),
+        ),
+        (
+            json!({"stdout":format!("{}\n", json!({"id":MACHINE,"engine":"codex","current":true}))}),
+            created.clone(),
+        ),
+        (json!({"stdout":"not json\n"}), created.clone()),
+        // A failed exit's words are never read as an answer.
+        (
+            json!({"exit":1,"stdout":format!("{}\n", json!({"machineId":MACHINE,"engine":"codex","signedIn":false}))}),
+            created.clone(),
+        ),
+    ] {
+        for switch in [true, false] {
+            let mut rig = Rig::new();
+            rig.config.engines_ready = switch;
+            rig.plan(json!({"machines":{"default":true},"engines":engines,"new":{"default":true}}));
+            let expected = if switch {
+                outcome.clone()
+            } else {
+                created.clone()
+            };
+            assert_eq!(rig.cli().launch(&launch()), expected, "{engines} {switch}");
+            assert_eq!(engines_asked(&rig), usize::from(switch), "{engines}");
+            assert_eq!(news(&rig), usize::from(expected == created), "{engines}");
+        }
+    }
+    // Asked of that computer, by its id, for the named engine only.
+    let mut rig = Rig::new();
+    rig.config.engines_ready = true;
+    rig.cli().launch(&launch());
+    let calls = rig.calls();
+    assert_eq!(
+        calls[1]["args"],
+        json!([
+            "machines", "engines", MACHINE, "--engine", "codex", "--json"
+        ])
+    );
+}
+
+/// One computer's answer for one engine that refuses nothing is kept
+/// (`ENGINES_KEPT`): a second hand-over asks nothing, and another engine
+/// is asked on its own. A refusal is asked again each time, so a person who
+/// signs in and asks again isn't refused on an old answer (the
+/// Reviewer-lead's P2 on #4033).
+#[test]
+fn a_computers_answer_is_kept_for_each_engine_unless_it_refused() {
+    let mut rig = Rig::new();
+    rig.config.engines_ready = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "engines":{"each":[
+            engines_row(json!({"signedIn":false})),
+            engines_row(json!({"signedIn":false})),
+            engines_row(json!({"signedIn":true})),
+        ]},
+        "new":{"default":true}
+    }));
+    let cli = rig.cli();
+    assert_eq!(cli.launch(&launch()), not_sent("engine_signed_out"));
+    assert_eq!(cli.launch(&launch()), not_sent("engine_signed_out"));
+    assert_eq!(engines_asked(&rig), 2);
+    // Signed in at the computer: the next hand-over goes, and is kept.
+    assert!(matches!(
+        cli.launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert!(matches!(
+        cli.launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(engines_asked(&rig), 3);
+    let mut claude = launch();
+    claude.target.engine = EngineKind::Claude;
+    assert!(matches!(cli.launch(&claude), LaunchOutcome::Created { .. }));
+    assert_eq!(engines_asked(&rig), 4);
+    assert_eq!(news(&rig), 3);
+    // A new run of the part asks again.
+    assert!(matches!(
+        rig.cli().launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(engines_asked(&rig), 5);
+}
+
+/// A computer slow to answer costs the hand-over at most the read bound
+/// (`ENGINES_PROBE_TIMEOUT`, here the test's shorter one), and the work
+/// still goes; its no-answer is kept, so the next hand-over waits for
+/// nothing.
+#[test]
+fn a_computer_slow_to_answer_is_no_refusal_and_is_not_asked_again() {
+    let mut rig = Rig::new();
+    rig.config.engines_ready = true;
+    rig.config.read_timeout = Duration::from_secs(3);
+    rig.plan(json!({
+        "machines":{"default":true},
+        "engines":{"delay_ms":5000},
+        "new":{"default":true}
+    }));
+    let cli = rig.cli();
+    let began = Instant::now();
+    assert!(matches!(
+        cli.launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert!(
+        began.elapsed() < Duration::from_millis(4900),
+        "{:?}",
+        began.elapsed()
+    );
+    let again = Instant::now();
+    assert!(matches!(
+        cli.launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert!(
+        again.elapsed() < Duration::from_secs(3),
+        "{:?}",
+        again.elapsed()
+    );
+    assert_eq!(engines_asked(&rig), 1);
+    assert_eq!(news(&rig), 2);
 }
 
 /// Harness 0.4.55's refusal of a bare project name whose folder it made on
