@@ -239,13 +239,13 @@ fn today() -> i64 {
 /// `remember`'s call as the memory is asked it: `on` dropped unless the
 /// line's `heard` words name that day ([`names_the_day`]) on the lamp's
 /// local today. Nothing heard, a text from the app or a line the lamp
-/// wrote, drops it too. Any other call is as it is.
+/// wrote, drops it too. A call with no `on` is given one only as
+/// [`day_to_fill`] says (#3987). Any other call is as it is.
 pub fn call_as_heard<'a>(call: &'a ToolCall, heard: Option<&str>) -> Cow<'a, ToolCall> {
     call_as_heard_on(call, heard, today)
 }
 
-/// [`call_as_heard`] with today's day from `today`, asked only when there
-/// is an `on` and heard words to hold it against.
+/// [`call_as_heard`] with today's day from `today`.
 fn call_as_heard_on<'a>(
     call: &'a ToolCall,
     heard: Option<&str>,
@@ -255,7 +255,20 @@ fn call_as_heard_on<'a>(
         return Cow::Borrowed(call);
     }
     let Some(on) = call.args.get("on") else {
-        return Cow::Borrowed(call);
+        // No day from the model: one only from the call's own text and the
+        // heard line together (#3987).
+        let text = call.args.get("text").and_then(Value::as_str);
+        let Some(day) = heard
+            .zip(text)
+            .and_then(|(heard, text)| day_to_fill(text, heard, today()))
+        else {
+            return Cow::Borrowed(call);
+        };
+        let mut call = call.clone();
+        if let Some(args) = call.args.as_object_mut() {
+            args.insert("on".into(), super::day_name(day).into());
+        }
+        return Cow::Owned(call);
     };
     let day = on.as_str().and_then(crate::local_time::day_of);
     if let (Some(heard), Some(day)) = (heard, day)
@@ -268,6 +281,86 @@ fn call_as_heard_on<'a>(
         args.remove("on");
     }
     Cow::Owned(call)
+}
+
+/// Words that make a line about a day past, never a coming one: "last
+/// Friday", "two days ago", "I saw my sister on Sunday".
+const PAST: &[&str] = &[
+    "last",
+    "ago",
+    "yesterday",
+    "was",
+    "were",
+    "went",
+    "had",
+    "did",
+    "saw",
+    "met",
+    "used",
+];
+/// Words that make a line about a day a coming event: "my dentist is on
+/// Friday", "I have an appointment", "remind me", "tomorrow".
+const COMING: &[&str] = &[
+    "is",
+    "are",
+    "will",
+    "ll",
+    "going",
+    "gonna",
+    "have",
+    "has",
+    "appointment",
+    "booked",
+    "starts",
+    "begins",
+    "due",
+    "remind",
+    "tomorrow",
+    "next",
+    "coming",
+    "upcoming",
+];
+
+/// The day a `remember` the model gave no `on` is kept with (#3987: a
+/// Friday dental appointment kept undated was later spoken of as today).
+/// Strict, so a day is never put on what isn't about one: the call's own
+/// `text` must name exactly one day from tomorrow to [`WITHIN_DAYS`] after
+/// `today` ([`names_the_day`]), and the `heard` line that same day (a day
+/// named elsewhere in the line never lands on another fact: "my son starts
+/// school on Monday, remember his name is Tom"). Neither may say a repeat
+/// (a weekday's plural, "every", "each", "weekly", "daily": a habit is no
+/// event day) or a past ([`PAST`]: "I went to the dentist last Friday"),
+/// and one of them must say a coming event ([`COMING`]). Today itself, or
+/// two days with today among them ("on Friday" said on a Friday, which may
+/// be today or next week), give none: "I fed the cat today" is no coming
+/// event to ask after.
+fn day_to_fill(text: &str, heard: &str, today: i64) -> Option<i64> {
+    let words = |said: &str| -> Vec<String> {
+        said.to_lowercase()
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|word| !word.is_empty())
+            .map(str::to_owned)
+            .collect()
+    };
+    let (text_words, heard_words) = (words(text), words(heard));
+    let undated = |word: &String| {
+        PAST.contains(&word.as_str())
+            || matches!(word.as_str(), "every" | "each" | "weekly" | "daily")
+            || WEEKDAYS
+                .iter()
+                .any(|name| word.strip_suffix('s') == Some(*name))
+    };
+    if text_words.iter().chain(&heard_words).any(undated)
+        || !text_words
+            .iter()
+            .chain(&heard_words)
+            .any(|word| COMING.contains(&word.as_str()))
+    {
+        return None;
+    }
+    let mut named = (today..=today + WITHIN_DAYS).filter(|day| names_the_day(text, *day, today));
+    let day = named.next().filter(|day| *day > today)?;
+    (named.next().is_none() && names_the_day(heard, day, today)).then_some(day)
 }
 
 /// `on` as the memory is sent it: a real `YYYY-MM-DD` from the local day
@@ -401,6 +494,114 @@ mod tests {
         }
         let plain = remember(json!({"text":"Her name is Mai."}));
         assert!(matches!(call_as_heard(&plain, None), Cow::Borrowed(_)));
+    }
+
+    /// #3987, the tester's day: "my dental appointment on Friday" said on
+    /// Wednesday 28 October, kept with no `on` from the model, is kept as
+    /// Friday 30 October; "tomorrow" and "next Tuesday" the same way, each
+    /// named by the call's own text and the line. Today, a habit, a span,
+    /// a past, no coming word, no day, or a day the line names for another
+    /// fact keeps none (the reviewers' P2s on #4010).
+    #[test]
+    fn a_day_the_model_left_out_is_kept_only_from_the_facts_own_coming_day() {
+        let wednesday = day("2026-10-28");
+        for (text, heard, on) in [
+            (
+                "Dental appointment on Friday.",
+                "Lamp, remind me about my dental appointment on Friday.",
+                "2026-10-30",
+            ),
+            (
+                "My dentist appointment is on Friday.",
+                "My dentist appointment is on Friday",
+                "2026-10-30",
+            ),
+            (
+                "Dentist is tomorrow.",
+                "my dentist is tomorrow",
+                "2026-10-29",
+            ),
+            (
+                "Flies to Hanoi the day after tomorrow.",
+                "the day after tomorrow I fly to Hanoi",
+                "2026-10-30",
+            ),
+            (
+                "Exam is next Tuesday.",
+                "my exam is next Tuesday",
+                "2026-11-10",
+            ),
+            (
+                "The party is on 7 November.",
+                "the party is on 7 November",
+                "2026-11-07",
+            ),
+        ] {
+            assert_eq!(
+                day_to_fill(text, heard, wednesday),
+                Some(day(on)),
+                "{heard}"
+            );
+            assert_eq!(
+                call_as_heard_on(&remember(json!({"text":text})), Some(heard), || wednesday).args["on"],
+                on,
+                "{heard}"
+            );
+        }
+        for (text, heard) in [
+            ("Fed the cat today.", "I fed the cat today"),
+            (
+                "The plant needs water on Fridays.",
+                "the plant needs water on Fridays",
+            ),
+            ("Dentist is every Friday.", "my dentist is every Friday"),
+            ("Busy this week.", "I'm busy this week"),
+            ("Favourite colour is green.", "my favourite colour is green"),
+            (
+                "Went to the dentist last Friday.",
+                "I went to the dentist last Friday",
+            ),
+            ("Saw my sister on Sunday.", "I saw my sister on Sunday"),
+            ("Dentist on Friday.", "dentist on Friday"),
+            (
+                "Son's name is Tom.",
+                "My son starts school on Monday, remember his name is Tom.",
+            ),
+        ] {
+            assert_eq!(day_to_fill(text, heard, wednesday), None, "{heard}");
+            assert!(matches!(
+                call_as_heard_on(&remember(json!({"text":text})), Some(heard), || wednesday),
+                Cow::Borrowed(_)
+            ));
+        }
+        // The text's day must be the line's too.
+        assert_eq!(
+            day_to_fill(
+                "Dentist is on Friday.",
+                "my dentist is on Thursday",
+                wednesday
+            ),
+            None
+        );
+        // "On Friday" said on a Friday may be today or next week: none.
+        assert_eq!(
+            day_to_fill(
+                "Dentist is on Friday.",
+                "my dentist is on Friday",
+                day("2026-10-30")
+            ),
+            None
+        );
+        // A model's day the words don't name is dropped, never replaced
+        // with another the line names ("last Friday" said with the 23rd).
+        let past = remember(json!({"text":"Went to the dentist last Friday.","on":"2026-10-23"}));
+        assert_eq!(
+            call_as_heard_on(&past, Some("I went to the dentist last Friday"), || {
+                wednesday
+            })
+            .args,
+            json!({"text":"Went to the dentist last Friday."})
+        );
     }
 
     /// From today, local, to 60 days on; nothing else.

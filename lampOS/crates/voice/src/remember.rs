@@ -2665,6 +2665,23 @@ fn day_name(day: i64) -> String {
     format!("{year:04}-{month:02}-{day:02}")
 }
 
+/// A kept thing's own day (`on`, #1693) as a person says it from `today`,
+/// both days since 1970-01-01 (#3987): "tomorrow, Friday 30 October",
+/// "Friday 30 October, in 2 days". [`when`] is when it was said; a model
+/// told only that took "my dental appointment on Friday (today)" for an
+/// appointment today.
+fn day_it_is_about(on: &str, today: i64) -> Option<String> {
+    let day = crate::local_time::day_of(on)?;
+    let said = crate::local_time::day_said(day);
+    Some(match day - today {
+        0 => format!("today, {said}"),
+        1 => format!("tomorrow, {said}"),
+        -1 => format!("yesterday, {said}"),
+        ahead @ 2.. => format!("{said}, in {ahead} days"),
+        ago => format!("{said}, {} days ago", -ago),
+    })
+}
+
 /// How long ago, the way a person would say it. A date and an hour read
 /// out are what a machine does.
 fn when(days_ago: i64) -> String {
@@ -5208,10 +5225,15 @@ fn is_when_word(word: &str) -> bool {
     WHEN_WORDS.contains(&word) || word.chars().any(|c| c.is_ascii_digit())
 }
 
+/// One kept thing a hit line may tell: the words it shares with what was
+/// heard, when it was said, its text, its id and the day it is about.
+type Hit = (usize, u64, String, Option<u64>, Option<String>);
+
 /// [`hits_note`]'s words for a kept list's answer and what was heard: the
 /// kept things sharing the most words with it, then the newest, at most
 /// [`HITS`]; nothing when none shares a word. With `ids` (#2510), each line
-/// ends with its kept thing's id, and the ids told are returned.
+/// ends with its kept thing's id, and the ids told are returned. Each says
+/// when it was said and, apart from it, the day it is about (#3987).
 fn hits_told(
     answer: &Value,
     heard: &str,
@@ -5224,7 +5246,7 @@ fn hits_told(
     }
     let wanted = hit_words(heard);
     let today = local_day(now_unix_ms, zone);
-    let mut found: Vec<(usize, u64, String, Option<u64>)> = answer
+    let mut found: Vec<Hit> = answer
         .get("entries")?
         .as_array()?
         .iter()
@@ -5232,11 +5254,14 @@ fn hits_told(
             let text = entry.get("text")?.as_str()?.trim();
             let at = entry.get("at_unix_ms")?.as_u64()?;
             let id = entry.get("id").and_then(Value::as_u64);
+            let day = entry["on"]
+                .as_str()
+                .and_then(|on| day_it_is_about(on, today));
             let shared = hit_words(text)
                 .iter()
                 .filter(|word| wanted.contains(word))
                 .count();
-            (shared > 0).then(|| (shared, at, text.chars().take(HIT_CHARS).collect(), id))
+            (shared > 0).then(|| (shared, at, text.chars().take(HIT_CHARS).collect(), id, day))
         })
         .collect();
     found.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
@@ -5245,17 +5270,18 @@ fn hits_told(
     let lines: Vec<String> = found
         .into_iter()
         .take(HITS)
-        .map(|(_, at, text, id)| {
+        .map(|(_, at, text, id, day)| {
             count.told += 1;
             count.bytes += text.len();
-            let when = when(today - local_day(at, zone));
-            match id.filter(|_| ids) {
-                Some(id) => {
-                    shown.push(id);
-                    format!("- {text} ({when}, source_id {id})")
-                }
-                None => format!("- {text} ({when})"),
+            // When it was said, and apart from it the day it is about
+            // (#3987).
+            let mut about = vec![format!("said {}", when(today - local_day(at, zone)))];
+            about.extend(day.map(|day| format!("the day: {day}")));
+            if let Some(id) = id.filter(|_| ids) {
+                shown.push(id);
+                about.push(format!("source_id {id}"));
             }
+            format!("- {text} ({})", about.join("; "))
         })
         .collect();
     (!lines.is_empty()).then(|| (format!("{HITS_NOTE}\n{}", lines.join("\n")), shown, count))
@@ -15025,12 +15051,12 @@ mod tests {
         assert_eq!(
             told,
             format!(
-                "{HITS_NOTE}\n- Names of the cats: Pim and Pom. (today)\n- Their name is Ossa. (yesterday)\n{HITS_OWN_NOTE}"
+                "{HITS_NOTE}\n- Names of the cats: Pim and Pom. (said today)\n- Their name is Ossa. (said yesterday)\n{HITS_OWN_NOTE}"
             )
         );
         let coffee = hits_note(&socket, None, "how do I take my coffee", NOW, None).unwrap();
         assert!(
-            coffee.contains("- They take their coffee black, no sugar. (2 days ago)")
+            coffee.contains("- They take their coffee black, no sugar. (said 2 days ago)")
                 && coffee.ends_with(HITS_ROOM_NOTE),
             "{coffee}"
         );
@@ -15170,7 +15196,10 @@ mod tests {
         });
         for heard in ["mau yeu thich", "Màu yêu thích của tôi là gì?"] {
             let told = hits_note(&socket, Some("p-1"), heard, NOW, None).unwrap();
-            assert!(told.contains("- Màu yêu thích là xanh. (today)"), "{told}");
+            assert!(
+                told.contains("- Màu yêu thích là xanh. (said today)"),
+                "{told}"
+            );
             assert!(!told.contains("sister"), "{told}");
         }
         let đ = hits_note(&socket, Some("p-1"), "ĐƯỢC YÊU", NOW, None).unwrap();
@@ -18417,6 +18446,46 @@ mod tests {
         std::fs::remove_file(&socket).unwrap();
     }
 
+    /// #3987: a hit line says when it was said apart from the day it is
+    /// about, so "my dental appointment on Friday", kept today, is never
+    /// read as an appointment today; an undated one says only when.
+    #[test]
+    fn a_hit_line_tells_the_day_a_kept_thing_is_about_apart_from_when_it_was_said() {
+        // NOW is Tuesday 13 October 2026, UTC.
+        let answer = json!({"ok":true,"entries":[
+            {"id":4,"at_unix_ms":NOW,"text":"My dental appointment is on Friday.","on":"2026-10-16"},
+            {"id":5,"at_unix_ms":NOW - 86_400_000,"text":"The dentist is on Main Street."}
+        ]});
+        let (told, _, _) = hits_told(
+            &answer,
+            "Find me a dental clinic or a dentist nearby.",
+            NOW,
+            None,
+            false,
+        )
+        .unwrap();
+        assert!(
+            told.contains(
+                "- My dental appointment is on Friday. (said today; the day: Friday 16 October, in 3 days)"
+            ),
+            "{told}"
+        );
+        assert!(
+            told.contains("- The dentist is on Main Street. (said yesterday)"),
+            "{told}"
+        );
+        let today = local_day(NOW, None);
+        for (on, said) in [
+            ("2026-10-13", "today, Tuesday 13 October"),
+            ("2026-10-14", "tomorrow, Wednesday 14 October"),
+            ("2026-10-12", "yesterday, Monday 12 October"),
+            ("2026-10-09", "Friday 9 October, 4 days ago"),
+        ] {
+            assert_eq!(day_it_is_about(on, today).as_deref(), Some(said), "{on}");
+        }
+        assert_eq!(day_it_is_about("someday", today), None);
+    }
+
     /// #2510: off unless set, the functions are exactly as before; on, only
     /// `remember` takes `replaces`. A hit line carries its id only with it,
     /// and those ids are this scope's shown, never its sources.
@@ -18462,13 +18531,13 @@ mod tests {
         let (off, none, _) = hits_told(&answer, "my favourite colour", NOW, None, false).unwrap();
         assert_eq!(
             off,
-            format!("{HITS_NOTE}\n- Her favourite colour is violet. (today)")
+            format!("{HITS_NOTE}\n- Her favourite colour is violet. (said today)")
         );
         assert!(none.is_empty());
         let (on, shown, _) = hits_told(&answer, "my favourite colour", NOW, None, true).unwrap();
         assert_eq!(
             on,
-            format!("{HITS_NOTE}\n- Her favourite colour is violet. (today, source_id 4)")
+            format!("{HITS_NOTE}\n- Her favourite colour is violet. (said today; source_id 4)")
         );
         assert_eq!(shown, [4]);
         let mut context = DaysContext::default();

@@ -1525,10 +1525,10 @@ fn run_call_with_scope(
             if let Some(told) = crate::remember::heard::yes_alone(call, request, heard, lease) {
                 return ("the memory", (told, true));
             }
-            let words =
-                (heard && call.name == crate::remember::REMEMBER && call.args.get("on").is_some())
-                    .then(|| crate::remember::heard::words_for(request, lease))
-                    .flatten();
+            // The words also give a day the model left out (#3987).
+            let words = (heard && call.name == crate::remember::REMEMBER)
+                .then(|| crate::remember::heard::words_for(request, lease))
+                .flatten();
             let model = call;
             let dated = crate::remember::on::call_as_heard(call, words.as_deref());
             let call = dated.as_ref();
