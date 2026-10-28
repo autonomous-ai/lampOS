@@ -950,6 +950,10 @@ pub trait Host {
     fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String>;
     /// `systemctl restart` of one unit.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
+    /// The sha256 of the `lamp-update` running this install, as hex: install
+    /// writes the units it carries itself ([`PRODUCT`]), so one that is not
+    /// the build's own is said ([`not_the_builds_updater`], #3733).
+    fn running_sha256(&mut self) -> Result<String, String>;
 }
 
 /// The machine itself: only with the root `/`.
@@ -998,6 +1002,18 @@ impl Host for System {
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         run(Command::new("systemctl").args(["restart", unit]))
+    }
+
+    fn running_sha256(&mut self) -> Result<String, String> {
+        // `/proc/self/exe` opens the file this process runs even after a
+        // newer one took its path; elsewhere, the path it was started from.
+        let proc_exe = Path::new("/proc/self/exe");
+        let path = if proc_exe.exists() {
+            proc_exe.to_path_buf()
+        } else {
+            std::env::current_exe().map_err(|error| error.to_string())?
+        };
+        file_sha256(&path).map_err(|error| format!("{}: {error}", path.display()))
     }
 
     fn utc_offset_minutes(&mut self, zone: &str) -> Result<i32, String> {
@@ -1335,6 +1351,12 @@ pub fn install(
     } = before_units(config, channel, host, say)
         .map_err(|why| format!("{UNITS_NOT_WRITTEN}: {why}"))?;
 
+    // The units below are this program's own (`PRODUCT`), not the build's:
+    // a lamp-update other than the build's own is said, and install goes on.
+    if let Some(line) = not_the_builds_updater(&manifest, host.running_sha256()) {
+        say(&line);
+    }
+
     // The units, their exit-note drop-ins and the tmpfiles. systemd must be
     // told of any of them written, so that is recorded before the first is:
     // a run stopped anywhere after leaves the debt for the next (the reviewer on #815,
@@ -1594,6 +1616,45 @@ pub fn install(
         sequence: manifest.sequence,
         changed,
     })
+}
+
+/// The line install says when the `lamp-update` running it, by its sha256
+/// (`running`), is not the build's own `lamp-update` (#3733): the units it
+/// writes are the ones it carries, so an older lamp-update installing a
+/// newer build leaves the new binaries under its own older units, as on
+/// lamp-c0a4 on 27 Oct. None when they are the same file. A running file
+/// that cannot be read says only that it could not be checked.
+pub fn not_the_builds_updater(
+    manifest: &Manifest,
+    running: Result<String, String>,
+) -> Option<String> {
+    let sequence = manifest.sequence;
+    let running = match running {
+        Ok(sha256) => sha256,
+        Err(why) => {
+            return Some(format!(
+                "this lamp-update could not be checked against build {sequence}'s: {why}"
+            ));
+        }
+    };
+    // Before the units the build is known to carry its lamp-update.
+    let builds = manifest
+        .files
+        .iter()
+        .find(|file| file.name == crate::own::BINARY)?;
+    if builds.sha256.eq_ignore_ascii_case(&running) {
+        return None;
+    }
+    let short = |sha256: &str| sha256.chars().take(12).collect::<String>();
+    Some(format!(
+        "this lamp-update (sha256 {}) is not build {sequence}'s ({}): the units written are \
+         this lamp-update's own, not build {sequence}'s; run build {sequence}'s, {}/{} install, \
+         to write its units",
+        short(&running),
+        short(&builds.sha256),
+        crate::own::CURRENT,
+        crate::own::BINARY,
+    ))
 }
 
 /// What install has when it comes to the units: the build, the records
