@@ -441,6 +441,12 @@ fn harness_on(options: &BTreeMap<String, String>) -> Result<(), String> {
 /// `lamp-update back`: lamp-update-back, at its fixed path (#1680).
 fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
+    // B1 of the settings writer rehearsal (#4181): a writer whose `back`
+    // fails at its start. A throwaway build: never merged, never published
+    // beyond the rehearsal's test channel.
+    if true {
+        return Err("B1, the rehearsal's writer whose back fails".to_owned());
+    }
     let records = Path::new(lamp_update::install::RECORDS);
     let unit = lamp_update::round::OWN_UNIT;
     let state = Systemctl::default()
