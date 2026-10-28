@@ -37,7 +37,9 @@
 # socket's group is what lets it in), asks lamp-voice's app-make socket with the very
 # calls the app's skills.make and skills.made make (`LAMP_APP_MAKE_SKILL=on` on the stand-in's drop-in too), with
 # no spoken ask and no yes to the hand-over; the app's view is read back (`{"made": ...}`) as kept with the same SHA-256,
-# then on (yes arm) or still off (no arm). The lamp still asks aloud, and only the spoken yes puts it on.
+# then on (yes arm) or still off (no arm). The lamp still asks aloud, and only the spoken yes puts it on. The running
+# lamp-cloud gets the switch too (the stand-in's PLAYED_CLOUD_ENV), so the owner's own app shows "Make a skill" while
+# the stand-in is in, and a person can make one from the app (fourteen-P11 on #2814).
 # Settings: as the kit's (README.md), and MAKE_FROM (voice, or app), MAKE_SETTLE (20 s after the stand-in is in), NOT_NOW_WAIT (30 s), LAMP_SSH,
 # QUIET_GATE, SAY and AFPLAY (the kit's own, or the tests' stand-ins), and for the tests MAKE_SAVED and MAKE_VOICE_DIR
 # (where the copy and the voice's state are). Its stand-in test is make-skill-test.sh.
@@ -278,7 +280,7 @@ trap 'lamp "sudo -n rm -rf $REMOTE"' EXIT
 "$LAMP_SSH" "sudo -n mkdir -p $REMOTE && sudo -n tee $REMOTE/harness-fixture >/dev/null && sudo -n chmod 0755 $REMOTE/harness-fixture" < "$FIXTURE" || exit 9
 printf '%s\n' "$PLAN" | "$LAMP_SSH" "sudo -n tee $REMOTE/plan.json >/dev/null" || exit 9
 SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_RESTORE=$SAVED/restore PLAYED_TARGET=auto PLAYED_VOICE_ENV=LAMP_MAKE_SKILL=on"
-[ "$FROM" = app ] && SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_RESTORE=$SAVED/restore PLAYED_TARGET=auto PLAYED_VOICE_ENV='LAMP_MAKE_SKILL=on LAMP_APP_MAKE_SKILL=on'"
+[ "$FROM" = app ] && SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_RESTORE=$SAVED/restore PLAYED_TARGET=auto PLAYED_VOICE_ENV='LAMP_MAKE_SKILL=on LAMP_APP_MAKE_SKILL=on' PLAYED_CLOUD_ENV=LAMP_APP_MAKE_SKILL=on"
 if [ -n "${TASKS:-}" ]; then
   echo "lamp-tasks for this run: $(shasum -a 256 "$TASKS" | cut -c1-12)" | tee -a "$OUT"
   "$LAMP_SSH" "sudo -n tee $REMOTE/lamp-tasks >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-tasks" < "$TASKS" || exit 9
