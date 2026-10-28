@@ -1,3 +1,20 @@
+## 2026-10-28 23:4x ICT — ship-week evening: #4158 read, #3472 carried, doc fixes, reads
+
+Ship-week order (first builder, 21:35): #2824, then #2539, then #1809.
+- **#2824:** no code left (#2899 in stable 7887); waits on the tester's 29e7 rerun.
+- **#1809:** waits on two real people at a lamp.
+- **#2539 → draft #4158:** `LAMP_SECOND_FACE_NAME` on in the product beside `LAMP_PERSON_SCOPE_SEEN`, with an install pin of its four companion switches. Reviewer-two and Reviewer-three answered its design question: #3437's binding is enough for the line's own `person`, not for `line` (#4090's alone-in-view name). So `known_name_told` now takes only `person`, and the owner keeps the alone-in-view name through the typed name. READ-OK from both on `1f162240f`. Mac: Clippy clean, Voice known-name/`switch_census`/worker tests 204/0, install 116/0; ARM64 green. Draft for the person row. #3014 (the same switch held behind Common #3064) is closed as replaced.
+
+**#3472** carried to `b0f97ba61` on `e53ae5c01`. Six conflicts with the day's trains, each two additions kept: `StepCallHeard` beside `FaceConsentCandidate`; the reauthorize-camera help; onboarding.md's words. My own Eyes test flake is fixed: `remember_speaker.rs`'s temp folder collided on macOS's microsecond clock, and it now has a per-call counter. The gate began at 1.2 GiB free disk (32 failures); re-run at 20 GiB, all passed but `hand_controls`' head-touch test (#1569 row 49, Tests') and `light_call`'s 25 ms bound (added to #1569 as a candidate). ARM64 green; Reviewer-three's READ-OK carried. Draft for the physical checks.
+
+**Reads:** #4155 (El, welcome back 60 s), #4157 (Thirteen, Wi-Fi recovery's line), #4165 (Mobile, Check for update), #4131 (third), #4105 and #4172 (docs). All READ-OK, with notes on #4157's notices release order and #4165's live-on-ship decision.
+
+**Doc fixes in my parts:**
+- #4169: records.md and lean.md said what the code does now (Body's anti-tip use of lean, stale `body.rs` lines, 0.03 mm, 15 voice commands, the product records units). READ-OK.
+- #4174: policy.md's judge slot statuses. READ-OK.
+
+The local judge's section otherwise matched the code. My 23 GB target was removed at 23:0x (42 GiB free after). No device action.
+
 ## 2026-10-28 16:2x ICT — #3971 merged; reads of Second's updater pieces
 
 **#3971** (Part of #3211, test-only trace-writer diagnostics):
