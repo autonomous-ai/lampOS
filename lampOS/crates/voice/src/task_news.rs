@@ -1101,7 +1101,8 @@ fn read_forever(
         } else {
             (Vec::new(), false)
         };
-        for (key, note) in sign_in_news {
+        for sign_in_note in sign_in_news {
+            let crate::sign_in::SignInNews { key, note, until } = sign_in_note;
             if told_keys.contains(&key) {
                 continue;
             }
@@ -1109,7 +1110,7 @@ fn read_forever(
             let news = News {
                 key,
                 note,
-                until: None,
+                until,
                 progress: None,
                 finished: None,
                 also: Vec::new(),
