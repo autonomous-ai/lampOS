@@ -207,6 +207,35 @@ fn a_new_writer_that_failed_is_put_back_and_never_asked_again() {
     )
     .unwrap();
     assert!(ask(lamp.root.path(), &held, b"newer", NOW + 2).unwrap());
+    // Refreshed, it is unproven, though the put-back of "new" is carried
+    // forward (Reviewer-two's P2 on #4178), and it is proved as any
+    // refresh is.
+    let done = refresh(
+        lamp.root.path(),
+        &lamp.records,
+        b"newer",
+        NOW + 3,
+        &mut good,
+    )
+    .unwrap();
+    assert_eq!(done.put_back, Some(sha256_hex(b"new")));
+    assert_eq!(writer(&lamp), "newer");
+    assert_eq!(prev(&lamp).as_deref(), Some("old"));
+    assert!(unproven(lamp.root.path(), &lamp.records));
+    note_back(&lamp.records, b"newer", NOW + 4).unwrap();
+    assert!(proved(&lamp.records, &done));
+    request(&held, b"newer", Op::Proven, NOW + 5).unwrap();
+    let proven = refresh(
+        lamp.root.path(),
+        &lamp.records,
+        b"newer",
+        NOW + 5,
+        &mut good,
+    )
+    .unwrap();
+    assert!(proven.proven);
+    assert_eq!(prev(&lamp), None);
+    assert!(!unproven(lamp.root.path(), &lamp.records));
 }
 
 #[test]

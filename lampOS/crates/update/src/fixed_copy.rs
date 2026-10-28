@@ -1,8 +1,8 @@
 //! A copy of lamp-update placed at a fixed root path, and run once before
 //! it is used (#3689, docs/updates.md, "A fixed copy, checked").
 //!
-//! **Unwired:** no round or unit calls [`place`] yet. It is the step the
-//! settings writer's refresh needs whichever way it is finished: a new copy
+//! `lamp-update writer-refresh` calls [`place`] (crate::writer_swap). It is
+//! the step the settings writer's refresh needs: a new copy
 //! of the confirmed updater, written beside the fixed path, run once with
 //! [`PROBE`], and renamed over the old copy only when it answers with its
 //! own SHA-256. The copy it replaces may be kept first ([`place`]'s `kept`).
