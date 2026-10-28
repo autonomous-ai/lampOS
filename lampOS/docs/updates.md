@@ -148,8 +148,10 @@ stable, the job's next step (`.github/scripts/lampos-stable-notes.py`, never
 a gate: `continue-on-error`) fills the `lampos-stable` release body's
 `### For developers` part. It gives the source release, the runs, the commit
 and the previous stable's, then lists the pull requests merged between the
-two commits: each commit's pull requests into `lamp-voice`, with a train
-opened into the pull requests its title names. If the body already starts
+two commits: each commit's merged pull requests into `lamp-voice`, with a
+train opened into the pull requests its title names. GitHub also names open
+or closed pull requests whose branch holds a landed commit; without
+`merged_at` they aren't listed (#4211). If the body already starts
 `## lampOS build <N>` for this build, written by hand, only that last part
 is replaced. Otherwise it is still the previous build's, and the body
 becomes a fresh header with the developers part, ready for the notes in
@@ -271,10 +273,13 @@ These tests do not establish a real stable promotion or lamp acceptance.
   signed manifest. All manifest hashes and sizes must match the staged files,
   and every uploaded asset is downloaded and hashed again before the
   channel can change. Missing or extra assets refuse promotion.
-- An existing immutable tag or release refuses the run, including a retry
-  after a partial upload. Nothing overwrites or prunes releases, tags or
-  retained envelopes. An owner inspects an incomplete release before
-  deciding how to recover; a newer push gets a new sequence.
+- An existing immutable tag or release that isn't this build's refuses the
+  run. A re-run over its own release, one a 5xx cut short included, goes on
+  from where it stopped ("GitHub's 5xx and a re-run" under
+  [Promotion and recovery](#promotion-and-recovery)). Nothing overwrites or
+  prunes build releases or tags. Old backups and stages are deleted from the
+  channel and stable releases only, after a verified switch ("The channel
+  release stays under GitHub's cap", in the same section).
 
 ### Cadence, storage and retention
 
@@ -286,13 +291,16 @@ installed parts, quiet period and refusal/rollback checks; publication
 does not promise that every lamp installs each merge within 15 minutes.
 
 The Actions artifact expires after **seven days**. Immutable GitHub build
-releases, tags, retained previous envelopes and incomplete uploads have
-**no automatic expiry or pruning** here. The publisher lists the release
-history on each attempt, so API work also grows with retained history.
-Before activation, the owner must choose an acceptable cadence and a
-separate retention/cleanup policy. This change enables neither cleanup
-nor publication, and it does not implement the earlier proposed 30-build
-retention limit.
+releases and their tags have **no automatic expiry or pruning** here, and
+the publisher lists the release history on each attempt, so API work also
+grows with retained history. Retained previous envelopes are pruned:
+after a verified switch, the channel and stable releases each keep the newest
+20 backups and lose the older ones and older sequences' stages, at most 250
+a run (#4160, #4164; "The channel release stays under GitHub's cap" under
+[Promotion and recovery](#promotion-and-recovery)). An unfinished upload of
+this build's own release is deleted and uploaded again by a re-run (#4103);
+one anywhere else refuses the run. The earlier proposed 30-build retention
+limit for build releases is not implemented.
 
 For a measured size baseline, [ARM64 run 39543873384](https://github.com/autonomous-ai/lampOS/actions/runs/39543873384)
 at `f41a24c185` produced 49 CI files: **300,709,350 bytes** uncompressed,
