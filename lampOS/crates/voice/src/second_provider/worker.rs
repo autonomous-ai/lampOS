@@ -11533,6 +11533,103 @@ mod tests {
         drop(heeding);
     }
 
+    /// Many looks through the actual reader, as the eyes send them: three
+    /// two-face looks are not yet persistence, and seven 300 ms apart are
+    /// (reviewer-two's P3 on #3990).
+    #[test]
+    fn two_faces_reader_keeps_many_real_bus_looks_until_two_faces_stay() {
+        const LOOKS: usize = 7;
+        const EVERY: Duration = Duration::from_millis(300);
+        let _one = crate::provider_worker::tests::one_thread();
+        assert!(
+            !crate::scenario_clock::is_active(),
+            "real-bus control must retain the actual clocks"
+        );
+        let root = TwoFacesRoot::new("m");
+        let bus = lamp_bus::Bus::new(&root.0).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        eyes.expires_after(Some(Duration::from_secs(2)));
+        let observer = two_faces_diagnostic::Scope::begin();
+        let control = observer.reader_control(Duration::from_secs(10)).unwrap();
+        let deadline = control.deadline();
+        let mut heeding = Heeding::new(true, true, Some(&root.0), None);
+        let prior_sockets = two_faces_socket_paths(bus.root()).unwrap();
+        heeding.holding_two_faces(Some(&root.0));
+        heeding
+            .faces_held
+            .as_ref()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .diagnostic = Some(two_faces_diagnostic::Records::default());
+        let mut own_socket = None;
+        let mut sent: Vec<u64> = Vec::new();
+        for n in 0..LOOKS {
+            let wait = control.next().unwrap();
+            own_socket
+                .get_or_insert_with(|| TwoFacesSocket::capture(&bus, &prior_sockets).unwrap());
+            assert_eq!(wait.epoch, 0);
+            if let Some(&last) = sent.last() {
+                let next = last + EVERY.as_micros() as u64;
+                while lamp_ipc::monotonic_us() < next {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            }
+            let at_us = two_faces_publish(&mut eyes, &observer, None, deadline);
+            control.proceed(wait).unwrap();
+            let _ = two_faces_event(&heeding, "admitted", at_us, deadline);
+            let received = two_faces_received(&heeding, at_us);
+            assert_eq!(received["fields"]["expired"], false);
+            assert_eq!(received["fields"]["receive_epoch"].as_u64(), Some(0));
+            if let Some(&last) = sent.last() {
+                assert!(
+                    at_us - last <= LOOK_GAP_MS * 1_000,
+                    "host setup failure: looks {}us apart, over the break",
+                    at_us - last
+                );
+            }
+            sent.push(at_us);
+            let mut held = heeding.faces_held.as_ref().unwrap().lock().unwrap();
+            assert_eq!(held.looks.len(), n + 1, "every look is kept in order");
+            assert_eq!(held.looks.back().unwrap().at_us, at_us);
+            if n + 1 == TWO_FACES_LOOKS {
+                assert!(
+                    sent[n] - sent[0] < TWO_FACES_FOR_MS * 1_000,
+                    "host setup failure: three looks already span the persistence time"
+                );
+                assert!(
+                    !held.two_stayed(lamp_ipc::monotonic_us()),
+                    "three looks are not yet persistence"
+                );
+            }
+        }
+        let span_us = sent[LOOKS - 1] - sent[0];
+        assert!(span_us >= TWO_FACES_FOR_MS * 1_000);
+        {
+            let mut held = heeding.faces_held.as_ref().unwrap().lock().unwrap();
+            assert_eq!(held.looks.len(), LOOKS);
+            assert!(
+                held.two_stayed(lamp_ipc::monotonic_us()),
+                "seven real-bus two-face looks over {span_us}us are persistence"
+            );
+        }
+        drop(heeding);
+        control.finish().unwrap();
+        let own_socket = own_socket.unwrap();
+        own_socket.wait_removed(deadline).unwrap();
+        assert_eq!(observer.receipts()["dropped"], 0);
+        eprintln!(
+            "two_faces_async {}",
+            serde_json::json!({"control": "many_looks_persist", "looks": LOOKS, "span_us": span_us, "sent_at_us": sent, "calling_thread": observer.receipts(), "reader_loop_exit_observed": true, "exact_socket_path_removed": true, "captured_socket_path": own_socket.path})
+        );
+    }
+
     #[test]
     fn two_faces_latest_expiry_refuses_turned_and_count_on_the_real_bus() {
         let _one = crate::provider_worker::tests::one_thread();
