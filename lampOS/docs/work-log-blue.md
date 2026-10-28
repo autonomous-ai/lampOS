@@ -795,3 +795,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 09:44: the queue continues on **#3997** (opened 09:43); I read it from now on. #3979's NEXT TRAIN re-posted there (clean on 492e011402). Today is onboarding by the lead's word; my SDK work rides behind it.
 - 09:49: tick moved to #3997 (cron d8428570). READ-OK on Ten's #3998 (docs/develop.md) da040c06: SDK calls checked against the SDKs; three P3s (install's grants_asked words, push vs sign branches, an unsigned package goes as a plain push).
 - 09:54: quiet for me. Reviewer-two lists #3910 and #3979 ready on their side; Reviewer-two reading #3998 as second reader. Onboarding lane until 12:00.
+- 09:59: #3998 (develop.md) READ-OK from Reviewer-two as second reader; mine posted earlier. Nothing to answer.
