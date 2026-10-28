@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Choose the runner for lampOS's ARM64 job: the self-hosted Mac Studio pool
-(org runner group lampos-studio) or GitHub-hosted ubuntu-22.04-arm, and
-rescue a job the Studio left stuck.
+"""Choose the runner for lampOS's ARM64 job on lamp-voice: the internal Mac
+Studio's trusted slot (org runner group lampos-studio, label studio-trusted)
+or GitHub-hosted ubuntu-22.04-arm, and rescue a job the Studio left stuck.
+
+The Studio builds and tests lamp-voice's pushes, the run whose artifact is
+signed and published, in about a third of GitHub-hosted's 25 minutes: one
+20-vCPU VM, fresh for each job, with no cache, as a signing candidate must be
+built (lampOS/docs/updates.md). Signing and publishing stay on GitHub-hosted,
+so the key never reaches the Studio. A manual run on lamp-voice may use it too
+(no publication follows one). Pull requests, forks, other branches, the
+nightly full run and promotions never do.
 
 GitHub-hosted is the default and every doubt falls back to it: an unknown
 switch, a stale or malformed heartbeat, an API error, a Studio stuck or too
-busy to finish sooner than GitHub-hosted would. The Studio is only a faster
-lane for the team's own pull requests and manual runs; forks, lamp-voice's
-pushes (signed publication builds), the nightly full run and promotions never
-reach this script (the job's `if`) and are refused here again.
+busy to finish sooner than GitHub-hosted would.
 
   route  writes `runner` (JSON for runs-on) and `reason` to GITHUB_OUTPUT and
          a line to the run's summary. Never fails: any error routes hosted.
@@ -18,11 +23,14 @@ reach this script (the job's `if`) and are refused here again.
 
 Inputs come from the environment, so the decision is testable offline
 (.github/scripts/lampos-route-test.py):
-  LAMPOS_STUDIO       off | shadow | canary | on (vars.LAMPOS_STUDIO; else off)
+  LAMPOS_STUDIO       off | shadow | canary | on (vars.LAMPOS_STUDIO; else off):
+                      shadow decides and says so but stays hosted, canary
+                      takes manual runs only (nothing published), on takes
+                      pushes too
   LAMPOS_STUDIO_BEAT  "v1 <epoch> <pr registered> <pr healthy> <trusted healthy>",
                       written every 30 s by the Studio host
-  GITHUB_EVENT_NAME, GITHUB_REPOSITORY, GITHUB_RUN_ID, HEAD_REPO, PR_NUMBER,
-  FULL, PROMOTE, GH_TOKEN
+  GITHUB_EVENT_NAME, GITHUB_REF, GITHUB_REPOSITORY, GITHUB_RUN_ID, FULL,
+  PROMOTE, GH_TOKEN
 """
 import json
 import math
@@ -34,19 +42,21 @@ import urllib.request
 from datetime import datetime
 
 HOSTED = "ubuntu-22.04-arm"
-STUDIO = {"group": "lampos-studio", "labels": ["self-hosted", "linux", "arm64", "studio"]}
+STUDIO = {"group": "lampos-studio", "labels": ["self-hosted", "linux", "arm64", "studio-trusted"]}
+LABEL = "studio-trusted"
+BRANCH = "refs/heads/lamp-voice"
 WORKFLOW = "lampos-arm64.yml"
 ROUTE_JOB = "lampOS — choose the ARM64 runner"
 
 BEAT_STALE = 120  # s: the host writes every 30 s
-# A pull request's job on one 12-vCPU Studio slot, cold: about 8.5 to 9 min
-# (estimated from 26 Oct's runs at 20 vCPU and the 27 Oct slot benchmark), and
-# 13.5 min at the median on GitHub-hosted. So a job waits for a slot only
-# while waiting still beats GitHub-hosted: with these, never.
+# lamp-voice's job, cold on the Studio's 20-vCPU VM: about 9 min (estimated
+# from 26 Oct's 6.1-min run of every crate there, with sccache, and a 91-s cold
+# release build), against 24.5 to 25.6 min on GitHub-hosted (28 Oct). So a
+# push waits behind one Studio job, not two.
 STUDIO_JOB = 9 * 60  # s
-HOSTED_JOB = int(13.5 * 60)  # s
-STUCK_QUEUED = 8 * 60  # s
-STUCK_RUNNING = 25 * 60  # s: the Studio's jobs take 5 to 7 minutes
+HOSTED_JOB = 25 * 60  # s
+STUCK_QUEUED = 15 * 60  # s: one job ahead, and some
+STUCK_RUNNING = 20 * 60  # s
 API_TIMEOUT = 10  # s per request
 
 
@@ -62,18 +72,18 @@ def api(path, method="GET"):
 
 
 def parse_beat(text, now):
-    """(registered, healthy) PR slots from a fresh heartbeat, or a reason it
-    can't be trusted."""
+    """The healthy trusted slots from a fresh heartbeat, or a reason it can't
+    be trusted."""
     parts = (text or "").split()
     if len(parts) != 5 or parts[0] != "v1" or not all(p.isdigit() for p in parts[1:]):
         return None, "heartbeat missing or malformed"
-    at, registered, healthy = int(parts[1]), int(parts[2]), int(parts[3])
+    at, healthy = int(parts[1]), int(parts[4])
     age = now - at
     if age > BEAT_STALE or age < -BEAT_STALE:
         return None, f"heartbeat {age} s old"
     if healthy < 1:
-        return None, "no healthy pull request slot"
-    return (registered, healthy), None
+        return None, "no healthy trusted slot"
+    return healthy, None
 
 
 def studio_jobs(repo, own_run):
@@ -94,9 +104,8 @@ def studio_jobs(repo, own_run):
                 if job["name"] == ROUTE_JOB and job["status"] == "in_progress":
                     jobs.append((run["id"], "routing", 0))
                     continue
-                # A queued job has no runner group yet: its labels say where it
-                # waits (`studio`; the cache warming pool's `studio-trusted` is another).
-                if "studio" not in job.get("labels", []) or job["status"] not in ("queued", "in_progress"):
+                # A queued job has no runner group yet: its labels say where it waits.
+                if LABEL not in job.get("labels", []) or job["status"] not in ("queued", "in_progress"):
                     continue
                 if job["status"] == "in_progress" and job.get("runner_group_name") != "lampos-studio":
                     continue
@@ -111,13 +120,11 @@ def stuck(jobs):
             if (j[1] == "queued" and j[2] > STUCK_QUEUED) or (j[1] == "in_progress" and j[2] > STUCK_RUNNING)]
 
 
-def eligible(env):
-    event = env.get("GITHUB_EVENT_NAME")
-    if env.get("FULL") == "true" or env.get("PROMOTE"):
+def eligible(env, switch):
+    if env.get("FULL") == "true" or env.get("PROMOTE") or env.get("GITHUB_REF") != BRANCH:
         return False
-    if event == "pull_request":
-        return env.get("HEAD_REPO") == env.get("GITHUB_REPOSITORY")
-    return event == "workflow_dispatch"
+    event = env.get("GITHUB_EVENT_NAME")
+    return event == "workflow_dispatch" or (event == "push" and switch != "canary")
 
 
 def decide(env, now, jobs_of):
@@ -125,15 +132,11 @@ def decide(env, now, jobs_of):
     switch = env.get("LAMPOS_STUDIO", "")
     if switch not in ("shadow", "canary", "on"):
         return False, "switch off"
-    if not eligible(env):
+    if not eligible(env, switch):
         return False, "event not eligible"
-    if switch == "canary" and env.get("GITHUB_EVENT_NAME") == "pull_request" \
-            and int(env.get("PR_NUMBER") or 1) % 2:
-        return False, "canary: odd pull request"
-    slots, why = parse_beat(env.get("LAMPOS_STUDIO_BEAT"), now)
+    healthy, why = parse_beat(env.get("LAMPOS_STUDIO_BEAT"), now)
     if why:
         return False, why
-    _, healthy = slots
     try:
         jobs = jobs_of()
     except (OSError, ValueError, KeyError, urllib.error.URLError) as e:
@@ -159,7 +162,7 @@ def route(env):
     runner = STUDIO if studio else HOSTED
     line = f"ARM64 runner: {'Studio' if studio else HOSTED} ({reason})"
     print(line)
-    for name, text in (("GITHUB_OUTPUT", f"runner={json.dumps(runner)}\nreason={reason}\n"),
+    for name, text in (("GITHUB_OUTPUT", f"runner={json.dumps(runner)}\nstudio={str(studio).lower()}\nreason={reason}\n"),
                        ("GITHUB_STEP_SUMMARY", line + "\n")):
         if env.get(name):
             with open(env[name], "a") as f:
