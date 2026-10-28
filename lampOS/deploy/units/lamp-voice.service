@@ -114,7 +114,11 @@ Environment=LAMP_MEMORY_SOCKET=@MEMORY_SOCKET@
 Environment=LAMP_ACTIONS_DIR=@ACTIONS_DIR@
 Environment=LAMP_SKILLS_DIR=/run/lampos-skills
 # The body's servo port: only the body opens it. Defence in depth only, not a mechanical stop.
-InaccessiblePaths=@SERVO_DEVICE@
+# With '-', a servo port that isn't there when the voice starts (a boot race: it comes up after the
+# unit starts; the body unplugged; a lamp without one) is passed over, and then not hidden for that run:
+# systemd sets up the namespace once, at start, and the next start hides it. Without '-' systemd fails the
+# unit at start (226/NAMESPACE), and the restart guard can leave the lamp mute (lamp-a0ae, 28 Oct).
+InaccessiblePaths=-@SERVO_DEVICE@
 
 [Install]
 WantedBy=lampos.target
