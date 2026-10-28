@@ -141,7 +141,7 @@ async function poll() {
   } catch (e) {
     const quiet = Date.now() - lastHeard;
     if (Date.now() - startedAt > GIVE_UP_MS) {
-      failed("The lamp did not come back. If its light shows it joined, open http://" + (host || "the lamp") + ".local/setup");
+      failed("The lamp did not come back. If its light breathes amber, it couldn't join. If not, put this phone back on your home Wi-Fi and open http://" + (host || "the lamp") + ".local/setup");
       return;
     }
     if (quiet > LOST_MS) {
