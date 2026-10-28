@@ -390,6 +390,22 @@ fn send_told(directory: &Path, key: &str) -> Sent {
     Sent::Again
 }
 
+/// [`TaskNews::played_through`]'s work, on a thread of its own: each of
+/// `keys` kept as asked in `made` ([`asked`]). The thread, to join in a test.
+fn keep_asked(
+    made: Option<crate::made_skill::Keeping>,
+    keys: Vec<String>,
+) -> Option<std::thread::JoinHandle<()>> {
+    std::thread::Builder::new()
+        .name("lamp-voice-news-played-through".into())
+        .spawn(move || {
+            for key in keys {
+                asked(made.as_ref(), &key);
+            }
+        })
+        .ok()
+}
+
 /// A made skill's news heard whole, or given in a text, has just asked
 /// whether to put it on: what the person's yes is held to
 /// ([`crate::made_skill::asked`]).
@@ -839,15 +855,8 @@ impl TaskNews {
     /// kept as asked ([`asked`]), what the person's yes is held to
     /// (fourteen-P10 on #2814). On a thread of its own: never waits.
     pub fn played_through(&self, keys: Vec<String>) {
-        let _ = std::thread::Builder::new()
-            .name("lamp-voice-news-played-through".into())
-            .spawn(move || {
-                // As the heard news' own thread finds it.
-                let made = crate::made_skill::Keeping::from_environment();
-                for key in keys {
-                    asked(made.as_ref(), &key);
-                }
-            });
+        // As the heard news' own thread finds it.
+        let _ = keep_asked(crate::made_skill::Keeping::from_environment(), keys);
     }
 
     /// The news waiting to be told, if any. Call every tick: it never blocks.
@@ -1599,6 +1608,11 @@ fn made_note(
                 }
             }
         }
+    }
+    // Put on already, by a yes to an earlier telling: nothing left to ask,
+    // so it isn't told again (Reviewer-three's P3 on #4240).
+    if made.is_ok() && crate::made_skill::is_on(&keeping.directory, key) {
+        return Some(None);
     }
     match &made {
         Ok(made) => {
@@ -3052,8 +3066,14 @@ mod tests {
             early["error"], "no skill made here is waiting for a yes",
             "{early}"
         );
-        // Heard whole (or given in a text): asked now, what a yes is held to.
-        asked(Some(&keeping), &news[0].key);
+        // Played through with a gap (fourteen-P10 on #2814), as
+        // `TaskNews::played_through` keeps it: asked now, on its own
+        // thread, what a yes is held to (Second's P3 on #4240). Heard whole,
+        // or given in a text, asks it the same way.
+        keep_asked(Some(keeping.clone()), vec![news[0].key.clone()])
+            .unwrap()
+            .join()
+            .unwrap();
         assert!(
             index()[0]["offered_at_unix_ms"].as_u64().is_some(),
             "{}",
@@ -3064,6 +3084,18 @@ mod tests {
         let again = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
         assert_eq!(again[0].note, *told);
         assert_eq!(std::fs::read_to_string(&runs).unwrap().lines().count(), 1);
+        // Put on by a yes: its news has nothing left to ask, and isn't told
+        // again (Reviewer-three's P3 on #4240).
+        let mut on = index();
+        on[0]["on"] = json!(true);
+        std::fs::write(
+            root.join("made").join(crate::made_skill::INDEX),
+            serde_json::to_vec(&on).unwrap(),
+        )
+        .unwrap();
+        assert!(crate::made_skill::is_on(&keeping.directory, &news[0].key));
+        let after = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        assert!(after.is_empty(), "{after:?}");
         // Without the switch, any task's news, its request quoted.
         let plain = read_once(&socket, &now(), &none, &none);
         assert!(
