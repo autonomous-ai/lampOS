@@ -1359,7 +1359,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 6; a product service carrier raises the floor to 6. A manifest
+before the field climbs first. The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7). A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
@@ -1605,7 +1605,7 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 6; a product service carrier raises the floor to 6.
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7).
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
