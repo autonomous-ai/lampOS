@@ -512,8 +512,9 @@ class Lamp:
         return await self.request("unsubscribe", events=events)
 
     async def get(self, *states: str) -> dict:
-        """The states asked for (`presence`, `light`, `mood`, `lamp`)."""
-        return await self.request("get", state=list(states))
+        """The states asked for (`presence`, `light`, `mood`, `lamp`), by
+        name: the reply's `state`."""
+        return (await self.request("get", state=list(states))).get("state", {})
 
     # Leases.
 
