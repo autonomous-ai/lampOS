@@ -3612,18 +3612,20 @@ after a take-over, but now for every turn:
   the eyes' boot, the known face's too (`speakers_with_boot`,
   `known_with_boot`, as the held forget's sight, #3037), so after the eyes
   restart a reused `f1` is not the known person's (Second's P1 on #3437),
-  or, with no face seen speaking it, when the known face, theirs, was the
-  only face in view through the line, in at least 3 of the eyes' looks, its
-  mouth read speaking in at least one of them and still in under half (a
-  mouth only ever unread is no evidence: an off-camera guest or a
-  television while they read their phone stays the room's, the
-  Reviewer-lead's P1 on #4090)
-  (`SpeakingFaces::alone_in_view`): `request N: no face was seen speaking
-  it, the known person's face alone in view (LAMP_PERSON_SCOPE_SEEN): told
-  and kept as theirs`. On lamp-3e83 (stable 8163, 28 Oct 16:30) the known
-  person alone at the lamp had about half their lines read with no face
-  speaking, kept as the room's, and the lamp forgot their name. Else the
-  room's: `request
+  else the room's. One thing more for such a line: when no face was seen
+  speaking it and the known face, theirs, was the only face in view through
+  it, in at least 3 of the eyes' looks, read speaking in at least one and
+  still in under half (`SpeakingFaces::alone_in_view`,
+  `speaking_faces::named_alone`), its reply is told their name
+  (`ScopeLease::named_for_reply`, the `known_faces::note` line and the typed
+  name) and nothing else: its scope, memory, thread and every keep, recall
+  and forget stay the room's (reviewer-three's P2 on #4090: a partner off
+  camera while the owner nods), and a mouth only ever unread names no one
+  (the Reviewer-lead's P1). `request N: no face was seen speaking it
+  (LAMP_PERSON_SCOPE_SEEN), the known person's face alone in view: kept as
+  the room's, its reply told their name`. On lamp-3e83 (stable 8163, 28 Oct
+  16:30) the owner alone at the lamp had about half their lines read with no
+  face speaking, and the lamp lost their name. Else: `request
   N: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN): told and kept as
   the room's`. A face seen speaking it gets one line too, by passing id
   only, never a name or the words (`speaking_faces::seen_speaking_note`):
@@ -3636,9 +3638,8 @@ after a take-over, but now for every turn:
   narrows (`remember::forget_everything` and `forget_face_memory`, the
   thread's exchanges, `tools.rs`' `keeper_within` and `run_scoped_for`), and
   a narrowed lease never widens (`ScopeLease::late_open`). Risk: an owner
-  whose speaking read misses with another face in view, or alone with
-  their mouth never read speaking in it, gets the room's scope for that
-  line, so a
+  whose speaking read misses gets the room's scope for that line (alone
+  in view, at most its reply told their name), so a
   personal keep or forget is not done as theirs: `forget_everything`
   refuses, and a keep is the room's, or withheld with
   `LAMP_MEMORY_PERSONAL_NEEDS_FACE`.

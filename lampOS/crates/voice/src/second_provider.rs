@@ -5112,6 +5112,7 @@ async fn spoken(
     // it. Only ever narrowed (the first builder, #1722 00:23).
     // With `LAMP_PERSON_SCOPE_SEEN`, no eyes to read is no face seen
     // speaking it: the room's (reviewer-two's P2 on #3437).
+    let mut named = false;
     if let Some(scope) = scope.as_ref()
         && let Some(person) = scope
             .scope()
@@ -5121,14 +5122,14 @@ async fn spoken(
             Some((eyes, known)) => {
                 let (speakers, pair, alone) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
-                let theirs = !crate::speaking_faces::not_theirs(
-                    &speakers,
-                    &person,
-                    pair,
-                    shared.scope_seen,
-                    alone,
-                );
-                let note = crate::speaking_faces::seen_speaking_note(&speakers, theirs, alone);
+                // Their face alone in view, none seen speaking it: the
+                // room's scope, but its reply told their name (lamp-3e83;
+                // reviewer-three's P2 on #4090).
+                named = shared.scope_seen
+                    && crate::speaking_faces::named_alone(&speakers, &person, pair.as_ref(), alone);
+                let theirs =
+                    !crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen);
+                let note = crate::speaking_faces::seen_speaking_note(&speakers, theirs);
                 // Kept as theirs: one line saying whose face it was, so a
                 // journal with two faces in view tells which one it went to.
                 if theirs && let Some(note) = &note {
@@ -5144,7 +5145,14 @@ async fn spoken(
         }
     {
         scope.narrow_to_room();
-        eprintln!("lamp-voice second: request {request}: {why}: told and kept as the room's");
+        if named {
+            scope.name_for_reply();
+            eprintln!(
+                "lamp-voice second: request {request}: {why}, the known person's face alone in view: kept as the room's, its reply told their name"
+            );
+        } else {
+            eprintln!("lamp-voice second: request {request}: {why}: told and kept as the room's");
+        }
         if prepared.take().is_some() {
             eprintln!(
                 "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
@@ -5165,10 +5173,9 @@ async fn spoken(
             let found = late_face.await.ok().flatten();
             let keeper = match (found, speaking) {
                 (Some(person), Some((eyes, known))) => {
-                    let (speakers, pair, alone) =
+                    let (speakers, pair, _) =
                         line_sight(&eyes, &known, begun, finishing, seen_only).await;
-                    if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only, alone)
-                    {
+                    if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only) {
                         eprintln!(
                             "lamp-voice second: request {request}: {}: its keep stays the room's",
                             if speakers.is_empty() {
