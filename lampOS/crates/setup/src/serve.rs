@@ -1184,26 +1184,39 @@ mod tests {
         (read, started.elapsed(), witness)
     }
 
-    fn bounded<T: std::fmt::Debug + PartialEq>(
-        read: impl Fn(&mut Command) -> T,
+    /// The stalled read and the held pipe run at once (#1806): one after
+    /// the other, with the wait for the witness, they took 3.5 s.
+    fn bounded<T: std::fmt::Debug + PartialEq + Send>(
+        read: impl Fn(&mut Command) -> T + Sync,
         good: &str,
         none: T,
     ) {
-        let (stalled, took, _) = timed(&read, "/bin/sleep 30");
+        let started = Instant::now();
+        let ((stalled, took, _), (held, took_held, escaped)) = std::thread::scope(|scope| {
+            let stalled = scope.spawn(|| timed(&read, "/bin/sleep 30"));
+            // As reset's own held-pipe control: the child writes its witness
+            // only if it outlives the bound.
+            let held = timed(
+                &read,
+                &format!("(/bin/sleep 2; printf escaped > \"$1\") & {good}"),
+            );
+            (stalled.join().unwrap(), held)
+        });
         assert_eq!(stalled, none);
         assert!(
             took < Duration::from_secs(3),
             "a stalled read took {took:?}"
         );
-        // As reset's own held-pipe control: the child writes its witness
-        // only if it outlives the bound.
-        let (held, took, escaped) = timed(
-            &read,
-            &format!("(/bin/sleep 2; printf escaped > \"$1\") & {good}"),
-        );
         assert_eq!(held, none);
-        assert!(took < Duration::from_secs(3), "a held pipe took {took:?}");
-        std::thread::sleep(Duration::from_millis(1500));
+        assert!(
+            took_held < Duration::from_secs(3),
+            "a held pipe took {took_held:?}"
+        );
+        // Half a second past the child's 2 s, as when the read's 1 s was
+        // followed by 1.5 s.
+        std::thread::sleep(
+            (started + Duration::from_millis(2500)).saturating_duration_since(Instant::now()),
+        );
         let survived = escaped.exists();
         let _ = std::fs::remove_file(&escaped);
         assert!(!survived, "the pipe-holding child outlived the read");
