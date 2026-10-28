@@ -823,7 +823,7 @@ product does it with systemd alone (#811):
 | `lamp-setup.service` | at boot, `WantedBy=multi-user.target`, only while `/var/lib/lampos-setup/done` is missing and setup's two settings exist | the hotspot and V1's setup page until the home's Wi-Fi and the person's settings are saved; then writes the marker |
 | `lampos-setup-done.path` | at boot, `WantedBy=multi-user.target` | starts `lampos.target` once the marker exists: the moment setup writes it, and at every later boot |
 | `lamp-setup-reset.service` | in the target, after setup | the reset button held 5 s: stops the lamp, wipes, removes the marker, reboots into setup |
-| `lamp-waking.service` | early at boot, `WantedBy=sysinit.target`, only once the marker exists | the waking face until the voice asks for the ring (#1681, [ring-choreography.md](ring-choreography.md), "The waking face"); off unless `LAMP_WAKING_FACE=on`, and then it exits at once |
+| `lamp-waking.service` | early at boot, `WantedBy=sysinit.target`, only once the marker exists | the waking face until the voice asks for the ring (#1681, [ring-choreography.md](ring-choreography.md), "The waking face"); off unless `LAMP_WAKING_FACE=on`, and then it exits at once. Sandboxed (#3710): `ProtectSystem=strict` with nothing written but its runtime directory and the ring's `/dev/spidev3.0`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges` |
 
 Setup, its reset and the waking face start the same binary, `/opt/lampOS/setup/current/lamp-setup`.
 `install` writes and enables all four and starts none.
