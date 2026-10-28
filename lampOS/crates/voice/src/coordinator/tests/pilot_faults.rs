@@ -2952,7 +2952,8 @@ fn held_onboarding_storage_at(near_call: bool) -> (SessionState, HeldOnboardingS
     let held = if near_call {
         let tries = [22.4, 25.0, 23.1].map(|rise_db| lamp_near_call::Try {
             rise_db,
-            score: 0.98,
+            score: Some(0.98),
+            heard_by: lamp_near_call::HeardBy::Name,
         });
         client.near_call(lamp_near_call::Calibrated::of(tries.to_vec(), 1))
     } else {

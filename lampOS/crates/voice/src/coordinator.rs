@@ -3615,6 +3615,7 @@ fn observe_provider_output(
         ProviderOutput::Unclear { .. }
         | ProviderOutput::LookAsked { .. }
         | ProviderOutput::SleepAsked { .. }
+        | ProviderOutput::StepCallHeard { .. }
         | ProviderOutput::RequestedAudio { .. } => {}
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
@@ -5295,6 +5296,41 @@ fn step_call(onboarding: Option<&crate::onboarding::Onboarding>) -> bool {
     onboarding.is_some_and(crate::onboarding::Onboarding::near_waits_for_call)
 }
 
+/// A call's line begun at `began_us` whose words were the lamp's name alone
+/// (#3923): the step's call heard by speech to text. Its Unix start when the
+/// step took it.
+fn near_text_call(
+    onboarding: Option<&mut crate::onboarding::Onboarding>,
+    began_us: u64,
+) -> Option<u64> {
+    #[cfg(test)]
+    if let Some(taken) = TEST_NEAR.with(|near| {
+        near.borrow_mut()
+            .as_mut()
+            .map(|flow| flow.text_call(began_us))
+    }) {
+        return taken;
+    }
+    onboarding.and_then(|walk| walk.near_text_call(began_us))
+}
+
+/// A call's line begun at `began_us` ended (#3923): the step waits a moment
+/// for its words before judging its try.
+fn near_call_line_ended(onboarding: Option<&mut crate::onboarding::Onboarding>, began_us: u64) {
+    #[cfg(test)]
+    if TEST_NEAR.with(|near| {
+        near.borrow_mut()
+            .as_mut()
+            .map(|flow| flow.call_line_ended(began_us))
+            .is_some()
+    }) {
+        return;
+    }
+    if let Some(walk) = onboarding {
+        walk.near_call_line_ended(began_us);
+    }
+}
+
 /// Whether the sentence part's window of onboarding's `how_you_sound` is
 /// open at `at_us` (#1803): a line that ends in it is the person's sentence.
 /// Unlike a name in the near-call window, its End goes on, so the words
@@ -5638,6 +5674,10 @@ fn conversation_with_gate_inner(
     // count-only to the provider, its words are counted for onboarding and
     // kept nowhere, and its answer is neither played, published nor kept.
     let mut sentence_turn: Option<u64> = None;
+    // The turn told the second route as onboarding's call (`StepCall`,
+    // #3504), and, once its line ended, when its speech began (#3923): the
+    // start the step takes if its words come back as the lamp's name alone.
+    let mut step_call_line: Option<(u64, Option<u64>)> = None;
     // Its words as they come, in memory only, until the last piece: on
     // Live they come in pieces, all of which are counted.
     let mut sentence_heard: Option<String> = None;
@@ -7522,6 +7562,21 @@ fn conversation_with_gate_inner(
                 ProviderOutput::HoldingAnswer { request, session } => {
                     holding_answer.observed(request, session, rig.provider.boot, reply.as_ref());
                 }
+                // A call's line whose words were the lamp's name alone
+                // (#3923): its speech's start goes to the step, which counts
+                // it only while its name part listens for a call.
+                ProviderOutput::StepCallHeard { request } => {
+                    let began = step_call_line
+                        .take()
+                        .filter(|(turn, _)| *turn == request)
+                        .and_then(|(_, began)| began);
+                    let taken = began.and_then(|began| near_text_call(onboarding.as_mut(), began));
+                    record(
+                        trace,
+                        json!({"kind":"onboarding_text_call","turn":request,
+                            "taken":taken.is_some(),"at_us":monotonic_us()}),
+                    )?;
+                }
                 ProviderOutput::SleepAsked { request } => {
                     // Asked once its line has been heard whole, or at the
                     // cap while it is still sounding.
@@ -9285,6 +9340,7 @@ fn conversation_with_gate_inner(
                             request: current.owner.turn(),
                             privacy_generation: snapshot.microphone_generation(),
                         });
+                        step_call_line = Some((current.owner.turn(), None));
                         record(
                             trace,
                             json!({"kind":"onboarding_step_call","turn":current.owner.turn(),"at_us":monotonic_us()}),
@@ -9614,6 +9670,15 @@ fn conversation_with_gate_inner(
                         .as_mut()
                         .ok_or_else(|| io::Error::other("speech end lost its owner"))?;
                     let input_end_us = audio.captured_at_us;
+                    // A call's line ending (#3923): when its speech began,
+                    // for its words, and the step waits a moment for them.
+                    if let Some((turn, began)) = step_call_line.as_mut()
+                        && *turn == current.owner.turn()
+                        && let Some((at, _)) = speech_levels.front()
+                    {
+                        *began = Some(*at);
+                        near_call_line_ended(onboarding.as_mut(), *at);
+                    }
                     // The sentence's line ending (begun in its window,
                     // count-only): its speech and the room microphone's
                     // largest rise during it, numbers only. Onboarding takes it if it ends in the

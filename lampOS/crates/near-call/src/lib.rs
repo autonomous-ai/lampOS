@@ -10,6 +10,11 @@
 //! lamp's name a few times; each answer is one [`near_try`], and
 //! [`near_rise`] turns three into this home's bar.
 //!
+//! The name may also be heard by speech to text (#3923): a line whose words
+//! were the lamp's name alone, which the on-device detector missed on some
+//! voices. Such a call counts as a detector's would, its rise read the same
+//! way; the detector's own bar is not lowered for it.
+//!
 //! Only numbers are measured and kept, never sound: the rise in decibels
 //! and how surely the name was heard. Nothing here is voice identity, and
 //! the voice microphone (mic2) stays out: its processing evens out loudness
@@ -36,6 +41,10 @@ pub const RISE_MS: u64 = 1_000;
 /// The lamp speaking this soon before the hearing's start spoils the try:
 /// the speaker's tail and the room's echo of its last word.
 pub const ECHO_BEFORE_MS: u64 = 500;
+/// A line heard by speech to text as the name, and a detector's hearing,
+/// that began at most this far apart are one call: the detector's start
+/// and the line's first speech block mark the same "Lamp".
+pub const ONE_CALL_MS: u64 = 1_000;
 /// Tries accepted for a result.
 pub const TRIES: usize = 3;
 /// Prompts at most, accepted or not.
@@ -61,6 +70,15 @@ pub struct Hearing {
     pub score: f32,
 }
 
+/// One line whose words, as speech to text heard them, were the lamp's name
+/// alone (#3923, the second route's `name_alone`): no score, only when it
+/// began. A sound with no words, or more words than the name, is never one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Said {
+    /// When the line's speech began.
+    pub began_ms: u64,
+}
+
 /// One reading of the room's level (`RoomSound`, the ears, every 100 ms).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Level {
@@ -82,14 +100,52 @@ pub struct Spoke {
     pub ended_ms: Option<u64>,
 }
 
+/// How a counted call's name was heard.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeardBy {
+    /// The on-device detector (`name/heard`) at [`SCORE`] or more. Files
+    /// from before #3923 hold only these.
+    #[default]
+    Name,
+    /// Speech to text, the line being the name alone ([`Said`]); the
+    /// detector missed it, or heard it under [`SCORE`].
+    Text,
+}
+
+impl HeardBy {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Name => "name",
+            Self::Text => "text",
+        }
+    }
+}
+
 /// A try that counts.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Try {
     /// mic1's largest rise over its quiet in the rise window, in dB, to
     /// one decimal.
     pub rise_db: f32,
-    /// How surely the name was heard.
-    pub score: f32,
+    /// How surely the detector heard the name; none when speech to text
+    /// heard it ([`HeardBy::Text`]), which gives no score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f32>,
+    #[serde(default)]
+    pub heard_by: HeardBy,
+}
+
+impl Try {
+    /// Whether the way it was heard is one [`near_try`] accepts: the
+    /// detector at [`SCORE`] to 1, or speech to text with no score.
+    pub fn heard_surely(&self) -> bool {
+        match (self.heard_by, self.score) {
+            (HeardBy::Name, Some(score)) => (SCORE..=1.0).contains(&score),
+            (HeardBy::Text, None) => true,
+            _ => false,
+        }
+    }
 }
 
 /// Why a try does not count. The person is asked again, up to
@@ -130,22 +186,59 @@ pub fn near_try(
     levels: &[Level],
     spoke: &[Spoke],
 ) -> Result<Try, Rejected> {
+    near_try_with_said(prompt_ended_ms, hearings, &[], levels, spoke)
+}
+
+/// [`near_try`] with the lines speech to text heard as the name alone
+/// (`said`, #3923). Each is a call as a hearing is, in the same window, one
+/// a try; one begun within [`ONE_CALL_MS`] of a hearing is that hearing's
+/// own words, so the two are one call, and a hearing under [`SCORE`] that
+/// they confirm counts as heard by text. A hearing under [`SCORE`] with no
+/// such line is still unsure: the detector's bar is not lowered.
+pub fn near_try_with_said(
+    prompt_ended_ms: u64,
+    hearings: &[Hearing],
+    said: &[Said],
+    levels: &[Level],
+    spoke: &[Spoke],
+) -> Result<Try, Rejected> {
     let window = prompt_ended_ms..=prompt_ended_ms.saturating_add(WINDOW_MS);
-    let mut heard = hearings
+    let heard: Vec<Hearing> = hearings
         .iter()
-        .filter(|hearing| window.contains(&hearing.began_ms));
-    let hearing = match (heard.next(), heard.next()) {
-        (None, _) => return Err(Rejected::NoHearing),
-        (Some(_), Some(_)) => return Err(Rejected::TwoHearings),
-        (Some(hearing), None) => *hearing,
+        .filter(|hearing| window.contains(&hearing.began_ms))
+        .copied()
+        .collect();
+    let said: Vec<u64> = said
+        .iter()
+        .map(|line| line.began_ms)
+        .filter(|began| window.contains(began))
+        .collect();
+    let one_call = |hearing: &Hearing, line: u64| hearing.began_ms.abs_diff(line) <= ONE_CALL_MS;
+    // Lines no hearing explains are calls of their own.
+    let alone: Vec<u64> = said
+        .iter()
+        .copied()
+        .filter(|&line| !heard.iter().any(|hearing| one_call(hearing, line)))
+        .collect();
+    let (began_ms, score, heard_by) = match (heard.as_slice(), alone.as_slice()) {
+        ([], []) => return Err(Rejected::NoHearing),
+        ([hearing], []) if hearing.score >= SCORE => {
+            (hearing.began_ms, Some(hearing.score), HeardBy::Name)
+        }
+        // Under the bar, or not a number: only its words make it a call.
+        ([hearing], []) if said.iter().any(|&line| one_call(hearing, line)) => {
+            (hearing.began_ms, None, HeardBy::Text)
+        }
+        ([hearing], []) => {
+            return Err(Rejected::Unsure {
+                score: hearing.score,
+            });
+        }
+        ([], [line]) => (*line, None, HeardBy::Text),
+        _ => return Err(Rejected::TwoHearings),
     };
-    if hearing.score.is_nan() || hearing.score < SCORE {
-        return Err(Rejected::Unsure {
-            score: hearing.score,
-        });
-    }
-    let rise_end = hearing.began_ms.saturating_add(RISE_MS);
-    let guarded = hearing.began_ms.saturating_sub(ECHO_BEFORE_MS);
+    let rise_end = began_ms.saturating_add(RISE_MS);
+    let guarded = began_ms.saturating_sub(ECHO_BEFORE_MS);
     if spoke.iter().any(|spoke| {
         spoke.began_ms <= rise_end && spoke.ended_ms.is_none_or(|ended| ended >= guarded)
     }) {
@@ -153,13 +246,14 @@ pub fn near_try(
     }
     levels
         .iter()
-        .filter(|level| (hearing.began_ms..=rise_end).contains(&level.at_ms) && !level.own_voice)
+        .filter(|level| (began_ms..=rise_end).contains(&level.at_ms) && !level.own_voice)
         .filter_map(|level| level.floor_db.map(|floor| level.level_db - floor))
         .filter(|rise| rise.is_finite())
         .reduce(f32::max)
         .map(|rise| Try {
             rise_db: tenths(rise),
-            score: hearing.score,
+            score,
+            heard_by,
         })
         .ok_or(Rejected::NoLevel)
 }
@@ -208,13 +302,12 @@ impl Calibrated {
     }
 
     /// Whether its bar is the one its tries make, from tries that could have
-    /// been accepted: each name heard at [`SCORE`] to 1. A file written by
-    /// hand, or by an older rule, is not used (Seventh on #1803: a score of
-    /// 7 or not a number was).
+    /// been accepted: each name heard at [`SCORE`] to 1, or by speech to
+    /// text with no score ([`Try::heard_surely`]). A file written by hand,
+    /// or by an older rule, is not used (Seventh on #1803: a score of 7 or
+    /// not a number was).
     pub fn fits(&self) -> bool {
-        self.tries
-            .iter()
-            .all(|done| (SCORE..=1.0).contains(&done.score))
+        self.tries.iter().all(Try::heard_surely)
             && near_rise(&self.tries).is_some_and(|bar| (bar - self.near_rise_db).abs() < 0.05)
     }
 }
@@ -293,7 +386,8 @@ mod tests {
             near_try(ENDED, &[heard(2_000, 0.98)], &room, &[]),
             Ok(Try {
                 rise_db: 21.4,
-                score: 0.98
+                score: Some(0.98),
+                heard_by: HeardBy::Name,
             })
         );
         // A louder moment before the name, or after its second, isn't it.
@@ -332,6 +426,160 @@ mod tests {
         );
         assert!(near_try(ENDED, &[heard(2_000, SCORE)], &room, &[]).is_ok());
         assert!(near_try(ENDED, &[heard(2_000, f32::NAN)], &room, &[]).is_err());
+    }
+
+    fn said(after_ms: u64) -> Said {
+        Said {
+            began_ms: ENDED + after_ms,
+        }
+    }
+
+    /// #3923, lamp-29e7: the detector missed "Lamp" on three prompts of
+    /// four while speech to text heard it whole. A line that was the name
+    /// alone counts as a call, its rise read from mic1 the same way, and is
+    /// kept as heard by text, with no score.
+    #[test]
+    fn a_line_heard_as_the_name_alone_counts_with_its_rise() {
+        let room = levels(0, 6_000, 2_400, 21.37);
+        assert_eq!(
+            near_try_with_said(ENDED, &[], &[said(2_000)], &room, &[]),
+            Ok(Try {
+                rise_db: 21.4,
+                score: None,
+                heard_by: HeardBy::Text,
+            })
+        );
+        // In the same window only, and one a try.
+        for outside in [
+            Said {
+                began_ms: ENDED - 1,
+            },
+            said(WINDOW_MS + 1),
+        ] {
+            assert_eq!(
+                near_try_with_said(ENDED, &[], &[outside], &room, &[]),
+                Err(Rejected::NoHearing)
+            );
+        }
+        assert_eq!(
+            near_try_with_said(ENDED, &[], &[said(1_000), said(3_000)], &room, &[]),
+            Err(Rejected::TwoHearings)
+        );
+        // The same guards: the lamp speaking, and its own sound uncounted.
+        assert_eq!(
+            near_try_with_said(ENDED, &[], &[said(2_000)], &room, &[spoke(0, Some(1_600))]),
+            Err(Rejected::LampSpoke)
+        );
+        let mut room = levels(0, 6_000, 2_400, 21.0);
+        room[24].own_voice = true;
+        assert_eq!(
+            near_try_with_said(ENDED, &[], &[said(2_000)], &room, &[]).map(|done| done.rise_db),
+            Ok(2.0)
+        );
+    }
+
+    /// A cough, the TV, or "Lamp is broken" is never a [`Said`]: with no
+    /// line and no sure hearing there is no call, and a detector's hearing
+    /// under its bar stays unsure without the name's own words beside it.
+    #[test]
+    fn without_a_line_of_the_name_alone_the_detectors_bar_is_unchanged() {
+        let room = levels(0, 6_000, 2_400, 21.0);
+        assert_eq!(
+            near_try_with_said(ENDED, &[], &[], &room, &[]),
+            Err(Rejected::NoHearing)
+        );
+        assert_eq!(
+            near_try_with_said(ENDED, &[heard(2_000, 0.9)], &[], &room, &[]),
+            Err(Rejected::Unsure { score: 0.9 })
+        );
+        // A line of the name 1.5 s off is a second call, not its words.
+        assert_eq!(
+            near_try_with_said(ENDED, &[heard(2_000, 0.9)], &[said(3_500)], &room, &[]),
+            Err(Rejected::TwoHearings)
+        );
+    }
+
+    /// The detector and speech to text hearing the same "Lamp" are one
+    /// call, never two hearings: a sure hearing stays the detector's, and
+    /// one under the bar counts by its words, from the detector's start.
+    #[test]
+    fn a_line_and_a_hearing_begun_within_a_second_are_one_call() {
+        let room = levels(0, 6_000, 2_400, 21.0);
+        assert_eq!(
+            near_try_with_said(ENDED, &[heard(2_000, 0.98)], &[said(2_300)], &room, &[]),
+            Ok(Try {
+                rise_db: 21.0,
+                score: Some(0.98),
+                heard_by: HeardBy::Name,
+            })
+        );
+        assert_eq!(
+            near_try_with_said(ENDED, &[heard(2_000, 0.9)], &[said(1_200)], &room, &[]),
+            Ok(Try {
+                rise_db: 21.0,
+                score: None,
+                heard_by: HeardBy::Text,
+            })
+        );
+        // Two separate calls, each heard both ways, are still two.
+        assert_eq!(
+            near_try_with_said(
+                ENDED,
+                &[heard(1_000, 0.98), heard(4_000, 0.98)],
+                &[said(1_100), said(4_100)],
+                &room,
+                &[]
+            ),
+            Err(Rejected::TwoHearings)
+        );
+    }
+
+    #[test]
+    fn three_calls_heard_by_text_alone_make_the_bar() {
+        let room = |rise| levels(0, 6_000, 2_400, rise);
+        let tries: Vec<Try> = [22.4, 25.0, 23.1]
+            .into_iter()
+            .map(|rise| near_try_with_said(ENDED, &[], &[said(2_000)], &room(rise), &[]).unwrap())
+            .collect();
+        let calibrated = Calibrated::of(tries, 1_760_000_000).expect("a bar");
+        assert!(calibrated.fits());
+        let folder = tempfile::tempdir().expect("folder");
+        let path = folder.path().join("near-call.json");
+        write(&path, &calibrated).expect("written");
+        assert_eq!(read(&path), Some(19.4));
+    }
+
+    /// A file from before #3923 (a score, no `heard_by`) reads as heard by
+    /// the detector; one heard by text has no score. A score with text, or
+    /// none with the detector, is no try a step made.
+    #[test]
+    fn old_and_text_files_read_and_odd_mixes_do_not() {
+        let old: Try = serde_json::from_str(r#"{"rise_db":22.4,"score":0.98}"#).unwrap();
+        assert_eq!(old.heard_by, HeardBy::Name);
+        assert_eq!(old.score, Some(0.98));
+        assert!(old.heard_surely());
+        let text: Try = serde_json::from_str(r#"{"rise_db":22.4,"heard_by":"text"}"#).unwrap();
+        assert_eq!((text.score, text.heard_by), (None, HeardBy::Text));
+        assert!(text.heard_surely());
+        assert_eq!(
+            serde_json::to_value(text).unwrap(),
+            serde_json::json!({"rise_db":22.4f32,"heard_by":"text"})
+        );
+        for odd in [
+            r#"{"rise_db":22.4}"#,
+            r#"{"rise_db":22.4,"score":0.98,"heard_by":"text"}"#,
+        ] {
+            let odd: Try = serde_json::from_str(odd).unwrap();
+            assert!(!odd.heard_surely(), "{odd:?}");
+        }
+        let folder = tempfile::tempdir().expect("folder");
+        let path = folder.path().join("near-call.json");
+        std::fs::write(
+            &path,
+            br#"{"near_rise_db":19.4,"tries":[{"rise_db":22.4,"score":0.98},{"rise_db":25.0,"heard_by":"text"},{"rise_db":23.1,"score":1.0,"heard_by":"name"}],"at_unix_s":1}"#,
+        )
+        .expect("written");
+        assert_eq!(read(&path), Some(19.4));
     }
 
     #[test]
@@ -407,7 +655,8 @@ mod tests {
             .iter()
             .map(|&rise_db| Try {
                 rise_db,
-                score: 0.98,
+                score: Some(0.98),
+                heard_by: HeardBy::Name,
             })
             .collect()
     }
@@ -462,7 +711,7 @@ mod tests {
         // or under the rule's bar.
         for score in [7.0, f32::NAN, 0.9] {
             let mut odd = tries(&[22.4, 25.0, 23.1]);
-            odd[1].score = score;
+            odd[1].score = Some(score);
             let odd = Calibrated {
                 near_rise_db: 19.4,
                 tries: odd,

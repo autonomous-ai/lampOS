@@ -4556,7 +4556,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
-        | ProviderOutput::SleepAsked { request } => Some(*request),
+        | ProviderOutput::SleepAsked { request }
+        | ProviderOutput::StepCallHeard { request } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }
@@ -5213,12 +5214,18 @@ async fn spoken(
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name, while how_you_sound waits for a call: left to the step, not answered"
         );
-        shared
-            .emit(ProviderOutput::TurnComplete {
-                request,
-                idle: true,
-            })
-            .await;
+        // Its words were the name (#3923): the step counts it as a call
+        // when the detector missed it. A line with no words, which only the
+        // detector's call made one, is not told: the detector heard it.
+        let worded = name_alone(&text);
+        if !worded || shared.emit(ProviderOutput::StepCallHeard { request }).await {
+            shared
+                .emit(ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                })
+                .await;
+        }
         return;
     }
     if let Ok(mut last) = shared.heard_last.lock() {

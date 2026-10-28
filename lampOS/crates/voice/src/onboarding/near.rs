@@ -15,6 +15,14 @@
 //! the lamp spoke). Nothing of the sound is kept; no voice identity and no
 //! mic2 ratio is used. The measurement itself is `lamp_near_call::near_try`.
 //!
+//! The detector misses some voices on some lamps (#3923, lamp-29e7: three
+//! bare "Lamp"s of four unheard). A line begun while the step waits for a
+//! call whose words speech to text heard as the name alone is a call too
+//! ([`Onboarding::near_text_call`]): its start, as the coordinator heard
+//! the line's speech begin, joins the evidence, and its rise is read from
+//! mic1 as a hearing's is (`lamp_near_call::near_try_with_said`). Only its
+//! start is kept, never its words.
+//!
 //! The name part ends when three accepted tries make a bar and the bar's
 //! file is written, or, with any old bar removed, when five prompts cannot
 //! reach three or the tries spread too far. Then the sentence part (the
@@ -44,8 +52,8 @@ use super::{
     STEP_GIVE_UP_US, Step, TIMED_OUT_QUIET_US, fresh_token, storage,
 };
 use lamp_near_call::{
-    Calibrated, Hearing, Level, MOST_PROMPTS, RISE_MS, SCORE, Spoke, Try, WINDOW_MS, asks_again,
-    near_try,
+    Calibrated, Hearing, Level, MOST_PROMPTS, RISE_MS, SCORE, Said, Spoke, Try, WINDOW_MS,
+    asks_again, near_try_with_said,
 };
 use lamp_turn_owner::BootId;
 use serde_json::json;
@@ -104,6 +112,10 @@ const SENTENCE_WINDOW_US: u64 = 15_000_000;
 /// The words of a line ended in the window are waited for this long past
 /// it: on the second route they came within a second of the line's end.
 const WORDS_WAIT_US: u64 = 3_000_000;
+/// A call's line that ended in the window has its words waited for this
+/// long past the try's usual judgement, at most (#3923): a "Lamp" begun
+/// near the window's end has its words back about a second after it.
+const TEXT_WAIT_US: u64 = 1_500_000;
 /// Words covering a line: at least one for each this many milliseconds of
 /// its speech, half the pace of ordinary speech (two to three words a
 /// second). A line whose words came back fewer is a fragment.
@@ -142,6 +154,8 @@ struct Line {
 pub(crate) enum Seen {
     /// A final hearing, and when it was sent: its name had ended by then.
     Hearing(Hearing, u64),
+    /// A line whose words were the lamp's name alone (#3923).
+    Said(Said),
     Level(Level),
     /// `voice/state` at this time: speaking or not.
     Speaking {
@@ -193,6 +207,7 @@ impl Seen {
     fn at_ms(&self) -> Option<u64> {
         match self {
             Self::Hearing(hearing, _) => Some(hearing.began_ms),
+            Self::Said(said) => Some(said.began_ms),
             Self::Level(level) => Some(level.at_ms),
             Self::Speaking { at_ms, .. } => Some(*at_ms),
             Self::Restart | Self::Invalid => None,
@@ -250,6 +265,9 @@ pub(crate) struct NearFlow {
     /// again after an absence, a pause or a mute: the step's first line,
     /// which says the phrase and that it asks three times (#3702).
     last: Option<bool>,
+    /// A call's line ended in the try's window, its words not back yet
+    /// ([`TEXT_WAIT_US`]): when it began, Unix milliseconds.
+    awaited: Option<u64>,
 }
 
 impl NearFlow {
@@ -289,6 +307,51 @@ impl NearFlow {
                 }
                 _ => false,
             })
+    }
+
+    /// The Unix time of `at_us` on the coordinator's clock, by the prompt's
+    /// end read on both, while the name part listens for a call.
+    fn call_unix_ms(&self, at_us: u64) -> Option<(u64, u64)> {
+        let listening = self
+            .listening
+            .as_ref()
+            .filter(|listening| !listening.sentence)?;
+        let at_ms = if at_us >= listening.ended_us {
+            listening.ended_ms + (at_us - listening.ended_us) / 1_000
+        } else {
+            listening
+                .ended_ms
+                .saturating_sub((listening.ended_us - at_us) / 1_000)
+        };
+        Some((at_ms, listening.ended_ms))
+    }
+
+    /// A line begun at `began_us` on the coordinator's clock, whose words
+    /// were the lamp's name alone (#3923), while the name part listens for
+    /// a call: kept as evidence when it began from the history kept before
+    /// the prompt's end (one over its last word is answered early) to the
+    /// window's end. Its Unix start when kept; otherwise it is ignored.
+    pub(crate) fn text_call(&mut self, began_us: u64) -> Option<u64> {
+        let (began_ms, ended_ms) = self.call_unix_ms(began_us)?;
+        if began_ms < ended_ms.saturating_sub(HISTORY_MS) || began_ms > ended_ms + WINDOW_MS {
+            return None;
+        }
+        self.awaited = None;
+        if self.seen.len() >= MOST_SEEN {
+            self.seen.remove(0);
+        }
+        self.seen.push(Seen::Said(Said { began_ms }));
+        Some(began_ms)
+    }
+
+    /// A call's line begun at `began_us` ended: begun in the window, its
+    /// words are waited for before the try is judged ([`TEXT_WAIT_US`]).
+    pub(crate) fn call_line_ended(&mut self, began_us: u64) {
+        if let Some((began_ms, ended_ms)) = self.call_unix_ms(began_us)
+            && (ended_ms..=ended_ms + WINDOW_MS).contains(&began_ms)
+        {
+            self.awaited = Some(began_ms);
+        }
     }
 
     /// A loop test's try window, open since `ended_us` (`ended_ms` on the
@@ -333,14 +396,25 @@ impl NearFlow {
         self.named
     }
 
-    fn take_evidence(&mut self) -> (Vec<Hearing>, Vec<Level>, Vec<Spoke>, Option<&'static str>) {
+    #[allow(clippy::type_complexity)]
+    fn take_evidence(
+        &mut self,
+    ) -> (
+        Vec<Hearing>,
+        Vec<Said>,
+        Vec<Level>,
+        Vec<Spoke>,
+        Option<&'static str>,
+    ) {
         let mut hearings = Vec::new();
+        let mut said = Vec::new();
         let mut levels = Vec::new();
         let mut spoke: Vec<Spoke> = Vec::new();
         let mut open: Option<u64> = None;
         for seen in self.seen.drain(..) {
             match seen {
                 Seen::Hearing(hearing, _) => hearings.push(hearing),
+                Seen::Said(line) => said.push(line),
                 Seen::Level(level) => levels.push(level),
                 Seen::Speaking { at_ms, speaking } => match (speaking, open) {
                     (true, None) => open = Some(at_ms),
@@ -362,7 +436,7 @@ impl NearFlow {
                 ended_ms: None,
             });
         }
-        (hearings, levels, spoke, self.spoiled.take())
+        (hearings, said, levels, spoke, self.spoiled.take())
     }
 }
 
@@ -573,6 +647,7 @@ impl Onboarding {
         self.near.reoffered = 0;
         self.near.unsaid = 0;
         self.near.last = None;
+        self.near.awaited = None;
     }
 
     pub(super) fn near_pending(&self) -> Option<lamp_msgs::OnboardingInvitation> {
@@ -743,6 +818,7 @@ impl Onboarding {
         // spoil from before this try is not.
         self.near.spoiled = None;
         self.near.line = None;
+        self.near.awaited = None;
         self.near.listening = Some(Listening {
             sentence: offer.sentence,
             prompt: offer.prompt,
@@ -760,6 +836,23 @@ impl Onboarding {
     /// than a call through too.
     pub(crate) fn near_holds_reply(&self, began_us: u64, at_us: u64) -> bool {
         self.near.holds_reply(began_us, at_us)
+    }
+
+    /// A line begun at `began_us` whose words were the lamp's name alone
+    /// (#3923, the second route's `StepCallHeard`): a call, while this step
+    /// is led and its name part listens for one ([`NearFlow::text_call`]).
+    pub(crate) fn near_text_call(&mut self, began_us: u64) -> Option<u64> {
+        if !self.collecting() {
+            return None;
+        }
+        self.near.text_call(began_us)
+    }
+
+    /// [`NearFlow::call_line_ended`], while this step is led.
+    pub(crate) fn near_call_line_ended(&mut self, began_us: u64) {
+        if self.collecting() {
+            self.near.call_line_ended(began_us);
+        }
     }
 
     /// [`NearFlow::waits_for_call`], while this step is led.
@@ -906,13 +999,21 @@ impl Onboarding {
             self.sentence_judge(now_us);
             return;
         }
+        // A call's line still waiting for its words holds the judgement a
+        // little, never past TEXT_WAIT_US.
+        let wait = if self.near.awaited.is_some() {
+            TEXT_WAIT_US
+        } else {
+            0
+        };
         let due = self.near.listening.as_ref().is_some_and(|listening| {
-            now_us >= listening.ended_us + COLLECT_MS * 1_000 + DELIVERY_GRACE_US
+            now_us >= listening.ended_us + COLLECT_MS * 1_000 + DELIVERY_GRACE_US + wait
         });
         if !due {
             return;
         }
         let listening = self.near.listening.take().expect("due");
+        self.near.awaited = None;
         let from_end = |ms: u64| ms as i64 - listening.ended_ms as i64;
         // Every name heard, as (ms from the prompt's end, score), for the
         // try's record and journal line.
@@ -925,6 +1026,16 @@ impl Onboarding {
                 _ => None,
             })
             .collect();
+        // Every line heard as the name alone, as ms from the prompt's end.
+        let said: Vec<i64> = self
+            .near
+            .seen
+            .iter()
+            .filter_map(|seen| match seen {
+                Seen::Said(line) => Some(from_end(line.began_ms)),
+                _ => None,
+            })
+            .collect();
         // A name begun over the prompt's last word ([`OVER_PROMPT_MS`]).
         let early = self.near.seen.iter().any(|seen| match seen {
             Seen::Hearing(hearing, heard_ms) => {
@@ -932,9 +1043,15 @@ impl Onboarding {
                     && hearing.score >= SCORE
                     && call_began_ms(hearing, *heard_ms, listening.ended_ms).is_some()
             }
+            // Its words came after the prompt, so only its start says it
+            // was over the last word.
+            Seen::Said(line) => {
+                line.began_ms < listening.ended_ms
+                    && line.began_ms + OVER_PROMPT_MS >= listening.ended_ms
+            }
             _ => false,
         });
-        let (hearings, levels, mut spoke, spoiled) = self.near.take_evidence();
+        let (hearings, said_lines, levels, mut spoke, spoiled) = self.near.take_evidence();
         // The prompt itself: the lamp spoke until its end.
         spoke.push(Spoke {
             began_ms: listening.ended_ms.saturating_sub(1),
@@ -950,10 +1067,11 @@ impl Onboarding {
             let again = self.offer_again(false, listening.prompt);
             self.note_try(json!({"kind":"onboarding_near_try",
                 "prompt":listening.prompt,"accepted":false,"why":"answered_early",
-                "offered_again":again,"heard":heard,"at_us":now_us}));
+                "offered_again":again,"heard":heard,"said":said,"at_us":now_us}));
             return;
         } else {
-            near_try(listening.ended_ms, &hearings, &levels, &spoke).map_err(|why| why.to_string())
+            near_try_with_said(listening.ended_ms, &hearings, &said_lines, &levels, &spoke)
+                .map_err(|why| why.to_string())
         };
         // When the lamp spoke, as ms from the prompt's end (none: still).
         let spoke: Vec<(i64, Option<i64>)> = spoke
@@ -968,12 +1086,12 @@ impl Onboarding {
                 self.note_try(
                     json!({"kind":"onboarding_near_try","prompt":listening.prompt,
                     "accepted":true,"rise_db":done.rise_db,"score":done.score,
-                    "heard":heard,"at_us":now_us}),
+                    "heard_by":done.heard_by.name(),"heard":heard,"said":said,"at_us":now_us}),
                 );
             }
             Err(why) => self.note_try(json!({"kind":"onboarding_near_try",
                 "prompt":listening.prompt,"accepted":false,"why":why,"heard":heard,
-                "spoke":spoke,"at_us":now_us})),
+                "said":said,"spoke":spoke,"at_us":now_us})),
         }
     }
 
@@ -1146,10 +1264,10 @@ fn call_began_ms(hearing: &Hearing, heard_ms: u64, ended_ms: u64) -> Option<u64>
 }
 
 /// Persisted tries are numbers someone could have edited: each must be one
-/// `near_try` could have accepted.
+/// `near_try` could have accepted, heard by the detector at its bar or by
+/// speech to text with no score (`Try::heard_surely`).
 pub(super) fn valid_try(done: &Try) -> bool {
     done.rise_db.is_finite()
         && (0.0..=-lamp_msgs::EARS_SILENCE_DB).contains(&done.rise_db)
-        && done.score.is_finite()
-        && (SCORE..=1.0).contains(&done.score)
+        && done.heard_surely()
 }
