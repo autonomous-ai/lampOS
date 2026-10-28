@@ -618,21 +618,24 @@ fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
 /// The tester on lamp-29e7, 28 October (#3702): the lamp never said what
 /// to say or how many calls it wanted, so a bare "Lamp" four times felt like
 /// being asked over and over. The first prompt names the phrase and says it
-/// asks a few times; after an accepted call the next prompt is "Got it. Once
-/// more."; after a call not caught, "I didn't catch that. Say 'Hey Lamp'
+/// asks a few times; after an accepted call the next prompt is "Got it. Say
+/// 'Hey Lamp' once more."; after a call not caught, "I didn't catch that. Say 'Hey Lamp'
 /// again, from your seat.", never the first prompt again. A first prompt cut before any try
 /// was judged says the first line again.
 #[test]
 fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
     assert!(NEAR_FIRST.contains("say 'Hey Lamp'"), "{NEAR_FIRST}");
-    assert!(NEAR_FIRST.contains("I'll ask three times."), "{NEAR_FIRST}");
+    assert!(
+        NEAR_FIRST.contains("I'll ask until I've heard you three times."),
+        "{NEAR_FIRST}"
+    );
     assert_eq!(
         lamp_near_call::TRIES,
         3,
         "the line says how many calls it takes"
     );
     assert!(
-        NEAR_AGAIN.contains("\"Got it. Once more.\""),
+        NEAR_AGAIN.contains("\"Got it. Say 'Hey Lamp' once more.\""),
         "{NEAR_AGAIN}"
     );
     assert!(
@@ -686,7 +689,7 @@ fn next_words(walk: &mut Onboarding, at: u64) -> String {
 /// all. Loudness is mic1's rise over the room's quiet: quiet 4 dB (the
 /// office calls on lamp-52e6, row 10, rose 3.9 dB), normal 22 dB (the
 /// tests' seat calls, over the near rule's 18 dB default), loud 30 dB. A try
-/// does not judge loudness: any heard call is "Got it. Once more.", and
+/// does not judge loudness: any heard call is "Got it. Say 'Hey Lamp' once more.", and
 /// whether the calls make a bar is decided at the end (16 to 24 dB, spread
 /// at most 10 dB).
 #[test]
@@ -725,7 +728,7 @@ fn every_way_a_person_calls_gets_its_line() {
 
 /// A call said over the prompt cuts it: the same prompt is offered again
 /// with the line it had, the first while no try was judged and "Got it.
-/// Once more." after an accepted call.
+/// Say 'Hey Lamp' once more." after an accepted call.
 #[test]
 fn a_call_over_the_prompt_is_asked_again_with_the_same_line() {
     let store = Store::new(None);
@@ -747,7 +750,7 @@ fn a_call_over_the_prompt_is_asked_again_with_the_same_line() {
 
 /// The Reviewer-lead's P2 on #4001: an accepted call, then the person leaves
 /// and comes back, or the step is paused: the next prompt names the phrase
-/// and the count again, never "Got it. Once more." for a call long past.
+/// and the count again, never "Got it. Say 'Hey Lamp' once more." for a call long past.
 #[test]
 fn after_an_absence_or_a_pause_the_prompt_names_the_phrase_again() {
     let store = Store::new(None);
@@ -768,7 +771,7 @@ fn after_an_absence_or_a_pause_the_prompt_names_the_phrase_again() {
 }
 
 /// An older skill file without `near_missed` answers a miss with the first
-/// line, never "Got it. Once more." (the Reviewer-lead's P3 on #4001).
+/// line, never "Got it. Say 'Hey Lamp' once more." (the Reviewer-lead's P3 on #4001).
 #[test]
 fn without_a_missed_line_a_miss_says_the_first_line() {
     let store = Store::new(None);

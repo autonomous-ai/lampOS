@@ -709,22 +709,25 @@ fn the_steps_lines_are_the_skills() {
     for (line, words) in [
         (
             GIVE_ASK,
-            "Take my head and tilt it gently to one side, then let go. I'll tell you when.",
+            "Hold my head and tilt it gently to one side. Let go when I say so.",
         ),
         (
             GIVE_AGAIN,
-            "I didn't feel my head move. Take my head and tilt it gently to one side, then let go. I'll tell you when.",
+            "I didn't feel my head move. Hold my head and tilt it gently to one side. Let go when I say so.",
         ),
-        (GIVE_FELT, "That's it, now let go."),
+        (
+            GIVE_FELT,
+            "I feel your hand. Tilt me a little more, then let go.",
+        ),
         (GIVE_MORE, "A little more, then let go."),
         (
             GIVE_PROMPT,
-            "Take my head and tilt it gently to one side. I'll go with your hand.",
+            "Hold my head and tilt it gently to one side. Let go when I say so.",
         ),
         (GIVE_DONE, "Got it, my head moved with your hand."),
         (
             GIVE_FAILED,
-            "I didn't feel my head move this time. That's fine, you can redo the setup later.",
+            "I didn't feel my head move this time. That's fine, you can redo the setup later. Just say 'Hey Lamp, redo the setup.'",
         ),
     ] {
         assert_eq!(said(line), words);

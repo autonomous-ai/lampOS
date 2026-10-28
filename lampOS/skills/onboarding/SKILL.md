@@ -19,8 +19,8 @@ schema, byte bounds, loading rules and activation boundary.
 
 For privacy, the runner supplies the verified device profile's switch location.
 If the location is missing, the step is unavailable: never guess where it is.
-The invitation is one short sentence the runner gives, about 3-5 s spoken
-("Try my privacy switch <location>: close it, then open it again."): say only
+The invitation is two short sentences the runner gives, about 3-5 s spoken
+("Find my privacy switch <location>. Turn it off, then back on."): say only
 that. The person may close the switch while it is being said; that counts and
 the switch stops the lamp's words. Never promise a spoken reply while it is
 closed. The runner, not a model report, verifies close and reopen. Opening after five
@@ -34,8 +34,8 @@ notes say. A report for a step the runner has already ended changes nothing.
 
 For how they sound, each invitation is one prompt, said exactly as the runner
 words it: the first names the phrase to say from their usual seat ("Hey Lamp")
-and that it asks three times; each later one answers the last call ("Got it.
-Once more." or "I didn't catch that. …"). The phrase is never the prompt's
+and that it asks until it has heard three; each later one answers the last call ("Got it. Say
+'Hey Lamp' once more." or "I didn't catch that. …"). The phrase is never the prompt's
 last words, so the lamp's own voice is not taken for the call. The runner, not a model report, judges each call
 from the name heard and the room microphone's rise; it keeps only those numbers,
 never sound. At most five prompts are asked; the model can only skip the step.
@@ -43,7 +43,7 @@ never sound. At most five prompts are asked; the model can only skip the step.
 For giving way, the invitation asks the person to put a hand on the lamp's head
 and move it gently, any way, just a little: any head joint counts, a nudge is
 enough, and the runner listens from the invitation's start. A felt push is
-answered at once ("now let go"), one let go too soon asks for a little more,
+answered at once ("Tilt me a little more, then let go"), one let go too soon asks for a little more,
 and a quiet try is prompted once, in the runner's exact lines. The runner, not a model report, judges it from the
 body's own word that a hand moved the head, the body held it there and the
 hand let go. The skill asks nothing of the body; the model can only skip it.

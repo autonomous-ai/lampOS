@@ -117,7 +117,7 @@ fn deliver(walk: &mut Onboarding, token: u64, now: u64) {
     assert!(
         walk.take_privacy_invitation(token, now)
             .unwrap()
-            .contains("close it, then open it again")
+            .contains("Turn it off, then back on.")
     );
     assert!(walk.bind_privacy_invitation(token, boot, 4));
     walk.privacy_invitation_finished(boot, 4, Delivery::Whole, now);
@@ -917,16 +917,16 @@ fn an_arm_that_fails_while_the_invitation_is_said_spends_no_try() {
 }
 
 #[test]
-fn the_invitation_is_one_short_sentence_with_the_location() {
+fn the_invitation_is_short_with_the_location() {
     let (_store, mut walk) = walk();
     let token = offer(&mut walk, T, 1);
     let note = walk.take_privacy_invitation(token, T).unwrap();
     let said = note.split('"').nth(1).unwrap();
     assert_eq!(
         said,
-        "Try my privacy switch at its verified profile location: close it, then open it again."
+        "Find my privacy switch at its verified profile location. Turn it off, then back on."
     );
-    // About 3-5 s spoken; one sentence.
+    // About 3-5 s spoken: where it is, then what to do.
     assert!(said.split_whitespace().count() <= 16);
-    assert_eq!(said.matches('.').count(), 1);
+    assert_eq!(said.matches('.').count(), 2);
 }

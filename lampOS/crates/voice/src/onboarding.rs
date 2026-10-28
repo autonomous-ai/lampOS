@@ -4650,7 +4650,8 @@ mod tests {
         assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::NotAvailable));
         assert!(!room_sounds_file(&room).exists());
         assert!(
-            ROOM_SOUNDS_NOTE.contains("the lamp notices music and laughter, nothing is recorded")
+            ROOM_SOUNDS_NOTE
+                .contains("May I notice music and laughter in the room? Nothing is recorded.")
         );
     }
 
@@ -4784,10 +4785,7 @@ mod tests {
             Some(Outcome::NotAvailable)
         );
         assert!(!face_expressions_file(&room).exists());
-        assert!(
-            FACE_EXPRESSIONS_NOTE
-                .contains("a yes covers everyone at this lamp, you never say it aloud, and no picture of a face is kept")
-        );
+        assert!(FACE_EXPRESSIONS_NOTE.contains("I never say it aloud and keep no pictures."));
     }
 
     #[test]
