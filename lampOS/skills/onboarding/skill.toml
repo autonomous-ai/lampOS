@@ -30,7 +30,7 @@ order = ["where_you_sit", "who_you_are", "how_you_sound", "touch", "privacy", "g
 reoffer_after_s = 86400
 
 [onboarding.steps.where_you_sit]
-first = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Let's get set up first. It takes a few minutes. Just do what I ask, and you can ask me anything once we're done. Sit where you usually sit and look at me. I'll tell you when I see you.\")"
+first = "(Say only this, nothing before or after it: \"Let's get set up first! It'll only take a few minutes. Please follow my instructions step-by-step, and once we're done, you can ask me anything. Sit where you usually sit and look at me. I'll tell you when I see you.\")"
 reoffer = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Sit where you usually sit and look at me. I'll tell you when I see you.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip where you sit for now.\")"
 
