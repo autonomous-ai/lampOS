@@ -562,6 +562,16 @@ on the lamp that run on their own".
   `grants_pushed_by` with its grants if it is. The last word the helper has
   for that computer is its pairing now, whatever order it serves requests
   in.
+- **A change the helper doesn't answer** is asked again after 2 s and then
+  20 s, three tries in all, before it is given up and journaled; later
+  changes wait behind it, so the order holds. A refusal is an answer and
+  isn't asked again.
+- **Not on before the helper's half:** no product unit passes
+  `--manage-socket`, and it must not be passed before lamp-skills' manage
+  helper keeps its record of revokes and grant changes (Eighth's piece B).
+  An install that the door stops waiting for at 60 s may still finish in
+  the helper, and only that record refuses it if the computer's pairing
+  changed meanwhile.
 - **The SDKs:** `lamp skill push FOLDER` runs `lamp skill check`, compares
   what the skill asks with the pairing's grants and the rules above
   (refusing on the computer with the lamp's own `no_grant` why, before any

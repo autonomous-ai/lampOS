@@ -97,6 +97,42 @@ impl Drop for Slot {
     }
 }
 
+/// How long the helper's change thread waits before asking again, after a
+/// change the helper didn't answer: three tries in all, about a minute with
+/// their waits, before the change is given up and journaled (Fourteen's P3
+/// on #3910: a lost `off_pushed_by` would leave a revoked computer's skills
+/// on).
+pub const RETRY_AFTER: [Duration; 2] = [Duration::from_secs(2), Duration::from_secs(20)];
+
+/// `request` told to the helper at `socket`, asked again after each of
+/// [`RETRY_AFTER`] while it gives no answer; later changes wait, so the
+/// order holds. An answer of any kind, a refusal included, is the helper's
+/// word and is not asked again.
+fn tell_until_answered(socket: &std::path::Path, request: &Value) {
+    let mut waits = RETRY_AFTER.iter();
+    loop {
+        match crate::push::ask_helper(socket, request, crate::push::ASK_WAIT) {
+            Ok(answer) => {
+                eprintln!("lamp-control: told the helper {request}: {answer}");
+                return;
+            }
+            Err(error) => match waits.next() {
+                Some(wait) => {
+                    eprintln!(
+                        "lamp-control: telling the helper {request}: {error}; again in {} s",
+                        wait.as_secs()
+                    );
+                    std::thread::sleep(*wait);
+                }
+                None => {
+                    eprintln!("lamp-control: gave up telling the helper {request}: {error}");
+                    return;
+                }
+            },
+        }
+    }
+}
+
 /// How often leases are checked for a lapse.
 pub const LEASE_TICK: Duration = Duration::from_millis(250);
 
@@ -189,6 +225,10 @@ impl Shared {
     /// pushed skills off, or held to new grants), sent in order by one
     /// thread; each answer said in the journal, as nobody waits for it.
     fn tell_helper(&self) {
+        // The queue's lock first, then the door's: two threads (an install's
+        // answer, a pair or a revoke) can't each take a batch and send them
+        // reversed (Reviewer-two's P3 on #3910).
+        let mut queue = self.changes.lock().expect("changes");
         let changes = self.door.lock().expect("door").take_helper_changes();
         if changes.is_empty() {
             return;
@@ -196,17 +236,11 @@ impl Shared {
         let Some(socket) = self.manage.lock().expect("manage").clone() else {
             return;
         };
-        let mut queue = self.changes.lock().expect("changes");
         let sender = queue.get_or_insert_with(|| {
             let (sender, received) = std::sync::mpsc::channel::<Value>();
             std::thread::spawn(move || {
                 for request in received {
-                    match crate::push::ask_helper(&socket, &request, crate::push::ASK_WAIT) {
-                        Ok(answer) => {
-                            eprintln!("lamp-control: told the helper {request}: {answer}")
-                        }
-                        Err(error) => eprintln!("lamp-control: told the helper {request}: {error}"),
-                    }
+                    tell_until_answered(&socket, &request);
                 }
             });
             sender
