@@ -47,6 +47,8 @@ mod head_touch;
 #[path = "round/asleep_quiet.rs"]
 mod asleep_quiet;
 
+#[path = "round/part_off.rs"]
+mod part_off;
 #[path = "round/product_adds.rs"]
 mod product_adds;
 #[path = "round/product_carrier.rs"]

@@ -757,6 +757,13 @@ each under the quiet rule. A round
    (`systemctl show`, at most 5 s) is not known yet and is asked again until
    the watch's end; only one still failing then puts the build back
    ("systemd cannot be asked").
+   A part that ends at once after its restart, `inactive`, with its own
+   last line since then a JSON object whose `enabled` is `false` (as every
+   part with a switch prints, `{"enabled":false,"message":…}`), is off by
+   its own switch, not stopped. The round says so and watches it no
+   further, and the build stands. Any other last line, or none, is
+   "stopped" as before (El's P3; the first builder's word on 8389's
+   put-back on lamp-06c1, 29 Oct).
 10. **Back.** A part not well: the journal's validated old startup order is
     used without rereading the installed dependency graph. Later changes or
     read failures in that graph cannot veto the saved restart order. Every

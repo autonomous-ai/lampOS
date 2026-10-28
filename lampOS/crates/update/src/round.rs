@@ -2442,6 +2442,8 @@ impl Run<'_, '_> {
         }
         let units: Vec<String> = watches.iter().map(|watch| watch.unit.clone()).collect();
         let until = self.world.clock.now_ms() + self.config.watch.as_millis() as u64;
+        // Parts that ended at once by their own switch, watched no further.
+        let mut off: Vec<String> = Vec::new();
         loop {
             // A query that fails is not known yet, not a part not well: it
             // is asked again until the watch's end, and only one that still
@@ -2464,6 +2466,9 @@ impl Run<'_, '_> {
             };
             let health = if done { self.world.ears.health() } else { None };
             for watch in watches.iter_mut() {
+                if off.contains(&watch.unit) {
+                    continue;
+                }
                 let state = states
                     .iter()
                     .find(|state| state.unit == watch.unit)
@@ -2477,6 +2482,20 @@ impl Run<'_, '_> {
                 } else {
                     watch.look(&state)
                 };
+                if judged.is_err() && state.active == "inactive" {
+                    // A part whose switch is off ends at once, exit 0,
+                    // saying so: a part off, not one that stopped (El's P3,
+                    // the first builder's word on 8389's put-back on
+                    // lamp-06c1, 29 Oct).
+                    if let Some(line) = self.said_off(&watch.unit) {
+                        self.say(&format!(
+                            "{} is off by its own switch since its restart, and is watched no further: \"{line}\"",
+                            watch.unit
+                        ));
+                        off.push(watch.unit.clone());
+                        continue;
+                    }
+                }
                 judged.map_err(|why| (watch.unit.clone(), why, true))?;
             }
             if done {
@@ -2547,6 +2566,15 @@ impl Run<'_, '_> {
 
     /// What a unit not well said of itself, for an outcome and never for the
     /// records (a part's line can carry what a person said): how often
+    /// The part's own last line since its restart, when it says the part is
+    /// off: a JSON object whose `enabled` is `false`, as every part with a
+    /// switch prints before it ends (`{"enabled":false,"message":…}`).
+    fn said_off(&mut self, unit: &str) -> Option<String> {
+        let line = self.world.systemd.last_line(unit)?;
+        let said: serde_json::Value = serde_json::from_str(&line).ok()?;
+        (said.get("enabled") == Some(&serde_json::Value::Bool(false))).then_some(line)
+    }
+
     /// systemd started it again since this round restarted it (`NRestarts`,
     /// which a restart asked for flushes), and its last own journal line.
     /// Empty when there is neither.
