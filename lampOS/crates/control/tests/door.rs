@@ -719,6 +719,26 @@ fn manage_helper(
     state: &std::path::Path,
     install_takes: Duration,
 ) -> Arc<std::sync::Mutex<Helper>> {
+    manage_helper_gated(socket, state, install_takes, None)
+}
+
+/// Held open until the test opens it (#1806): a list answers then, not
+/// after a fixed wait. Ten seconds at most, so a test that never opens it
+/// fails rather than hangs.
+type Gate = Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>;
+
+fn open_gate(gate: &Gate) {
+    *gate.0.lock().unwrap() = true;
+    gate.1.notify_all();
+}
+
+/// [`manage_helper`], with each list held at `gate` when one is given.
+fn manage_helper_gated(
+    socket: &std::path::Path,
+    state: &std::path::Path,
+    install_takes: Duration,
+    gate: Option<Gate>,
+) -> Arc<std::sync::Mutex<Helper>> {
     use std::io::{BufRead as _, Write as _};
     let seen = Arc::new(std::sync::Mutex::new(Helper::default()));
     let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
@@ -729,6 +749,7 @@ fn manage_helper(
             let Ok(mut stream) = stream else { break };
             let keep = keep.clone();
             let state = state.clone();
+            let gate = gate.clone();
             std::thread::spawn(move || {
                 let mut line = String::new();
                 std::io::BufReader::new(&stream)
@@ -746,7 +767,19 @@ fn manage_helper(
                     std::thread::sleep(install_takes);
                     json!({"done": {"name": "desk-wave", "version": "0.1.0", "on": true, "held": null}})
                 } else if request.get("list_pushed_by").is_some() {
-                    std::thread::sleep(install_takes);
+                    match &gate {
+                        Some(gate) => {
+                            let (open, opened) = &**gate;
+                            let _held = opened
+                                .wait_timeout_while(
+                                    open.lock().unwrap(),
+                                    Duration::from_secs(10),
+                                    |open| !*open,
+                                )
+                                .unwrap();
+                        }
+                        None => std::thread::sleep(install_takes),
+                    }
                     json!({"done": [{"name": "desk-wave", "version": "0.1.0", "on": true}]})
                 } else if request["remove_pushed"]["name"] == "desk-wave" {
                     json!({"done": "removed desk-wave"})
@@ -1051,10 +1084,13 @@ async fn a_stalled_helper_takes_four_requests_and_stop_still_answers() {
         door.with_push_folder(dir.to_path_buf())
     })
     .await;
-    let helper = manage_helper(
+    // The helper holds the four lists until the test opens its gate (#1806).
+    let gate: Gate = Arc::default();
+    let helper = manage_helper_gated(
         &lamp.dir.join("manage.sock"),
         &lamp.dir,
-        Duration::from_secs(3),
+        Duration::ZERO,
+        Some(gate.clone()),
     );
     lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
     // Five computers, all from this one address.
@@ -1065,8 +1101,9 @@ async fn a_stalled_helper_takes_four_requests_and_stop_still_answers() {
     let mut sockets = Vec::new();
     for seed in 50..55 {
         if seed > 50 {
-            // One pairing try a second.
-            tokio::time::sleep(Duration::from_millis(1_100)).await;
+            // One pairing try a second: the door's clock moves on past it
+            // rather than the test sleeping it (#1806).
+            lamp.shared.move_clock_on(Duration::from_millis(1_100));
         }
         sockets.push(paired(&lamp, json!(["skills"]), seed).await);
     }
@@ -1100,6 +1137,7 @@ async fn a_stalled_helper_takes_four_requests_and_stop_still_answers() {
         asked.elapsed()
     );
     assert_eq!(helper.lock().unwrap().asked.len(), 4);
+    open_gate(&gate);
     // Each of the four is answered once the helper is.
     for socket in &mut sockets[..4] {
         let listed = next(socket).await;
