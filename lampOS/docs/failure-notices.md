@@ -63,7 +63,7 @@ No wording or voice has been approved.
 | `approval` | `production` or `test` |
 | `file` | A bare `.wav` name in this directory: letters, digits, `.`, `-`, `_`; not hidden; at most 64 bytes |
 | `wav_sha256` | SHA-256 of the whole file |
-| `frames` | Mono frames at 24 kHz, 7,200 to 240,000: 0.3 s to 10 s |
+| `frames` | Mono frames at 24 kHz, 7,200 to 360,000: 0.3 s to 15 s |
 
 Unknown fields, an unknown kind or approval, a second entry for the same kind
 and language, more than 8 entries, or a manifest over 16 KiB make the whole
@@ -73,10 +73,17 @@ An unknown kind refuses the whole manifest, so one with `wifi_lost` goes onto
 a lamp only with, or after, the build that knows it (#1959), as for #830's
 kinds.
 
+The longest notice was 10 s before #3743; the no-Wi-Fi line with the reset
+pinhole runs about 13.4 s in the lamp's voice. An older loader refuses an
+entry over 10 s (`invalid_entry`), and the Wi-Fi helper's fallback, words for
+the model, can't be spoken without a network. So a notices release with a
+recording over 10 s goes onto a lamp only with, or after, the build that
+allows 15 s.
+
 Each recording must be a regular file opened without following a link, a
 complete RIFF/WAVE container of mono 24 kHz 16-bit integer PCM with exactly
 the stated number of frames, matching its hash, unchanged in size while read,
-and not all silence. Worst case held in memory: 8 notices of 10 s, 3.84 MB.
+and not all silence. Worst case held in memory: 8 notices of 15 s, 5.76 MB.
 
 ## What the runtime gets
 
@@ -243,7 +250,9 @@ The `wifi_lost` words above are the new ones (#3743), naming the RESET
 pinhole on the back of the base. The clip `wifi-lost.en-US.wav` pinned in
 `deploy/product/models.json` still has the old words ("If your Wi-Fi has
 changed, hold the reset button for five seconds."). A lamp plays the clip, so
-the new words arrive from the next notices release.
+the new words arrive from the next notices release. The new line renders at
+13.37 s in the lamp's voice, over an older loader's 10 s, so that release goes
+out with or after the build that allows 15 s (above).
 
 They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
 size and SHA-256 in `deploy/product/models.json`. `lamp-update install`

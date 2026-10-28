@@ -309,7 +309,8 @@ fn only_complete_mono_24khz_pcm16_of_the_stated_length_is_accepted() {
             Err(Missing::InvalidEntry)
         );
     }
-    for frames in [MIN_FRAMES, MAX_FRAMES] {
+    // The no-Wi-Fi line with the reset pinhole, 13.4 s in the lamp's voice (#3743).
+    for frames in [MIN_FRAMES, 321_000, MAX_FRAMES] {
         let bytes = wav(RATE, 1, &tone(frames));
         assert_eq!(
             with(|value| value["frames"] = json!(frames), Some(bytes)),
