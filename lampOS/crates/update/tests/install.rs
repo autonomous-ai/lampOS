@@ -1074,12 +1074,23 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
 /// its own /tmp and no privileges gained. One row a unit, each line once.
 #[test]
 fn root_units_write_only_what_their_work_needs() {
-    let rows: [(&str, &[&str]); 1] = [
+    // (unit, what it writes, its own /tmp)
+    let rows: [(&str, &[&str], bool); 2] = [
         // The release socket, in its runtime directory, and the ring's
-        // device: nothing else (crates/setup/src/wake.rs).
-        ("lamp-waking.service", &[]),
+        // device: nothing else (crates/setup/src/wake.rs). No PrivateTmp:
+        // it would order this early unit after the /tmp mounts and
+        // systemd-tmpfiles-setup, delaying first light (Reviewer-lead's P3
+        // on #4036), and it uses no /tmp.
+        ("lamp-waking.service", &[], false),
+        // Its subscriber's socket under the bus; the reset is detached
+        // (below), so the wipe is not this unit's to write.
+        ("lamp-setup-reset.service", &["/run/lampos-bus"], true),
     ];
-    for (unit, writes) in rows {
+    // The reset's wipe, stop and reboot run in a unit of their own
+    // (`start_reset`), so watch-reset's sandbox never has to hold them.
+    let plan: serde_json::Value = serde_json::from_str(install::RESET_PLAN).unwrap();
+    assert_eq!(plan["detach"][0], "/usr/bin/systemd-run");
+    for (unit, writes, private_tmp) in rows {
         let text = PRODUCT
             .iter()
             .find_map(|(name, text)| (*name == unit).then_some(*text))
@@ -1089,7 +1100,6 @@ fn root_units_write_only_what_their_work_needs() {
         for line in [
             "ProtectSystem=strict",
             "ProtectHome=yes",
-            "PrivateTmp=yes",
             "NoNewPrivileges=yes",
         ] {
             assert_eq!(
@@ -1098,6 +1108,19 @@ fn root_units_write_only_what_their_work_needs() {
                 "{unit}: {line}"
             );
         }
+        let tmp: Vec<&&str> = service
+            .iter()
+            .filter(|line| line.starts_with("PrivateTmp="))
+            .collect();
+        assert_eq!(
+            tmp,
+            if private_tmp {
+                vec![&"PrivateTmp=yes"]
+            } else {
+                vec![]
+            },
+            "{unit}"
+        );
         let written: Vec<&str> = service
             .iter()
             .filter_map(|line| line.strip_prefix("ReadWritePaths="))
