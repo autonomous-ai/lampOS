@@ -303,10 +303,28 @@ impl Lamp {
     }
 
     fn say(&self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
+        self.to_voice(
+            client,
+            re,
+            json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS}),
+        )
+    }
+
+    /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
+    /// no model), through the same queue, quiet, rarity and privacy gates as
+    /// a skill's sound; its outcome is a `done`, as a say's is.
+    fn sound(&self, client: &str, re: u64) -> Result<Value, Error> {
+        self.to_voice(
+            client,
+            re,
+            json!({"skill": "control", "cue": "hum", "expires_in_ms": SAY_EXPIRES_MS}),
+        )
+    }
+
+    fn to_voice(&self, client: &str, re: u64, line: Value) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
-        let line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
         let events = self.events.clone();
         let client = client.to_owned();
         // Off the door's lock, connecting included (the Reviewer-lead's P3
@@ -399,7 +417,14 @@ impl Parts for Lamp {
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength),
-            Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
+            // Only the hum today (protocol.rs refuses any other name).
+            Op::Sound { .. } => self.sound(client, re),
+            // The lamp's own recorded move, whole, as its skill sends it;
+            // protocol.rs refused any other name.
+            Op::Play { name } => match crate::plays::named(name) {
+                Some(file) => self.to_body(json!({ "move": file }), client),
+                None => Err(Error::new(ErrorCode::BadRequest, "no such move")),
+            },
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
     }
@@ -479,6 +504,20 @@ mod tests {
         let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
         assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));
         assert_eq!(sent["priority"], "skill");
+        // `play`: the lamp's own move, whole, as its skill ships it.
+        assert_eq!(
+            lamp.act("c_1", 3, &op(r#"{"id":3,"op":"play","name":"sway"}"#), 0)
+                .unwrap(),
+            json!({"to": "body"})
+        );
+        let length = body.recv(&mut buffer).unwrap();
+        let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+        let sway: Value = serde_json::from_str(crate::plays::PLAYS[3].1).unwrap();
+        assert_eq!(sent["move"], sway);
+        assert_eq!(
+            (&sent["source"], &sent["priority"]),
+            (&json!("control:c_1"), &json!("skill"))
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -746,6 +785,53 @@ mod tests {
         assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"ahead"}"#);
     }
 
+    /// `sound` is the lamp's own short hum: the voice's built-in cue on the
+    /// say socket, with say's gates and outcome (in this release, #3504).
+    #[test]
+    fn a_sound_is_the_voices_own_hum_and_its_outcome_comes_as_done() {
+        let dir = dir("sound");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let mut out = &stream;
+            writeln!(out, r#"{{"event":"begun","at_us":5}}"#).unwrap();
+            writeln!(out, r#"{{"outcome":"spoken"}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        assert_eq!(
+            lamp.act("c_1", 14, &op(r#"{"id":14,"op":"sound","name":"hum"}"#), 0)
+                .unwrap(),
+            json!({"to": "voice"})
+        );
+        let asked = voice.join().unwrap();
+        assert_eq!(
+            asked,
+            json!({"skill": "control", "cue": "hum", "expires_in_ms": 30000})
+        );
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            told.lock().unwrap()[0],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 14, "how": "finished"})
+            )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn what_is_not_routed_yet_says_what_it_waits_for() {
         let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
@@ -756,7 +842,10 @@ mod tests {
             ),
             (r#"{"id":1,"op":"look","at":"face"}"#, NOT_IN_THIS_RELEASE),
             (r#"{"id":1,"op":"look","at":"name"}"#, NOT_IN_THIS_RELEASE),
-            (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
+            (
+                r#"{"id":1,"op":"joints","lease":"l_1","targets":{"pitch":4.0},"within_ms":300}"#,
+                "lease socket",
+            ),
         ] {
             let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();
             assert!(error.why.contains(waits), "{frame}: {}", error.why);

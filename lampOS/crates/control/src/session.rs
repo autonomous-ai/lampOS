@@ -1252,7 +1252,7 @@ mod tests {
             };
         }
         let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
-        let sound = r#"{"id":4,"op":"sound","name":"chime"}"#;
+        let sound = r#"{"id":4,"op":"sound","name":"hum"}"#;
         for hour in [22, 23, 0, 3, 6] {
             for frame in [say, sound] {
                 let refused = send!(door, frame, at(hour));
@@ -1442,7 +1442,7 @@ mod tests {
         assert_eq!(code_of(&subscribe), Some("no_grant"));
         let play = door.handle(
             &mut session,
-            r#"{"id":4,"op":"play","name":"wave"}"#,
+            r#"{"id":4,"op":"play","name":"sway"}"#,
             &mut fake,
             2 * S,
             1,
@@ -1458,7 +1458,7 @@ mod tests {
         assert_eq!(reply(&take)["lease"], "l_1");
         let play = door.handle(
             &mut session,
-            r#"{"id":6,"op":"play","name":"wave"}"#,
+            r#"{"id":6,"op":"play","name":"sway"}"#,
             &mut fake,
             3 * S,
             1,
