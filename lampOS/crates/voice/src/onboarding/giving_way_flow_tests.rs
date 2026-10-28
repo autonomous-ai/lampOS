@@ -1,5 +1,7 @@
 //! The giving-way step (#1800), with a fake body on a scripted Unix clock.
-use super::giving_way::{Felt, GIVE_AGAIN, GIVE_ASK, GIVE_DONE, GIVE_FAILED};
+use super::giving_way::{
+    Felt, GIVE_AGAIN, GIVE_ASK, GIVE_DONE, GIVE_FAILED, GIVE_FELT, GIVE_MORE, GIVE_PROMPT,
+};
 use super::*;
 use std::cell::Cell;
 use std::sync::{
@@ -10,6 +12,8 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 const S: u64 = 1_000_000;
+/// How long an invitation takes to say, here.
+const SAID_MS: u64 = 5_000;
 
 thread_local! {
     static NOW_MS: Cell<u64> = const { Cell::new(0) };
@@ -143,10 +147,12 @@ fn play_saying(
 ) -> Played {
     let token = offer(walk, now);
     let asked = asked(walk.desired.giving_way_tries);
+    let ended_ms = 1_760_000_000_000 + now / 1_000;
+    // Taken to be said 5 s before its playback ends.
+    set_clock(ended_ms - SAID_MS);
     assert_eq!(walk.take_invitation(token, now).unwrap(), asked);
     let boot = BootId::new([4; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
-    let ended_ms = 1_760_000_000_000 + now / 1_000;
     set_clock(ended_ms);
     walk.invitation_finished(boot, turn, Delivery::Whole, now);
     Played {
@@ -265,7 +271,7 @@ fn a_hand_still_on_the_head_is_not_done_and_two_tries_unfelt_fail() {
     let played = play(&mut walk, 10 * S, 1);
     push(&mut walk, &played, 2_000, 30.0, 30.0, false);
     let now = played.at(30_000);
-    assert_eq!(settle(&mut walk, now), Vec::<&str>::new());
+    assert_eq!(settle(&mut walk, now), [GIVE_FELT]);
     assert_eq!(outcome(&walk), None);
     // The minute ends: asked once more.
     let now = played.at(60_000);
@@ -414,10 +420,11 @@ fn a_head_not_moved_far_or_not_held_where_the_hand_put_it_is_not_done() {
         },
     );
     assert_eq!(forged, Felt::Invalid);
-    assert_eq!(settle(&mut walk, played.at(7_000)), Vec::<&str>::new());
+    assert_eq!(settle(&mut walk, played.at(7_000)), [GIVE_MORE]);
     assert_eq!(outcome(&walk), None);
-    // Evidence from before the invitation ended is not of this try.
-    let early = played.ended_ms - 1_000;
+    // Evidence from before the invitation was taken to be said is not of
+    // this try.
+    let early = played.ended_ms - SAID_MS - 1_000;
     for felt in [
         joints(early, 0.0, 0.0),
         hand(early + 80, true),
@@ -620,7 +627,7 @@ fn the_same_turn_with_the_hand_never_said_is_not_done() {
     let played = play(&mut walk, 10 * S, 1);
     let holds = [1_871.0, 1_839.0, 1_807.0, 1_775.0, 1_744.0];
     turn_base_as_on_52e6(&mut walk, &played, &holds, false);
-    assert_eq!(settle(&mut walk, played.at(20_000)), Vec::<&str>::new());
+    assert_eq!(settle(&mut walk, played.at(20_000)), [GIVE_PROMPT]);
     assert_eq!(outcome(&walk), None);
     walk.tick(played.at(60_000), START_QUIET_US, true, false, face(), true);
     assert!(
@@ -686,4 +693,218 @@ fn an_ask_never_said_three_times_is_not_available_never_failed() {
     assert_eq!(outcome(&walk), Some(Outcome::NotAvailable));
     assert_eq!(walk.kept().giving_way_tries, 0);
     assert!(walk.pending().invitations.is_empty());
+}
+
+/// Each of the step's lines, as the skill ships them (#3702): the ask names
+/// no direction, as any head joint counts (`base_yaw`, `head_pitch`,
+/// `head_roll`), and asks for the push now, as the lamp listens from the
+/// ask's start.
+#[test]
+fn the_steps_lines_are_the_skills() {
+    let said = |line: &str| line.split('"').nth(1).unwrap().to_owned();
+    for (line, words) in [
+        (
+            GIVE_ASK,
+            "Put your hand on my head and move it gently, any way, just a little. I'll tell you when.",
+        ),
+        (
+            GIVE_AGAIN,
+            "I didn't feel my head move. Put your hand on my head and move it gently, any way, just a little. I'll tell you when.",
+        ),
+        (GIVE_FELT, "That's it, now let go."),
+        (GIVE_MORE, "A little more, then let go."),
+        (
+            GIVE_PROMPT,
+            "Put your hand on my head and move it a little, any way you like. I'll go with your hand.",
+        ),
+        (GIVE_DONE, "Got it, my head moved with your hand."),
+        (
+            GIVE_FAILED,
+            "I didn't feel my head move this time. That's fine, you can redo the setup later.",
+        ),
+    ] {
+        assert_eq!(said(line), words);
+    }
+}
+
+/// lamp-29e7, 28 Oct (#3702): the person pushed while the lamp was still
+/// saying the invitation, the body said the hand, and the try opened 15 s
+/// later with nobody pushing again. A push from the ask's start is the
+/// try's: answered once the ask is said, and done on the same judgement.
+#[test]
+fn a_push_while_the_invitation_is_said_is_the_trys() {
+    for release_before_the_end in [true, false] {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        let token = offer(&mut walk, 10 * S);
+        let taken_ms = 1_760_000_000_000;
+        set_clock(taken_ms);
+        assert_eq!(walk.take_invitation(token, 10 * S).unwrap(), GIVE_ASK);
+        let boot = BootId::new([4; 16]).unwrap();
+        assert!(walk.bind_invitation(token, boot, 1));
+        // Both clocks `after` ms past the ask's start.
+        let at = |after: u64| {
+            set_clock(taken_ms + after);
+            10 * S + after * 1_000
+        };
+        let felt = [
+            (1_000, joints(taken_ms + 1_000, 0.0, 0.0)),
+            (1_080, hand(taken_ms + 1_080, true)),
+            (1_160, joints(taken_ms + 1_160, 33.0, 0.0)),
+            (1_240, joints(taken_ms + 1_240, 33.0, 33.0)),
+            (1_240, hand(taken_ms + 1_240, true)),
+        ];
+        for (after, felt) in felt {
+            walk.giving_way_felt(felt, at(after));
+        }
+        // Nothing is said over the ask.
+        assert_eq!(
+            walk.tick(at(1_300), START_QUIET_US, false, false, face(), true),
+            None
+        );
+        if release_before_the_end {
+            walk.giving_way_felt(hand(taken_ms + 1_320, false), at(1_320));
+        }
+        walk.invitation_finished(boot, 1, Delivery::Whole, at(15_000));
+        if release_before_the_end {
+            assert_eq!(settle(&mut walk, at(15_100)), [GIVE_DONE]);
+            assert_eq!(outcome(&walk), Some(Outcome::Done));
+            continue;
+        }
+        // Still in the hand: told at once to let go, then done on it.
+        assert_eq!(settle(&mut walk, at(15_100)), [GIVE_FELT]);
+        walk.giving_way_felt(hand(taken_ms + 16_000, false), at(16_000));
+        assert_eq!(settle(&mut walk, at(16_100)), [GIVE_DONE]);
+        assert_eq!(outcome(&walk), Some(Outcome::Done));
+    }
+}
+
+/// Never a silent minute (#3702): with nothing felt, the lamp prompts once
+/// a few seconds into the minute, and says nothing more before the minute's
+/// end asks again.
+#[test]
+fn nothing_felt_is_prompted_once_early_never_a_silent_minute() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    let mut said = Vec::new();
+    for tenth in 1..600 {
+        for line in settle(&mut walk, played.at(tenth * 100)) {
+            said.push((tenth * 100, line));
+        }
+    }
+    assert_eq!(said, [(8_000, GIVE_PROMPT.to_owned())]);
+    let now = played.at(60_000);
+    assert_eq!(settle(&mut walk, now), Vec::<String>::new());
+    offer(&mut walk, now + S);
+}
+
+/// A push answered at once, then the hand gone without moving the head
+/// far enough: asked for a little more, and nothing else through the minute.
+#[test]
+fn a_push_that_did_not_move_the_head_is_answered_then_prompted_once() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    push(&mut walk, &played, 2_000, 10.0, 10.0, false);
+    assert_eq!(settle(&mut walk, played.at(2_200)), [GIVE_FELT]);
+    // Released 4 counts from where it was: a bump.
+    walk.giving_way_felt(joints(played.ended_ms + 3_000, 4.0, 4.0), played.at(3_000));
+    walk.giving_way_felt(hand(played.ended_ms + 3_000, false), played.at(3_000));
+    let mut said = Vec::new();
+    for tenth in 31..600 {
+        said.extend(settle(&mut walk, played.at(tenth * 100)));
+    }
+    assert_eq!(said, [GIVE_MORE]);
+}
+
+/// The body's joints with only `moved` off the middle: at `position`
+/// counts, its goal at `goal`.
+fn one_joint(at_ms: u64, moved: &str, position: f64, goal: f64) -> Felt {
+    let names = ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"];
+    let at = |value: f64| {
+        names
+            .map(|name| if name == moved { radians(value) } else { 0.0 })
+            .to_vec()
+    };
+    Felt::joints(
+        at_ms,
+        "body",
+        &lamp_msgs::JointState {
+            name: names.map(str::to_owned).to_vec(),
+            position: at(position),
+            velocity: Vec::new(),
+            effort: vec![0.1; 5],
+            commanded: at(goal),
+        },
+    )
+}
+
+/// A person moves the head whichever way they like (#3702): the base
+/// turned (lamp-52e6), the head tilted (lamp-29e7's pass) or rolled is
+/// done; the arm moved alone is not the head, and the lamp says plainly
+/// how to do it.
+#[test]
+fn any_head_joint_moved_by_hand_is_done_and_the_arm_alone_is_not() {
+    for (joint, done) in [
+        ("base_yaw", true),
+        ("head_pitch", true),
+        ("head_roll", true),
+        ("shoulder", false),
+    ] {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        let played = play(&mut walk, 10 * S, 1);
+        let at = |after: u64| played.ended_ms + after;
+        for (after, felt) in [
+            (2_000, one_joint(at(2_000), joint, 0.0, 0.0)),
+            (2_080, hand(at(2_080), true)),
+            (2_160, one_joint(at(2_160), joint, -33.0, -28.0)),
+            (2_240, hand(at(2_240), false)),
+        ] {
+            walk.giving_way_felt(felt, played.at(after));
+        }
+        let said = settle(&mut walk, played.at(2_300));
+        if done {
+            assert_eq!(said, [GIVE_DONE], "{joint}");
+            assert_eq!(outcome(&walk), Some(Outcome::Done), "{joint}");
+        } else {
+            assert_eq!(said, [GIVE_MORE], "{joint}");
+            assert_eq!(outcome(&walk), None, "{joint}");
+        }
+    }
+}
+
+/// A push late in the minute, a second before its end, still counts.
+#[test]
+fn a_late_push_near_the_trys_end_is_done() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    assert_eq!(settle(&mut walk, played.at(8_000)), [GIVE_PROMPT]);
+    push(&mut walk, &played, 58_700, 30.0, 30.0, true);
+    assert_eq!(settle(&mut walk, played.at(59_000)), [GIVE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+/// Nobody pushes at all: each try is prompted once a few seconds in, the
+/// second invitation says what didn't work, and the end is the plain fail
+/// line, never a silent minute.
+#[test]
+fn no_push_at_all_is_prompted_each_try_then_failed_plainly() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let mut played = play(&mut walk, 10 * S, 1);
+    let mut said = Vec::new();
+    for tries in 1..=2 {
+        for tenth in 1..=600 {
+            said.extend(settle(&mut walk, played.at(tenth * 100)));
+        }
+        if tries == 1 {
+            let now = played.at(60_000) + S;
+            played = play(&mut walk, now, 2);
+        }
+    }
+    assert_eq!(said, [GIVE_PROMPT, GIVE_PROMPT, GIVE_FAILED]);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
 }

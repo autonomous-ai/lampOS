@@ -56,8 +56,8 @@ first = "(Say only this one short sentence, nothing before or after it: \"Try my
 reoffer = "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
 
 [onboarding.steps.giving_way]
-first = "(Say only this, nothing before or after it: \"My head gives way to your hand. Take it gently, move it a little, then let go.\")"
-reoffer = "(Say only this, nothing before or after it: \"My head gives way to your hand. Take it gently, move it a little, then let go.\")"
+first = "(Say only this, nothing before or after it: \"Put your hand on my head and move it gently, any way, just a little. I'll tell you when.\")"
+reoffer = "(Say only this, nothing before or after it: \"Put your hand on my head and move it gently, any way, just a little. I'll tell you when.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip my head giving way for now.\")"
 
 [onboarding.steps.room_sounds]
@@ -97,7 +97,10 @@ sentence_closer = "(Say only this, nothing before or after it: \"Come a little c
 sentence_again = "(Say only this, nothing before or after it: \"Say another sentence from your seat.\")"
 sentence_done = "(Say only this, nothing before or after it: \"Got it, I hear you well from there.\")"
 sentence_failed = "(Say only this, nothing before or after it: \"I couldn't hear you well enough this time. I'll get used to your voice as we talk.\")"
-give_again = "(Say only this, nothing before or after it: \"I didn't feel my head move. Take it gently, move it a little, then let go.\")"
+give_again = "(Say only this, nothing before or after it: \"I didn't feel my head move. Put your hand on my head and move it gently, any way, just a little. I'll tell you when.\")"
+give_felt = "(Say only this, nothing before or after it: \"That's it, now let go.\")"
+give_prompt = "(Say only this, nothing before or after it: \"Put your hand on my head and move it a little, any way you like. I'll go with your hand.\")"
+give_more = "(Say only this, nothing before or after it: \"A little more, then let go.\")"
 give_done = "(Say only this, nothing before or after it: \"Got it, my head moved with your hand.\")"
 give_failed = "(Say only this, nothing before or after it: \"I didn't feel my head move this time. That's fine, you can redo the setup later.\")"
 who_confirm = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)"
