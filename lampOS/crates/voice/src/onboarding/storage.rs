@@ -1076,7 +1076,8 @@ mod tests {
         idle(&client);
         let tries = [22.4, 25.0, 23.1].map(|rise_db| lamp_near_call::Try {
             rise_db,
-            score: 0.98,
+            score: Some(0.98),
+            heard_by: lamp_near_call::HeardBy::Name,
         });
         let bar = lamp_near_call::Calibrated::of(tries.to_vec(), 7).unwrap();
         // A bar its tries don't make is refused before it reaches the worker.

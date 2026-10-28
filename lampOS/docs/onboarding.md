@@ -26,7 +26,7 @@ ready, not paused) and a face is in front of it.
 |---|---|---|---|---|
 | 1 | `where_you_sit` | asks them to sit where they usually sit and look at it | the eyes' largest fresh face (`humans/faces/tracked`) is at least 0.14 of the picture's height with its centre within 0.35 of the middle (the lead's chair at about 1 m, row 10 on lamp-52e6 on 21 October, gave size 0.15, x 0.05, y -0.26: a seated person is a little high in a lamp's picture), held 3 s while the head is still and no hand is on the lamp (every head joint, `base_yaw`, `head_pitch`, `head_roll` on `body/joint_states`, within 6 counts of its goal, slower than 25 counts a second, and the same goals as the last reading; `body/hand` not pushed; each reading fresh, within 0.7 s; any motion, or a reading stale or missing once there is any sign of a body, starts the 3 s again, and a hand not freshly released counts as still there. Any sign stays: either topic present at all (fresh, stale, unparseable, or a read that failed) or any `body/` topic or declaration on the bus. Only a lamp with no body at all goes without that gate): done, and the lamp says so. While the step is led the voice tells the body it listens between turns (`Onboarding::looking`), so the body's gaze turns the head to the face in small corrections, as a creature looks at someone, before anything is asked of the person. Short of that, after 8 s of quiet, one note (only one, ever) says what is missing: no face, or "a bit closer" / "turn me a little toward you" with "where you are is fine too". "Turn me" waits until a face big enough has been in view, looked at, for 5 s: the lamp asks to be moved only when its own look still has the person off the middle. After that note any face held 3 s the same way is done where it is, its framing kept: a person sitting beside the lamp (row 10 on lamp-52e6, the face at x 0.12, y -0.63) would just say "there's fine". After 60 s: failed, and the lamp says they can turn it toward their seat later or redo the setup | the framing (size, centre) |
 | 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) when the voice has it (`LAMP_EYES_WHO_SOCKET`, and eyes that recognise); without it, the name only, never `remember` | a name heard ("call me …", "my name is …", "I'm …", "I am …", "it's …", or a name alone, one or two words and no question) and then a yes ("yes", "that's fine", …, and "no problem", "I don't mind", "of course", "go ahead", whose no word is no no, when the phrase leads the line or the line is four words or fewer, so "I'll go ahead and sit down" is no yes; #3883, a tester's 7071 lamp took 5 minutes on 27 October) heard after it: the walk ends the step itself, but only on a lamp that keeps no face (no `LAMP_EYES_WHO_SOCKET`); with a face to keep, that yes is most often the face question's, and the step ends when the face is saved (below), by the model's report, or 15 s after the latest yes with no face saved, once the room has been quiet 3 s (`FACE_SAVE_WAIT_US`, timed from the latest yes since the first is often the name's "Marie, right?"; `START_QUIET_US`: a refused save, the eyes away), done with the name only; with a face to keep, a no after the name never ends the step or takes the name back: like a yes it restarts that 15 s wait, so a no to "Marie, right?" waits for the new name (a line that names someone, "No, it's Mary.", corrects it), and the face's no, of any length, ends it done with the name only once the wait and the quiet are over (lamp-29e7, 28 Oct, ended on the yes with no face kept; the Reviewer-lead's P2s on #3992) (`onboarding_heard`; row 10 on lamp-52e6, 21 October: named and agreed, never reported). The word after "I'm" and the others is no name when it is fine, good, okay, ok, not, sure, here, ready, sorry, just, back, busy, tired, the lamp's name ("lamp") or a yes or no word; a name alone also never is what, huh, hmm, um, uh, hey, hi or hello. Without a face to keep, a no after a name takes it back. The model's `setup_step` call is a second way in, as soon as the name (and the face, if asked) is settled. Each `setup_step` call is a journal line with its step, outcome and answer ("lamp-voice: onboarding: setup_step step … outcome …: noted" or "refused (…)"), and a report the walk does not take says which step is led; a name heard and a no that takes it back are journal lines too, without the name (#3883). A face `remember_my_face` saves while this step is led is a third: the eyes' `ok` ends it as done through the same mailbox, so a chat that saves the face never leaves the step without an outcome (#3740, a tester's 7071 lamp on 27 October); a refused save, or one at any other time, changes nothing. Nobody is known yet in this step, so every save there is the room's: a visitor's "remember my face" during it ends the step too, which the scope can't tell apart (the Reviewer-lead on #3746). The walk's record names it (`onboarding_face_saved`), and with the nudge on its `onboarding_nudge` line says `"reported": false`, since the model made no `setup_step` call. A name heard with no yes is done, not failed, at the 90 s give-up. The name's words are not kept: the walk's record says `"name_kept": false`, as the model's own call keeps none. This reading is for the nudge off: with the nudge on (`LAMP_ONBOARDING_NUDGE`), the step ends only through the nudge's own path, where the name is asked back and kept on a yes (`onboarding_nudge`, `"name_confirmed": true`). The two never both end it (the first builder on #2526) | the face in the eyes' people file, when asked and agreed; otherwise nothing |
-| 3 | `how_you_sound` | the core onboarding skill requests a short prompt: from their usual seat, say "Hey Lamp" the way they'd get its attention, a few times, each later prompt answering the last call (#1803, #3702, below); then one to say a sentence from there in their own words | the name part: three accepted calls make a bar and its file is written; five prompts can't reach three, or the calls spread over 10 dB: no bar. Then the sentence part, whose outcome is the step's: a line heard with words, said close, its words covering it: done; short of that, coached once ("a little louder" or "a little closer"), then done or failed | the prompts and accepted tries (`rise_db`, `score`); the bar in `/var/lib/lampOS/voice/near-call.json`; the sentence's prompt count only |
+| 3 | `how_you_sound` | the core onboarding skill requests a short prompt: from their usual seat, say "Hey Lamp" the way they'd get its attention, a few times, each later prompt answering the last call (#1803, #3702, below); then one to say a sentence from there in their own words | the name part: three accepted calls (each heard by lamp-name at 0.95 or more, or by speech to text as the name alone, #3923) make a bar and its file is written; five prompts can't reach three, or the calls spread over 10 dB: no bar. Then the sentence part, whose outcome is the step's: a line heard with words, said close, its words covering it: done; short of that, coached once ("a little louder" or "a little closer"), then done or failed | the prompts and accepted tries (`rise_db`, `score` when lamp-name heard it, `heard_by`: `name` or `text`); the bar in `/var/lib/lampOS/voice/near-call.json`; the sentence's prompt count only |
 | 4 | `touch` | says exactly "Tap the top of my head once, then let go." (see "Exact lines" below), then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder, "I didn't feel that. Tap a little firmer, right on top of my head."; 60 s after the ask: failed. Either end is said (`touch_done`, `touch_failed`) before the next step is asked. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |
 | 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | an invitation begun, a fresh physical close (even while it is said), the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; with eyes that give receipts on the bus, also their receipt that the camera closed for this close (#1802) | bounded attempt evidence and completion identity |
 | 6 | `giving_way` | the core onboarding skill requests a short invitation, exactly "Take my head and tilt it gently to one side, then let go. I'll tell you when."; a second try's is `give_again`, "I didn't feel my head move. …" (#1800, below). A push is answered at once ("That's it, now let go."), and a minute with none a few seconds in is prompted once (#3702) | from the invitation's start to a minute after its playback, the body says a hand pushed it, a head joint moved more than the body's `HAND_MOVED` (15 counts) from where it was asked to be with its goal held there, and then the hand let go: done; two invitations without that: failed; no body, or the keeper's pause while it is led: `not_available` | the outcome only |
@@ -581,6 +581,49 @@ the window does not spoil it). The prompt itself counts as the lamp speaking
 until its end, so a name begun in the half second after it is refused as the
 lamp speaking (its own tail or echo).
 
+**A call heard by speech to text counts too** (#3923). lamp-name misses some
+voices on some lamps: on lamp-29e7 (build 8001) the tester said "Lamp" the
+same way four times and only prompt 2 counted; 1, 3 and 4 were refused "the
+name wasn't heard" with `heard: []`, while the second route's speech to text
+heard each bare "Lamp". So a line told the second route as the step's call
+(`StepCall`, below) whose words were the lamp's name alone (`name_alone`:
+"Lamp", "Lamp.", "Hey Lamp", "Hey, Lamp.", "Hey Lamp!") is told back as
+`ProviderOutput::StepCallHeard`, before its idle `TurnComplete`. The
+coordinator kept when that line's speech began (its first speech block, at
+its End) and hands it to the step (`Onboarding::near_text_call`; record
+`onboarding_text_call` with `taken`), which maps it to the Unix clock by the
+prompt's end read on both clocks, as `holds_reply` does, and keeps it as
+evidence only while the name part listens for a call. `near_try_with_said`
+then counts it as a hearing: the same 6 s window, one call a try (two
+separate calls, by either path, are two hearings), the same lamp-spoke guard,
+and the rise from mic1's largest level over its quiet in the second after the
+line began, `own_voice` readings left out. A line and a hearing begun within
+1 s of each other (`ONE_CALL_MS`) are one call: a hearing at 0.95 or more
+stays the detector's (`heard_by: name`, its score kept); one under 0.95 that
+the line confirms counts as `heard_by: text`. A hearing under 0.95 with no
+such line is still refused as unsure: the detector's bar is not lowered. A
+try heard by text keeps no score (`score` absent, `heard_by: text`); an older
+file, with a score and no `heard_by`, reads as heard by the name, and the bar
+file and the kept tries accept either (`Try::heard_surely`). A line of the
+name begun over the prompt's last word is answered early, as a hearing is
+(below). A sound with no words, "Lamp is broken", or any other words never
+come back as `StepCallHeard`, so they are never a call by text. When a call's
+line began in the window and ended with its words not back yet, the try's
+judgement waits for them at most 1.5 s more (`TEXT_WAIT_US`): a "Lamp" begun
+near 6 s has its words back about a second later. Tests:
+`lamp_near_call::tests::a_line_heard_as_the_name_alone_counts_with_its_rise`,
+`without_a_line_of_the_name_alone_the_detectors_bar_is_unchanged`,
+`a_line_and_a_hearing_begun_within_a_second_are_one_call`,
+`three_calls_heard_by_text_alone_make_the_bar`,
+`old_and_text_files_read_and_odd_mixes_do_not`;
+`onboarding::near_flow_tests::a_call_heard_only_by_text_counts_with_its_rise_and_says_so`,
+`a_call_heard_by_text_and_by_the_detector_is_one_try`,
+`a_call_by_text_begun_over_the_prompt_is_offered_again`,
+`a_call_begun_late_has_its_words_waited_for_a_moment`,
+`three_calls_heard_only_by_text_keep_a_bar`;
+`second_provider::tests::a_line_with_no_words_is_never_told_as_the_steps_call`;
+`coordinator::tests::second_route::a_bare_name_heard_by_text_reaches_the_step_as_its_call`.
+
 **A call begun over the prompt's last word is not a try.** People start
 answering as the lamp finishes: on lamp-52e6 (row 10, tries 2 and 4) the name
 began 237 to 478 ms before the prompt's end. A name heard at 0.95 or more,
@@ -611,9 +654,11 @@ identity is used or kept.
 journal line, `lamp-voice onboarding: how_you_sound try: {…}`: the prompt,
 `accepted`, `why` (or the sentence's `short`), and the numbers that decided
 it. A name try lists every name heard as `heard: [[ms from the prompt's end,
-score], …]` and, when refused, when the lamp spoke as `spoke: [[from, to],
+score], …]`, every line heard by text as the name alone as `said: [ms from
+the prompt's end, …]` (#3923) and, when refused, when the lamp spoke as `spoke: [[from, to],
 …]` (ms from the prompt's end; the prompt itself is the span ending at 0);
-an accepted one adds `rise_db`. A sentence try has `words`, `speech_ms`,
+an accepted one adds `rise_db`, `score` (null when heard by text) and
+`heard_by` (`name` or `text`), so a run shows which path counted. A sentence try has `words`, `speech_ms`,
 `rise_db`, `bar_db` and `said_close`. The session record rolls over and the
 journal is rotated, so read it soon after the walk.
 
@@ -655,7 +700,11 @@ name (`second_provider.rs`'s `name_alone`, the rule of
 no words came back, the second route asks no chat, answers nothing, keeps it
 out of the thread and carries it to no later line ("only the lamp's name,
 while how_you_sound waits for a call: left to the step, not answered"). The
-try is measured from `name/heard` as before. Any other words ("Lamp, what
+try is measured from `name/heard` as before, and, when the words were the
+name alone, from the line itself too: the route also sends `StepCallHeard`
+(#3923, "A call heard by speech to text counts too" above). A line with no
+words, which only the detector's call made one, is not told: the detector
+heard it. Any other words ("Lamp, what
 time is it?") are a turn as now, and a prompt such a line cuts is offered
 again as any cut prompt. Outside the step nothing is told. The Live worker
 takes nothing from `StepCall`; there the coordinator's hold above stands.

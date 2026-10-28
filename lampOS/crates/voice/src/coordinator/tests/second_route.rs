@@ -234,6 +234,10 @@ struct Script {
     /// The lamp's name is heard beginning this many milliseconds from the
     /// scenario's start, as that step reads it (#1803).
     near_name_ms: Option<u64>,
+    /// Alone, a line told as the step's call (`StepCall`) has words that
+    /// were the lamp's name alone (#3923): the route says so
+    /// (`StepCallHeard`) and ends it idle, as the engine does.
+    heard_as_call: bool,
     /// Capture frames of speech in the person's first utterance, from frame
     /// 20 (60: 0.6 s, as long as a call).
     speech_frames: u64,
@@ -302,6 +306,7 @@ impl Script {
             live_hears: &[],
             live_says: None,
             near_name_ms: None,
+            heard_as_call: false,
             speech_frames: 60,
             echo_evidence: false,
         }
@@ -1099,6 +1104,20 @@ impl Peers {
                 ProviderInput::End { request, .. } => {
                     self.ended.insert(request);
                     if !live && self.script.second_holds {
+                        continue;
+                    }
+                    if !live
+                        && self.script.heard_as_call
+                        && self.seen.lock().unwrap().second.iter().any(|input| {
+                            matches!(input, ProviderInput::StepCall { request: called, .. } if *called == request)
+                        })
+                    {
+                        let queued = &mut self.peers[index].queued;
+                        queued.push_back(ProviderOutput::StepCallHeard { request });
+                        queued.push_back(ProviderOutput::TurnComplete {
+                            request,
+                            idle: true,
+                        });
                         continue;
                     }
                     if !live && self.script.second_waits_first && self.ended.len() == 1 {
@@ -5557,6 +5576,37 @@ fn a_line_begun_while_the_step_waits_for_a_call_is_told_the_second_route() {
             run.events("onboarding_step_call").len(),
             usize::from(window.is_some())
         );
+    }
+}
+
+/// lamp-29e7, build 8001 (#3923): a bare "Lamp" the name detector missed
+/// but speech to text heard is told back by the second route
+/// (`StepCallHeard`), and the coordinator gives the step the line's speech
+/// start, mapped to the Unix clock by the try's prompt end. The step takes
+/// it only while its name part listens for a call; outside the step the
+/// line is never told as a call.
+#[test]
+fn a_bare_name_heard_by_text_reaches_the_step_as_its_call() {
+    let _one = super::pilot_faults::one_session();
+    for window in [Some(0), None] {
+        let run = run(Script {
+            second: false,
+            only: true,
+            near_window_ms: window,
+            second_hears: Some("Lamp."),
+            heard_as_call: true,
+            ..Script::question(Live::Answer(12))
+        });
+        run.assert_clean();
+        let calls = run.events("onboarding_text_call");
+        if window.is_some() {
+            assert_eq!(calls.len(), 1, "{}", run.summary());
+            assert_eq!(calls[0]["turn"], 1);
+            assert_eq!(calls[0]["taken"], true, "{calls:?}");
+            assert!(run.played(1).is_empty(), "{}", run.summary());
+        } else {
+            assert!(calls.is_empty(), "{calls:?}");
+        }
     }
 }
 

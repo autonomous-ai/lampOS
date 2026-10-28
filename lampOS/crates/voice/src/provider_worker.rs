@@ -1011,6 +1011,14 @@ pub enum ProviderOutput {
     SleepAsked {
         request: u64,
     },
+    /// A line begun while onboarding's `how_you_sound` waits for a call
+    /// (`ProviderInput::StepCall`) whose words were the lamp's name alone
+    /// (#3923): the coordinator gives the step its start, as a call heard by
+    /// speech to text. Sent before its idle `TurnComplete`; nothing is asked
+    /// or answered.
+    StepCallHeard {
+        request: u64,
+    },
     /// The second route's times for `request` (19 Oct: an A/B is scored on
     /// each request's first answer audio, never a wait cue), sent once,
     /// before its `TurnComplete` or `TurnFailed`, for every request: in
@@ -1392,6 +1400,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
+        | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };

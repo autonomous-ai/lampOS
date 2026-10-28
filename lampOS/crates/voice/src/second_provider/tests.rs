@@ -449,6 +449,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             ProviderOutput::WordsEnd { unfinished, .. } => {
                 (format!("words_end:{unfinished:?}"), false)
             }
+            ProviderOutput::StepCallHeard { request } => (format!("step_call:{request}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -4514,13 +4515,20 @@ async fn the_sentence_is_heard_for_its_count_and_never_asked_of_the_model() {
 /// (`StepCall`), a line that is only the lamp's name is the step's: the
 /// model is never asked and nothing is answered, so no answer cuts the
 /// walk's next prompt. "Lamp, what time is it?" in the same window is a
-/// turn and is answered.
+/// turn and is answered. The name alone, bare or after "Hey" as the step's
+/// prompt may ask it (#3702), is told the coordinator as the step's call
+/// heard by speech to text (#3923, `StepCallHeard`), before the turn ends.
 #[tokio::test]
 async fn only_the_name_while_the_step_waits_for_a_call_is_not_a_turn() {
     for (heard, asked) in [
         ("Lamp.", false),
+        ("Lamp", false),
         ("Hey Lamp!", false),
+        ("Hey Lamp", false),
+        ("Hey, Lamp.", false),
         ("Lamp, what time is it?", true),
+        ("Hey Lamp, what's the weather?", true),
+        ("Lamp is broken.", true),
     ] {
         let script = Arc::new(Script {
             heard: Mutex::new([Ok(heard.to_owned())].into()),
@@ -4543,8 +4551,43 @@ async fn only_the_name_while_the_step_waits_for_a_call_is_not_a_turn() {
             "{heard}: {said:?}"
         );
         if !asked {
-            assert_eq!(said, ["started:1", "complete"], "{heard}");
+            assert_eq!(said, ["started:1", "step_call:1", "complete"], "{heard}");
+        } else {
+            assert!(!said.iter().any(|label| label.starts_with("step_call")));
         }
+    }
+}
+
+/// #3923: a line with no words is never a call by text, a cough or the TV.
+/// One the detector called (`Called`) is still the step's and not answered,
+/// but only the detector's hearing counts it: it is not told as heard.
+#[tokio::test]
+async fn a_line_with_no_words_is_never_told_as_the_steps_call() {
+    for called in [false, true] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(String::new())].into()),
+            chats: Mutex::new([vec![text("Hm?"), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        engine.submit(start(1));
+        engine.submit(ProviderInput::StepCall {
+            request: 1,
+            privacy_generation: 1,
+        });
+        if called {
+            engine.submit(ProviderInput::Called {
+                request: 1,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let said = turn(&mut engine).await;
+        assert!(
+            !said.iter().any(|label| label.starts_with("step_call")),
+            "{called}: {said:?}"
+        );
     }
 }
 
