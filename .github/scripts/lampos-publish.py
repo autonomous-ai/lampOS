@@ -30,6 +30,13 @@ DIAGNOSTIC_LIMIT = 320
 # GitHub's own 5xx (#4103: three 504s on 28 Oct) is retried after these
 # pauses, only for a read. A failed change is never repeated blind: the run
 # reads what GitHub did and goes on from there, now or on a re-run.
+# GitHub allows at most 1000 assets on one release, and every promotion
+# leaves a backup on the channel's: the newest few are kept for putting a
+# switch back by hand, the rest deleted once the new head is verified.
+KEEP_BACKUPS = 20
+MOST_PRUNED = 250
+BACKUP = re.compile(r"lampos-manifest-previous-([1-9][0-9]*)-([1-9][0-9]*)\.json\Z")
+STAGED = re.compile(r"lampos-manifest-staged-([1-9][0-9]*)\.json\Z")
 SERVER_ERROR = re.compile(rb"\bHTTP 50[0234]\b")
 RETRY_PAUSES = (5, 15, 30)
 ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|$))")
@@ -575,6 +582,28 @@ class Publisher:
             except (Refused, OSError, UnicodeError, ValueError) as recovery:
                 raise Refused(f"promotion failed; restoration also failed; owner must inspect channel release {release['id']} and retained assets {previous['asset']['id'] if previous else 'none'}/{candidate['id']}") from recovery
             raise Refused("promotion failed; previous canonical envelope restored (or initial head left absent)") from error
+        self.prune(release)
+
+    def prune(self, release):
+        """After a verified switch, the channel release's backups beyond the
+        newest [`KEEP_BACKUPS`] and the stages of older sequences, oldest
+        first and [`MOST_PRUNED`] at most, are deleted, so the release stays
+        under GitHub's 1000 assets. The build is published already: a cleanup
+        that fails is said and leaves the rest for the next run."""
+        try:
+            assets = self.assets(release)
+            # This switch's own backup, and any of a later sequence, are kept
+            # whatever their number; of the older ones, the newest that fit.
+            older = sorted(((int(match[1]), asset["id"], asset) for name, asset in assets.items() if (match := BACKUP.fullmatch(name)) and int(match[1]) < self.sequence), key=lambda entry: entry[:2])
+            stale = [(int(match[1]), asset["id"], asset) for name, asset in assets.items() if (match := STAGED.fullmatch(name)) and int(match[1]) < self.sequence]
+            doomed = sorted(older[:max(0, len(older) - (KEEP_BACKUPS - 1))] + stale, key=lambda entry: entry[:2])[:MOST_PRUNED]
+            for _, _, asset in doomed:
+                require(asset["name"] != ENVELOPE, "the head is never pruned")
+                self.command("gh", "api", "--method", "DELETE", f"repos/{REPO}/releases/assets/{asset['id']}")
+            if doomed:
+                print(f"channel release: {len(doomed)} old backups and stages deleted, {len(assets) - len(doomed)} assets left", file=sys.stderr)
+        except (Refused, OSError, UnicodeError, ValueError) as error:
+            print(f"channel cleanup stopped, the build is published: {error}", file=sys.stderr)
 
     def run(self):
         self.validate_context()

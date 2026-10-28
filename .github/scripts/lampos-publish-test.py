@@ -852,6 +852,63 @@ class PublicationTests(unittest.TestCase):
         self.refused_unchanged("uncertain release assets")
         self.assertEqual(self.fake.deleted, [])
 
+    def backups(self, count, staged=()):
+        # Older promotions' backups, as a channel holds them: sequences below
+        # this run's (500).
+        self.env["GITHUB_RUN_NUMBER"] = "500"
+        self.fake = FakeCommands(499)
+        head = self.fake.release_map[P.HEAD]
+        for sequence in range(1, count + 1):
+            self.fake.add(head, f"lampos-manifest-previous-{sequence}-{9000 + sequence}.json", b"old head")
+        for sequence in staged:
+            self.fake.add(head, f"lampos-manifest-staged-{sequence}.json", b"left stage")
+        return head
+
+    def test_a_verified_switch_keeps_the_newest_backups_and_deletes_the_rest(self):
+        # GitHub's cap is 1000 assets on one release (#4103's channel).
+        head = self.backups(30, staged=(3, 7, 512))
+        result = self.publish()
+        names = set(head["assets"])
+        kept = sorted(int(P.BACKUP.fullmatch(name)[1]) for name in names if P.BACKUP.fullmatch(name))
+        self.assertEqual(len(kept), P.KEEP_BACKUPS)
+        self.assertEqual(kept[-1], 500, "this switch's own backup is kept")
+        self.assertEqual(kept[0], 12)
+        # Stages of older sequences go; a newer run's (512) stays.
+        self.assertEqual(sorted(name for name in names if P.STAGED.fullmatch(name)), ["lampos-manifest-staged-512.json"])
+        self.assertEqual(self.fake.canonical(), self.fake.release_map[result["published"]]["assets"][P.ENVELOPE]["data"])
+        self.assertTrue(all(not name.startswith(("lampos-manifest-previous-1-", "lampos-manifest-staged-3")) for name in names))
+
+    def test_a_cleanup_that_fails_leaves_the_build_published(self):
+        self.backups(30)
+        original = self.fake.run
+        def refusing(words, output=None):
+            if "DELETE" in [str(word) for word in words]:
+                raise P.Refused("gh api failed (exit 1): HTTP 403: delete refused")
+            return original(words, output)
+        self.fake.run = refusing
+        logged = io.StringIO()
+        with mock.patch.object(P.sys, "stderr", logged):
+            result = self.publish()
+        self.assertEqual(result["published"], "lampos-lamp-voice-500")
+        self.assertEqual(self.fake.canonical(), self.fake.release_map["lampos-lamp-voice-500"]["assets"][P.ENVELOPE]["data"])
+        self.assertIn("channel cleanup stopped, the build is published", logged.getvalue())
+
+    def test_one_run_deletes_at_most_its_bound_oldest_first(self):
+        head = self.backups(300)
+        self.publish()
+        left = sorted(int(P.BACKUP.fullmatch(name)[1]) for name in head["assets"] if P.BACKUP.fullmatch(name))
+        # 300 older ones and this switch's: 250 deleted, the oldest first.
+        self.assertEqual(len(left), 301 - P.MOST_PRUNED)
+        self.assertEqual(left[0], P.MOST_PRUNED + 1)
+        self.assertEqual(left[-1], 500)
+
+    def test_a_failed_switch_deletes_nothing(self):
+        head = self.backups(30)
+        self.fake.fail = "rename-candidate"
+        self.refused_unchanged("previous canonical envelope restored")
+        self.assertEqual(self.fake.deleted, [])
+        self.assertEqual(sum(bool(P.BACKUP.fullmatch(name)) for name in head["assets"]), 30)
+
     def test_a_short_release_with_a_changed_asset_is_not_completed(self):
         self.fake.fail = "create-upload"
         self.refused_unchanged("partial immutable upload")
