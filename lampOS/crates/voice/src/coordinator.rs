@@ -9837,16 +9837,20 @@ fn conversation_with_gate_inner(
                     let input_end_us = audio.captured_at_us;
                     // A call's line ending (#3923): when its speech began,
                     // for its words, and the step waits a moment for them.
-                    // Not again for a line whose end went early: the step was
-                    // told then (the Reviewer-lead on #4006).
-                    if let Some((_, spoken @ None)) = step_call_lines
+                    // A line whose end went early was told then, not again
+                    // (the Reviewer-lead on #4006); its span still reaches
+                    // this End, so a hearing in between stays inside it.
+                    if let Some((_, spoken)) = step_call_lines
                         .iter_mut()
                         .find(|(turn, _)| *turn == current.owner.turn())
                         && let Some((_, began)) =
                             line_began.filter(|(turn, _)| *turn == current.owner.turn())
                     {
+                        let told = spoken.is_some();
                         *spoken = Some((began, input_end_us.max(began)));
-                        near_call_line_ended(onboarding.as_mut(), began);
+                        if !told {
+                            near_call_line_ended(onboarding.as_mut(), began);
+                        }
                     }
                     // The sentence's line ending (begun in its window,
                     // count-only): its speech and the room microphone's
