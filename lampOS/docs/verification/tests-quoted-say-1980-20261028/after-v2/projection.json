@@ -1,0 +1,145 @@
+{
+  "scope": "after-v2",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "only_these_two_Rust_cases_are_this_control": [
+    {
+      "case": "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+      "actual_exit": 0,
+      "row": [
+        "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+        "ok"
+      ],
+      "summary": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 5.71s"
+      ],
+      "wall_seconds": 5.814075,
+      "markers": {
+        "hold_start_present": true,
+        "final_snapshot_present": true,
+        "hold_end_present": true,
+        "hold_was_pending_at_old_snapshot": false,
+        "reported_hold_elapsed_us": [
+          358709
+        ]
+      },
+      "nominal_hold_ms": 350,
+      "old_incomplete_hold_not_falsely_measured": true
+    },
+    {
+      "case": "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+      "actual_exit": 0,
+      "row": [
+        "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+        "ok"
+      ],
+      "summary": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.44s"
+      ],
+      "wall_seconds": 0.530365,
+      "markers": {
+        "hold_start_present": true,
+        "final_snapshot_present": true,
+        "hold_end_present": true,
+        "hold_was_pending_at_old_snapshot": false,
+        "reported_hold_elapsed_us": [
+          359228
+        ]
+      },
+      "nominal_hold_ms": 350,
+      "old_incomplete_hold_not_falsely_measured": true
+    }
+  ],
+  "ordinary_and_ignored_IT_inventory": {
+    "all": 345,
+    "ignored": 1
+  },
+  "original_caller_internal_subcases_not_extra_Rust_identities": true,
+  "compiled_source_snapshot": {
+    "cohort": "quoted-say-v2-after-only-controls-prep-20261028",
+    "file": "after-source-before.json",
+    "sha256": "1dfd31690b69a3f2dbf1043d5b53121dfe7c9f864db89ff97e3b27cab8725822",
+    "bytes": 2460026,
+    "source_files": 10922,
+    "source_file_payload": {
+      "sha256": "d13f74f4824c128704ecb608a86eb496c269f01195271428733b4d8cc886e3dc",
+      "bytes": 35119,
+      "mode": 420,
+      "kind": "file"
+    },
+    "whole_source_snapshot_not_copied": true
+  },
+  "artifact_bindings": [
+    {
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "a26e964d4d34b012b354c83749f3c5057d693c3990241139c37f0b077885d795",
+      "bytes": 25995908,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "fresh": true,
+      "sha256": "0734dcb62d77e4ca46327a0759b80e48df4be332f0e1c79becabbeec2f89ee40",
+      "bytes": 20486684,
+      "mode": 493
+    }
+  ],
+  "parent_cohort_terminal": {
+    "cohort": "quoted-say-v2-after-only-controls-prep-20261028",
+    "file": "terminal.json",
+    "sha256": "035d161f116756446ff2f36f77fca38e6762a5b4976eb99250c0f47c4bc8a295",
+    "bytes": 1136
+  },
+  "parent_cohort_note": "Final AFTER-V2-only producer; BEFORE was referenced, never rerun.",
+  "closure_and_integrity": {
+    "plain_candidate_restored": true,
+    "official_owner_unchanged": true,
+    "all_source_and_sealed_and_actual_guards": true,
+    "protected_count": 574,
+    "actual_count": 2,
+    "unresolved_owned_pids": [],
+    "lease_released": true
+  }
+}

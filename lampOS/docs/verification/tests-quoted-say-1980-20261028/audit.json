@@ -1,0 +1,80 @@
+{
+  "status": "FINAL_V2_HOST_AND_CONTROLS_VERIFIED_PUBLIC_SUBSET",
+  "PR": "https://github.com/autonomous-ai/lampOS/pull/3972",
+  "head": "1980b969e06d4f28a851e35f80f924bbb4149c7e",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "controls": {
+    "before": {
+      "counts": {
+        "passed": 1,
+        "failed": 1,
+        "ignored": 0
+      },
+      "Rust_exits": [
+        0,
+        101
+      ],
+      "original_missing_journal_assertion_verified": true,
+      "nominal_response_hold_ms": 350,
+      "not_rerun_for_V2": true
+    },
+    "after_V2": {
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      "Rust_exits": [
+        0,
+        0
+      ],
+      "not_old_V1_after_relabelled": true
+    }
+  },
+  "full_plain_V2": {
+    "counts": {
+      "passed": 557,
+      "failed": 0,
+      "ignored": 9
+    },
+    "docs": [
+      {
+        "kind": "doctests",
+        "package": "lamp-skills",
+        "name": "lamp-skills:doctests",
+        "result": "ok",
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        "raw_test_rows": [],
+        "test_rows": [],
+        "display_annotation_mapping": [],
+        "stdout_interleaving_mapping": []
+      }
+    ],
+    "drivers": 5,
+    "helpers": 2,
+    "compiled_cases": 566,
+    "single_unfiltered_serial_package_runtime": true,
+    "required_five_once": "projections/required-five-once.json",
+    "runtime_seconds": 245.13302,
+    "sealed": 581,
+    "actual": 7,
+    "command_closures": 16,
+    "native_controller_exit": 0
+  },
+  "V1_full557_0_9_remains_V1_only": true,
+  "fixture_P2": "SAY worker may journal before Main drains Done; final V2 observes BOTH exact complete records within unchanged2.2s, negative absence remainsfull2.2s. Current Main reason contains no note; no demonstrated product leak.",
+  "historical_cause_established": false,
+  "old_failures_waived": false,
+  "source_commit_bridge": "commit-bridge/source-bridge.json",
+  "precommit_tests_then_committed_whole_source_bridge": true,
+  "fresh_native_and_final_train_merged_tree_ARM_scope": "Separate; not asserted by this host packet",
+  "no_Mac_ARM_build_or_device_action": true,
+  "no_whole_source_preimages_binaries_scripts_or_credentials_exported": true,
+  "all_raw_copies": "raw-byte-copy-index.json"
+}

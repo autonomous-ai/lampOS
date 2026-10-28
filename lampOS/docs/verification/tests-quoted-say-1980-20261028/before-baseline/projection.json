@@ -1,0 +1,143 @@
+{
+  "scope": "before-baseline",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "only_these_two_Rust_cases_are_this_control": [
+    {
+      "case": "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+      "actual_exit": 0,
+      "row": [
+        "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+        "ok"
+      ],
+      "summary": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 5.56s"
+      ],
+      "wall_seconds": 5.653957,
+      "markers": {
+        "hold_start_present": true,
+        "final_snapshot_present": true,
+        "hold_end_present": true,
+        "hold_was_pending_at_old_snapshot": true,
+        "reported_hold_elapsed_us": [
+          352876
+        ]
+      },
+      "nominal_hold_ms": 350,
+      "old_incomplete_hold_not_falsely_measured": true
+    },
+    {
+      "case": "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+      "actual_exit": 101,
+      "row": [
+        "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+        "FAILED"
+      ],
+      "summary": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.27s"
+      ],
+      "wall_seconds": 0.365548,
+      "markers": {
+        "hold_start_present": true,
+        "final_snapshot_present": true,
+        "hold_end_present": false,
+        "hold_was_pending_at_old_snapshot": true,
+        "reported_hold_elapsed_us": []
+      },
+      "nominal_hold_ms": 350,
+      "old_incomplete_hold_not_falsely_measured": true
+    }
+  ],
+  "ordinary_and_ignored_IT_inventory": {
+    "all": 345,
+    "ignored": 1
+  },
+  "original_caller_internal_subcases_not_extra_Rust_identities": true,
+  "compiled_source_snapshot": {
+    "cohort": "quoted-say-898-paired-controls-prep-20261028",
+    "file": "before-source-before.json",
+    "sha256": "2d9ef42a94ed184d2c62078d42449067a5d698a05a2e06fa44e6d257c2049488",
+    "bytes": 2460026,
+    "source_files": 10922,
+    "source_file_payload": {
+      "sha256": "772e5bba6f93402889ef31b96eac40a928b6d7f41e19b2a48abb2c2ffd995899",
+      "bytes": 30276,
+      "mode": 420,
+      "kind": "file"
+    },
+    "whole_source_snapshot_not_copied": true
+  },
+  "artifact_bindings": [
+    {
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "d80e2669377abb19b6efe352f77bbfc82c69477daa705c1726eb26a278aac95b",
+      "bytes": 26008116,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "0734dcb62d77e4ca46327a0759b80e48df4be332f0e1c79becabbeec2f89ee40",
+      "bytes": 20486684,
+      "mode": 493
+    }
+  ],
+  "parent_cohort_terminal": {
+    "cohort": "quoted-say-898-paired-controls-prep-20261028",
+    "file": "terminal.json",
+    "sha256": "992e34fbfcdae8696718c6cba363af5dc86c42bd99705e15282bb13e9d7a1054",
+    "bytes": 1725
+  },
+  "parent_cohort_note": "Original paired producer also ran intermediate V1 AFTER; those outcomes are omitted here and are NOT final V2 credit.",
+  "closure_and_integrity": {
+    "plain_candidate_restored": true,
+    "official_owner_unchanged": true,
+    "all_source_and_sealed_and_actual_guards": true,
+    "protected_count": 565,
+    "actual_count": 2,
+    "unresolved_owned_pids": [],
+    "lease_released": true
+  }
+}

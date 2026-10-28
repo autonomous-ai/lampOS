@@ -1,0 +1,63 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--test",
+    "it",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T23:40:02.315908+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-before-compile.stdout.txt",
+  "stderr": "cmd-before-compile.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 75472,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/quoted-say-898-paired-controls-prep-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 35,
+  "disk_last_available_bytes": 15977517056,
+  "disk_minimum_available_bytes": 15977517056,
+  "available_bytes_before_Cargo": 16036077568,
+  "owned_pid": 75472,
+  "owned_process_group": 75472,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 34.970207,
+  "finished_at": "2026-10-27T23:40:37.285718+00:00",
+  "stdout_sha256": "8b868ba7498e6198fa0455215859fcae98c6172d381006a9fcb9b3d16ed37309",
+  "stdout_bytes": 191507,
+  "stderr_sha256": "533ccdfb5f6a4e7dcadb668a0acf026ac74e8429ff740237e1d421d48d23753a",
+  "stderr_bytes": 394
+}

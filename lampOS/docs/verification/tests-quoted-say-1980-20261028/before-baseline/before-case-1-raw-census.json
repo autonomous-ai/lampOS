@@ -1,0 +1,16 @@
+{
+  "case": "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+  "actual_exit": 101,
+  "rows": [
+    [
+      "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+      "FAILED"
+    ]
+  ],
+  "summaries": [
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.27s"
+  ],
+  "stdout_sha256": "c7e376868b530b65ca0cfe16e61b25e95b8a5d98f99b7f4d5212ba580b455d18",
+  "stderr_sha256": "078929b2b262a0373d26a810220b30b9d9e9c114737b0aad0f2ab11e789599a5",
+  "raw_before_postguards": true
+}

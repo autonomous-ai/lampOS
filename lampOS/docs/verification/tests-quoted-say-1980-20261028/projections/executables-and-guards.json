@@ -1,0 +1,245 @@
+{
+  "artifacts": [
+    {
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "fresh": true,
+      "sha256": "0734dcb62d77e4ca46327a0759b80e48df4be332f0e1c79becabbeec2f89ee40",
+      "bytes": 20486684,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": true,
+      "sha256": "48fddf388c220152fe244897eb501eb71536997f0b0b00579b1755a5435d99fe",
+      "bytes": 13446716,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": true,
+      "sha256": "8c202ad745f0ef4ac839eae486eedf71dfde70b566e5a57077915392c23822b9",
+      "bytes": 3695280,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_relaxing_music",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/examples/render_relaxing_music.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "fresh": true,
+      "sha256": "7e344928394f2657f58e7cbaec879eb452e96fac45857f3b945f345903c649be",
+      "bytes": 548512,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "576423f206d51e2d8af727614f9f19c5e2839c09085aff067278742119246895",
+      "bytes": 25995980,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "requested_audio",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/requested_audio.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": true,
+      "sha256": "8f6ce9455b81c1ba37ccefab6a44c59cc9abe6f55647606900a30b6d2db5de91",
+      "bytes": 13355124,
+      "mode": 493
+    },
+    {
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": true,
+      "sha256": "e99e162417069c315b38bb5bbd2b7d0c92b79f8769b2ee3bafd288d03777d201",
+      "bytes": 14332940,
+      "mode": 493
+    }
+  ],
+  "initial_sealed": 574,
+  "final_sealed": 581,
+  "actual_count": 7,
+  "manifest_receipts": [
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "protected-before.json",
+      "sha256": "652443173f00fc528bd7dbad6d29d608e9a972ce93f45f492c5b34bb2e17ea4c",
+      "bytes": 237634
+    },
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "protected-after.json",
+      "sha256": "42dd468f9e939d61499dc36cf33ef5b7bd17609a3e7198abd7e0f3bdb3d1c524",
+      "bytes": 240732
+    },
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "actual-after.json",
+      "sha256": "7532805fb0eb03c7b61ce730fd9de13c463abfba769c8cca9be9b0d8d567086a",
+      "bytes": 11490
+    },
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "new-frozen.json",
+      "sha256": "ca3b15d17fcd7a95ed23584b0b1db4874bebb97ee8ca92ad3d5ecc081e7b024e",
+      "bytes": 3101
+    }
+  ],
+  "all_bound_modes_and_attributes_preserved_as_producer_evidence": true,
+  "producer_guard_flags": {
+    "source_unchanged": true,
+    "official_owner_unchanged": true,
+    "sealed_and_actual_guards": true,
+    "full_hash_checkpoints": [
+      "initial",
+      "final"
+    ],
+    "owned_groups_closed": true,
+    "unresolved_owned_pids": [],
+    "lease_released": true
+  },
+  "guard_policy": "Full source/all sealed SHA initial/final; all tracked file-set/stat6/Git and frozen bound metadata between; actual SHA/stat plus adjacent consumed-copy SHA. Exact normal alias inode-only exception after closed no-recompile Cargo; test/frozen inodes strict.",
+  "new_plain_executables_checked_for_absent_control_marker": true,
+  "binary_preimages_not_exported": true
+}

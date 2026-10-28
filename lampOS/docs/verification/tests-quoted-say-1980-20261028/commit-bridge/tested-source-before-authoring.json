@@ -1,0 +1,8 @@
+{
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "branch": "tests/1806-quoted-say-journal",
+  "source_files": 10922,
+  "source_semantic_snapshot_sha256": "7eaf4e732316e37955c18b36fdad3d3130b27ebd463e20b5a32c604b0206115c",
+  "full_gate_terminal_sha256": "9ddce3a88735e0a1a3f15c3b94e5345d830fb805cfd39a1b2f9f5e00dc26994a",
+  "actual_local_tests_precommit": true
+}

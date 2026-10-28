@@ -1,0 +1,61 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-28T00:44:05.340779+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-test-compile.stdout.txt",
+  "stderr": "cmd-test-compile.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 27055,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/quoted-say-v2-plain-full-skills-prep-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 10,
+  "disk_last_available_bytes": 11559301120,
+  "disk_minimum_available_bytes": 11559301120,
+  "available_bytes_before_Cargo": 11588685824,
+  "owned_pid": 27055,
+  "owned_process_group": 27055,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 9.857568,
+  "finished_at": "2026-10-28T00:44:15.198287+00:00",
+  "stdout_sha256": "cee924125ad74ee4839a02ff92ad39fd89476ad8419de8363da0340d430e64c0",
+  "stdout_bytes": 195548,
+  "stderr_sha256": "4f36f8c4f209c1102f86d98a9301bdb1e5a76f6c261b2953ff2f8536deca5b99",
+  "stderr_bytes": 162
+}

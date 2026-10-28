@@ -1,0 +1,55 @@
+{
+  "command": [
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/it-aabcadd0c6d2694b",
+    "--exact",
+    "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-28T00:36:25.975964+00:00",
+  "timeout_seconds": 120,
+  "stdout": "cmd-after-case-1.stdout.txt",
+  "stderr": "cmd-after-case-1.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 71870,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/quoted-say-v2-after-only-controls-prep-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 11646124032,
+  "disk_minimum_available_bytes": 11646124032,
+  "available_bytes_before_Cargo": 11646124032,
+  "owned_pid": 71870,
+  "owned_process_group": 71870,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.530365,
+  "finished_at": "2026-10-28T00:36:26.507144+00:00",
+  "stdout_sha256": "189dbdda630db55902af8468237fb01e8e1a06eba09a84e35a3dc83762155626",
+  "stdout_bytes": 188,
+  "stderr_sha256": "63688e101bff08c34917807af3b243973a431f8165deaf5978c7b35475b5771d",
+  "stderr_bytes": 118
+}

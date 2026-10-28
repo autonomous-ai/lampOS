@@ -1,0 +1,6 @@
+
+running 1 test
+test addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 5.56s
+

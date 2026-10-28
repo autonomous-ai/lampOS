@@ -1,0 +1,24 @@
+--- a/lampOS/crates/skills/tests/it/addon.rs
++++ b/lampOS/crates/skills/tests/it/addon.rs
+@@ -616,6 +616,13 @@
+                         Err(error) => panic!("read say request: {error}"),
+                     }
+                 };
++                eprintln!("QUOTED_SAY_CONTROL hold-start");
++                let reply_hold_began = Instant::now();
++                std::thread::sleep(Duration::from_millis(350));
++                eprintln!(
++                    "QUOTED_SAY_CONTROL hold-end elapsed_us={}",
++                    reply_hold_began.elapsed().as_micros()
++                );
+                 let reply = format!("{outcome}\n");
+                 let mut sent = 0;
+                 while sent < reply.len() {
+@@ -689,6 +696,7 @@
+     // The listener is local too; neither success nor panic leaves a worker.
+     drop(running);
+     let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
++    eprintln!("QUOTED_SAY_CONTROL final-journal-snapshot");
+     assert!(
+         !journal.contains("Music is playing."),
+         "no words journaled: {journal}"

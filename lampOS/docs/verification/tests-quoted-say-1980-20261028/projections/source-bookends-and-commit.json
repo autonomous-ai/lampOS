@@ -1,0 +1,59 @@
+{
+  "qualified_precommit_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "qualified_status": " M lampOS/crates/skills/tests/it/addon.rs\n M lampOS/docs/skills.md\n",
+  "source_files": 10922,
+  "canonical_before_after_equal": true,
+  "official_before_after_equal": true,
+  "all_canonical_official_file_bytes_modes_kinds_equal": true,
+  "whole_source_preimage_files_not_exported": true,
+  "source_receipts": [
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "source-before.json",
+      "sha256": "ee4f4e50df2e7b003dd4480c2382904f525c808025d286a87974d63e9e789f72",
+      "bytes": 2460026
+    },
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "source-after.json",
+      "sha256": "ee4f4e50df2e7b003dd4480c2382904f525c808025d286a87974d63e9e789f72",
+      "bytes": 2460026
+    },
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "official-source-before.json",
+      "sha256": "f40231e178f3a945e62380faec7e8bda787c0bdc97a97237d41df283f47630f3",
+      "bytes": 2460013
+    },
+    {
+      "cohort": "quoted-say-v2-plain-full-skills-prep-20261028",
+      "file": "official-source-after.json",
+      "sha256": "f40231e178f3a945e62380faec7e8bda787c0bdc97a97237d41df283f47630f3",
+      "bytes": 2460013
+    }
+  ],
+  "commit_bridge": {
+    "status": "AUTHOR_COMMIT_WHOLE_TESTED_SOURCE_BRIDGE_PASS",
+    "head": "1980b969e06d4f28a851e35f80f924bbb4149c7e",
+    "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "branch": "tests/1806-quoted-say-journal",
+    "tree": "78b5eadbd57dab8054c4582bcf64d3464a1d689a",
+    "exact_files": [
+      "lampOS/crates/skills/tests/it/addon.rs",
+      "lampOS/docs/skills.md"
+    ],
+    "all_tracked_source_bytes_modes_kinds_equal_tested": true,
+    "source_files": 10922,
+    "only_Git_HEAD_index_and_status_changed": true,
+    "local_tests_were_precommit_dirty_source": true,
+    "counts": {
+      "passed": 557,
+      "failed": 0,
+      "ignored": 9
+    },
+    "no_attribution_single_line_message": "lampOS: wait for quoted say journal completion",
+    "at_utc": "2026-10-28T00:51:25.594478+00:00"
+  },
+  "compiled_on_later_author_commit_claim": false,
+  "producer_recorded_whole_source_bridge_not_independent_reexecution": true
+}

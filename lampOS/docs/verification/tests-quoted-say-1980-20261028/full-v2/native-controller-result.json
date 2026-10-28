@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "controller_exit": 0,
+  "actual_subprocess_waited": true,
+  "outer_native_handle_confirms_wrapper_exit_separately": true
+}

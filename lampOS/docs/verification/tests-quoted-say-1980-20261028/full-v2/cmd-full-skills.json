@@ -1,0 +1,62 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-28T00:44:45.816924+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-full-skills.stdout.txt",
+  "stderr": "cmd-full-skills.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 30149,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/quoted-say-v2-plain-full-skills-prep-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 243,
+  "disk_last_available_bytes": 11242143744,
+  "disk_minimum_available_bytes": 11195617280,
+  "available_bytes_before_Cargo": 11494100992,
+  "owned_pid": 30149,
+  "owned_process_group": 30149,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 245.13302,
+  "finished_at": "2026-10-28T00:48:51.029251+00:00",
+  "stdout_sha256": "9c115e0a62d62cf09c45f659cb21b7755919ec6a492a3cafe53a3fe33301b71c",
+  "stdout_bytes": 47773,
+  "stderr_sha256": "fc04d8326b16524e18bb6cf9933836fa60693798bbf37e4a0a35300101c58688",
+  "stderr_bytes": 53779
+}

@@ -1,0 +1,61 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-same-voice-restart-20261026/lampOS",
+  "started_at": "2026-10-28T00:48:55.587524+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-full-Voice-lib.stdout.txt",
+  "stderr": "cmd-full-Voice-lib.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 41191,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-after-reader-delivery-prep-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 241,
+  "disk_last_available_bytes": 11205050368,
+  "disk_minimum_available_bytes": 11204706304,
+  "available_bytes_before_Cargo": 11241242624,
+  "owned_pid": 41191,
+  "owned_process_group": 41191,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 243.575096,
+  "finished_at": "2026-10-28T00:52:59.158611+00:00",
+  "stdout_sha256": "57a79034d8bab5d6bde4847e27652163a252e94890b8a65b4e0e33800ab741d1",
+  "stdout_bytes": 642442,
+  "stderr_sha256": "5be5a39b667124c09a497973e53562804c71ffd0b888f79fdf6e6aee6752b7da",
+  "stderr_bytes": 182
+}

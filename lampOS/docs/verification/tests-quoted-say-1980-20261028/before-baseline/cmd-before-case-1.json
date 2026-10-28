@@ -1,0 +1,55 @@
+{
+  "command": [
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/it-aabcadd0c6d2694b",
+    "--exact",
+    "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T23:41:06.692134+00:00",
+  "timeout_seconds": 120,
+  "stdout": "cmd-before-case-1.stdout.txt",
+  "stderr": "cmd-before-case-1.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 77667,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/quoted-say-898-paired-controls-prep-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 15901589504,
+  "disk_minimum_available_bytes": 15901589504,
+  "available_bytes_before_Cargo": 15901589504,
+  "owned_pid": 77667,
+  "owned_process_group": 77667,
+  "direct_wait_status": 101,
+  "exit_code": 101,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.365548,
+  "finished_at": "2026-10-27T23:41:07.057806+00:00",
+  "stdout_sha256": "c7e376868b530b65ca0cfe16e61b25e95b8a5d98f99b7f4d5212ba580b455d18",
+  "stdout_bytes": 284,
+  "stderr_sha256": "078929b2b262a0373d26a810220b30b9d9e9c114737b0aad0f2ab11e789599a5",
+  "stderr_bytes": 707
+}

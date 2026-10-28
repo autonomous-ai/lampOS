@@ -1,0 +1,11 @@
+QUOTED_SAY_CONTROL hold-start
+QUOTED_SAY_CONTROL final-journal-snapshot
+
+thread 'addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing' (44652583) panicked at crates/skills/tests/it/addon.rs:810:28:
+lamp-skills: skills from /tmp/adSHpmVb/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["music-says"]
+lamp-skills: music-says Triggered: voice/state has held for 0 s
+lamp-skills: music-says Answered: an add-on: its proposals go to the judge on addon/proposal
+lamp-skills: music-says Done: proposed say as 316683813548 on addon/proposal
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

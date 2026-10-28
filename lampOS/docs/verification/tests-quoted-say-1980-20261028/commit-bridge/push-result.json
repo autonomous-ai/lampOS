@@ -1,0 +1,8 @@
+{
+  "status": "PUSHED_EXACT_NEW_OWN_BRANCH",
+  "head": "1980b969e06d4f28a851e35f80f924bbb4149c7e",
+  "branch": "tests/1806-quoted-say-journal",
+  "expected_remote_absent": true,
+  "exit_code": 0,
+  "at_utc": "2026-10-28T00:52:00.455917+00:00"
+}

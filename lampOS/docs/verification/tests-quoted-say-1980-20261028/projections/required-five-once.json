@@ -1,0 +1,32 @@
+{
+  "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted": [
+    {
+      "target": "{'kind': ['test'], 'crate_types': ['bin'], 'name': 'it', 'src_path': '/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/it/main.rs', 'edition': '2024', 'doc': False, 'doctest': False, 'test': True}",
+      "status": "ok"
+    }
+  ],
+  "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing": [
+    {
+      "target": "{'kind': ['test'], 'crate_types': ['bin'], 'name': 'it', 'src_path': '/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/it/main.rs', 'edition': '2024', 'doc': False, 'doctest': False, 'test': True}",
+      "status": "ok"
+    }
+  ],
+  "addon::says_the_judge_dropped_do_not_spend_the_hour": [
+    {
+      "target": "{'kind': ['test'], 'crate_types': ['bin'], 'name': 'it', 'src_path': '/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/tests/it/main.rs', 'edition': '2024', 'doc': False, 'doctest': False, 'test': True}",
+      "status": "ok"
+    }
+  ],
+  "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline": [
+    {
+      "target": "{'kind': ['lib'], 'crate_types': ['lib'], 'name': 'lamp_skills', 'src_path': '/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/src/lib.rs', 'edition': '2024', 'doc': True, 'doctest': True, 'test': True}",
+      "status": "ok"
+    }
+  ],
+  "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline": [
+    {
+      "target": "{'kind': ['lib'], 'crate_types': ['lib'], 'name': 'lamp_skills', 'src_path': '/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills/src/lib.rs', 'edition': '2024', 'doc': True, 'doctest': True, 'test': True}",
+      "status": "ok"
+    }
+  ]
+}

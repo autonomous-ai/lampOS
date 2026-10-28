@@ -1,0 +1,11 @@
+
+running 1 test
+test addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing ... FAILED
+
+failures:
+
+failures:
+    addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.27s
+

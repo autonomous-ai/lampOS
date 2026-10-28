@@ -1,0 +1,16 @@
+{
+  "case": "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+  "actual_exit": 0,
+  "rows": [
+    [
+      "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+      "ok"
+    ]
+  ],
+  "summaries": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 5.56s"
+  ],
+  "stdout_sha256": "96b0c9fbcccfa8db99660a67f06d8bd778705ad2fce9eb3808d1ff382b653ea2",
+  "stderr_sha256": "d8ccce3e2918280a3be7235aed168e290ed60f1491817c9914e6935dd33c565b",
+  "raw_before_postguards": true
+}

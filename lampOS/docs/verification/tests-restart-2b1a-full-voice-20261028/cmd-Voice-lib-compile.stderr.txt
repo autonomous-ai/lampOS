@@ -1,0 +1,9 @@
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/local-time)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/body)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/schedule)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/policy)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/actions)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/camera)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/expression)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-same-voice-restart-20261026/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 2m 26s

@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "controller_exit": 0,
+  "actual_subprocess_waited": true,
+  "wrapper_actual_exit_is_the_callers_native_handle_result": true
+}

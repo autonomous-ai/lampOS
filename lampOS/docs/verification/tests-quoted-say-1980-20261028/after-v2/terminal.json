@@ -1,0 +1,39 @@
+{
+  "status": "AFTER_V2_QUOTED_SAY_CONTROL_COMPLETE",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "runtime_processes_started": 2,
+  "observations": [
+    {
+      "variant": "after",
+      "case": "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+      "Rust_exit": 0,
+      "expected_original_failure": false,
+      "hold350ms_nominal_not_assumed_measured": true
+    },
+    {
+      "variant": "after",
+      "case": "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+      "Rust_exit": 0,
+      "expected_original_failure": false,
+      "hold350ms_nominal_not_assumed_measured": true
+    }
+  ],
+  "qualification_claim": false,
+  "historical_cause_established": false,
+  "no_historical_failure_waived": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true,
+  "commands_completed": [
+    "metadata",
+    "after-compile",
+    "after-list-all",
+    "after-list-ignored",
+    "after-case-0",
+    "after-case-1"
+  ],
+  "plain_candidate_restored": true,
+  "official_owner_unchanged": true,
+  "all_source_and_sealed_and_actual_guards": true,
+  "protected_count": 574,
+  "actual_count": 2
+}

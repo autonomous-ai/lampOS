@@ -1,0 +1,14 @@
+[
+  {
+    "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-skills",
+    "old_inode": 490589853,
+    "new_inode": 490592754,
+    "all_other_fields_SHA_equal": true
+  },
+  {
+    "path": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/examples/render_relaxing_music",
+    "old_inode": 490589854,
+    "new_inode": 490592753,
+    "all_other_fields_SHA_equal": true
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "head": "1980b969e06d4f28a851e35f80f924bbb4149c7e",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "exact_files": [
+    "lampOS/crates/skills/tests/it/addon.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "both_committed_payload_SHA_match_tested_source": true,
+  "all_Rust_bytes_outside_helper_equal_base": true,
+  "caller_functions": [
+    {
+      "name": "only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+      "whole_body_byte_equal_base": true,
+      "sha256": "872c23d300563be63d530b76c4b98528cd80d727024bdabd7ea9a3adb6430437"
+    },
+    {
+      "name": "a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+      "whole_body_byte_equal_base": true,
+      "sha256": "46db61f3ed4b53973e0f25dd185a5d369f507e5f3bbafb3cacfd051784d0bb09"
+    }
+  ],
+  "patch_sha256": "71ebe0a93d72926436ee14cd35d00cca1914c115078efc6e7ff79cb2a80b79a4"
+}

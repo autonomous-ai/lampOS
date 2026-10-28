@@ -1,0 +1,22 @@
+{
+  "status": "AUTHOR_COMMIT_WHOLE_TESTED_SOURCE_BRIDGE_PASS",
+  "head": "1980b969e06d4f28a851e35f80f924bbb4149c7e",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "branch": "tests/1806-quoted-say-journal",
+  "tree": "78b5eadbd57dab8054c4582bcf64d3464a1d689a",
+  "exact_files": [
+    "lampOS/crates/skills/tests/it/addon.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "all_tracked_source_bytes_modes_kinds_equal_tested": true,
+  "source_files": 10922,
+  "only_Git_HEAD_index_and_status_changed": true,
+  "local_tests_were_precommit_dirty_source": true,
+  "counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "no_attribution_single_line_message": "lampOS: wait for quoted say journal completion",
+  "at_utc": "2026-10-28T00:51:25.594478+00:00"
+}

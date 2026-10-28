@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "--list",
+    "--format",
+    "terse"
+  ],
+  "cwd": "/private/tmp/tests-same-voice-restart-20261026/lampOS",
+  "started_at": "2026-10-28T00:48:45.976812+00:00",
+  "timeout_seconds": 300,
+  "stdout": "cmd-inventory-all.stdout.txt",
+  "stderr": "cmd-inventory-all.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 40372,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-after-reader-delivery-prep-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 3,
+  "disk_last_available_bytes": 11210559488,
+  "disk_minimum_available_bytes": 11210559488,
+  "available_bytes_before_Cargo": 11228020736,
+  "owned_pid": 40372,
+  "owned_process_group": 40372,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 2.155002,
+  "finished_at": "2026-10-28T00:48:48.131903+00:00",
+  "stdout_sha256": "879e64b2647a5cdde152ea2005167a81d5db2de79bf499a77957f6fd98f0bb18",
+  "stdout_bytes": 363795,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

@@ -1,0 +1,59 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "build",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--jobs",
+    "1",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-28T00:44:02.150950+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-workspace.stdout.txt",
+  "stderr": "cmd-workspace.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 26930,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/quoted-say-v2-plain-full-skills-prep-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 11591909376,
+  "disk_minimum_available_bytes": 11591909376,
+  "available_bytes_before_Cargo": 11591909376,
+  "owned_pid": 26930,
+  "owned_process_group": 26930,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.999288,
+  "finished_at": "2026-10-28T00:44:03.150353+00:00",
+  "stdout_sha256": "5eca465f4e1ad49a107e998473c920f4cf199761b08183944e8d1316a8bec3cf",
+  "stdout_bytes": 380694,
+  "stderr_sha256": "c252f3856a0e1c6f2121e0aa263f057aed09d12465df972dc4a66126f3d9f066",
+  "stderr_bytes": 60
+}
