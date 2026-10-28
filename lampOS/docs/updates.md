@@ -2670,7 +2670,10 @@ The same bytes already at the fixed path, executable, are left and nothing
 is run. A link or a folder at either path is refused before anything is
 written, and so is a copy over 64 MiB. A cut at any step leaves the fixed
 path whole, old or new. If writing the kept copy or the rename fails, the new
-copy is removed too. The caller keeps other writers out of the folder while it
+copy is removed too. A folder that can't be synced after the rename is
+said in what `place` returns (`Replaced` with `synced: false`): the new
+copy is in place, though a power cut could still bring the old one back,
+and it is never read as "nothing replaced". The caller keeps other writers out of the folder while it
 runs: the copy there is read once and renamed over without being read again.
 On Linux `writer-probe` hashes `/proc/self/exe`, the running file itself, so
 a file put at its path since it started can't answer for it.
