@@ -329,16 +329,16 @@ impl Shared {
         self.ahead_us.fetch_add(by, Ordering::Relaxed);
     }
 
-    /// Whether a computer holds the protocol's `body` lease now: the door
+    /// The client holding the protocol's `body` lease now, if any: the door
     /// then holds the body's own (`crate::body_lease`).
-    pub fn body_held(&self) -> bool {
+    pub fn body_holder(&self) -> Option<String> {
         let now = self.now_us();
         self.door
             .lock()
             .expect("door")
             .leases()
             .holder(crate::protocol::Part::Body, now)
-            .is_some()
+            .map(str::to_owned)
     }
 
     /// What the bus said, handed on: each event to every connection that
@@ -717,8 +717,9 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 14] = [
+pub const TOPICS: [&str; 15] = [
     "humans/faces/tracked",
+    "humans/hands/tracked",
     "room/stood_up",
     "name/heard",
     "voice/heard",

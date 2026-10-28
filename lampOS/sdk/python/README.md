@@ -86,6 +86,7 @@ asyncio.run(main())
   | `person.arrived`, `person.left` | `count`, `near` (0–1, share of the picture's height) | `look` |
   | `person.stood_up` | `side` | `look` |
   | `person.facing` | `facing` | `look` |
+  | `hand` | `seen`; when seen, `x`, `y` (the palm's centre, 0–1 from the left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. By edge, at most 4 a second; `seen: false` once, 1 s after the last hand | `look` |
   | `phrase.heard` | `phrase`: one you registered (`on(..., phrases=[...])`), never what else was said | `hear` |
   | `name.heard` | | `hear` |
   | `sound.heard` | `class`, `score` | `sound` |
