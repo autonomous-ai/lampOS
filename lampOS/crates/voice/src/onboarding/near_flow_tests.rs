@@ -301,6 +301,156 @@ fn a_hearing_begun_at_six_seconds_counts_and_one_a_millisecond_later_does_not() 
     );
 }
 
+/// A line begun `after_ms` after the prompt's end (before it, negative),
+/// whose words were the lamp's name alone (#3923, `StepCallHeard`).
+fn by_text(walk: &mut Onboarding, prompt: &Prompt, after_ms: i64) -> Option<u64> {
+    let began_us = (prompt.ended_us as i64 + after_ms * 1_000) as u64;
+    walk.near_text_call(began_us)
+}
+
+/// The try judged `after_us` past the prompt's end.
+fn judge_at(walk: &mut Onboarding, prompt: &Prompt, after_us: u64) -> Option<Value> {
+    let now = prompt.ended_us + after_us;
+    set_clock(prompt.ended_ms + after_us / 1_000);
+    walk.tick(now, START_QUIET_US, true, false, face(), true);
+    walk.drain_storage_for_test(now);
+    walk.take_records()
+        .into_iter()
+        .rfind(|row| row["kind"] == "onboarding_near_try")
+}
+
+/// lamp-29e7, build 8001 (#3923): the detector missed "Lamp" on prompts 1,
+/// 3 and 4 while speech to text heard it whole. A line whose words were the
+/// name alone counts as the call, its rise read from mic1 as a hearing's,
+/// and the try's line says it was heard by text. A sound with no words, or
+/// a longer line, never reaches the step as one (the second route tells
+/// only the name alone), so with nothing else heard the try is refused.
+#[test]
+fn a_call_heard_only_by_text_counts_with_its_rise_and_says_so() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 2_400, 21.0);
+    assert_eq!(
+        by_text(&mut walk, &prompt, 2_000),
+        Some(prompt.ended_ms + 2_000)
+    );
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["heard_by"], "text");
+    assert!(judged["score"].is_null(), "{judged}");
+    assert_eq!(judged["said"], json!([2_000]));
+    assert_eq!(judged["rise_db"].as_f64().unwrap() as f32, 21.0);
+    assert_eq!(
+        walk.kept().near_call_tries,
+        [lamp_near_call::Try {
+            rise_db: 21.0,
+            score: None,
+            heard_by: lamp_near_call::HeardBy::Text,
+        }]
+    );
+    // A cough, the TV or "Lamp is broken": nothing told, nothing counted.
+    let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
+    room(&mut walk, &prompt, 2_400, 21.0);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], false);
+    assert_eq!(judged["why"], "the name wasn't heard");
+    // Begun as the prompt ended: the lamp's own tail may be what mic1
+    // heard, so it is not measured.
+    let prompt = play(&mut walk, 50 * S, 1_760_000_050_000, 3);
+    room(&mut walk, &prompt, 300, 21.0);
+    by_text(&mut walk, &prompt, 0);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], false, "{judged}");
+    assert_eq!(walk.kept().near_call_tries.len(), 1);
+    // Outside a try's window the step takes no line.
+    assert_eq!(walk.near_text_call(70 * S), None);
+}
+
+/// The same "Lamp" heard by the detector and by speech to text is one call,
+/// not two hearings. A sure hearing stays the detector's; one under its bar
+/// counts by its words. Two separate calls are still two.
+#[test]
+fn a_call_heard_by_text_and_by_the_detector_is_one_try() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for (turn, score, heard_by) in [(1, 0.98, "name"), (2, 0.9, "text")] {
+        let at = turn * 20 * S;
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 2_400, 21.0);
+        name(&mut walk, &prompt, 2_000, score);
+        by_text(&mut walk, &prompt, 2_200);
+        let judged = judge(&mut walk, &prompt);
+        assert_eq!(judged["accepted"], true, "{judged}");
+        assert_eq!(judged["heard_by"], heard_by, "{judged}");
+    }
+    let prompt = play(&mut walk, 60 * S, 1_760_000_060_000, 3);
+    room(&mut walk, &prompt, 2_400, 21.0);
+    name(&mut walk, &prompt, 1_000, 0.98);
+    by_text(&mut walk, &prompt, 4_000);
+    assert_eq!(
+        judge(&mut walk, &prompt)["why"],
+        "the name was heard more than once"
+    );
+}
+
+/// A line of the name begun over the prompt's last word is answered early,
+/// as a hearing begun there is: offered again, never measured.
+#[test]
+fn a_call_by_text_begun_over_the_prompt_is_offered_again() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 300, 20.0);
+    assert!(by_text(&mut walk, &prompt, -300).is_some());
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], false, "{judged}");
+    assert_eq!(judged["why"], "answered_early");
+    assert_eq!(judged["offered_again"], true);
+    assert!(walk.kept().near_call_tries.is_empty());
+}
+
+/// A call begun near the window's end has its words back after the usual
+/// judgement: the try waits for them, 1.5 s at most.
+#[test]
+fn a_call_begun_late_has_its_words_waited_for_a_moment() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 6_000, 21.0);
+    walk.near_call_line_ended(prompt.ended_us + 5_900_000);
+    assert_eq!(judge_at(&mut walk, &prompt, 7_300_000), None);
+    assert!(walk.near_waits_for_call());
+    by_text(&mut walk, &prompt, 5_900);
+    let judged = judge_at(&mut walk, &prompt, 7_400_000).expect("judged once its words are in");
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["heard_by"], "text");
+    // Words that never come as the name: judged at the wait's end.
+    let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
+    room(&mut walk, &prompt, 6_000, 21.0);
+    walk.near_call_line_ended(prompt.ended_us + 5_900_000);
+    assert_eq!(judge_at(&mut walk, &prompt, 8_700_000), None);
+    let judged = judge_at(&mut walk, &prompt, 8_800_000).expect("judged at the wait's end");
+    assert_eq!(judged["why"], "the name wasn't heard");
+}
+
+/// Three calls heard only by text make this home's bar.
+#[test]
+fn three_calls_heard_only_by_text_keep_a_bar() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for (turn, rise) in [(1, 22.4), (2, 25.0), (3, 23.1)] {
+        let at = turn * 20 * S;
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 2_400, rise);
+        by_text(&mut walk, &prompt, 2_000);
+        assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
+    }
+    assert_eq!(settle(&mut walk, 90 * S), [NEAR_DONE]);
+    assert_eq!(named(&walk), Some(Outcome::Done));
+    assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
+}
+
 #[test]
 fn the_lamp_speaking_spoils_only_the_half_second_before_to_a_second_after() {
     let store = Store::new(None);
@@ -777,18 +927,29 @@ fn persisted_samples_are_validated_on_load() {
         near_call_tries: vec![
             lamp_near_call::Try {
                 rise_db: 22.4,
-                score: 0.98,
+                score: Some(0.98),
+                heard_by: lamp_near_call::HeardBy::Name,
             };
             3
         ],
         ..Progress::default()
     };
     assert!(good().check().is_ok());
-    let bad: [fn(&mut Progress); 7] = [
+    let mut by_text = good();
+    by_text.near_call_tries[1] = lamp_near_call::Try {
+        rise_db: 23.0,
+        score: None,
+        heard_by: lamp_near_call::HeardBy::Text,
+    };
+    assert!(by_text.check().is_ok());
+    let bad: [fn(&mut Progress); 9] = [
         |p| p.near_call_tries[0].rise_db = f32::NAN,
+        // No score is only for a call heard by text (#3923), and text has none.
+        |p| p.near_call_tries[0].score = None,
+        |p| p.near_call_tries[0].heard_by = lamp_near_call::HeardBy::Text,
         |p| p.near_call_tries[0].rise_db = -1.0,
-        |p| p.near_call_tries[0].score = 1.2,
-        |p| p.near_call_tries[0].score = 0.9,
+        |p| p.near_call_tries[0].score = Some(1.2),
+        |p| p.near_call_tries[0].score = Some(0.9),
         |p| p.near_call_prompts = 6,
         |p| p.near_call_prompts = 2,
         |p| {
