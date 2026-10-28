@@ -28,9 +28,10 @@ pub const SCHEMA_VERSION: u8 = 1;
 pub const MAX_MANIFEST_BYTES: u64 = 16 * 1024;
 pub const MAX_NOTICES: usize = 8;
 pub const RATE: u32 = 24_000;
-/// A notice is a sentence, not a reply: 0.3 s to 10 s.
+/// A notice is a sentence or two, not a reply: 0.3 s to 15 s. The no-Wi-Fi
+/// line with the reset pinhole runs about 13.4 s in the lamp's voice (#3743).
 pub const MIN_FRAMES: u32 = RATE * 3 / 10;
-pub const MAX_FRAMES: u32 = RATE * 10;
+pub const MAX_FRAMES: u32 = RATE * 15;
 const MAX_WAV_BYTES: u64 = 44 + 2 * MAX_FRAMES as u64 + 4096;
 const MAX_TRANSCRIPT_BYTES: usize = 240;
 const MAX_NAME_BYTES: usize = 64;
