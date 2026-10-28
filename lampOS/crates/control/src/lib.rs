@@ -16,6 +16,7 @@
 pub mod body_lease;
 pub mod cert;
 pub mod feelings;
+pub mod journal;
 pub mod lease;
 pub mod pairing;
 pub mod parts;
