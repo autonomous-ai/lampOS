@@ -59,7 +59,10 @@ jobs:
             --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > /dev/null
       - name: build the test binaries (listed, not run)
         working-directory: lampOS
-        run: cargo nextest list --locked --release --workspace --profile pr > /dev/null
+        # The two own-harness tests cannot be listed; lampos-arm64.yml leaves them out the same way.
+        run: >-
+          cargo nextest list --locked --release --workspace --profile pr
+          -E 'not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))' > /dev/null
       - name: sccache's count
         if: always()
         run: sccache --show-stats || true
