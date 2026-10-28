@@ -13,6 +13,15 @@ Type=simple
 # Root: the person's stores belong to several parts; stopping the lamp; reboot.
 User=root
 ExecStart=/opt/lampOS/setup/current/lamp-setup watch-reset --plan /etc/lampOS/setup/reset-plan.json --bus-root /run/lampos-bus --enable
+# Its sandbox (#3710): it writes only its subscriber's socket under the bus, and hands the reset itself to a
+# unit of its own through systemd-run (the plan's `detach`), which wipes, stops the lamp and reboots outside
+# this sandbox. So the whole file system is read-only to it but the bus; no home, its own /tmp, and nothing it
+# starts gains privileges.
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
 Restart=on-failure
 RestartSec=2
 
