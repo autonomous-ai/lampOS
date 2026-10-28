@@ -175,9 +175,9 @@ Environment=LAMP_BUSY_ENDS_SOONER=on
 # A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by
 # LAMP_SECOND_SPEECH_MODEL's eleven_v4_turbo (#2901): the owner's pick at lamp-52e6 on 28 Oct, first sound unchanged.
 Environment=LAMP_SECOND_SPEECH_TAGS=on
-# The weather for any place and day. LAMP_SECOND_FACE_NAME and LAMP_SECOND_MEMORY_HITS, on in the A/B, stay off
-# until a request is bound to the person seen speaking it (reviewer-two on #3371): a silent face in view would
-# otherwise give its name and kept notes to an off-camera caller's answer.
+# The weather for any place and day. LAMP_SECOND_MEMORY_HITS, on in the A/B, stays off (reviewer-two on #3371): a
+# silent face in view would otherwise give its kept notes to an off-camera caller's answer. LAMP_SECOND_FACE_NAME is
+# on below, beside LAMP_PERSON_SCOPE_SEEN, which binds a turn to the person seen speaking it.
 Environment=LAMP_SECOND_WEATHER=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
@@ -348,6 +348,12 @@ Environment=LAMP_CONVERSATION_CARRIES_PAST_SILENT=on
 # and the conversation's 45 s chain. Room to person only: a room's or unplaced turn is never told a person's, and
 # another person's never; never into a person's running summary or talk note; gone at any forget.
 Environment=LAMP_CONVERSATION_ROOM_LINES_TOLD=on
+# A known person's own turn is told their name, as the Live route tells it (#2539: a name kept with
+# remember_my_face was recognised and never said back). Only with LAMP_PERSON_SCOPE_SEEN above: a turn is theirs
+# only when their own face alone was seen speaking it, so a silent face in view names no off-camera caller
+# (reviewer-two on #3371). A face only alone in view, not seen speaking, is never named this way: the owner alone is
+# named through the typed name (#4090, #4132), nobody else (the readers' HOLDs on #4158).
+Environment=LAMP_SECOND_FACE_NAME=on
 # The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things
 # worth keeping, each checked by the store and linked to the words it came from (OBSERVE); a dated one keeps its
 # day (EVENTS); the next session with that person asks after one open thread, once, at most one a day (THREADS);

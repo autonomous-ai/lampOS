@@ -2488,16 +2488,13 @@ pub fn serve(
             let facts = facts(session_fact && !going_on, room)
                 + &named_by_default
                 + &health_fact(health.as_deref())
-                // A line narrowed to the room whose person's face was alone
-                // in view is told their name only (`ScopeLease::named_for_reply`,
-                // lamp-3e83): its `line`, never its `person`, the thread's.
-                + &known_name_told(
-                    known_name,
-                    who.as_deref(),
-                    person
-                        .as_deref()
-                        .or(line.as_ref().and_then(Option::as_deref)),
-                );
+                // Only the line's own person, the face seen speaking it under
+                // LAMP_PERSON_SCOPE_SEEN: never `line`'s alone-in-view name
+                // (`ScopeLease::named_for_reply`), which #4090 and #4132 give
+                // the owner alone, through the typed name (the readers'
+                // HOLDs on #4158: a silent known guest's nod would name an
+                // off-camera caller's answer).
+                + &known_name_told(known_name, who.as_deref(), person.as_deref());
             // Beside the character, where the instruction had it: told after
             // the exchanges, the model used it for the owner a third as
             // often (EN, the #2602 probe).
