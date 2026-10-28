@@ -165,3 +165,15 @@ the last one seen. `install NAME` fetches the entry's package and refuses it
 unless its SHA-256, size, signer and asks are the entry's. Then it asks you
 yes as for any shared package. A publisher is shown as "published by key
 FPR16, not the Store", never "verified".
+
+- What you're shown at install comes from the package itself, never from its
+  entry: an entry can only make the install refuse.
+- `index add` and `install` name the host they fetch from. A URL with a name
+  or password in it is refused.
+- An index that can't be fetched is named by `browse`, and the others go on.
+  `install NAME` then needs `--from INDEX`.
+- An older version than the one on your lamp needs `--force`.
+- Nothing is fetched or installed in the background: an index is read when you
+  run `browse` or `install`, and a skill goes on only on your yes.
+- `seq` stops an older copy of the index, but not someone serving an old one
+  frozen. A publisher can't withdraw a version yet.

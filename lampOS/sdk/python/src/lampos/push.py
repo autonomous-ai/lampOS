@@ -188,6 +188,8 @@ class Opened:
     version: str
     author: str | None
     files: dict[str, bytes]
+    #: The author's whole key, base64 of its 32 bytes (None when not signed).
+    public: str | None = None
 
 
 def open_package(data: bytes) -> Opened:
@@ -220,7 +222,7 @@ def open_package(data: bytes) -> Opened:
         if not isinstance(entry, dict) or not path_ok(entry.get("path")):
             path = entry.get("path") if isinstance(entry, dict) else entry
             raise _bad(f"{path!r}: a skill's paths are at most {MOST_DEPTH} parts of letters, digits, -, _ and ., none beginning with a dot")
-    author = None
+    author = public_b64 = None
     signed = read.pop(SIGNATURE, None)
     if signed is not None:
         if members[1].name != SIGNATURE:
@@ -241,6 +243,7 @@ def open_package(data: bytes) -> Opened:
         except InvalidSignature as error:
             raise _bad(f"{SIGNATURE} does not match {MANIFEST}: the package was changed after it was signed") from error
         author = key
+        public_b64 = base64.b64encode(public).decode("ascii")
     files = {}
     for entry in entries:
         body = read.pop(f"{name}/{entry['path']}", None)
@@ -251,7 +254,7 @@ def open_package(data: bytes) -> Opened:
         files[entry["path"]] = body
     if read:
         raise _bad(f"{sorted(read)[0]} is in the package but not in {MANIFEST}")
-    return Opened(name, version, author, files)
+    return Opened(name, version, author, files, public_b64)
 
 
 class _HttpsOnly(urllib.request.HTTPRedirectHandler):
@@ -277,12 +280,22 @@ def fetch(url: str, *, timeout: float = 30.0) -> bytes:
     goes to a URL for it. https only, no redirect to another scheme, and at
     most 1 MiB read (Fourteen's point 4 on #3504). Nothing in it is run or
     unpacked here: `open_package` checks it in memory."""
-    if urllib.parse.urlsplit(url).scheme != "https":
+    return fetch_from(url, timeout=timeout)[0]
+
+
+def fetch_from(url: str, *, timeout: float = 30.0) -> tuple[bytes, str]:
+    """`fetch`, and the URL the bytes came from after any redirect, so the
+    person can be shown the host (Fourteen on #3997). A URL carrying a name
+    or password is refused: nothing of the person's goes to a host."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https":
         raise LampError(f"{url}: a shared skill is fetched over https only", code="bad_request")
+    if parts.username is not None or parts.password is not None:
+        raise LampError(f"https://{parts.hostname}/…: a URL with a name or password in it is refused", code="bad_request")
     opener = urllib.request.build_opener(_HttpsOnly)
     try:
         with opener.open(url, timeout=timeout) as response:
-            return read_capped(response)
+            return read_capped(response), response.geturl()
     except OSError as error:
         raise LampError(f"{url}: {error}", code="bad_request") from error
 

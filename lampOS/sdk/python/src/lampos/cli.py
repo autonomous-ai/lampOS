@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -165,17 +166,31 @@ async def _skill_push(args) -> int:
     return 0
 
 
+def _older(version: str, than: str) -> bool | None:
+    """Whether dotted-number [version] is older than [than]; None when either
+    isn't one."""
+    def parts(text: str) -> tuple[int, ...] | None:
+        core = text.split("-", 1)[0].split("+", 1)[0]
+        return tuple(int(part) for part in core.split(".")) if re.fullmatch(r"\d+(\.\d+)*", core) else None
+
+    a, b = parts(version), parts(than)
+    return None if a is None or b is None else a < b
+
+
 async def _skill_install(args) -> int:
-    from .index import Indexes, find, read_source
+    from .index import Indexes, find, host_of, read_source
     from .push import _NAME, GRANTS_ASKED, asks_of, open_package, tomllib
 
     # A URL is fetched over https only; a file here is read; a skill's name
     # is looked up in the indexes kept here and checked against its entry.
     if "://" not in args.source and not Path(args.source).exists() and _NAME.fullmatch(args.source):
-        listing, _, data = find(Indexes(Keyring().folder), args.source, args.from_index)
-        print(f"from index {listing.name}, published by key {listing.publisher}, not the Store")
+        listing, entry, data = find(Indexes(Keyring().folder), args.source, args.from_index)
+        print(f"from index {listing.name}, published by key {listing.publisher}, not the Store; fetched from {host_of(entry.url)}")
     else:
         data = read_source(args.source)
+        if "://" in args.source:
+            print(f"fetched from {host_of(args.source)}")
+    # What the person reads comes from the package itself, never from an index's entry.
     opened = open_package(data)
     asks = asks_of(tomllib.loads(opened.files.get("skill.toml", b"").decode("utf-8", "replace")))
     # Integrity, not trust: anyone can make a key (Fourteen, #3504).
@@ -185,12 +200,17 @@ async def _skill_install(args) -> int:
         print(f"  it {GRANTS_ASKED[ask]} ({ask})")
     if "camera" in asks:
         print("  It asks for the camera's picture: the lamp keeps it off until the owner says yes in the app.")
-    if not args.yes:
-        answer = input(f"Put {opened.name} on your lamp? [y/N] ").strip().lower()
-        if answer not in ("y", "yes"):
-            print("not installed")
-            return 1
     async with await Lamp.connect(args.lamp) as lamp:
+        # The same signer's older version is still a valid package: said first, and taken only with --force (Fourteen on #3997).
+        kept = next((s for s in await lamp.skills() if s.get("name") == opened.name), None) if "skills" in lamp.grants else None
+        if kept and _older(opened.version, str(kept.get("version"))) and not args.force:
+            print(f"{opened.name} {opened.version} is older than the {kept.get('version')} on your lamp: --force to put it back")
+            return 1
+        if not args.yes:
+            answer = input(f"Put {opened.name} on your lamp? [y/N] ").strip().lower()
+            if answer not in ("y", "yes"):
+                print("not installed")
+                return 1
         skill = await lamp.install_package(data)
     held = f", held: {skill['held']}" if skill.get("held") else ""
     print(f"{skill.get('name')} {skill.get('version')} installed, {'on' if skill.get('on') else 'off'}{held}")
@@ -217,11 +237,17 @@ async def _skill_index(args) -> int:
         _show_index(open_index(data))
         print(f"written to {out}")
     elif args.index_command == "add":
+        from .index import host_of
+
         listing = open_index(read_source(args.url))
         held = indexes.all().get(listing.name)
         if held and held["public"] != listing.public:
             raise LampError(f"an index named {listing.name} is kept already, by key {held['key']}: remove it first", code="refused")
         _show_index(listing)
+        if "://" in args.url:
+            print(f"  from {host_of(args.url)}")
+        if held and held["url"] != args.url:
+            print(f"  index {listing.name} is kept from {held['url']}: now from {args.url}")
         if not args.yes:
             answer = input(f"Keep index {listing.name}, and trust only key {listing.publisher} to change it? [y/N] ").strip().lower()
             if answer not in ("y", "yes"):
@@ -242,12 +268,15 @@ async def _skill_browse(args) -> int:
     from .index import Indexes, refresh
 
     query = (args.query or "").lower()
-    for listing in refresh(Indexes(Keyring().folder)):
+    listings, unread = refresh(Indexes(Keyring().folder))
+    for listing in listings:
         for entry in listing.skills:
             if query in entry.name.lower():
                 asks = ", ".join(entry.asks) or "nothing"
                 print(f"{entry.name}\t{entry.version}\tsigned by key {entry.author}\tasks {asks}\tindex {listing.name}")
-    return 0
+    for name, why in unread:
+        print(f"index {name} could not be read: {why}", file=sys.stderr)
+    return 1 if unread else 0
 
 
 async def _skill_list(args) -> int:
@@ -317,6 +346,7 @@ def main(argv: list[str] | None = None) -> int:
     skill_install.add_argument("lamp", nargs="?")
     skill_install.add_argument("--from", dest="from_index", help="the index to take NAME from, when more than one lists it")
     skill_install.add_argument("--yes", action="store_true", help="don't ask: you have read what it asks")
+    skill_install.add_argument("--force", action="store_true", help="put back an older version than the one on your lamp")
     skill_install.set_defaults(run=_skill_install)
     skill_index = skill_commands.add_parser("index", help="shared-skill indexes: signed lists of signed packages to install from")
     index_commands = skill_index.add_subparsers(dest="index_command", required=True)

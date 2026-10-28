@@ -89,6 +89,9 @@ def test_the_pinned_key_and_the_last_seq_hold(made, tmp_path):
         ({"author": None}, "signed packages only"),
         ({"name": "../wave"}, "not a skill's name"),
         ({"size": 2 << 20}, "size is 1 to"),
+        ({"url": "https://me:secret@skills.example/w.tar"}, "no name or password"),
+        ({"withdrawn": True}, "withdrawn is not a field of a format 1 entry"),
+        ({"public": base64.b64encode(b"x" * 32).decode()}, "whose fingerprint is author"),
     ],
 )
 def test_an_entry_out_of_shape_is_refused(made, change, says):
@@ -105,7 +108,8 @@ def test_a_package_that_isnt_the_entrys_is_refused(made, tmp_path):
         index.check_package(wave, made["nod"])
     # Same bytes as listed, but the index says another author or fewer asks.
     stranger = Keyring(tmp_path / "stranger").author_key(make=True)
-    for field, value, says in (("author", push.fingerprint(push._public_bytes(stranger)), "the index says key"),
+    stranger_public = base64.b64encode(push._public_bytes(stranger)).decode()
+    for field, value, says in (("public", stranger_public, "the index says key"),
                                ("asks", ["light"], "the index says \\[light\\]")):
         lying = index.Entry(**{**wave.__dict__, field: value})
         with pytest.raises(LampError, match=says):
@@ -196,3 +200,46 @@ def test_a_name_kept_under_another_signer_is_refused_before_a_byte(made, tmp_pat
                 assert len(fake.asked("skill.push")) == pushed
 
     run(go())
+
+
+def test_one_index_that_cant_be_read_is_named_and_the_others_go_on(made, tmp_path):
+    kept = index.Indexes(tmp_path / "home")
+    kept.keep("https://lan.example/a.json", index.open_index(made["index"]))
+    other = index.make_index("other-things", [made["nod"]], BASE, 1, made["publisher"])
+    kept.keep("https://gone.example/b.json", index.open_index(other))
+    served = {"https://lan.example/a.json": made["index"], BASE + "desk-wave-1.0.0.tar": made["wave"]}
+
+    def fetch(url):
+        if url not in served:
+            raise LampError(f"{url}: 404", code="bad_request")
+        return served[url]
+
+    listings, unread = index.refresh(kept, fetch)
+    assert [listing.name for listing in listings] == ["desk-things"]
+    assert unread == [("other-things", "bad_request: https://gone.example/b.json: 404")]
+    # Without --from, a second listing of the name can't be ruled out; with it, the readable one serves.
+    with pytest.raises(LampError, match="index other-things could not be read .*: say which with --from"):
+        index.find(kept, "desk-wave", fetch=fetch)
+    assert index.find(kept, "desk-wave", "desk-things", fetch=fetch)[1].name == "desk-wave"
+    # A refused index stays loud: an older seq raises, it is never skipped.
+    served["https://lan.example/a.json"] = _resign(made["index"], dict(json.loads(json.loads(made["index"])["index"]), seq=1), made["publisher"])
+    with pytest.raises(LampError, match="went back"):
+        index.refresh(kept, fetch)
+
+
+def test_the_kept_indexes_are_the_persons_alone_and_a_moved_url_is_said(made, tmp_path):
+    kept = index.Indexes(tmp_path / "home")
+    listing = index.open_index(made["index"])
+    assert kept.keep("https://a.example/i.json", listing) is None
+    assert (kept.path.stat().st_mode & 0o777) == 0o600
+    assert kept.keep("https://b.example/i.json", listing) == "https://a.example/i.json"
+
+
+def test_an_older_version_is_told_apart():
+    from lampos.cli import _older
+
+    assert _older("1.2.0", "1.10.0") is True
+    assert _older("1.10.0", "1.2.0") is False
+    assert _older("1.0.0", "1.0.0") is False
+    assert _older("1.0.0-beta", "1.0.1") is True
+    assert _older("one", "1.0.0") is None
