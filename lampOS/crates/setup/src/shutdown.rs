@@ -48,7 +48,17 @@ pub fn switched_on(value: Option<&str>) -> bool {
 /// start after the voice). A voice that loses the switch while it stops
 /// counts it a fault, and its restart guard keeps the lamp muted at the
 /// next power-on: lamp-52e6, 27 Oct, after each shutdown.
-pub const VOICE_FIRST: [&str; 3] = ["/usr/bin/systemctl", "stop", "lamp-voice.service"];
+/// The path that starts `lampos.target` once the lamp is set up stops with
+/// it: left on, it started the target, and with it the voice, again while
+/// the shutdown was stopping it (lamp-52e6, 28 Oct 06:28: the voice back for
+/// 6 s between the two stops; the Reviewer-lead on #3713). A dry run starts
+/// it again with the rest of what it stopped.
+pub const VOICE_FIRST: [&str; 4] = [
+    "/usr/bin/systemctl",
+    "stop",
+    "lampos-setup-done.path",
+    "lamp-voice.service",
+];
 
 pub const STOP: [&str; 3] = ["/usr/bin/systemctl", "stop", "lampos.target"];
 
@@ -621,6 +631,16 @@ mod tests {
             );
             assert_eq!(steps.last(), Some(&Step::PoweringOff));
         }
+    }
+
+    /// The set-up path stops with the voice, before the target, so nothing
+    /// starts the target again under the shutdown.
+    #[test]
+    fn the_set_up_path_stops_with_the_voice_before_the_target() {
+        assert_eq!(VOICE_FIRST[..2], ["/usr/bin/systemctl", "stop"]);
+        assert!(VOICE_FIRST.contains(&"lampos-setup-done.path"));
+        assert!(VOICE_FIRST.contains(&"lamp-voice.service"));
+        assert_eq!(STOP, ["/usr/bin/systemctl", "stop", "lampos.target"]);
     }
 
     #[test]
