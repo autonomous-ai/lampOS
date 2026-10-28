@@ -1497,10 +1497,22 @@ fn request(at_us: u64, source: lamp_msgs::ShutdownSource) -> lamp_msgs::Shutdown
 
 /// Publish `requests` (each under its bus publisher name) on the shutdown's
 /// topic, and watch with the switch `on` or off and `--enable`: how many
-/// shutdowns were started, and the log.
+/// shutdowns were started, and the log. The runner takes each start and is
+/// still at work after it.
 fn watch_requests(
     on: bool,
     enabled: bool,
+    requests: Vec<(&str, lamp_msgs::ShutdownRequest)>,
+) -> (usize, Vec<String>) {
+    watch_requests_taken(on, enabled, true, requests)
+}
+
+/// As [`watch_requests`], the runner `taken`: still at work after a start,
+/// or (false) refused at once, as while an update installs, and gone.
+fn watch_requests_taken(
+    on: bool,
+    enabled: bool,
+    taken: bool,
     requests: Vec<(&str, lamp_msgs::ShutdownRequest)>,
 ) -> (usize, Vec<String>) {
     use lamp_msgs::ShutdownRequest;
@@ -1533,11 +1545,12 @@ fn watch_requests(
         .publish_json(request.stamp.at_us, request)
         .unwrap();
     }
-    let mut started = 0;
+    let started = std::cell::Cell::new(0);
     let mut start = || {
-        started += 1;
+        started.set(started.get() + 1);
         Ok(())
     };
+    let mut running = || taken && started.get() > 0;
     let logged = RefCell::new(Vec::new());
     lamp_setup::watch(
         &mut touch,
@@ -1549,11 +1562,12 @@ fn watch_requests(
         Some(lamp_setup::ShutdownWatch {
             requests: &mut asked,
             start: on.then_some(&mut start as &mut dyn FnMut() -> io::Result<()>),
+            running: &mut running,
         }),
         || panic!("no reset was asked"),
     )
     .unwrap();
-    (started, logged.into_inner())
+    (started.get(), logged.into_inner())
 }
 
 #[test]
@@ -1611,5 +1625,30 @@ fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
     assert_eq!(
         watch_requests(true, true, vec![("voice", request(at, Button))]).0,
         0
+    );
+}
+
+/// The Reviewer-lead's P2 on #3729: `systemd-run` returning only hands the
+/// shutdown to the runner, which refuses while an update installs and is
+/// gone. A flag set on that return passed over every later hold this boot;
+/// the watcher now asks whether the runner is still at work, so the second
+/// hold, once the update is done, turns the lamp off.
+#[test]
+fn a_refused_shutdown_leaves_the_next_hold_acted_on() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
+    let (started, log) = watch_requests_taken(
+        true,
+        true,
+        false,
+        vec![
+            ("controls", request(at - 1_000, Button)),
+            ("controls", request(at, Button)),
+        ],
+    );
+    assert_eq!(started, 2, "{log:?}");
+    assert!(
+        !log.iter().any(|line| line.contains("already turning off")),
+        "{log:?}"
     );
 }
