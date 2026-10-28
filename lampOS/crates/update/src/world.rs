@@ -30,6 +30,11 @@ pub trait Systemd {
     fn reload(&mut self) -> Result<(), String>;
     /// `systemctl restart`: returns once systemd has done it.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
+    /// `systemctl stop`, of a unit a round added and takes away again
+    /// (crate::added). Refused unless a world can.
+    fn stop(&mut self, unit: &str) -> Result<(), String> {
+        Err(format!("{unit} cannot be stopped here"))
+    }
     /// The last line the unit's own program wrote to the journal since this
     /// program last restarted it, cleaned ([`clean_line`]); none before a
     /// restart, or when it said nothing since (#1505). Only ever asked of a
@@ -135,6 +140,10 @@ impl Systemd for Systemctl {
         self.restarted.retain(|(name, _, _)| name != unit);
         self.restarted.push((unit.to_owned(), at, before));
         run(&["restart", unit], self.restart_within)
+    }
+
+    fn stop(&mut self, unit: &str) -> Result<(), String> {
+        run(&["stop", unit], self.restart_within)
     }
 
     fn last_line(&mut self, unit: &str) -> Option<String> {

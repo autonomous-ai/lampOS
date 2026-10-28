@@ -105,6 +105,23 @@ fn what_a_socket_or_timer_starts_is_its_named_unit_else_its_own_name() {
         starts("lamp-a.socket", "[Socket]\nAccept = yes\n").as_deref(),
         Some("lamp-a@.service")
     );
+    // A boolean in any case; a key only of the unit's own section.
+    assert_eq!(
+        starts("lamp-a.socket", "[Socket]\nAccept=Yes\n").as_deref(),
+        Some("lamp-a@.service")
+    );
+    assert_eq!(
+        starts(
+            "lamp-a.timer",
+            "[Install]\nUnit=lamp-b.service\n[Timer]\nOnCalendar=hourly\n"
+        )
+        .as_deref(),
+        Some("lamp-a.service")
+    );
+    assert_eq!(
+        starts("lamp-a.socket", "[Socket]\n#Accept=yes\n").as_deref(),
+        Some("lamp-a.service")
+    );
     // Something that is not a part's unit is not followed.
     assert_eq!(
         starts("lamp-a.timer", "[Timer]\nUnit=lampos.target\n"),
