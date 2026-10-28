@@ -1,10 +1,10 @@
 # lampOS eyes' camera helper, one ask (lampOS/docs/eyes.md, "The camera's helper"; #2892): started by
 # lamp-eyes-camera.socket for each connection, as root, the connection its standard output.
-# `lamp-eyes reauthorize-camera` checks that the USB device at the port below is the camera named
-# (idVendor, idProduct under /sys/bus/usb/devices), writes its authorized 0 then 1, at most once a
+# `lamp-eyes reauthorize-camera` finds the one USB device with the camera's ids on any port
+# (idVendor, idProduct under /sys/bus/usb/devices; none or two: refused, #4074), writes its authorized 0 then 1, at most once a
 # minute (the time kept in /run/lampos-eyes-camera/last), answers one line and exits. It reads
-# nothing from the connection, so it can't be pointed at another device. The camera and its port
-# are the same as lamp-eyes.service's --usb.
+# nothing from the connection, so it can't be pointed at another device. The camera is the same as
+# lamp-eyes.service's --usb.
 [Unit]
 Description=lampOS eyes' camera helper (lamp-eyes reauthorize-camera)
 CollectMode=inactive-or-failed
@@ -13,7 +13,7 @@ CollectMode=inactive-or-failed
 Type=simple
 User=root
 Group=root
-ExecStart=/opt/lampOS/eyes/current/lamp-eyes reauthorize-camera --usb 01da:5875@3-1.1.4
+ExecStart=/opt/lampOS/eyes/current/lamp-eyes reauthorize-camera --usb 01da:5875
 StandardInput=null
 StandardOutput=socket
 StandardError=journal
