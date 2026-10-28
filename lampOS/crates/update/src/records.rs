@@ -265,6 +265,15 @@ pub struct Records {
 /// Held while one lamp-update works; let go when dropped.
 pub struct Lock {
     _file: File,
+    /// The records it is the lock of.
+    folder: PathBuf,
+}
+
+impl Lock {
+    /// The records' folder this lock holds.
+    pub fn folder(&self) -> &Path {
+        &self.folder
+    }
 }
 
 impl Records {
@@ -295,7 +304,10 @@ impl Records {
         rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive).map_err(
             |_| io::Error::new(io::ErrorKind::WouldBlock, "another lamp-update is at work"),
         )?;
-        Ok(Lock { _file: file })
+        Ok(Lock {
+            _file: file,
+            folder: self.folder.clone(),
+        })
     }
 
     /// The state. One that cannot be read is moved aside, said, and begun

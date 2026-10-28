@@ -17,15 +17,16 @@ use std::{
 };
 
 /// Whether the writer may be refreshed from `running`, the bytes of the
-/// lamp-update that runs: no switch of lamp-update's own waiting in
-/// `records`, and `update/current` under `root` naming a build whose
-/// lamp-update holds exactly those bytes. Why not, when not.
+/// lamp-update that runs: no switch of lamp-update's own waiting in the
+/// records `held` locks, and `update/current` under `root` naming a build
+/// whose lamp-update holds exactly those bytes. Why not, when not.
 ///
-/// `_held` is the records' lock (`Records::lock` of `records`), which the
-/// caller holds from here until the copy is placed: no switch of its own can
-/// begin in between, so the answer still holds when it is acted on.
-pub fn ready(root: &Path, records: &Path, _held: &Lock, running: &[u8]) -> Result<(), String> {
-    match own::pending(records) {
+/// The records are read from the lock held on them (`Records::lock`), so the
+/// answer is about those records and no switch of lamp-update's own can
+/// begin while the lock is held. The refresh that will call this is not
+/// written yet; it is to hold the lock until the copy is placed.
+pub fn ready(root: &Path, held: &Lock, running: &[u8]) -> Result<(), String> {
+    match own::pending(held.folder()) {
         Ok(None) => {}
         Ok(Some(_)) => {
             return Err("a switch of lamp-update's own waits to be confirmed".to_owned());
