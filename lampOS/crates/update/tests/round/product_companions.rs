@@ -59,7 +59,7 @@ fn publish(lamp: &mut Lamp, eyes: &str, units: &[(&str, String)]) {
     for (name, text) in units {
         let unit = Unit {
             lamp: manifest::PRODUCT_LAMP.into(),
-            unit: (*name).into(),
+            unit: manifest::manifest_name(name),
             sha256: sha(text),
             size: text.len() as u64,
         };
@@ -100,7 +100,14 @@ fn a_parts_template_socket_and_timer_switch_with_it_and_only_the_template_is_not
     // The keeper's program is a fixed path no round switches: left, and
     // never fetched.
     assert_eq!(unit(&lamp, KEEPER), keeper("restart-asked"));
-    assert!(!lamp.channel.fetched.iter().any(|url| url.ends_with(KEEPER)));
+    let keeper_file = format!("product.{}", manifest::manifest_name(KEEPER));
+    assert!(
+        !lamp
+            .channel
+            .fetched
+            .iter()
+            .any(|url| url.ends_with(&keeper_file))
+    );
     assert_eq!(lamp.eyes_link(), sha("eyes 2"));
     assert_eq!(
         lamp.calls(),

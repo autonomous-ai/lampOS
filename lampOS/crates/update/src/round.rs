@@ -1289,26 +1289,27 @@ impl Run<'_, '_> {
     ) -> Result<BTreeMap<String, String>, Outcome> {
         let mut carried = BTreeMap::new();
         for unit in &manifest.units {
-            if companion::kind(&unit.unit).is_some() {
+            // A template is named without its `@` in a manifest.
+            let name = unit.on_lamp();
+            if companion::kind(&name).is_some() {
                 // Only the product's (crate::manifest), and only where the
                 // lamp has it, belonging to a part it has.
-                let Some(ours) = owner(installed, companions, &unit.unit) else {
+                let Some(ours) = owner(installed, companions, &name) else {
                     continue;
                 };
                 let text = self.fetch_unit(manifest, unit)?;
                 let mut built = companions.clone();
-                built.insert(unit.unit.clone(), text.clone());
-                let before = &companions[&unit.unit];
-                if companion::starts(&unit.unit, &text) != companion::starts(&unit.unit, before)
-                    || owner(installed, &built, &unit.unit).map(|part| &part.unit)
-                        != Some(&ours.unit)
+                built.insert(name.clone(), text.clone());
+                let before = &companions[&name];
+                if companion::starts(&name, &text) != companion::starts(&name, before)
+                    || owner(installed, &built, &name).map(|part| &part.unit) != Some(&ours.unit)
                 {
                     return Err(Outcome::Refused(format!(
                         "the product's {} does not start {} through {}current as the lamp's does",
-                        unit.unit, ours.program.binary, ours.program.builds
+                        name, ours.program.binary, ours.program.builds
                     )));
                 }
-                carried.insert(unit.unit.clone(), text);
+                carried.insert(name, text);
                 continue;
             }
             let Some(part) = installed.iter().find(|part| part.unit == unit.unit) else {

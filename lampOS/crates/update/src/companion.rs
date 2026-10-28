@@ -43,13 +43,13 @@ pub fn kind(name: &str) -> Option<Kind> {
 pub fn starts(name: &str, text: &str) -> Option<String> {
     let (stem, key) = match kind(name)? {
         Kind::Template => return None,
-        Kind::Socket => (name.strip_suffix(".socket")?, "Service="),
-        Kind::Timer => (name.strip_suffix(".timer")?, "Unit="),
+        Kind::Socket => (name.strip_suffix(".socket")?, "Service"),
+        Kind::Timer => (name.strip_suffix(".timer")?, "Unit"),
     };
     let started = last(text, key).map_or_else(
         || {
             let accepts = kind(name) == Some(Kind::Socket)
-                && last(text, "Accept=")
+                && last(text, "Accept")
                     .is_some_and(|value| matches!(value, "yes" | "true" | "on" | "1"));
             if accepts {
                 format!("{stem}@.service")
@@ -86,13 +86,13 @@ pub fn part<'a>(
     unit::linked(text_of(&started)?)
 }
 
-/// The last value a unit gives `key` (`Unit=`), as systemd reads a key set
-/// twice.
+/// The last value a unit gives `key` (`Unit`), as systemd reads a key set
+/// twice, with or without spaces around its `=`.
 fn last<'t>(text: &'t str, key: &str) -> Option<&'t str> {
     text.lines()
-        .map(str::trim)
-        .filter_map(|line| line.strip_prefix(key))
-        .map(str::trim)
+        .filter_map(|line| line.split_once('='))
+        .filter(|(name, _)| name.trim() == key)
+        .map(|(_, value)| value.trim())
         .next_back()
 }
 
