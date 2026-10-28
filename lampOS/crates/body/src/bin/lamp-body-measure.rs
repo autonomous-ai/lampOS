@@ -19,7 +19,7 @@ fn usage() -> String {
     USAGE.replacen(
         "{home}",
         &format!(
-            "A home pitch\nwithin {tolerance} counts outside the body's home range ({low}..{high}) is the head on its stop: --home\ntakes the nearest edge and the file says so in a comment line. One over it (the side the head\nfalls) by more, within {reach}, is a head moved off home by a hand: --home keeps {high} and says so.\nFarther out it is refused, a head off its stop: fold it onto its stop and measure again. The clamp helps a body that wakes (lamp-body's\n--wake, on unless given off): its start check also reads the live pitch, and lets it through\nonly to wake it home. "
+            "A home pitch\nwithin {tolerance} counts outside the body's home range ({low}..{high}) is the head on its stop: --home\ntakes the nearest edge and the file says so in a comment line. One over it (the head tipped\nup) by more, within {reach}, is a head moved off home by a hand: --home keeps {high} and says so.\nFarther out it is refused, a head off its stop: fold it onto its stop and measure again. The clamp helps a body that wakes (lamp-body's\n--wake, on unless given off): its start check also reads the live pitch, and lets it through\nonly to wake it home. "
         ),
         1,
     )

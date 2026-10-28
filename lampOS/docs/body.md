@@ -2006,7 +2006,7 @@ each head staying where a hand left it): `--home` keeps the high edge, 2020,
 and the comment line says so ("home pitch 2213 is 193 over the body's home
 range 1760..2020: a head moved off home by a hand; 2020 kept, and the body
 wakes it home (within 400)"). Farther over than that, or under by more than
-the 20 (a head tipped up against its weight), it is refused, a head off its
+the 20 (a head tipped down), it is refused, a head off its
 stop, and the refusal says to fold the head onto its stop and measure again
 (`a_home_pitch_moved_by_hand_within_the_wake_reach_keeps_the_edge`,
 `a_home_pitch_far_outside_the_body_s_range_is_refused`). The body's own start
