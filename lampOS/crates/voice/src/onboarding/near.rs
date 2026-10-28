@@ -244,6 +244,12 @@ pub(crate) struct NearFlow {
     reoffered: u8,
     /// Prompts the voice never said, offered again ([`MOST_UNSAID`]).
     unsaid: u8,
+    /// Whether the last call try judged in this voice cycle was accepted:
+    /// the next call prompt says "Got it. Once more." (`near_again`) or "I
+    /// didn't catch that." (`near_missed`). None until one is judged: the
+    /// step's first line, which says the phrase and that it asks a few
+    /// times, so a prompt cut before any try says it again (#3702).
+    last: Option<bool>,
 }
 
 impl NearFlow {
@@ -534,11 +540,17 @@ impl Onboarding {
         }
         // The name part's stored bar stands: the sentence part goes on. The
         // prompts offered again stay counted, so absence can't renew them.
-        let (named, reoffered, unsaid) = (self.near.named, self.near.reoffered, self.near.unsaid);
+        let (named, reoffered, unsaid, last) = (
+            self.near.named,
+            self.near.reoffered,
+            self.near.unsaid,
+            self.near.last,
+        );
         self.forget_near();
         self.near.named = named;
         self.near.reoffered = reoffered;
         self.near.unsaid = unsaid;
+        self.near.last = last;
     }
 
     /// The committed-to-be prompt count of a part.
@@ -564,6 +576,7 @@ impl Onboarding {
         self.near.short = None;
         self.near.reoffered = 0;
         self.near.unsaid = 0;
+        self.near.last = None;
     }
 
     pub(super) fn near_pending(&self) -> Option<lamp_msgs::OnboardingInvitation> {
@@ -599,11 +612,20 @@ impl Onboarding {
         offer.ready = false;
         Some(
             match (offer.sentence, offer.prompt, self.near.short) {
-                (false, 1, _) => self.definition.note(
-                    Step::HowYouSound,
-                    self.desired.steps.contains_key(Step::HowYouSound.name()),
-                ),
-                (false, _, _) => self.definition.words.near_again.as_str(),
+                // Each call prompt answers the last try (#3702).
+                (false, _, _) => match self.near.last {
+                    None => self.definition.note(
+                        Step::HowYouSound,
+                        self.desired.steps.contains_key(Step::HowYouSound.name()),
+                    ),
+                    Some(true) => self.definition.words.near_again.as_str(),
+                    Some(false) => self
+                        .definition
+                        .words
+                        .near_missed
+                        .as_deref()
+                        .unwrap_or(&self.definition.words.near_again),
+                },
                 (true, 1, _) => self.definition.words.sentence_first.as_str(),
                 (true, _, Some(Short::Level)) => self.definition.words.sentence_louder.as_str(),
                 (true, _, Some(Short::Coverage)) => self.definition.words.sentence_closer.as_str(),
@@ -929,6 +951,7 @@ impl Onboarding {
         } else if let Some(why) = spoiled {
             Err(why.to_owned())
         } else if early {
+            self.near.last = Some(false);
             let again = self.offer_again(false, listening.prompt);
             self.note_try(json!({"kind":"onboarding_near_try",
                 "prompt":listening.prompt,"accepted":false,"why":"answered_early",
@@ -942,6 +965,7 @@ impl Onboarding {
             .iter()
             .map(|span| (from_end(span.began_ms), span.ended_ms.map(from_end)))
             .collect();
+        self.near.last = Some(judged.is_ok());
         match judged {
             Ok(done) => {
                 self.desired.near_call_tries.push(done);
