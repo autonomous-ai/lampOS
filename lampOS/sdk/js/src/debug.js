@@ -13,7 +13,8 @@ export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp']);
 export const SUMMARISED = new Set(['text', 'data']);
 // Every other field the protocol has, printed as it is. A test fails on any
 // field of control.schema.json in none of these, so a new one is decided here,
-// not found later in a log. Shown as they are, so on a terminal or in the logs
+// not found later in a log; and at run time a field in none of them prints as
+// `<not shown>`, so one from a newer lamp is hidden until decided (fails closed). Shown as they are, so on a terminal or in the logs
 // an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
 // phrase, events' fields, and a refusal's `why`.
 export const SHOWN = new Set([
@@ -27,6 +28,13 @@ export const SHOWN = new Set([
   'roll', 'say', 'say_max_chars', 'score', 'seen', 'shoulder', 'shows', 'side', 'size', 'skill', 'skills', 'state',
   'step_ms', 'strength', 'take_max_ms', 'talking', 'targets', 'to', 'until', 'v', 'where', 'why',
   'within_ms', 'x', 'y', 'yaw',
+]);
+// Fields a lamp sends that the schema leaves open (`limits`, an `express`
+// answer, `mood`, `light`, a pushed skill's parts, Nine's `shows` and `hand`,
+// and a `look` at `hand`'s `follow`).
+export const SHOWN_BEYOND_SCHEMA = new Set([
+  'joints_hz', 'to', 'move', 'on', 'energy', 'warmth', 'awake', 'shows', 'seen', 'x', 'y', 'size', 'open',
+  'confidence', 'sha256', 'part', 'follow',
 ]);
 // A said text's tag is keyed with this process's own random key: the same text
 // gives the same tag within a run, and nobody holding the log can test a guess.
@@ -45,7 +53,8 @@ export function redact(value, key) {
   if (Array.isArray(value)) return value.map((item) => redact(item));
   if (value && typeof value === 'object') {
     const pairing = value.op === 'pair';
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, pairing && k === 'code' ? '<redacted>' : redact(v, k)]));
+    const decided = (k) => SECRET.has(k) || SUMMARISED.has(k) || SHOWN.has(k) || SHOWN_BEYOND_SCHEMA.has(k);
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, pairing && k === 'code' ? '<redacted>' : decided(k) ? redact(v, k) : '<not shown>']));
   }
   return value;
 }

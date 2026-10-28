@@ -114,14 +114,29 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
     frame = {
         "id": 1, "op": "pair", "name": "laptop", "key": "K" * 44, "proof": "P" * 44,
         "lamp": {"id": "lamp-1", "fp": "f" * 16}, "nonce": "N" * 44,
-        "nested": [{"sig": "S" * 88}, {"pin": "a" * 64}],
+        "skills": [{"sig": "S" * 88}, {"pin": "a" * 64}],
         "text": "Build passed.", "data": "D" * 1000,
     }
     shown = debug.redact(frame)
     for field in ("key", "proof", "nonce"):
         assert shown[field] == "<redacted>"
     assert shown["lamp"] == {"id": "lamp-1", "fp": "<redacted>"}
-    assert shown["nested"] == [{"sig": "<redacted>"}, {"pin": "<redacted>"}]
+    assert shown["skills"] == [{"sig": "<redacted>"}, {"pin": "<redacted>"}]
+    # Fails closed: a field nobody decided (a newer lamp's) is hidden, at any depth.
+    unknown = debug.redact({"ev": "lamp.changed", "token": "t0ps3cret", "lamp": {"id": "lamp-1", "badge": "b4dge"}})
+    assert unknown == {"ev": "lamp.changed", "token": "<not shown>", "lamp": {"id": "lamp-1", "badge": "<not shown>"}}
+    # What a lamp sends beyond the schema's own fields is decided too.
+    for sample in ({"re": 3, "ok": True, "to": "body", "move": "glad-lift", "light": True},
+                  {"re": 1, "ok": True, "limits": {"joints_hz": 20}},
+                  {"re": 2, "ok": True, "state": {"mood": {"energy": 0.5, "warmth": 0.6, "awake": True, "asleep": False},
+                                                  "light": {"on": True, "colour": "warm", "level": 3,
+                                                            "shows": {"on": True, "colour": "warm", "level": 3}}}},
+                  {"ev": "hand", "seen": True, "x": 0.4, "y": 0.5, "size": 0.12, "open": True, "confidence": 0.9},
+                  {"re": 4, "ok": True, "to": "body", "follow": "hand"},
+                  {"re": 5, "ok": True, "limits": {"say": {"most": 6, "within_ms": 60_000}, "hold_max_ms": 30_000,
+                                                   "take_max_ms": 600_000, "say_max_chars": 300,
+                                                   "quiet_hours": {"from": "22:00", "to": "07:00"}}}):
+        assert "<not shown>" not in json.dumps(debug.redact(sample)), sample
     assert shown["text"].startswith("<13 chars, tag ") and "Build" not in shown["text"]
     # Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.
     import hashlib

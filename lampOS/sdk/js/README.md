@@ -161,8 +161,9 @@ this computer, or give away the lamp's pin, is printed: `proof`, `sig`, `key`,
 `code`. A said `text` shows only as its
 length and a tag keyed for this run (an HMAC: the same text tags the same within
 a run, and nobody can test a guess against it), and a pushed skill part's
-`data` only as its length. Everything else is printed as it is: a registered
-phrase, events' fields and a refusal's `why`.
+`data` only as its length. The fields the protocol has are printed as they
+are: a registered phrase, events' fields and a refusal's `why`. A field the SDK
+doesn't know, such as one from a newer lamp, is printed as `<not shown>`.
 
 **Dependencies:** `ws` and the optional `bonjour-service` are caret ranges
 with no lock file, as a library's are: the application that uses it locks

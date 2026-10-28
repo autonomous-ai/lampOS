@@ -96,13 +96,25 @@ test('the debug log redacts what would pair or hello as this computer', async ()
   const frame = {
     id: 1, op: 'pair', name: 'laptop', key: 'K'.repeat(44), proof: 'P'.repeat(44),
     lamp: { id: 'lamp-1', fp: 'f'.repeat(16) }, nonce: 'N'.repeat(44),
-    nested: [{ sig: 'S'.repeat(88) }, { pin: 'a'.repeat(64) }],
+    skills: [{ sig: 'S'.repeat(88) }, { pin: 'a'.repeat(64) }],
     text: 'Build passed.', data: 'D'.repeat(1000),
   };
   const shown = debug.redact(frame);
   for (const field of ['key', 'proof', 'nonce']) assert.equal(shown[field], '<redacted>');
   assert.deepEqual(shown.lamp, { id: 'lamp-1', fp: '<redacted>' });
-  assert.deepEqual(shown.nested, [{ sig: '<redacted>' }, { pin: '<redacted>' }]);
+  assert.deepEqual(shown.skills, [{ sig: '<redacted>' }, { pin: '<redacted>' }]);
+  // Fails closed: a field nobody decided (a newer lamp's) is hidden, at any depth.
+  assert.deepEqual(debug.redact({ ev: 'lamp.changed', token: 't0ps3cret', lamp: { id: 'lamp-1', badge: 'b4dge' } }),
+    { ev: 'lamp.changed', token: '<not shown>', lamp: { id: 'lamp-1', badge: '<not shown>' } });
+  // What a lamp sends beyond the schema's own fields is decided too.
+  for (const frame of [
+    { re: 3, ok: true, to: 'body', move: 'glad-lift', light: true },
+    { re: 1, ok: true, limits: { joints_hz: 20 } },
+    { re: 2, ok: true, state: { mood: { energy: 0.5, warmth: 0.6, awake: true, asleep: false }, light: { on: true, colour: 'warm', level: 3, shows: { on: true, colour: 'warm', level: 3 } } } },
+    { ev: 'hand', seen: true, x: 0.4, y: 0.5, size: 0.12, open: true, confidence: 0.9 },
+    { re: 4, ok: true, to: 'body', follow: 'hand' },
+    { re: 5, ok: true, limits: { say: { most: 6, within_ms: 60000 }, hold_max_ms: 30000, take_max_ms: 600000, say_max_chars: 300, quiet_hours: { from: '22:00', to: '07:00' } } },
+  ]) assert.ok(!JSON.stringify(debug.redact(frame)).includes('<not shown>'), JSON.stringify(frame));
   assert.ok(shown.text.startsWith('<13 chars, tag ') && !shown.text.includes('Build'));
   // Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.
   const { createHash } = await import('node:crypto');
