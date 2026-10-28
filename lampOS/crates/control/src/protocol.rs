@@ -41,8 +41,8 @@ pub fn phrase_words(text: &str) -> Vec<String> {
 /// The longest a light request or one lease renewal holds, in ms: as the
 /// ring's own light requests ([`lamp_msgs::LightRequest`]'s claims, ≤ 30 s).
 pub const HOLD_MAX_MS: u32 = 30_000;
-/// A move's step, in ms.
-pub const STEP_MS: std::ops::RangeInclusive<u32> = 20..=1_000;
+/// A move's step, in ms: the body's own (`lamp_body::moves::check`).
+pub const STEP_MS: std::ops::RangeInclusive<u32> = 40..=1_000;
 /// A move's frames: from a start to an end at the least.
 pub const FRAMES: std::ops::RangeInclusive<usize> = 2..=500;
 /// The longest a `joints` goal may take to reach, in ms.
@@ -548,6 +548,21 @@ impl Op {
                 if frames.first() != Some(&[0; 5]) || frames.last() != Some(&[0; 5]) {
                     return Err("frames: start and end at home, all five 0".to_owned());
                 }
+                // Held to the body's own check here, so a move the body
+                // would drop (too short, too far, too fast) is refused with
+                // its words, never answered `{"to":"body"}` and then lost
+                // (Ten's finding on #3997, 29 Oct).
+                let frames = frames
+                    .iter()
+                    .map(|frame| frame.map(|counts| i16::try_from(counts).unwrap_or(i16::MAX)))
+                    .collect();
+                let file = lamp_body::moves::Move {
+                    name: "control".to_owned(),
+                    step_ms: u16::try_from(*step_ms).unwrap_or(u16::MAX),
+                    frames,
+                };
+                lamp_body::moves::check(&file)
+                    .map_err(|why| format!("frames: a move this body cannot play: {why}"))?;
             }
             Self::Joints {
                 lease,
@@ -867,7 +882,7 @@ mod tests {
             r#"{"id":9,"op":"gesture","name":"nod"}"#.to_owned(),
             r#"{"id":10,"op":"look","at":{"yaw":-10,"pitch":5}}"#.to_owned(),
             r#"{"id":10,"op":"look","at":"face"}"#.to_owned(),
-            r#"{"id":11,"op":"move","step_ms":40,"frames":[[0,0,0,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#.to_owned(),
+            r#"{"id":11,"op":"move","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":12,"op":"joints","lease":"l_81","targets":{"pitch":4.0,"yaw":-12.0},"within_ms":300}"#.to_owned(),
             r#"{"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}"#.to_owned(),
             r#"{"id":14,"op":"say","text":"Build passed."}"#.to_owned(),
@@ -897,6 +912,27 @@ mod tests {
             Op::Look {
                 at: LookAt::Target(LookTarget::Ahead)
             }
+        );
+    }
+
+    /// Ten's finding on #3997 (lamp-a0ae, 29 Oct): a 600 ms move was taken
+    /// as `{"to":"body"}` and then dropped by the body. The door now holds a
+    /// move to the body's own check and says the body's words.
+    #[test]
+    fn a_move_the_body_would_drop_is_refused_with_the_bodys_words() {
+        let (re, words) = why(
+            r#"{"id":4,"op":"move","step_ms":200,"frames":[[0,0,0,0,0],[20,0,0,0,0],[20,0,0,0,0],[0,0,0,0,0]]}"#,
+        );
+        assert_eq!(re, Some(4));
+        assert!(
+            words.contains("a move this body cannot play: it lasts 600 ms, not 1500 to 10000"),
+            "{words}"
+        );
+        assert!(why(r#"{"id":5,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,151,0,0],[0,0,0,0,0]]}"#).1.contains("farther than 150"));
+        assert!(
+            why(r#"{"id":6,"op":"move","step_ms":20,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#)
+                .1
+                .contains("step_ms: from 40 to 1000")
         );
     }
 
@@ -946,6 +982,12 @@ mod tests {
             r#"{"id":1,"op":"gesture","name":"idle"}"#.to_owned(),
             r#"{"id":1,"op":"gesture","name":"scanning"}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":5,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
+            // What the body would drop: 600 ms, a 20 ms step, too far, too fast
+            // (lamp_body::moves::check; Ten's finding on #3997).
+            r#"{"id":1,"op":"move","step_ms":200,"frames":[[0,0,0,0,0],[20,0,0,0,0],[20,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
+            r#"{"id":1,"op":"move","step_ms":20,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
+            r#"{"id":1,"op":"move","step_ms":1000,"frames":[[0,0,0,0,0],[0,0,151,0,0],[0,0,0,0,0]]}"#.to_owned(),
+            r#"{"id":1,"op":"move","step_ms":100,"frames":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,300],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[10,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[0,0,0,0,0],[0,0,0,0]]}"#.to_owned(),

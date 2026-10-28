@@ -403,7 +403,7 @@ mod tests {
             serde_json::from_slice::<Value>(&buffer[..length]).unwrap(),
             json!({"gesture": "nod", "source": "control:c_1", "priority": "skill"})
         );
-        lamp.act("c_1", 2, &op(r#"{"id":2,"op":"move","step_ms":40,"frames":[[0,0,0,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#), 0).unwrap();
+        lamp.act("c_1", 2, &op(r#"{"id":2,"op":"move","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#), 0).unwrap();
         let length = body.recv(&mut buffer).unwrap();
         let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
         assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));

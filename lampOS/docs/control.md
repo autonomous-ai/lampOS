@@ -91,7 +91,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `express` | `feeling`, `strength` 0–1 (0.5) | the `feelings` skill's (#3691) move on `mood.sock` `{move}` and its light as a `light/request`, so one set of feelings (below) | `body`, `light` | no |
 | `gesture` | `name`, one of 19 built-in clips (below) | `mood.sock` `{gesture}` | `body` | no |
 | `look` | `at`: `face`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive) | `gaze.sock`, body goals, within the gaze reach | `body` (and `look` for `face`) | body |
-| `move` | `step_ms` 20–1,000, `frames` (2–500) of 5 joints in counts, first and last all 0 | `mood.sock` `{move}`, through `moves.rs`'s check | `body` | body |
+| `move` | `step_ms` 40–1,000, `frames` (2–500) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
@@ -338,7 +338,7 @@ connection closed), `slumped` (the body gave way under load and let go). Ids are
 {"id":8,"op":"express","feeling":"glad","strength":0.6}
 {"id":9,"op":"gesture","name":"nod"}
 {"id":10,"op":"look","at":{"yaw":-10,"pitch":5}}
-{"id":11,"op":"move","step_ms":40,"frames":[[0,0,0,0,0],[20,0,30,0,0],[0,0,0,0,0]]}
+{"id":11,"op":"move","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]}
 {"id":12,"op":"joints","lease":"l_81","targets":{"pitch":4.0,"yaw":-12.0},"within_ms":300}
 {"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}
 {"id":14,"op":"say","text":"Build passed."}
@@ -386,7 +386,7 @@ which back. An SDK's wait for them returns at the answer.
 | `express` | `feeling` (a lowercase name, the `feelings` skill's), `strength` 0–1 (0.5) | `body` + `light` | — |
 | `gesture` | `name` (a built-in, not `idle` or `scanning`) | `body` | — |
 | `look` | `at`: `"face"` (+ `look`), `"name"`, `"ahead"`, or `{yaw, pitch}` in degrees (±180, ±90) | `body` | body |
-| `move` | `step_ms` 20–1,000, `frames` 2–500 of five joints (body counts from home), first and last all 0 | `body` | body |
+| `move` | `step_ms` 40–1,000, `frames` 2–500 of five joints (body counts from home), first and last all 0, lasting 1.5–10 s ((frames − 1) × `step_ms`), within the body's reach and speed (`lamp_body::moves::check`) | `body` | body |
 | `play` | `name` (a recorded move of the client's package) | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |
 | `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
