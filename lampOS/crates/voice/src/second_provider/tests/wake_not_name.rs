@@ -205,9 +205,44 @@ fn a_greeting_before_the_name_as_heard_is_passed_over() {
         "Good morning. Tomorrow, I see the dentist.",
         "Hello.",
         "Hello there, my dog is called Moe.",
+        // Reviewer-three's P2 on #4069: past a greeting, the name said as
+        // itself means the first word was heard right, a person's name.
+        "Good morning, Anna. Lamp, remember Anna's birthday is the fifth of May.",
+        "Hello, Anna. Lamp, what's the weather today?",
     ] {
         assert_eq!(wake_heard_as(heard), None, "{heard}");
     }
+    // "Hey" and "Hi" are read as lamp-voice reads them today.
+    for (heard, word, rest) in [
+        (
+            "Hey, Anna. Lamp, what's the weather today?",
+            "Anna",
+            "Lamp, what's the weather today?",
+        ),
+        (
+            "Hi, honey. Lamp, what time is it?",
+            "honey",
+            "Lamp, what time is it?",
+        ),
+    ] {
+        assert_eq!(wake_heard_as(heard), Some((word, rest)), "{heard}");
+    }
+}
+
+/// The Reviewer-lead's P3 on #4069: a greeting written decomposed ("chào"
+/// as "cha", a combining grave and "o") is passed over whole, never cut
+/// inside its accent.
+#[test]
+fn a_decomposed_greeting_is_passed_over_whole() {
+    const NFD: &str = "Xin cha\u{300}o. Gaswa, nho\u{31b}\u{301} giu\u{301}p to\u{302}i.";
+    assert_eq!(
+        wake_heard_as(NFD),
+        Some(("Gaswa", "nho\u{31b}\u{301} giu\u{301}p to\u{302}i."))
+    );
+    assert_eq!(
+        wake_heard_as("Cha\u{300}o, Ramon. Nhớ giúp tôi."),
+        Some(("Ramon", "Nhớ giúp tôi."))
+    );
 }
 
 /// A greeting and a person's own name on a line lamp-name did not hear the
