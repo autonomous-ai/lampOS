@@ -217,3 +217,15 @@ Ready for lamp-voice: yes (#4170, docs only)
 - Restored after, lock released, Twelve told.
 - A real person at a distance is still needed (Not verified on #4170).
 - #3743: asked the first builder about the production render and its listen.
+
+### #4226, the opening "Lamp" missed after desk talk (8389)
+
+Ready for lamp-voice: yes (#4238, journal only, Part of #4226)
+
+- A/B on lamp-c0a4, 21:26–21:53Z: 8327's and 8389's own lamp-voice, A B A B, five trials each. A synthetic voice played from the Mac said desk talk, then "Lamp, I want to cook something new this weekend." 1.5 s later.
+- Let out: 8327 7 of 10, 8389 6 of 10. Not a regression.
+- 5 of the 7 misses were the name heard at 0.94–0.99 and dropped by `NAME_AT_THE_START_US` (1.3 s), at 1686–1822 ms into the line.
+- #4238 journals where every weighed hearing began, so the bound can be set from both sides.
+- Gate: voice lib 4049/0, the other targets 275/0, 1/0, 4/0, 6/0; clippy and fmt clean.
+- Restored after, lock released, Twelve told. c0a4's chat provider answers HTTP 402.
+- Next: (b) the spread with this journal, (c) the bound or a first-word line start.
