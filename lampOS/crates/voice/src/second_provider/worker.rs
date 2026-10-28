@@ -2212,7 +2212,16 @@ pub fn serve(
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
             let facts = facts(session_fact && !going_on, room)
                 + &health_fact(health.as_deref())
-                + &known_name_told(known_name, who.as_deref(), person.as_deref());
+                // A line narrowed to the room whose person's face was alone
+                // in view is told their name only (`ScopeLease::named_for_reply`,
+                // lamp-3e83): its `line`, never its `person`, the thread's.
+                + &known_name_told(
+                    known_name,
+                    who.as_deref(),
+                    person
+                        .as_deref()
+                        .or(line.as_ref().and_then(Option::as_deref)),
+                );
             // Beside the character, where the instruction had it: told after
             // the exchanges, the model used it for the owner a third as
             // often (EN, the #2602 probe).
@@ -8454,7 +8463,12 @@ fn memory_context(
     };
     move |lease, chosen| match chosen {
         Chosen::ByLease => told_while_scope_holds(&sessions, lease, |sessions, scope| {
-            let line = scope.map(|scope| scope.person().map(str::to_owned));
+            let line = scope.map(|scope| {
+                scope
+                    .person()
+                    .or(lease.and_then(crate::memory_scope::ScopeLease::named_for_reply))
+                    .map(str::to_owned)
+            });
             compose(sessions, scope, line)
         }),
         // Whose the turn is as before; the line's own person, read once
