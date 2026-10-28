@@ -24,6 +24,9 @@ pub const LOOK_EVERY: Duration = Duration::from_secs(1);
 pub struct AppCheck {
     checks: Option<Subscriber>,
     last: Option<Instant>,
+    /// [`LOOK_EVERY`] on a lamp; shorter only in tests, so none sleeps
+    /// for whole seconds (#1806).
+    look: Duration,
 }
 
 impl AppCheck {
@@ -44,7 +47,18 @@ impl AppCheck {
                 None
             }
         };
-        Self { checks, last: None }
+        Self {
+            checks,
+            last: None,
+            look: LOOK_EVERY,
+        }
+    }
+
+    /// The same check, looking every `look` instead of [`LOOK_EVERY`].
+    #[cfg(test)]
+    fn looking_every(mut self, look: Duration) -> Self {
+        self.look = look;
+        self
     }
 
     /// Drops every check that came while a round ran: a round never starts
@@ -97,7 +111,7 @@ impl AppCheck {
             if left.is_zero() {
                 return false;
             }
-            let _ = ears.listen(left.min(LOOK_EVERY));
+            let _ = ears.listen(left.min(self.look));
             if self.asked(Instant::now()) {
                 return true;
             }
@@ -136,38 +150,43 @@ mod tests {
         publisher
     }
 
+    /// How often the tests' waits look: short, so a test takes well under
+    /// #1806's 3 s, with the same shape as [`LOOK_EVERY`] on a lamp.
+    const LOOK: Duration = Duration::from_millis(50);
+
     #[test]
     fn a_check_between_rounds_starts_the_next_at_once_and_at_most_once_a_minute() {
         let root = tempfile::tempdir().unwrap();
         let mut said = Vec::new();
-        let mut check = AppCheck::new(root.path(), &mut |line| said.push(line.to_owned()));
+        let mut check =
+            AppCheck::new(root.path(), &mut |line| said.push(line.to_owned())).looking_every(LOOK);
         assert!(said.is_empty(), "{said:?}");
         let mut cloud = cloud(&Bus::new(root.path()).unwrap());
         let mut ears = Waits::default();
 
-        // Nothing asked: the whole wait, in looks of a second.
+        // Nothing asked: the whole wait, in looks of `LOOK`.
         let started = Instant::now();
-        assert!(!check.wait(&mut ears, Duration::from_millis(1500)));
-        assert!(started.elapsed() >= Duration::from_millis(1500));
-        assert_eq!(ears.0.len(), 2, "{:?}", ears.0);
-        assert_eq!(ears.0[0], LOOK_EVERY);
-        assert!(ears.0[1] <= Duration::from_millis(500), "{:?}", ears.0);
+        assert!(!check.wait(&mut ears, Duration::from_millis(120)));
+        assert!(started.elapsed() >= Duration::from_millis(120));
+        assert_eq!(ears.0.len(), 3, "{:?}", ears.0);
+        assert_eq!(ears.0[..2], [LOOK, LOOK]);
+        assert!(ears.0[2] <= Duration::from_millis(20), "{:?}", ears.0);
 
         // A check said during the wait ends it within about a look.
         let sender = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(300));
+            std::thread::sleep(Duration::from_millis(30));
             cloud.publish_json(0, &UpdateCheck {}).unwrap();
             cloud
         });
         let started = Instant::now();
         assert!(check.wait(&mut ears, Duration::from_secs(60)));
         let took = started.elapsed();
-        assert!(took < Duration::from_secs(3), "{took:?}");
+        assert!(took < Duration::from_secs(1), "{took:?}");
         let mut cloud = sender.join().unwrap();
 
         // Asked again within the minute: dropped, and the wait goes on.
         cloud.publish_json(0, &UpdateCheck {}).unwrap();
-        assert!(!check.wait(&mut ears, Duration::from_millis(1200)));
+        assert!(!check.wait(&mut ears, Duration::from_millis(120)));
         // A minute after the last that started a round, it may again.
         cloud.publish_json(0, &UpdateCheck {}).unwrap();
         assert!(check.asked(Instant::now() + UpdateCheck::AGAIN_AFTER));
