@@ -439,7 +439,13 @@ service stopped, a privacy gap) was never said, so it is no try (#3754): it is
 offered again once the voice can speak, `MOST_UNSAID` (2) times at most, then
 the step is `not_available`, never `failed`, with an
 `onboarding_privacy_try` row whose `why` is `"invitation not said"`. Giving
-way and how you sound do the same with their own rows. A model-led step whose
+way and how you sound do the same with their own rows. They also take an
+invitation played to its end with a gap in its playback and nobody's turn
+taken over it (`Delivery::Gapped`: on lamp-52e6 on 28 October the lamp
+yielded to its own voice and resumed, every word said, #4035) as one not
+said, under the same `MOST_UNSAID` bound and counter; their rows' `why` is
+`"the invitation was played with a gap"` and `"the prompt was played with a
+gap"`. Privacy keeps such an invitation as cut. A model-led step whose
 90 s run out after its conversation ended (20 s of quiet) is asked again too,
 twice at most, and fails only after that. Software mute, sleep, an initial open level,
 and model `setup_step done` are not evidence of physical close followed by
@@ -547,7 +553,13 @@ the person answering early, as on lamp-52e6's row 10, try 1), or answered
 over its last word (below), is offered again with its own number and spends
 nothing, twice in a step at most (`MOST_REOFFERS`, kept through absence); a
 third such prompt counts. Its record
-says `offered_again`.
+says `offered_again`. A prompt said through a playback gap with nobody's turn
+taken over it, no call heard over it (`Delivery::Gapped`, #4035: on
+lamp-52e6 prompt 1 was "cut" three times by the lamp yielding to its own
+voice and the step failed early), spends neither the budget nor these two
+re-offers: it is offered again as a prompt never said, `MOST_UNSAID` times
+at most, then the step is `not_available`. Test:
+`a_prompt_said_with_a_gap_and_no_call_over_it_spends_nothing`.
 
 **What each prompt says (#3702).** The tester on lamp-29e7 (28 October)
 said a bare "Lamp" four times, never told what to say or how many calls were
@@ -761,7 +773,8 @@ does not pass. Tests:
 `coordinator::tests::second_route::a_line_begun_while_the_step_waits_for_a_call_is_told_the_second_route`.
 
 **Each prompt's end is one journal line**: `lamp-voice onboarding:
-how_you_sound prompt N played whole (call)`, or `cut`, or `(sentence)`, at the
+how_you_sound prompt N played whole (call)`, or `cut`, or `with a gap`, or
+`(sentence)`, at the
 moment its playback is known whole or cut. A test driven from outside times
 its answer by it.
 
@@ -951,7 +964,13 @@ gives way), so no line warns of it. The prompt also comes 8 s after a push
 that was not enough, once a try. An invitation cut by the person talking while
 they push (`Delivery::Cut` with a push felt) keeps the push and opens the
 minute; a push still on at the minute's end is waited for `LET_GO_US` (5 s)
-to be let go (the Reviewer-lead's P2 and P3 on #4002). A newer line owed replaces one not yet said (done replaces the felt
+to be let go (the Reviewer-lead's P2 and P3 on #4002). One cut, or played
+with a gap, before any push began spends no try (#4035: on lamp-52e6 on 28
+October the invitation was "not played whole" twice, the lamp yielding to its
+own voice, and the step failed with no push asked for): it is said again as
+an invitation not said, `MOST_UNSAID` times at most, then the step is
+`not_available`, never `failed`. Test:
+`an_invitation_cut_with_no_push_is_said_again_and_spends_no_try`. A newer line owed replaces one not yet said (done replaces the felt
 line). The words are the skill's (optional, as #3769's: an older file says
 none of them). Latency from the body's push to the line: the body says the hand
 on its next offered step (every 80 ms); the voice drains the bus at most every

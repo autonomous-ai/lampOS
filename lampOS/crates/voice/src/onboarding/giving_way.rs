@@ -451,16 +451,25 @@ impl Onboarding {
         let Some(offer) = self.giving.offer.take() else {
             return;
         };
-        if delivery == Delivery::Unsaid {
-            // Never said, never asked: its try is given back (#3754).
+        // Never said, or cut or gapped before any push began (on lamp-52e6
+        // the lamp yielded to its own voice, #4035): the person was never
+        // asked, so its try is given back and it is said again,
+        // [`MOST_UNSAID`] times in all (#3754).
+        if delivery == Delivery::Unsaid || (delivery != Delivery::Whole && self.giving.pushes == 0)
+        {
             if self.desired.giving_way_tries == offer.attempt {
                 self.desired.giving_way_tries = offer.attempt - 1;
                 self.save();
             }
             self.giving.unsaid = self.giving.unsaid.saturating_add(1);
             let again = self.giving.unsaid <= MOST_UNSAID;
+            let why = match delivery {
+                Delivery::Unsaid => NOT_SAID,
+                Delivery::Gapped => "the invitation was played with a gap",
+                _ => "the invitation was not played whole",
+            };
             eprintln!(
-                "lamp-voice: giving_way: the invitation was not said; {}",
+                "lamp-voice: giving_way: {why}; {}",
                 if again {
                     "asked again"
                 } else {
@@ -468,7 +477,7 @@ impl Onboarding {
                 }
             );
             self.records.push(json!({"kind":"onboarding_giving_way_try",
-                "felt":false,"why":NOT_SAID,"offered_again":again,"at_us":now_us}));
+                "felt":false,"why":why,"offered_again":again,"at_us":now_us}));
             self.forget_giving();
             if again {
                 self.giving.retry_after_us = now_us.saturating_add(1_000_000);
@@ -479,12 +488,6 @@ impl Onboarding {
         }
         // Cut by the person talking while they push ("like this?"): the
         // push is kept and the try goes on (the Reviewer-lead's P2 on #4002).
-        if delivery != Delivery::Whole && self.giving.pushes == 0 {
-            self.records.push(json!({"kind":"onboarding_giving_way_try",
-                "felt":false,"why":"the invitation was not played whole","at_us":now_us}));
-            flow_end(self, now_us);
-            return;
-        }
         // A push felt while it was said is kept: the minute runs from here.
         let ended_ms = (self.unix_clock)();
         let window = self.giving.window.get_or_insert(Window {
