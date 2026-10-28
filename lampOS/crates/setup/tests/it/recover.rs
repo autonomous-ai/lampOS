@@ -2,7 +2,7 @@
 //! network is gone (`lamp_setup::recover`), on a clock and looks of its own.
 use lamp_setup::recover::{
     Act, JOIN_WAIT_MS, LOSS_GRACE_MS, PHONE_HOLDS_MS, RECORDING_OPENED, RETRY_EVERY_MS, Recovery,
-    SAY_OPENED, Seen, State, on, says_opened,
+    SAY_OPENED, Seen, State, on,
 };
 
 const GONE: Seen = Seen {
@@ -43,9 +43,8 @@ fn the_hotspots_line_is_said_once_a_loss() {
     let mut policy = Recovery::default();
     let mut said = Vec::new();
     let mut look = |policy: &mut Recovery, at: u64, seen: Seen| {
-        let was = policy.recovering();
         let act = policy.step(at, seen);
-        if says_opened(was, act) {
+        if policy.says_opened(act) {
             said.push(at);
         }
         act
@@ -73,6 +72,46 @@ fn the_hotspots_line_is_said_once_a_loss() {
         "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app."
     );
     assert!(!SAY_OPENED.contains("reset") && !SAY_OPENED.contains("erase"));
+}
+
+/// Second's P3 on #4157: a retry that joins the radio but gets no address,
+/// or that a setup or Wi-Fi change takes, goes back to `Lost`, and its 90 s
+/// open the hotspot again; the line was said for this loss already, so it
+/// isn't said again until the lamp has been online.
+#[test]
+fn a_retry_back_to_lost_does_not_say_the_line_again() {
+    let slow = Seen {
+        associated: true,
+        ..GONE
+    };
+    let busy = Seen { busy: true, ..GONE };
+    for seen in [slow, busy] {
+        let mut policy = Recovery::default();
+        let mut said = Vec::new();
+        let mut look = |policy: &mut Recovery, at: u64, seen: Seen| {
+            let act = policy.step(at, seen);
+            if policy.says_opened(act) {
+                said.push(at);
+            }
+            act
+        };
+        for at in (0..=LOSS_GRACE_MS).step_by(5_000) {
+            look(&mut policy, at, GONE);
+        }
+        let retry = LOSS_GRACE_MS + RETRY_EVERY_MS;
+        assert_eq!(look(&mut policy, retry, GONE), Some(Act::Rejoin));
+        // Only slow, or busy: lost afresh, not recovering.
+        assert_eq!(look(&mut policy, retry + 5_000, seen), None);
+        assert!(!policy.recovering());
+        let mut reopened = None;
+        for at in (retry + 10_000..=retry + 10_000 + LOSS_GRACE_MS).step_by(5_000) {
+            if look(&mut policy, at, GONE) == Some(Act::OpenHotspot) {
+                reopened = Some(at);
+            }
+        }
+        assert!(reopened.is_some(), "{seen:?}: the hotspot opens again");
+        assert_eq!(said, [LOSS_GRACE_MS], "{seen:?}: said once this loss");
+    }
 }
 
 #[test]
