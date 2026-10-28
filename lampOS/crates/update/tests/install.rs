@@ -62,6 +62,8 @@ struct FakeHost {
     /// The sha256 of the lamp-update running install: the build's own
     /// unless a test says otherwise (#3733).
     running: Result<String, String>,
+    /// Whether this run was handed over to already (#3733).
+    handed_over: bool,
 }
 
 /// `harness service status --json` once the service is gone (Harness
@@ -223,6 +225,10 @@ impl Host for FakeHost {
         self.running.clone()
     }
 
+    fn handed_over(&mut self) -> bool {
+        self.handed_over
+    }
+
     fn hand_over(&mut self, exe: &std::path::Path) -> String {
         // A real hand-over never comes back; here it is only recorded.
         self.calls.push(format!("hand over {}", exe.display()));
@@ -326,6 +332,7 @@ impl Lamp {
             pids: String::new(),
             versions: Default::default(),
             running,
+            handed_over: false,
         };
         Self {
             _dir: dir,
@@ -538,6 +545,30 @@ fn another_lamp_update_hands_over_to_the_builds_own_before_any_unit() {
         "{:?}",
         lamp.said
     );
+}
+
+#[test]
+fn a_run_handed_over_to_already_hands_over_no_further() {
+    // Thirteen's P3 on #4162: the channel moved on between the two runs.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.host.running = Ok(sha256_hex(b"lamp-update of build 187\n"));
+    lamp.host.handed_over = true;
+    lamp.install().unwrap();
+    assert_eq!(handed(&lamp), Vec::<&str>::new());
+    assert!(
+        lamp.said.iter().any(|line| line
+            == "this lamp-update was handed this install already, so it writes its own \
+                units over build 188's binaries"),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        !lamp.said.iter().any(|line| line.starts_with("handing over")
+            || line.starts_with("could not hand over")),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(updater_said(&lamp).len(), 1, "{:?}", lamp.said);
 }
 
 #[test]

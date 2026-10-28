@@ -1201,8 +1201,12 @@ units` and runs that file, just placed in step 4, in its own place
 (`exec`) with the same arguments and `LAMP_UPDATE_HANDED_OVER=1`. The
 records' lock is let go at the `exec`, and the build's own `lamp-update`
 installs again: the binaries and links are already there, so it writes
-only what is missing, then the build's own units. A run with
-`LAMP_UPDATE_HANDED_OVER` set never hands over again. A hand-over that
+only what is missing, then the build's own units. Its own `changed`
+lines are the ones printed at the end; the first run's are not repeated.
+A run with `LAMP_UPDATE_HANDED_OVER` set never hands over again: if the
+channel moved to a newer build between the two runs, it says `this
+lamp-update was handed this install already, so it writes its own units
+over build <N>'s binaries`, then the warning below. A hand-over that
 cannot happen says `could not hand over: <why>`, and install goes on with
 its own units, as before #3733's hand-over, and says, e.g.
 `lamp-update: this lamp-update (sha256 4f1c09a2be77) is not build 7071's
@@ -1219,9 +1223,10 @@ nothing, and an install that ends before its units says nothing of it.
 None of these hands over: only a running file known to be another. Shown only in
 tests (`crates/update/tests/install.rs`,
 `a_lamp_update_not_the_builds_own_is_named_and_install_still_writes_the_units`
-and the four beside it, and the hand-over in
-`another_lamp_update_hands_over_to_the_builds_own_before_any_unit`), not
-yet on a lamp.
+and the four beside it, the hand-over in
+`another_lamp_update_hands_over_to_the_builds_own_before_any_unit`, and the
+guard in `a_run_handed_over_to_already_hands_over_no_further`), not yet on
+a lamp.
 
 So a unit can meet a binary older than itself. `lamp-actions` and
 `lamp-skills` exit 2 on an option they don't know, and with
