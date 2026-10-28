@@ -4997,6 +4997,9 @@ thread_local! {
     /// A loop test's near-call try (#1803), in place of onboarding's own.
     static TEST_NEAR: std::cell::RefCell<Option<crate::onboarding::near::NearFlow>> =
         const { std::cell::RefCell::new(None) };
+    /// How many times a loop test's call lines were told ended to its
+    /// near-call try (`near_call_line_ended`).
+    static TEST_LINE_ENDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// A loop test's open sentence window (#1803), in the scenario's
     /// monotonic microseconds, in place of onboarding's own.
     static TEST_SENTENCE_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
@@ -5372,6 +5375,8 @@ fn near_call_words_back(onboarding: Option<&mut crate::onboarding::Onboarding>, 
 /// A call's line begun at `began_us` ended (#3923): the step waits a moment
 /// for its words before judging its try.
 fn near_call_line_ended(onboarding: Option<&mut crate::onboarding::Onboarding>, began_us: u64) {
+    #[cfg(test)]
+    TEST_LINE_ENDS.with(|ends| ends.set(ends.get() + 1));
     #[cfg(test)]
     if TEST_NEAR.with(|near| {
         near.borrow_mut()
@@ -9832,7 +9837,9 @@ fn conversation_with_gate_inner(
                     let input_end_us = audio.captured_at_us;
                     // A call's line ending (#3923): when its speech began,
                     // for its words, and the step waits a moment for them.
-                    if let Some((_, spoken)) = step_call_lines
+                    // Not again for a line whose end went early: the step was
+                    // told then (the Reviewer-lead on #4006).
+                    if let Some((_, spoken @ None)) = step_call_lines
                         .iter_mut()
                         .find(|(turn, _)| *turn == current.owner.turn())
                         && let Some((_, began)) =
