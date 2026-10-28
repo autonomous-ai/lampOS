@@ -1,0 +1,8 @@
+{
+  "cmd": "python3 <private-path> <private-path> d11cad93132fe7999af3a711bf03acdb1f5a26d37af058d16648cc8f626d29aa",
+  "workdir": "<project-tree>",
+  "sandbox_permissions": "require_escalated",
+  "justification": "Run the first formatting, strict Clippy, and full changed-Update test gate for the bounded saved-plan container using the explicitly released serial target.",
+  "yield_time_ms": 1000,
+  "max_output_tokens": 4500
+}

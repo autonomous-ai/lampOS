@@ -1,3 +1,15 @@
+## 28 October 2026, 07:12 +07 — exact saved ordinary plans
+
+Ready for lamp-voice: no (#3966 is draft pending its own original native checks, independent reads and prerequisite acceptance).
+
+#3966 0850ceae2 [first full Mac gate](verification/ordinary-plan-container-20261028/first-full621-9f32/README.md) passes **621 unique tests**, all **142** required controls including **7** new parameterized cases, zero bad or selected unrun and six existing ignored. Formatting, strict Update all-target Clippy, compilation/discovery, runtime, docs and two separate ignored Mac contracts all close zero; all7,529 source/configuration/controller/tool/selector guards pass. Actual runtime428.288 seconds. Nine full committed blobs/modes equal the frozen working files overc27e/9f32. No result is transferred across a source carry. Original request/FIRST/CONTINUE1..6 are direct retained result objects; the six exact ignore pairs, complete ordinals and preserved driver bindings are independently reconciled.
+
+The container retains the original envelope/Raw/Head bytes, complete signed-order decisions including no-ops and Keep/Record, full effective settings, content flag and actual projected order. Reopening checks an external plan identity and protected context, both existing decoders, full pure preparation and exact canonical decision/order bytes. Allocation-free framing admits six bounded mandatory sections and bounded unique optional nonsemantic tags; unknown semantic versions/actions refuse. Signed and derived PINS remain separate, including appended order[1,0]. This adds no ordinary caller, capability bump, live loader, durable publication, grant, execution or restoration.
+
+Reviewer-two's preimage P3 wording is corrected in this final commit: ignored future JSON metadata is bounded by the16MiB artifact; iterative ignored traversal supplies no typed-recursion nesting guard. Existing qualified parent bases remain in place under the train merged-tree rule. The next Present-only original-State projection is being built separately, with exact source retention and no default-on-error loader. Source authentication/capture/exclusion and real7071 GOOD/BAD/power acceptance remain future owner work.
+
+Twenty manifest members and all21 text files are verified in the index and committed tree before push. Complete private snapshots/controllers/binaries remain private with hashes; only immutable preserved executable copies are read by the exporter. No original ARM/Linux result is added to this Mac packet; those runs are separately owned.
+
 ## 28 October 2026, 07:03 +07 — signed preparation original ARM and Linux close
 
 Ready for lamp-voice: yes (#3960's private preparation slice; Raw/preimage/coherence prerequisite acceptance and two external readers remain separate).

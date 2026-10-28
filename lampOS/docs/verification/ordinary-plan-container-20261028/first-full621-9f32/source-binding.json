@@ -1,0 +1,178 @@
+{
+  "actual_source_freeze": {
+    "head": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+    "base": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+    "owned_paths": [
+      "lampOS/crates/update/src/writer_plan/saved.rs",
+      "lampOS/crates/update/src/writer_plan.rs",
+      "lampOS/crates/update/src/writer_plan/tests/saved.rs",
+      "lampOS/crates/update/src/writer_plan/tests.rs",
+      "lampOS/docs/ordinary-plan-container.md",
+      "lampOS/docs/ordinary-plan-preparation.md",
+      "lampOS/docs/updates.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/writer-preimages.md"
+    ],
+    "files": {
+      "lampOS/crates/update/src/writer_plan/saved.rs": {
+        "sha256": "4123d358d5a2fa06583811f23390e0c6229070f208c75964f4ca8565837d97cb",
+        "mode": 420,
+        "bytes": 13975
+      },
+      "lampOS/crates/update/src/writer_plan.rs": {
+        "sha256": "6d01ed0a710b60d47f42f738c84a9802892cd02c47e248c96f854db7c80a37f0",
+        "mode": 420,
+        "bytes": 19026
+      },
+      "lampOS/crates/update/src/writer_plan/tests/saved.rs": {
+        "sha256": "5a6add8e066dedc2ad8365d91daebb38a7312cf74c066a79d5b39026cc6af745",
+        "mode": 420,
+        "bytes": 22713
+      },
+      "lampOS/crates/update/src/writer_plan/tests.rs": {
+        "sha256": "ed57b3e3f17f5ae40b3a617c0cf55481c87dcf87e8fa2e6f9268f44c571a9309",
+        "mode": 420,
+        "bytes": 36553
+      },
+      "lampOS/docs/ordinary-plan-container.md": {
+        "sha256": "d1319d0b80b4aeac676b56eeb7a4954fbe5c14cf0772013bed2ed694d0436516",
+        "mode": 420,
+        "bytes": 5523
+      },
+      "lampOS/docs/ordinary-plan-preparation.md": {
+        "sha256": "e5fb63a32bee5a5b70761cb09ab31487b3e83861260544e8e8fc55d1bcdb5b46",
+        "mode": 420,
+        "bytes": 6697
+      },
+      "lampOS/docs/updates.md": {
+        "sha256": "1a18f0e249d80f939e7680d812b557cb9955d0958bd05326914be63499d2e803",
+        "mode": 420,
+        "bytes": 179690
+      },
+      "lampOS/docs/reuse-decisions.md": {
+        "sha256": "0648c221a1b2127dd30e3919cd2221414d436a6231c20a83c7710b8c01b06b4b",
+        "mode": 420,
+        "bytes": 158816
+      },
+      "lampOS/docs/writer-preimages.md": {
+        "sha256": "b54325879e169ed58faa22f1075b341f4d49a19a3d4a4aee4ce34e21d830ef28",
+        "mode": 420,
+        "bytes": 5462
+      }
+    },
+    "saved_tests": [
+      "closed_saved_replay_preserves_signed_source_future_inputs_and_actual_pins_order",
+      "complete_none_keep_record_rows_survive_saved_reopen_without_content_qualification",
+      "rebound_plan_identity_cannot_substitute_protected_context_writer_or_derived_tables",
+      "rebound_outer_and_envelope_context_still_require_the_actual_signature",
+      "independently_decodable_rebound_nested_inputs_cannot_replace_records_or_closed_dependencies",
+      "optional_binary_metadata_retains_exact_bytes_at_count_and_aggregate_boundaries",
+      "every_truncated_prefix_and_bounded_framing_corruption_refuses_with_rebound_identity"
+    ],
+    "new_tests": 7,
+    "all_core_required": 142,
+    "runtime": "UNRUN",
+    "self_read": "Root full source +all7tests, Query internal wholeproduction noneP1P2, no formalexternalcredit",
+    "parent_carry_proof": "<private-path>",
+    "upstream_input_audit": "<private-path>"
+  },
+  "committed_file_bindings": [
+    {
+      "path": "lampOS/crates/update/src/writer_plan/saved.rs",
+      "sha256": "4123d358d5a2fa06583811f23390e0c6229070f208c75964f4ca8565837d97cb",
+      "bytes": 13975,
+      "actual_mode": 420,
+      "committed_git_blob": "be6142e6497a4410c31e017e9ad7dda94d12254e",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_plan.rs",
+      "sha256": "6d01ed0a710b60d47f42f738c84a9802892cd02c47e248c96f854db7c80a37f0",
+      "bytes": 19026,
+      "actual_mode": 420,
+      "committed_git_blob": "baeda18ebdeaaf82d80a408a38e7a612bbfe5b13",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_plan/tests/saved.rs",
+      "sha256": "5a6add8e066dedc2ad8365d91daebb38a7312cf74c066a79d5b39026cc6af745",
+      "bytes": 22713,
+      "actual_mode": 420,
+      "committed_git_blob": "5f0cad70d67d9ba917b1fc0993047bafb586d894",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_plan/tests.rs",
+      "sha256": "ed57b3e3f17f5ae40b3a617c0cf55481c87dcf87e8fa2e6f9268f44c571a9309",
+      "bytes": 36553,
+      "actual_mode": 420,
+      "committed_git_blob": "27ec0973ea7994a43ebcef302a3cdd57dd0858d1",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/docs/ordinary-plan-container.md",
+      "sha256": "d1319d0b80b4aeac676b56eeb7a4954fbe5c14cf0772013bed2ed694d0436516",
+      "bytes": 5523,
+      "actual_mode": 420,
+      "committed_git_blob": "ebbc740cef64e0938636836505affc00f479bb02",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/docs/ordinary-plan-preparation.md",
+      "sha256": "e5fb63a32bee5a5b70761cb09ab31487b3e83861260544e8e8fc55d1bcdb5b46",
+      "bytes": 6697,
+      "actual_mode": 420,
+      "committed_git_blob": "09db3dc30276be670208051beb6b25cf2f613758",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "sha256": "1a18f0e249d80f939e7680d812b557cb9955d0958bd05326914be63499d2e803",
+      "bytes": 179690,
+      "actual_mode": 420,
+      "committed_git_blob": "fec7855488c4b34f216431773d75a67c561a5eb5",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "sha256": "0648c221a1b2127dd30e3919cd2221414d436a6231c20a83c7710b8c01b06b4b",
+      "bytes": 158816,
+      "actual_mode": 420,
+      "committed_git_blob": "b243e6e1de7596d283bc211ac8183e3b5085bb05",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    },
+    {
+      "path": "lampOS/docs/writer-preimages.md",
+      "sha256": "b54325879e169ed58faa22f1075b341f4d49a19a3d4a4aee4ce34e21d830ef28",
+      "bytes": 5462,
+      "actual_mode": 420,
+      "committed_git_blob": "30891bf5cc8d9c5072689005a0bf6dce1c891e1f",
+      "git_mode": "100644",
+      "actual_WIP_parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+      "exact_committed_equivalent": "0850ceae2cb6a0c149e57243b4d949edc787bee2"
+    }
+  ],
+  "complete_snapshot_count": 7529,
+  "complete_snapshot_before_after_equal": true,
+  "whole_snapshots_private_sha256": {
+    "before": "51f517504f173110fe395006b47d6ae50a819daa925b5ecb155dd559cd59ba96",
+    "after": "51f517504f173110fe395006b47d6ae50a819daa925b5ecb155dd559cd59ba96"
+  },
+  "live_worktree_or_current_target_hashed": false
+}

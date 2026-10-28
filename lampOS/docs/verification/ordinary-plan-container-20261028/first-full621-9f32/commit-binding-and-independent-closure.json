@@ -1,0 +1,83 @@
+{
+  "commit_binding": {
+    "head": "0850ceae2cb6a0c149e57243b4d949edc787bee2",
+    "parent": "c27e2957cccc2bea9b3c241956212334bfa8a4b3",
+    "base": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+    "paths": {
+      "lampOS/crates/update/src/writer_plan/saved.rs": {
+        "sha256": "4123d358d5a2fa06583811f23390e0c6229070f208c75964f4ca8565837d97cb",
+        "mode": 420,
+        "bytes": 13975
+      },
+      "lampOS/crates/update/src/writer_plan.rs": {
+        "sha256": "6d01ed0a710b60d47f42f738c84a9802892cd02c47e248c96f854db7c80a37f0",
+        "mode": 420,
+        "bytes": 19026
+      },
+      "lampOS/crates/update/src/writer_plan/tests/saved.rs": {
+        "sha256": "5a6add8e066dedc2ad8365d91daebb38a7312cf74c066a79d5b39026cc6af745",
+        "mode": 420,
+        "bytes": 22713
+      },
+      "lampOS/crates/update/src/writer_plan/tests.rs": {
+        "sha256": "ed57b3e3f17f5ae40b3a617c0cf55481c87dcf87e8fa2e6f9268f44c571a9309",
+        "mode": 420,
+        "bytes": 36553
+      },
+      "lampOS/docs/ordinary-plan-container.md": {
+        "sha256": "d1319d0b80b4aeac676b56eeb7a4954fbe5c14cf0772013bed2ed694d0436516",
+        "mode": 420,
+        "bytes": 5523
+      },
+      "lampOS/docs/ordinary-plan-preparation.md": {
+        "sha256": "e5fb63a32bee5a5b70761cb09ab31487b3e83861260544e8e8fc55d1bcdb5b46",
+        "mode": 420,
+        "bytes": 6697
+      },
+      "lampOS/docs/updates.md": {
+        "sha256": "1a18f0e249d80f939e7680d812b557cb9955d0958bd05326914be63499d2e803",
+        "mode": 420,
+        "bytes": 179690
+      },
+      "lampOS/docs/reuse-decisions.md": {
+        "sha256": "0648c221a1b2127dd30e3919cd2221414d436a6231c20a83c7710b8c01b06b4b",
+        "mode": 420,
+        "bytes": 158816
+      },
+      "lampOS/docs/writer-preimages.md": {
+        "sha256": "b54325879e169ed58faa22f1075b341f4d49a19a3d4a4aee4ce34e21d830ef28",
+        "mode": 420,
+        "bytes": 5462
+      }
+    },
+    "all_nine_committed_blobs_modes_equal_actual_gated_source": true,
+    "runtime": "621/all142/new7; exact frozen WIP over c27e/9f32",
+    "independent_closure": {
+      "native78393_closed_exit0": true,
+      "passed": 621,
+      "all_required": 142,
+      "new_controls": 7,
+      "ignored": 6,
+      "bad_selected_unrun": 0,
+      "all_ten_stages_zero": true,
+      "all7529guards_true": true,
+      "ten_actual_preserved_post_hashes_verified_before_release": true,
+      "final_manifest_sha256": "8bf07dbec5148bc65eef15e132021dde0903227063b245ed916e7f0451fa91a9",
+      "closure_sha256": "e9b84ec0c1adbdf53eba49792832d34cf0ab2f43a506031f1fd3db73893b34fb"
+    },
+    "push_exit": 0
+  },
+  "independent_closure": {
+    "native78393_closed_exit0": true,
+    "passed": 621,
+    "all_required": 142,
+    "new_controls": 7,
+    "ignored": 6,
+    "bad_selected_unrun": 0,
+    "all_ten_stages_zero": true,
+    "all7529guards_true": true,
+    "ten_actual_preserved_post_hashes_verified_before_release": true,
+    "final_manifest_sha256": "8bf07dbec5148bc65eef15e132021dde0903227063b245ed916e7f0451fa91a9",
+    "closure_sha256": "e9b84ec0c1adbdf53eba49792832d34cf0ab2f43a506031f1fd3db73893b34fb"
+  }
+}

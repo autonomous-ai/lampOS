@@ -1,0 +1,72 @@
+[
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_plan::tests::saved::complete_none_keep_record_rows_survive_saved_reopen_without_content_qualification",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "preserved_path": "<full621-evidence>/executables/7",
+    "preserved_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_plan::tests::saved::closed_saved_replay_preserves_signed_source_future_inputs_and_actual_pins_order",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "preserved_path": "<full621-evidence>/executables/7",
+    "preserved_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_plan::tests::saved::independently_decodable_rebound_nested_inputs_cannot_replace_records_or_closed_dependencies",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "preserved_path": "<full621-evidence>/executables/7",
+    "preserved_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_plan::tests::saved::optional_binary_metadata_retains_exact_bytes_at_count_and_aggregate_boundaries",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "preserved_path": "<full621-evidence>/executables/7",
+    "preserved_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_plan::tests::saved::rebound_outer_and_envelope_context_still_require_the_actual_signature",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "preserved_path": "<full621-evidence>/executables/7",
+    "preserved_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_plan::tests::saved::rebound_plan_identity_cannot_substitute_protected_context_writer_or_derived_tables",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "preserved_path": "<full621-evidence>/executables/7",
+    "preserved_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_plan::tests::saved::every_truncated_prefix_and_bounded_framing_corruption_refuses_with_rebound_identity",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "preserved_path": "<full621-evidence>/executables/7",
+    "preserved_sha256": "047056e7f8ec7fa29c120d8912be312946d8737d643b1e642524a597359fb9a6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  }
+]
