@@ -595,6 +595,27 @@ const STAND_ALONE_INS: &[&str] = &[
     "lynn", "len", "lin", "lump", "land", "line", "palin", "palan", "louvre", "lampy",
 ];
 
+/// Words a line opens with, set off, when it is said to a person, not to
+/// the lamp (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945): "Ma'am, could you
+/// pass me the salt please?" was heard as the lamp's name at 0.95 to 0.99
+/// at its start and answered. None is the lamp's name, a word written for
+/// it ([`STAND_INS`], [`STAND_ALONE_INS`]; "man" and "mom" stay those, and
+/// the text calls them before a hearing matters), or one of its shape.
+pub(crate) const SAID_TO_A_PERSON: &[&str] = &[
+    "ma'am", "madam", "sir", "mum", "dad", "honey", "sweetie", "babe", "dude", "bro", "buddy",
+    "guys",
+];
+
+/// The word on [`SAID_TO_A_PERSON`] that `heard` opens with, set off as a
+/// name is ([`crate::second_provider::first_word_set_off`]), compared lower
+/// case with its apostrophe, a curly one as a straight one.
+pub(crate) fn said_to_a_person(heard: &str) -> Option<&'static str> {
+    let heard = heard.replace('\u{2019}', "'");
+    let (start, end) = crate::second_provider::first_word_set_off(&heard)?;
+    let word = heard[start..end].to_lowercase();
+    SAID_TO_A_PERSON.iter().copied().find(|said| *said == word)
+}
+
 /// [`STAND_ALONE_INS`] when they count, else none.
 fn stand_alone(counted: bool) -> &'static [&'static str] {
     if counted { STAND_ALONE_INS } else { &[] }
@@ -1143,6 +1164,11 @@ pub struct Attention {
     /// The name heard only in the room's sound counts only with a second
     /// sign (`LAMP_NAME_SECOND_SIGN=on`, [`Self::weigh_the_name`]).
     name_second_sign: bool,
+    /// With `name_second_sign`, a hearing at the line's start is no second
+    /// sign of its own when the line's first word, set off, is one said to
+    /// a person ([`SAID_TO_A_PERSON`], `LAMP_NAME_SAID_TO_A_PERSON=on`,
+    /// [`Self::hold_a_start_said_to_a_person`]).
+    name_said_to_a_person: bool,
     /// A face turned to the lamp lets no line out alone in a busy room
     /// (`LAMP_NAME_OR_FOLLOW_UP=on`, [`Self::face_shows`]), and the room the
     /// request in hand was judged in, for [`Self::sign`].
@@ -1171,6 +1197,25 @@ impl Attention {
     /// sign ([`Self::weigh_the_name`]).
     pub fn ask_a_second_sign_of_the_name(&mut self, on: bool) {
         self.name_second_sign = on;
+    }
+
+    /// With [`Self::ask_a_second_sign_of_the_name`], a hearing of the name
+    /// at the line's start is no second sign of its own when the line's
+    /// first word, set off, is said to a person ([`SAID_TO_A_PERSON`]:
+    /// "Ma'am, could you pass me the salt please?", heard at 0.95 to 0.99
+    /// at its start, #3945); `LAMP_NAME_SAID_TO_A_PERSON=on`.
+    pub fn hold_a_start_said_to_a_person(&mut self, on: bool) {
+        self.name_said_to_a_person = on;
+    }
+
+    /// The word on [`SAID_TO_A_PERSON`] that takes the line's start from the
+    /// name's second signs ([`Self::hold_a_start_said_to_a_person`]): only
+    /// with both switches on and the name heard at the line's start.
+    pub fn start_said_to_a_person(&self) -> Option<&'static str> {
+        if !(self.name_second_sign && self.name_said_to_a_person && self.named_at_start) {
+            return None;
+        }
+        said_to_a_person(&self.heard)
     }
 
     /// A hearing of the name that began inside the sound of the line before
@@ -1221,19 +1266,27 @@ impl Attention {
     /// lamp, and the lines after it were answered as that conversation
     /// going on (the first builder at 21:03 on #1722). Called once a line's
     /// signs are all in, before it is judged; whether the name was dropped.
-    pub fn weigh_the_name(&mut self, turned: Option<bool>) -> bool {
+    ///
+    /// With [`Self::hold_a_start_said_to_a_person`], a conversation with
+    /// the lamp going on (`going_on`) is a second sign too, and the line's
+    /// start is none when its first word is said to a person
+    /// ([`Self::start_said_to_a_person`]).
+    pub fn weigh_the_name(&mut self, turned: Option<bool>, going_on: bool) -> bool {
         let text_calls = if self.name_in_passing_ignored {
             called_by_name(&self.heard)
         } else {
             called(&self.heard)
         };
+        let start_counts = self.named_at_start && self.start_said_to_a_person().is_none();
+        let going_on = going_on && self.name_said_to_a_person;
         let alone = self.name_second_sign
             && self.named
             && !(turned == Some(true)
                 || self.near
                 || self.addressed
                 || text_calls
-                || self.named_at_start);
+                || going_on
+                || start_counts);
         if alone {
             self.named = false;
             self.named_sure = false;
@@ -4885,7 +4938,7 @@ mod tests {
             if going_on {
                 attention.continued_at(2, 1, began + 3_000_000);
             }
-            attention.weigh_the_name(None)
+            attention.weigh_the_name(None, false)
         };
         for going_on in [false, true] {
             for before in [false, true] {
@@ -4905,7 +4958,104 @@ mod tests {
         attention.began_at(1, 1, began);
         attention.name_heard_scored(began + 1_600_000, 0.95);
         attention.continued_at(2, 1, began + 1_800_000);
-        assert!(attention.weigh_the_name(None));
+        assert!(attention.weigh_the_name(None, false));
+    }
+
+    /// #3945, `LAMP_NAME_SAID_TO_A_PERSON=on`: "Ma'am, could you pass me
+    /// the salt please?", said to a person, heard as the lamp's name at
+    /// 0.996 at the line's start, is no call of its own: its first word,
+    /// set off, is said to a person. A face turned to the lamp, a
+    /// conversation going on, said close, or the switch off still let it
+    /// count; a start hearing on any other first word is still one.
+    #[test]
+    fn with_said_to_a_person_a_start_hearing_on_maam_is_no_second_sign() {
+        let began = 10_000_000;
+        let weighed = |line: &str, on: bool, turned: Option<bool>, going_on: bool, near: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.hold_a_start_said_to_a_person(on);
+            attention.began_at(1, 1, began);
+            attention.name_heard_scored(began + 200_000, 0.996);
+            attention.heard(line);
+            attention.set_near(near);
+            let held = attention.start_said_to_a_person();
+            (attention.weigh_the_name(turned, going_on), held)
+        };
+        let maam = "Ma'am, could you pass me the salt please?";
+        assert_eq!(
+            weighed(maam, true, None, false, false),
+            (true, Some("ma'am"))
+        );
+        assert_eq!(
+            weighed(
+                "Ma\u{2019}am, could you pass me the salt please?",
+                true,
+                None,
+                false,
+                false
+            ),
+            (true, Some("ma'am"))
+        );
+        for (line, word) in [
+            ("Sir, could you pass me the salt please?", "sir"),
+            ("Honey, could you pass me the salt please?", "honey"),
+            ("Hey guys, could you pass me the salt please?", "guys"),
+        ] {
+            assert_eq!(
+                weighed(line, true, None, false, false),
+                (true, Some(word)),
+                "{line}"
+            );
+        }
+        // Every other second sign still lets it count.
+        assert!(!weighed(maam, true, Some(true), false, false).0);
+        assert!(!weighed(maam, true, None, true, false).0);
+        assert!(!weighed(maam, true, None, false, true).0);
+        // The switch off: the start counts, as before.
+        assert_eq!(weighed(maam, false, None, false, false), (false, None));
+        // Without it a conversation going on is no second sign, as before.
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.began_at(1, 1, began);
+        attention.name_heard_scored(began + 2_000_000, 0.996);
+        assert!(attention.weigh_the_name(None, true));
+        // Any other first word keeps the start's sign.
+        for line in [
+            "Lamp, what time is it in London?",
+            "1. How are you today?",
+            "Blake, what time is it in London?",
+            "Man, what time is it in London?",
+            "Could you pass me the salt please?",
+            "Ma'am",
+        ] {
+            let (dropped, held) = weighed(line, true, None, false, false);
+            if line == "Ma'am" {
+                assert_eq!(held, Some("ma'am"));
+                continue;
+            }
+            assert!(!dropped, "{line}");
+            assert_eq!(held, None, "{line}");
+        }
+        // Never a veto: the name, a word written for it.
+        for word in ["lamp", "lamb"]
+            .iter()
+            .chain(STAND_INS)
+            .chain(STAND_ALONE_INS)
+        {
+            let line = format!("{word}, what time is it in London?");
+            assert_eq!(said_to_a_person(&line), None, "{line}");
+            let mut capital = word.to_string();
+            capital[..1].make_ascii_uppercase();
+            let line = format!("{capital}, what time is it in London?");
+            assert_eq!(
+                weighed(&line, true, None, false, false),
+                (false, None),
+                "{line}"
+            );
+        }
+        // Said to a person only set off: "Dad's car" is no call to a person.
+        assert_eq!(said_to_a_person("Dad's car is outside."), None);
+        assert_eq!(said_to_a_person("Sir Paul sang it."), None);
     }
 
     /// A line for [`judged_at_the_desk`].

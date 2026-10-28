@@ -250,3 +250,22 @@ async fn a_line_going_on_from_an_earlier_piece_is_not_rewritten() {
         "the two pieces are judged as they came, not named: {asked:?}"
     );
 }
+
+/// #3945: no word written for the lamp's name on lamp-4ace, nor a
+/// person's name of its shape, nor a word that isn't alphabetic, is one
+/// said to a person (`LAMP_NAME_SAID_TO_A_PERSON`): a hearing at the
+/// line's start on any of them still counts.
+#[test]
+fn no_word_heard_for_the_name_is_said_to_a_person() {
+    use super::super::{HEARD_FOR_THE_NAME, NAMES_OF_ITS_SHAPE};
+    use crate::attention::said_to_a_person;
+    for word in HEARD_FOR_THE_NAME
+        .iter()
+        .chain(NAMES_OF_ITS_SHAPE.iter())
+        .chain(["1", "2nd", "ma'am1", "--"].iter())
+    {
+        let line = format!("{word}, what time is it in London?");
+        assert_eq!(said_to_a_person(&line), None, "{line}");
+    }
+    assert_eq!(said_to_a_person("Ma'am, the salt?"), Some("ma'am"));
+}
