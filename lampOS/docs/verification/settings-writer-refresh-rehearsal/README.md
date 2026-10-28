@@ -90,6 +90,28 @@ follow the channel with B1.
 - A later round asks nothing of the writer for that build: no
   `lamp-update-writer.service` start in the journal.
 
+## BAD 3: a refresh after a put-back is unproved too
+
+From the BAD 1 lamp, with B1 put back and 7071's writer again. This is the
+case of Reviewer-two's P2 on #4178: a refresh carries the last put-back
+forward in `writer-refresh.done`, and that must not make it count as
+proved.
+
+- Stop `lamp-update-back.timer` for the step, which a person notes and
+  restores, so the new writer's `back` doesn't prove it before the checks.
+- Follow the channel with G. lamp-update switches to G and confirms, and
+  the next round says `the settings writer is now build <G's lamp-update, 12
+  hex>`. Then check:
+  - `lamp-update-back` is G's lamp-update, and `.prev` is 7071's.
+  - `writer-refresh.done` names G's build with `before` 7071's,
+    `proven: false`, and `put_back` still naming B1's lamp-update.
+- Publish G′ (as in GOOD step 3). A round says `lamp-update's own switch
+  waits: the settings writer was refreshed and has not proved itself yet`,
+  and writes no `self.json`.
+- Start the timer again. Its `back` ends well, the next round says `… has
+  proved itself …`, `.prev` is gone and `done` says `proven: true`. Then
+  G′'s switch may begin.
+
 ## BAD 2: the new writer's first `apply` fails
 
 From the GOOD lamp after step 2, before the proof (or with the timer
