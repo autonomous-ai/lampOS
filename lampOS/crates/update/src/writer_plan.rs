@@ -16,6 +16,7 @@ use std::{collections::BTreeMap, fmt, os::unix::ffi::OsStrExt, path::Path};
 
 pub(crate) const ORDINARY_DERIVATION: u32 = 1;
 
+pub(crate) mod product;
 pub(crate) mod saved;
 const MOST_CONTEXT_PATH: usize = 4096;
 const MOST_COMPONENTS: usize = 64;

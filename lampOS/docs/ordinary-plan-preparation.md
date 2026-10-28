@@ -21,6 +21,9 @@ values for every signed setting. Those values must be independently extracted
 from protected product-before context. A matching snapshot hash alone does not
 prove that a staged bundle's selected records came from that snapshot. This
 API deliberately supplies no State parser or default for unrelated records.
+The separate [original-product projection](ordinary-product-context.md) can
+derive these selected facts from independently retained present raw-State
+bytes; it is not a live loader, full State validator or source authenticator.
 
 Known caller fields are checked before copying: lowercase digest/transaction
 and commit widths, ordinary channel syntax, at most 128 selected records,
