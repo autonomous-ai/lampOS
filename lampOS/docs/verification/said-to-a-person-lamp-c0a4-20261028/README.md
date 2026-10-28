@@ -23,3 +23,9 @@ The lines, in order:
    times (requests 8 to 12). Request 9 is #3945's case: lamp-name heard the
    name at 1.00 at the line's start, and the switch held it ("is said to a
    person ("ma'am") ... not counted"). The others raised no hearing.
+
+The start-up line in `journal.txt` ("… and a conversation going on counts as
+one") is the run's own build. After the Reviewer-lead's P3 on #4082 a
+conversation going on gives back only a start the switch held, and the line
+now says "unless a conversation is going on". The run's lines are unchanged by
+that: no conversation was going on during them.
