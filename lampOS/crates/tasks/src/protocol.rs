@@ -90,6 +90,11 @@ pub enum Request {
     /// Where the sign-in is: its code, the email to ask about, or how it
     /// ended.
     SignInState {},
+    /// Atomically take the initial telling of the current code. A new
+    /// heard request still uses `SignInStart` to ask for the code again.
+    SignInTakeCode {
+        id: u64,
+    },
     /// The voice heard "Sign in as …?" said whole, for sign-in `id`, in its
     /// `request`: from then an answer is taken.
     SignInAsked {
@@ -147,6 +152,7 @@ impl Request {
                 | Self::Told { .. }
                 | Self::SignInStart {}
                 | Self::SignInState {}
+                | Self::SignInTakeCode { .. }
                 | Self::SignInAsked { .. }
                 | Self::SignInAnswer { .. }
         )
@@ -179,6 +185,7 @@ impl Request {
             Self::Told { .. } => "told",
             Self::SignInStart {} => "sign_in_start",
             Self::SignInState {} => "sign_in_state",
+            Self::SignInTakeCode { .. } => "sign_in_take_code",
             Self::SignInAsked { .. } => "sign_in_asked",
             Self::SignInAnswer { .. } => "sign_in_answer",
         }
@@ -241,6 +248,7 @@ mod tests {
         for (bytes, name) in [
             (br#"{"op":"sign_in_start"}"#.as_slice(), "sign_in_start"),
             (br#"{"op":"sign_in_state"}"#, "sign_in_state"),
+            (br#"{"op":"sign_in_take_code","id":1}"#, "sign_in_take_code"),
             (
                 br#"{"op":"sign_in_asked","id":1,"request":4}"#,
                 "sign_in_asked",
@@ -269,6 +277,9 @@ mod tests {
             br#"{"op":"sign_in_asked","id":1,"request":4,"email":"someone@example.com"}"#,
             br#"{"op":"sign_in_start","email":"someone@example.com"}"#,
             br#"{"op":"sign_in_state","code":"12345678"}"#,
+            br#"{"op":"sign_in_take_code"}"#,
+            br#"{"op":"sign_in_take_code","id":-1}"#,
+            br#"{"op":"sign_in_take_code","id":1,"code":"12345678"}"#,
         ] {
             assert_eq!(Request::parse(bytes), Err("bad_request"));
         }

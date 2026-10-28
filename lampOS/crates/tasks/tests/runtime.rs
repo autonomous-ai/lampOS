@@ -1520,6 +1520,93 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
     );
 }
 
+#[test]
+fn sign_in_code_claims_share_one_owner_and_keep_legacy_repeats_explicit() {
+    use lamp_tasks::sign_in::Event;
+    let off = Running::new(false);
+    assert_eq!(
+        off.trusted(json!({"op":"sign_in_take_code","id":1}))["error"],
+        "sign_in_off"
+    );
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.sign_in_by_code = true;
+    s.start();
+    let state = s.trusted(json!({"op":"sign_in_state"}));
+    assert_eq!(state["sign_in"], "none");
+    assert_eq!(state["code_claims"], 1);
+    let absent = s.trusted(json!({"op":"sign_in_take_code","id":1}));
+    assert_eq!(absent["claim"], "not_available");
+    assert!(absent.get("code").is_none());
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 0);
+
+    let started = s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(started["sign_in"], "starting");
+    let id = started["id"].as_u64().unwrap();
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_take_code","id":id}))["claim"],
+        "waiting"
+    );
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        }));
+    let untrusted = s.ask(json!({"op":"sign_in_take_code","id":id}));
+    assert_eq!(untrusted["error"], "untrusted");
+    assert!(untrusted.get("code").is_none());
+    let stale = s.trusted(json!({"op":"sign_in_take_code","id":id + 1}));
+    assert_eq!(stale["claim"], "not_available");
+    assert!(stale.get("code").is_none());
+
+    // Whichever Voice process claims first owns this initial payload.
+    let first = s.trusted(json!({"op":"sign_in_take_code","id":id}));
+    assert_eq!(first["claim"], "granted");
+    assert_eq!(first["sign_in"], "code");
+    assert_eq!(first["code"], "12345678");
+    assert_eq!(first["code_told"], true);
+    let second = s.trusted(json!({"op":"sign_in_take_code","id":id}));
+    assert_eq!(second["claim"], "already_given");
+    assert!(second.get("code").is_none());
+    assert!(second.get("email").is_none());
+    let repeated = s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(repeated["id"], id);
+    assert_eq!(repeated["code"], "12345678");
+    assert_eq!(repeated["code_told"], true);
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        }));
+    let kept = s.trusted(json!({"op":"sign_in_take_code","id":id}));
+    assert_eq!(kept["claim"], "already_given");
+    assert!(kept.get("code").is_none());
+
+    // The opposite order: a legacy START reply consumes the next code's
+    // initial handoff before a news reader tries its claim.
+    s.counts
+        .sign_in_lines
+        .lock()
+        .unwrap()
+        .push_back(Ok(Event::Code {
+            code: "87654321".into(),
+            expires_in: 120,
+        }));
+    let legacy = s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(legacy["code"], "87654321");
+    assert_eq!(legacy["code_told"], true);
+    let after_legacy = s.trusted(json!({"op":"sign_in_take_code","id":id}));
+    assert_eq!(after_legacy["claim"], "already_given");
+    assert!(after_legacy.get("code").is_none());
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 1);
+    assert!(s.counts.sign_in_answers.lock().unwrap().is_empty());
+}
+
 /// #1676: Harness's sign-in by a spoken code through the service, on the
 /// trusted route only: started once while open, its code, the question,
 /// the answer passed on only once the voice heard the question told, in a

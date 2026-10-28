@@ -890,6 +890,7 @@ fn owner<C: Clock>(
                         work.request,
                         Request::SignInStart {}
                             | Request::SignInState {}
+                            | Request::SignInTakeCode { .. }
                             | Request::SignInAsked { .. }
                             | Request::SignInAnswer { .. }
                     ),
@@ -1107,9 +1108,22 @@ fn sign_in_operation(
             session.code_given();
             Ok(session.view(now))
         }
-        Request::SignInState {} => Ok(sign_in
-            .as_ref()
-            .map_or_else(|| json!({"sign_in": "none"}), |session| session.view(now))),
+        Request::SignInState {} => {
+            let mut view = sign_in
+                .as_ref()
+                .map_or_else(|| json!({"sign_in": "none"}), |session| session.view(now));
+            view["code_claims"] = 1.into();
+            Ok(view)
+        }
+        Request::SignInTakeCode { id } => {
+            let Some(session) = sign_in.as_mut().filter(|session| session.id() == *id) else {
+                return Ok(json!({"claim": "not_available", "id": id}));
+            };
+            for said in session.tend(now) {
+                eprintln!("tasks: sign-in {}: {said}", session.id());
+            }
+            Ok(session.take_code(*id, now))
+        }
         Request::SignInAsked { id, request } => {
             let session = sign_in.as_mut().ok_or(EngineError {
                 code: "not_asking",

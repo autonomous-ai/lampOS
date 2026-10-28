@@ -203,8 +203,8 @@ pub struct Session {
     /// The voice's request in which the question was heard whole, and
     /// when ([`Session::asked`]).
     told: Option<(u64, Instant)>,
-    /// The code a start's answer gave the voice, which says it then: a
-    /// newer code is the news's to tell.
+    /// The code already given by a start or initial claim. A same-code
+    /// keepalive does not make another initial telling available.
     code_given: Option<String>,
 }
 
@@ -243,6 +243,30 @@ impl Session {
     pub fn code_given(&mut self) {
         if let State::Code { code, .. } = &self.state {
             self.code_given = Some(code.clone());
+        }
+    }
+
+    /// Take this code's initial payload once, shared by the provider and
+    /// coordinator through Tasks' serialized owner. A lost reply does not
+    /// undo the claim; a new heard start can ask for the code again.
+    pub(crate) fn take_code(&mut self, id: u64, now: Instant) -> Value {
+        let unavailable = || json!({"claim": "not_available", "id": id});
+        if id != self.id || now >= self.until {
+            return unavailable();
+        }
+        match &self.state {
+            State::Starting => json!({"claim": "waiting", "id": id}),
+            State::Code { until, .. } if now >= *until => unavailable(),
+            State::Code { code, .. } if self.code_given.as_ref() == Some(code) => {
+                json!({"claim": "already_given", "id": id})
+            }
+            State::Code { .. } => {
+                self.code_given();
+                let mut view = self.view(now);
+                view["claim"] = "granted".into();
+                view
+            }
+            _ => unavailable(),
         }
     }
 
@@ -449,6 +473,128 @@ mod tests {
             code: code.into(),
             expires_in: 120,
         }))
+    }
+
+    #[test]
+    fn the_initial_code_is_claimed_once_and_a_keepalive_does_not_reopen_it() {
+        let now = Instant::now();
+        let (mut session, lines, _) = scripted(now);
+        assert_eq!(
+            session.take_code(1, now),
+            json!({"claim": "waiting", "id": 1})
+        );
+        lines.lock().unwrap().push_back(code("12345678"));
+        session.tend(now);
+        let snapshot = session.view(now);
+        assert_eq!(snapshot["code_told"], false);
+        assert_eq!(session.view(now), snapshot, "state reads do not claim");
+        assert_eq!(
+            session.take_code(1, now + Duration::from_secs(1)),
+            json!({"claim": "granted", "sign_in": "code", "id": 1,
+                "code": "12345678", "expires_in": 119, "code_told": true})
+        );
+        assert_eq!(
+            session.take_code(1, now + Duration::from_secs(2)),
+            json!({"claim": "already_given", "id": 1})
+        );
+        lines.lock().unwrap().push_back(code("12345678"));
+        session.tend(now + Duration::from_secs(60));
+        assert_eq!(
+            session.take_code(1, now + Duration::from_secs(121)),
+            json!({"claim": "already_given", "id": 1})
+        );
+        assert_eq!(
+            session.view(now + Duration::from_secs(121))["expires_in"],
+            59
+        );
+        lines.lock().unwrap().push_back(code("87654321"));
+        session.tend(now + Duration::from_secs(122));
+        let next = session.take_code(1, now + Duration::from_secs(123));
+        assert_eq!(next["claim"], "granted");
+        assert_eq!(next["code"], "87654321");
+        assert_eq!(next["expires_in"], 119);
+    }
+
+    #[test]
+    fn a_legacy_start_and_a_code_claim_share_the_initial_telling() {
+        let now = Instant::now();
+        let (mut session, lines, _) = scripted(now);
+        lines.lock().unwrap().push_back(code("12345678"));
+        session.tend(now);
+        session.code_given();
+        assert_eq!(
+            session.take_code(1, now),
+            json!({"claim": "already_given", "id": 1})
+        );
+        // An explicit later start still returns the legacy code view.
+        session.code_given();
+        assert_eq!(session.view(now)["code"], "12345678");
+        assert_eq!(session.view(now)["code_told"], true);
+    }
+
+    #[test]
+    fn a_stale_or_expired_claim_contains_no_code_and_cannot_spend_a_new_code() {
+        let now = Instant::now();
+        let (mut session, lines, _) = scripted(now);
+        lines.lock().unwrap().push_back(code("12345678"));
+        session.tend(now);
+        assert_eq!(
+            session.take_code(2, now),
+            json!({"claim": "not_available", "id": 2})
+        );
+        assert_eq!(session.view(now)["code_told"], false);
+        assert_eq!(
+            session.take_code(1, now + Duration::from_secs(120)),
+            json!({"claim": "not_available", "id": 1})
+        );
+        assert_eq!(session.view(now)["code_told"], false);
+        lines.lock().unwrap().push_back(code("87654321"));
+        session.tend(now + Duration::from_secs(121));
+        let taken = session.take_code(1, now + Duration::from_secs(122));
+        assert_eq!(taken["claim"], "granted");
+        assert_eq!(taken["code"], "87654321");
+        assert_eq!(taken["expires_in"], 119);
+        assert_eq!(
+            session.take_code(1, now + MOST_LIFE),
+            json!({"claim": "not_available", "id": 1})
+        );
+    }
+
+    #[test]
+    fn a_code_claim_never_acknowledges_a_question_or_returns_its_email() {
+        let now = Instant::now();
+        let (mut session, lines, answers) = scripted(now);
+        lines.lock().unwrap().push_back(code("12345678"));
+        session.tend(now);
+        assert_eq!(session.take_code(1, now)["claim"], "granted");
+        lines.lock().unwrap().push_back(Some(Ok(Event::Confirm {
+            email: "someone@example.com".into(),
+        })));
+        session.tend(now);
+        assert_eq!(
+            session.take_code(1, now),
+            json!({"claim": "not_available", "id": 1})
+        );
+        assert_eq!(session.answer(true, 2, now), Err("not_told"));
+        assert!(answers.lock().unwrap().is_empty());
+        session.asked(1, 2, now).unwrap();
+        session.answer(true, 3, now).unwrap();
+        assert_eq!(*answers.lock().unwrap(), [true]);
+        assert_eq!(
+            session.take_code(1, now),
+            json!({"claim": "not_available", "id": 1})
+        );
+        lines
+            .lock()
+            .unwrap()
+            .push_back(Some(Ok(Event::Result(Done::Success {
+                email: Some("someone@example.com".into()),
+            }))));
+        session.tend(now);
+        assert_eq!(
+            session.take_code(1, now),
+            json!({"claim": "not_available", "id": 1})
+        );
     }
 
     /// The lines Harness's team gave on openharness#1410 (20 October).
