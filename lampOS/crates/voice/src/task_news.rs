@@ -1468,6 +1468,7 @@ fn note_failed(
     let refused = match code {
         Some("folder_missing") => Some(&words.failed_folder),
         Some("engine_signed_out") => Some(&words.failed_signed_out),
+        Some("engine_no_prompt") => Some(&words.failed_no_prompt),
         _ => None,
     };
     if let Some(line) = refused
@@ -3717,14 +3718,20 @@ mod tests {
             note_failed(&own(), &task("codex", json!([])), true, signed_out),
             note_failed(&own(), &task("codex", json!([])), true, None)
         );
-        assert_eq!(
-            note_failed(
-                &own(),
-                &task("codex", json!([])),
-                false,
-                Some("engine_no_prompt")
-            ),
-            note_failed(&own(), &task("codex", json!([])), false, None)
+        // No retry helps one Harness can't start with work: said so, and no
+        // retry offered (the Reviewer-lead's P3 on #4033).
+        let no_prompt = note_failed(
+            &own(),
+            &task("codex", json!([])),
+            false,
+            Some("engine_no_prompt"),
+        )
+        .unwrap();
+        assert!(
+            no_prompt.contains("trying again won't help")
+                && no_prompt.contains("has to be updated first")
+                && !no_prompt.contains("offer to try again"),
+            "{no_prompt}"
         );
     }
 
