@@ -1118,7 +1118,7 @@
           "type": "boolean"
         },
         "quiet_hours": {
-          "description": "Planned: not produced yet. The lamp says it once quiet hours are enforced (control.md, quiet hours).",
+          "description": "Planned: not produced yet. The door refuses say and sound in quiet hours with the error `quiet_hours` (control.md, quiet hours); this state key is a later piece.",
           "type": "boolean"
         },
         "lease": {
