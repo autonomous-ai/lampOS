@@ -447,3 +447,134 @@ fn installed_startup_and_cached_selection_have_no_turn_path_io() {
         cached.as_nanos() / 10_000
     );
 }
+
+/// Every line the shipped skill gives a step: its notes and the `[words]`
+/// keys named for it (#3769).
+fn lines_of(step: Step) -> Vec<String> {
+    let file: toml::Table = toml::from_str(SHIPPED).unwrap();
+    let onboarding = file["onboarding"].as_table().unwrap();
+    let mut lines = Vec::new();
+    for (key, value) in onboarding["steps"][step.name()].as_table().unwrap() {
+        match value {
+            toml::Value::String(line) => lines.push(line.clone()),
+            toml::Value::Table(nudge) if key == "nudge" => {
+                lines.push(nudge["words"].as_str().unwrap().to_owned())
+            }
+            _ => {}
+        }
+    }
+    let prefixes: &[&str] = match step {
+        Step::WhereYouSit => &["sit_"],
+        Step::WhoYouAre => &["who_"],
+        Step::HowYouSound => &["near_", "sentence_"],
+        Step::Touch => &["touch_"],
+        Step::Privacy => &["privacy_"],
+        Step::GivingWay => &["give_"],
+        _ => &[],
+    };
+    for (key, value) in onboarding["words"].as_table().unwrap() {
+        if prefixes.iter().any(|prefix| key.starts_with(prefix)) {
+            lines.push(value.as_str().unwrap().to_owned());
+        }
+    }
+    lines
+}
+
+#[test]
+fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
+    // (step, what to do, didn't work, worked), each in the step's own lines.
+    // Giving way is parked (#4063) and left as it is.
+    let three = [
+        (
+            Step::WhereYouSit,
+            "Sit where you usually sit and look at me.",
+            "I can't see your face yet.",
+            "Got it, I can see you well there.",
+        ),
+        (
+            Step::WhoYouAre,
+            "What should I call you?",
+            "Sorry, what should I call you?",
+            "Nice to meet you.",
+        ),
+        (
+            Step::HowYouSound,
+            "say 'Hey Lamp' from your seat",
+            "I didn't catch that. Say 'Hey Lamp' again, from your seat.",
+            "Got it, that's three.",
+        ),
+        (
+            Step::Touch,
+            "Tap the top of my head once, then let go.",
+            "I didn't feel that. Touch the very top of my head with your fingertip, once.",
+            "Got it, I felt that.",
+        ),
+        (
+            Step::Privacy,
+            "Close it, then open it again.",
+            "The switch check didn't finish.",
+            "Got it, the switch closes my microphones.",
+        ),
+        (
+            Step::RoomSounds,
+            "May I notice music and laughter in the room?",
+            "Sorry, was that a yes or a no?",
+            "Got it, I'll notice music and laughter.",
+        ),
+        (
+            Step::FaceExpressions,
+            "May I notice when people look happy or upset",
+            "Sorry, was that a yes or a no?",
+            "Got it, I'll notice how people look.",
+        ),
+        (
+            Step::Preferences,
+            "Are there hours when I should keep quiet?",
+            "Sorry, could you say that again?",
+            "Got it, that's everything.",
+        ),
+    ];
+    for (step, todo, again, worked) in three {
+        let lines = lines_of(step);
+        for line in [todo, again, worked] {
+            assert!(
+                lines.iter().any(|said| said.contains(line)),
+                "{} lacks {line:?}",
+                step.name()
+            );
+        }
+    }
+    // Touch says "head" only.
+    assert!(
+        lines_of(Step::Touch)
+            .iter()
+            .all(|line| !line.contains("pad"))
+    );
+}
+
+#[test]
+fn no_step_says_another_steps_words() {
+    let marks = [
+        (Step::WhereYouSit, "usually sit"),
+        (Step::WhoYouAre, "should I call you"),
+        (Step::HowYouSound, "Hey Lamp"),
+        (Step::Touch, "top of my head"),
+        (Step::Privacy, "privacy switch"),
+        (Step::GivingWay, "tilt my head"),
+        (Step::RoomSounds, "music and laughter"),
+        (Step::FaceExpressions, "happy or upset"),
+        (Step::Preferences, "keep quiet"),
+    ];
+    for (step, _) in marks {
+        for line in lines_of(step) {
+            for (other, mark) in marks {
+                assert!(
+                    other == step || !line.contains(mark),
+                    "{} says {}'s {mark:?}: {line}",
+                    step.name(),
+                    other.name()
+                );
+            }
+        }
+    }
+}
