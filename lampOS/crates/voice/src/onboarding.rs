@@ -60,6 +60,8 @@ pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 pub const FLAG: &str = "--onboarding-file";
 pub const STEP: &str = "setup_step";
 pub const REDO: &str = "redo_setup";
+/// `redo_setup`'s step for the whole walk again: the person asked for all of it.
+pub const REDO_ALL: &str = "all";
 
 /// A step begins after this much quiet.
 const START_QUIET_US: u64 = 3_000_000;
@@ -2398,8 +2400,38 @@ impl Onboarding {
         self.dirty = self.desired != self.committed || self.erase_on_commit;
     }
 
+    /// One step asked for again: its outcome and its own counts go, and
+    /// every other step keeps what it ended with.
+    fn redo_step(&mut self, step: Step, now_us: u64) {
+        self.storage_failed = false;
+        self.desired.steps.remove(step.name());
+        match step {
+            Step::HowYouSound => {
+                self.forget_near();
+                self.near.generation = 0;
+                self.desired.near_call_prompts = 0;
+                self.desired.near_call_tries.clear();
+                self.desired.sentence_prompts = 0;
+            }
+            Step::GivingWay => {
+                self.redo_giving();
+                self.desired.giving_way_tries = 0;
+            }
+            _ => {}
+        }
+        if self.led.as_ref().is_some_and(|led| led.step == step) {
+            self.led = None;
+            self.owed = None;
+        }
+        self.finished_recorded = false;
+        self.pending_records
+            .push(json!({"kind":"onboarding_redo","step":step.name(),"at_us":now_us}));
+        self.save();
+        self.fence_storage();
+    }
+
     /// What the model reported through the provider worker: a step's end,
-    /// or that the walk starts again.
+    /// one step asked for again, or that the walk starts again.
     fn apply_mailbox(&mut self, lines: &str, now_us: u64) {
         for line in lines.lines() {
             let Ok(told) = serde_json::from_str::<Value>(line) else {
@@ -2427,6 +2459,15 @@ impl Onboarding {
                     .push(json!({"kind":"onboarding_redo","at_us":now_us}));
                 self.save();
                 self.fence_storage();
+                continue;
+            }
+            if let Some(step) = told
+                .get("redo_step")
+                .and_then(Value::as_str)
+                .and_then(Step::named)
+                .filter(|step| *step != Step::Privacy)
+            {
+                self.redo_step(step, now_us);
                 continue;
             }
             let step = told
@@ -2817,6 +2858,7 @@ fn nearest(faces: &lamp_msgs::Faces) -> Option<Framing> {
 /// The two functions the model is told of when the walk is switched on.
 pub fn tools() -> Vec<Tool> {
     let names = Step::IDS;
+    let redo_names: Vec<&str> = Step::IDS.iter().copied().chain([REDO_ALL]).collect();
     vec![
         Tool {
             name: STEP.into(),
@@ -2841,10 +2883,18 @@ pub fn tools() -> Vec<Tool> {
         },
         Tool {
             name: REDO.into(),
-            description: "Call this when someone asks you to redo the setup, or to go through your first \
-                          introductions again. Then say in a few words that you will start again."
+            description: "Call this when someone asks you to redo a step of your first meeting, or the \
+                          whole of it. Name the one step they asked for, or `all` only when they asked \
+                          to go through the whole setup again. If you are not sure which, ask them \
+                          first. Then say in a few words that you will do it again."
                 .into(),
-            parameters: None,
+            parameters: Some(json!({
+                "type": "object",
+                "properties": {
+                    "step": {"type": "string", "enum": redo_names}
+                },
+                "required": ["step"]
+            })),
             silent: false,
         },
     ]
@@ -2876,7 +2926,25 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
 
 fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
     let line = match call.name.as_str() {
-        REDO => json!({"redo": true}),
+        // One step, or the whole walk only when it was asked for by name:
+        // on lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no
+        // step, which reopened every step (#3754).
+        REDO => match call.args.get("step").and_then(Value::as_str) {
+            Some(REDO_ALL) => json!({"redo": true}),
+            Some(name) if Step::named(name) == Some(Step::Privacy) => {
+                return (
+                    json!({"error":"Privacy can't be redone on its own. Ask whether they want to go through the whole setup again."}),
+                    true,
+                );
+            }
+            Some(name) if Step::named(name).is_some() => json!({"redo_step": name}),
+            _ => {
+                return (
+                    json!({"error":"Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it."}),
+                    true,
+                );
+            }
+        },
         STEP => {
             let step = call.args.get("step").and_then(Value::as_str);
             let outcome = call.args.get("outcome").and_then(Value::as_str);
@@ -3279,7 +3347,7 @@ mod tests {
         let redo = ToolCall {
             id: "c".into(),
             name: REDO.into(),
-            args: json!({}),
+            args: json!({"step": "all"}),
         };
         assert!(run(&room.walk.file, &redo).1);
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
@@ -3305,7 +3373,7 @@ mod tests {
         let redo = ToolCall {
             id: "c".into(),
             name: REDO.into(),
-            args: json!({}),
+            args: json!({"step": "all"}),
         };
         assert!(run(&room.walk.file, &redo).1);
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
@@ -3317,6 +3385,72 @@ mod tests {
             args: json!({"step": "dance", "outcome": "done"}),
         };
         assert!(run(&room.walk.file, &wrong).0.get("error").is_some());
+    }
+
+    #[test]
+    fn a_redo_of_one_step_reopens_only_that_step() {
+        let mut room = Room::new("redo-one");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        report(&room.walk, "where_you_sit", "skipped");
+        assert_eq!(
+            room.wait(4 * S, Some(SIDE)),
+            [WHERE_YOU_SIT_SKIPPED, WHO_NOTE]
+        );
+        report(&room.walk, "who_you_are", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
+        report(&room.walk, "preferences", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
+        // "Lamp, can we redo the who-you-are step?"
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({"step": "who_you_are"}),
+        };
+        assert!(run(&room.walk.file, &redo).1);
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [WHO_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), None, "reopened");
+        assert_eq!(
+            room.outcome(Step::WhereYouSit),
+            Some(Outcome::Skipped),
+            "the other steps keep what they ended with"
+        );
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Skipped));
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len() - 1);
+    }
+
+    #[test]
+    fn a_redo_naming_no_step_or_privacy_alone_reopens_nothing() {
+        let mut room = Room::new("redo-none");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        report(&room.walk, "where_you_sit", "skipped");
+        assert_eq!(
+            room.wait(4 * S, Some(SIDE)),
+            [WHERE_YOU_SIT_SKIPPED, WHO_NOTE]
+        );
+        report(&room.walk, "who_you_are", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
+        report(&room.walk, "preferences", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
+        let before = room.walk.kept().clone();
+        // lamp-06c1, 28 Oct: "redo the touch step" reached a redo with no
+        // step, and every step but privacy was reopened.
+        for args in [
+            json!({}),
+            json!({"step": "touch step"}),
+            json!({"step": "privacy"}),
+        ] {
+            let redo = ToolCall {
+                id: "c".into(),
+                name: REDO.into(),
+                args,
+            };
+            let (told, answered) = run(&room.walk.file, &redo);
+            assert!(answered);
+            assert!(told.get("error").is_some(), "{told}");
+        }
+        assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
+        assert_eq!(*room.walk.kept(), before, "nothing reopened");
     }
 
     /// Ticks every quarter second for `for_us` with what the body says on
@@ -4721,7 +4855,7 @@ mod tests {
         let redo = ToolCall {
             id: "c".into(),
             name: REDO.into(),
-            args: json!({}),
+            args: json!({"step": "all"}),
         };
         assert!(run(&again.walk.file, &redo).1);
         assert_eq!(again.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
@@ -4850,7 +4984,7 @@ mod tests {
         let redo = ToolCall {
             id: "c".into(),
             name: REDO.into(),
-            args: json!({}),
+            args: json!({"step": "all"}),
         };
         assert!(run(&again.walk.file, &redo).1);
         assert_eq!(again.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
