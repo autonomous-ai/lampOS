@@ -5833,3 +5833,54 @@ mod head_touch_preflight_files {
         );
     }
 }
+
+/// Every shipped unit that hides the body's servo port from itself says it
+/// with `-`, so a port not there when the unit starts (a boot race, the body
+/// unplugged, a lamp without one) is passed over, and then not hidden for
+/// that run: systemd sets up the namespace once, at start, and the next start
+/// hides it. Without it systemd fails
+/// the unit at start (226/NAMESPACE), and the voice's restart guard left
+/// lamp-a0ae mute on 28 Oct. Read from every unit under deploy/, so a new
+/// per-lamp copy is held to it too.
+#[test]
+fn a_servo_port_not_there_never_fails_a_unit_that_hides_it() {
+    fn units(folder: &Path, found: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                units(&path, found);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "service")
+            {
+                found.push(path);
+            }
+        }
+    }
+    let mut found = Vec::new();
+    units(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy"),
+        &mut found,
+    );
+    let mut hiding = Vec::new();
+    for unit in &found {
+        for line in fs::read_to_string(unit).unwrap().lines() {
+            let Some(paths) = line.strip_prefix("InaccessiblePaths=") else {
+                continue;
+            };
+            for path in paths.split_whitespace() {
+                if path.contains("ttyACM") || path.contains("@SERVO_DEVICE@") {
+                    assert!(
+                        path.starts_with('-'),
+                        "{}: InaccessiblePaths={path} fails the unit when the port isn't there; write -{path}",
+                        unit.display()
+                    );
+                    hiding.push(unit.file_name().unwrap().to_owned());
+                }
+            }
+        }
+    }
+    // The product's, the generic package's, the two per-lamp copies and the
+    // attended pilot's: a check that found none would pass on nothing.
+    assert!(hiding.len() >= 5, "only {hiding:?} hide the servo port");
+}
