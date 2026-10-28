@@ -404,3 +404,39 @@ fn the_wifi_lost_line_is_a_kind_of_its_own() {
         Some(Missing::NotProvisioned)
     );
 }
+
+/// #3743: the recovery hotspot's line is a kind of its own too, beside the
+/// Wi-Fi helper's, each loaded only by its own name.
+#[test]
+fn the_wifi_recovering_line_is_a_kind_of_its_own() {
+    let directory = Directory::new();
+    let lost = tone(RATE * 4);
+    let lost_bytes = wav(RATE, 1, &lost);
+    directory.write("wifi-lost.en-US.wav", &lost_bytes);
+    let recovering: Vec<i16> = lost.iter().map(|sample| sample / 2).collect();
+    let recovering_bytes = wav(RATE, 1, &recovering);
+    directory.write("wifi-recovering.en-US.wav", &recovering_bytes);
+    let mut value = entry(
+        "wifi_recovering",
+        "wifi-recovering.en-US.wav",
+        &recovering_bytes,
+        RATE * 4,
+    );
+    value["transcript"] =
+        "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.".into();
+    directory.provision(vec![
+        entry("wifi_lost", "wifi-lost.en-US.wav", &lost_bytes, RATE * 4),
+        value,
+    ]);
+    let notices = directory.load(Approval::Production);
+    let notice = notices.get(NoticeKind::WifiRecovering, "en-US").unwrap();
+    assert_eq!(notice.samples(), recovering);
+    assert_eq!(notice.info.kind, NoticeKind::WifiRecovering);
+    assert_eq!(
+        notices
+            .get(NoticeKind::WifiLost, "en-US")
+            .unwrap()
+            .samples(),
+        lost
+    );
+}

@@ -33,6 +33,24 @@ pub const ON_FILE: &str = "/run/lampos-setup-recover/on";
 pub const RECOVERING: &str = "recovering";
 /// The switch, exactly `on`.
 pub const SWITCH: &str = "LAMP_WIFI_RECOVERY";
+/// What the lamp says as the hotspot first opens for a loss (#3743, agreed
+/// with Sixth on #3020): what happened and what to do, with no control named
+/// and nothing erased. With no network the voice's model can't be reached,
+/// so it is only ever [`RECORDING_OPENED`], recorded at build time in the
+/// lamp's own voice; this is its transcript. Under 10 s, so any loader
+/// takes the clip.
+pub const SAY_OPENED: &str =
+    "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.";
+/// [`SAY_OPENED`]'s recording, by the name the say service takes, the
+/// failure notice `wifi_recovering` (`docs/failure-notices.md`).
+pub const RECORDING_OPENED: &str = "wifi_recovering";
+
+/// Whether `act`, taken while `was_recovering` was not, is the hotspot's
+/// first opening for this loss: [`SAY_OPENED`] is said then, once, never at
+/// a reopening after a failed retry of the saved network.
+pub fn says_opened(was_recovering: bool, act: Option<Act>) -> bool {
+    !was_recovering && act == Some(Act::OpenHotspot)
+}
 
 /// Whether the switch's value turns recovery on.
 pub fn on(value: Option<&str>) -> bool {

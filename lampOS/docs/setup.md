@@ -718,7 +718,8 @@ by the voice:
   refuses anything that does not match. `lamp-voice.service` passes
   `--failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US`.
   It is read once at start; `failure_notice_capability` reports `wifi_lost`.
-- **Rendered** by `tools/render-wifi-line.sh PROVIDER.json NEW_FOLDER [production|test]`:
+- **Rendered** by `tools/render-wifi-line.sh PROVIDER.json NEW_FOLDER [production|test] [lost|recovering]`
+  (`lost` by default; `recovering` is the recovery hotspot's line, below):
   the voice's own route, model and voice (`gemini-3.8-live`, `Kore`), the line
   as one written turn, as the say service's `text` is
   (`crates/gemini/examples/render_line.rs`), kept as 24 kHz mono 16-bit with
@@ -930,6 +931,17 @@ its only way back once its package carries the unit.
   each retry, and when recovery ends; lamp-cloud's `system.info` says
   `"recovery": true` while it runs with its switch on, so the app names the
   hotspot only to a lamp that will open one (Fourteen's ecm-sds-mobile#50).
+- **Spoken** (#3743, the words agreed with Sixth): as the hotspot first opens
+  for a loss, `recover` asks the voice's say service for the recording
+  `wifi_recovering`, "I can't reach my Wi-Fi, so I've opened setup. Set my
+  Wi-Fi again in the app." (`recover::SAY_OPENED`). It names no control and
+  sends nobody to the reset. Once a loss (`recover::says_opened`): not at a
+  reopening after a failed try of the saved network, and again only after
+  the lamp was back online. The voice stays up while the hotspot is open, as
+  `recover` stops no unit. With no network there is no model, so it is the
+  recording only, never words. One the voice doesn't hold (`not_provisioned`
+  until its notices release, [failure-notices.md](failure-notices.md)) is
+  journalled and the hotspot opens all the same.
 
 Not shown on a lamp: the check is a lamp with its person, the router's SSID
 changed, the hotspot open within 2 minutes, the app setting the new network,

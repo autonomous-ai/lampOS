@@ -43,7 +43,8 @@
 //!   `recording` names one line recorded at build time in the lamp's own
 //!   voice and loaded with the failure notices at start
 //!   (`docs/failure-notices.md`), [`RECORDINGS`] only: `wifi_lost`, for the
-//!   Wi-Fi helper with no network, when the model cannot be reached. Its
+//!   Wi-Fi helper with no network, when the model cannot be reached, and
+//!   `wifi_recovering`, for `lamp-setup recover` as its hotspot opens (#3743). Its
 //!   samples are played as a skill's sound is, with the same gates; one not
 //!   provisioned is refused at once with the loader's reason
 //!   ([`Recordings`]), and nothing is said. Only the Wi-Fi helper may ask
@@ -1500,7 +1501,7 @@ fn read_line_within(stream: &UnixStream, within: Duration) -> Result<String, &'s
 /// The recordings an ask may name (#1959): each is one line recorded at
 /// build time in the lamp's own voice, a failure notice of the same name
 /// (`lamp_audio::notice::NoticeKind`, `docs/failure-notices.md`).
-pub const RECORDINGS: &[&str] = &["wifi_lost"];
+pub const RECORDINGS: &[&str] = &["wifi_lost", "wifi_recovering"];
 
 /// The recordings the voice loaded at start, by name: their samples, or
 /// the loader's reason they are not there (`not_provisioned`,
@@ -2054,6 +2055,12 @@ mod tests {
         let asked = parse_from(line, Caller::WifiHelper).unwrap();
         assert_eq!(asked.words, Words::Recording("wifi_lost".into()));
         assert_eq!(asked.words.turn(), None, "never a turn for the model");
+        // The recovery hotspot's line, by its own name (#3743).
+        let recovering = r#"{"skill":"wifi","recording":"wifi_recovering","expires_in_ms":60000}"#;
+        assert_eq!(
+            parse_from(recovering, Caller::WifiHelper).unwrap().words,
+            Words::Recording("wifi_recovering".into())
+        );
         // Another caller, under any skill name, is refused.
         for line in [
             line,
