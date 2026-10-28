@@ -59,6 +59,9 @@ struct FakeHost {
     /// What each `harness version` says, in turn; when none is left, the
     /// version `harness-on` needs.
     versions: std::collections::VecDeque<Result<String, String>>,
+    /// The sha256 of the lamp-update running install: the build's own
+    /// unless a test says otherwise (#3733).
+    running: Result<String, String>,
 }
 
 /// `harness service status --json` once the service is gone (Harness
@@ -215,6 +218,10 @@ impl Host for FakeHost {
         self.calls.push(format!("offset {zone}"));
         Ok(if zone == "Asia/Ho_Chi_Minh" { 420 } else { 0 })
     }
+
+    fn running_sha256(&mut self) -> Result<String, String> {
+        self.running.clone()
+    }
 }
 
 struct Lamp {
@@ -257,11 +264,15 @@ impl Lamp {
         let key = Ed25519KeyPair::from_pkcs8(document.as_ref()).unwrap();
         let mut channel = FakeChannel::default();
         let mut files = Vec::new();
+        let mut running = Err("no lamp-update in the build".to_owned());
         for name in binaries() {
             if leave_out.contains(&name.as_str()) {
                 continue;
             }
             let bytes = format!("{name} of build {sequence}\n").into_bytes();
+            if name == "lamp-update" {
+                running = Ok(sha256_hex(&bytes));
+            }
             files.push(File {
                 name: name.clone(),
                 sha256: sha256_hex(&bytes),
@@ -308,6 +319,7 @@ impl Lamp {
             status_json: STATUS_GONE.into(),
             pids: String::new(),
             versions: Default::default(),
+            running,
         };
         Self {
             _dir: dir,
@@ -462,6 +474,82 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
         serde_json::from_slice(&fs::read(lamp.on("/var/lib/lampos-update/state.json")).unwrap())
             .unwrap();
     assert_eq!(state["installed"]["sequence"], 188, "{state}");
+}
+
+/// The lines install said about the lamp-update running it (#3733).
+fn updater_said(lamp: &Lamp) -> Vec<&str> {
+    lamp.said
+        .iter()
+        .map(String::as_str)
+        .filter(|line| line.starts_with("this lamp-update"))
+        .collect()
+}
+
+#[test]
+fn a_lamp_update_not_the_builds_own_is_named_and_install_still_writes_the_units() {
+    let mut lamp = Lamp::new(188, &[]);
+    let builds = lamp.host.running.clone().unwrap();
+    let older = sha256_hex(b"lamp-update of build 120\n");
+    lamp.host.running = Ok(older.clone());
+    let done = lamp.install().unwrap();
+    assert_eq!(done.sequence, 188);
+    assert_eq!(
+        updater_said(&lamp),
+        [format!(
+            "this lamp-update (sha256 {}) is not build 188's ({}): the units written are \
+                 this lamp-update's own, not build 188's; run build 188's, \
+                 /opt/lampOS/update/current/lamp-update install, to write its units",
+            &older[..12],
+            &builds[..12]
+        )],
+        "{:?}",
+        lamp.said
+    );
+    // Said, never refused: the units and the state are written as ever.
+    for (name, text) in PRODUCT {
+        let written = fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{name}"))).unwrap();
+        assert_eq!(&written, text, "{name}");
+    }
+    assert!(
+        lamp.host
+            .calls
+            .iter()
+            .any(|call| call.starts_with("enable "))
+    );
+}
+
+#[test]
+fn the_builds_own_lamp_update_says_nothing_of_itself() {
+    let mut lamp = Lamp::new(188, &[]);
+    // The same hash in capitals is the same file.
+    lamp.host.running = Ok(lamp.host.running.clone().unwrap().to_uppercase());
+    lamp.install().unwrap();
+    assert_eq!(updater_said(&lamp), Vec::<&str>::new(), "{:?}", lamp.said);
+}
+
+#[test]
+fn a_lamp_update_that_cannot_be_read_says_it_could_not_be_checked() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.host.running = Err("/proc/self/exe: Permission denied".into());
+    lamp.install().unwrap();
+    assert_eq!(
+        updater_said(&lamp),
+        [
+            "this lamp-update could not be checked against build 188's: \
+              /proc/self/exe: Permission denied"
+        ],
+        "{:?}",
+        lamp.said
+    );
+}
+
+#[test]
+fn an_install_that_ends_before_its_units_says_nothing_of_the_lamp_update() {
+    let mut lamp = Lamp::new(188, &["lamp-voice"]);
+    lamp.host.running = Ok(sha256_hex(b"lamp-update of build 120\n"));
+    let why = lamp.install().unwrap_err();
+    assert!(why.starts_with(install::UNITS_NOT_WRITTEN), "{why}");
+    assert_eq!(updater_said(&lamp), Vec::<&str>::new(), "{:?}", lamp.said);
 }
 
 #[test]
