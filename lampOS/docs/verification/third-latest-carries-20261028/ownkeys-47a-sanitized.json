@@ -1,0 +1,651 @@
+{
+  "actual_source": {
+    "candidate": "47a7e8f85e3cf15b15abfa401391d4e7eb4b750f",
+    "candidate_to_actual_delta": [
+      "M\t.github/workflows/lampos-sdk.yml",
+      "M\tlampOS/sdk/python/README.md",
+      "M\tlampOS/sdk/python/src/lampos/skillcheck.py",
+      "M\tlampOS/sdk/python/tests/test_skillcheck.py"
+    ],
+    "candidate_tree": "67cf69f0a3f60b7b0930e36537f4ff317f338da1",
+    "compiler_product_settings_skills_and_publisher_inputs_equal": true,
+    "full_tree_equal_to_candidate": false,
+    "logged_checkout": "2b5b4d0398dc70eecedf06606b8ee61eb9540070",
+    "no_historical_execution_transfer": true,
+    "owned_blobs_modes": {
+      "lampOS/crates/selftest/src/voice_route.rs": {
+        "actual": "100644 blob d7dbb6121d0b001e46e01681c47ac17391fe45db\tlampOS/crates/selftest/src/voice_route.rs",
+        "candidate": "100644 blob d7dbb6121d0b001e46e01681c47ac17391fe45db\tlampOS/crates/selftest/src/voice_route.rs"
+      },
+      "lampOS/crates/update/src/install.rs": {
+        "actual": "100644 blob 0746cad94d375fd6d6d788b68e92d671bdc781c6\tlampOS/crates/update/src/install.rs",
+        "candidate": "100644 blob 0746cad94d375fd6d6d788b68e92d671bdc781c6\tlampOS/crates/update/src/install.rs"
+      },
+      "lampOS/crates/update/src/retired-own-keys-voice.conf": {
+        "actual": "100644 blob ce1cee3234fe14c3cd5d80f66af94b0349a15ee7\tlampOS/crates/update/src/retired-own-keys-voice.conf",
+        "candidate": "100644 blob ce1cee3234fe14c3cd5d80f66af94b0349a15ee7\tlampOS/crates/update/src/retired-own-keys-voice.conf"
+      },
+      "lampOS/crates/update/tests/install.rs": {
+        "actual": "100644 blob 4dfd76af3779dba44630681b7859dd89225d9a60\tlampOS/crates/update/tests/install.rs",
+        "candidate": "100644 blob 4dfd76af3779dba44630681b7859dd89225d9a60\tlampOS/crates/update/tests/install.rs"
+      },
+      "lampOS/crates/voice/src/second_config.rs": {
+        "actual": "100644 blob 40c2c89bc247ed46a03f2c22b999ed8e95a4fc52\tlampOS/crates/voice/src/second_config.rs",
+        "candidate": "100644 blob 40c2c89bc247ed46a03f2c22b999ed8e95a4fc52\tlampOS/crates/voice/src/second_config.rs"
+      },
+      "lampOS/deploy/product/README.md": {
+        "actual": "100644 blob 17efe0bfa3cf91e128eb5ef441ffb111d34107e5\tlampOS/deploy/product/README.md",
+        "candidate": "100644 blob 17efe0bfa3cf91e128eb5ef441ffb111d34107e5\tlampOS/deploy/product/README.md"
+      },
+      "lampOS/deploy/product/lamp-cloud.service": {
+        "actual": "100644 blob 3a754428d4275a095d706286cc5ba22165731dea\tlampOS/deploy/product/lamp-cloud.service",
+        "candidate": "100644 blob 3a754428d4275a095d706286cc5ba22165731dea\tlampOS/deploy/product/lamp-cloud.service"
+      },
+      "lampOS/deploy/product/lamp-setup-keys.socket": {
+        "actual": "100644 blob 6706f518997442593a66e86cd09a5b423a3b893a\tlampOS/deploy/product/lamp-setup-keys.socket",
+        "candidate": "100644 blob 6706f518997442593a66e86cd09a5b423a3b893a\tlampOS/deploy/product/lamp-setup-keys.socket"
+      },
+      "lampOS/deploy/product/lamp-setup.service": {
+        "actual": "100644 blob d5ebabfb680eaac39917f5dd86372243b02e70d6\tlampOS/deploy/product/lamp-setup.service",
+        "candidate": "100644 blob d5ebabfb680eaac39917f5dd86372243b02e70d6\tlampOS/deploy/product/lamp-setup.service"
+      },
+      "lampOS/deploy/product/lamp-voice.service": {
+        "actual": "100644 blob 32c3385a54e5f90cc6f11b2e76b001ea64838122\tlampOS/deploy/product/lamp-voice.service",
+        "candidate": "100644 blob 32c3385a54e5f90cc6f11b2e76b001ea64838122\tlampOS/deploy/product/lamp-voice.service"
+      },
+      "lampOS/docs/cloud.md": {
+        "actual": "100644 blob 734a4e560b896cdb913847d17ca672a8ee6d393d\tlampOS/docs/cloud.md",
+        "candidate": "100644 blob 734a4e560b896cdb913847d17ca672a8ee6d393d\tlampOS/docs/cloud.md"
+      },
+      "lampOS/docs/install.md": {
+        "actual": "100644 blob 4e492aab87ed41c3fee2f29bd21a1e49bfad7856\tlampOS/docs/install.md",
+        "candidate": "100644 blob 4e492aab87ed41c3fee2f29bd21a1e49bfad7856\tlampOS/docs/install.md"
+      },
+      "lampOS/docs/own-keys.md": {
+        "actual": "100644 blob b87bacb3d344a61f8a9d7783313d1ed89122daba\tlampOS/docs/own-keys.md",
+        "candidate": "100644 blob b87bacb3d344a61f8a9d7783313d1ed89122daba\tlampOS/docs/own-keys.md"
+      },
+      "lampOS/docs/selftest.md": {
+        "actual": "100644 blob 16bcde45592599461dc7cba485de14048ef2c6e9\tlampOS/docs/selftest.md",
+        "candidate": "100644 blob 16bcde45592599461dc7cba485de14048ef2c6e9\tlampOS/docs/selftest.md"
+      },
+      "lampOS/docs/setup.md": {
+        "actual": "100644 blob c2c4bc957459e2043ebda938f7f05fdaab221c71\tlampOS/docs/setup.md",
+        "candidate": "100644 blob c2c4bc957459e2043ebda938f7f05fdaab221c71\tlampOS/docs/setup.md"
+      },
+      "lampOS/docs/switches.md": {
+        "actual": "100644 blob ae67abcc8352e4e6929198a80cd5d1148dc4d99b\tlampOS/docs/switches.md",
+        "candidate": "100644 blob ae67abcc8352e4e6929198a80cd5d1148dc4d99b\tlampOS/docs/switches.md"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/README.md": {
+        "actual": "100644 blob 4aef32d676f1c4d56c1ce7004c1ef0530112a60b\tlampOS/docs/verification/own-keys-product-carry-20261026/README.md",
+        "candidate": "100644 blob 4aef32d676f1c4d56c1ce7004c1ef0530112a60b\tlampOS/docs/verification/own-keys-product-carry-20261026/README.md"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/SHA256SUMS": {
+        "actual": "100644 blob bc3f4d823d9f86e34944e37786d9dcd6a46539bd\tlampOS/docs/verification/own-keys-product-carry-20261026/SHA256SUMS",
+        "candidate": "100644 blob bc3f4d823d9f86e34944e37786d9dcd6a46539bd\tlampOS/docs/verification/own-keys-product-carry-20261026/SHA256SUMS"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/README.md": {
+        "actual": "100644 blob 1d32358e15322d7dc3dd044c7db75da3d8e453fa\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/README.md",
+        "candidate": "100644 blob 1d32358e15322d7dc3dd044c7db75da3d8e453fa\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/README.md"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/SHA256SUMS": {
+        "actual": "100644 blob dddf0ccb4a66655b14233ca89f7e4e6b98ab0e8b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/SHA256SUMS",
+        "candidate": "100644 blob dddf0ccb4a66655b14233ca89f7e4e6b98ab0e8b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/SHA256SUMS"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/inputs.sha256": {
+        "actual": "100644 blob 4eec44475cf499ef30897845e75805eb5ddb170b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/inputs.sha256",
+        "candidate": "100644 blob 4eec44475cf499ef30897845e75805eb5ddb170b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/inputs.sha256"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/range-diff.txt": {
+        "actual": "100644 blob 662060cdbf4516e197f37b525b1f066250c84c6e\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/range-diff.txt",
+        "candidate": "100644 blob 662060cdbf4516e197f37b525b1f066250c84c6e\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/range-diff.txt"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/results.json": {
+        "actual": "100644 blob 8a14bba2b6871d75aafdb9acfdba2560239a36af\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/results.json",
+        "candidate": "100644 blob 8a14bba2b6871d75aafdb9acfdba2560239a36af\tlampOS/docs/verification/own-keys-product-carry-20261026/current-274/results.json"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/README.md": {
+        "actual": "100644 blob 7fa44d571bcdcde5751495b2ad0e9fe3fa52bd0a\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/README.md",
+        "candidate": "100644 blob 7fa44d571bcdcde5751495b2ad0e9fe3fa52bd0a\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/README.md"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/SHA256SUMS": {
+        "actual": "100644 blob f1cb91bf36514452a299a9099d2d8efacd56c648\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/SHA256SUMS",
+        "candidate": "100644 blob f1cb91bf36514452a299a9099d2d8efacd56c648\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/SHA256SUMS"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/inputs.sha256": {
+        "actual": "100644 blob 0580d69e60553fbe95d541d74177d0400afb43cc\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/inputs.sha256",
+        "candidate": "100644 blob 0580d69e60553fbe95d541d74177d0400afb43cc\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/inputs.sha256"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/range-diff.txt": {
+        "actual": "100644 blob 9f411acd34003dcb0d203fd62300467eb61265f1\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/range-diff.txt",
+        "candidate": "100644 blob 9f411acd34003dcb0d203fd62300467eb61265f1\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/range-diff.txt"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/results.json": {
+        "actual": "100644 blob 23116f7dbfa5d0aa1806fc3c5b8e65aa7bad9e7b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/results.json",
+        "candidate": "100644 blob 23116f7dbfa5d0aa1806fc3c5b8e65aa7bad9e7b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-756/results.json"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/README.md": {
+        "actual": "100644 blob d475f1e0d78194684d2e19632b9166656b323bbd\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/README.md",
+        "candidate": "100644 blob d475f1e0d78194684d2e19632b9166656b323bbd\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/README.md"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/SHA256SUMS": {
+        "actual": "100644 blob 5fbda765b06200e590401f74fe593562b296944b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/SHA256SUMS",
+        "candidate": "100644 blob 5fbda765b06200e590401f74fe593562b296944b\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/SHA256SUMS"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/inputs.sha256": {
+        "actual": "100644 blob 1b420823f8cc4c2447a01ea69c6652ad25296140\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/inputs.sha256",
+        "candidate": "100644 blob 1b420823f8cc4c2447a01ea69c6652ad25296140\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/inputs.sha256"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/range-diff.txt": {
+        "actual": "100644 blob 5055526b3c731b763ae0a6c02ee745108386eab9\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/range-diff.txt",
+        "candidate": "100644 blob 5055526b3c731b763ae0a6c02ee745108386eab9\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/range-diff.txt"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/results.json": {
+        "actual": "100644 blob c5b2a38c710ce74195f1c54693864b4adbacf114\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/results.json",
+        "candidate": "100644 blob c5b2a38c710ce74195f1c54693864b4adbacf114\tlampOS/docs/verification/own-keys-product-carry-20261026/current-d21/results.json"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/inputs.sha256": {
+        "actual": "100644 blob c058e0b698621c2df923c3866a4a30d7c65dfca6\tlampOS/docs/verification/own-keys-product-carry-20261026/inputs.sha256",
+        "candidate": "100644 blob c058e0b698621c2df923c3866a4a30d7c65dfca6\tlampOS/docs/verification/own-keys-product-carry-20261026/inputs.sha256"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/results.json": {
+        "actual": "100644 blob 055ba371c93a3d2dc614fe6212428d7eb315c207\tlampOS/docs/verification/own-keys-product-carry-20261026/results.json",
+        "candidate": "100644 blob 055ba371c93a3d2dc614fe6212428d7eb315c207\tlampOS/docs/verification/own-keys-product-carry-20261026/results.json"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/README.md": {
+        "actual": "100644 blob ae7a87cdaeb17232418c886794c918e43eb64916\tlampOS/docs/verification/own-keys-product-carry-20261026/review-docs/README.md",
+        "candidate": "100644 blob ae7a87cdaeb17232418c886794c918e43eb64916\tlampOS/docs/verification/own-keys-product-carry-20261026/review-docs/README.md"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/SHA256SUMS": {
+        "actual": "100644 blob c8737a31184da7637dfd35eb3d229255ee680108\tlampOS/docs/verification/own-keys-product-carry-20261026/review-docs/SHA256SUMS",
+        "candidate": "100644 blob c8737a31184da7637dfd35eb3d229255ee680108\tlampOS/docs/verification/own-keys-product-carry-20261026/review-docs/SHA256SUMS"
+      },
+      "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/results.json": {
+        "actual": "100644 blob ade447267c3def3134d8f69335ae2a61b7c45402\tlampOS/docs/verification/own-keys-product-carry-20261026/review-docs/results.json",
+        "candidate": "100644 blob ade447267c3def3134d8f69335ae2a61b7c45402\tlampOS/docs/verification/own-keys-product-carry-20261026/review-docs/results.json"
+      }
+    },
+    "owned_overlay_equal": true,
+    "parents": [
+      "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+      "47a7e8f85e3cf15b15abfa401391d4e7eb4b750f"
+    ],
+    "raw_log_sha256": "afcf8337f3b4f961a6fc650ea0b4060b87c818bd70b04ada96b764b505e13f3b",
+    "tree": "56300ae211e7e98ee8dcd9fedae5d1bbf041bc52"
+  },
+  "additional_workflow_controls": {
+    "CLI7": [
+      "2026-10-27T23:31:15.5133757Z Ran 7 tests in 0.490s",
+      "2026-10-27T23:31:15.5134048Z OK"
+    ],
+    "old_Reader_case_current_once_PASS": [
+      "2026-10-27T23:41:43.1869046Z         PASS [   0.012s] (10544/11861) lamp-voice session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    ],
+    "old_failure_cause_repair_waiver_inferred": false,
+    "publication_unit49": [
+      "2026-10-27T23:26:13.9052891Z Ran 49 tests in 0.318s",
+      "2026-10-27T23:26:13.9053432Z OK"
+    ],
+    "separate_harnesses": {
+      "process13_0": true,
+      "relay_signals_ok": true
+    }
+  },
+  "authored_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "authored_head": "47a7e8f85e3cf15b15abfa401391d4e7eb4b750f",
+  "limits": [
+    "Actual preview contains four SDK overlay paths; it is not the authored whole tree. All38 owned blobs/modes and exact payload overlay match.",
+    "337 current applicable identities mechanically matched from this new original log;1debug-only source case excluded, no PASS/SKIP/unrun credit.",
+    "No old runtime counts transferred, no Memory/Friday semantic review; old Reader/parallel reports and draft broker2094 remain separate.",
+    "Local parser first missed padded ordinals; both parser versions/limit retained. Reanalysis used the same immutable log, no test/CI retry.",
+    "No artifact download/execution, credential provisioning, device, release or manual CI actions."
+  ],
+  "nextest": {
+    "required_scope_only_percase_audit": true,
+    "retry_rows": 0,
+    "summary_FAIL": 0,
+    "summary_PASS": 11861,
+    "summary_rows": [
+      "2026-10-27T23:42:00.9697088Z      Summary [ 248.673s] 11861 tests run: 11861 passed, 107 skipped"
+    ],
+    "summary_skipped": 107,
+    "summary_tests_run": 11861
+  },
+  "observer": {
+    "all_native_handles_closed": true,
+    "combined_watch_exit": 0,
+    "combined_watch_handle": 79457,
+    "deadline_limit_reached": false,
+    "earlier_log_exit": 0,
+    "earlier_log_handle": 59624,
+    "elapsed_seconds": 972.57,
+    "metadata_transport_limits": [
+      {
+        "error": "gh metadata transport exited 1",
+        "label": "ownkeys-arm",
+        "utc": "2026-10-27T23:27:17.837390+00:00"
+      },
+      {
+        "error": "Command '['gh', 'api', 'repos/autonomous-ai/lampOS/actions/runs/40602022202']' timed out after 25 seconds",
+        "label": "ownkeys-linux",
+        "utc": "2026-10-27T23:27:42.842258+00:00"
+      },
+      {
+        "error": "Command '['gh', 'api', 'repos/autonomous-ai/lampOS/actions/runs/40602024586']' timed out after 25 seconds",
+        "label": "auth-arm",
+        "utc": "2026-10-27T23:28:07.847657+00:00"
+      },
+      {
+        "error": "Command '['gh', 'api', 'repos/autonomous-ai/lampOS/actions/runs/40602022358']' timed out after 25 seconds",
+        "label": "ownkeys-arm",
+        "utc": "2026-10-27T23:29:37.427671+00:00"
+      }
+    ],
+    "source_fetch_exit": 0,
+    "source_fetch_handle": 6534,
+    "terminal_log_exit": 0,
+    "terminal_log_handle": 19259
+  },
+  "originals": {
+    "ownkeys-arm": {
+      "jobs": [
+        {
+          "completed_at": "2026-10-27T23:42:24Z",
+          "conclusion": "success",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602022358/job/122532232409",
+          "id": 122532232409,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+          "started_at": "2026-10-27T23:25:36Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completed_at": "2026-10-27T23:25:38Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "started_at": "2026-10-27T23:25:37Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:06Z",
+              "conclusion": "success",
+              "name": "system packages",
+              "number": 2,
+              "started_at": "2026-10-27T23:25:38Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:13Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 3,
+              "started_at": "2026-10-27T23:26:06Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:13Z",
+              "conclusion": "success",
+              "name": "publication failure tests (offline, no signing secret)",
+              "number": 4,
+              "started_at": "2026-10-27T23:26:13Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:20Z",
+              "conclusion": "success",
+              "name": "Rust 1.96.0",
+              "number": 5,
+              "started_at": "2026-10-27T23:26:13Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:21Z",
+              "conclusion": "success",
+              "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+              "number": 6,
+              "started_at": "2026-10-27T23:26:20Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:44Z",
+              "conclusion": "success",
+              "name": "stable promotion tests (offline, disposable test key)",
+              "number": 7,
+              "started_at": "2026-10-27T23:26:21Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:58Z",
+              "conclusion": "success",
+              "name": "restore the cache",
+              "number": 8,
+              "started_at": "2026-10-27T23:26:44Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:59Z",
+              "conclusion": "success",
+              "name": "unchanged source files get the cached build's times back",
+              "number": 9,
+              "started_at": "2026-10-27T23:26:58Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:59Z",
+              "conclusion": "skipped",
+              "name": "record fresh source times for a cold publication build",
+              "number": 10,
+              "started_at": "2026-10-27T23:26:59Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:27:00Z",
+              "conclusion": "success",
+              "name": "Run taiki-e/install-action@v2",
+              "number": 11,
+              "started_at": "2026-10-27T23:26:59Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:29:53Z",
+              "conclusion": "success",
+              "name": "build (release, the lamps' binaries)",
+              "number": 12,
+              "started_at": "2026-10-27T23:27:00Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:29:53Z",
+              "conclusion": "success",
+              "name": "every built lamp-* binary is classified for the lamp-os package",
+              "number": 13,
+              "started_at": "2026-10-27T23:29:53Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:31:14Z",
+              "conclusion": "success",
+              "name": "build the two selected artifact examples without filename collisions",
+              "number": 14,
+              "started_at": "2026-10-27T23:29:53Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:31:15Z",
+              "conclusion": "success",
+              "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+              "number": 15,
+              "started_at": "2026-10-27T23:31:14Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:31:15Z",
+              "conclusion": "success",
+              "name": "which crates a pull request tests",
+              "number": 16,
+              "started_at": "2026-10-27T23:31:15Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:00Z",
+              "conclusion": "success",
+              "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+              "number": 17,
+              "started_at": "2026-10-27T23:31:15Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:15Z",
+              "conclusion": "success",
+              "name": "doc tests and the own-harness tests (nextest runs neither)",
+              "number": 18,
+              "started_at": "2026-10-27T23:42:00Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:15Z",
+              "conclusion": "success",
+              "name": "export only current Cargo targets and their SHA-256",
+              "number": 19,
+              "started_at": "2026-10-27T23:42:15Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:23Z",
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 20,
+              "started_at": "2026-10-27T23:42:15Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:23Z",
+              "conclusion": "skipped",
+              "name": "discard the isolated example target before saving the cache",
+              "number": 21,
+              "started_at": "2026-10-27T23:42:23Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:23Z",
+              "conclusion": "skipped",
+              "name": "save the cache",
+              "number": 22,
+              "started_at": "2026-10-27T23:42:23Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:23Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 44,
+              "started_at": "2026-10-27T23:42:23Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:42:23Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 45,
+              "started_at": "2026-10-27T23:42:23Z",
+              "status": "completed"
+            }
+          ]
+        },
+        {
+          "completed_at": "2026-10-27T23:25:24Z",
+          "conclusion": "skipped",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602022358/job/122532234392",
+          "id": 122532234392,
+          "name": "lampOS \u2014 promote a tested release to the stable feed",
+          "started_at": "2026-10-27T23:25:25Z",
+          "status": "completed",
+          "steps": []
+        },
+        {
+          "completed_at": "2026-10-27T23:42:24Z",
+          "conclusion": "skipped",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602022358/job/122538652235",
+          "id": 122538652235,
+          "name": "report-full-run-failure",
+          "started_at": "2026-10-27T23:42:25Z",
+          "status": "completed",
+          "steps": []
+        },
+        {
+          "completed_at": "2026-10-27T23:42:24Z",
+          "conclusion": "skipped",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602022358/job/122538652601",
+          "id": 122538652601,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+          "started_at": "2026-10-27T23:42:25Z",
+          "status": "completed",
+          "steps": []
+        }
+      ],
+      "run": {
+        "conclusion": "success",
+        "created_at": "2026-10-27T23:25:24Z",
+        "event": "pull_request",
+        "head_sha": "47a7e8f85e3cf15b15abfa401391d4e7eb4b750f",
+        "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602022358",
+        "id": 40602022358,
+        "name": "lampOS on ARM64",
+        "run_attempt": 1,
+        "run_number": 7973,
+        "status": "completed",
+        "updated_at": "2026-10-27T23:42:25Z"
+      }
+    },
+    "ownkeys-linux": {
+      "jobs": [
+        {
+          "completed_at": "2026-10-27T23:29:40Z",
+          "conclusion": "success",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602022202/job/122532232368",
+          "id": 122532232368,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "started_at": "2026-10-27T23:25:27Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completed_at": "2026-10-27T23:25:30Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "started_at": "2026-10-27T23:25:28Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:25:56Z",
+              "conclusion": "success",
+              "name": "system packages",
+              "number": 2,
+              "started_at": "2026-10-27T23:25:30Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:04Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 3,
+              "started_at": "2026-10-27T23:25:56Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:12Z",
+              "conclusion": "success",
+              "name": "Rust 1.96.0",
+              "number": 4,
+              "started_at": "2026-10-27T23:26:04Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:23Z",
+              "conclusion": "success",
+              "name": "stable promotion formatting and strict Clippy",
+              "number": 5,
+              "started_at": "2026-10-27T23:26:12Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:26:30Z",
+              "conclusion": "success",
+              "name": "formatting (whole workspace, pinned Rust)",
+              "number": 6,
+              "started_at": "2026-10-27T23:26:23Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:28:31Z",
+              "conclusion": "success",
+              "name": "restore the cache",
+              "number": 7,
+              "started_at": "2026-10-27T23:26:30Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:28:44Z",
+              "conclusion": "success",
+              "name": "unchanged source files get the cached build's times back",
+              "number": 8,
+              "started_at": "2026-10-27T23:28:31Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:29:38Z",
+              "conclusion": "success",
+              "name": "clippy (every crate and target, warnings as errors)",
+              "number": 9,
+              "started_at": "2026-10-27T23:28:44Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:29:38Z",
+              "conclusion": "skipped",
+              "name": "save the cache",
+              "number": 10,
+              "started_at": "2026-10-27T23:29:38Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:29:39Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 20,
+              "started_at": "2026-10-27T23:29:38Z",
+              "status": "completed"
+            },
+            {
+              "completed_at": "2026-10-27T23:29:39Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 21,
+              "started_at": "2026-10-27T23:29:39Z",
+              "status": "completed"
+            }
+          ]
+        }
+      ],
+      "run": {
+        "conclusion": "success",
+        "created_at": "2026-10-27T23:25:24Z",
+        "event": "pull_request",
+        "head_sha": "47a7e8f85e3cf15b15abfa401391d4e7eb4b750f",
+        "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602022202",
+        "id": 40602022202,
+        "name": "lampOS clippy",
+        "run_attempt": 1,
+        "run_number": 3927,
+        "status": "completed",
+        "updated_at": "2026-10-27T23:29:41Z"
+      }
+    }
+  },
+  "parser_limit_sha256": "0538d6688425a86d0f3d1e66740efc3294eb8bffab01f56ae9f75a2ed49d4a8a",
+  "pr": 3646,
+  "required_cases": {
+    "Linux9_once_PASS": 9,
+    "current_raw_rows_packet_sha256": "018d150872a5cab4a0c0767faf99a831cfce37bcde8ca84e49cf4442e132b55a",
+    "debug_only_excluded_without_PASS_SKIP_unrun_credit": {
+      "PASS_SKIP_unrun_credit": false,
+      "actual_command_release": true,
+      "case": {
+        "binary": "lamp-body",
+        "name": "lease::tests::a_seventh_why_is_refused_where_it_is_said"
+      },
+      "count": 1,
+      "source_file_cfg_equal": true
+    },
+    "missing_or_nonPASS": 0,
+    "once_PASS": 337,
+    "own71_once_PASS": 71,
+    "release_applicable": 337,
+    "source_candidates": 338,
+    "source_file_bindings_equal_to_prior_green_source": 69
+  },
+  "schema": "third-ownkeys-3646-47a-original-native-v1",
+  "source_proofs_sha256": "f4a1200290859f9a41635240afffccf0b76bb1a28fb3874e1e2194562058296e",
+  "utc": "2026-10-27T23:44:38.534824+00:00"
+}
