@@ -346,7 +346,8 @@ export class Lamp {
     return this.request('unsubscribe', { events });
   }
 
-  get(...states) { return this.request('get', { state: states }); }
+  // The states asked for (presence, light, mood, lamp), by name: the reply's `state`.
+  async get(...states) { return (await this.request('get', { state: states })).state ?? {}; }
 
   // `const lease = await lamp.lease('body').take()` ... `await lease.release()`,
   // or `await lamp.withLease(['body'], async (lease) => ...)`.

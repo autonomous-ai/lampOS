@@ -789,7 +789,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries the states asked for; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills.",
           "type": "object",
           "properties": {
             "re": {
@@ -844,17 +844,30 @@
             "until": {
               "$ref": "#/$defs/time"
             },
-            "presence": {
-              "$ref": "#/$defs/presence"
-            },
-            "light": {
-              "type": "object"
-            },
-            "mood": {
-              "type": "object"
-            },
-            "lamp_state": {
-              "$ref": "#/$defs/lamp_state"
+            "state": {
+              "type": "object",
+              "description": "get's answer: each state asked for, by its name. lamp-control's own: light and mood are null until known.",
+              "properties": {
+                "presence": {
+                  "$ref": "#/$defs/presence"
+                },
+                "light": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "mood": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "lamp": {
+                  "$ref": "#/$defs/lamp_state"
+                }
+              },
+              "additionalProperties": false
             },
             "got": {
               "type": "integer",

@@ -226,8 +226,8 @@ test('get answers the states asked', async () => {
   await withLamp({ grants: ['look'] }, async (lamp, fake) => {
     fake.state.presence = { count: 2, near: 0.4, facing: true };
     const state = await lamp.get('presence', 'lamp');
-    assert.equal(state.presence.count, 2);
-    assert.equal(state.lamp_state.private, false);
+    // As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
+    assert.deepEqual(state, { presence: { count: 2, near: 0.4, facing: true }, lamp: { talking: false, paused: false, private: false, asleep: false } });
   });
 });
 
