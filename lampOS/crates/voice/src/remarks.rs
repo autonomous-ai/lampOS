@@ -71,12 +71,12 @@ const QUESTION_WORDS: [&str; 34] = [
 
 /// Words that tell someone to do something, said first: "Remember that my
 /// favourite colour is green." asks the lamp to keep it.
-const DOING_WORDS: [&str; 48] = [
+const DOING_WORDS: [&str; 49] = [
     "remember", "note", "forget", "keep", "let", "tell", "make", "set", "play", "turn", "remind",
     "check", "show", "start", "stop", "give", "read", "say", "find", "write", "ask", "put", "help",
     "sing", "dim", "brighten", "open", "close", "call", "send", "add", "change", "go", "come",
     "look", "listen", "wait", "hold", "repeat", "explain", "count", "spell", "switch", "cancel",
-    "let's", "lets", "don't", "dont",
+    "shut", "let's", "lets", "don't", "dont",
 ];
 
 /// Words that come before the first that counts: "And what about…",

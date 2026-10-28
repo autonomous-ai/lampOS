@@ -22,6 +22,20 @@ pub enum Trigger {
     /// Only the startle skill's own clip ([`crate::startle`], #2822): a
     /// catalogue file's is dropped, and without the skill's none reacts.
     Sudden,
+    /// Someone in a busy room said something about the lamp and the voice
+    /// chose to say nothing (`voice/remarked`, #4175). Only the glance
+    /// Expression derives from the startle skill's move, with
+    /// `LAMP_REMARK_GLANCE=on` ([`crate::startle::remark`]): a catalogue
+    /// file's is dropped, as a sudden clip is.
+    Remarked,
+}
+
+impl Trigger {
+    /// The room's, not the voice's: a glance at a sudden sound or a remark
+    /// outlives a turn and finishes once begun (#2822, #4175).
+    pub fn is_rooms(self) -> bool {
+        matches!(self, Self::Sudden | Self::Remarked)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -175,7 +189,19 @@ impl Behaviour {
                 "rest needs one slow quiet-only head clip, zero endpoints, 20 s delay and 60 s cooldown or longer".into(),
             ));
         }
-        if clip.trigger == Trigger::Sudden
+        if clip.trigger == Trigger::Remarked
+            && (clip
+                .states
+                .iter()
+                .any(|state| !matches!(state, Voice::Resting | Voice::Listening))
+                || clip.cooldown_us < 60_000_000
+                || clip.stroke_us > 1_500_000)
+        {
+            return Err(Error(
+                "a glance at a remark is never while thinking or speaking, at most once a minute and within 1.5 s of the remark".into(),
+            ));
+        }
+        if matches!(clip.trigger, Trigger::Sudden | Trigger::Remarked)
             && (clip.repeat
                 || clip.hold
                 || clip.states.iter().any(|state| {
@@ -194,7 +220,7 @@ impl Behaviour {
                 }))
         {
             return Err(Error(
-                "a glance at a sudden sound is one head clip of at most 2 s from and back to rest, never while speaking, with a 5 s cooldown or longer".into(),
+                "a glance at a sudden sound or a remark is one head clip of at most 2 s from and back to rest, never while speaking, with a 5 s cooldown or longer".into(),
             ));
         }
         if clip.repeat && clip.trigger != Trigger::Playout {
@@ -399,14 +425,21 @@ impl Catalogue {
         unread_paths(&written, &read, "", &mut unread);
         // The startle is its skill's file's alone (#2822): a sudden clip a
         // catalogue from before it still carries is named and never played.
+        // So is the glance at a remark, the startle's move (#4175).
         for (index, clip) in catalogue.behaviours.iter().enumerate() {
-            if clip.trigger == Trigger::Sudden {
-                unread.push(format!("behaviours[{index}] (the startle is its skill's)"));
+            match clip.trigger {
+                Trigger::Sudden => {
+                    unread.push(format!("behaviours[{index}] (the startle is its skill's)"))
+                }
+                Trigger::Remarked => unread.push(format!(
+                    "behaviours[{index}] (the glance at a remark is the startle skill's)"
+                )),
+                _ => {}
             }
         }
         catalogue
             .behaviours
-            .retain(|clip| clip.trigger != Trigger::Sudden);
+            .retain(|clip| !matches!(clip.trigger, Trigger::Sudden | Trigger::Remarked));
         catalogue.check()?;
         Ok((catalogue, unread))
     }

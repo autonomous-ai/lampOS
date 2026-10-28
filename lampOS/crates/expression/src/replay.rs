@@ -436,6 +436,12 @@ fn topic(topic: &str) -> Option<(&'static str, &'static str, Kind, bool)> {
         "voice/said" => ("said", Speech::TYPE, Kind::Event, false),
         NameHeard::TOPIC => ("name", NameHeard::TYPE, Kind::Event, false),
         SuddenSound::TOPIC => ("sudden", SuddenSound::TYPE, Kind::Event, false),
+        lamp_msgs::VoiceRemarked::TOPIC => (
+            "remarked",
+            lamp_msgs::VoiceRemarked::TYPE,
+            Kind::Event,
+            false,
+        ),
         ControlGesture::TOPIC => ("touch", ControlGesture::TYPE, Kind::Event, false),
         ScheduleDue::TOPIC => ("due", ScheduleDue::TYPE, Kind::Latest, false),
         lamp_msgs::TouchEvent::TOPIC => (

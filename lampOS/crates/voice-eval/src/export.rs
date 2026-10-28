@@ -742,6 +742,7 @@ const BUS_TOPICS: &[&str] = &[
     "voice/playout",
     "voice/privacy",
     "voice/progress",
+    "voice/remarked",
     "voice/said",
     "voice/sound",
     "voice/state",

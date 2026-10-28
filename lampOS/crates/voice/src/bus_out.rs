@@ -29,7 +29,8 @@
 use crate::ring_wire::RingPhase;
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
-    LinkFault, Room, RoomState, Speech, TurnVerdict, Voice, VoiceLink, VoiceState, VoiceTurn,
+    LinkFault, Room, RoomState, Speech, TurnVerdict, Voice, VoiceLink, VoiceRemarked, VoiceState,
+    VoiceTurn,
 };
 use std::{
     io,
@@ -141,6 +142,33 @@ impl TurnOut {
         let _ = self
             .turn
             .publish_json(now_us, &VoiceTurn { request, verdict });
+    }
+}
+
+/// A line held as a remark about the lamp (`voice/remarked`, #4175), for
+/// Expression's small glance: its request's number alone.
+pub struct RemarkOut {
+    remarked: Publisher,
+}
+
+impl RemarkOut {
+    pub fn on(root: &Path) -> io::Result<Self> {
+        let bus = Bus::new(root)?;
+        Ok(Self {
+            remarked: bus.publisher_declared(
+                VoiceRemarked::TOPIC,
+                &VoiceRemarked::declaration(),
+                SOURCE,
+            )?,
+        })
+    }
+
+    /// Says that `request` was held as a remark. A send that fails changes
+    /// nothing for the voice.
+    pub fn tell(&mut self, request: u64, now_us: u64) {
+        let _ = self
+            .remarked
+            .publish_json(now_us, &VoiceRemarked { request });
     }
 }
 
