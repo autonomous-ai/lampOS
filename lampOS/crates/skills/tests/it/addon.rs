@@ -511,7 +511,7 @@ fn a_say_decided_told(
     by: &str,
     outcome: &'static str,
 ) -> (Option<serde_json::Value>, String) {
-    use std::io::{BufRead, BufReader, Write};
+    use std::io::{Read, Write};
     let dir = tempfile::Builder::new()
         .prefix("ad")
         .tempdir_in("/tmp")
@@ -519,16 +519,7 @@ fn a_say_decided_told(
     let root = dir.path();
     addon_with(&root.join("skills"), "music-says", SAYS);
     let say = std::os::unix::net::UnixListener::bind(root.join("say.sock")).unwrap();
-    let (asked, heard) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        if let Ok((stream, _)) = say.accept() {
-            let mut line = String::new();
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            reader.read_line(&mut line).unwrap();
-            let _ = asked.send(serde_json::from_str::<serde_json::Value>(&line).unwrap());
-            let _ = (&stream).write_all(format!("{outcome}\n").as_bytes());
-        }
-    });
+    say.set_nonblocking(true).unwrap();
     let bus = Bus::new(root.join("bus")).unwrap();
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
@@ -546,7 +537,7 @@ fn a_say_decided_told(
         .env_remove("LAMP_SKILLS_ASK")
         .env(lamp_skills::ADDONS_ENVIRONMENT, "on")
         .stderr(std::fs::File::create(root.join("stderr")).unwrap());
-    let _running = Running(command.spawn().unwrap());
+    let mut running = Running(command.spawn().unwrap());
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline && bus.subscribers(VoiceState::TOPIC).unwrap().is_empty() {
         std::thread::sleep(Duration::from_millis(50));
@@ -581,9 +572,122 @@ fn a_say_decided_told(
         },
     )
     .unwrap();
-    let asked = heard.recv_timeout(Duration::from_secs(2)).ok();
-    // The outcome's journal line comes just after.
-    std::thread::sleep(Duration::from_millis(200));
+    let request_deadline = Instant::now() + Duration::from_secs(2);
+    let completion_deadline = request_deadline + Duration::from_millis(200);
+    let pause = |deadline: Instant| {
+        std::thread::sleep(
+            deadline
+                .saturating_duration_since(Instant::now())
+                .min(Duration::from_millis(5)),
+        );
+    };
+    // Own the listener here, including when no request should arrive. A
+    // detached accept thread would keep it alive after either negative case.
+    let asked = loop {
+        let absence_observed = Instant::now() >= completion_deadline;
+        match say.accept() {
+            Ok((mut stream, _)) => {
+                assert!(Instant::now() < request_deadline, "late say request");
+                stream.set_nonblocking(true).unwrap();
+                let mut line = Vec::new();
+                let mut buffer = [0; 1_024];
+                let asked = loop {
+                    running.waiting(request_deadline, root, "a complete say request");
+                    match stream.read(&mut buffer) {
+                        Ok(0) => panic!("say request ended before its newline"),
+                        Ok(count) => {
+                            line.extend_from_slice(&buffer[..count]);
+                            assert!(line.len() <= 65_536, "say request exceeded 64 KiB");
+                            if let Some(end) = line.iter().position(|byte| *byte == b'\n') {
+                                let asked =
+                                    serde_json::from_slice::<serde_json::Value>(&line[..end])
+                                        .unwrap();
+                                assert!(
+                                    Instant::now() < request_deadline,
+                                    "late complete say request"
+                                );
+                                break asked;
+                            }
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            pause(request_deadline);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                        Err(error) => panic!("read say request: {error}"),
+                    }
+                };
+                let reply = format!("{outcome}\n");
+                let mut sent = 0;
+                while sent < reply.len() {
+                    running.waiting(completion_deadline, root, "writing the say outcome");
+                    match stream.write(&reply.as_bytes()[sent..]) {
+                        Ok(0) => panic!("say outcome stopped being writable"),
+                        Ok(count) => sent += count,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            pause(completion_deadline);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                        Err(error) => panic!("write say outcome: {error}"),
+                    }
+                }
+                break Some(asked);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                let status = running.0.try_wait().unwrap();
+                assert!(status.is_none(), "lamp-skills exited {status:?}");
+                // Keep the full former 2 s plus 200 ms observation envelope
+                // for silence. Any request after 2 s fails above, not as None.
+                if absence_observed {
+                    break None;
+                }
+                pause(completion_deadline);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
+                assert!(
+                    !absence_observed,
+                    "say listener was interrupted after its observation deadline"
+                );
+            }
+            Err(error) => panic!("accept say request: {error}"),
+        }
+    };
+    if asked.is_some() {
+        let prefix = format!(
+            "lamp-skills: {} say #{}, quoted: ",
+            proposal.addon, proposal.proposal
+        );
+        // The say worker can finish before Main drains its queued Done.
+        // Observe both writers before closing the child for the privacy check.
+        let main_done = format!(
+            "lamp-skills: {} Done: proposed say as {} on {}\n",
+            proposal.addon,
+            proposal.proposal,
+            AddonProposal::TOPIC
+        );
+        loop {
+            let journal = fs::read_to_string(root.join("stderr")).unwrap();
+            if journal
+                .split_inclusive('\n')
+                .any(|line| line.ends_with('\n') && line.starts_with(&prefix))
+                && journal.split_inclusive('\n').any(|line| line == main_done)
+            {
+                assert!(
+                    Instant::now() < completion_deadline,
+                    "late complete say outcome: {journal}"
+                );
+                break;
+            }
+            running.waiting(
+                completion_deadline,
+                root,
+                "the quoted say's complete outcome",
+            );
+            pause(completion_deadline);
+        }
+    }
+    // Include all output through child closure in the privacy assertion.
+    // The listener is local too; neither success nor panic leaves a worker.
+    drop(running);
     let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
     assert!(
         !journal.contains("Music is playing."),
