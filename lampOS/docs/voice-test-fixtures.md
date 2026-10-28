@@ -695,3 +695,23 @@ test with two folders never waits behind itself. The light-call test holds
 pass and the calls are unchanged. Under `cargo nextest` each test is its own
 process, and the lock orders nothing. A flush from outside the binary, such
 as another build on the same Mac, can still slow the timed calls.
+
+## Closed reference peers beside started workers
+
+`reference_link::terminal_notice_survives_capture_closing_first_without_relaxing_live_sends`
+drops the capture side, then requires the speaker's next live control and
+data sends to fail. Beside `process`, which starts real `lamp-voice` workers,
+the first send was accepted in 16 of 20 runs. Alone it was refused in 20 of
+20, and beside `fixture_provider` and `ring_worker` in 20 of 20 each (#3315).
+On macOS a socket is made close-on-exec in a second step. A worker started in
+between keeps a copy of the capture's socket, so the peer is not closed. The
+worker fixture's own Stop waits this out (`send_stop_until_peer_gone`, #1569).
+
+So `tests/it/spawns.rs` gives turns. Each test in the binary that starts a
+child holds `spawns::spawning()` alone: `process`'s five,
+`fixture_provider`'s real fixture worker and `ring_worker`'s late-startup
+child. `privacy_worker` also starts workers, but it is built only on Linux. Each `reference_link` test holds
+`spawns::closing_sockets()`, shared, from its first socket to its last check,
+so those still run beside each other and every other test. The assertions and
+the sends are unchanged. Linux makes a socket close-on-exec as it creates it,
+and under `cargo nextest` each test is its own process.

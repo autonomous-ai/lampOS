@@ -759,6 +759,8 @@ fn cue_endpoint_must_be_private_same_user_socket_not_symlink_or_file() {
 
 #[test]
 fn real_fixture_worker_exchanges_exact_pcm_and_stops_without_devices_or_cloud() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
     let private = Private::new();
     let (wav, hash, expected) = private.wave(24_000, 1, 2500);
     let dir = SessionDirectory::create().unwrap();
