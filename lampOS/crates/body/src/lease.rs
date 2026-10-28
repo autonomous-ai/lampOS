@@ -21,6 +21,19 @@
 //!
 //! A hold asked while a hand, privacy, a pause or a sleep is in force is
 //! answered `lost` with why, and nothing is held.
+//!
+//! While held, the holder may also say where the head looks ([`Looking`],
+//! the protocol's `look`): `{"look":{"yaw":Y,"pitch":P}}` in degrees, yaw
+//! right and pitch up positive, or `{"look":"ahead"}`. It is answered once,
+//! when the head is there or when it can't be:
+//! - `{"look":"there","yaw":Y,"pitch":P,"clamped":false}`, the angles kept
+//!   inside this body's reach (`clamped` when they were cut to it);
+//! - `{"look":"cut_short","why":...}`: the lease suspended or ended, another
+//!   look asked, or the head not there within [`LONGEST_LOOK`];
+//! - `{"look":"refused","why":...}`: not held, or not a look.
+//!
+//! The head keeps looking there while the lease is held, and comes back to
+//! the pose's own direction when it ends.
 
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
@@ -213,6 +226,187 @@ impl Lease {
     }
 }
 
+/// The encoder's counts in one degree of a joint's turn.
+pub const COUNTS_PER_DEGREE: f32 = 4_096.0 / 360.0;
+/// How near its goal the head and base must be, in counts, and for how many
+/// steps in a row with the goal still, for a look to be there.
+pub const THERE_WITHIN: f32 = 6.0;
+pub const THERE_STEPS: u32 = 10;
+/// A look not there by then is cut short: something holds the head.
+pub const LONGEST_LOOK: Duration = Duration::from_secs(5);
+
+/// How far a look may take the head from the pose's own direction, in
+/// counts: the base either way, and the head up and down. The body's own
+/// bounds for every pose still hold beyond these.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Reach {
+    pub yaw: f32,
+    pub up: f32,
+    pub down: f32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LookLine {
+    look: LookValue,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LookValue {
+    Word(String),
+    Angles(Angles),
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Angles {
+    yaw: f32,
+    pitch: f32,
+}
+
+/// A look asked and not yet answered.
+#[derive(Clone, Copy, Debug)]
+struct Owed {
+    since: Instant,
+    degrees: [f32; 2],
+    clamped: bool,
+    settled: u32,
+    goals: Option<[u16; 3]>,
+}
+
+/// The holder's look: where the head is asked to look, and the answer
+/// still owed for it.
+#[derive(Debug, Default)]
+pub struct Looking {
+    aim: Option<[f32; 2]>,
+    asked: Option<Owed>,
+}
+
+impl Looking {
+    /// Whether a holder's line is a look, for [`Looking::ask`], or else the
+    /// lease's.
+    pub fn is_look(line: &[u8]) -> bool {
+        serde_json::from_slice::<serde_json::Value>(line)
+            .is_ok_and(|value| value.get("look").is_some())
+    }
+
+    /// A look from the holder ([`Looking::is_look`]): its answer now, if one
+    /// is due now (a refusal, or the look it replaces cut short).
+    pub fn ask(&mut self, line: &[u8], held: bool, reach: Reach, now: Instant) -> Option<String> {
+        let at = match serde_json::from_slice::<LookLine>(line) {
+            Ok(LookLine {
+                look: LookValue::Angles(Angles { yaw, pitch }),
+            }) if yaw.is_finite() && pitch.is_finite() => [yaw, pitch],
+            Ok(LookLine {
+                look: LookValue::Word(word),
+            }) if word == "ahead" => [0.0, 0.0],
+            _ => {
+                return Some(refused(
+                    "a look is {\"yaw\":Y,\"pitch\":P} in degrees, or \"ahead\"",
+                ));
+            }
+        };
+        if !held {
+            return Some(refused("the body is not held"));
+        }
+        let before = self.asked.take().map(|_| cut_short("another look"));
+        // Degrees to counts: the base turns right with more counts (every
+        // measured `--gaze` yaw is positive: more counts bring a face from the
+        // picture's right edge to its middle; on lamp-75c9 on 28 Oct fewer
+        // turned it away from a hand on the right), and the head looks up
+        // with fewer (a lift is negative, as every clip's).
+        let yaw = (at[0] * COUNTS_PER_DEGREE).clamp(-reach.yaw, reach.yaw);
+        let pitch = (-at[1] * COUNTS_PER_DEGREE).clamp(-reach.up, reach.down);
+        let degrees = [yaw / COUNTS_PER_DEGREE, -pitch / COUNTS_PER_DEGREE];
+        let clamped = (degrees[0] - at[0]).abs() > 0.05 || (degrees[1] - at[1]).abs() > 0.05;
+        self.aim = Some([yaw, pitch]);
+        self.asked = Some(Owed {
+            since: now,
+            degrees,
+            clamped,
+            settled: 0,
+            goals: None,
+        });
+        before
+    }
+
+    /// Where the head is asked to look, as the body's `Asked::aim` takes it.
+    pub fn aim(&self) -> Option<[f32; 2]> {
+        self.aim
+    }
+
+    /// The body's last step (its goals and positions for pitch, roll and
+    /// yaw), and whether the body is held now, or why not: the answer owed,
+    /// once it is due.
+    pub fn step(
+        &mut self,
+        held: Result<(), &'static str>,
+        seen: Option<([u16; 3], [u16; 3])>,
+        now: Instant,
+    ) -> Option<String> {
+        if let Err(why) = held {
+            if why != "conversation" {
+                self.aim = None;
+            }
+            return self.asked.take().map(|_| cut_short(why));
+        }
+        let asked = self.asked.as_mut()?;
+        if let Some((goals, positions)) = seen {
+            let near = [0, 2].into_iter().all(|joint| {
+                (f32::from(goals[joint]) - f32::from(positions[joint])).abs() <= THERE_WITHIN
+            });
+            let still = asked.goals.is_some_and(|before| {
+                [0, 2]
+                    .into_iter()
+                    .all(|joint| before[joint].abs_diff(goals[joint]) <= 1)
+            });
+            asked.goals = Some(goals);
+            asked.settled = if near && still { asked.settled + 1 } else { 0 };
+            if asked.settled >= THERE_STEPS {
+                let asked = self.asked.take()?;
+                return Some(there(asked.degrees, asked.clamped));
+            }
+        }
+        if now.duration_since(asked.since) >= LONGEST_LOOK {
+            self.asked = None;
+            return Some(cut_short("not there in time: something holds the head"));
+        }
+        None
+    }
+
+    /// The lease ended (let go, lapsed, its holder gone): the head comes
+    /// back to the pose's own direction, and a look owed is cut short.
+    pub fn end(&mut self, why: &'static str) -> Option<String> {
+        self.aim = None;
+        self.asked.take().map(|_| cut_short(why))
+    }
+}
+
+fn line(value: serde_json::Value) -> String {
+    let mut line = value.to_string();
+    line.push('\n');
+    line
+}
+
+fn there(degrees: [f32; 2], clamped: bool) -> String {
+    let round = |degrees: f32| (f64::from(degrees) * 10.0).round() / 10.0;
+    line(serde_json::json!({
+        "look": "there",
+        "yaw": round(degrees[0]),
+        "pitch": round(degrees[1]),
+        "clamped": clamped,
+    }))
+}
+
+fn cut_short(why: &str) -> String {
+    line(serde_json::json!({"look": "cut_short", "why": why}))
+}
+
+fn refused(why: &str) -> String {
+    line(serde_json::json!({"look": "refused", "why": why}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,6 +422,125 @@ mod tests {
 
     fn said(text: &str) -> String {
         text.to_owned() + "\n"
+    }
+
+    const REACH: Reach = Reach {
+        yaw: 480.0,
+        up: 150.0,
+        down: 15.0,
+    };
+
+    fn value(line: &str) -> serde_json::Value {
+        serde_json::from_str(line).unwrap()
+    }
+
+    #[test]
+    fn a_look_is_aimed_in_counts_inside_the_reach_and_said_once_there() {
+        let mut looking = Looking::default();
+        let now = Instant::now();
+        assert!(
+            !Looking::is_look(br#"{"hold":{"for_ms":5000}}"#),
+            "the lease's"
+        );
+        assert!(Looking::is_look(br#"{"look":"ahead"}"#));
+        assert_eq!(
+            looking.ask(br#"{"look":{"yaw":10,"pitch":5}}"#, true, REACH, now),
+            None
+        );
+        let aim = looking.aim().unwrap();
+        assert!(
+            (aim[0] - 113.8).abs() < 0.1 && (aim[1] + 56.9).abs() < 0.1,
+            "{aim:?}"
+        );
+        // Moving: not there yet.
+        assert_eq!(
+            looking.step(Ok(()), Some(([1900, 2060, 1900], [1950, 2060, 1960])), now),
+            None
+        );
+        let mut said = None;
+        for step in 0..=THERE_STEPS {
+            said = looking.step(Ok(()), Some(([1734, 2060, 1898], [1736, 2060, 1895])), now);
+            if step < THERE_STEPS - 1 {
+                assert_eq!(said, None, "step {step}");
+            }
+            if said.is_some() {
+                break;
+            }
+        }
+        assert_eq!(
+            value(&said.unwrap()),
+            serde_json::json!({"look": "there", "yaw": 10.0, "pitch": 5.0, "clamped": false})
+        );
+        assert_eq!(looking.step(Ok(()), None, now), None, "said once");
+        assert!(looking.aim().is_some(), "it keeps looking there");
+        // Past the reach: cut to it, and said so. Down is 15 counts here.
+        looking.ask(br#"{"look":{"yaw":-90,"pitch":-20}}"#, true, REACH, now);
+        assert_eq!(looking.aim(), Some([-480.0, 15.0]));
+        let mut said = None;
+        for _ in 0..=THERE_STEPS {
+            said =
+                said.or(looking.step(Ok(()), Some(([1806, 2060, 2492], [1806, 2060, 2492])), now));
+        }
+        let said = value(&said.unwrap());
+        assert_eq!(said["clamped"], true);
+        assert_eq!(said["yaw"], -42.2);
+        assert_eq!(said["pitch"], -1.3);
+        // Ahead: back to the pose's own direction.
+        looking.ask(br#"{"look":"ahead"}"#, true, REACH, now);
+        assert_eq!(looking.aim(), Some([0.0, 0.0]));
+        // The lease ends: the aim goes, the head comes back.
+        assert_eq!(value(&looking.end("let go").unwrap())["look"], "cut_short");
+        assert_eq!(looking.aim(), None);
+    }
+
+    #[test]
+    fn a_look_is_cut_short_by_the_lease_another_look_or_a_hold_on_the_head() {
+        let now = Instant::now();
+        let mut looking = Looking::default();
+        looking.ask(br#"{"look":{"yaw":0,"pitch":10}}"#, true, REACH, now);
+        let replaced = looking
+            .ask(br#"{"look":"ahead"}"#, true, REACH, now)
+            .unwrap();
+        assert_eq!(
+            value(&replaced),
+            serde_json::json!({"look": "cut_short", "why": "another look"})
+        );
+        // A conversation: cut short, and the aim kept for when it ends.
+        assert_eq!(
+            value(&looking.step(Err("conversation"), None, now).unwrap())["why"],
+            "conversation"
+        );
+        assert_eq!(looking.aim(), Some([0.0, 0.0]));
+        // Lost: the aim goes too.
+        looking.ask(br#"{"look":"ahead"}"#, true, REACH, now);
+        assert_eq!(
+            value(&looking.step(Err("hand"), None, now).unwrap())["why"],
+            "hand"
+        );
+        assert_eq!(looking.aim(), None);
+        // A head that never gets there: cut short at the longest.
+        looking.ask(br#"{"look":{"yaw":0,"pitch":30}}"#, true, REACH, now);
+        let stuck = ([1641, 2060, 2012], [1790, 2060, 2012]);
+        assert_eq!(
+            looking.step(Ok(()), Some(stuck), now + Duration::from_secs(1)),
+            None
+        );
+        let late = looking
+            .step(Ok(()), Some(stuck), now + LONGEST_LOOK)
+            .unwrap();
+        assert_eq!(value(&late)["look"], "cut_short");
+        // Not held, or not a look: refused, and nothing aimed.
+        let mut looking = Looking::default();
+        for (line, held) in [
+            (&br#"{"look":"ahead"}"#[..], false),
+            (br#"{"look":"face"}"#, true),
+            (br#"{"look":{"yaw":1}}"#, true),
+            (br#"{"look":{"yaw":1,"pitch":2,"speed":3}}"#, true),
+        ] {
+            let said = value(&looking.ask(line, held, REACH, now).unwrap());
+            assert_eq!(said["look"], "refused", "{}", String::from_utf8_lossy(line));
+            assert_eq!(looking.aim(), None);
+        }
     }
 
     #[test]

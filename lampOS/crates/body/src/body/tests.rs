@@ -1575,6 +1575,88 @@ fn a_lamp_held_by_its_lease_stays_up_and_a_hold_alone_never_stands_it() {
     assert!(never.iter().all(|(_, stand)| *stand == 0.0));
 }
 
+/// The lease holder's look (#3504's `look`): taken only while held, in
+/// place of the gaze's, and eased to; let go, the base comes back.
+#[test]
+fn a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go() {
+    let run = |held_until: Duration| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+        let time = clock.time.clone();
+        let seen = clock.time.clone();
+        let mut yaw = Vec::new();
+        run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits::FOLDED,
+            Some(HOME),
+            None,
+            None,
+            || Some((Mood::Resting, 0)),
+            move || {
+                let now = time.get();
+                Asked {
+                    held: now < held_until,
+                    aim: (now >= Duration::from_secs(1)).then_some([-30.0, 0.0]),
+                    ..Asked::default()
+                }
+            },
+            |glimpse| yaw.push((seen.get(), glimpse.goals[2])),
+        );
+        yaw
+    };
+    let at = |yaw: &[(Duration, u16)], seconds: u64| {
+        yaw.iter()
+            .find(|(at, _)| *at >= Duration::from_secs(seconds))
+            .map(|(_, yaw)| i32::from(*yaw))
+            .unwrap()
+    };
+    let home = i32::from(HOME[2]);
+    // Held from the start until 6 s: turned the 30 counts by 4 s, back by 11 s.
+    let held = run(Duration::from_secs(6));
+    assert!((at(&held, 0) - home).abs() <= 2);
+    assert!((at(&held, 4) - (home - 30)).abs() <= 3, "{}", at(&held, 4));
+    assert!((at(&held, 11) - home).abs() <= 3, "{}", at(&held, 11));
+    // Never held: an aim alone moves nothing.
+    let never = run(Duration::ZERO);
+    assert!(
+        never
+            .iter()
+            .all(|(_, yaw)| (i32::from(*yaw) - home).abs() <= 3)
+    );
+}
+
+/// The Reviewer-lead's P2 on #4023: held still on its look, the head
+/// arrives and its goals stop being written, as any pose's do; a longer
+/// hold writes no more than a shorter one.
+#[test]
+fn a_held_look_arrives_and_stops_being_written() {
+    let writes = |seconds: u64| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+        // A real base stops a few counts short of its goal, against its
+        // own friction: where the swing showed.
+        lamp.short = Some((YAW, 8.0));
+        let time = clock.time.clone();
+        run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits::FOLDED,
+            Some(HOME),
+            None,
+            None,
+            || Some((Mood::Resting, 0)),
+            move || Asked {
+                held: true,
+                aim: (time.get() >= Duration::from_secs(1)).then_some([-30.0, 0.0]),
+                ..Asked::default()
+            },
+            |_| {},
+        )
+        .goal_writes
+    };
+    let (short, long) = (writes(10), writes(30));
+    assert!(long <= short + 2, "{short} writes in 10 s, {long} in 30 s");
+}
+
 #[test]
 fn spoken_to_it_stands_up_and_left_alone_it_folds_down_again() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(22));
@@ -2507,6 +2589,7 @@ fn gesture_run(
                 unplug: false,
                 held_by_test: false,
                 held: false,
+                aim: None,
                 asleep: false,
                 woken: false,
             }
@@ -2580,6 +2663,7 @@ fn expression_run_with(
             unplug: false,
             held_by_test: false,
             held: false,
+            aim: None,
             asleep: false,
             woken: false,
         },
@@ -2743,6 +2827,7 @@ fn speaking_run_with(
             unplug: false,
             held_by_test: false,
             held: false,
+            aim: None,
             asleep: false,
             woken: false,
         },
@@ -3449,6 +3534,7 @@ fn rest_glances_watched(
             unplug: false,
             held_by_test: false,
             held: false,
+            aim: None,
             asleep: false,
             woken: false,
         },
@@ -3866,6 +3952,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             unplug: false,
             held_by_test: false,
             held: false,
+            aim: None,
             asleep: false,
             woken: false,
         },
@@ -3930,6 +4017,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             unplug: false,
             held_by_test: false,
             held: false,
+            aim: None,
             asleep: false,
             woken: false,
         },
@@ -4012,6 +4100,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 unplug: false,
                 held_by_test: false,
                 held: false,
+                aim: None,
                 asleep: false,
                 woken: false,
             }
@@ -4433,6 +4522,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     unplug: false,
                     held_by_test: false,
                     held: false,
+                    aim: None,
                     asleep: false,
                     woken: false,
                 }
@@ -4510,6 +4600,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 unplug: false,
                 held_by_test: false,
                 held: false,
+                aim: None,
                 asleep: false,
                 woken: false,
             }
@@ -4594,6 +4685,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 unplug: false,
                 held_by_test: false,
                 held: false,
+                aim: None,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -7404,6 +7496,7 @@ fn called_run(
                 unplug: false,
                 held_by_test: false,
                 held: false,
+                aim: None,
                 asleep: false,
                 woken: false,
             }
@@ -12060,6 +12153,7 @@ fn held_from_test_input_run(
                 gesture: due.then_some(&crate::clips::STRETCHING),
                 held_by_test: held,
                 held: false,
+                aim: None,
                 ..Asked::default()
             };
             (asked, Priority::Skill)
@@ -13003,6 +13097,7 @@ fn unplug_never_attests_an_arm_stuck_away_from_its_fold() {
             unplug: true,
             held_by_test: false,
             held: false,
+            aim: None,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -13033,6 +13128,7 @@ fn unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off() {
             unplug: true,
             held_by_test: false,
             held: false,
+            aim: None,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -13071,6 +13167,7 @@ fn unplug_brings_a_base_looking_aside_home_before_it_attests() {
                     unplug: true,
                     held_by_test: false,
                     held: false,
+                    aim: None,
                     ..Asked::default()
                 }
             }
@@ -13131,6 +13228,7 @@ fn unplug_ready_stays_ready_through_a_second_turn() {
                 unplug: true,
                 held_by_test: false,
                 held: false,
+                aim: None,
                 seen: late.then_some(Seen {
                     face: Some(crate::gaze::Sight {
                         x: 0.8,
@@ -13185,6 +13283,7 @@ fn unplug_ready_survives_a_bad_read() {
             unplug: true,
             held_by_test: false,
             held: false,
+            aim: None,
             ..Asked::default()
         },
         |glimpse| {
@@ -13323,6 +13422,7 @@ fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
             unplug: true,
             held_by_test: false,
             held: false,
+            aim: None,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -13379,6 +13479,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                     unplug: latched,
                     held_by_test: false,
                     held: false,
+                    aim: None,
                     paused: paused && at >= Duration::from_secs(16),
                     ..Asked::default()
                 }
