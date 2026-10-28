@@ -5783,6 +5783,12 @@ fn conversation_with_gate_inner(
     // Whether any of the bound invitation's audio played, kept past its
     // reply: a turn that ends unsettled with none is no ask (#3754).
     let mut onboarding_invitation_audio = false;
+    // A note the walk asked to say (`lamp_leads_setup`), its turn, and
+    // whether any of it played: one whose turn ends with none is told back
+    // to the walk ([`crate::onboarding::Onboarding::note_ended`]).
+    let mut onboarding_note: Option<String> = None;
+    let mut onboarding_note_turn: Option<(BootId, u64)> = None;
+    let mut onboarding_note_audio = false;
     // The near-call step's evidence (#1803): `name/heard`, `ears/level` and
     // `voice/state`, drained without waiting. Without the bus the step is
     // unavailable.
@@ -7278,6 +7284,7 @@ fn conversation_with_gate_inner(
             onboarding_invitation_turn,
             &mut onboarding_invitation_audio,
         );
+        latch_invitation_sounded(reply, onboarding_note_turn, &mut onboarding_note_audio);
         if let Some(lapsed) = speaker_lapsed.take()
             && cut_after_speaker_lapse(
                 lapsed,
@@ -8696,12 +8703,22 @@ fn conversation_with_gate_inner(
                             onboarding_invitation_turn,
                             &mut onboarding_invitation_audio,
                         );
+                        latch_invitation_sounded(
+                            reply,
+                            onboarding_note_turn,
+                            &mut onboarding_note_audio,
+                        );
                         continue;
                     }
                     latch_invitation_sounded(
                         reply,
                         onboarding_invitation_turn,
                         &mut onboarding_invitation_audio,
+                    );
+                    latch_invitation_sounded(
+                        reply,
+                        onboarding_note_turn,
+                        &mut onboarding_note_audio,
                     );
                     if let Some(lapsed) = speaker_lapsed.take()
                         && cut_after_speaker_lapse(
@@ -11375,6 +11392,18 @@ fn conversation_with_gate_inner(
                 walk.invitation_finished(boot, turn, delivery, monotonic_us());
                 onboarding_invitation_turn = None;
             }
+            latch_invitation_sounded(reply, onboarding_note_turn, &mut onboarding_note_audio);
+            if onboarding_note_turn.is_some()
+                && reply
+                    .as_ref()
+                    .map(|current| (current.owner.boot(), current.owner.turn()))
+                    != onboarding_note_turn
+            {
+                onboarding_note_turn = None;
+                if let Some(said) = onboarding_note.take() {
+                    walk.note_ended(said, onboarding_note_audio, monotonic_us());
+                }
+            }
             let can_speak = reply.is_none()
                 && speaker_pending.is_none()
                 && provider_queue.is_empty()
@@ -11479,6 +11508,11 @@ fn conversation_with_gate_inner(
                 )?;
                 last_publish = monotonic_us();
                 lamp_began = reply.as_ref().map(|current| current.owner.turn());
+                onboarding_note_turn = reply
+                    .as_ref()
+                    .map(|current| (current.owner.boot(), current.owner.turn()));
+                onboarding_note = onboarding_note_turn.map(|_| note);
+                onboarding_note_audio = false;
             }
         }
         // A tap on the head of a quiet lamp (#711): a soft "hm?" of its own,

@@ -603,6 +603,37 @@ impl Onboarding {
         }
     }
 
+    /// How a note [`Self::tick`] returned ended: `sounded` if any of it
+    /// reached the speaker. One that never did lost its turn to a sound heard
+    /// as it began (on lamp-52e6 a hand on the head, heard as lines of no
+    /// words, cut `give_felt` before a word of it, and the person held the
+    /// head with nothing said). Giving way's lines are owed again, unless a
+    /// newer note is owed: `give_felt` only while the hand is still on,
+    /// `give_done` and `give_failed` always, [`MOST_UNSAID`] times in a row
+    /// at most. The rule that a sound takes the turn is kept: the line is
+    /// said again only once the lamp may speak.
+    pub(crate) fn note_ended(&mut self, note: String, sounded: bool, now_us: u64) {
+        if sounded {
+            self.notes_unsaid = 0;
+            return;
+        }
+        let words = &self.definition.words;
+        let due = if words.give_felt.as_ref() == Some(&note) {
+            self.giving.pushed
+        } else {
+            note == words.give_done || note == words.give_failed
+        };
+        if !due || self.owed.is_some() || self.notes_unsaid >= MOST_UNSAID {
+            return;
+        }
+        self.notes_unsaid += 1;
+        eprintln!("lamp-voice: giving_way: a line was not said, its turn taken; owed again");
+        self.records.push(
+            json!({"kind":"onboarding_note_unsaid","step":Step::GivingWay.name(),"at_us":now_us}),
+        );
+        self.owed = Some(note);
+    }
+
     /// A try's minute ended without the evidence. Run every loop, whatever
     /// storage is doing, as the evidence is judged.
     pub(super) fn giving_judge(&mut self, now_us: u64) {

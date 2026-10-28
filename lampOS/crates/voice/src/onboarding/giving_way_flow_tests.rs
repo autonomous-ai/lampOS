@@ -953,3 +953,67 @@ fn a_push_across_the_minutes_end_is_waited_for() {
     assert_eq!(settle(&mut walk, played.at(61_100)), [GIVE_DONE]);
     assert_eq!(outcome(&walk), Some(Outcome::Done));
 }
+
+/// lamp-52e6, 28 Oct 14:22 and 14:23: the push was felt and `give_felt`
+/// asked at once, but a sound heard as its turn began (a line of no words)
+/// took the turn before a word of it played. It is owed again while the
+/// hand is still on, and said at the next moment the lamp may speak.
+#[test]
+fn a_felt_line_cut_before_it_sounded_is_said_again_while_the_hand_is_on() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    push(&mut walk, &played, 2_000, 30.0, 30.0, false);
+    // Said at once, with the lamp otherwise idle.
+    assert_eq!(settle(&mut walk, played.at(2_170)), [GIVE_FELT]);
+    // Not while a sound holds the turn: the person is never talked over.
+    walk.note_ended(GIVE_FELT.into(), false, played.at(2_800));
+    assert!(
+        walk.tick(played.at(2_900), 0, false, false, face(), false)
+            .is_none()
+    );
+    assert!(
+        walk.take_records()
+            .iter()
+            .any(|row| row["kind"] == "onboarding_note_unsaid")
+    );
+    // The hand still on and the lamp free to speak: said again.
+    assert_eq!(settle(&mut walk, played.at(3_000)), [GIVE_FELT]);
+    // Said this time: never a third.
+    walk.note_ended(GIVE_FELT.into(), true, played.at(4_500));
+    assert!(settle(&mut walk, played.at(5_000)).is_empty());
+    // Let go, given way: `give_done`, and cut, said again.
+    walk.giving_way_felt(hand(played.ended_ms + 6_000, false), played.at(6_000));
+    assert_eq!(settle(&mut walk, played.at(6_100)), [GIVE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+    walk.note_ended(GIVE_DONE.into(), false, played.at(7_000));
+    assert_eq!(settle(&mut walk, played.at(7_100)), [GIVE_DONE]);
+}
+
+/// A `give_felt` cut once the hand is gone fits no more, and a line cut
+/// time after time is let go after [`MOST_UNSAID`].
+#[test]
+fn a_cut_felt_line_after_the_hand_is_gone_and_a_line_cut_too_often_are_let_go() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    push(&mut walk, &played, 2_000, 0.0, 0.0, false);
+    assert_eq!(settle(&mut walk, played.at(2_170)), [GIVE_FELT]);
+    // Let go before the head moved: not given way, the hand is off.
+    walk.giving_way_felt(hand(played.ended_ms + 2_500, false), played.at(2_500));
+    assert_eq!(settle(&mut walk, played.at(2_600)), [GIVE_MORE]);
+    walk.note_ended(GIVE_FELT.into(), false, played.at(3_000));
+    assert!(settle(&mut walk, played.at(3_100)).is_empty());
+    // Moved and let go: done, its line cut each time it begins.
+    push(&mut walk, &played, 4_000, 30.0, 30.0, true);
+    let mut at = played.at(5_000);
+    assert_eq!(settle(&mut walk, at), [GIVE_DONE]);
+    for _ in 0..MOST_UNSAID {
+        at += S;
+        walk.note_ended(GIVE_DONE.into(), false, at);
+        assert_eq!(settle(&mut walk, at), [GIVE_DONE]);
+    }
+    walk.note_ended(GIVE_DONE.into(), false, at + S);
+    let notes = settle(&mut walk, at + S + 100_000);
+    assert!(!notes.iter().any(|note| note == GIVE_DONE), "{notes:?}");
+}

@@ -952,6 +952,21 @@ to the provider as a written turn on the next onboarding poll, once nothing
 else is being said, so at most about 100 ms plus the provider's first audio;
 a push during the invitation is answered as soon as it ends.
 
+**A line whose turn is taken before it sounds is said again.** On lamp-52e6
+(28 Oct, 14:22 and 14:23) `give_felt` was asked at once on the push, but a
+sound heard as its turn began (the hold, heard as lines of no words) took the
+turn before any of it played, as any sound may take a line the lamp starts on
+its own. The walk never knew, so the tester held the head 25 s with nothing
+said. Now the voice binds the walk's written turn (`lamp_leads_setup`) and,
+when that turn ends with none of it reaching the speaker, tells the walk
+(`Onboarding::note_ended`). Giving way's lines are owed again, unless a newer
+line is owed: `give_felt` only while the hand is still on, `give_done` and
+`give_failed` always, `MOST_UNSAID` (2) times in a row at most. They are said
+at the next moment the lamp may begin a turn, so a sound still takes the turn
+as before and the person is never talked over. The journal says
+`lamp-voice: giving_way: a line was not said, its turn taken; owed again`, and
+the record is `onboarding_note_unsaid`. Other steps' lines are not said again.
+
 The journal says what the step saw, as `lamp-voice: giving_way: ...`: the
 try opening, each push the body says, and on its release the decision with
 the head joint farthest from its goal before (one held where the hand has it

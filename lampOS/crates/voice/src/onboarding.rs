@@ -551,6 +551,8 @@ pub struct Onboarding {
     led: Option<Led>,
     /// A word owed before the next step: how "where you sit" ended.
     owed: Option<String>,
+    /// Owed notes told back unsaid in a row ([`Self::note_ended`]).
+    notes_unsaid: u8,
     seen_us: Option<u64>,
     read_us: Option<u64>,
     finished_recorded: bool,
@@ -716,6 +718,7 @@ impl Onboarding {
             fixture_storage: None,
             led: None,
             owed: None,
+            notes_unsaid: 0,
             seen_us: None,
             read_us: None,
             finished_recorded: false,
