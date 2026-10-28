@@ -121,6 +121,17 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             None
         }
     };
+    // This lamp's own window (`--quiet-hours`, else LAMP_CONTROL_QUIET),
+    // 22:00 to 07:00 unless set; `off` only when said. A bad value stops it
+    // here, before anything is served.
+    let window = session::quiet_window_of(
+        option(arguments, "--quiet-hours").as_deref(),
+        std::env::var("LAMP_CONTROL_QUIET").ok().as_deref(),
+    )?;
+    match window {
+        Some(window) => eprintln!("lamp-control: quiet hours {window} local"),
+        None => eprintln!("lamp-control: quiet hours off, this lamp's setting"),
+    }
     let mut door = session::Door::new(
         &host,
         &host,
@@ -128,7 +139,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         clients,
         Some(clients_path),
     )
-    .with_quiet_hours(session::Quiet::new(local_time));
+    .with_quiet_hours(session::Quiet::new(local_time).with_window(window));
     // Skill push: on with the manage helper's socket, the packages kept in
     // the state folder for it.
     let manage = option(arguments, "--manage-socket").map(PathBuf::from);

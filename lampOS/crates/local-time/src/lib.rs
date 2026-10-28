@@ -31,7 +31,72 @@ pub const QUIET_TO_MINUTE: u16 = 7 * 60;
 
 /// Whether the local `minute_of_day` (0 to 1439) is in the quiet hours.
 pub fn quiet_hours(minute_of_day: u16) -> bool {
-    !(QUIET_TO_MINUTE..QUIET_FROM_MINUTE).contains(&minute_of_day)
+    QuietWindow::DEFAULT.contains(minute_of_day)
+}
+
+/// A lamp's own quiet hours, local minutes from `from` up to `to`, across
+/// midnight when `to` comes first: lamp-control's `--quiet-hours`, read
+/// once at its start. [`QuietWindow::DEFAULT`] is the one above.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct QuietWindow {
+    pub from: u16,
+    pub to: u16,
+}
+
+impl QuietWindow {
+    pub const DEFAULT: Self = Self {
+        from: QUIET_FROM_MINUTE,
+        to: QUIET_TO_MINUTE,
+    };
+
+    /// Whether the local `minute_of_day` is inside the window.
+    pub fn contains(&self, minute_of_day: u16) -> bool {
+        if self.from < self.to {
+            (self.from..self.to).contains(&minute_of_day)
+        } else {
+            !(self.to..self.from).contains(&minute_of_day)
+        }
+    }
+
+    /// `HH:MM-HH:MM` as a window, or `off` as none; anything else, or a
+    /// window whose ends are the same minute, is refused with why.
+    pub fn parse(text: &str) -> Result<Option<Self>, String> {
+        let text = text.trim();
+        if text == "off" {
+            return Ok(None);
+        }
+        let minute = |end: &str| -> Option<u16> {
+            let (hour, minute) = end.split_once(':')?;
+            let all_digits =
+                |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+            if !all_digits(hour) || hour.len() > 2 || !all_digits(minute) || minute.len() != 2 {
+                return None;
+            }
+            let (hour, minute): (u16, u16) = (hour.parse().ok()?, minute.parse().ok()?);
+            (hour < 24 && minute < 60).then_some(hour * 60 + minute)
+        };
+        let window = text
+            .split_once('-')
+            .and_then(|(from, to)| {
+                Some(Self {
+                    from: minute(from)?,
+                    to: minute(to)?,
+                })
+            })
+            .ok_or_else(|| format!("{text:?}: HH:MM-HH:MM, such as 22:00-07:00, or off"))?;
+        if window.from == window.to {
+            return Err(format!("{text:?}: its two ends are the same minute"));
+        }
+        Ok(Some(window))
+    }
+}
+
+impl std::fmt::Display for QuietWindow {
+    /// "22:00 to 07:00".
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let hhmm = |minute: u16| format!("{:02}:{:02}", minute / 60, minute % 60);
+        write!(f, "{} to {}", hhmm(self.from), hhmm(self.to))
+    }
 }
 
 /// The system's zone file, or a link to one.

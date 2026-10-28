@@ -115,8 +115,9 @@ then `heard: good night lamp` and `lease: held`.
   README.
 - **Actions** return once the lamp has taken them. A refusal is a typed
   error, such as `rate` (with `retry_ms`), `no_grant`, `private` or
-  `quiet_hours`. `say` and `sound` are refused from 22:00 to 07:00, the
-  lamp's local time.
+  `quiet_hours`. `say` and `sound` are refused in the lamp's quiet hours,
+  22:00 to 07:00 its local time unless the lamp sets its own; hello's
+  `limits.quiet_hours` says this lamp's window, or `"off"`.
 - **A body lease** (`lamp.lease("body")`) is needed for `look`, `move`,
   `play` and `joints`. For a gesture it keeps the lamp's own idle life
   back. It is renewed for you every 15 s, lasts at most 10 minutes a take,
