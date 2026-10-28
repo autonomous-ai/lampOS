@@ -49,6 +49,8 @@ mod asleep_quiet;
 
 #[path = "round/product_carrier.rs"]
 mod product_carrier;
+#[path = "round/product_companions.rs"]
+mod product_companions;
 #[path = "round/restart_order.rs"]
 mod restart_order;
 #[path = "round/restart_quiet.rs"]
@@ -235,6 +237,23 @@ struct FakeSystemd {
 impl FakeSystemd {
     fn start(&mut self, unit: &str) {
         let text = fs::read_to_string(self.root.join("etc/systemd/system").join(unit)).unwrap();
+        if unit.ends_with(".socket") || unit.ends_with(".timer") {
+            // Listening, or waiting: no process of its own.
+            let sub = if unit.ends_with(".socket") {
+                "listening"
+            } else {
+                "waiting"
+            };
+            self.units.insert(
+                unit.to_owned(),
+                Running {
+                    active: "active".into(),
+                    sub: sub.into(),
+                    ..Running::default()
+                },
+            );
+            return;
+        }
         let program = unit::program(&text)
             .or_else(|| unit::linked_program(&text, &self.root))
             .unwrap();

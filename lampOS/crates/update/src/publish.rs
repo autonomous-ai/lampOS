@@ -8,11 +8,11 @@
 //! `<lamp>.<unit>`, and the skills written there, so that the folder is
 //! what is published.
 use crate::{
-    install,
+    companion, install,
     manifest::{self, File, ImageFile, Manifest, Model, SCHEMA, Setting, Unit},
     product_skills, unit,
 };
-use std::{fs, io, path::Path};
+use std::{collections::BTreeMap, fs, io, path::Path};
 
 fn invalid(why: String) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, why)
@@ -144,10 +144,14 @@ pub fn make_with(
         if !manifest::is_token(&name) || (!product && !lamp.path().join("LAMP.md").is_file()) {
             continue;
         }
+        // A part's templates, sockets and timers, the product's only, are
+        // read with the units they start (crate::companion).
+        let mut texts = BTreeMap::new();
         for entry in fs::read_dir(lamp.path())? {
             let entry = entry?;
             let unit_name = entry.file_name().to_string_lossy().into_owned();
-            if !manifest::is_unit_name(&unit_name) || !entry.file_type()?.is_file() {
+            let companion = product && companion::kind(&unit_name).is_some();
+            if !(manifest::is_unit_name(&unit_name) || companion) || !entry.file_type()?.is_file() {
                 continue;
             }
             // The updater's own service and fixed recovery helpers keep their
@@ -157,19 +161,29 @@ pub fn make_with(
             }
             let bytes = fs::read(entry.path())?;
             // Only a part installed by build: the others are not updated.
-            let Some(text) = std::str::from_utf8(&bytes).ok() else {
-                continue;
+            if let Ok(text) = String::from_utf8(bytes) {
+                texts.insert(unit_name, text);
+            }
+        }
+        for (unit_name, text) in &texts {
+            let carried = match companion::kind(unit_name) {
+                Some(_) => {
+                    companion::part(unit_name, text, |name| texts.get(name).map(String::as_str))
+                        .is_some()
+                }
+                None => unit::program(text).is_some() || unit::linked(text).is_some(),
             };
-            if unit::program(text).is_none() && unit::linked(text).is_none() {
+            if !carried {
                 continue;
             }
+            let (unit_name, bytes) = (unit_name.clone(), text.as_bytes());
             let unit = Unit {
                 lamp: name.clone(),
                 unit: unit_name,
-                sha256: manifest::sha256_hex(&bytes),
+                sha256: manifest::sha256_hex(bytes),
                 size: bytes.len() as u64,
             };
-            fs::write(binaries.join(unit.file_name()), &bytes)?;
+            fs::write(binaries.join(unit.file_name()), bytes)?;
             units.push(unit);
         }
     }
@@ -180,6 +194,12 @@ pub fn make_with(
                 .unwrap_or(1)
                 .max(manifest::PRODUCT_UNITS_UPDATER),
         );
+    }
+    if units
+        .iter()
+        .any(|unit| companion::kind(&unit.unit).is_some())
+    {
+        min_updater = Some(min_updater.unwrap_or(1).max(manifest::COMPANIONS_UPDATER));
     }
     if let Some(needed) = min_updater {
         if !files.iter().any(|file| file.name == "lamp-update") {
@@ -311,6 +331,78 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("carries no lamp-update"));
+    }
+
+    #[test]
+    fn a_parts_templates_sockets_and_timers_are_carried_with_level_seven() {
+        let folder = tempfile::tempdir().unwrap();
+        let out = folder.path().join("out");
+        let deploy = folder.path().join("deploy");
+        fs::create_dir_all(&out).unwrap();
+        fs::create_dir_all(deploy.join(manifest::PRODUCT_LAMP)).unwrap();
+        fs::create_dir_all(deploy.join("lamp-owned")).unwrap();
+        fs::write(deploy.join("lamp-owned/LAMP.md"), "owned\n").unwrap();
+        for binary in ["lamp-update", "lamp-setup", "lamp-records"] {
+            fs::write(out.join(binary), binary).unwrap();
+        }
+        let setup = "[Service]\nExecStart=/opt/lampOS/setup/current/lamp-setup serve\n";
+        let records = "[Service]\nExecStart=/opt/lampOS/records/current/lamp-records check\n";
+        for (name, text) in [
+            ("lamp-setup.service", setup),
+            (
+                "lamp-setup-wifi@.service",
+                "[Service]\nExecStart=/opt/lampOS/setup/current/lamp-setup wifi\n",
+            ),
+            ("lamp-setup-wifi.socket", "[Socket]\nAccept=yes\n"),
+            ("lamp-records.service", records),
+            ("lamp-records.timer", "[Timer]\nOnCalendar=hourly\n"),
+            // Fixed programs that no round switches.
+            (
+                "lamp-keeper-restart@.service",
+                "[Service]\nExecStart=/usr/local/bin/lamp-keeper restart-asked\n",
+            ),
+            ("lamp-keeper-restart.socket", "[Socket]\nAccept=yes\n"),
+            (
+                "lamp-update-back.service",
+                "[Service]\nExecStart=/usr/local/lib/lampos/lamp-update-back back\n",
+            ),
+            ("lamp-update-back.timer", "[Timer]\nOnBootSec=2min\n"),
+            ("lampos.target", "[Unit]\n"),
+        ] {
+            fs::write(deploy.join(manifest::PRODUCT_LAMP).join(name), text).unwrap();
+        }
+        // A lamp's own folder carries services only.
+        fs::write(deploy.join("lamp-owned/lamp-records.timer"), "[Timer]\n").unwrap();
+        fs::write(deploy.join("lamp-owned/lamp-records.service"), records).unwrap();
+        let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let made = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &"c".repeat(40),
+            "https://channel.test/build-7/",
+            None,
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(made.min_updater, Some(manifest::COMPANIONS_UPDATER));
+        let units: Vec<String> = made.units.iter().map(Unit::file_name).collect();
+        assert_eq!(
+            units,
+            [
+                "lamp-owned.lamp-records.service",
+                "product.lamp-records.service",
+                "product.lamp-records.timer",
+                "product.lamp-setup-wifi.socket",
+                "product.lamp-setup-wifi@.service",
+                "product.lamp-setup.service",
+            ]
+        );
+        for unit in &made.units {
+            assert!(out.join(unit.file_name()).is_file(), "{}", unit.file_name());
+        }
     }
 
     #[test]
