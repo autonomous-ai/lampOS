@@ -451,7 +451,10 @@ that build could never be promoted. Now:
   or the re-run is refused as before. One cut short inside `gh release
   create` (a 5xx between its uploads, in this run or an earlier one) gets
   only its missing assets, once the ones it has are checked, and then every
-  asset is checked again. A matching release is used as is, and its
+  asset is checked again. An upload GitHub left unfinished (an asset whose
+  state isn't `uploaded`) still holds its name: if the name is one of this
+  build's, it is deleted and uploaded with the rest. Anywhere else, an
+  unfinished asset still refuses the run. A matching release is used as is, and its
   notes are changed to name this attempt (`attempt N`), since the promote
   tool reads the run's success from that attempt. A stage left by a failed
   switch is used again only if it holds these bytes. If the channel's head
