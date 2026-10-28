@@ -11,9 +11,9 @@ feeling once, small, as a creature would, not as a performance:
 
 | Feeling | What makes it | Move | Light |
 |---|---|---|---|
-| Glad | A smile, a glad line or a kindly touch | `glad-lift`: the head lifts a little (about 4°) and comes back, 3.2 s | Warmer, at the person's level, a slow breath (6 s) down one level and back, for 12 s |
-| Lively | A surely lively voice, with no glad or down words | `perk`: the same lift, quicker, about 2 s | Warmer, at the person's level, a quicker breath (4 s), for 8 s |
-| Low | Someone seems low, with a face near | `low-droop`: the head lowers a little (40 counts, less than Stuffy air's sleepy droop) and comes back, 4.8 s | Warmer and one level dimmer, steady, for 20 s |
+| Glad | A smile, a glad line or a kindly touch | `glad-lift`: the head lifts (110 counts, about 10°, of which the head-pitch servo, lifting against the head's weight, shows about 5 to 7°), holds it a moment (0.4 s, short of the body's 1.5 s stall rule) and eases back, 3.4 s | Warmer, at the person's level, a slow breath (6 s) down one level and back, for 12 s |
+| Lively | A surely lively voice, with no glad or down words | `perk`: a smaller lift (90 counts), quicker, held a moment, about 2.5 s | Warmer, at the person's level, a quicker breath (4 s), for 8 s |
+| Low | Someone seems low, with a face near | `low-droop`: the head lowers a little (40 counts, less than Stuffy air's sleepy droop), then eases back slowly in two steps, to 25 counts above rest for a moment and then to rest, so it rises gently instead of stalling and snapping up, 7.2 s | Warmer and one level dimmer, steady, for 20 s |
 
 The light is never brighter than the person's own: it is a step from the
 light they chose, then given back. With the light off, or already at its
