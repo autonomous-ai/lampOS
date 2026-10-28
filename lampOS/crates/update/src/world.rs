@@ -356,13 +356,13 @@ pub fn clean_line(line: &str) -> String {
     cut
 }
 
-/// `systemctl` with these words, waiting at most `within` for it.
 /// Whether `run`'s error is systemctl's for a unit it has not loaded: its
 /// exit status 5, or its own words.
 fn not_loaded(why: &str) -> bool {
     why.contains(": exit status: 5:") || why.contains("not loaded")
 }
 
+/// `systemctl` with these words, waiting at most `within` for it.
 fn run(words: &[&str], within: Duration) -> Result<(), String> {
     let mut child = Command::new("systemctl")
         .args(words)
