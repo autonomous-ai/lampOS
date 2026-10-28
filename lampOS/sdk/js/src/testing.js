@@ -180,13 +180,14 @@ export class FakeLamp {
   // The grant each event and state needs, as lamp-control's own (#3736).
   static EVENT_GRANT = {
     'person.arrived': 'look', 'person.left': 'look', 'person.stood_up': 'look', 'person.facing': 'look',
+    hand: 'look',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
   };
 
   needs(op, request) {
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
     if (op === 'get') return (request.state ?? []).includes('presence') ? ['look'] : [];
-    if (op === 'look') return request.at === 'face' ? ['body', 'look'] : ['body'];
+    if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
     return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'] }[op] ?? [];

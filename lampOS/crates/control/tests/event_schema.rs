@@ -183,10 +183,26 @@ fn every_event_from_the_bus_validates_against_the_schema() {
             25 * S,
         ),
         ("voice/privacy", json!({"private": true}), 26 * S),
+        (
+            "humans/hands/tracked",
+            json!({"x": 0.42, "y": 0.61, "size": 0.18, "open": true, "confidence": 0.93, "t": 1}),
+            27 * S,
+        ),
     ];
     let mut kinds = std::collections::BTreeSet::new();
+    let mut outs: Vec<(String, Value, Out)> = Vec::new();
     for (topic, payload, at) in messages {
         for out in watch.take(topic, &payload, at) {
+            outs.push((topic.to_owned(), payload.clone(), out));
+        }
+    }
+    // The hand gone: by time passing, with no message.
+    for out in watch.lapse(29 * S) {
+        outs.push(("(lapse)".to_owned(), Value::Null, out));
+    }
+    let mut hands = 0;
+    for (topic, payload, out) in outs {
+        {
             if let Out::Event(kind, fields) = out {
                 let event = as_sent(kind, fields);
                 let checked = holds(&root, &root["$defs"]["event"], &event, "event");
@@ -195,10 +211,14 @@ fn every_event_from_the_bus_validates_against_the_schema() {
                     // Rounded to two places, never 0.39999999999999997.
                     assert_eq!(event["near"], json!(0.4), "{event}");
                 }
+                if event["ev"] == "hand" {
+                    hands += 1;
+                }
                 kinds.insert(event["ev"].as_str().unwrap().to_owned());
             }
         }
     }
+    assert_eq!(hands, 2, "seen and gone");
     // Every kind the bus gives was seen and checked.
     for kind in [
         "person.arrived",
@@ -210,6 +230,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         "touch",
         "button",
         "lamp.changed",
+        "hand",
     ] {
         assert!(kinds.contains(kind), "{kind} not seen: {kinds:?}");
     }
@@ -224,4 +245,8 @@ fn the_validator_catches_what_the_reviewer_lead_found() {
     assert!(check(json!({"ev": "touch", "kind": "double_tap"})).is_err());
     assert!(check(json!({"ev": "lamp.changed", "talking": true})).is_err());
     assert!(check(json!({"ev": "person.left", "count": 0})).is_ok());
+    // A hand seen says where; gone says only that.
+    assert!(check(json!({"ev": "hand", "seen": true, "open": true})).is_err());
+    assert!(check(json!({"ev": "hand"})).is_err());
+    assert!(check(json!({"ev": "hand", "seen": false})).is_ok());
 }

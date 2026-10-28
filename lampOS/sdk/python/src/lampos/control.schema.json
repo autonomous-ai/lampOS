@@ -52,6 +52,7 @@
         "person.left",
         "person.stood_up",
         "person.facing",
+        "hand",
         "phrase.heard",
         "name.heard",
         "sound.heard",
@@ -532,9 +533,10 @@
         "at": {
           "oneOf": [
             {
-              "description": "At the face it sees (needs look), the person who called its name, or straight ahead.",
+              "description": "At the face it sees (needs look); at the hand it sees, followed by the body until stop, another look or the lease ends (needs look); the person who called its name; or straight ahead.",
               "enum": [
                 "face",
+                "hand",
                 "name",
                 "ahead"
               ]
@@ -1433,6 +1435,74 @@
             },
             "required": [
               "press"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "hand"
+              }
+            }
+          },
+          "then": {
+            "description": "A hand in view (humans/hands/tracked, on the lamp): told when it is first seen, moves or grows by 0.05 of the picture, opens or closes, at most four times a second; and once when gone, after 1 s with no hand. Where it is in the picture, never the picture, its keypoints or whose hand.",
+            "anyOf": [
+              {
+                "properties": {
+                  "seen": {
+                    "const": false,
+                    "description": "The hand is gone."
+                  }
+                },
+                "required": [
+                  "seen"
+                ]
+              },
+              {
+                "properties": {
+                  "seen": {
+                    "const": true
+                  },
+                  "x": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "The palm's centre, as a share of the picture's width from its left edge."
+                  },
+                  "y": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "The palm's centre, as a share of the picture's height from its top edge."
+                  },
+                  "size": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "The palm's width as a share of the picture's width."
+                  },
+                  "open": {
+                    "type": "boolean",
+                    "description": "An open hand; false for a closed one."
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "How sure the tracker is that it is a hand, from 0.5: below that it isn't one."
+                  }
+                },
+                "required": [
+                  "seen",
+                  "x",
+                  "y",
+                  "size",
+                  "open",
+                  "confidence"
+                ]
+              }
             ]
           }
         },

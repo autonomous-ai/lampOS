@@ -170,8 +170,16 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         })
         .unwrap_or_default();
     let watching = watch.clone();
+    // Set by a `look` at `hand`, told to the body with each hold.
+    let lease_socket = option(arguments, "--lease-socket").map(PathBuf::from);
+    let follow = lamp_control::body_lease::Follower::default();
+    let following = lease_socket.is_some().then(|| follow.clone());
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
-        Box::new(parts::Lamp::new(body, light, say, clock_id, events).watching(watching))
+        let lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
+        Box::new(match following {
+            Some(follow) => lamp.following(follow),
+            None => lamp,
+        })
     });
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
@@ -212,11 +220,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         // The body's own lease, so the lamp's own life stands back while a
         // computer holds `body` (lamp-body --lease-socket).
-        if let Some(path) = option(arguments, "--lease-socket") {
-            tokio::spawn(lamp_control::body_lease::hold(
-                PathBuf::from(path),
-                shared.clone(),
-            ));
+        if let Some(path) = lease_socket {
+            tokio::spawn(lamp_control::body_lease::hold(path, shared.clone(), follow));
         }
         tokio::select! {
             () = server::serve(listener, tls, shared) => {}
