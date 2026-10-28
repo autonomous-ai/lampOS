@@ -23,7 +23,7 @@ from typing import Any, Callable
 from websockets.asyncio.client import ClientConnection, connect as ws_connect
 from websockets.exceptions import ConnectionClosed
 
-from . import debug, schema
+from . import debug, errors, schema
 from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
 from .keys import Keyring, Pairing, b64, is_pin, pin_of, proof, unb64
 
@@ -203,6 +203,80 @@ class Lease:
         await self.release()
 
 
+class Following:
+    """The head following a hand (`look` at `"hand"`), under a body lease of
+    its own. lamp-body follows on the lamp, waiting while the hand is gone,
+    until `stop()`, the client's `stop`, another look, or the lamp taking
+    the body back (a hand on the head, a conversation). lamp-control
+    answers `{"to": "body", "follow": "hand"}` and says no `done`, so
+    `ended` is told here: `{"how": "finished", "why": "stopped"}`, or
+    `{"how": "cut_short", "why": "stop" | "another look" | the lease's why}`.
+    Where the hand is comes as `hand` events (`lamp.on("hand", ...)`):
+    `seen` with `x`, `y`, `size`, `open`, `confidence`, and `seen: false`
+    once it's gone. Needs the `body` and `look` grants."""
+
+    def __init__(self, lamp: "Lamp", for_ms: int, why: str | None):
+        self.lamp = lamp
+        self.lease = Lease(lamp, ["body"], for_ms, why)
+        self.ended: asyncio.Future = asyncio.get_running_loop().create_future()
+
+    async def start(self) -> "Following":
+        await self.lease.take()
+        self.lamp.on("lease", self._lease_event)
+        try:
+            reply = await self.lamp.request("look", at="hand")
+        except BaseException:
+            await self._end()
+            raise
+        if reply.get("follow") != "hand":
+            # A lamp that took the look but doesn't say it follows (a
+            # lamp-control from before #4183): let go rather than claim it does.
+            await self._end()
+            raise errors.BY_CODE["refused"]("this lamp doesn't follow a hand yet")
+        # Another look or a stop from this client ends it (`Lamp.look`,
+        # `Lamp.stop`); one following a connection.
+        if self.lamp._following is not None:
+            self.lamp._following.end("cut_short", "another look")
+        self.lamp._following = self
+        return self
+
+    def end(self, how: str, why: str | None) -> None:
+        if not self.ended.done():
+            self.ended.set_result({"how": how, "why": why})
+        if self.lamp._following is self:
+            self.lamp._following = None
+
+    def _lease_event(self, event: dict) -> None:
+        if event.get("lease") == self.lease.id and event.get("state") == "lost":
+            self.end("cut_short", event.get("why"))
+
+    @property
+    def following(self) -> bool:
+        return not self.ended.done() and self.lease.held
+
+    async def wait(self) -> dict:
+        """Until it ends: how, and why."""
+        return await asyncio.shield(self.ended)
+
+    async def stop(self) -> dict:
+        """Stop following: the lease is let go, and the head goes back to the
+        lamp's own pose. Says how it ended (`finished`, "stopped", if it was
+        still following)."""
+        self.end("finished", "stopped")
+        await self._end()
+        return self.ended.result()
+
+    async def _end(self) -> None:
+        self.lamp.off("lease", self._lease_event)
+        await self.lease.release()
+
+    async def __aenter__(self) -> "Following":
+        return await self.start()
+
+    async def __aexit__(self, *_exc) -> None:
+        await self.stop()
+
+
 class Lamp:
     """A connection to one paired lamp."""
 
@@ -218,6 +292,8 @@ class Lamp:
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
         self._phrases: list[str] = []
         self._leases: dict[str, Lease] = {}
+        # The hand this connection's head follows, if any (`follow_hand`).
+        self._following: Following | None = None
         self._tasks: set[asyncio.Task] = set()
         # The first refusal of a subscription nobody awaited: `wait_closed`
         # raises it, so a listener the lamp refused never waits in silence
@@ -533,7 +609,20 @@ class Lamp:
 
     async def look(self, at: str | None = None, *, yaw: float | None = None, pitch: float | None = None) -> dict:
         target: Any = at if at is not None else {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
-        return await self._act("look", False, at=target)
+        reply = await self._act("look", False, at=target)
+        # Taken, another look ends a following (lamp-control's own rule).
+        if self._following is not None:
+            self._following.end("cut_short", "another look")
+        return reply
+
+    def follow_hand(self, *, for_ms: int = 10_000, why: str | None = None) -> Following:
+        """`async with lamp.follow_hand() as following:` turns the head after
+        the hand the lamp sees, under a body lease of its own, until the block
+        ends, another look, or the lamp takes the body back. Or
+        `following = await lamp.follow_hand().start()`, then
+        `await following.stop()`. Listen with `lamp.on("hand", ...)` for
+        where the hand is."""
+        return Following(self, for_ms, why)
 
     async def move(self, frames: list[list[int]], step_ms: int, *, wait: bool = False) -> dict:
         return await self._act("move", wait, step_ms=step_ms, frames=frames)
@@ -554,5 +643,8 @@ class Lamp:
         return await self._act("sound", False, name=name)
 
     async def stop(self) -> dict:
-        return await self._act("stop", False)
+        reply = await self._act("stop", False)
+        if self._following is not None:
+            self._following.end("cut_short", "stop")
+        return reply
 

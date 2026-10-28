@@ -3,7 +3,7 @@
 //   lamp find
 //   lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
 //   lamp hello [LAMP_ID]
-//   lamp fake [--every 10] [--cycles N]
+//   lamp fake [--every 10] [--cycles N] [--everything] [--hands]
 import { parseArgs } from 'node:util';
 import { Lamp } from './client.js';
 import { find } from './discovery.js';
@@ -12,7 +12,7 @@ import { fake } from './fake.js';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' } },
+  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, hands: { type: 'boolean' } },
 });
 const [command, arg] = positionals;
 
@@ -36,13 +36,13 @@ async function main() {
     const pairing = await Lamp.pair(arg, host, { pin, port, name: values.name });
     console.log(`paired with ${pairing.lamp} (${pairing.name}) as ${pairing.client}: ${pairing.grants.join(', ')}`);
   } else if (command === 'fake') {
-    return fake({ every: Number(values.every ?? 10), cycles: values.cycles === undefined ? undefined : Number(values.cycles), everything: Boolean(values.everything) });
+    return fake({ every: Number(values.every ?? 10), cycles: values.cycles === undefined ? undefined : Number(values.cycles), everything: Boolean(values.everything), hands: Boolean(values.hands) });
   } else if (command === 'hello') {
     const lamp = await Lamp.connect(arg);
     console.log(`${lamp.info.id}: grants ${lamp.grants.join(', ')}`);
     await lamp.close();
   } else {
-    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N]');
+    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] [--everything] [--hands]');
     return 2;
   }
   return 0;

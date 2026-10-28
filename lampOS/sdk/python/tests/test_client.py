@@ -1028,6 +1028,129 @@ def test_the_fakes_light_keeps_lamp_controls_pattern_levels_and_the_rings_pulse_
     run(go())
 
 
+def test_hand_events_need_the_look_grant_and_carry_only_where_the_hand_is(tmp_path):
+    from lampos.testing import hand_events, hand_track
+
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.on("hand", lambda event: None)
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path / "2")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                seen = []
+                await lamp.on("hand", seen.append)
+                track = hand_track("circle", seconds=2, hz=15)
+                said = [event for _, event in hand_events(track)]
+                await fake.emit_hand_track(track)
+                while len(seen) < len(said):
+                    await asyncio.sleep(0.01)
+        assert [{k: v for k, v in e.items() if k not in ("ev", "at")} for e in seen] == said
+        assert set(said[0]) == {"seen", "x", "y", "size", "open", "confidence"} and said[-1] == {"seen": False}
+
+    run(go())
+
+
+def test_hand_events_are_told_by_change_four_a_second_at_most_and_gone_after_a_second():
+    from lampos.testing import hand_events, hand_track
+
+    # A hand held still is told once, then gone 1 to 1.25 s after its last
+    # message (the check runs every 250 ms), rounded to 2 places.
+    track = hand_track("still", seconds=2, hz=15)
+    still = hand_events(track)
+    assert [event["seen"] for _, event in still] == [True, False]
+    assert 1_000_000 <= still[1][0] - track[-1]["t"] < 1_250_000
+    assert still[0][1]["x"] == round(track[0]["x"], 2) and still[0][1]["confidence"] == round(track[0]["confidence"], 2)
+    # A waving hand moves more than 0.05 between frames: told every 250 ms, the newest.
+    wave = hand_track("wave", seconds=2, hz=15)
+    told = [(at, event) for at, event in hand_events(wave) if event["seen"]]
+    assert len(told) >= 6 and all(b[0] - a[0] >= 250_000 for a, b in zip(told, told[1:]))
+    assert all(set(event) == {"seen", "x", "y", "size", "open", "confidence"} for _, event in told)
+    # Closing the hand is told (250 ms after the last told at most), and a
+    # gap over 1 s is a gone and a new hand.
+    closing = hand_track("still", seconds=1, hz=10) + hand_track("still", seconds=1, hz=10, open=False, t0=1_000_000)
+    assert [e["open"] for _, e in hand_events(closing) if e["seen"]] == [True, False]
+    gap = hand_track("still", seconds=0.5, hz=10) + hand_track("still", seconds=0.5, hz=10, t0=3_000_000)
+    assert [e["seen"] for _, e in hand_events(gap)] == [True, False, True, False]
+    # Under 0.5 confidence is no hand.
+    unsure = [{**hand, "confidence": 0.3} for hand in hand_track("still", seconds=1)]
+    assert hand_events(unsure) == []
+
+
+def test_synthetic_hand_tracks_are_in_the_topics_shape_and_repeat_by_seed():
+    from lampos.testing import HAND_PATHS, hand_track
+
+    for path in HAND_PATHS:
+        track = hand_track(path, seconds=2, hz=15, seed=3)
+        assert len(track) == 30 and track == hand_track(path, seconds=2, hz=15, seed=3)
+        assert set(track[0]) == {"x", "y", "size", "open", "confidence", "t"}
+        assert track[1]["t"] - track[0]["t"] == round(1_000_000 / 15)
+        for hand in track:
+            assert 0 <= hand["x"] <= 1 and 0 <= hand["y"] <= 1 and 0 < hand["size"] < 1
+            assert 0.5 <= hand["confidence"] <= 1
+    wave = hand_track("wave", seconds=2, hz=15)
+    assert max(h["x"] for h in wave) - min(h["x"] for h in wave) > 0.5
+    with pytest.raises(ValueError):
+        hand_track("scan")
+
+
+def test_the_fakes_hand_events_are_the_schemas():
+    from lampos.testing import hand_events, hand_track
+
+    jsonschema = pytest.importorskip("jsonschema")
+    validator = jsonschema.Draft202012Validator({**schema.schema(), "$ref": "#/$defs/event"})
+    for _, event in hand_events(hand_track("circle", seconds=2)):
+        assert not list(validator.iter_errors({"ev": "hand", **event}))
+    assert list(validator.iter_errors({"ev": "hand", "seen": True, "x": 0.5}))
+
+
+def test_follow_hand_follows_under_its_own_lease_and_waits_while_the_hand_is_gone(tmp_path):
+    from lampos.testing import hand_track
+
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.follow_hand(for_ms=1000, why="test") as following:
+                    assert following.following and fake.following
+                    await fake.emit_hand_track(hand_track("wave", seconds=0.5))
+                    await asyncio.sleep(0.05)
+                    assert following.following and fake.following
+                    await lamp.look("ahead")
+                    ended = await following.wait()
+                    assert not following.following
+                assert (ended["how"], ended["why"]) == ("cut_short", "another look")
+                assert fake.leases == {} and fake.following == {}
+            assert fake.asked("look") == [{"at": "hand"}, {"at": "ahead"}]
+            assert fake.asked("lease.take") == [{"parts": ["body"], "for_ms": 1000, "why": "test"}]
+
+    run(go())
+
+
+def test_follow_hand_stops_when_asked_at_a_stop_or_when_the_lamp_takes_the_body_back(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                following = await lamp.follow_hand().start()
+                assert (await following.stop())["how"] == "finished"
+                assert fake.leases == {} and fake.following == {}
+                following = await lamp.follow_hand().start()
+                await lamp.stop()
+                assert (await following.wait())["why"] == "stop"
+                await following.stop()
+                following = await lamp.follow_hand().start()
+                await fake.lose_lease(following.lease.id, "hand")
+                ended = await following.wait()
+                assert (ended["how"], ended["why"]) == ("cut_short", "hand")
+                await following.stop()
+                assert fake.asked("lease.release") == [{"lease": "l_1"}, {"lease": "l_2"}]
+
+    run(go())
+
+
 def test_a_second_pulse_within_a_minute_shows_without_its_pulse_and_a_refused_light_never(tmp_path):
     async def go():
         async with FakeLamp(grants=("light",)) as fake:
@@ -1043,6 +1166,18 @@ def test_a_second_pulse_within_a_minute_shows_without_its_pulse_and_a_refused_li
                 with pytest.raises(errors.BY_CODE["refused"]):
                     await lamp.light("green", 1, 30_000, pattern="breathe")  # refused: never shown
                 assert (await lamp.get("light"))["light"]["shows"]["colour"] == "blue"
+
+    run(go())
+
+
+def test_follow_hand_needs_the_look_grant_and_lets_go_of_its_lease_when_refused(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.follow_hand().start()
+                assert fake.leases == {}
 
     run(go())
 
@@ -1072,3 +1207,68 @@ def test_every_sdk_part_says_the_same_version():
     assert set(versions.values()) == {lampos.__version__}, versions
     major_minor = ".".join(lampos.__version__.split(".")[:2])
     assert f'"lampos>={major_minor}"' in (sdk / "mcp/pyproject.toml").read_text()
+
+
+def test_a_look_at_the_hand_is_answered_as_lamp_control_does_with_no_done(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body"):
+                    reply = await lamp.request("look", at="hand")
+                    assert (reply["to"], reply["follow"]) == ("body", "hand")
+                    assert fake.following
+                    await lamp.request("look", at="ahead")
+                    assert not fake.following
+                    await lamp.request("look", at="hand")
+                    await lamp.stop()
+                    assert not fake.following
+
+    run(go())
+
+
+# The same track and the same events in both SDKs' tests (and lamp-control's
+# watch.rs): across, closed, then gone.
+FIXED_TRACK = [
+    {"x": 0.1 + n * 0.02, "y": 0.5, "size": 0.125, "open": n < 30, "confidence": 0.875, "t": n * 66_667} for n in range(40)
+]
+FIXED_EVENTS = [[0, {"seen": True, "x": 0.1, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [250000, {"seen": True, "x": 0.16, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [500000, {"seen": True, "x": 0.24, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [750000, {"seen": True, "x": 0.32, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [1000000, {"seen": True, "x": 0.38, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [1250000, {"seen": True, "x": 0.46, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [1500000, {"seen": True, "x": 0.54, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [1750000, {"seen": True, "x": 0.62, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [2000000, {"seen": True, "x": 0.68, "y": 0.5, "size": 0.13, "open": True, "confidence": 0.88}], [2250000, {"seen": True, "x": 0.76, "y": 0.5, "size": 0.13, "open": False, "confidence": 0.88}], [2500000, {"seen": True, "x": 0.84, "y": 0.5, "size": 0.13, "open": False, "confidence": 0.88}], [3750000, {"seen": False}]]
+
+
+def test_a_fixed_track_tells_the_same_hand_events_in_both_sdks():
+    from lampos.testing import hand_events
+
+    assert [[at, event] for at, event in hand_events(FIXED_TRACK)] == FIXED_EVENTS
+
+
+def test_follow_hand_lets_go_on_a_lamp_that_takes_the_look_without_following(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body", "look"), follows_hand=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["refused"], match="doesn't follow a hand yet"):
+                    await lamp.follow_hand().start()
+                assert fake.leases == {} and fake.following == {}
+                assert fake.asked("lease.release") == [{"lease": "l_1"}]
+
+    run(go())
+
+
+def test_a_look_at_the_hand_needs_the_bodys_lease_socket_as_other_looks_do(tmp_path):
+    # lamp-control without --lease-socket refuses every look, `hand` too
+    # (parts.rs: "the body's lease socket"), and follow_hand lets go of its lease.
+    from lampos.testing import LAMP_CONTROL_REFUSES
+
+    async def go():
+        async with FakeLamp(grants=("body", "look"), refuses=LAMP_CONTROL_REFUSES) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body"):
+                    for at in ("ahead", "hand"):
+                        with pytest.raises(errors.BY_CODE["refused"], match="lease socket"):
+                            await lamp.look(at)
+                with pytest.raises(errors.BY_CODE["refused"]):
+                    await lamp.follow_hand().start()
+                assert not fake.leases
+
+    run(go())

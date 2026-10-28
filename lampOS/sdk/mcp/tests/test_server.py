@@ -18,6 +18,8 @@ from mcp.shared.memory import create_connected_server_and_client_session
 from lamp_mcp.server import Limits, build, gestures
 
 ALL = {"lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_light", "lamp_say", "lamp_stop"}
+# Offered only with both body and look.
+FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
 
 
 def run(coroutine):
@@ -25,10 +27,10 @@ def run(coroutine):
 
 
 @asynccontextmanager
-async def connected(folder: Path, grants=("body", "light", "speak"), auto_done=True, clock=None):
+async def connected(folder: Path, grants=("body", "light", "speak"), auto_done=True, clock=None, **fake_options):
     """A fake lamp, this computer paired with it, and an MCP session on the
     server built for it."""
-    async with FakeLamp(grants=tuple(grants), auto_done=auto_done) as fake:
+    async with FakeLamp(grants=tuple(grants), auto_done=auto_done, **fake_options) as fake:
         ring = Keyring(folder)
         await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
         async with await Lamp.connect(keyring=ring) as lamp:
@@ -456,6 +458,16 @@ def test_an_argument_a_tool_does_not_take_is_refused(tmp_path):
     run(go())
 
 
+def test_follow_hand_is_offered_only_with_body_and_look(tmp_path):
+    async def go():
+        async with connected(tmp_path) as (_, _, session):
+            assert "lamp_follow_hand" not in {tool.name for tool in (await session.list_tools()).tools}
+        async with connected(tmp_path / "look", grants=("body", "look")) as (_, _, session):
+            assert "lamp_follow_hand" in {tool.name for tool in (await session.list_tools()).tools}
+
+    run(go())
+
+
 def readme_rows() -> dict[str, list[list[str]]]:
     """The README's tools table: each tool's rows, cells stripped."""
     tools: dict[str, list[list[str]]] = {}
@@ -482,7 +494,7 @@ def test_the_readme_gives_every_tool_its_parameters_defaults_and_every_resource(
         readme = (Path(__file__).parents[1] / "README.md").read_text()
         async with connected(tmp_path, grants=EVERY_GRANT) as (_, _, session):
             listed = (await session.list_tools()).tools
-            assert {tool.name for tool in listed} == ALL == set(rows)
+            assert {tool.name for tool in listed} == ALL | FOLLOW == set(rows)
             for tool in listed:
                 by_parameter = {row[1].strip("`"): row for row in rows[tool.name]}
                 properties = tool.inputSchema.get("properties", {})
@@ -500,6 +512,29 @@ def test_the_readme_gives_every_tool_its_parameters_defaults_and_every_resource(
     run(go())
 
 
+def test_follow_hand_follows_until_the_hand_is_gone_and_says_only_where_it_was(tmp_path):
+    from lampos.testing import hand_events, hand_track
+
+    async def go():
+        async with connected(tmp_path, grants=("body", "look")) as (fake, _, session):
+            call = asyncio.create_task(session.call_tool("lamp_follow_hand", {"seconds": 10}))
+            await until(lambda: fake.following)
+            track = hand_track("across", seconds=0.5)
+            await fake.emit_hand_track(track)
+            result = await call
+            assert not result.isError
+            said = json.loads(text(result))
+            told = [event for _, event in hand_events(track) if event["seen"]]
+            assert (said["how"], said["why"]) == ("finished", "the hand is gone")
+            assert said["hands_seen"] == len(told)
+            assert said["last"] == {k: told[-1][k] for k in ("x", "y", "size", "open")}
+            assert fake.asked("look") == [{"at": "hand"}]
+            await until(lambda: not fake.leases)
+            assert fake.subscribed and all("hand" not in events for events in fake.subscribed.values())
+
+    run(go())
+
+
 def test_a_call_missing_what_a_tool_needs_is_said_in_the_lamps_form(tmp_path):
     """Not the validator's "1 validation error for lamp_lightArguments …":
     the tool's error names what it needs, and nothing reaches the lamp."""
@@ -512,6 +547,22 @@ def test_a_call_missing_what_a_tool_needs_is_said_in_the_lamps_form(tmp_path):
             moved = await session.call_tool("lamp_move", {})
             assert text(moved) == "bad_request: lamp_move needs step_ms, frames"
             assert fake.asked("light") == [] and fake.asked("move") == []
+
+    run(go())
+
+
+def test_follow_hand_ends_when_its_time_is_up_or_at_stop(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body", "look")) as (fake, _, session):
+            said = json.loads(text(await session.call_tool("lamp_follow_hand", {"seconds": 0.2})))
+            assert (said["how"], said["why"], said["hands_seen"], said["last"]) == ("finished", "time up", 0, None)
+            assert not fake.leases
+            call = asyncio.create_task(session.call_tool("lamp_follow_hand", {"seconds": 10}))
+            await until(lambda: fake.following)
+            assert not (await session.call_tool("lamp_stop", {})).isError
+            said = json.loads(text(await call))
+            assert (said["how"], said["why"]) == ("finished", "stopped")
+            assert not fake.leases and not fake.following
 
     run(go())
 
@@ -533,6 +584,22 @@ def test_server_info_says_lamp_mcps_own_version(tmp_path):
     run(go())
 
 
+def test_wait_for_hears_a_hand_with_look(tmp_path):
+    from lampos.testing import hand_track
+
+    async def go():
+        async with connected(tmp_path, grants=("body", "look")) as (fake, _, session):
+            call = asyncio.create_task(session.call_tool("lamp_wait_for", {"events": ["hand"], "timeout_s": 5}))
+            await until(lambda: any("hand" in events for events in fake.subscribed.values()))
+            await fake.emit_hand_track(hand_track("still", seconds=0.1))
+            event = json.loads(text(await call))
+            assert event["ev"] == "hand" and event["seen"] and set(event) >= {"x", "y", "size", "open", "confidence"}
+        async with connected(tmp_path / "nolook") as (_, _, session):
+            assert (await session.call_tool("lamp_wait_for", {"events": ["hand"]})).isError
+
+    run(go())
+
+
 def test_a_required_argument_given_as_null_is_missing(tmp_path):
     """harness-reviewer's P3 on #4215: `colour: null` is refused in the
     lamp's form too, never in the validator's words."""
@@ -543,6 +610,30 @@ def test_a_required_argument_given_as_null_is_missing(tmp_path):
             assert refused.isError
             assert text(refused) == "bad_request: lamp_light needs colour"
             assert fake.asked("light") == []
+
+    run(go())
+
+
+def test_a_second_follow_is_busy_and_follow_stop_ends_the_first(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body", "look")) as (fake, _, session):
+            assert text(await session.call_tool("lamp_follow_stop", {})) == "not following"
+            call = asyncio.create_task(session.call_tool("lamp_follow_hand", {"seconds": 30}))
+            await until(lambda: fake.following)
+            lease = next(iter(fake.leases))
+            listed = await session.read_resource("lamp://lease")
+            assert lease in listed.contents[0].text
+            second = await session.call_tool("lamp_follow_hand", {"seconds": 5})
+            assert second.isError and "busy: already following a hand" in text(second)
+            assert len(fake.asked("look")) == 1 and len(fake.asked("lease.take")) == 1
+            assert text(await session.call_tool("lamp_follow_stop", {})) == "stopped following"
+            said = json.loads(text(await call))
+            assert (said["how"], said["why"]) == ("finished", "stopped")
+            assert not fake.leases and not fake.following
+            assert lease not in (await session.read_resource("lamp://lease")).contents[0].text
+            # Free again once it ended.
+            again = asyncio.create_task(session.call_tool("lamp_follow_hand", {"seconds": 0.2}))
+            assert not (await again).isError
 
     run(go())
 
@@ -600,5 +691,22 @@ def test_the_readme_lease_column_is_the_servers_own(tmp_path):
             async with connected(tmp_path / str(n), grants=EVERY_GRANT) as (fake, _, session):
                 await session.call_tool(tool, arguments)
                 assert bool(fake.asked("lease.take")) == takes, (tool, takes)
+
+    run(go())
+
+
+def test_a_follow_refused_or_not_followed_lets_go_of_its_lease(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body", "look"), follows_hand=False) as (fake, _, session):
+            result = await session.call_tool("lamp_follow_hand", {"seconds": 5})
+            assert result.isError and "refused: this lamp doesn't follow a hand yet" in text(result)
+            assert not fake.leases and fake.asked("lease.release")
+        async with connected(tmp_path / "2", grants=("body", "look")) as (fake, _, session):
+            fake.refuse_next("look", "busy", "another client holds it")
+            result = await session.call_tool("lamp_follow_hand", {"seconds": 5})
+            assert result.isError and "busy: another client holds it" in text(result)
+            assert not fake.leases and fake.asked("lease.release")
+            # A refused follow leaves nothing running: the next one starts.
+            assert text(await session.call_tool("lamp_follow_stop", {})) == "not following"
 
     run(go())

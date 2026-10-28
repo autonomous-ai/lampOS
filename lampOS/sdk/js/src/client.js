@@ -144,6 +144,76 @@ export class Lease {
   }
 }
 
+// The head following a hand (`look` at `'hand'`), under a body lease of its
+// own. lamp-body follows on the lamp, waiting while the hand is gone, until
+// `stop()`, the client's `stop`, another look, or the lamp taking the body
+// back (a hand on the head, a conversation). lamp-control answers
+// `{"to":"body","follow":"hand"}` and says no `done`, so `ended` is told
+// here: `{ how: 'finished', why: 'stopped' }`, or `{ how: 'cut_short', why:
+// 'stop' | 'another look' | the lease's why }`. Where the hand is comes as
+// `hand` events: `seen` with `x`, `y`, `size`, `open`, `confidence`, and
+// `seen: false` once it's gone. Needs the `body` and `look` grants.
+export class Following {
+  constructor(lamp, forMs, why) {
+    this.lamp = lamp;
+    this.lease = new Lease(lamp, ['body'], forMs, why);
+    this.result = null;
+    this.ended = new Promise((resolve) => { this.resolveEnded = resolve; });
+    this.onLease = (event) => {
+      if (event.lease === this.lease.id && event.state === 'lost') this.end('cut_short', event.why ?? null);
+    };
+  }
+
+  end(how, why) {
+    if (!this.result) {
+      this.result = { how, why };
+      this.resolveEnded(this.result);
+    }
+    if (this.lamp.following === this) this.lamp.following = null;
+  }
+
+  async start() {
+    await this.lease.take();
+    this.lamp.on('lease', this.onLease);
+    let reply;
+    try {
+      reply = await this.lamp.request('look', { at: 'hand' });
+    } catch (error) {
+      await this.finish();
+      throw error;
+    }
+    if (reply.follow !== 'hand') {
+      // A lamp that took the look but doesn't say it follows (a lamp-control
+      // from before #4183): let go rather than claim it does.
+      await this.finish();
+      throw new byCode.refused("this lamp doesn't follow a hand yet");
+    }
+    // Another look or a stop from this client ends it (`look`, `stop`); one
+    // following a connection.
+    this.lamp.following?.end('cut_short', 'another look');
+    this.lamp.following = this;
+    return this;
+  }
+
+  get following() { return !this.result && this.lease.held; }
+
+  // Until it ends: how, and why.
+  wait() { return this.ended; }
+
+  // Stop following: the lease is let go, and the head goes back to the lamp's
+  // own pose. Says how it ended (`finished`, 'stopped', if still following).
+  async stop() {
+    this.end('finished', 'stopped');
+    await this.finish();
+    return this.result;
+  }
+
+  async finish() {
+    await this.lamp.off('lease', this.onLease);
+    await this.lease.release();
+  }
+}
+
 export class Lamp {
   // A ping this often keeps a connection that only listens open: the lamp
   // closes one quiet for 2 minutes (lamp-control's QUIET_MAX, #3778). A ping
@@ -158,6 +228,8 @@ export class Lamp {
     this.grants = hello.grants ?? [];
     this.limits = hello.limits ?? {};
     this.nextId = 1;
+    // The hand this connection's head follows, if any (`followHand`).
+    this.following = null;
     this.waiting = new Map();
     this.done = new Map();
     this.handlers = new Map();
@@ -376,12 +448,30 @@ export class Lamp {
 
   express(feeling, strength) { return this.act('express', { feeling, strength }); }
   gesture(name, { wait = false } = {}) { return this.act('gesture', { name }, wait); }
-  look(at) { return this.act('look', { at }); }
+  // Taken, another look ends a following (lamp-control's own rule).
+  async look(at) {
+    const reply = await this.act('look', { at });
+    this.following?.end('cut_short', 'another look');
+    return reply;
+  }
+  // `const following = await lamp.followHand().start()` ... `await
+  // following.stop()`, or `await lamp.withHand(async (following) => ...)`:
+  // the head turns after the hand the lamp sees. Listen with
+  // `lamp.on('hand', ...)` for where the hand is.
+  followHand({ forMs = 10_000, why } = {}) { return new Following(this, forMs, why); }
+  async withHand(body, options) {
+    const following = await this.followHand(options).start();
+    try { return await body(following); } finally { await following.stop(); }
+  }
   move(frames, stepMs, { wait = false } = {}) { return this.act('move', { step_ms: stepMs, frames }, wait); }
   play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
   joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
   say(text) { return this.act('say', { text }); }
   sound(name) { return this.act('sound', { name }); }
-  stop() { return this.act('stop', {}); }
+  async stop() {
+    const reply = await this.act('stop', {});
+    this.following?.end('cut_short', 'stop');
+    return reply;
+  }
 }

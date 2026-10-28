@@ -106,6 +106,106 @@ export function moveRefusal(stepMs, frames) {
   return why === null ? null : `frames: a move this body cannot play: ${why}`;
 }
 
+// How a synthetic hand moves (`handTrack`): across the picture and back
+// (`wave`), round in a circle, left to right once, or held still.
+export const HAND_PATHS = Object.freeze(['wave', 'circle', 'across', 'still']);
+// How lamp-control turns `humans/hands/tracked` into `hand` events (Nine's
+// watch.rs): told when first seen, moved or grown by `HAND_STEP`, or opened or
+// closed, at most every `HAND_EVERY_US` with the newest held back until then;
+// `seen: false` once, `HAND_GONE_US` after the last message. A message under
+// `HAND_SURE`, or a share outside 0 to 1, is no hand. Its check runs every
+// `HAND_CHECK_US`.
+export const HAND_STEP = 0.05;
+export const HAND_EVERY_US = 250_000;
+export const HAND_GONE_US = 1_000_000;
+export const HAND_SURE = 0.5;
+export const HAND_CHECK_US = 250_000;
+const HAND_FIELDS = ['x', 'y', 'size', 'open', 'confidence'];
+// Rust's `round` to 2 places: halves away from zero (shares are never negative).
+const two = (value) => Math.floor(value * 100 + 0.5) / 100;
+
+// The `hand` events lamp-control says for a `humans/hands/tracked` track, as
+// its watch.rs does, each `[at, event]` with the topic time (µs) it is said
+// at: `seen` with where the hand is, rounded to 2 places, never the tracker's
+// clock; `seen: false` once it's gone. Each message is taken at its `t`, and
+// the 250 ms check runs from the first.
+export function handEvents(track) {
+  const events = [];
+  let newest = null;
+  let told = null;
+  let toldUs = null;
+  const news = (now) => {
+    if (!newest) return;
+    const [hand, heard] = newest;
+    if (now - heard >= HAND_GONE_US) {
+      newest = null;
+      if (!told) return;
+      told = null;
+      toldUs = now;
+      events.push([now, { seen: false }]);
+      return;
+    }
+    const fresh = !told || hand.open !== told.open || ['x', 'y', 'size'].some((k) => Math.abs(hand[k] - told[k]) >= HAND_STEP);
+    if (!fresh || (toldUs !== null && now - toldUs < HAND_EVERY_US)) return;
+    told = hand;
+    toldUs = now;
+    events.push([now, { seen: true, ...Object.fromEntries(HAND_FIELDS.map((k) => [k, k === 'open' ? hand[k] : two(hand[k])])) }]);
+  };
+  let check = track.length ? track[0].t + HAND_CHECK_US : 0;
+  for (const hand of track) {
+    for (; check < hand.t; check += HAND_CHECK_US) news(check);
+    if (hand.confidence < HAND_SURE || !['x', 'y', 'size', 'confidence'].every((k) => hand[k] >= 0 && hand[k] <= 1)) continue;
+    newest = [hand, hand.t];
+    news(hand.t);
+  }
+  for (; newest; check += HAND_CHECK_US) news(check);
+  return events;
+}
+
+// A small seeded generator (mulberry32), so a seed gives the same track.
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A synthetic hand track in `humans/hands/tracked`'s shape (Ten's): `x` and
+// `y` the palm centre as shares of the picture from its left and top, `size`
+// the palm box's width over the picture's, `open`, `confidence`, and `t` the
+// lamp's monotonic clock in microseconds, from `t0`. A seeded jitter of a
+// hundredth keeps it from being a perfect line.
+export function handTrack(path = 'wave', { seconds = 3, hz = 15, open = true, seed = 0, t0 = 0 } = {}) {
+  if (!HAND_PATHS.includes(path)) throw new Error(`path: one of ${HAND_PATHS.join(', ')}`);
+  const random = seeded(seed);
+  const jitter = (by) => (random() * 2 - 1) * by;
+  const round = (v, places) => Number(v.toFixed(places));
+  const clamp = (v) => Math.min(Math.max(v, 0), 1);
+  const frames = Math.max(1, Math.round(seconds * hz));
+  return Array.from({ length: frames }, (_, n) => {
+    const share = n / Math.max(frames - 1, 1);
+    const angle = 2 * Math.PI * share;
+    const [x, y] = {
+      wave: [0.5 + 0.3 * Math.sin(angle), 0.45],
+      circle: [0.5 + 0.25 * Math.cos(angle), 0.5 + 0.25 * Math.sin(angle)],
+      across: [0.15 + 0.7 * share, 0.5],
+      still: [0.5, 0.5],
+    }[path];
+    return {
+      x: round(clamp(x + jitter(0.01)), 4),
+      y: round(clamp(y + jitter(0.01)), 4),
+      size: round(0.12 + jitter(0.01), 4),
+      open,
+      confidence: round(0.9 + jitter(0.05), 3),
+      t: t0 + Math.round((n * 1_000_000) / hz),
+    };
+  });
+}
+
+const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const LEASE_OPS = new Set(['look', 'move', 'play', 'joints']);
 
@@ -129,8 +229,10 @@ export class FakeLamp {
   // `autoDone: false` leaves a play's or say's `done` to the test.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {} } = {}) {
-    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses } });
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {}, followsHand = true } = {}) {
+    // `followsHand: false` answers a look at `hand` as a lamp-control from
+    // before #4183 does: taken, with no `follow`, and nothing follows it.
+    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses }, followsHand });
     this.asker = new Map();
     this.lamp = { id: lampId, name, v: schema.VERSION };
     this.clients = new Map();
@@ -152,6 +254,11 @@ export class FakeLamp {
     this.pulsesDropped = [];
     this.pulsed = new Map();
     this.clock = () => Date.now();
+    // Each connection whose head follows the hand (`look` at `hand`) and its
+    // lease, until its stop, another look, or the lease ends; and the last
+    // hand said.
+    this.following = new Map();
+    this.hand = null;
   }
 
   async listen() {
@@ -209,12 +316,38 @@ export class FakeLamp {
     return Object.keys(own).length ? own : null;
   }
 
+  // Say a `humans/hands/tracked` track (`handTrack`) as lamp-control would
+  // (`handEvents`): `hand` events by change, at most four a second, and
+  // `seen: false` once the hand is gone. `realtime` paces them by the track's
+  // clock; without it they go as fast as they can. A lost hand doesn't end a
+  // following: the head waits for it, as the lamp's does.
+  async emitHandTrack(track, { realtime = false } = {}) {
+    const started = Date.now();
+    const first = track.length ? track[0].t : 0;
+    for (const [at, event] of handEvents(track)) {
+      if (realtime) await sleepMs(Math.max(0, started + (at - first) / 1000 - Date.now()));
+      this.hand = event.seen ? event : null;
+      this.emit('hand', event);
+    }
+  }
+
+  // End the following of `ws` (or of every connection). lamp-control says
+  // nothing for it: the head just stops following.
+  stopFollowing(ws) {
+    for (const held of [...this.following.keys()]) if (ws === undefined || held === ws) this.following.delete(held);
+  }
+
+  unfollow(lease) {
+    for (const [held, following] of [...this.following]) if (following.lease === lease) this.following.delete(held);
+  }
+
   // Tell a lease's holder it is `held`, `suspended` or `lost` (and, lost, end it here).
   leaseEvent(lease, state, why) {
     const held = this.leases.get(lease);
     if (!held) return;
     if (state === 'lost') this.leases.delete(lease);
     held.ws.send(JSON.stringify({ ev: 'lease', lease, state, ...(why ? { why } : {}) }));
+    if (state === 'lost') this.unfollow(lease);
   }
 
   loseLease(lease, why = 'hand') { this.leaseEvent(lease, 'lost', why); }
@@ -232,6 +365,7 @@ export class FakeLamp {
     ws.send(JSON.stringify({ ev: 'welcome', at: now(), nonce: b64(nonce), lamp: this.lamp }));
     ws.on('close', () => {
       this.subscribed.delete(ws);
+      this.following.delete(ws);
       for (const [lease, held] of this.leases) if (held.ws === ws) this.leases.delete(lease);
     });
     ws.on('message', (data) => {
@@ -347,6 +481,7 @@ export class FakeLamp {
         return this.ok(ws, id, { lease: request.lease, until: now() });
       case 'lease.release':
         this.leases.delete(request.lease);
+        this.unfollow(request.lease);
         return this.ok(ws, id);
       case 'light': {
         // As lamp-control's parts.rs: the pattern checked first, then to the
@@ -371,6 +506,10 @@ export class FakeLamp {
         this.show(request);
         return this.ok(ws, id, { to: 'ring' });
       }
+      case 'stop':
+        // The holder's stop ends its following, as any of its actions.
+        this.stopFollowing(ws);
+        return this.ok(ws, id);
       case 'express': {
         // As lamp-control's feelings.rs: the feelings skill's three, its
         // move to the body (smaller below strength 0.5) and its light; no
@@ -389,7 +528,16 @@ export class FakeLamp {
         // or the lease ends, so no `done` follows it; the body takes the rest,
         // and its `done` says where the head got to.
         if (typeof request.at === 'string' && LOOK_WAITS[request.at]) return this.refuse(ws, id, 'refused', LOOK_WAITS[request.at]);
-        if (request.at === 'hand') return this.ok(ws, id, { to: 'body', follow: 'hand' });
+        // Another look ends a following.
+        this.stopFollowing(ws);
+        if (request.at === 'hand') {
+          // `followsHand: false` is a lamp-control from before #4183: it takes
+          // the look without saying it follows.
+          if (!this.followsHand) return this.ok(ws, id);
+          const [lease] = [...this.leases].find(([, h]) => h.ws === ws && h.parts.includes('body')) ?? [];
+          this.following.set(ws, { lease });
+          return this.ok(ws, id, { to: 'body', follow: 'hand' });
+        }
         this.ok(ws, id, { to: 'body' });
         if (this.autoDone) {
           const { yaw = 0, pitch = 0 } = typeof request.at === 'object' ? request.at : {};
