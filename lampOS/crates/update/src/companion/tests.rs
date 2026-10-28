@@ -96,6 +96,15 @@ fn what_a_socket_or_timer_starts_is_its_named_unit_else_its_own_name() {
         .as_deref(),
         Some("lamp-c.service")
     );
+    // As systemd reads it, with spaces around `=`.
+    assert_eq!(
+        starts("lamp-a.timer", "[Timer]\nUnit = lamp-b.service\n").as_deref(),
+        Some("lamp-b.service")
+    );
+    assert_eq!(
+        starts("lamp-a.socket", "[Socket]\nAccept = yes\n").as_deref(),
+        Some("lamp-a@.service")
+    );
     // Something that is not a part's unit is not followed.
     assert_eq!(
         starts("lamp-a.timer", "[Timer]\nUnit=lampos.target\n"),

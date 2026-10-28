@@ -144,6 +144,34 @@ impl Unit {
     pub fn file_name(&self) -> String {
         format!("{}.{}", self.lamp, self.unit)
     }
+
+    /// The unit as systemd names it on a lamp ([`lamp_name`]).
+    pub fn on_lamp(&self) -> String {
+        lamp_name(&self.unit)
+    }
+}
+
+/// How a manifest names a part's template: `lamp-setup-wifi.template.service`
+/// for `lamp-setup-wifi@.service`. Its file in the channel is `<lamp>.<unit>`,
+/// a release asset, whose name can't hold `@`. No part's service has a `.`
+/// in its name, so the two forms never meet.
+const TEMPLATE: &str = ".template.service";
+
+/// A unit's name on a lamp, from its name in a manifest: a template's `@`
+/// given back, any other name as it is.
+pub fn lamp_name(unit: &str) -> String {
+    match unit.strip_suffix(TEMPLATE) {
+        Some(stem) => format!("{stem}@.service"),
+        None => unit.to_owned(),
+    }
+}
+
+/// A unit's name in a manifest, from its name on a lamp ([`lamp_name`]).
+pub fn manifest_name(unit: &str) -> String {
+    match unit.strip_suffix("@.service") {
+        Some(stem) => format!("{stem}{TEMPLATE}"),
+        None => unit.to_owned(),
+    }
 }
 
 /// A build.
@@ -806,7 +834,10 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
                 "a build with product units needs min_updater {PRODUCT_UNITS_UPDATER} or more"
             )));
         }
-        let companion = unit.lamp == PRODUCT_LAMP && crate::companion::kind(&unit.unit).is_some();
+        // A template only in its manifest form: never with its `@`.
+        let companion = unit.lamp == PRODUCT_LAMP
+            && !unit.unit.contains('@')
+            && crate::companion::kind(&unit.on_lamp()).is_some();
         if !is_token(&unit.lamp) || !(is_unit_name(&unit.unit) || companion) {
             return Err(refused(format!(
                 "{:?} of {:?} is not a unit of a lamp",
@@ -1088,7 +1119,13 @@ mod tests {
         let key = throwaway();
         let mut product = manifest();
         product.units[0].lamp = PRODUCT_LAMP.into();
-        product.units[0].unit = "lamp-setup-wifi@.service".into();
+        product.units[0].unit = "lamp-setup-wifi.template.service".into();
+        assert_eq!(product.units[0].on_lamp(), "lamp-setup-wifi@.service");
+        assert_eq!(
+            manifest_name("lamp-setup-wifi@.service"),
+            "lamp-setup-wifi.template.service"
+        );
+        assert_eq!(lamp_name("lamp-voice.service"), "lamp-voice.service");
         for level in [Some(PRODUCT_UNITS_UPDATER), Some(COMPANIONS_UPDATER - 1)] {
             product.min_updater = level;
             let why = parse(&serde_json::to_vec(&product).unwrap()).unwrap_err().0;
@@ -1096,7 +1133,7 @@ mod tests {
         }
         product.min_updater = Some(COMPANIONS_UPDATER);
         for name in [
-            "lamp-setup-wifi@.service",
+            "lamp-setup-wifi.template.service",
             "lamp-setup-wifi.socket",
             "lamp-records.timer",
         ] {
@@ -1108,7 +1145,14 @@ mod tests {
             let why = parse(&serde_json::to_vec(&own).unwrap()).unwrap_err().0;
             assert!(why.contains("is not a unit of a lamp"), "{why}");
         }
-        for name in ["lampos.target", "lamp-x@1.service", "lampos-parts.slice"] {
+        // A release asset's name can't hold `@`: a template is only ever
+        // named in its manifest form.
+        for name in [
+            "lampos.target",
+            "lamp-x@1.service",
+            "lampos-parts.slice",
+            "lamp-setup-wifi@.service",
+        ] {
             product.units[0].unit = name.into();
             let why = parse(&serde_json::to_vec(&product).unwrap()).unwrap_err().0;
             assert!(why.contains("is not a unit of a lamp"), "{name}: {why}");

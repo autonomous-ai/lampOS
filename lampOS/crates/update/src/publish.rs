@@ -179,7 +179,7 @@ pub fn make_with(
             let (unit_name, bytes) = (unit_name.clone(), text.as_bytes());
             let unit = Unit {
                 lamp: name.clone(),
-                unit: unit_name,
+                unit: manifest::manifest_name(&unit_name),
                 sha256: manifest::sha256_hex(bytes),
                 size: bytes.len() as u64,
             };
@@ -396,7 +396,7 @@ mod tests {
                 "product.lamp-records.service",
                 "product.lamp-records.timer",
                 "product.lamp-setup-wifi.socket",
-                "product.lamp-setup-wifi@.service",
+                "product.lamp-setup-wifi.template.service",
                 "product.lamp-setup.service",
             ]
         );

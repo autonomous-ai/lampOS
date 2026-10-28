@@ -1375,7 +1375,13 @@ it starts. The keeper's template and socket start `/usr/local/bin/lamp-keeper`,
 and `lamp-update-back.timer` starts the fixed settings writer, so neither is
 carried. A socket that hands one listener to a running service is not
 carried either: systemd refuses to start such a socket again while its
-service runs. A lamp's own folder carries services only. Such a build has
+service runs. A lamp's own folder carries services only. A unit's file in
+the channel is a release asset named `<lamp>.<unit>`, and an asset's name
+can't hold `@`. So a manifest names a template `lamp-<x>.template.service`
+(`manifest::manifest_name`), and a round gives it back its `@` on the lamp
+(`Unit::on_lamp`). No part's service has a `.` in its name, so the two forms
+never meet, and a manifest that names a unit with an `@` is refused. Such a
+build has
 `min_updater` 7, so an updater of level 6 (7071's, after its climb) climbs
 again first, and the manifest's other readers, `lamp-update-apply` among
 them, never read these names.
