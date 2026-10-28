@@ -1,0 +1,100 @@
+//! A remark about the lamp is not a call, on the second route in a busy room
+//! (#4175), off unless `LAMP_REMARK_ABOUT_IT=on`.
+//!
+//! On lamp-4ace on 28 October, in build 8327's busy_day check, two
+//! colleagues talked at a desk. "That lamp is cute, where did you get it?"
+//! was heard as "That lamp is cute." and let out for the lamp's name heard
+//! in the room's sound; the lamp answered "Thanks. I'd blush if I could."
+//! Its own answer then made a conversation going on, and the next two desk
+//! lines ("Do you want coffee? I'm going downstairs.", heard as "Do you want
+//! confidence?", and "Yes please, a latte, no sugar.") were answered as part
+//! of it.
+//!
+//! With the switch, in a busy room:
+//! - a line let out only for the name heard ([`talked_about`]: every "lamp"
+//!   in its words follows "that", "this", "the", "your" and the like), with
+//!   no face turned to the lamp, no tap and no call in its words, is held:
+//!   the lamp was talked about, not to, and a living thing says nothing;
+//! - a line let out for the name heard in the room's sound alone, with no
+//!   call in its words, no face turned and no tap, opens no conversation:
+//!   its answer neither starts the call's window nor renews the one going
+//!   on, so the next line needs a sign of its own.
+//!
+//! A line said to the lamp ("Lamp, is it cute?", "Hey lamp") keeps its call:
+//! its "lamp" follows no determiner. Without the switch, as before.
+
+/// Where the second route reads the switch.
+pub const ENVIRONMENT: &str = "LAMP_REMARK_ABOUT_IT";
+
+/// Why the rule holds a remark, as its journal says it after "held back: ".
+pub const HELD: &str =
+    "a busy room: the lamp was talked about, not to (a remark about it), so it says nothing";
+
+/// Whether the switch is on.
+pub fn on() -> bool {
+    std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// Words that make the "lamp" after them a thing talked about.
+const ABOUT: &[&str] = &[
+    "that", "this", "the", "your", "my", "a", "our", "his", "her", "their", "these", "those",
+];
+
+/// Whether `heard` names the lamp only as a thing talked about: it says
+/// "lamp" at least once, and every "lamp" follows one of [`ABOUT`]. A line
+/// with no "lamp" in its words is not judged here: its call may have been
+/// lost in the hearing.
+pub fn talked_about(heard: &str) -> bool {
+    let words: Vec<String> = heard
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let mut said = false;
+    for (index, word) in words.iter().enumerate() {
+        let word = word.trim_end_matches("'s");
+        if word != "lamp" && word != "lamps" {
+            continue;
+        }
+        said = true;
+        let before = index.checked_sub(1).map(|before| words[before].as_str());
+        if !before.is_some_and(|before| ABOUT.contains(&before)) {
+            return false;
+        }
+    }
+    said
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_remark_about_the_lamp_is_talked_about() {
+        for heard in [
+            "That lamp is cute.",
+            "That lamp is cute, where did you get it?",
+            "Is the lamp on?",
+            "I love your lamp's light.",
+            "Where did you get this lamp? And that lamp?",
+        ] {
+            assert!(talked_about(heard), "{heard}");
+        }
+    }
+
+    #[test]
+    fn a_line_said_to_the_lamp_is_not() {
+        for heard in [
+            "Lamp, is it cute?",
+            "Hey lamp, what time is it?",
+            "Lamp what's the weather",
+            "Thanks lamp.",
+            "That lamp is cute. Lamp, are you listening?",
+            "Do you want confidence? Going downstairs.",
+            "Yes, please. A latte. No sugar.",
+            "",
+        ] {
+            assert!(!talked_about(heard), "{heard}");
+        }
+    }
+}

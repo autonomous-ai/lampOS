@@ -3527,6 +3527,23 @@ after a take-over, but now for every turn:
   or off, so an unknown voice let out at 3 s does not match itself at 12 s.
   Tests only (`worker.rs`, `CarryDesk`); off until a played five-turn
   back-and-forth on lamp-52e6 or lamp-75c9, quiet and with desk talk.
+- **A remark about the lamp, held** (`LAMP_REMARK_ABOUT_IT=on`, #4175;
+  [`remark_about_it`](../crates/voice/src/remark_about_it.rs)). In build
+  8327's busy_day check on lamp-4ace (28 Oct), "That lamp is cute." between
+  two colleagues was let out for the name heard at the line's start, and the
+  lamp's answer made a conversation going on that let the next two desk
+  lines out. With the switch, in a busy room, `Heeding::verdict` holds a line
+  let out only by the name (heard in the room's sound or said close), with
+  no call in its words, no tap, no face turned to the lamp and no question of
+  the lamp's it answers, when every "lamp" in its words follows a word like
+  "that", "this", "the" or "your" (`talked_about`) and no conversation is
+  going on; the journal says `remark_about_it::HELD`. A line let out for the
+  name in the room's sound alone (its words not calling the lamp) is still
+  answered but opens no conversation: no `called_at`, and its answer is put
+  on the chain so it renews none. "Lamp, is it cute?", a face turned to the
+  lamp, a tap and a quiet room are as before. Nothing reacts to a held
+  remark yet: a small glance would need an expression topic of its own.
+  Tests (`worker.rs`, `with_remarks_held_a_remark_about_the_lamp_opens_no_conversation`).
 - **A busy room's call by the text, narrowed** (`LAMP_BUSY_CALLED_STRICT=on`;
   with `--attention`). On #1712's branch the busy room let out "Man, that
   meeting ran long.", "Plan the sprint for tomorrow.", "Mom, can you pick me
