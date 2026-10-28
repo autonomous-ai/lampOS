@@ -128,6 +128,15 @@ pub fn main() -> io::Result<()> {
         let code = json!({"type":"code","code":"12345678","expiresIn":120});
         println!("{code}");
         println!("{code}");
+        // The code stays the only thing said until this file exists, or for
+        // two minutes, so a played check can ask for it again first (#2839).
+        if let Some(release) = step["code_hold_until"].as_str() {
+            io::stdout().flush()?;
+            let until = std::time::Instant::now() + Duration::from_secs(120);
+            while !std::path::Path::new(release).exists() && std::time::Instant::now() < until {
+                thread::sleep(Duration::from_millis(20));
+            }
+        }
         println!(
             "{}",
             json!({"type":"confirm","email":"someone@example.com"})

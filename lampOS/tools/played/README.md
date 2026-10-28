@@ -38,6 +38,15 @@ These you can run on their own:
   make it busy by themselves). It prints whether each statement was
   answered, and the count. Run it with the switch off and on in the same
   quiet hour.
+- `code-once.sh LABEL FIXTURE`, about 2 minutes (#2839): a spoken
+  sign-in's code is told once, and once more only when asked for again. It
+  puts the stand-in Harness in as `ask-again.sh` does, with its code held
+  (`code_hold_until`) until the script lets the question come. It counts
+  lamp-tasks' journal lines `code handed to a start` and `code claimed`,
+  which carry no digits: one after the first ask, still one 20 s later, two
+  after "say the code again", still two 20 s later. Then it releases the
+  question and answers no, so nothing signs in. FIXTURE and `TASKS=` are as
+  for `ask-again.sh`, from a build with #4112's journal lines.
 - `ask-again.sh LABEL FIXTURE`, about 3 minutes (#2702): a sign-in's
   question cut short is asked again 30 s later, then heard whole, and the
   yes after it is taken. It uses a stand-in Harness, so nothing signs in for
