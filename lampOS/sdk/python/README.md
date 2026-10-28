@@ -127,8 +127,10 @@ lamp is printed to stderr, one line each (`lampos -> {...}` sent, `lampos <-
 this computer, or give away the lamp's pin, is printed: `proof`, `sig`, `key`,
 `nonce`, `pin` and `fp` show as `<redacted>`, and so does a pair request's
 `code`. A said `text` shows only as its
-length and the start of its SHA-256, and a pushed skill part's `data` only as
-its length.
+length and a tag keyed for this run (an HMAC: the same text tags the same within
+a run, and nobody can test a guess against it), and a pushed skill part's
+`data` only as its length. Everything else is printed as it is: a registered
+phrase, events' fields and a refusal's `why`.
 
 ## Check a skill folder
 
