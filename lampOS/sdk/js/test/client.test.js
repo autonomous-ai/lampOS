@@ -677,12 +677,15 @@ test('a package path outside its folder is refused before anything is written', 
 });
 
 test('a shared package is installed with its asks on part 0, and refused before a byte past the pairing', async () => {
-  const { asksOf, pack } = await import('../src/push.js');
+  const { asksOf, openPackage, pack } = await import('../src/push.js');
   const author = new Keyring(folder()).authorKey({ make: true });
   const signed = pack(skillFolder('desk-wave', 'version = "0.2.0"\n[permissions]\nlight = true\nspeak = true\n'), { author }).data;
   await withLamp({ grants: ['light', 'speak', 'skills'] }, async (lamp, fake) => {
     const skill = await lamp.installPackage(signed);
     assert.deepEqual([skill.name, skill.version, skill.on], ['desk-wave', '0.2.0', true]);
+    const fpr = openPackage(signed).author;
+    assert.deepEqual([skill.author, skill.asks], [fpr, ['light', 'speak']]);
+    assert.deepEqual((await lamp.skills()).map((s) => s.author), [fpr]);
     const pushes = fake.asked('skill.push');
     assert.deepEqual(pushes[0].asks, ['light', 'speak']);
     assert.ok(pushes.slice(1).every((later) => !('asks' in later)));
@@ -723,6 +726,7 @@ test('lamp skill install shows the signer and asks, then asks yes once', async (
     assert.equal(fake.asked('skill.push').length, 0);
     const yes = await lamp('y\n', 'skill', 'install', file);
     assert.ok(yes.code === 0 && yes.said.endsWith('desk-wave 0.1.0 installed, on'), yes.said);
+    assert.equal((await lamp('', 'skill', 'list')).said, `desk-wave\t0.1.0\ton\tsigned by key ${fpr}`);
     const http = await lamp('', 'skill', 'install', 'http://example.com/desk-wave.tar', '--yes');
     assert.ok(http.code === 1 && /https only/.test(http.said), http.said);
   } finally { await fake.stop(); }

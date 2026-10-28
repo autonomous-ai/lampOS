@@ -1069,6 +1069,9 @@ def test_a_shared_package_is_installed_with_its_asks_on_part_0(tmp_path, monkeyp
             async with await Lamp.connect(keyring=ring) as lamp:
                 skill = await lamp.install_package(signed)
                 assert (skill["name"], skill["version"], skill["on"]) == ("desk-wave", "0.2.0", True)
+                fpr = push.open_package(signed).author
+                assert (skill["author"], skill["asks"]) == (fpr, ["light", "speak"])
+                assert [s.get("author") for s in await lamp.skills()] == [fpr]
                 pushes = fake.asked("skill.push")
                 assert len(pushes) > 1 and pushes[0]["asks"] == ["light", "speak"]
                 assert all("asks" not in later for later in pushes[1:])
@@ -1114,6 +1117,7 @@ def test_lamp_skill_install_shows_the_signer_and_asks_then_asks_yes(tmp_path):
             assert fake.asked("skill.push") == []
             code, said = await lamp_cli(home, "skill", "install", str(package), typed="y\n")
             assert code == 0 and said.endswith("desk-wave 0.1.0 installed, on"), said
+            assert (await lamp_cli(home, "skill", "list"))[1] == f"desk-wave\t0.1.0\ton\tsigned by key {fpr}"
             code, said = await lamp_cli(home, "skill", "install", "http://example.com/desk-wave.tar", "--yes")
             assert code == 1 and "https only" in said
 

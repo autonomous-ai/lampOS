@@ -208,7 +208,8 @@ async def _skill_list(args) -> int:
         for skill in await lamp.skills():
             state = "on" if skill.get("on") else "off"
             held = f" (held: {skill['held']})" if skill.get("held") else ""
-            print(f"{skill.get('name')}\t{skill.get('version')}\t{state}{held}")
+            signed = f"\tsigned by key {skill['author']}" if skill.get("author") else ""
+            print(f"{skill.get('name')}\t{skill.get('version')}\t{state}{held}{signed}")
     return 0
 
 

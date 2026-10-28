@@ -21,6 +21,8 @@ import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
+import { asksOf, openPackage } from './push.js';
+import { parse as parseToml } from 'smol-toml';
 
 const now = () => new Date().toISOString();
 
@@ -174,15 +176,26 @@ export class FakeLamp {
     if (data.length !== request.size || sha !== request.sha256.toLowerCase()) {
       return this.refuse(ws, id, 'bad_request', "the package's SHA-256 doesn't match");
     }
-    const size = parseInt(data.subarray(124, 135).toString('ascii'), 8);
-    const first = data.subarray(0, 100).toString('utf8').replace(/\0.*$/s, '');
-    const manifest = JSON.parse(data.subarray(512, 512 + size).toString('utf8'));
-    if (first !== 'lamp-skill.json' || manifest.name !== request.name) return this.refuse(ws, id, 'refused', 'not a package of that skill');
+    // The package and its signature, as the lamp reads them first.
+    let opened;
+    try {
+      opened = openPackage(data);
+    } catch (error) {
+      return this.refuse(ws, id, 'bad_request', error.why ?? error.message);
+    }
+    if (opened.name !== request.name) return this.refuse(ws, id, 'refused', 'not a package of that skill');
     const kept = this.pushed.get(request.name);
     if (kept && kept.client !== client) return this.refuse(ws, id, 'refused', "another computer's skill has that name");
-    const skill = { name: manifest.name, version: manifest.version, sha256: sha, on: true, held: null };
+    let asks = [];
+    try {
+      asks = asksOf(parseToml((opened.files.get('skill.toml') ?? Buffer.alloc(0)).toString('utf8')));
+    } catch {
+      // A fake: the lamp's own load check says what's wrong with skill.toml.
+    }
+    // `author`, the signer's fingerprint, only when it is signed (Ten's shape on #3931).
+    const skill = { name: opened.name, version: opened.version, sha256: sha, on: true, held: null, ...(opened.author ? { author: opened.author } : {}) };
     this.pushed.set(request.name, { ...skill, client, pushed_at: now() });
-    return this.ok(ws, id, { skill: { ...skill, asks: [], shown: [] } });
+    return this.ok(ws, id, { skill: { ...skill, asks, shown: [] } });
   }
 
   ok(ws, re, fields = {}) { ws.send(JSON.stringify({ re, ok: true, ...fields })); }

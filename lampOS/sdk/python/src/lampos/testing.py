@@ -322,8 +322,9 @@ class FakeLamp:
         its manifest, then kept as this computer's."""
         import base64
         import hashlib
-        import io
-        import tarfile
+
+        from .errors import LampError
+        from .push import asks_of, open_package, tomllib
 
         going = self._pushing
         if request["part"] == 0:
@@ -344,25 +345,35 @@ class FakeLamp:
         if len(data) != request["size"] or hashlib.sha256(data).hexdigest() != request["sha256"].lower():
             await self._refuse(ws, id_, "bad_request", "the package's SHA-256 doesn't match")
             return
-        with tarfile.open(fileobj=io.BytesIO(data)) as tar:
-            names = tar.getnames()
-            manifest = json.loads(tar.extractfile("lamp-skill.json").read())
-        if names[0] != "lamp-skill.json" or manifest["name"] != request["name"]:
+        # The package and its signature, as the lamp reads them first.
+        try:
+            opened = open_package(data)
+        except LampError as error:
+            await self._refuse(ws, id_, "bad_request", error.why)
+            return
+        if opened.name != request["name"]:
             await self._refuse(ws, id_, "refused", "not a package of that skill")
             return
         kept = self.pushed.get(request["name"])
         if kept and kept["client"] != client:
             await self._refuse(ws, id_, "refused", "another computer's skill has that name")
             return
+        try:
+            asks = asks_of(tomllib.loads(opened.files.get("skill.toml", b"").decode("utf-8")))
+        except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+            asks = []  # a fake: the lamp's own load check says what's wrong
         skill = {
-            "name": manifest["name"],
-            "version": manifest["version"],
+            "name": opened.name,
+            "version": opened.version,
             "sha256": request["sha256"].lower(),
             "on": True,
             "held": None,
         }
+        # `author`, the signer's fingerprint, only when it is signed (Ten's shape on #3931).
+        if opened.author:
+            skill["author"] = opened.author
         self.pushed[request["name"]] = {**skill, "client": client, "pushed_at": _now()}
-        await self._ok(ws, id_, skill={**skill, "asks": [], "shown": []})
+        await self._ok(ws, id_, skill={**skill, "asks": asks, "shown": []})
 
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]

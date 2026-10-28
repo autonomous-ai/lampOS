@@ -91,7 +91,7 @@ async function main() {
   } else if (command === 'skill' && arg === 'list') {
     const lamp = await Lamp.connect(third);
     try {
-      for (const skill of await lamp.skills()) console.log(`${skill.name}\t${skill.version}\t${skill.on ? 'on' : 'off'}${skill.held ? ` (held: ${skill.held})` : ''}`);
+      for (const skill of await lamp.skills()) console.log(`${skill.name}\t${skill.version}\t${skill.on ? 'on' : 'off'}${skill.held ? ` (held: ${skill.held})` : ''}${skill.author ? `\tsigned by key ${skill.author}` : ''}`);
     } finally {
       await lamp.close();
     }
