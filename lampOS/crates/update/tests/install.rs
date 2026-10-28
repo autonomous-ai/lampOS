@@ -1960,6 +1960,18 @@ fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
             "{owner}"
         );
     }
+    // Health and crash reports are on in Cloud, which sends them only after
+    // the person's yes, and in the voice, which can only stop them (#2862).
+    // No other product unit sets the switch.
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service").contains(&"Environment=LAMP_REPORTS=on");
+        let mentioned = section(text, "Service")
+            .iter()
+            .any(|line| line.contains("LAMP_REPORTS"));
+        let owner = ["lamp-cloud.service", "lamp-voice.service"].contains(unit);
+        assert_eq!(on, owner, "{unit}");
+        assert_eq!(mentioned, owner, "{unit}");
+    }
     // Actions needs no caps path while off, and the product's new argument
     // alone must not open persistent storage or opt into the cap service.
     let caps = Path::new("/var/lib/lampos-output-caps");

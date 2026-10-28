@@ -320,10 +320,13 @@ mod tests {
         // the clock group or here, outside the attention group: a new attention switch can't be
         // forgotten (the Reviewer-lead's P3 on #2883). Head touch goes on with the product's
         // own pins and its try (#1362); a moved lamp's controls carry no head lines yet.
-        const NOT_THE_GROUP: [&str; 6] = [
+        // Reports decide nothing about whom the voice answers: a held line naming reports
+        // gets one round for `reports_stop`, the product's only (#2862).
+        const NOT_THE_GROUP: [&str; 7] = [
             "LAMP_FIRST_OUTPUT",
             "LAMP_HEAD_TOUCH",
             "LAMP_PROVIDER_PATIENCE",
+            "LAMP_REPORTS",
             "LAMP_SECOND_LOOK",
             "LAMP_THREAD_FILE",
             "LAMP_VOICE_ROUTE",

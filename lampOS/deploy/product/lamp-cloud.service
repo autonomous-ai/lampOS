@@ -45,6 +45,10 @@ Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
 # the other broker-held changes for the broker connection's TLS (LAMP_CLOUD_TLS, docs/cloud.md).
 Environment=LAMP_SETTINGS_CHANGE=on
 Environment=LAMP_SKILLS_PAGE=on
+# Health and crash reports to the company (#2862, docs/cloud.md, "Health and crash reports"): only after
+# the person's yes at setup (share_reports) or from the app (reports.set). With no recorded yes, nothing
+# is sent; a reset wipes the choice.
+Environment=LAMP_REPORTS=on
 # Install writes this shared, default-off switch; a separately provisioned Store key is
 # required too. Changing store.env and restarting cloud enables the next helper connection.
 Environment=LAMP_SKILLS_STORE=off

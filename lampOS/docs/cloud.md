@@ -904,7 +904,8 @@ are built by their own builders.
 
 **Off unless set.** No health or crash report is queued or sent unless all
 three are on: `LAMP_CLOUD=on`; `LAMP_REPORTS=on` in `lamp-cloud`'s unit
-(and in the voice's, for the stop by voice); and the person's yes, read at
+(and in the voice's, for the stop by voice), both on in the product units
+since #2862; and the person's yes, read at
 each send, never kept past a change. Without the switch `lamp-cloud` starts
 no reports driver, subscribes to nothing for reports, writes no reports
 file, and answers `reports.get` and `reports.set` as kinds it lacks.
