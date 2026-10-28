@@ -88,6 +88,12 @@ impl Sentences {
         None
     }
 
+    /// The text written so far that no sentence, clause or first words
+    /// have taken yet.
+    pub fn pending(&self) -> &str {
+        &self.text
+    }
+
     /// Whatever is left when the text ends.
     pub fn finish(&mut self) -> Option<String> {
         let rest = std::mem::take(&mut self.text);

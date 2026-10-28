@@ -470,6 +470,144 @@ pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
     if maybe && !whole { None } else { Some(false) }
 }
 
+/// Whether `sentence` asks whether to keep something: "Want me to keep
+/// that?", "Should I remember your birthday?", "Mình nhớ điều đó nhé?".
+/// Said beside a `remember` call that keeps it, it is not said (finding K2
+/// on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
+/// Kept — library now, not the bakery."). A question, asked by the lamp
+/// ("me", "should I", "shall I"…), with a keep word and what it takes:
+/// "Shall I keep the light on?", "Do you want me to remember to remind
+/// you?", "What should I call you?" and "Bạn có nhớ không?" ask nothing of
+/// the kind.
+pub fn offers_a_keep(sentence: &str) -> bool {
+    let lower = sentence.to_lowercase().replace('\u{2019}', "'");
+    if !lower
+        .trim_end_matches(|c: char| c.is_whitespace() || c == '"' || c == '\u{201d}')
+        .ends_with('?')
+    {
+        return false;
+    }
+    let words: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .filter(|word| !word.is_empty())
+        .collect();
+    let lamp_asks = words.contains(&"me")
+        || words
+            .windows(2)
+            .any(|pair| ["should", "shall", "can", "may"].contains(&pair[0]) && pair[1] == "i");
+    let keeps = words.windows(2).any(|pair| match pair[0] {
+        "keep" | "save" => ["that", "this", "it", "those", "them"].contains(&pair[1]),
+        "remember" | "note" => {
+            ["that", "this", "it", "those", "them", "your", "the", "my"].contains(&pair[1])
+        }
+        _ => false,
+    });
+    if lamp_asks && keeps {
+        return true;
+    }
+    // Vietnamese: the lamp ("mình", "tôi", "em") keeping ("nhớ", "lưu"),
+    // asked ("nhé", "không", "có muốn").
+    let has = |word: &str| words.contains(&word);
+    (has("m\u{ec}nh") || has("t\u{f4}i") || has("em"))
+        && (has("nh\u{1edb}") || has("l\u{1b0}u"))
+        && (has("nh\u{e9}") || has("kh\u{f4}ng") || lower.contains("c\u{f3} mu\u{1ed1}n"))
+}
+
+/// Whether a sentence still being written (`pending`, no end yet) could
+/// still become an offer to keep ([`offers_a_keep`]): the early cut of a
+/// reply's first words waits on it, so "Want me to keep that as the
+/// change?" is not said as "Want me to keep" before its end is known (the
+/// Reviewer-lead's and Reviewer-two's P2 on #4076). Only such openings
+/// wait: "Let me check", "Can I help" and "It is warm and" are cut as
+/// before.
+pub fn may_offer_a_keep(pending: &str) -> bool {
+    const ASKS: &[&str] = &["should", "shall", "can", "may"];
+    const VERBS: &[&str] = &["keep", "save", "remember", "note"];
+    // The words that may yet lead to an asker: "Do you want", "Would you like".
+    const LEADS: &[&str] = &[
+        "want", "like", "should", "shall", "can", "may", "would", "do", "you",
+    ];
+    let lower = pending.to_lowercase().replace('\u{2019}', "'");
+    let words: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .filter(|word| !word.is_empty())
+        .collect();
+    let has = |word: &str| words.contains(&word);
+    if (has("m\u{ec}nh") || has("t\u{f4}i") || has("em")) && (has("nh\u{1edb}") || has("l\u{1b0}u"))
+    {
+        return true;
+    }
+    // The last word may be cut mid-word: "Want me to ke".
+    let whole = pending.ends_with(char::is_whitespace);
+    let asker = words
+        .iter()
+        .position(|word| *word == "me")
+        .map(|at| at + 1)
+        .or_else(|| {
+            words
+                .windows(2)
+                .position(|pair| ASKS.contains(&pair[0]) && pair[1] == "i")
+                .map(|at| at + 2)
+        });
+    let Some(after) = asker else {
+        return words.last().is_some_and(|last| {
+            LEADS.contains(last) || (!whole && LEADS.iter().any(|lead| lead.starts_with(last)))
+        });
+    };
+    let rest = &words[after..];
+    let rest = rest.strip_prefix(&["to"][..]).unwrap_or(rest);
+    match rest {
+        [] => true,
+        [verb] if !whole => VERBS.iter().any(|known| known.starts_with(verb)),
+        [verb, ..] => VERBS.contains(verb),
+    }
+}
+
+/// A reply's sentences from its first offer to keep ([`offers_a_keep`]),
+/// held to its round's end, when the round's calls are known (finding K2
+/// on #3504). Beside a `remember` call, or after one this request ran, the
+/// offer is not said; the sentences after it are, in their order. With
+/// none, all are said as they came. An offer is most often the reply's
+/// last sentence, so holding it delays nothing else.
+#[derive(Debug, Default)]
+pub struct OfferHold {
+    held: Vec<(String, bool)>,
+    left_out: usize,
+}
+
+impl OfferHold {
+    /// What of `sentence` to say now: nothing while an offer is held, and
+    /// nothing of an offer once `remembered` (a `remember` of this request
+    /// ran).
+    pub fn say(&mut self, sentence: String, remembered: bool) -> Option<String> {
+        let offer = offers_a_keep(&sentence);
+        if offer && remembered {
+            self.left_out += 1;
+            return None;
+        }
+        if offer || !self.held.is_empty() {
+            self.held.push((sentence, offer));
+            return None;
+        }
+        Some(sentence)
+    }
+
+    /// At a round's end: the sentences held, but the offers when
+    /// `remembered`, and how many offers were left out since the last end.
+    pub fn release(&mut self, remembered: bool) -> (Vec<String>, usize) {
+        let mut left_out = std::mem::take(&mut self.left_out);
+        let mut said = Vec::new();
+        for (sentence, offer) in self.held.drain(..) {
+            if offer && remembered {
+                left_out += 1;
+            } else {
+                said.push(sentence);
+            }
+        }
+        (said, left_out)
+    }
+}
+
 /// Whether `said` asks to forget, by its words: the English ones folded as
 /// names are matched, and the Vietnamese ones with their accents kept,
 /// written as one letter or as a letter and its mark, since without them
@@ -1679,7 +1817,8 @@ pub const REMEMBER_DESCRIBED: &str = "Call this when someone asks you to remembe
                           with their own words for names and numbers. If you are not sure you heard a key word \
                           right (a name, a number, or the thing itself), do not call this yet: ask them, in a few \
                           words, and call it once they say it again; never keep a word you doubt. Then say back \
-                          in a few words what you kept, so they can put you right if you misheard.";
+                          in a few words what you kept, so they can put you right if you misheard; \
+                          never also ask whether to keep it.";
 
 fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
     let mut tools = vec![
@@ -10457,6 +10596,80 @@ mod tests {
     }
 
     /// Finding K on #3504: which openings say something was kept.
+    /// Finding K2 on #3504: an offer to keep is known as one; another
+    /// question, or a keep the lamp does not offer, is not.
+    #[test]
+    fn an_offer_to_keep_is_known_by_its_question() {
+        for offer in [
+            "Want me to keep that as the change?",
+            "Do you want me to remember that?",
+            "Should I remember your birthday?",
+            "Shall I save it?",
+            "Would you like me to note that?",
+            "M\u{ec}nh nh\u{1edb} \u{111}i\u{1ec1}u \u{111}\u{f3} nh\u{e9}?",
+        ] {
+            assert!(super::offers_a_keep(offer), "{offer}");
+        }
+        for other in [
+            "Kept: library now, not the bakery.",
+            "Want me to keep that",
+            "What should I call you?",
+            "Shall I keep the light on?",
+            "Do you want me to remember to remind you?",
+            "Do you remember that?",
+            "How is it going?",
+            "B\u{1ea1}n c\u{f3} nh\u{1edb} kh\u{f4}ng?",
+        ] {
+            assert!(!super::offers_a_keep(other), "{other}");
+        }
+    }
+
+    /// The P2 on #4076: an opening that may yet offer to keep waits for its
+    /// end; others are cut early as before.
+    #[test]
+    fn an_opening_that_may_yet_offer_to_keep_waits() {
+        for maybe in [
+            "Want ",
+            "Do you want ",
+            "Want me ",
+            "Want me to ke",
+            "Want me to keep ",
+            "Want me to keep that as ",
+            "Should I ",
+            "Shall I remember ",
+            "M\u{ec}nh nh\u{1edb} ",
+        ] {
+            assert!(super::may_offer_a_keep(maybe), "{maybe}");
+        }
+        for not in [
+            "It is warm and ",
+            "Let me check the ",
+            "Can I help with ",
+            "Do you want to hear ",
+            "Sure, here's a ",
+        ] {
+            assert!(!super::may_offer_a_keep(not), "{not}");
+        }
+    }
+
+    /// An offer held with what follows it; beside a keep, only the offer
+    /// is left out.
+    #[test]
+    fn an_offer_held_to_the_round_end_is_left_out_only_beside_a_keep() {
+        let mut hold = super::OfferHold::default();
+        assert_eq!(hold.say("Nice.".into(), false).as_deref(), Some("Nice."));
+        assert_eq!(hold.say("Want me to keep that?".into(), false), None);
+        assert_eq!(hold.say("It sounds fun.".into(), false), None);
+        assert_eq!(hold.release(true), (vec!["It sounds fun.".to_owned()], 1));
+        assert_eq!(hold.say("Shall I save it?".into(), false), None);
+        assert_eq!(
+            hold.release(false),
+            (vec!["Shall I save it?".to_owned()], 0)
+        );
+        assert_eq!(hold.say("Shall I save it?".into(), true), None);
+        assert_eq!(hold.release(true), (Vec::new(), 1));
+    }
+
     #[test]
     fn a_reply_that_says_it_kept_something_is_known_by_its_opening() {
         for reply in [

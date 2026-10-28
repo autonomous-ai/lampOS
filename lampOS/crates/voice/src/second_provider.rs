@@ -7843,6 +7843,23 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
     Ok(())
 }
 
+/// A round's held sentences ([`crate::remember::OfferHold`]) at its end:
+/// an offer to keep beside a `remember` call is left out, and logged.
+fn offered(
+    hold: &mut crate::remember::OfferHold,
+    remembers: bool,
+    request: u64,
+    round: usize,
+) -> Vec<String> {
+    let (said, left_out) = hold.release(remembers);
+    if left_out > 0 {
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: {left_out} offer(s) to keep what its remember call keeps: not said (K2)"
+        );
+    }
+    said
+}
+
 /// Chat, speech and the turn's last events, for the person's `said`, with
 /// the picture of a look (`looking`). The picture goes in this request only,
 /// never into the thread or a later turn's history.
@@ -8153,6 +8170,11 @@ async fn answer(
         // Told before the round after one whose claim went unsaid beside
         // other calls, once those calls are answered.
         let mut keep_claim_note = false;
+        // A reply's offer to keep something, held to its round's end and
+        // not said beside a `remember` call that keeps it (finding K2 on
+        // #3504), and whether a `remember` of this request ran.
+        let mut offer_hold = crate::remember::OfferHold::default();
+        let mut remember_ran = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if std::mem::take(&mut keep_claim_note) {
@@ -8364,13 +8386,21 @@ async fn answer(
                             queue.announce().await?;
                         }
                         let mut sentences = split.push(&piece);
-                        if sentences.is_empty() && !queue.started {
+                        // An opening that may yet offer to keep waits for
+                        // its sentence's end (K2): "Want me to keep" alone
+                        // would be said before its offer is known.
+                        if sentences.is_empty()
+                            && !queue.started
+                            && !crate::remember::may_offer_a_keep(split.pending())
+                        {
                             sentences.extend(split.clause().or_else(|| {
                                 shared.first_words.and_then(|words| split.words(words))
                             }));
                         }
                         for sentence in sentences {
-                            queue.push(sentence).await?;
+                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                                queue.push(sentence).await?;
+                            }
                         }
                     }
                     ChatEvent::ToolCalls(asked) => {
@@ -8399,7 +8429,9 @@ async fn answer(
                     return Err(Stop::Declined);
                 }
                 for sentence in split.push(&held) {
-                    queue.push(sentence).await?;
+                    if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                        queue.push(sentence).await?;
+                    }
                 }
             }
             // A reply that says it kept something (finding K on #3504:
@@ -8433,6 +8465,11 @@ async fn answer(
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says again it kept something, with no remember call: said it was not kept"
                         );
+                        // What an earlier round held is said first: nothing
+                        // was kept (Reviewer-two's P3 on #4076).
+                        for sentence in offered(&mut offer_hold, false, request, round) {
+                            queue.push(sentence).await?;
+                        }
                         queue
                             .push(crate::remember::NOT_KEPT_LINE.to_owned())
                             .await?;
@@ -8440,7 +8477,9 @@ async fn answer(
                     }
                 } else {
                     for sentence in split.push(&held) {
-                        queue.push(sentence).await?;
+                        if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            queue.push(sentence).await?;
+                        }
                     }
                 }
             }
@@ -8513,9 +8552,18 @@ async fn answer(
             // A look asked by its own call (#1712): the coordinator takes the
             // turn's full look, and the turn ends here; its picture comes in
             // the look turn after it. Only in a turn someone spoke.
+            let remembers = remember_ran
+                || calls
+                    .iter()
+                    .any(|call| call.name == crate::remember::REMEMBER);
             if shared.look_by_call && calls.iter().any(|call| call.name == LOOK_CALL) {
-                if let Some(rest) = split.finish() {
+                if let Some(rest) = split.finish()
+                    && let Some(rest) = offer_hold.say(rest, remember_ran)
+                {
                     queue.push(rest).await?;
+                }
+                for sentence in offered(&mut offer_hold, remembers, request, round) {
+                    queue.push(sentence).await?;
                 }
                 if ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?
                     && !queue.started
@@ -8524,8 +8572,13 @@ async fn answer(
                 }
                 return Ok(());
             }
-            if let Some(rest) = split.finish() {
+            if let Some(rest) = split.finish()
+                && let Some(rest) = offer_hold.say(rest, remember_ran)
+            {
                 queue.push(rest).await?;
+            }
+            for sentence in offered(&mut offer_hold, remembers, request, round) {
+                queue.push(sentence).await?;
             }
             // The round after a turn's calls were all answered short
             // (`LAMP_SHORT_DONE`, #2877): with no words and no calls, the
@@ -8933,6 +8986,7 @@ async fn answer(
                     && answer.told.get("error").is_none()
                 {
                     kept_now = true;
+                    remember_ran |= call.name == crate::remember::REMEMBER;
                 }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {

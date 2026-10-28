@@ -8126,6 +8126,211 @@ async fn a_reply_never_says_it_kept_something_with_no_remember_call() {
     }
 }
 
+/// Finding K2 on #3504 (lamp-06c1, 28 Oct, "Want me to keep that as the
+/// change? Kept — library now, not the bakery."): an offer to keep, beside
+/// the `remember` call that keeps it or after one, is not said; with no
+/// such call it is, in its place. Another question is said either way.
+#[tokio::test]
+async fn an_offer_to_keep_is_not_said_beside_the_remember_that_keeps_it() {
+    let remember = || {
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "remember",
+            json!({"text":"Works at the library now, not the bakery."}),
+        )]))
+    };
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let cases: Vec<(Chats, Vec<&str>)> = vec![
+        // The lamp's own reply: the offer beside its call is left out.
+        (
+            vec![
+                vec![
+                    text("Good to know, the library now. Want me to keep that as the change? "),
+                    remember(),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("Kept: library now, not the bakery."),
+                    Ok(ChatEvent::Done),
+                ],
+            ],
+            vec![
+                "said:Good to know, the library now.",
+                "said:Kept: library now, not the bakery.",
+            ],
+        ),
+        // After its call: the offer of the next round is left out, the
+        // sentence after it said.
+        (
+            vec![
+                vec![remember(), Ok(ChatEvent::Done)],
+                vec![
+                    text("Kept: the library now. Should I remember that too? Have a good day."),
+                    Ok(ChatEvent::Done),
+                ],
+            ],
+            vec!["said:Kept: the library now.", "said:Have a good day."],
+        ),
+        // No call: the offer is said, and what follows it, in order.
+        (
+            vec![vec![
+                text("The library, nice. Want me to keep that? It sounds fun."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec![
+                "said:The library, nice.",
+                "said:Want me to keep that?",
+                "said:It sounds fun.",
+            ],
+        ),
+        // Another question beside the call: said.
+        (
+            vec![
+                vec![
+                    text("Kept: the library now. How is it going?"),
+                    remember(),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+            ],
+            vec!["said:Kept: the library now.", "said:How is it going?"],
+        ),
+    ];
+    for (chats, want) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("I work at the library now, not the bakery.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let runner: ToolRunner =
+            Arc::new(|_, _, _, _| Box::pin(async { json!({"remembered": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<String> = labels
+            .iter()
+            .filter_map(|label| label.strip_prefix("said:"))
+            .map(|said| format!("said:{}", said.trim()))
+            .collect();
+        assert_eq!(said, want, "{labels:?}");
+    }
+}
+
+/// The Reviewer-lead's and Reviewer-two's P2 on #4076: with the first
+/// words cut early (`cutting_first_words(4)`), an offer to keep as the
+/// reply's first sentence is not cut into "Want me to keep" before its end
+/// is known, so beside its `remember` call none of it is said. An opening
+/// that offers nothing is still cut at its first words, as before.
+#[tokio::test]
+async fn an_offer_to_keep_is_not_cut_early_into_first_words() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let cases: Vec<(Chats, Vec<&str>)> = vec![
+        (
+            vec![
+                vec![
+                    text("Want me to keep "),
+                    text("that as the change? "),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "remember",
+                        json!({"text":"Works at the library now."}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Kept: library now."), Ok(ChatEvent::Done)],
+            ],
+            vec!["said:Kept: library now."],
+        ),
+        (
+            vec![vec![
+                text("Let me check "),
+                text("the weather "),
+                text("for you."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec!["said:Let me check the", "said:weather for you."],
+        ),
+    ];
+    for (chats, want) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("I work at the library now.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.cutting_first_words(4);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<String> = labels
+            .iter()
+            .filter_map(|label| label.strip_prefix("said:"))
+            .map(|said| format!("said:{}", said.trim()))
+            .collect();
+        assert_eq!(said, want, "{labels:?}");
+    }
+}
+
+/// Reviewer-two's P3 on #4076: a held sentence is never lost when the turn
+/// ends on the plain line that nothing was kept. Here the offer is held by
+/// a round asked once more (a decline of a line named to a face), then two
+/// claims with no call end the turn: the offer is said, then the line.
+#[tokio::test]
+async fn a_held_offer_is_said_before_the_line_that_nothing_was_kept() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, the meeting room is called Orange.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    text("Sure. Want me to keep that? "),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        NOT_FOR_ME,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Kept: it's Orange."), Ok(ChatEvent::Done)],
+                vec![text("Kept: Orange."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine
+        .announcing(false)
+        .answering_named_to_a_face(Arc::new(|_| true));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let labels = turn(&mut engine).await;
+    let said: Vec<String> = labels
+        .iter()
+        .filter_map(|label| label.strip_prefix("said:"))
+        .map(|said| format!("said:{}", said.trim()))
+        .collect();
+    assert_eq!(
+        said,
+        [
+            "said:Sure.",
+            "said:Want me to keep that?",
+            &format!("said:{}", crate::remember::NOT_KEPT_LINE),
+        ],
+        "{labels:?}"
+    );
+    assert_eq!(script.asked.lock().unwrap().len(), 3, "{labels:?}");
+}
+
 /// The reviewer-lead's P3 on #3628: a turn offered no function (here a
 /// reminder) is never held for a claim, since it could never call
 /// `remember`: its words are said as they come.
