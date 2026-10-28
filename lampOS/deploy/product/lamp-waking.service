@@ -23,10 +23,11 @@ RuntimeDirectory=lampos-waking
 RuntimeDirectoryMode=0700
 # Its sandbox (#3710): it writes only that socket and the ring's device, /dev/spidev3.0. So the whole file
 # system is read-only to it but its runtime directory, which systemd keeps writable; /dev stays as it is.
-# No home, its own /tmp, and nothing it starts gains privileges.
+# No home, and nothing it starts gains privileges. No PrivateTmp: it uses no /tmp, and PrivateTmp would
+# order it after systemd-tmpfiles-setup and the /tmp mounts, later in boot than its first light should be
+# (Reviewer-lead's P3 on #4036).
 ProtectSystem=strict
 ProtectHome=yes
-PrivateTmp=yes
 NoNewPrivileges=yes
 Restart=no
 StandardOutput=journal
