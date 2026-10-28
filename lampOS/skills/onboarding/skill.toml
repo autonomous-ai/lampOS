@@ -55,6 +55,8 @@ skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip the to
 first = "(Say only this, nothing before or after it: \"Find my privacy switch {location}. Close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
 reoffer = "(Say only this, nothing before or after it: \"Find my privacy switch {location}. Close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
 
+# PARKED (#3702): giving way is out of the walk (the owner's call, 28 Oct); lamp-voice keeps it not_available
+# (crates/voice/src/coordinator.rs, set_giving_way_available). Its words stay so it can be put back.
 [onboarding.steps.giving_way]
 first = "(Say only this, nothing before or after it: \"Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.\")"
 reoffer = "(Say only this, nothing before or after it: \"Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.\")"

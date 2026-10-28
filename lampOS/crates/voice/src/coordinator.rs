@@ -6742,13 +6742,11 @@ fn conversation_with_gate_inner(
                 }
             }
             // No body to give way: the step is not available.
-            walk.set_giving_way_available(
-                says.is_some()
-                    && bus_out.is_some()
-                    && body_link.is_some()
-                    && onboarding_feel.is_some()
-                    && !trace.onboarding_privacy_disabled,
-            );
+            // PARKED (#3702): giving way is out of the onboarding walk (the owner's call, 28 Oct): the step is
+            // never offered and is kept `not_available`. Its code, words and tests stay. To put it back,
+            // restore the line below in place of `false`.
+            // says.is_some() && bus_out.is_some() && body_link.is_some() && onboarding_feel.is_some() && !trace.onboarding_privacy_disabled
+            walk.set_giving_way_available(false);
             if let Some(feel) = onboarding_feel.as_mut() {
                 let now_us = monotonic_us();
                 for felt in feel.take(now_us) {
