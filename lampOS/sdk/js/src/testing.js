@@ -51,9 +51,61 @@ export const PATTERN_LEAST_LEVEL = Object.freeze({
   candle: [3, 'a candle flickers at level 3 and up'],
   pulse: [2, 'a pulse is seen at level 2 and up'],
 });
-// The ring plays one pulse a minute for one asker, and drops a second without a
-// word to the computer (lamp_msgs' PULSE_GAP_US): the door has answered by then.
+// The ring plays one pulse a minute for one asker, and shows a second steady,
+// without its pulse (lamp_msgs' PULSE_GAP_US): the door has answered by then.
 export const PULSE_GAP_MS = 60_000;
+
+// A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs): head
+// pitch, head roll, base yaw, shoulder, elbow, in counts from rest and counts a
+// second. The Python SDK's skillcheck has the same.
+export const MOVE_STEP_MS = [40, 1000];
+export const MOVE_LASTS_MS = [1500, 10000];
+// A computer's move: 2 to 500 frames (lamp-control's protocol.rs FRAMES).
+export const MOVE_FRAMES = [2, 500];
+export const MOVE_FARTHEST = [200, 200, 150, 350, 350];
+export const MOVE_FASTEST = [900, 1300, 1000, 800, 800];
+
+// Rust's `{:.0}`, as the body prints a speed: a half rounds to the even neighbour.
+function roundHalfEven(value) {
+  const floor = Math.floor(value);
+  const part = value - floor;
+  if (part !== 0.5) return Math.round(value);
+  return floor % 2 === 0 ? floor : floor + 1;
+}
+
+// Why the body refuses a move of these steps and frames, in its words, at its
+// first problem; null for one it plays.
+export function moveWhy(stepMs, frames) {
+  if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms ${stepMs} is not from 40 to 1000`;
+  const lasts = Math.max(frames.length - 1, 0) * stepMs;
+  if (lasts < MOVE_LASTS_MS[0] || lasts > MOVE_LASTS_MS[1]) return `it lasts ${lasts} ms, not 1500 to 10000`;
+  const rest = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
+  if (!frames.length || !rest(frames[0]) || !rest(frames.at(-1))) return 'it does not begin and end at nothing';
+  const step = stepMs / 1000;
+  for (let at = 1; at < frames.length; at++) {
+    for (let joint = 0; joint < 5; joint++) {
+      const after = frames[at][joint];
+      if (Math.abs(after) > MOVE_FARTHEST[joint]) return `frame ${at} takes joint ${joint} ${after} counts, farther than ${MOVE_FARTHEST[joint]}`;
+      const speed = Math.abs(after - frames[at - 1][joint]) / step;
+      if (speed > MOVE_FASTEST[joint] + 2 / step) {
+        return `frame ${at} asks joint ${joint} for ${roundHalfEven(speed)} counts a second, faster than ${MOVE_FASTEST[joint]}`;
+      }
+    }
+  }
+  return null;
+}
+
+// lamp-control's refusal of a computer's `move` (protocol.rs), in its words, as
+// `bad_request`: its own shape first, then the body's check; null for one it takes.
+export function moveRefusal(stepMs, frames) {
+  if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms: from ${MOVE_STEP_MS[0]} to ${MOVE_STEP_MS[1]}`;
+  if (frames.length < MOVE_FRAMES[0] || frames.length > MOVE_FRAMES[1]) return `frames: from ${MOVE_FRAMES[0]} to ${MOVE_FRAMES[1]}`;
+  const home = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
+  if (!home(frames[0]) || !home(frames.at(-1))) return 'frames: start and end at home, all five 0';
+  const why = moveWhy(stepMs, frames);
+  return why === null ? null : `frames: a move this body cannot play: ${why}`;
+}
+
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const LEASE_OPS = new Set(['look', 'move', 'play', 'joints']);
 
@@ -188,6 +240,20 @@ export class FakeLamp {
       this.received.push(request);
       const id = Number.isInteger(request.id) && request.id >= 0 ? request.id : null;
       if (id === null || !schema.ops.includes(request.op)) return this.refuse(ws, id, 'bad_request', 'not a v1 request');
+      // As lamp-control's protocol.rs, before grants or leases: a move it won't
+      // take, or the body would drop, is refused in its words (#4217).
+      if (request.op === 'move') {
+        // Only a move lamp-control parses (`step_ms: u32`, `Vec<[i32; 5]>`)
+        // reaches its check. JSON.parse gives 1.0 as 1, so this fake takes a
+        // count written `1.0`, which serde refuses.
+        const whole = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every(Number.isInteger);
+        if (!Number.isInteger(request.step_ms)) return this.refuse(ws, id, 'bad_request', 'step_ms: a whole number of ms');
+        if (!Array.isArray(request.frames) || !request.frames.every(whole)) {
+          return this.refuse(ws, id, 'bad_request', 'frames: each frame is five whole counts');
+        }
+        const refusal = moveRefusal(request.step_ms, request.frames);
+        if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
+      }
       if (request.op === 'pair') return this.pair(ws, request, nonce);
       if (request.op === 'hello') { client = this.hello(ws, request, nonce); return undefined; }
       if (!client) return this.refuse(ws, id, 'no_hello', 'hello first');

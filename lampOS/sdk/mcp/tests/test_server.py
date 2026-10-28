@@ -146,8 +146,8 @@ def test_a_lease_whose_action_is_refused_or_never_ends_is_not_listed_held(tmp_pa
             # Refused: its lease is let go of at once.
             assert len(fake.asked("lease.release")) == 1 and await leases(session) == []
             now[0] += 20  # past the tool's own 10 s wait without a done
-            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
-            call = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 40, "frames": frames}))
+            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]  # 1.5 s
+            call = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 500, "frames": frames}))
             await until(lambda: fake.asked("move"))
             assert len(await leases(session)) == 1
             now[0] += 11  # it lapses by itself on the lamp
@@ -171,9 +171,9 @@ def test_an_action_handed_to_a_part_ends_at_once(tmp_path):
                 await plain(ws, id_, **fields)
 
             fake._ok = handed
-            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]  # 1.5 s
             started = asyncio.get_running_loop().time()
-            result = await session.call_tool("lamp_move", {"step_ms": 40, "frames": frames})
+            result = await session.call_tool("lamp_move", {"step_ms": 500, "frames": frames})
             assert not result.isError and text(result).startswith("move taken by the body")
             assert asyncio.get_running_loop().time() - started < 5
 
