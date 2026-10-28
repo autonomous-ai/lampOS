@@ -133,15 +133,6 @@ fn link(lamp: &Lamp, path: &str) -> Option<String> {
         .map(|to| to.display().to_string())
 }
 
-/// What a lamp had before, without the part folders a put-back leaves
-/// empty.
-fn without_part_folders(files: BTreeMap<String, Vec<u8>>) -> BTreeMap<String, Vec<u8>> {
-    files
-        .into_iter()
-        .filter(|(name, _)| !["opt/lampOS/mood/", "opt/lampOS/records/"].contains(&name.as_str()))
-        .collect()
-}
-
 #[test]
 fn a_new_part_its_timer_and_a_helper_of_a_part_the_lamp_has_are_added_and_enabled_not_started() {
     let mut lamp = product_lamp();
@@ -203,7 +194,7 @@ fn an_added_unit_that_ends_at_once_holds_nothing_back_since_it_is_not_started() 
 #[test]
 fn a_build_put_back_takes_away_every_unit_link_and_part_it_added() {
     let mut lamp = product_lamp();
-    let before = without_part_folders(lamp.lamp_files());
+    let before = lamp.lamp_files();
     // The eyes' new build is not well: everything goes back.
     publish_with_eyes(
         &mut lamp,
@@ -223,7 +214,7 @@ fn a_build_put_back_takes_away_every_unit_link_and_part_it_added() {
         "{:?}",
         lamp.said
     );
-    assert_eq!(without_part_folders(lamp.lamp_files()), before);
+    assert_eq!(lamp.lamp_files(), before);
     for unit in [SOCKET, MOOD, RECORDS_TIMER] {
         assert!(lamp.calls().contains(&format!("stop {unit}")), "{unit}");
     }
@@ -263,7 +254,7 @@ fn an_enabling_link_already_there_is_left_as_it_is_both_ways() {
 #[test]
 fn a_switch_cut_short_is_put_back_and_takes_away_what_it_added() {
     let mut lamp = product_lamp();
-    let before = without_part_folders(lamp.lamp_files());
+    let before = lamp.lamp_files();
     publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
     lamp.systemd.cut_at_reload = true;
     let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
@@ -278,7 +269,7 @@ fn a_switch_cut_short_is_put_back_and_takes_away_what_it_added() {
         matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
         "{outcome:?}"
     );
-    assert_eq!(without_part_folders(lamp.lamp_files()), before);
+    assert_eq!(lamp.lamp_files(), before);
 }
 
 #[test]

@@ -145,9 +145,10 @@ impl Systemd for Systemctl {
 
     fn stop(&mut self, unit: &str) -> Result<(), String> {
         // A unit systemd never loaded (its file written, the reload not
-        // reached) is stopped already: `systemctl stop` says so, exit 5.
+        // reached) is stopped already: `systemctl stop` exits 5 and says
+        // "not loaded". Either is taken as stopped.
         match run(&["stop", unit], self.restart_within) {
-            Err(why) if why.contains("not loaded") => Ok(()),
+            Err(why) if not_loaded(&why) => Ok(()),
             done => done,
         }
     }
@@ -356,6 +357,12 @@ pub fn clean_line(line: &str) -> String {
 }
 
 /// `systemctl` with these words, waiting at most `within` for it.
+/// Whether `run`'s error is systemctl's for a unit it has not loaded: its
+/// exit status 5, or its own words.
+fn not_loaded(why: &str) -> bool {
+    why.contains(": exit status: 5:") || why.contains("not loaded")
+}
+
 fn run(words: &[&str], within: Duration) -> Result<(), String> {
     let mut child = Command::new("systemctl")
         .args(words)
@@ -583,6 +590,19 @@ impl Clock for Monotonic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stop_of_a_unit_systemd_never_loaded_is_known_by_its_status_or_its_words() {
+        assert!(not_loaded(
+            "systemctl stop lamp-a.service: exit status: 5: Failed to stop lamp-a.service: Unit lamp-a.service not loaded."
+        ));
+        assert!(not_loaded(
+            "systemctl stop lamp-a.service: exit status: 5: "
+        ));
+        assert!(!not_loaded(
+            "systemctl stop lamp-a.service: exit status: 1: Job for lamp-a.service failed."
+        ));
+    }
 
     fn sh(script: &str) -> Command {
         let mut command = Command::new("sh");

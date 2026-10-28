@@ -1429,7 +1429,9 @@ for level 8, so an updater of level 7 climbs first. It adds only:
   name in `/lib/systemd/system` or `/run/systemd/system` would be shadowed by
   the added copy, and lampOS ships none there.
 - **A unit whose users the lamp has:** its `User=`, `Group=` and
-  `SupplementaryGroups=` (root needs none). A round can't write
+  `SupplementaryGroups=` (root needs none), read from `/etc/passwd` and
+  `/etc/group` only. A user of another source (userdb, NSS) or a numeric
+  one reads as missing, which fails safe. A round can't write
   `/etc/passwd`, so one that runs as a user or a group the lamp lacks is not
   added, and that is said. `lamp-update install` makes them.
 
@@ -1453,8 +1455,8 @@ start mid-day.
 All of it rides the switch's journal (`Switching::added`). A build put
 back, or a switch cut short and recovered at the next start, stops each
 added unit and removes its file, its links, an emptied `.wants` folder and
-the `current` link it made. A new part's folder goes when nothing names it.
-The empty folder of a part's builds (`/opt/lampOS/<part>/`) stays.
+the `current` link it made. A new part's folder goes when nothing names it,
+and then the folder of its builds (`/opt/lampOS/<part>/`) too, once empty.
 
 Not shown: any of it on a real systemd or a 7071 lamp. A lamp imaged with
 7071 lacks no product unit of today's `install` list, so the first build
