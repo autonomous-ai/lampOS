@@ -147,8 +147,8 @@ fn a_back_that_began_before_the_refresh_and_failed_is_waited_past_never_put_back
             ..Running::default()
         },
     );
-    // Began in the refresh's own second: it may be the copy before's.
-    lamp.systemd.back_began = Some(done.at_unix_ms / 1000 * 1000);
+    // Began in the refresh's own millisecond: it may be the copy before's.
+    lamp.systemd.back_began = Some(done.at_unix_ms);
     lamp.round();
     assert_eq!(lamp.read(BACK), "lamp-update 1");
     assert_eq!(lamp.read(PREV), "old writer");
@@ -161,7 +161,7 @@ fn a_back_that_began_before_the_refresh_and_failed_is_waited_past_never_put_back
         lamp.said
     );
     // The new writer's own `back`, begun after, fails: it is put back.
-    lamp.systemd.back_began = Some((done.at_unix_ms / 1000 + 1) * 1000);
+    lamp.systemd.back_began = Some(done.at_unix_ms + 1);
     lamp.round();
     assert_eq!(lamp.read(BACK), "old writer");
     assert!(!lamp.exists(PREV));
