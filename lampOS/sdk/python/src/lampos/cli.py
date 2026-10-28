@@ -9,6 +9,7 @@ it all with no lamp.
     lamp skill keygen
     lamp skill pack FOLDER [--sign] [--out DIR]
     lamp skill push FOLDER [LAMP_ID]
+    lamp skill install FILE|URL [LAMP_ID] [--yes]
     lamp skill list [LAMP_ID]
     lamp skill remove NAME [LAMP_ID]
 """
@@ -162,6 +163,46 @@ async def _skill_push(args) -> int:
     return 0
 
 
+# What each ask lets a skill do, in the words a person is shown.
+ASK_WORDS = {
+    "body": "move the lamp",
+    "camera": "see the camera's picture",
+    "light": "change the light",
+    "look": "know when someone is at the lamp",
+    "speak": "speak and play sounds",
+}
+
+
+async def _skill_install(args) -> int:
+    from .push import asks_of, fetch, open_package, read_capped, tomllib
+
+    # A URL is fetched over https only; anything else is a file here.
+    if "://" in args.source:
+        data = fetch(args.source)
+    else:
+        with open(args.source, "rb") as file:
+            data = read_capped(file)
+    opened = open_package(data)
+    asks = asks_of(tomllib.loads(opened.files.get("skill.toml", b"").decode("utf-8", "replace")))
+    # Integrity, not trust: anyone can make a key (Fourteen, #3504).
+    print(f"{opened.name} {opened.version}")
+    print(f"  signed by key {opened.author}, not the Store" if opened.author else "  not signed, not the Store")
+    for ask in asks:
+        print(f"  asks to {ASK_WORDS[ask]} ({ask})")
+    if "camera" in asks:
+        print("  It asks for the camera's picture: the lamp keeps it off until the owner says yes in the app.")
+    if not args.yes:
+        answer = input(f"Put {opened.name} on your lamp? [y/N] ").strip().lower()
+        if answer not in ("y", "yes"):
+            print("not installed")
+            return 1
+    async with await Lamp.connect(args.lamp) as lamp:
+        skill = await lamp.install_package(data)
+    held = f", held: {skill['held']}" if skill.get("held") else ""
+    print(f"{skill.get('name')} {skill.get('version')} installed, {'on' if skill.get('on') else 'off'}{held}")
+    return 0
+
+
 async def _skill_list(args) -> int:
     async with await Lamp.connect(args.lamp) as lamp:
         for skill in await lamp.skills():
@@ -223,6 +264,11 @@ def main(argv: list[str] | None = None) -> int:
     skill_push.add_argument("folder")
     skill_push.add_argument("lamp", nargs="?")
     skill_push.set_defaults(run=_skill_push)
+    skill_install = skill_commands.add_parser("install", help="put a shared package (a .tar file or an https URL) on your paired lamp, after showing what it asks")
+    skill_install.add_argument("source", help="a package file, or an https:// URL (1 MiB at most)")
+    skill_install.add_argument("lamp", nargs="?")
+    skill_install.add_argument("--yes", action="store_true", help="don't ask: you have read what it asks")
+    skill_install.set_defaults(run=_skill_install)
     skill_list = skill_commands.add_parser("list", help="the skills this computer has pushed")
     skill_list.add_argument("lamp", nargs="?")
     skill_list.set_defaults(run=_skill_list)

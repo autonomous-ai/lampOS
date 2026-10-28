@@ -567,10 +567,44 @@ class Lamp:
         if beyond:
             code, why = beyond
             raise BY_CODE[code](why)
-        package = pack(folder)
+        return await self._send_package(pack(folder))
+
+    async def install_package(self, data: bytes) -> dict:
+        """Put a shared package (`lamp skill pack`'s, signed or not) on the
+        paired lamp, as `skill.push` with `asks`: the package and its
+        signature checked first, then its skill as `push_skill` checks a
+        folder. Returns the lamp's `skill`. Show the person `opened` and
+        `asks_of` before this: the lamp holds a picture skill for the
+        owner's yes in the app whatever is said here."""
+        import tempfile
+        from pathlib import Path
+
+        from .push import Package, asks_of, open_package, rules_beyond, tomllib
+        from .skillcheck import check
+
+        opened = open_package(data)
+        with tempfile.TemporaryDirectory() as scratch:
+            folder = Path(scratch) / opened.name
+            for path, body in opened.files.items():
+                (folder / path).parent.mkdir(parents=True, exist_ok=True)
+                (folder / path).write_bytes(body)
+            report = check(folder)
+        if not report.ok:
+            raise LampError(f"{opened.name}: {report.errors[0]}", code="bad_request")
+        if "skills" not in self.grants:
+            raise BY_CODE["no_grant"]("not granted: skills")
+        rules = tomllib.loads(opened.files["skill.toml"].decode("utf-8"))
+        beyond = rules_beyond(rules, self.grants)
+        if beyond:
+            code, why = beyond
+            raise BY_CODE[code](why)
+        return await self._send_package(Package(opened.name, opened.version, data), asks=asks_of(rules))
+
+    async def _send_package(self, package, asks: list[str] | None = None) -> dict:
         parts = package.parts()
         reply: dict = {}
         for part, data in enumerate(parts):
+            extra = {"asks": asks} if part == 0 and asks is not None else {}
             reply = await self.request(
                 "skill.push",
                 name=package.name,
@@ -579,6 +613,7 @@ class Lamp:
                 part=part,
                 parts=len(parts),
                 data=data,
+                **extra,
             )
         return reply.get("skill", {})
 

@@ -1053,3 +1053,68 @@ def test_a_package_path_outside_its_folder_is_refused_before_anything_is_written
     with pytest.raises(LampError) as raised:
         open_package(out.getvalue())
     assert "a skill's paths are at most 4 parts" in raised.value.why
+
+
+def test_a_shared_package_is_installed_with_its_asks_on_part_0(tmp_path, monkeypatch):
+    from lampos import push
+
+    monkeypatch.setattr(push, "PART_BYTES", 600)
+    author = Keyring(tmp_path / "author").author_key(make=True)
+    rules = 'version = "0.2.0"\n[permissions]\nlight = true\nspeak = true\n'
+    signed = push.pack(_skill(tmp_path, "desk-wave", rules), author=author).data
+
+    async def go():
+        async with FakeLamp(grants=("light", "speak", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                skill = await lamp.install_package(signed)
+                assert (skill["name"], skill["version"], skill["on"]) == ("desk-wave", "0.2.0", True)
+                pushes = fake.asked("skill.push")
+                assert len(pushes) > 1 and pushes[0]["asks"] == ["light", "speak"]
+                assert all("asks" not in later for later in pushes[1:])
+                assert pushes[0]["sha256"] == hashlib.sha256(signed).hexdigest()
+                # Beyond the pairing, or changed after signing: nothing more is sent.
+                body = push.pack(_skill(tmp_path / "b", "desk-lift", 'version = "0.1.0"\n[permissions]\nbody = true\n'), author=author).data
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.install_package(body)
+                with pytest.raises(LampError, match="does not match lamp-skill.json"):
+                    await lamp.install_package(signed.replace(b"speak = true", b"speak = TRUE"))
+                assert len(fake.asked("skill.push")) == len(pushes)
+
+    run(go())
+
+
+def test_lamp_skill_install_shows_the_signer_and_asks_then_asks_yes(tmp_path):
+    import os
+    import sys
+
+    from lampos import push
+
+    author = Keyring(tmp_path / "author").author_key(make=True)
+    package = tmp_path / "desk-wave-0.1.0.tar"
+    package.write_bytes(push.pack(_skill(tmp_path, "desk-wave", 'version = "0.1.0"\n[permissions]\nlight = true\n'), author=author).data)
+    fpr = push.open_package(package.read_bytes()).author
+
+    async def lamp_cli(home: Path, *args: str, typed: str = "") -> tuple[int, str]:
+        process = await asyncio.create_subprocess_exec(
+            sys.executable, "-m", "lampos.cli", *args,
+            env={**os.environ, "LAMPOS_HOME": str(home)},
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await process.communicate(typed.encode())
+        return process.returncode, (out.decode() + err.decode()).strip()
+
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            home = tmp_path / "home"
+            await paired(fake, home)
+            code, said = await lamp_cli(home, "skill", "install", str(package), typed="n\n")
+            assert code == 1 and said.endswith("not installed"), said
+            assert said.splitlines()[:3] == ["desk-wave 0.1.0", f"  signed by key {fpr}, not the Store", "  asks to change the light (light)"]
+            assert fake.asked("skill.push") == []
+            code, said = await lamp_cli(home, "skill", "install", str(package), typed="y\n")
+            assert code == 0 and said.endswith("desk-wave 0.1.0 installed, on"), said
+            code, said = await lamp_cli(home, "skill", "install", "http://example.com/desk-wave.tar", "--yes")
+            assert code == 1 and "https only" in said
+
+    run(go())
