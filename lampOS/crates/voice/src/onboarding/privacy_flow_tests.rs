@@ -117,7 +117,7 @@ fn deliver(walk: &mut Onboarding, token: u64, now: u64) {
     assert!(
         walk.take_privacy_invitation(token, now)
             .unwrap()
-            .contains("Turn it off, then back on.")
+            .contains("Close it, then open it again.")
     );
     assert!(walk.bind_privacy_invitation(token, boot, 4));
     walk.privacy_invitation_finished(boot, 4, Delivery::Whole, now);
@@ -924,7 +924,7 @@ fn the_invitation_is_short_with_the_location() {
     let said = note.split('"').nth(1).unwrap();
     assert_eq!(
         said,
-        "Find my privacy switch at its verified profile location. Turn it off, then back on."
+        "Find my privacy switch at its verified profile location. Close it, then open it again."
     );
     // About 3-5 s spoken: where it is, then what to do.
     assert!(said.split_whitespace().count() <= 16);
