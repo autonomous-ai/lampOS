@@ -2719,13 +2719,14 @@ fn a_meal_check_names_no_food_and_takes_no_picture() {
 /// #3694: a trigger `follows` another of its skill's triggers by name, for 10
 /// s to 1 h after that one ran, once each time it holds, on the whole topic.
 /// Naming none of the others, itself, no rearm, a `within` past those bounds,
-/// or an `each`, `once_per_day` or `yields_to` beside it, is refused.
+/// or an `each`, `once_per_day`, `unless_heard` or `yields_to` beside it, is
+/// refused.
 #[test]
 fn follows_names_another_trigger_of_the_skill_and_is_refused_otherwise() {
     let dir = tempfile::tempdir().unwrap();
     let toml = |second: &str| {
         format!(
-            "[[trigger]]\nname = \"slouch\"\ntopic = \"room/activity\"\nfield = \"state\"\n\
+            "[[trigger]]\nname = \"leaned_in\"\ntopic = \"room/activity\"\nfield = \"state\"\n\
              equals = \"leaning_in\"\nfor = \"10m\"\nrearm = \"leaves\"\n\
              [[trigger]]\nname = \"sat_well\"\ntopic = \"room/activity\"\nfield = \"state\"\n\
              equals = \"at_desk\"\nfor = \"1m\"\n{second}\
@@ -2736,7 +2737,7 @@ fn follows_names_another_trigger_of_the_skill_and_is_refused_otherwise() {
     load(&skill_with(
         dir.path(),
         "fine",
-        &toml("rearm = \"leaves\"\nfollows = { trigger = \"slouch\", within = \"15m\" }\n"),
+        &toml("rearm = \"leaves\"\nfollows = { trigger = \"leaned_in\", within = \"15m\" }\n"),
     ))
     .unwrap();
     for (second, why) in [
@@ -2749,16 +2750,32 @@ fn follows_names_another_trigger_of_the_skill_and_is_refused_otherwise() {
             "names none of the skill's other triggers",
         ),
         (
-            "follows = { trigger = \"slouch\", within = \"15m\" }\n",
+            "follows = { trigger = \"leaned_in\", within = \"15m\" }\n",
             "follows goes with rearm",
         ),
         (
-            "rearm = \"leaves\"\nfollows = { trigger = \"slouch\", within = \"5s\" }\n",
+            "rearm = \"leaves\"\nfollows = { trigger = \"leaned_in\", within = \"5s\" }\n",
             "follows.within is 10s to 1h",
         ),
         (
-            "rearm = \"leaves\"\nfollows = { trigger = \"slouch\", within = \"2h\" }\n",
+            "rearm = \"leaves\"\nfollows = { trigger = \"leaned_in\", within = \"2h\" }\n",
             "follows.within is 10s to 1h",
+        ),
+        (
+            "rearm = \"leaves\"\neach = \"faces\"\nkey = \"id\"\nfollows = { trigger = \"leaned_in\", within = \"15m\" }\n",
+            "follows goes with rearm",
+        ),
+        (
+            "rearm = \"leaves\"\nonce_per_day = true\nduring = { from = \"08:00\", to = \"20:00\" }\nfollows = { trigger = \"leaned_in\", within = \"15m\" }\n",
+            "follows goes with rearm",
+        ),
+        (
+            "rearm = \"leaves\"\nunless_heard = true\nduring = { from = \"08:00\", to = \"20:00\" }\nfollows = { trigger = \"leaned_in\", within = \"15m\" }\n",
+            "follows goes with rearm",
+        ),
+        (
+            "when = \"appears\"\nyields_to = { skill = \"bedtime-morning\", trigger = \"morning\" }\nfollows = { trigger = \"leaned_in\", within = \"15m\" }\n",
+            "follows goes with rearm",
         ),
     ] {
         let error = load(&skill_with(dir.path(), "bad", &toml(second))).unwrap_err();
@@ -2823,6 +2840,11 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
         &["room/activity", "humans/faces/tracked", "voice/state"]
             .map(|topic| toml::Value::String(topic.to_owned()))
     );
+    // In the wellbeing group's hour, as the other nudges: another wellbeing
+    // skill's run holds it back (`a_shared_budget_gives_its_group_its_runs_an_hour_between_them`);
+    // two words in a row unnoticed rest it, as theirs do.
+    assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
+    assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
     assert_eq!(skill.kind, SkillKind::Installable);
 }
 

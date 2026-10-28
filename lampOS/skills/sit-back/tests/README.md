@@ -1,7 +1,7 @@
 # Sit back's tests
 
 **How they were made.** Not on a lamp, and not recorded: each case's
-`.jsonl` files were written by a script in the format `lamp-bus record`
+`.jsonl` files were written by a script (the last three with `away` spans: no face, and a new sitting with no baseline for its first 2 minutes after a gap over 2 minutes, as the eyes say it) in the format `lamp-bus record`
 writes (#3694), as A comfort break's were: the eyes'
 `room/activity` every 5 s, its baseline in throughout (under the triggers'
 gaps; its declaration's 3 s lifespan as the eyes publish it), faces every
@@ -31,10 +31,17 @@ both in `crates/skills/tests/it/skills.rs`.
 | `quiet-at-night` | 22:00, leaned in from minute 3 | Pass: nothing (`[quiet]` 22:00 to 08:00) |
 | `three-a-day-at-most` | 09:00, four times leaned in 11 minutes, an hour apart | Pass: a word and a warm word the first three times, nothing the fourth (`most_a_day = 3`, the warm words not counted) |
 | `off-when-asked` | 11:00, `wellbeing_nudges(how = "off")` at a minute | Pass: nothing (`[stop]`) |
+| `no-warm-word-on-coming-back` | 11:00, the word at 13, then away from 16 to 20 and back (a new sitting, its baseline again) | Pass: the word only: no warm word for coming back (the sitting past 12 minutes) |
+| `a-second-lean-within-the-hour-is-let-be` | 11:00, the word at 13 and the warm word at 17, leaned in again from 30 to 45 | Pass: nothing more: the hour since the word not past (`cooldown`, and the group's hour) |
+| `rests-after-two-unnoticed` | 09:00, the word at 13 and at 90, each unnoticed for a minute, leaned in again from 150 | Pass: the two words and their warm words, nothing at 160 (`[rest] after_ignored = 2`) |
 
 Red runs, each against these cases (#3694): with `follows` ignored, the warm
 word comes after a lean that drew no word (`a-short-lean-is-let-be` fails);
 with the warm word counted and held back as a nudge, it waits for the
 group's hour (`a-warm-word-after-they-sit-back` fails); without its
 `faces_at_most` condition, the word is said at 13 with the second face in
-view (`held-while-someone-else-is-in-view` fails).
+view (`held-while-someone-else-is-in-view` fails); without the sitting's 12
+minutes, a warm word comes a minute after coming back (`no-warm-word-on-coming-back`
+fails); without `[rest]`, the third lean is told (`rests-after-two-unnoticed`
+fails); without both `cooldown` and `[budget]`, the second lean within the hour is
+told (`a-second-lean-within-the-hour-is-let-be` fails; either alone holds it).
