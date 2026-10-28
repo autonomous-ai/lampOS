@@ -6698,13 +6698,11 @@ fn conversation_with_gate_inner(
         // Every turn in hand while the walk is under way, whichever way it
         // began, is told so before its `go_to_sleep` can be answered: never
         // the line, then a sleep refused (#3835's P3).
-        if crate::sleep_asked::switched_on()
-            && (walk_under_way
-                || onboarding
-                    .as_ref()
-                    .and_then(crate::onboarding::Onboarding::under_way)
-                    .unwrap_or(false))
-            && let Some(current) = reply.as_ref()
+        if sleep_not_now(
+            crate::sleep_asked::switched_on(),
+            controls.as_ref(),
+            onboarding.as_ref(),
+        ) && let Some(current) = reply.as_ref()
             && onboarding_marked != Some(current.owner.turn())
         {
             onboarding_marked = Some(current.owner.turn());
@@ -9245,6 +9243,13 @@ fn conversation_with_gate_inner(
                     // A line begun in onboarding's sentence window is the
                     // sentence (#1803): count-only from its Start.
                     let count_only = sentence_window(onboarding.as_ref(), monotonic_us());
+                    // Begun while the walk is under way (#3748): a
+                    // `go_to_sleep` it calls is answered not now.
+                    let not_now = sleep_not_now(
+                        crate::sleep_asked::switched_on(),
+                        controls.as_ref(),
+                        onboarding.as_ref(),
+                    );
                     snapshot = commit_admitted_input(
                         owner,
                         reply,
@@ -9259,10 +9264,14 @@ fn conversation_with_gate_inner(
                         heard_of_cut,
                         follows_on,
                         count_only,
+                        not_now,
                         rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
                     )?;
+                    if not_now {
+                        onboarding_marked = reply.as_ref().map(|current| current.owner.turn());
+                    }
                     last_publish = monotonic_us();
                     // Begun while how_you_sound waits for a call (#3504):
                     // the second route leaves a line that is only the name
@@ -9279,20 +9288,6 @@ fn conversation_with_gate_inner(
                             trace,
                             json!({"kind":"onboarding_step_call","turn":current.owner.turn(),"at_us":monotonic_us()}),
                         )?;
-                    }
-                    // Begun while onboarding is under way (#3748): a
-                    // `go_to_sleep` it calls is answered not now.
-                    if crate::sleep_asked::switched_on()
-                        && onboarding
-                            .as_ref()
-                            .and_then(crate::onboarding::Onboarding::under_way)
-                            .unwrap_or(false)
-                        && let Some(current) = reply.as_ref()
-                    {
-                        provider_queue.push_back(ProviderInput::Onboarding {
-                            request: current.owner.turn(),
-                            privacy_generation: snapshot.microphone_generation(),
-                        });
                     }
                     if goes_on_from_name {
                         open_name_turn = None;
@@ -9447,6 +9442,11 @@ fn conversation_with_gate_inner(
                             .filter(|_| provider_control_empty && !submission_draining)
                         {
                             Some(provider_session) => {
+                                let not_now = sleep_not_now(
+                                    crate::sleep_asked::switched_on(),
+                                    controls.as_ref(),
+                                    onboarding.as_ref(),
+                                );
                                 snapshot = continue_after_early_end(
                                     owner,
                                     reply,
@@ -9456,10 +9456,15 @@ fn conversation_with_gate_inner(
                                     provider_session,
                                     rig.cut_keeps_name,
                                     sentence_heard.is_some(),
+                                    not_now,
                                     rig.playout_start_now(),
                                     trace,
                                     |state| rig.publish(state),
                                 )?;
+                                if not_now {
+                                    onboarding_marked =
+                                        reply.as_ref().map(|current| current.owner.turn());
+                                }
                                 if took_over {
                                     took_over_turn =
                                         reply.as_ref().map(|current| current.owner.turn());
@@ -13276,6 +13281,9 @@ fn commit_admitted_input(
     // Begun in onboarding's sentence window (#1803): its Start is followed
     // at once by `CountOnly`, before any of its sound.
     count_only: bool,
+    // Begun while the walk is under way ([`sleep_not_now`]): its Start is
+    // followed at once by `Onboarding`, before any of its sound.
+    not_now: bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -13342,12 +13350,14 @@ fn commit_admitted_input(
         over_the_lamps_voice,
         heard_of_cut,
     });
-    if count_only {
-        provider_queue.push_back(ProviderInput::CountOnly {
-            request: turn.turn(),
-            privacy_generation: snapshot.microphone_generation(),
-        });
-    }
+    let marks = after_start(
+        turn.turn(),
+        snapshot.microphone_generation(),
+        count_only,
+        not_now,
+    );
+    let marked = marks.len();
+    provider_queue.extend(marks);
     let mut current = Reply {
         owner: turn,
         cloud: CloudRequest::new(provider_session)?,
@@ -13377,8 +13387,8 @@ fn commit_admitted_input(
     };
     // One candidate's audio, already bounded by the admission's hold. The
     // standard hold's prefix fits the standing bound as it always has, and
-    // the sentence's `CountOnly` has a slot of its own.
-    let bound = PROVIDER_QUEUE_BOUND.max(prefix.len() + 2) + usize::from(count_only);
+    // the marks after the Start ([`after_start`]) have slots of their own.
+    let bound = PROVIDER_QUEUE_BOUND.max(prefix.len() + 2) + marked;
     for audio in prefix {
         queue_input(
             provider_queue,
@@ -13686,6 +13696,8 @@ fn continue_after_early_end(
     cut_keeps_name: bool,
     // The sentence going on (#1803): count-only, as its first part was.
     count_only: bool,
+    // Going on while the walk is under way ([`sleep_not_now`]).
+    not_now: bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -13725,12 +13737,14 @@ fn continue_after_early_end(
         over_the_lamps_voice: false,
         heard_of_cut: None,
     });
-    if count_only {
-        provider_queue.push_back(ProviderInput::CountOnly {
-            request: turn.turn(),
-            privacy_generation: snapshot.microphone_generation(),
-        });
-    }
+    let marks = after_start(
+        turn.turn(),
+        snapshot.microphone_generation(),
+        count_only,
+        not_now,
+    );
+    let marked = marks.len();
+    provider_queue.extend(marks);
     let mut current = Reply {
         owner: turn,
         cloud: CloudRequest::new(provider_session)?,
@@ -13759,7 +13773,7 @@ fn continue_after_early_end(
         sounded: false,
     };
     // At most a pre-roll, as a new candidate's opening is.
-    let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2) + usize::from(count_only);
+    let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2) + marked;
     for audio in opening {
         queue_input(
             provider_queue,
@@ -14035,6 +14049,48 @@ fn dispatch_speaker_chunk(
 /// Queue threshold before appending PCM: a start, the largest accepted prefix
 /// and what arrives while it drains. One terminal End may follow at this bound;
 /// total command capacity is 65 in standard mode or 115 in duplex mode.
+/// What follows a request's Start at once, before any of its sound: the
+/// sentence's `CountOnly` (#1803), then `Onboarding` while the walk is
+/// under way, so a `go_to_sleep` the request calls is answered not now
+/// however soon the model calls it, never the line, then a sleep refused
+/// (Sixth's P3 on #3835).
+fn after_start(
+    request: u64,
+    privacy_generation: u64,
+    count_only: bool,
+    not_now: bool,
+) -> Vec<ProviderInput> {
+    let mut marks = Vec::new();
+    if count_only {
+        marks.push(ProviderInput::CountOnly {
+            request,
+            privacy_generation,
+        });
+    }
+    if not_now {
+        marks.push(ProviderInput::Onboarding {
+            request,
+            privacy_generation,
+        });
+    }
+    marks
+}
+
+/// Whether a request begun now is in the walk for `go_to_sleep`
+/// (`LAMP_SLEEP_ASKED=on`, #3748): the hand controls' own onboarding bit,
+/// or the walk under way.
+fn sleep_not_now(
+    switched_on: bool,
+    controls: Option<&HandControls>,
+    onboarding: Option<&crate::onboarding::Onboarding>,
+) -> bool {
+    switched_on
+        && (controls.is_some_and(HandControls::onboarding)
+            || onboarding
+                .and_then(crate::onboarding::Onboarding::under_way)
+                .unwrap_or(false))
+}
+
 const PROVIDER_QUEUE_BOUND: usize = 64;
 
 /// A longer hold accepts a longer prefix; the queue keeps the same spare

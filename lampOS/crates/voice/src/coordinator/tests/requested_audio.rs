@@ -384,6 +384,7 @@ impl Test {
                 None,
                 false,
                 false,
+                false,
                 PlayoutStart::default(),
                 &mut self.trace,
                 |state| self.speaker.publish_speaker_snapshot(state),

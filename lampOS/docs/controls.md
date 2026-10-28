@@ -130,7 +130,11 @@ sounding 8 s after the call, it asks then. The sleep is dropped if the
 person cuts in, if the turn ends with no audio, or if it ends not heard
 whole (`SleepOwed`, #3835). Never while onboarding is under way: the
 coordinator marks every turn in hand while it is
-(`ProviderInput::Onboarding`), and the model is told it is not now. Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
+(`ProviderInput::Onboarding`), and the model is told it is not now. A
+request begun in the walk is marked right after its Start, before any of
+its sound, so the mark reaches the worker before the model can call
+(Sixth's P3 on #3835); a turn begun before the walk is marked at the next
+poll. Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
 mute), since a tap on the head is how it wakes: without it the function is
 not declared at all, and the journal says so once. A held line's call is
 refused, as every action's is.
