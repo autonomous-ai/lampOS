@@ -45,13 +45,6 @@ pub const SAY_OPENED: &str =
 /// failure notice `wifi_recovering` (`docs/failure-notices.md`).
 pub const RECORDING_OPENED: &str = "wifi_recovering";
 
-/// Whether `act`, taken while `was_recovering` was not, is the hotspot's
-/// first opening for this loss: [`SAY_OPENED`] is said then, once, never at
-/// a reopening after a failed retry of the saved network.
-pub fn says_opened(was_recovering: bool, act: Option<Act>) -> bool {
-    !was_recovering && act == Some(Act::OpenHotspot)
-}
-
 /// Whether the switch's value turns recovery on.
 pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
@@ -104,12 +97,18 @@ pub enum State {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Recovery {
     state: State,
+    /// [`SAY_OPENED`] was said for this loss: kept until the lamp is online
+    /// again, so neither a reopening after a failed retry nor one after a
+    /// retry that went back to `Lost` (only slow, or busy) says it again
+    /// (Second's P3 on #4157).
+    told: bool,
 }
 
 impl Default for Recovery {
     fn default() -> Self {
         Self {
             state: State::Online,
+            told: false,
         }
     }
 }
@@ -123,6 +122,15 @@ impl Recovery {
     /// or a try of the saved network from it.
     pub fn recovering(&self) -> bool {
         matches!(self.state, State::Hotspot { .. } | State::Rejoining { .. })
+    }
+
+    /// Whether `act`, the step's own, is the hotspot's first opening for
+    /// this loss: [`SAY_OPENED`] is said then, once a loss, until the lamp
+    /// is online again.
+    pub fn says_opened(&mut self, act: Option<Act>) -> bool {
+        let first = act == Some(Act::OpenHotspot) && !self.told;
+        self.told |= first;
+        first
     }
 
     /// What `seen` at `now_ms` asks for.
@@ -176,6 +184,9 @@ impl Recovery {
             ),
             State::Rejoining { until_ms } => (State::Rejoining { until_ms }, None),
         };
+        if state == State::Online {
+            self.told = false;
+        }
         self.state = state;
         act
     }
