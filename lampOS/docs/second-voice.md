@@ -3547,7 +3547,7 @@ after a take-over, but now for every turn:
   conversation already going on is renewed as before. "Lamp, is it cute?", a face turned to the
   lamp, a tap and a quiet room are as before. A clause naming the lamp that
   asks it to move ("Tilt the lamp up.", `MOVES`) or states a need of its
-  light ("The lamp is too bright.", `NEEDS`) is no remark either
+  light ("The lamp is too bright.", "too" before a light or place word, `TOO_WHAT`, or a comparative after the lamp, "I need the lamp brighter.", `MORE`; bare "too", "need" or "want" is no need: "That lamp is cute too.", Thirteen's P2 on #4219) is no remark either, and "please" anywhere in a sentence naming the lamp asks ("The lamp, off please.")
   (Reviewer-three's narrower P2 on #4201). A remark held is said on the bus
   as `voice/remarked` (`VoiceRemarked`, its request alone; `bus_out::RemarkOut`,
   from the verdict's own callback, so only a line `voice/turn` says
