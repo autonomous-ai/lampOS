@@ -118,14 +118,14 @@ def test_a_look_takes_its_own_lease_and_lets_go_at_done(tmp_path):
 def test_a_lease_the_lamp_takes_back_is_the_tools_error(tmp_path):
     async def go():
         async with connected(tmp_path, auto_done=False) as (fake, _, session):
-            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
-            call = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 40, "frames": frames}))
-            await until(lambda: fake.asked("move"))
+            # A look waits for its done; a move is handed to the body and ends at once (#3903's fake, as lamp-control).
+            call = asyncio.create_task(session.call_tool("lamp_look", {"yaw": 10, "pitch": 0}))
+            await until(lambda: fake.asked("look"))
             await fake.lease_event(next(iter(fake.leases)), "lost", why="hand")
             result = await call
             assert result.isError and "lease_lost: hand" in text(result)
             # Lost is gone already: nothing to let go of, and no retry.
-            assert not fake.asked("lease.release") and len(fake.asked("move")) == 1
+            assert not fake.asked("lease.release") and len(fake.asked("look")) == 1
 
     run(go())
 
@@ -201,14 +201,14 @@ def test_a_wait_for_a_phrase_ends_only_on_its_own_phrases(tmp_path):
     async def go():
         async with connected(tmp_path, grants=("hear",)) as (fake, lamp, session):
             first = await session.call_tool(
-                "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["stop"], "timeout_s": 0.2}
+                "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["please stop now"], "timeout_s": 0.2}
             )
             assert json.loads(text(first)) == {"timed_out": True}
             call = asyncio.create_task(
                 session.call_tool("lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["good night"], "timeout_s": 5})
             )
             await until(lambda: any("good night" in ask.get("phrases", []) for ask in fake.asked("subscribe")))
-            await fake.emit("phrase.heard", phrase="stop")
+            await fake.emit("phrase.heard", phrase="please stop now")
             await asyncio.sleep(0.2)
             assert not call.done()
             await fake.emit("phrase.heard", phrase="good night")
@@ -240,7 +240,7 @@ def test_a_wait_cancelled_before_its_subscribe_reply_leaves_nothing(tmp_path):
                 for tries in range(1, 4):
                     call = asyncio.create_task(
                         server.call_tool(
-                            "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["stop"], "timeout_s": 5}
+                            "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["please stop now"], "timeout_s": 5}
                         )
                     )
                     await until(lambda: len(fake.asked("subscribe")) >= tries)
@@ -250,7 +250,7 @@ def test_a_wait_cancelled_before_its_subscribe_reply_leaves_nothing(tmp_path):
                     assert not lamp._handlers.get("phrase.heard"), f"after {tries} cancelled"
                 await asyncio.sleep(0.5)
                 assert len(fake.asked("unsubscribe")) == 3
-                await fake.emit("phrase.heard", phrase="stop")
+                await fake.emit("phrase.heard", phrase="please stop now")
                 await asyncio.sleep(0.1)
                 recent = await server.read_resource("lamp://events/recent")
                 assert json.loads(list(recent)[0].content) == []
@@ -277,15 +277,15 @@ def test_a_second_phrase_wait_while_one_runs_is_busy(tmp_path):
     async def go():
         async with connected(tmp_path, grants=("hear",)) as (fake, _, session):
             call = asyncio.create_task(
-                session.call_tool("lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["stop"], "timeout_s": 5})
+                session.call_tool("lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["please stop now"], "timeout_s": 5})
             )
             await until(lambda: fake.asked("subscribe"))
             second = await session.call_tool(
-                "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["go"], "timeout_s": 1}
+                "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["go to sleep now"], "timeout_s": 1}
             )
             assert second.isError and "busy: " in text(second)
-            await fake.emit("phrase.heard", phrase="stop")
-            assert json.loads(text(await call))["phrase"] == "stop"
+            await fake.emit("phrase.heard", phrase="please stop now")
+            assert json.loads(text(await call))["phrase"] == "please stop now"
 
     run(go())
 

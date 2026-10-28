@@ -78,6 +78,28 @@ jobs:
       - run: python -m pip install -e '.[test]'
       - run: python -m pytest -q tests
 
+  # lamp-mcp (lampOS/sdk/mcp) on the Python SDK of the same commit: no job ran
+  # it, so the SDK's phrase floor (#3914) left 4 of its tests failing on
+  # lamp-voice unseen (harness-reviewer and Ten, 28 Oct).
+  mcp:
+    name: lampOS SDK — lamp-mcp, Python ${{ matrix.python }} (pytest)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12']
+    defaults:
+      run:
+        working-directory: lampOS/sdk/mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ../python -e '.[test]'
+      - run: python -m pytest -q tests
+
   js:
     name: lampOS SDK — JavaScript, Node ${{ matrix.node }} (node --test)
     runs-on: ubuntu-24.04
