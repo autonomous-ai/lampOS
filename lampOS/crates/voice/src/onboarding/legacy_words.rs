@@ -1,5 +1,5 @@
 //! Independent pre-move prompt bytes for unchanged semantic tests and parity.
-pub const SIT_NOTE: &str = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Let's get set up first. It takes a few minutes. Just do what I ask, and you can ask me anything once we're done. Sit where you usually sit and look at me. I'll tell you when I see you.\")";
+pub const SIT_NOTE: &str = "(Say only this, nothing before or after it: \"Let's get set up first! It'll only take a few minutes. Please follow my instructions step-by-step, and once we're done, you can ask me anything. Sit where you usually sit and look at me. I'll tell you when I see you.\")";
 pub const SIT_OFFER: &str = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Sit where you usually sit and look at me. I'll tell you when I see you.\")";
 pub const SIT_NO_FACE: &str = "(Say only this, nothing before or after it: \"I can't see your face yet. Sit where you usually sit, and look at me.\")";
 pub const SIT_CLOSER: &str = "(Say only this, nothing before or after it: \"You're a little far. Move me closer to you, or stay as you are.\")";
