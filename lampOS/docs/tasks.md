@@ -894,8 +894,10 @@ credential of its own.
   voice's news to key on: counted from the clock (unix ms, then one more a
   sign-in), so one after a restart isn't taken for one before it.
 - **The code.** `{"sign_in":"code","code":"12345678","expires_in":…,"code_told":…}`:
-  `code_told` is true once a `sign_in_start` answer gave that code, which
-  the voice says itself; a code that came later is its news's to tell. The
+  `code_told` is true once a `sign_in_start` answer or an atomic
+  `sign_in_take_code` claim gave that code. The provider's continuation and
+  coordinator news share this Tasks-owned claim; a state read alone gives
+  neither ownership to say it. The
   code given is forgotten once the state leaves `code`. The
   voice says the digits, and where to type them (Harness on the computer,
   Machines ▸ Approve a device, or harness.autonomous.ai). The same code
@@ -1763,7 +1765,8 @@ Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_han
 A lamp has no screen for Harness's QR code. Harness 0.4.23 signs a device in
 by a code it says aloud (openharness#1410). The tasks part runs Harness's
 own sign-in for the voice (`lamp-tasks serve --sign-in-by-code`, its trusted
-ops `sign_in_start`, `sign_in_state`, `sign_in_asked` and `sign_in_answer`;
+ops `sign_in_start`, `sign_in_state`, `sign_in_take_code`, `sign_in_asked`
+and `sign_in_answer`;
 ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
 With `LAMP_TASKS_SIGN_IN=on` the voice declares two functions
 ([`sign_in.rs`](../crates/voice/src/sign_in.rs)), on both routes.
@@ -1780,16 +1783,44 @@ never have asked or taken an answer on a lamp).
   type it (the Harness app under Machines ▸ Approve a device, or
   harness.autonomous.ai). A start refused says why: only the switch being
   off is "not set up"; a busy tasks part is "busy just now".
-- **The news, in the coordinator, from the tasks part's state only**
+- **The news, in the coordinator, from the tasks part**
   (`sign_in::news`, read every 2 s while a sign-in is open, every 10 s
-  otherwise): a code that came after the start's answer (`code_told`
-  false); once the person approves in Harness, the question "Shall I sign
+  otherwise): a code whose atomic claim it wins (`code_told` was false
+  when read, but the claim decides); once the person approves in Harness, the question "Shall I sign
   in as someone at example dot com?", the email read back slowly ("dot",
   "at", "dash", "underscore", "plus"); and how it ended (signed in, or why
   not). A sign-in first seen already done gets none (the start's answer told
   it), nor does the end after a no. Each is told once; its key
   (`sign-in-<id>-code`, `-asking`, `-done`) has no `:`, so it is never taken
   for a task's or sent as `told`.
+- **One initial code payload (#2839).** Each heard tool invocation sends
+  `sign_in_start` once. If its reply is `starting`, continuation polls use
+  `{"op":"sign_in_take_code","id":<that id>}` within the original deadline
+  and cadence. News uses that same operation before offering a code. Tasks
+  handles it atomically: `claim` is `waiting`, `granted`, `already_given`, or
+  `not_available`. Only `granted` carries the current code view, with
+  `code_told:true`; every other outcome has only the requested id and status.
+  Wrong or expired ids, expired codes and question/end states grant nothing.
+  An unchanged-code keepalive never reopens a claim. A new heard invocation
+  ("say it again") still returns the open code once through START.
+- **The update boundary.** `sign_in_state` advertises `code_claims:1`, even
+  with no session. New Voice requires it before START or automatic code
+  delivery; an old or replaced Tasks that lacks/refuses the operation causes
+  a bounded update explanation for START and no code news, never fallback
+  polling. Old Voice can still use the unchanged legacy operations with new
+  Tasks, but needs its own update to gain this duplicate fix. Questions and
+  answers keep their separate existing protocol.
+- **Expiry and delivery limits.** Voice uses the grant RPC's start plus
+  Tasks' remaining lifetime as the code news's `until`; transit cannot extend
+  it. The existing queue drops expired notes before telling them. Direct
+  START replies are checked against the same conservative lifetime. A claim
+  is never refunded after a stop, lost reply, privacy closure or provider
+  restart: the person can request another telling. This is payload ownership,
+  not proof the code was heard. A requested repeat does not revoke an older
+  queued initial note; it is one additional authorized payload. Existing
+  sign-in priority and other news's relative order remain unchanged, as do
+  the coordinator's final privacy, ownership and cancellation gates. A remote
+  session change cannot immediately retract an already queued note.
 - **Told at the next pause** (#2602, finding 4): a sign-in's news goes
   ahead of any task's waiting (`TaskNews::sign_in_first`) and is told at
   the first pause, as `LAMP_TASK_NEWS_AT_PAUSE=on` tells all news, whether
@@ -1896,8 +1927,24 @@ Tests: `sign_in::tests`:
   a refused answer said, the yes passed on with its own request, the end
   once;
 - `a_sign_in_is_never_told_twice_nor_its_end_after_a_no`;
-- `a_refused_start_says_why` (a tasks part too old for the ops,
-  `bad_request`, is "not set up on this lamp", the reviewer's P3 2);
+- `code_delivery::a_sign_in_code_is_delivered_once_and_repeated_only_on_request`
+  and `code_delivery::a_queued_sign_in_code_is_not_repeated_by_the_pending_start`
+  use the real Tasks service with a channel-controlled stand-in Harness. The
+  latter runs the provider in a separate test process and holds its initial
+  `starting` reply until code news is in the actual Voice queue, then lets
+  START continue. They count the code in tool results
+  and news taken to tell, and one further tool result for a new heard request
+  ("say it again"). Harness's unchanged-code keepalive must add no news and
+  both requests must use one sign-in. Readiness and ordering use events;
+  the production request deadlines and code lifetime stay unchanged. These
+  are delivery-payload regressions, not proof of acoustic speech or a played
+  sign-in; #2839 still needs its authorized lamp run;
+- `a_refused_start_says_why` (an old Tasks `bad_request` now explains that
+  Tasks needs updating, while switch-off and busy refusals remain distinct);
+- `a_code_handoff_needs_the_claim_protocol_and_never_restarts_its_poll`,
+  `news_never_reads_digits_from_an_unclaimed_or_expired_snapshot`, and
+  `code_validity_cannot_be_extended_by_a_delayed_reply` cover refusal after
+  capability, stale ids, conservative expiry and exact request sequences;
 - `the_code_is_kept_only_for_its_sign_in_and_held_pieces_leave_whole`;
 - `what_leaves_the_worker_has_neither_the_code_nor_the_account`, with
   Jarvis's planted values, in pieces and mixed forms;

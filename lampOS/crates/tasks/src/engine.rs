@@ -1487,6 +1487,7 @@ impl<P: Persistence> Engine<P> {
             // `--sign-in-by-code` (#1676).
             Request::SignInStart {}
             | Request::SignInState {}
+            | Request::SignInTakeCode { .. }
             | Request::SignInAsked { .. }
             | Request::SignInAnswer { .. } => {
                 return Err(err(
