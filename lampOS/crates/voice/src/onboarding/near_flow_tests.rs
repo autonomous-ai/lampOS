@@ -1794,3 +1794,48 @@ fn late_lines_skip_redo_and_a_new_cycle_in_the_sentence_part() {
     assert_eq!(outcome(&walk), Some(Outcome::Skipped));
     assert_eq!(lamp_near_call::read(&store.near_file()), Some(19.4));
 }
+
+/// Seventh's P2 on #4192: a silent first walk leaves the name part failed in
+/// this process, so a `later` re-offer of how_you_sound went straight to the
+/// sentence. Offered again, it begins with the call part, with nothing of
+/// the first walk's prompts, tries or answers.
+#[test]
+fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    // Three silent prompts: the two left could never make three calls.
+    for turn in 1..=3 {
+        let at = turn * 20 * S;
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 2_400, 21.0);
+        assert_eq!(judge(&mut walk, &prompt)["accepted"], false);
+    }
+    // The name part's failed line is said, as in a walk.
+    let mut said = settle(&mut walk, 120 * S);
+    assert_eq!(named(&walk), Some(Outcome::Failed));
+    said.extend(settle(&mut walk, 121 * S));
+    assert!(
+        said.contains(&walk.definition.words.near_failed),
+        "{said:?}"
+    );
+    // Its sentence part met with silence too: the step was left for later.
+    walk.desired.steps.insert(
+        Step::HowYouSound.name().into(),
+        Kept {
+            outcome: Outcome::Later,
+            at_unix_s: 1,
+            framing: None,
+            offered_at_unix_s: None,
+            later_offers: 0,
+        },
+    );
+    walk.begin_later_offer(Step::HowYouSound);
+    assert_eq!(walk.desired.steps["how_you_sound"].later_offers, 1);
+    assert_eq!(walk.near.named(), None);
+    assert_eq!(walk.desired.near_call_prompts, 0);
+    assert!(walk.desired.near_call_tries.is_empty());
+    walk.desired.steps.remove(Step::HowYouSound.name());
+    let first = play(&mut walk, 200 * S, 1_760_000_200_000, 6);
+    assert!(first.words.contains("how you call me"), "{}", first.words);
+    assert!(!first.words.contains("sentence"), "{}", first.words);
+}
