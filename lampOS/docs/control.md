@@ -184,7 +184,7 @@ lamp-control clients
 - **Off by default:** `serve` runs only with `LAMP_CONTROL=on`; otherwise it says so and exits 0. No product unit passes it yet.
 - **The parts it reaches:** `--mood-socket` (the body's gestures and moves), `--say-socket` (the voice), `--bus-root` (light requests out; events and state in) and `--boot-id` (the clock a light request names, `/proc/sys/kernel/random/boot_id` by default). A part not given is refused with "not reachable from lamp-control here".
 - **The body's lease:** with `--lease-socket` (lamp-body's, docs/body.md "Held by lamp-control"), while a computer holds `body` the door holds the body too, so the lamp's own life (the rest glance, Expression's offsets, a stand timing out) stands back. It holds for 30 s, renewed every 10 s, and lets go when no computer holds `body`. The body's own end of it (`lost` for a hand, privacy, a pause, a sleep, a slump or a lapse) ends the computer's `body` lease with that why, a lapse as `expired`; a why the door doesn't know, or a hold the body refuses, ends it as `released`, so a computer never thinks the lamp's own life stands back when it doesn't. A body that restarts is held again at the next 250 ms check, and a line from a connection the door has dropped is ignored. A body that can't be reached is journaled once, and the lamp's own life goes on.
-- **The quiet hours:** `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. A zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC.
+- **The quiet hours:** `--quiet-hours HH:MM-HH:MM` (or `LAMP_CONTROL_QUIET`; the flag wins) is this lamp's window, 22:00-07:00 unless set, and `off` turns them off; it is read once at the start, and a bad value (a window whose ends are the same minute too) stops lamp-control there. The window is journaled at start and said in hello's `limits`. `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. A zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC.
 - **Skill push:** with `--manage-socket` (root's manage helper, `/run/lampos-skills-manage/manage.sock`), the skill ops are served and a pushed package is kept in `--state-dir`'s `push/` for the helper ("Skills pushed from a computer" below). Without it, each is refused with "skill push is not on this lamp".
 - **The certificate:** made on first start in `--state-dir` (`/var/lib/lampos-control`): P-256, valid to 2100, `cert.der` and `key.der`, the key 0600. Its pin, the certificate's SHA-256 in hex, is journaled at start and returned with every pairing code.
 - **Listening:** `--listen`, `0.0.0.0:7731` by default. TLS 1.3 only, and only `/v1`: any other path is 404 before the WebSocket opens.
@@ -288,7 +288,8 @@ listener's included, after its leases' `lost`, and its leases end; they also end
 connection closes. `limits` says the rates below, so an
 SDK can keep under them: for each class (`joints`, `motion`, `light`, `say`,
 `express`, `refused`, `phrases`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
-`take_max_ms` and `say_max_chars`.
+`take_max_ms` and `say_max_chars`, and `quiet_hours`: this lamp's window,
+`{"from": "22:00", "to": "07:00"}`, or `"off"`.
 
 ### Subscribe and state
 
@@ -450,16 +451,18 @@ says `retry_ms`, the time until the oldest counted action leaves its window.
 A refused action isn't counted.
 
 At night the ring's night caps still clamp every light, and nothing moves
-while the lamp sleeps. **Quiet hours:** from 22:00 to 07:00 local (one
-definition, `lamp_local_time::quiet_hours`, which lamp-skills' pushed skills
-will call too), a computer's `say` and `sound` are refused with
-`quiet_hours`, the hours in its why ("quiet hours: 22:00 to 07:00 local"),
-and so are they while the lamp's local time isn't known (its clock not yet
+while the lamp sleeps. **Quiet hours:** from 22:00 to 07:00 local unless
+this lamp sets its own (`--quiet-hours`, one definition in
+`lamp_local_time::QuietWindow`; lamp-skills keeps its own), a computer's
+`say` and `sound` are refused with `quiet_hours`, the window in its why
+("quiet hours: 22:00 to 07:00 local, this lamp's setting"), and so are they
+while the lamp's local time isn't known (its clock not yet
 set, or its zone unreadable: "quiet hours: the lamp's local time isn't
 known"). A refusal reaches no part and isn't counted against the rate, and
-it's journaled once a computer a night. The owner's per-client allowance,
-with the app's setting, will be the only thing that lifts it (Fourteen,
-Eighth and Nine on #3504). Every command and its answer is
+it's journaled once a computer a night. With this lamp's window `off`
+nothing is refused, even while its time isn't known. Besides that setting,
+the owner's per-client allowance, with the app's setting, will be the only
+thing that lifts it (Fourteen, Eighth and Nine on #3504). Every command and its answer is
 journaled as one line (client id and name, op, result); the app can show the
 last 100 and revoke a client, which closes its connections at once.
 
