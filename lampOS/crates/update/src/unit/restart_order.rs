@@ -122,11 +122,24 @@ mod tests {
             .iter()
             .copied()
             .filter(|(name, text)| {
-                *name != crate::round::OWN_UNIT
+                let product = |unit: &str| {
+                    crate::install::PRODUCT
+                        .iter()
+                        .find(|(other, _)| *other == unit)
+                        .map(|(_, text)| *text)
+                };
+                // A part's templates, sockets and timers join its graph.
+                (*name != crate::round::OWN_UNIT
                     && crate::manifest::is_unit_name(name)
-                    && crate::unit::linked(text).is_some()
+                    && crate::unit::linked(text).is_some())
+                    || crate::companion::part(name, text, product).is_some()
             })
             .collect();
+        assert!(
+            units
+                .iter()
+                .any(|(name, _)| *name == "lamp-setup-wifi.socket")
+        );
         assert!(
             units
                 .iter()

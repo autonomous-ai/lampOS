@@ -398,8 +398,8 @@ replacement or guaranteed recovery from a lost runner. The old bytes are
 retained and no automatic deletion follows.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 6 (2 reads models, 3 settings, 4 image, 5 reset plans,
-6 product service units). With its product deploy tree, this workflow now
+`manifest::UPDATER` is 7 (2 reads models, 3 settings, 4 image, 5 reset plans,
+6 product service units, 7 a part's templates, sockets and timers). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -814,10 +814,11 @@ the units a build carries for this lamp by name. On a product-installed
 lamp it also carries the product's own units (#3466, updater level 6, which
 an older updater climbs to first): the new text of each `lamp-<name>.service`
 already installed and started through its `current` link, so a switch in a
-product unit comes over the air. It never carries `@` templates, sockets,
-timers, the updater's own unit or the fixed helper units, and it never adds
-or enables a part. Those still come only with `lamp-update install` run
-again (#3689). A round writes the product's settings and tmpfiles the build
+product unit comes over the air. At updater level 7 it carries a part's
+templates, sockets and timers too, where the lamp has them (below, "A
+part's templates, sockets and timers"). It never carries the updater's own
+unit or the fixed helper units, and it never adds or enables a part. Those
+still come only with `lamp-update install` run again (#3689). A round writes the product's settings and tmpfiles the build
 carries (below, "Settings and tmpfiles") with `LAMP_UPDATE_APPLY=on` on any
 install, or with no apply choice at all on a managed, self-updating product
 install. With an apply choice of off or an invalid one, or with no choice on
@@ -1334,9 +1335,9 @@ drop-ins. Unit text, binary links and settings use the existing quiet
 switch, journal, health check and fallback; a failure restores the exact
 previous unit and link before restarting the old part.
 
-The carrier covers ordinary part services. It does not replace the
-updater's own service, the fixed fallback/helper units, targets, slices,
-timers or socket templates. In particular, the install-time fallback
+The carrier covers ordinary part services, and from level 7 their
+templates, sockets and timers (next). It does not replace the updater's own
+service, the fixed fallback/helper units, targets or slices. In particular, the install-time fallback
 understands the updater's old link contract, not a backup of its service
 text; changing that contract requires a separately compatible fallback.
 Those exclusions are not claims of a complete systemd effective graph.
@@ -1361,6 +1362,40 @@ These changes add no work to Voice's input path. The existing quiet checks
 still gate actuator restarts; local fixtures use their fake clock and do
 not establish device timing, systemd sandbox behavior or power-cut safety
 on a shipped lamp.
+
+### A part's templates, sockets and timers (#3689)
+
+At updater level 7 (`manifest::COMPANIONS_UPDATER`) the publisher also
+carries, under `product`, each `lamp-<x>@.service`, `lamp-<x>.socket` and
+`lamp-<x>.timer` in `deploy/product/` that belongs to a part
+(`crate::companion`). A template belongs to the part its `ExecStart=` starts
+through that part's `current` link. A socket that accepts each connection
+belongs to its template's part. A timer belongs to the part of the service
+it starts. The keeper's template and socket start `/usr/local/bin/lamp-keeper`,
+and `lamp-update-back.timer` starts the fixed settings writer, so neither is
+carried. A socket that hands one listener to a running service is not
+carried either: systemd refuses to start such a socket again while its
+service runs. A lamp's own folder carries services only. Such a build has
+`min_updater` 7, so an updater of level 6 (7071's, after its climb) climbs
+again first, and the manifest's other readers, `lamp-update-apply` among
+them, never read these names.
+
+A round takes one only where the lamp already has that file, a regular one,
+belonging to a part installed here through its `current` link. The build's
+must start the same unit, of the same part. One that would start another
+part or another unit is refused before anything is written. One the lamp
+lacks is neither fetched nor added (2b, adding a part, is still to come).
+Each that changes is written with its part's switch, in the same journal and
+under the same quiet checks. A template is reloaded and never restarted: an
+instance a socket starts after the reload runs it, and one already running
+finishes on the old text. A socket that was listening, or a timer that was
+waiting, is restarted with the switch in startup order and watched as a
+part is. A build put back, or a switch cut short and recovered at the next
+start, writes each back as it was, with the rest.
+
+Not shown: a real systemd restarting a socket while an instance of its
+template runs, and a carried template on a 7071 lamp. The tests use the
+round's fake systemd.
 
 ### Settings and tmpfiles (`LAMP_UPDATE_APPLY`)
 
@@ -1546,7 +1581,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 6. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 7. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,
@@ -2283,7 +2318,7 @@ test does (#1512):
   (lamp-0c89's), updated by a round, ends with the build's and a backup.
   No round carrying the plan has run on a lamp. The product publisher now includes it with settings; this does not claim an attended published-plan switch.
 - The keeper,
-  `lampos.target`, timers, models and libraries a build does not carry,
+  `lampos.target`, timers of no part, models and libraries a build does not carry,
   configuration under `/etc/lampOS` (but for `second.json`, above), and a
   part new to a lamp.
 - Two parts of one build that must change together across a failed
