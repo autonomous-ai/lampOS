@@ -14534,3 +14534,49 @@ fn a_base_stuck_short_of_its_goal_still_ends_on_tracking() {
         "{report:?}"
     );
 }
+
+/// A gentle hand turning the head of a standing lamp, under the load that
+/// eases it, is followed by the stall rule alone: said as a hand all the
+/// same, once, and never at rest (lamp-29e7 on 8080: the roll put 34
+/// counts over a minute at 100 to 144, its bound 150, and no hand was ever
+/// said, so onboarding's giving_way failed with the base held).
+#[test]
+fn a_head_joint_given_way_under_a_gentle_hand_is_said_as_a_hand() {
+    let s = Duration::from_secs;
+    let ran = |pressed: bool| {
+        let (mut lamp, mut clock) = folded(s(14));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        if pressed {
+            // Held 30 counts short of where it is sent, at 120, from 7 s.
+            lamp.short = Some((ROLL, 30.0));
+            lamp.strains = vec![(s(7), s(60), ROLL, 120)];
+        }
+        let news = || Some((Mood::Listening, 100));
+        let time = clock.time.clone();
+        let mut said = Vec::new();
+        let report = run_standing(
+            &mut lamp,
+            &mut clock,
+            giving_way(GiveWay::Return),
+            Some(HOME),
+            Some(standing(100, 60)),
+            news,
+            |glimpse| said.push((time.get(), glimpse.hand)),
+        );
+        let hand: Vec<Duration> = said
+            .iter()
+            .filter(|(_, hand)| *hand)
+            .map(|(at, _)| *at)
+            .collect();
+        (report, hand)
+    };
+    let (report, hand) = ran(true);
+    assert_eq!(report.eased, [0; 3], "under its bound: {report:?}");
+    assert!(report.stalls[1] >= 1, "{report:?}");
+    assert!(!hand.is_empty(), "never said a hand: {report:?}");
+    assert!(hand.iter().all(|at| *at >= s(7)), "{hand:?}");
+    let (report, hand) = ran(false);
+    assert_eq!(report.stalls, [0; 5], "{report:?}");
+    assert!(hand.is_empty(), "{hand:?}");
+}
