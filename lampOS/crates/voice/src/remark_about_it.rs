@@ -80,26 +80,36 @@ const MOVES: &[&str] = &[
     "bend", "swing", "rotate", "bring", "shine", "light", "wake",
 ];
 
-/// Light or place words that state a need after "too" ("The lamp is too
-/// bright."). Bare "too" is no need: "That lamp is cute too.", "That lamp is
-/// way too cute." (Thirteen's P2 on #4219).
+/// Light or place words that state a need after "too", "so" or "really"
+/// ("The lamp is too bright.", "The lamp is so bright."; Reviewer-three's
+/// P3 on #4239). Bare "too" is no need: "That lamp is cute too.", "That
+/// lamp is way too cute." (Thirteen's P2 on #4219).
 const TOO_WHAT: &[&str] = &[
     "bright", "dim", "dark", "high", "low", "close", "far", "warm", "cold", "harsh", "hot",
     "yellow", "blue", "white", "strong", "weak",
 ];
 
+/// Words before a [`TOO_WHAT`] word that make it a complaint.
+const TOO: &[&str] = &["too", "so", "really"];
+
+/// Words after the lamp that say its light hurts ("This lamp hurts my
+/// eyes.", "The lamp is blinding me."; Reviewer-three's P3 on #4239).
+const HURTS: &[&str] = &["hurts", "blinding", "blinds"];
+
 /// Comparatives of its light or place that state a need when they come
 /// after the lamp ("I need the lamp brighter."). "Lighter" is left out: it
 /// is said of weight too ("My lamp is lighter than yours."), and a bare
 /// "need" or "want" is no need ("I want that lamp.", "We need a lamp like
-/// that.").
+/// that."). A comparative right before "than" compares and asks nothing:
+/// "That lamp is brighter than mine." (Thirteen's P3 on #4239).
 const MORE: &[&str] = &[
     "brighter", "dimmer", "darker", "warmer", "cooler", "higher", "lower", "closer",
 ];
 
 /// Whether a clause naming the lamp asks it to move, or states a need of
 /// its light or place: "too" before a light or place word ([`TOO_WHAT`]),
-/// or a comparative after the lamp ([`MORE`]).
+/// a comparative after the lamp and not before "than" ([`MORE`]), or a
+/// word after the lamp that its light hurts ([`HURTS`]).
 fn moves_or_needs(clause: &str) -> bool {
     let mut words = clause
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
@@ -123,7 +133,7 @@ fn moves_or_needs(clause: &str) -> bool {
     let words: Vec<String> = words.collect();
     let too = words
         .windows(2)
-        .any(|pair| pair[0] == "too" && TOO_WHAT.contains(&pair[1].as_str()));
+        .any(|pair| TOO.contains(&pair[0].as_str()) && TOO_WHAT.contains(&pair[1].as_str()));
     let after_the_lamp = words
         .iter()
         .position(|word| {
@@ -132,7 +142,13 @@ fn moves_or_needs(clause: &str) -> bool {
                 "lamp" | "lamps" | "lamb" | "lambs"
             )
         })
-        .is_some_and(|at| words[at..].iter().any(|word| MORE.contains(&word.as_str())));
+        .is_some_and(|at| {
+            words[at..].iter().enumerate().any(|(i, word)| {
+                HURTS.contains(&word.as_str())
+                    || (MORE.contains(&word.as_str())
+                        && words.get(at + i + 1).map(String::as_str) != Some("than"))
+            })
+        });
     too || after_the_lamp
 }
 
@@ -194,6 +210,9 @@ mod tests {
             "I want that lamp.",
             "We need a lamp like that.",
             "My lamp is lighter than yours.",
+            // Thirteen's P3 on #4239: a comparison asks nothing.
+            "That lamp is brighter than mine.",
+            "Your lamp is lower than mine.",
         ] {
             assert!(talked_about(heard), "{heard}");
         }
@@ -228,6 +247,11 @@ mod tests {
             "Tilt the lamp up.",
             "The lamp is too bright.",
             "I need the lamp brighter.",
+            // A complaint about its light (Reviewer-three's P3 on #4239).
+            "The lamp is so bright.",
+            "The lamp is really dim.",
+            "The lamp is blinding me.",
+            "This lamp hurts my eyes.",
             "Do you want confidence? Going downstairs.",
             "Yes, please. A latte. No sugar.",
             "",
