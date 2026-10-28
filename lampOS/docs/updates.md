@@ -802,7 +802,12 @@ lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --s
                      [--min-updater N]
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
+lamp-update writer-probe
 ```
+
+`writer-probe` prints one line, `lamp-update writer-probe 1 <sha256>`, the
+SHA-256 of the file it runs from, and changes nothing. A copy of lamp-update
+is run so before it is put at a fixed path (below, "A fixed copy, checked").
 
 `harness-on` puts Harness on the lamp with Harness's own installer and sets
 it at boot (#1676), `harness-off` undoes install's Harness at boot, and only that, and
@@ -2571,3 +2576,34 @@ its result is read from what the command leaves, not from the start.
 not a command yet. The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
+
+### A fixed copy, checked (#3689)
+
+`fixed_copy::place` is the step that puts a copy of lamp-update at a fixed
+root path, such as `/usr/local/lib/lampos/lamp-update-back`, which no round
+can write. The settings writer's refresh needs it, whichever way that is
+finished. It writes the new copy beside the fixed path (`.<name>.new`, mode
+0755, synced) and runs it once with `writer-probe`, within 20 s, its process
+group owned. Only when the copy answers with the SHA-256 of the bytes
+written is it renamed over the fixed path and the folder synced. With a kept
+path (`lamp-update-back.prev`, say), the copy it replaces is written there
+first, with its mode. A kept file already there is used only when it holds
+the same bytes as the fixed path: a different one may be the only good copy
+left, so nothing is replaced.
+
+A copy that doesn't answer, answers another SHA-256 or another protocol, or
+fails, is removed, and the fixed path and kept path are left as they were.
+The same bytes already at the fixed path, executable, are left and nothing
+is run. A link or a folder at either path is refused before anything is
+written, and so is a copy over 64 MiB. A cut at any step leaves the fixed
+path whole, old or new. If writing the kept copy or the rename fails, the new
+copy is removed too. The caller keeps other writers out of the folder while it
+runs: the copy there is read once and renamed over without being read again.
+On Linux `writer-probe` hashes `/proc/self/exe`, the running file itself, so
+a file put at its path since it started can't answer for it.
+
+The probe shows that the copy starts on this lamp and that its bytes are the
+ones written. It does not show that its `back` or `apply` work: those are
+proved by their own first use. Nothing calls `place` yet: no round, unit or
+command. Its tests run real programs as copies: one that answers as
+lamp-update does, one that answers another SHA-256, and one that fails.
