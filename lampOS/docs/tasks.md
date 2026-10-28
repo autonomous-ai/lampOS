@@ -271,7 +271,9 @@ of afresh. Each ask is given at
 most 8 s (`ENGINES_PROBE_TIMEOUT`; Harness reads the engine in a login shell
 of 5 s at most there). Only a known no refuses:
 - `firstPrompt: false` ends the task `not_sent` with `engine_no_prompt`,
-  told as a plain failure;
+  told with Task news' `failed_no_prompt` words: that computer can't start
+  it with work yet, so trying again won't help until its software is
+  updated;
 - `signedIn: false` (read for Claude Code and Codex only) ends it `not_sent`
   with `engine_signed_out`, and the voice tells it with Task news'
   `failed_signed_out` words: the work didn't start, as the engine isn't
@@ -280,7 +282,10 @@ of 5 s at most there). Only a known no refuses:
 `null`, no row for that computer and engine, a failed exit, a timeout, or an
 older Harness without the command is no refusal, and is kept as long, so a
 computer that can't say costs one ask. Hermes' `signedIn` is always `null`,
-so a hand-over to Hermes is never refused by it. Each ask says how it went
+so a hand-over to Hermes is never refused by it. Devin Cloud is never asked:
+it isn't one of Harness's engines there. The ask runs inside the launch,
+under the part's one Harness lane, so a read for another task waits for it,
+8 s at most. Each ask says how it went
 in one journal line, never naming the computer: `tasks: asked the computer
 about ENGINE: engine_signed_out | engine_no_prompt | no refusal | it could
 not say | CODE, T ms`.
