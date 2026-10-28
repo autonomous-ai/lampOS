@@ -1071,11 +1071,14 @@ impl Onboarding {
             self.sentence_judge(now_us);
             return;
         }
-        // Judged as soon as a call is heard: once its rise window is in
-        // (a call begun over the prompt's end, from that end). With none
-        // heard, at the window's end and the rise window after it. A call's
-        // line still waiting for its words holds the judgement until they
-        // come, never past the window, the rise window and TEXT_WAIT_US.
+        // Judged as soon as a sure call (SCORE or more) is heard: once its
+        // rise window is in (a call begun over the prompt's end, from that
+        // end). With none heard surely, at the window's end and the rise
+        // window after it: a weaker hearing may still count by its words,
+        // and its line's End, which says they are on their way, can come
+        // after its rise window. A call's line still waiting for its words
+        // holds the judgement until they come, never past the window, the
+        // rise window and TEXT_WAIT_US.
         let awaited = self.near.awaited.is_some();
         let due = self.near.listening.as_ref().is_some_and(|listening| {
             if awaited {
@@ -1087,7 +1090,7 @@ impl Onboarding {
                 .seen
                 .iter()
                 .filter_map(|seen| match seen {
-                    Seen::Hearing(hearing, heard_ms) => {
+                    Seen::Hearing(hearing, heard_ms) if hearing.score >= SCORE => {
                         call_began_ms(hearing, *heard_ms, listening.ended_ms)
                     }
                     _ => None,
