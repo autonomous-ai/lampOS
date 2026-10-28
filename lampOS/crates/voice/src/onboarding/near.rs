@@ -326,22 +326,36 @@ impl NearFlow {
         Some((at_ms, listening.ended_ms))
     }
 
-    /// A line begun at `began_us` on the coordinator's clock, whose words
-    /// were the lamp's name alone (#3923), while the name part listens for
-    /// a call: kept as evidence when it began from the history kept before
-    /// the prompt's end (one over its last word is answered early) to the
-    /// window's end. Its Unix start when kept; otherwise it is ignored.
-    pub(crate) fn text_call(&mut self, began_us: u64) -> Option<u64> {
+    /// A line spoken from `began_us` to `ended_us` on the coordinator's
+    /// clock, whose words were the lamp's name alone (#3923), while the name
+    /// part listens for a call: kept as evidence when it began from the
+    /// history kept before the prompt's end (one over its last word is
+    /// answered early) to the window's end. Its Unix start when kept;
+    /// otherwise it is ignored. Its end tells a hearing begun inside it,
+    /// however far in, as its own call.
+    pub(crate) fn text_call(&mut self, began_us: u64, ended_us: u64) -> Option<u64> {
         let (began_ms, ended_ms) = self.call_unix_ms(began_us)?;
         if began_ms < ended_ms.saturating_sub(HISTORY_MS) || began_ms > ended_ms + WINDOW_MS {
             return None;
         }
+        let line_ended_ms = self
+            .call_unix_ms(ended_us.max(began_us))
+            .map_or(began_ms, |(at, _)| at);
         self.awaited = None;
         if self.seen.len() >= MOST_SEEN {
             self.seen.remove(0);
         }
-        self.seen.push(Seen::Said(Said { began_ms }));
+        self.seen.push(Seen::Said(Said {
+            began_ms,
+            ended_ms: line_ended_ms,
+        }));
         Some(began_ms)
+    }
+
+    /// The words of the call's line came back as more than the name, or it
+    /// ended with none (#3923): the try waits for nothing more.
+    pub(crate) fn call_words_back(&mut self) {
+        self.awaited = None;
     }
 
     /// A call's line begun at `began_us` ended: begun in the window, its
@@ -841,11 +855,16 @@ impl Onboarding {
     /// A line begun at `began_us` whose words were the lamp's name alone
     /// (#3923, the second route's `StepCallHeard`): a call, while this step
     /// is led and its name part listens for one ([`NearFlow::text_call`]).
-    pub(crate) fn near_text_call(&mut self, began_us: u64) -> Option<u64> {
+    pub(crate) fn near_text_call(&mut self, began_us: u64, ended_us: u64) -> Option<u64> {
         if !self.collecting() {
             return None;
         }
-        self.near.text_call(began_us)
+        self.near.text_call(began_us, ended_us)
+    }
+
+    /// [`NearFlow::call_words_back`].
+    pub(crate) fn near_call_words_back(&mut self) {
+        self.near.call_words_back();
     }
 
     /// [`NearFlow::call_line_ended`], while this step is led.
