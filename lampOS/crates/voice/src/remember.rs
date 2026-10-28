@@ -397,31 +397,89 @@ pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll reme
 /// "I'll remember that", "I've saved it", "Đã ghi nhớ"). "I'll keep it
 /// short", "I'll keep the light on", "I'll remember to remind you at five"
 /// and "Saved your playlist" claim nothing (the reviewer-lead's P2 on
-/// #3628), nor do "Got it, lights off." and "Noted.". `None` while the
-/// words so far could still begin a claim (unless `whole`, the reply is
-/// all there is); decided at the first that cannot.
+/// #3628), nor do "Got it, lights off." and "Noted.". The softer claims
+/// count too (K3, lamp-06c1, 28 Oct night: "Noted — you work at a library
+/// now, not the bakery." and "All right, I'll keep it in mind." with no
+/// `remember` call): "Noted" with what was noted after a dash or colon, or
+/// "noted that"; "I'll keep it in mind", "I'll hold on to that"; "Mình nhớ
+/// rồi", "Đã ghi nhận". "Noted, thanks." and "Got it, thanks." claim
+/// nothing. `None` while the words so far could still begin a claim
+/// (unless `whole`, the reply is all there is); decided at the first that
+/// cannot.
 pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
+    keep_claim_of(reply, whole).map(|claim| claim.is_some())
+}
+
+/// Which kind of keep claim a reply makes ([`claims_a_keep`]): a hard one
+/// ("Kept: …", "I'll remember that") or a soft one (K3: "Noted — …",
+/// "I'll keep it in mind", "I'll hold on to that", "mình nhớ rồi", "đã ghi
+/// nhận"). A soft claim beside any call is the call's confirmation
+/// ("Noted — timer set for ten minutes." beside `set_timer`), so it counts
+/// only in a round with no calls (Reviewer-three's and Reviewer-two's P2
+/// on #4137).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeepClaim {
+    Hard,
+    Soft,
+}
+
+/// The kind of keep claim the whole of `reply` makes, if any.
+pub fn keep_claim(reply: &str) -> Option<KeepClaim> {
+    keep_claim_of(reply, true).flatten()
+}
+
+/// [`claims_a_keep`] with the kind of claim: `None` while undecided,
+/// `Some(None)` for no claim.
+fn keep_claim_of(reply: &str, whole: bool) -> Option<Option<KeepClaim>> {
     const OPENING: &[&str] = &[
-        "okay", "ok", "sure", "alright", "done", "yes", "yep", "great", "got it", "right",
+        "okay",
+        "ok",
+        "sure",
+        "alright",
+        "all right",
+        "done",
+        "yes",
+        "yep",
+        "great",
+        "got it",
+        "right",
     ];
     // Each claim, then what must follow it: a word from `objects`, or,
     // when `bare`, also the reply's end or a mark (`.`, `!`, `:`, `,`); or,
     // when `any`, anything after a word's end (the Vietnamese ones: "đã ghi
-    // nhớ rồi", "mình sẽ nhớ điều đó").
-    const CLAIMS: &[(&str, bool, bool)] = &[
-        ("kept", true, false),
-        ("i've kept", true, false),
-        ("i have kept", true, false),
-        ("i'll remember", false, false),
-        ("i will remember", false, false),
-        ("i've remembered", false, false),
-        ("i've saved", true, false),
-        ("saved", false, false),
-        ("\u{111}\u{e3} ghi nh\u{1edb}", true, true),
-        ("m\u{ec}nh s\u{1ebd} nh\u{1edb}", true, true),
-        ("\u{111}\u{e3} l\u{1b0}u", true, true),
+    // nhớ rồi", "mình sẽ nhớ điều đó"). The last: whether it is a soft
+    // claim ([`KeepClaim::Soft`]).
+    const CLAIMS: &[(&str, bool, bool, bool)] = &[
+        ("kept", true, false, false),
+        ("i've kept", true, false, false),
+        ("i have kept", true, false, false),
+        ("i'll remember", false, false, false),
+        ("i will remember", false, false, false),
+        ("i've remembered", false, false, false),
+        ("i've saved", true, false, false),
+        ("saved", false, false, false),
+        ("\u{111}\u{e3} ghi nh\u{1edb}", true, true, false),
+        ("m\u{ec}nh s\u{1ebd} nh\u{1edb}", true, true, false),
+        ("\u{111}\u{e3} l\u{1b0}u", true, true, false),
+        // K3: the softer claims, whatever follows them.
+        ("i'll keep it in mind", true, true, true),
+        ("i'll keep that in mind", true, true, true),
+        ("i will keep that in mind", true, true, true),
+        ("i'll bear that in mind", true, true, true),
+        ("i'll hold on to that", true, true, true),
+        ("i'll hold onto that", true, true, true),
+        ("i'll hang on to that", true, true, true),
+        ("m\u{ec}nh nh\u{1edb} r\u{1ed3}i", true, true, true),
+        ("\u{111}\u{e3} ghi nh\u{1ead}n", true, true, true),
     ];
     const OBJECTS: &[&str] = &["that", "this", "it", "those", "them"];
+    let kind = |soft: bool| {
+        if soft {
+            KeepClaim::Soft
+        } else {
+            KeepClaim::Hard
+        }
+    };
     let mut rest = reply.trim_start().to_lowercase().replace('\u{2019}', "'");
     // Up to three opening words, each with what ends it.
     for _ in 0..3 {
@@ -436,13 +494,43 @@ pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
             .to_owned();
     }
     let mut maybe = rest.is_empty() || OPENING.iter().any(|opening| opening.starts_with(&rest));
-    for (claim, bare, any) in CLAIMS {
+    // K3: "Noted" claims a keep only with what was noted after a dash or
+    // colon ("Noted — you work at a library now"), or with an object
+    // ("Noted that."); "Noted.", "Noted, thanks." claim nothing. Only an
+    // opening of "note" or more waits, so "Not sure" is decided at once.
+    if let Some(after) = rest.strip_prefix("noted") {
+        let told = after.trim_start();
+        if let Some(told) = told.strip_prefix(['\u{2014}', '\u{2013}', '-', ':']) {
+            if told.chars().any(char::is_alphanumeric) {
+                return Some(Some(KeepClaim::Soft));
+            }
+            return if whole { Some(None) } else { None };
+        }
+        let word = told
+            .split(|c: char| !c.is_alphanumeric() && c != '\'')
+            .next()
+            .unwrap_or_default();
+        let ended = told.len() > word.len() || whole;
+        if after.starts_with(' ') && ended && OBJECTS.contains(&word) {
+            return Some(Some(KeepClaim::Soft));
+        }
+        let waiting = told.is_empty()
+            || (after.starts_with(' ')
+                && !ended
+                && OBJECTS.iter().any(|object| object.starts_with(word)));
+        if waiting && !whole {
+            maybe = true;
+        }
+    } else if rest.len() >= 4 && "noted".starts_with(rest.as_str()) {
+        maybe = true;
+    }
+    for (claim, bare, any, soft) in CLAIMS {
         if let Some(after) = rest.strip_prefix(claim) {
             if *any
                 && (after.starts_with(|c: char| !c.is_alphanumeric())
                     || (whole && after.is_empty()))
             {
-                return Some(true);
+                return Some(Some(kind(*soft)));
             }
             let marked = after.starts_with(['.', '!', ':', ',']);
             let word = after
@@ -452,7 +540,7 @@ pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
                 .unwrap_or_default();
             let object = after.starts_with(' ') && OBJECTS.contains(&word);
             if (*bare && (marked || (whole && after.trim().is_empty()))) || object {
-                return Some(true);
+                return Some(Some(kind(*soft)));
             }
             // Still coming: the end, or a word that may yet be an object.
             if after.is_empty()
@@ -467,7 +555,7 @@ pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
             maybe = true;
         }
     }
-    if maybe && !whole { None } else { Some(false) }
+    if maybe && !whole { None } else { Some(None) }
 }
 
 /// Whether `sentence` asks whether to keep something: "Want me to keep
@@ -11062,6 +11150,15 @@ mod tests {
             "Đã ghi nhớ: phòng họp tên là Orange.",
             "Đã ghi nhớ rồi.",
             "Mình sẽ nhớ điều đó.",
+            // K3, lamp-06c1 on 28 Oct night: softer claims with no call.
+            "Noted — you work at a library now, not the bakery.",
+            "Noted: the lunch is at one.",
+            "Got it, noted that.",
+            "All right, I'll keep it in mind.",
+            "Sure, I'll keep that in mind.",
+            "Okay, I'll hold on to that.",
+            "Mình nhớ rồi nhé.",
+            "Đã ghi nhận.",
         ] {
             assert_eq!(claims_a_keep(reply, false), Some(true), "{reply}");
         }
@@ -11080,6 +11177,12 @@ mod tests {
             "Kept items are in the box.",
             "Remembered! You asked me this yesterday too.",
             "Saved to your shopping list.",
+            "Got it, thanks.",
+            "Noted, thanks.",
+            "Noted!",
+            "Not sure, maybe ask the office.",
+            "I'll keep it short and sweet.",
+            "Notes are in the drawer.",
         ] {
             assert_eq!(claims_a_keep(reply, true), Some(false), "{reply}");
         }
@@ -11093,6 +11196,38 @@ mod tests {
         // Decided at the first word that begins no claim.
         assert_eq!(claims_a_keep("Not", false), Some(false));
         assert_eq!(claims_a_keep("The red", false), Some(false));
+        // K3: a "Noted" opening waits for what follows it, and only that.
+        assert_eq!(claims_a_keep("Noted", false), None);
+        assert_eq!(claims_a_keep("Noted \u{2014}", false), None);
+        assert_eq!(claims_a_keep("Noted \u{2014} you", false), Some(true));
+        assert_eq!(claims_a_keep("Noted.", false), Some(false));
+        assert_eq!(claims_a_keep("Noted, thanks", false), Some(false));
+        assert_eq!(claims_a_keep("Note", false), None);
+        assert_eq!(claims_a_keep("All right, I'll keep it", false), None);
+        assert_eq!(
+            claims_a_keep("All right, I'll keep it short", false),
+            Some(false)
+        );
+        // Reviewer-three's and Reviewer-two's P2 on #4137: the kind.
+        assert_eq!(keep_claim("Kept: Orange."), Some(KeepClaim::Hard));
+        assert_eq!(
+            keep_claim("Okay, I'll remember that."),
+            Some(KeepClaim::Hard)
+        );
+        assert_eq!(
+            keep_claim("Noted — timer set for ten minutes."),
+            Some(KeepClaim::Soft)
+        );
+        assert_eq!(
+            keep_claim("All right, I'll keep it in mind."),
+            Some(KeepClaim::Soft)
+        );
+        assert_eq!(
+            keep_claim("Okay, I'll hold on to that."),
+            Some(KeepClaim::Soft)
+        );
+        assert_eq!(keep_claim("Đã ghi nhận."), Some(KeepClaim::Soft));
+        assert_eq!(keep_claim("Got it, thanks."), None);
     }
 
     /// Reviewer-two's P2 on #3625: `recall` stays a valid function, its

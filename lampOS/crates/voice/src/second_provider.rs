@@ -8611,7 +8611,15 @@ async fn answer(
                 let remembers = calls
                     .iter()
                     .any(|call| call.name == crate::remember::REMEMBER);
-                if crate::remember::claims_a_keep(&held, true) == Some(true) && !remembers {
+                // A soft claim ("Noted — timer set for ten minutes.") beside
+                // any call confirms that call (Reviewer-three's and
+                // Reviewer-two's P2 on #4137): a claim only with none.
+                let claimed = match crate::remember::keep_claim(&held) {
+                    Some(crate::remember::KeepClaim::Hard) => true,
+                    Some(crate::remember::KeepClaim::Soft) => calls.is_empty(),
+                    None => false,
+                };
+                if claimed && !remembers {
                     if !calls.is_empty() {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no remember call: not said, its other calls run"

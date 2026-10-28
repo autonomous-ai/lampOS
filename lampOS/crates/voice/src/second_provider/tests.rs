@@ -8191,6 +8191,94 @@ async fn a_reply_never_says_it_kept_something_with_no_remember_call() {
     }
 }
 
+/// K3 on #3504 (lamp-06c1, 28 Oct night: "Noted — you work at a library
+/// now, not the bakery." and "All right, I'll keep it in mind." with no
+/// call): a soft keep claim in a round with no calls is held and asked
+/// again, as a hard one is. Beside any call it confirms that call and is
+/// said as it comes (Reviewer-three's and Reviewer-two's P2 on #4137).
+#[tokio::test]
+async fn a_soft_keep_claim_is_a_claim_only_in_a_round_with_no_calls() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let beside = |line: &str, name: &str| -> Chats {
+        vec![
+            vec![
+                text(line),
+                Ok(ChatEvent::ToolCalls(vec![call("c1", name, json!({}))])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![Ok(ChatEvent::Done)],
+        ]
+    };
+    let mut cases: Vec<(Chats, String, usize)> = Vec::new();
+    for (line, name) in [
+        ("Noted — timer set for ten minutes.", "set_timer"),
+        (
+            "Noted — I'll remind you at five to call your mom.",
+            "set_reminder",
+        ),
+        ("Noted: lights off at ten.", "light_off"),
+        (
+            "All right, I'll keep it in mind and wake you at seven.",
+            "set_alarm",
+        ),
+    ] {
+        cases.push((beside(line, name), format!("said:{line}"), 2));
+    }
+    // With no call: held and asked again; the next round is said.
+    for line in [
+        "Noted — you work at a library now, not the bakery.",
+        "All right, I'll keep it in mind.",
+    ] {
+        cases.push((
+            vec![
+                vec![text(line), Ok(ChatEvent::Done)],
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+            ],
+            "said:Okay.".to_owned(),
+            2,
+        ));
+    }
+    for (chats, first_said, rounds) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("I work at a library now, not the bakery.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let ran = Arc::new(AtomicUsize::new(0));
+        let counted = ran.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async { json!({"ok": true}) })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first().is_some_and(|said| **said == first_said),
+            "{first_said}: {labels:?}"
+        );
+        assert!(
+            !said
+                .iter()
+                .any(|said| said.contains(crate::remember::NOT_KEPT_LINE)),
+            "{labels:?}"
+        );
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+    }
+}
+
 /// Finding K2 on #3504 (lamp-06c1, 28 Oct, "Want me to keep that as the
 /// change? Kept — library now, not the bakery."): an offer to keep, beside
 /// the `remember` call that keeps it or after one, is not said; with no
