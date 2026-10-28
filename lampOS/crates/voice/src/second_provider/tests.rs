@@ -2416,6 +2416,71 @@ async fn a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// lamp-52e6, 28 Oct 16:42: an onboarding line the walk owes, of the fixed
+/// "Say only this" form, whose chat never begins is still said, its exact
+/// words through the route's own speech, and ends complete with its audio,
+/// as the coordinator's `Whole` takes; never by the model, whose late chat
+/// is let go. A line asking the model to do more (preferences) ends
+/// unanswered as before, as an ordinary turn does (above).
+#[tokio::test(start_paused = true)]
+async fn an_onboarding_fixed_line_whose_chat_never_begins_is_said_as_it_is() {
+    let fixed = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat.\")";
+    let privacy = "(Say only this, nothing before or after it: \"Find my privacy switch on my back. Close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)";
+    let preferences = "(Nobody has spoken. Ask exactly this first: \"Are there hours when I should keep quiet?\" When they have answered, ask exactly this: \"May I say good morning?\")";
+    for (note, words) in [
+        (
+            fixed,
+            Some(
+                "Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat.",
+            ),
+        ),
+        (
+            privacy,
+            Some("Find my privacy switch on my back. Close it, then open it again."),
+        ),
+        (preferences, None),
+    ] {
+        let script = Arc::new(Script {
+            chats: Mutex::new([vec![]].into()),
+            hold_chat: true,
+            ..Script::default()
+        });
+        let (mut engine, calls, _) = scripted(script.clone());
+        engine.submit(written(1, note));
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        let said: Vec<_> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        match words {
+            Some(words) => {
+                assert_eq!(said, [&format!("said:{words}")], "{labels:?}");
+                assert!(
+                    labels.iter().any(|label| label.starts_with("audio:")),
+                    "{labels:?}"
+                );
+                assert!(
+                    labels.ends_with(&["generated".into(), "complete".into()]),
+                    "{labels:?}"
+                );
+            }
+            None => {
+                assert!(said.is_empty(), "{labels:?}");
+                assert!(
+                    !labels.iter().any(|label| label.starts_with("audio:")),
+                    "{labels:?}"
+                );
+                assert_eq!(
+                    labels.last().map(String::as_str),
+                    Some("complete"),
+                    "{labels:?}"
+                );
+            }
+        }
+        assert!(calls.lock().unwrap().is_empty());
+    }
+}
+
 /// #1712, the first builder at 16:04: a spoken line whose chat the route
 /// gave up, not begun within `BEGIN_WITHIN`, is no talk the lamp left
 /// alone. Two of them don't end the conversation, and the person's next

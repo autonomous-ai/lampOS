@@ -649,6 +649,23 @@ pub fn no_slide(privacy_controls: Option<&str>) -> bool {
     privacy_controls == Some(NO_SLIDE)
 }
 
+/// The opening of the walk's fixed lines, as the skill writes them.
+const FIXED_OPENING: &str = "(Say only this, nothing before or after it: \"";
+
+/// The exact words of one of the walk's fixed lines: `(Say only this,
+/// nothing before or after it: "<words>")`, or the same with a trailer that
+/// only forbids (` Do not ...)`, privacy's). The second route says them as
+/// they are when its chat has not begun in time, rather than leaving the
+/// walk's line unsaid (lamp-52e6, 28 Oct 16:42). Any other note (one that
+/// asks the model to ask, wait or call) is none: it keeps the model path.
+pub fn fixed_words(note: &str) -> Option<&str> {
+    let rest = note.strip_prefix(FIXED_OPENING)?;
+    let (words, trailer) = rest.split_once('"')?;
+    let fixed = trailer == ")"
+        || (trailer.starts_with(" Do not ") && trailer.ends_with(')') && !trailer.contains('"'));
+    (fixed && !words.trim().is_empty()).then_some(words)
+}
+
 pub fn mailbox_of(file: &Path) -> PathBuf {
     let mut name = file.as_os_str().to_owned();
     name.push(".told");

@@ -139,6 +139,23 @@ said before the next step's invitation:
 Giving way's lines never mention sleep: the step never puts the lamp to
 sleep (#3747).
 
+**A fixed line is said even when the chat is late.** These lines still go to
+the model as a written turn, and on the second route a turn whose chat has
+not begun in time used to end unanswered, the walk's line unsaid (lamp-52e6,
+28 Oct 16:42, `how_you_sound`: three lines ended `chat round 1 had not begun
+in 3000 ms; the turn ends unanswered`). Now a written turn whose note is the
+fixed form, `(Say only this, nothing before or after it: "…")` with nothing
+after the quote but `)` or a trailer that only forbids (` Do not …)`,
+privacy's), says the quoted words as they are through the route's own speech
+when its first round has not begun within the bound (journal: `the
+onboarding line's own words are said`; `onboarding::fixed_words`). It is an
+ordinary spoken reply to the coordinator, so the invitation's delivery
+(`Whole`, `Gapped`, `Cut`, `Unsaid`), the yield to a person speaking and
+the turn's bookkeeping are as for any reply. A line that asks the model to do
+more (`who_you_are`, preferences, a confirm: "Ask exactly this … When they
+have answered …") keeps the model path and ends unanswered as before; so do
+a person's line, a look and an add-on's quoted line.
+
 The conversational steps keep their tool calls and consent clauses, but say
 their questions exactly: `who_you_are` asks "What should I call you?", then
 "May I remember your face, so I know you next time?", and on a skip or a
