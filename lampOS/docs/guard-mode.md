@@ -125,7 +125,10 @@ yet seen on a lamp.
 - **Arrivals by sound** (#2562, with `LAMP_GUARD_SOUNDS=on`). The ears'
   room sound classes (`ears/classes`, `lamp_msgs::SoundClasses`, with
   `LAMP_EARS_CLASSES=on` in `lamp-ears`) now score a door and footsteps too
-  (YAMNet's `Door` and `Walk, footsteps`). With nobody at the desk, a door
+  (YAMNet's `Walk, footsteps`, and for a door the highest of `Door`,
+  `Sliding door`, `Slam` and `Knock`: a knock on a door is AudioSet's
+  `Knock`, not `Door`; `Tap`, which desk taps and typing raise, is left
+  out). With nobody at the desk, a door
   or footsteps scored at least 0.5 in a window the lamp didn't speak into
   is someone come in only when a face (anywhere in view, or a known one) or speech
   (`voice/heard`, or the classes' speech at least 0.5) follows within 30 s:
@@ -371,6 +374,7 @@ off guard" the voice's say service (`LAMP_SAY=on`).
   `lamp-cloud`'s unit reaching the call socket
   (`the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it`).
 - `lamp_msgs::sound_classes::tests::scores_without_a_door_or_footsteps_read_as_none`.
+- `lamp_ears::classes::tests::a_knock_a_slam_or_a_sliding_door_is_the_door_and_a_tap_is_not`.
 - `lamp_msgs::chat::tests::a_text_sent_unasked_is_one_short_line_from_its_sender`.
 
 ## Not shown, and open
@@ -388,7 +392,8 @@ off guard" the voice's say service (`LAMP_SAY=on`).
 - A typed call that comes within 30 s of someone speaking at the lamp would
   turn it on; the mark still shows it.
 - #2562: the door and footsteps scores and their 0.5 are not measured in a
-  room; the app's `guard.on` and the turn of the head are not yet seen on a
+  room (a real knock and real steps by lamp-06c1's mic owe the bar's
+  check: ESC-50 clips through a laptop speaker read under 0.01); the app's `guard.on` and the turn of the head are not yet seen on a
   lamp. On a host other than Linux no peer is `lamp-cloud`, so the `guard`
   op is refused there unless a test sets `LAMP_SKILLS_ANY_ASKER=on`.
 - Names (#2562 item 1): not seen on a lamp. A text says "was here" also

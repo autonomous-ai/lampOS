@@ -7,7 +7,8 @@
 //!
 //! MODEL is the pinned `yamnet.onnx` with `yamnet.data` beside it
 //! (`classes.rs`; neither is in the repository). Each FILE is 16 kHz mono
-//! 16-bit. It prints each 500 ms window's speech, music and laughter, then,
+//! 16-bit. It prints each 500 ms window's speech, music, laughter, door (the
+//! door group's highest, a knock among them) and footsteps, then,
 //! per file, how many windows clear the skills' provisional bars and the
 //! longest stretch music holds (Music sway asks for 20 s, with 5 s gaps).
 //! The scores are the model's on the file's own sound, with no lamp, no
@@ -33,7 +34,7 @@ fn main() -> Result<(), String> {
     }
     let model = Model::load(Path::new(model))?;
     let frontend = Frontend::new();
-    println!("file\tend_s\tspeech\tmusic\tlaughter");
+    println!("file\tend_s\tspeech\tmusic\tlaughter\tdoor\tfootsteps");
     for file in files {
         let pcm = read(file)?;
         let mut windows = Vec::new();
@@ -43,8 +44,8 @@ fn main() -> Result<(), String> {
             let scores = model.score(&frontend.features(&pcm, 0, window)?)?;
             let end_s = window.end_sample as f32 / RATE as f32;
             println!(
-                "{file}\t{end_s:.1}\t{:.2}\t{:.2}\t{:.2}",
-                scores.speech, scores.music, scores.laughter
+                "{file}\t{end_s:.1}\t{:.2}\t{:.2}\t{:.2}\t{:.3}\t{:.3}",
+                scores.speech, scores.music, scores.laughter, scores.door, scores.footsteps
             );
             windows.push((end_s, scores));
             first_frame += PATCH_HOP;

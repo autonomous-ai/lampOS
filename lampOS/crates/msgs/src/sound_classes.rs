@@ -37,7 +37,8 @@ pub struct SoundScores {
     pub speech: f32,
     pub music: f32,
     pub laughter: f32,
-    /// A door, and someone walking (#2562, guard mode's arrivals by
+    /// A door (the highest of YAMNet's Door, Sliding door, Slam and
+    /// Knock), and someone walking (#2562, guard mode's arrivals by
     /// sound). Added to version 1: an older lamp-ears says neither, read
     /// as 0, which is no door and no footsteps.
     #[serde(default)]

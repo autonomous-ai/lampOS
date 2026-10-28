@@ -1,5 +1,6 @@
 # #2562: asked at 14:20 and the desk empty from 49 s; a real knock at 14:31,
-# ESC-50 1-103999-A-30 scored by the pinned YAMNet, door 0.648 at 660 s, and
+# ESC-50 1-103999-A-30 scored by the pinned YAMNet, door 0.944 at 660 s
+# (Knock; Door alone 0.648), and
 # no face, voice or anyone at the desk after: a sound alone is nobody coming
 # in, and nothing is texted.
 clock = "14:20"
