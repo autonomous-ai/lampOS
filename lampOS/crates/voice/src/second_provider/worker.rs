@@ -4163,9 +4163,19 @@ pub(crate) mod two_faces_diagnostic {
     pub(super) struct Records {
         events: Vec<Value>,
         dropped: usize,
+        #[serde(skip)]
+        reader_gate: Option<std::sync::Arc<ReaderGate>>,
     }
 
     impl Records {
+        pub(super) fn events(&self) -> &[Value] {
+            &self.events
+        }
+
+        pub(super) fn dropped(&self) -> usize {
+            self.dropped
+        }
+
         pub(super) fn push(&mut self, event: Value) {
             if self.events.len() < MAX_RECORDS {
                 self.events.push(event);
@@ -4203,6 +4213,151 @@ pub(crate) mod two_faces_diagnostic {
         }
     }
 
+    #[derive(Clone, Copy, Debug)]
+    pub(super) struct ReaderNotice {
+        pub(super) turn: u64,
+        pub(super) epoch: u64,
+    }
+
+    enum ReaderCommand {
+        Proceed(u64),
+        Stop,
+    }
+
+    struct CommandWait {
+        receiver: std::sync::mpsc::Receiver<ReaderCommand>,
+        next_turn: u64,
+    }
+
+    /// A test-only phase barrier, independent of the held-state mutex. It
+    /// holds no Heeding/FacesHeld reference and cannot keep authority alive.
+    pub(super) struct ReaderGate {
+        notices: std::sync::mpsc::SyncSender<ReaderNotice>,
+        commands: std::sync::Mutex<CommandWait>,
+        ended: std::sync::mpsc::SyncSender<()>,
+        deadline: std::time::Instant,
+    }
+
+    fn remaining(deadline: std::time::Instant) -> std::io::Result<std::time::Duration> {
+        deadline
+            .checked_duration_since(std::time::Instant::now())
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::TimedOut, "faces fixture phase watchdog")
+            })
+    }
+
+    impl ReaderGate {
+        pub(super) fn before_receive(&self, epoch: u64) -> std::io::Result<()> {
+            let mut wait = self
+                .commands
+                .lock()
+                .map_err(|_| std::io::Error::other("faces phase mutex poisoned"))?;
+            let turn = wait.next_turn;
+            wait.next_turn = turn
+                .checked_add(1)
+                .ok_or_else(|| std::io::Error::other("faces phase counter exhausted"))?;
+            remaining(self.deadline)?;
+            self.notices
+                .try_send(ReaderNotice { turn, epoch })
+                .map_err(|why| {
+                    std::io::Error::other(format!("faces before-receive receipt: {why}"))
+                })?;
+            match wait.receiver.recv_timeout(remaining(self.deadline)?) {
+                Ok(ReaderCommand::Proceed(released)) if released == turn => Ok(()),
+                Ok(ReaderCommand::Proceed(_)) => {
+                    Err(std::io::Error::other("faces phase released out of order"))
+                }
+                Ok(ReaderCommand::Stop) => Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "faces fixture stopped",
+                )),
+                Err(why) => Err(std::io::Error::other(format!(
+                    "faces phase disconnected or timed out: {why}"
+                ))),
+            }
+        }
+
+        pub(super) fn life(self: &std::sync::Arc<Self>) -> ReaderLife {
+            ReaderLife(std::sync::Arc::clone(self))
+        }
+    }
+
+    pub(super) struct ReaderLife(std::sync::Arc<ReaderGate>);
+
+    impl Drop for ReaderLife {
+        fn drop(&mut self) {
+            // This acknowledges loop exit, not a JoinHandle/OS-thread join.
+            let _ = self.0.ended.try_send(());
+        }
+    }
+
+    pub(super) struct ReaderControl {
+        notices: std::sync::mpsc::Receiver<ReaderNotice>,
+        commands: Option<std::sync::mpsc::SyncSender<ReaderCommand>>,
+        ended: std::sync::mpsc::Receiver<()>,
+        deadline: std::time::Instant,
+    }
+
+    impl ReaderControl {
+        pub(super) fn deadline(&self) -> std::time::Instant {
+            self.deadline
+        }
+
+        pub(super) fn next(&self) -> std::io::Result<ReaderNotice> {
+            let notice = self
+                .notices
+                .recv_timeout(remaining(self.deadline)?)
+                .map_err(|why| std::io::Error::other(format!("faces phase receipt: {why}")))?;
+            record(
+                || json!({"event": "before_receive_ack", "turn": notice.turn, "epoch": notice.epoch, "at": stamp()}),
+            );
+            Ok(notice)
+        }
+
+        pub(super) fn proceed(&self, notice: ReaderNotice) -> std::io::Result<()> {
+            remaining(self.deadline)?;
+            self.commands
+                .as_ref()
+                .ok_or_else(|| std::io::Error::other("faces phase controller closed"))?
+                .try_send(ReaderCommand::Proceed(notice.turn))
+                .map_err(|why| std::io::Error::other(format!("faces phase release: {why}")))?;
+            record(
+                || json!({"event": "release_receive", "turn": notice.turn, "epoch": notice.epoch, "at": stamp()}),
+            );
+            Ok(())
+        }
+
+        fn close(&mut self) {
+            if let Some(sender) = self.commands.take() {
+                let _ = sender.try_send(ReaderCommand::Stop);
+                // Disconnect also releases a waiter if a Proceed already
+                // occupied the one-slot queue. Drop never waits or locks.
+                drop(sender);
+            }
+        }
+
+        pub(super) fn finish(mut self) -> std::io::Result<()> {
+            self.close();
+            self.ended
+                .recv_timeout(remaining(self.deadline)?)
+                .map_err(|why| {
+                    std::io::Error::other(format!("faces reader loop did not exit: {why}"))
+                })?;
+            record(|| json!({"event": "reader_loop_exit_ack", "at": stamp()}));
+            Ok(())
+        }
+    }
+
+    impl Drop for ReaderControl {
+        fn drop(&mut self) {
+            self.close();
+        }
+    }
+
+    pub(super) fn capture_reader_gate() -> Option<std::sync::Arc<ReaderGate>> {
+        observer().and_then(|log| log.try_borrow().ok()?.reader_gate.clone())
+    }
+
     pub(super) struct Scope {
         log: Rc<RefCell<Records>>,
         previous: Option<Weak<RefCell<Records>>>,
@@ -4213,6 +4368,48 @@ pub(crate) mod two_faces_diagnostic {
             let log = Rc::new(RefCell::new(Records::default()));
             let previous = OBSERVER.with(|slot| slot.replace(Some(Rc::downgrade(&log))));
             Self { log, previous }
+        }
+
+        pub(super) fn receipts(&self) -> Value {
+            json!(&*self.log.borrow())
+        }
+
+        pub(super) fn reader_control(
+            &self,
+            timeout: std::time::Duration,
+        ) -> std::io::Result<ReaderControl> {
+            let deadline = std::time::Instant::now()
+                .checked_add(timeout)
+                .filter(|_| !timeout.is_zero())
+                .ok_or_else(|| std::io::Error::other("invalid faces fixture watchdog"))?;
+            let (notice_tx, notice_rx) = std::sync::mpsc::sync_channel(1);
+            let (command_tx, command_rx) = std::sync::mpsc::sync_channel(1);
+            let (end_tx, end_rx) = std::sync::mpsc::sync_channel(1);
+            let gate = std::sync::Arc::new(ReaderGate {
+                notices: notice_tx,
+                commands: std::sync::Mutex::new(CommandWait {
+                    receiver: command_rx,
+                    next_turn: 0,
+                }),
+                ended: end_tx,
+                deadline,
+            });
+            let mut log = self
+                .log
+                .try_borrow_mut()
+                .map_err(|_| std::io::Error::other("faces observer already borrowed"))?;
+            if log.reader_gate.is_some() {
+                return Err(std::io::Error::other(
+                    "faces observer already owns a reader gate",
+                ));
+            }
+            log.reader_gate = Some(gate);
+            Ok(ReaderControl {
+                notices: notice_rx,
+                commands: Some(command_tx),
+                ended: end_rx,
+                deadline,
+            })
         }
 
         pub(super) fn published(
@@ -4229,35 +4426,16 @@ pub(crate) mod two_faces_diagnostic {
                 "meaning": "queue delivery only; match at_us with actual ingestion/header receipts",
             }));
         }
-
-        pub(super) fn report(
-            &self,
-            heeding: &super::Heeding,
-            query_us: u64,
-            room: crate::room_told::Room,
-            held: Option<&str>,
-            held_on: bool,
-            privacy: bool,
-        ) {
-            let ingestion = heeding
-                .faces_held
-                .as_ref()
-                .and_then(|held| held.lock().ok().and_then(|held| held.diagnostic.clone()));
-            eprintln!(
-                "two_faces_diagnostic {}",
-                json!({
-                    "held_on": held_on, "privacy": privacy, "query_at_us_argument": query_us,
-                    "after_verdict": stamp(), "room": format!("{room:?}"), "held": held,
-                    "calling_thread": &*self.log.borrow(), "reader_and_policy": ingestion,
-                    "bound_per_log": MAX_RECORDS,
-                    "observation_only": true,
-                })
-            );
-        }
     }
 
     impl Drop for Scope {
         fn drop(&mut self) {
+            if std::thread::panicking() {
+                // Preserve finite phase receipts on a fixture failure too.
+                if let Ok(log) = self.log.try_borrow() {
+                    eprintln!("two_faces_observer_unwind {}", json!(&*log));
+                }
+            }
             let previous = self.previous.take();
             let _ = OBSERVER.try_with(|slot| {
                 if let Ok(mut slot) = slot.try_borrow_mut() {
@@ -5673,9 +5851,13 @@ impl Heeding {
                 .ok()
         });
         if let Some(mut faces) = faces {
+            #[cfg(test)]
+            let diagnostic_gate = two_faces_diagnostic::capture_reader_gate();
             let _ = std::thread::Builder::new()
                 .name("second-faces".into())
                 .spawn(move || {
+                    #[cfg(test)]
+                    let _diagnostic_life = diagnostic_gate.as_ref().map(|gate| gate.life());
                     loop {
                         // Read before waiting: a look taken across a privacy
                         // change is refused.
@@ -5685,6 +5867,12 @@ impl Heeding {
                         else {
                             return;
                         };
+                        #[cfg(test)]
+                        if let Some(gate) = &diagnostic_gate
+                            && gate.before_receive(epoch).is_err()
+                        {
+                            return;
+                        }
                         let message = faces.recv(Duration::from_secs(1));
                         let Some(held) = kept.upgrade() else { return };
                         match message {
@@ -10909,23 +11097,265 @@ mod tests {
         assert!(!stepped.two_stayed(101_000_000));
     }
 
-    /// `LAMP_TWO_FACES_HELD` on this route with `LAMP_NAME_OR_FOLLOW_UP`,
-    /// on the real clock: the eyes' looks published between lines are all
-    /// read, so two faces held 2.1 s make the first line's room busy, and
-    /// the face turned to the lamp lets nothing out alone; one stray look
-    /// with two faces, or two faces whose newest look sees one, leave the
-    /// room as it was, and so do looks before a privacy close and reopen.
-    /// Without the switch one look is enough, as today.
+    /// An owned short socket root. Refuse a pre-existing path rather than
+    /// deleting evidence from a different run with a reused PID.
+    struct TwoFacesRoot(std::path::PathBuf);
+
+    impl TwoFacesRoot {
+        fn new(suffix: &str) -> Self {
+            let root =
+                std::path::PathBuf::from(format!("/tmp/ltfr-{}-{suffix}", std::process::id()));
+            use std::os::unix::fs::DirBuilderExt;
+            std::fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&root)
+                .unwrap();
+            Self(root)
+        }
+    }
+
+    impl Drop for TwoFacesRoot {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn two_faces_payload(count: usize) -> lamp_msgs::Faces {
+        assert!(count <= 2);
+        lamp_msgs::Faces {
+            faces: [("a", true), ("b", false)]
+                .into_iter()
+                .take(count)
+                .map(|(id, facing)| lamp_msgs::Face {
+                    id: id.into(),
+                    xmin: 0.4,
+                    ymin: 0.0,
+                    xmax: 0.7,
+                    ymax: 0.3,
+                    confidence: 0.9,
+                    yaw: None,
+                    facing: Some(facing),
+                    speaking: None,
+                })
+                .collect(),
+        }
+    }
+
+    fn two_faces_event(
+        heeding: &Heeding,
+        kind: &str,
+        at_us: u64,
+        deadline: Instant,
+    ) -> serde_json::Value {
+        loop {
+            let found = {
+                let held = heeding.faces_held.as_ref().unwrap().lock().unwrap();
+                let mut active = None;
+                assert_eq!(
+                    held.diagnostic.as_ref().unwrap().dropped(),
+                    0,
+                    "bounded faces receipt log overflow"
+                );
+                held.diagnostic
+                    .as_ref()
+                    .unwrap()
+                    .events()
+                    .iter()
+                    .find_map(|event| {
+                        if event["event"] == "admission_begin" {
+                            active = event["fields"]["look_at_us"].as_u64();
+                        }
+                        (active == Some(at_us) && event["event"] == kind).then(|| event.clone())
+                    })
+            };
+            if let Some(found) = found {
+                return found;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "faces fixture receipt/setup watchdog: {kind} {at_us}"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    fn two_faces_received(heeding: &Heeding, at_us: u64) -> serde_json::Value {
+        let held = heeding.faces_held.as_ref().unwrap().lock().unwrap();
+        held.diagnostic
+            .as_ref()
+            .unwrap()
+            .events()
+            .iter()
+            .find(|event| {
+                event["event"] == "received_after_parse"
+                    && event["fields"]["at_us"].as_u64() == Some(at_us)
+            })
+            .unwrap()
+            .clone()
+    }
+
+    fn two_faces_publish(
+        eyes: &mut lamp_bus::Publisher,
+        observer: &two_faces_diagnostic::Scope,
+        after: Option<u64>,
+        deadline: Instant,
+    ) -> u64 {
+        while after.is_some_and(|cutoff| lamp_ipc::monotonic_us() <= cutoff) {
+            assert!(
+                Instant::now() < deadline,
+                "faces fixture monotonic setup watchdog"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        let before = two_faces_diagnostic::stamp();
+        let at_us = lamp_ipc::monotonic_us();
+        let outcome = eyes.publish_json(at_us, &two_faces_payload(2)).unwrap();
+        observer.published(before, at_us, two_faces_diagnostic::stamp(), outcome);
+        assert!(
+            outcome.delivered > 0 && outcome.dropped == 0,
+            "real queue delivery: {outcome:?}"
+        );
+        at_us
+    }
+
+    /// Fallible discovery in this private fresh root only: no guessed bus
+    /// layout, suppressed entry errors, symlink traversal or unbounded walk.
+    fn two_faces_socket_paths(
+        root: &Path,
+    ) -> std::io::Result<std::collections::BTreeSet<std::path::PathBuf>> {
+        use std::os::unix::fs::FileTypeExt;
+        fn walk(
+            path: &Path,
+            depth: usize,
+            left: &mut usize,
+            found: &mut std::collections::BTreeSet<std::path::PathBuf>,
+        ) -> std::io::Result<()> {
+            if depth > 16 {
+                return Err(std::io::Error::other(
+                    "private faces bus walk depth exceeded",
+                ));
+            }
+            for entry in std::fs::read_dir(path)? {
+                let entry = entry?;
+                *left = (*left).checked_sub(1).ok_or_else(|| {
+                    std::io::Error::other("private faces bus entry bound exceeded")
+                })?;
+                let kind = entry.file_type()?;
+                if kind.is_symlink() {
+                    return Err(std::io::Error::other(
+                        "unexpected symlink in private faces bus",
+                    ));
+                }
+                if kind.is_dir() {
+                    walk(&entry.path(), depth + 1, left, found)?;
+                } else if kind.is_socket() {
+                    found.insert(entry.path());
+                }
+            }
+            Ok(())
+        }
+        if !std::fs::symlink_metadata(root)?.file_type().is_dir() {
+            return Err(std::io::Error::other(
+                "private faces bus root is not a real directory",
+            ));
+        }
+        let mut found = std::collections::BTreeSet::new();
+        walk(root, 0, &mut 256, &mut found)?;
+        Ok(found)
+    }
+
+    struct TwoFacesSocket {
+        path: std::path::PathBuf,
+        parent: std::path::PathBuf,
+        socket_identity: (u64, u64),
+        parent_identity: (u64, u64),
+    }
+
+    impl TwoFacesSocket {
+        fn identity(metadata: &std::fs::Metadata) -> (u64, u64) {
+            use std::os::unix::fs::MetadataExt;
+            (metadata.dev(), metadata.ino())
+        }
+
+        fn capture(
+            bus: &lamp_bus::Bus,
+            before: &std::collections::BTreeSet<std::path::PathBuf>,
+        ) -> std::io::Result<Self> {
+            use std::os::unix::fs::FileTypeExt;
+            let after = two_faces_socket_paths(bus.root())?;
+            if !before.is_subset(&after) {
+                return Err(std::io::Error::other(
+                    "pre-existing fixture socket disappeared during face-reader creation",
+                ));
+            }
+            let added: Vec<_> = after.difference(before).collect();
+            if added.len() != 1 {
+                return Err(std::io::Error::other(format!(
+                    "expected one added face-reader socket, got {}",
+                    added.len()
+                )));
+            }
+            let path = added[0].to_path_buf();
+            let parent = path
+                .parent()
+                .ok_or_else(|| std::io::Error::other("face-reader socket has no parent"))?
+                .to_path_buf();
+            let socket_metadata = std::fs::symlink_metadata(&path)?;
+            let parent_metadata = std::fs::symlink_metadata(&parent)?;
+            if !socket_metadata.file_type().is_socket() || !parent_metadata.file_type().is_dir() {
+                return Err(std::io::Error::other(
+                    "captured face-reader path/parent changed type",
+                ));
+            }
+            Ok(Self {
+                path,
+                parent,
+                socket_identity: Self::identity(&socket_metadata),
+                parent_identity: Self::identity(&parent_metadata),
+            })
+        }
+
+        /// Observe removal only; never unlink the path to make this pass.
+        fn wait_removed(&self, deadline: Instant) -> std::io::Result<()> {
+            use std::os::unix::fs::FileTypeExt;
+            loop {
+                let parent = std::fs::symlink_metadata(&self.parent)?;
+                if !parent.file_type().is_dir() || Self::identity(&parent) != self.parent_identity {
+                    return Err(std::io::Error::other(
+                        "face-reader parent directory replaced",
+                    ));
+                }
+                match std::fs::symlink_metadata(&self.path) {
+                    Err(why) if why.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                    Err(why) => return Err(why),
+                    Ok(metadata)
+                        if !metadata.file_type().is_socket()
+                            || Self::identity(&metadata) != self.socket_identity =>
+                    {
+                        return Err(std::io::Error::other("face-reader socket path replaced"));
+                    }
+                    Ok(_) => {}
+                }
+                if Instant::now() >= deadline {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "face-reader exact socket unlink watchdog",
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+    }
+
     #[test]
-    fn with_two_faces_held_looks_between_lines_make_the_first_line_busy() {
-        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+    fn two_faces_reader_admits_a_fresh_current_epoch_look_from_the_real_bus() {
         let _one = crate::provider_worker::tests::one_thread();
-        use crate::room_told::Room;
-        // A short root: a Unix socket's address holds 103 bytes.
-        let root = std::path::PathBuf::from(format!("/tmp/ltf-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
-        let bus = lamp_bus::Bus::new(&root).unwrap();
+        assert!(
+            !crate::scenario_clock::is_active(),
+            "real-bus control must retain the actual clocks"
+        );
+        let root = TwoFacesRoot::new("a");
+        let bus = lamp_bus::Bus::new(&root.0).unwrap();
         let mut eyes = bus
             .publisher_declared(
                 lamp_msgs::Faces::TOPIC,
@@ -10934,21 +11364,253 @@ mod tests {
             )
             .unwrap();
         eyes.expires_after(Some(Duration::from_secs(2)));
-        let face = |id: &str, facing: bool| lamp_msgs::Face {
-            id: id.into(),
-            xmin: 0.4,
-            ymin: 0.0,
-            xmax: 0.7,
-            ymax: 0.3,
-            confidence: 0.9,
-            yaw: None,
-            facing: Some(facing),
-            speaking: None,
+        let observer = two_faces_diagnostic::Scope::begin();
+        let control = observer.reader_control(Duration::from_secs(10)).unwrap();
+        let deadline = control.deadline();
+        let mut heeding = Heeding::new(true, true, Some(&root.0), None);
+        // Heeding already owns a NameHeard subscriber; identify only the
+        // single socket added by the face-reader factory.
+        let prior_sockets = two_faces_socket_paths(bus.root()).unwrap();
+        heeding.holding_two_faces(Some(&root.0));
+        heeding
+            .faces_held
+            .as_ref()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .diagnostic = Some(two_faces_diagnostic::Records::default());
+        let first = control.next().unwrap();
+        let own_socket = TwoFacesSocket::capture(&bus, &prior_sockets).unwrap();
+        assert_eq!(first.epoch, 0);
+        let first_at = two_faces_publish(&mut eyes, &observer, None, deadline);
+        control.proceed(first).unwrap();
+        let _ = two_faces_event(&heeding, "admitted", first_at, deadline);
+        let old_wait = control.next().unwrap();
+        assert_eq!(old_wait.epoch, 0);
+        heeding.privacy_changed();
+        heeding.privacy_changed();
+        // Complete one ordinary empty receive, then require the next actual
+        // receive boundary to have sampled the new epoch before publishing.
+        control.proceed(old_wait).unwrap();
+        let current_wait = control.next().unwrap();
+        assert_eq!(current_wait.epoch, 2);
+        let cutoff = heeding
+            .faces_held
+            .as_ref()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .cutoff_us
+            .unwrap();
+        let at_us = two_faces_publish(&mut eyes, &observer, Some(cutoff), deadline);
+        control.proceed(current_wait).unwrap();
+        let admitted = two_faces_event(&heeding, "admitted", at_us, deadline);
+        let received = two_faces_received(&heeding, at_us);
+        assert_eq!(received["fields"]["expires_ms"].as_u64(), Some(2_000));
+        assert_eq!(received["fields"]["expired"], false);
+        assert_eq!(received["fields"]["receive_epoch"].as_u64(), Some(2));
+        assert!(
+            admitted["now_us"]
+                .as_u64()
+                .unwrap()
+                .checked_sub(at_us)
+                .expect("monotonic setup moved backwards")
+                <= LOOK_GAP_MS * 1_000
+        );
+        {
+            let mut held = heeding.faces_held.as_ref().unwrap().lock().unwrap();
+            assert_eq!(held.epoch, 2);
+            assert_eq!(held.looks.len(), 1);
+            assert_eq!(held.looks[0].at_us, at_us);
+            assert!(
+                !held.two_stayed(monotonic_us()),
+                "one admitted fresh look is not persistence"
+            );
+        }
+        drop(heeding);
+        control.finish().unwrap();
+        own_socket.wait_removed(deadline).unwrap();
+        assert_eq!(observer.receipts()["dropped"], 0);
+        eprintln!(
+            "two_faces_async {}",
+            serde_json::json!({"control": "fresh_current_epoch", "received": received, "admitted": admitted, "deque_len": 1, "calling_thread": observer.receipts(), "reader_loop_exit_observed": true, "exact_socket_path_removed": true, "captured_socket_path": own_socket.path})
+        );
+    }
+
+    #[test]
+    fn two_faces_reader_rejects_a_post_privacy_look_taken_across_the_old_wait() {
+        let _one = crate::provider_worker::tests::one_thread();
+        assert!(
+            !crate::scenario_clock::is_active(),
+            "real-bus control must retain the actual clocks"
+        );
+        let root = TwoFacesRoot::new("x");
+        let bus = lamp_bus::Bus::new(&root.0).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        eyes.expires_after(Some(Duration::from_secs(2)));
+        let observer = two_faces_diagnostic::Scope::begin();
+        let control = observer.reader_control(Duration::from_secs(10)).unwrap();
+        let deadline = control.deadline();
+        let mut heeding = Heeding::new(true, true, Some(&root.0), None);
+        // Heeding already owns a NameHeard subscriber; identify only the
+        // single socket added by the face-reader factory.
+        let prior_sockets = two_faces_socket_paths(bus.root()).unwrap();
+        heeding.holding_two_faces(Some(&root.0));
+        heeding
+            .faces_held
+            .as_ref()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .diagnostic = Some(two_faces_diagnostic::Records::default());
+        let old_wait = control.next().unwrap();
+        let own_socket = TwoFacesSocket::capture(&bus, &prior_sockets).unwrap();
+        assert_eq!(old_wait.epoch, 0);
+        // The reader is paused outside the held mutex at its recorded epoch.
+        heeding.privacy_changed();
+        heeding.privacy_changed();
+        let cutoff = heeding
+            .faces_held
+            .as_ref()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .cutoff_us
+            .unwrap();
+        let at_us = two_faces_publish(&mut eyes, &observer, Some(cutoff), deadline);
+        assert!(at_us > cutoff);
+        control.proceed(old_wait).unwrap();
+        let rejected = two_faces_event(&heeding, "rejected_privacy", at_us, deadline);
+        let received = two_faces_received(&heeding, at_us);
+        assert_eq!(received["fields"]["expired"], false);
+        assert_eq!(received["fields"]["expires_ms"].as_u64(), Some(2_000));
+        assert_eq!(received["fields"]["receive_epoch"].as_u64(), Some(0));
+        assert_eq!(rejected["epoch"].as_u64(), Some(2));
+        assert!(
+            rejected["now_us"]
+                .as_u64()
+                .unwrap()
+                .checked_sub(at_us)
+                .expect("monotonic setup moved backwards")
+                <= LOOK_GAP_MS * 1_000,
+            "fresh monotonic input, not a stale-input explanation"
+        );
+        {
+            let mut held = heeding.faces_held.as_ref().unwrap().lock().unwrap();
+            assert!(held.looks.is_empty());
+            assert!(!held.two_stayed(monotonic_us()));
+        }
+        control.finish().unwrap();
+        own_socket.wait_removed(deadline).unwrap();
+        assert!(
+            heeding.faces_held.is_some(),
+            "controller Stop must work while the owner is alive"
+        );
+        assert_eq!(observer.receipts()["dropped"], 0);
+        eprintln!(
+            "two_faces_async {}",
+            serde_json::json!({"control": "cross_epoch_rejection", "owner_alive_at_stop": true, "received": received, "rejected": rejected, "deque_len": 0, "calling_thread": observer.receipts(), "reader_loop_exit_observed": true, "exact_socket_path_removed": true, "captured_socket_path": own_socket.path})
+        );
+        drop(heeding);
+    }
+
+    #[test]
+    fn two_faces_latest_expiry_refuses_turned_and_count_on_the_real_bus() {
+        let _one = crate::provider_worker::tests::one_thread();
+        assert!(!crate::scenario_clock::is_active());
+        let root = TwoFacesRoot::new("e");
+        let bus = lamp_bus::Bus::new(&root.0).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        eyes.expires_after(Some(Duration::ZERO));
+        let at_us = lamp_ipc::monotonic_us();
+        eyes.publish_json(at_us, &two_faces_payload(2)).unwrap();
+        let initial = bus.latest(lamp_msgs::Faces::TOPIC).unwrap().unwrap();
+        assert_eq!(initial.header.at_us, at_us);
+        assert_eq!(initial.header.expires_ms, Some(0));
+        let due = initial
+            .header
+            .at_unix_ms
+            .checked_add(lamp_bus::EXPIRY_GRACE_MS)
+            .and_then(|at| at.checked_add(1))
+            .unwrap();
+        let started = Instant::now();
+        let watchdog = started + Duration::from_secs(10);
+        let sample = || {
+            let before = Instant::now();
+            let wall = unix_ms(SystemTime::now());
+            let after = Instant::now();
+            (before, wall, after)
         };
+        let initial_sample = sample();
+        let mut previous_wall = initial_sample.1;
+        let final_sample;
+        loop {
+            let current_sample = sample();
+            let wall = current_sample.1;
+            assert!(
+                wall >= previous_wall,
+                "wall-clock-step/setup failure: previous={previous_wall} current={wall}"
+            );
+            previous_wall = wall;
+            assert!(
+                Instant::now() < watchdog,
+                "wall-clock expiry/setup watchdog: current={wall} due={due}"
+            );
+            if wall >= due {
+                final_sample = current_sample;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(1).min(Duration::from_millis(due - wall)));
+        }
+        let expired = bus.latest(lamp_msgs::Faces::TOPIC).unwrap().unwrap();
+        assert_eq!(expired.header.at_us, at_us);
+        assert!(
+            expired.expired,
+            "actual latest expiry/setup failure at wall={}",
+            unix_ms(SystemTime::now())
+        );
+        assert_eq!(crate::bus_out::someone_turned_to_lamp(&bus), None);
+        assert_eq!(crate::bus_out::faces_in_view(&bus), None);
+        eprintln!(
+            "two_faces_expiry {}",
+            serde_json::json!({"header_at_unix_ms": initial.header.at_unix_ms, "expires_ms": initial.header.expires_ms, "grace_ms": lamp_bus::EXPIRY_GRACE_MS, "independent_due_unix_ms": due, "observed_unix_ms": unix_ms(SystemTime::now()), "actual_latest_expired": expired.expired, "host_elapsed_us": started.elapsed().as_micros(), "initial_wall_ms": initial_sample.1, "initial_host_bracket_us": [initial_sample.0.duration_since(started).as_micros(), initial_sample.2.duration_since(started).as_micros()], "final_wall_ms": final_sample.1, "final_host_bracket_us": [final_sample.0.duration_since(started).as_micros(), final_sample.2.duration_since(started).as_micros()], "drift_classified": false})
+        );
+    }
+
+    /// The five route contracts use explicit historical receipt times and a
+    /// shared logical query clock. Latest state is non-expiring only here;
+    /// real reader/expiry controls below preserve the omitted I/O boundaries.
+    #[test]
+    fn with_two_faces_held_looks_between_lines_make_the_first_line_busy() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let clock = clock_with_history();
+        clock.set_pump(|_| Ok(())).unwrap();
+        use crate::room_told::Room;
+        let root = TwoFacesRoot::new("d");
+        let bus = lamp_bus::Bus::new(&root.0).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        // Only this deterministic route layer excludes wall expiry. The real
+        // reader and actual-expiry controls below keep that boundary separate.
+        eyes.expires_after(None);
         let busy = (Room::Busy, Some(crate::attention::BUSY_TURNED_ALONE));
-        // Each case: the switch, the looks' face counts, 300 ms apart, and
-        // whether privacy closes and reopens after them, with one more look
-        // with two faces after the reopening.
         for (held_on, looks, privacy, expected) in [
             (true, vec![2; 8], false, busy),
             (true, vec![1, 1, 1, 2], false, (Room::Unknown, None)),
@@ -10961,7 +11623,6 @@ mod tests {
             (true, vec![2; 8], true, (Room::Unknown, None)),
             (false, vec![2], false, busy),
         ] {
-            let diagnostic = two_faces_diagnostic::Scope::begin();
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -10969,52 +11630,87 @@ mod tests {
                 room.count_only_talk(true);
                 room.count_held_talk(true);
             }
-            let mut heeding = Heeding::new(true, true, Some(&root), None);
+            let mut heeding = Heeding::new(true, true, Some(&root.0), None);
             heeding.as_the_only_voice(false, true, false);
             heeding.needing_name_or_follow_up();
             if held_on {
-                heeding.holding_two_faces(Some(&root));
-                if let Some(held) = &heeding.faces_held {
-                    held.lock().unwrap().diagnostic =
-                        Some(two_faces_diagnostic::Records::default());
+                let mut seeded = FacesHeld::default();
+                let query_us = monotonic_us();
+                for (index, &faces) in looks.iter().enumerate() {
+                    let at_us = query_us - 100_000 - (looks.len() - 1 - index) as u64 * 300_000;
+                    // Historical instant receipts, all in the same explicit
+                    // logical domain as the verdict. Admission is unchanged.
+                    seeded.look(
+                        FacesLook {
+                            at_us,
+                            faces,
+                            expires_ms: Some(2_000),
+                        },
+                        seeded.epoch,
+                        at_us,
+                    );
                 }
-                // The reader subscribes before the first look.
-                std::thread::sleep(Duration::from_millis(100));
+                heeding.faces_held = Some(Arc::new(Mutex::new(seeded)));
             }
-            for (k, &count) in looks.iter().enumerate() {
-                if k > 0 {
-                    std::thread::sleep(Duration::from_millis(300));
-                }
-                let faces = [face("a", true), face("b", false)][..count].to_vec();
-                let before = two_faces_diagnostic::stamp();
-                let at_us = lamp_ipc::monotonic_us();
-                let published = eyes
-                    .publish_json(at_us, &lamp_msgs::Faces { faces })
-                    .unwrap();
-                diagnostic.published(before, at_us, two_faces_diagnostic::stamp(), published);
+            if !held_on {
+                assert!(
+                    heeding.faces_held.is_none(),
+                    "default-off has no held reader state"
+                );
             }
-            std::thread::sleep(Duration::from_millis(100));
-            if privacy {
-                // Closed, then reopened.
+            let fresh_after_privacy = if privacy {
                 heeding.privacy_changed();
                 heeding.privacy_changed();
-                let faces = vec![face("a", true), face("b", false)];
-                let before = two_faces_diagnostic::stamp();
-                let at_us = lamp_ipc::monotonic_us();
-                let published = eyes
-                    .publish_json(at_us, &lamp_msgs::Faces { faces })
-                    .unwrap();
-                diagnostic.published(before, at_us, two_faces_diagnostic::stamp(), published);
-                std::thread::sleep(Duration::from_millis(100));
-            }
+                assert!(crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap());
+                let now_us = monotonic_us();
+                let mut held = heeding.faces_held.as_ref().unwrap().lock().unwrap();
+                assert!(
+                    held.looks.is_empty(),
+                    "privacy must remove the old positive history"
+                );
+                let epoch = held.epoch;
+                assert_eq!(epoch, 2);
+                assert!(now_us > held.cutoff_us.unwrap());
+                held.look(
+                    FacesLook {
+                        at_us: now_us,
+                        faces: 2,
+                        expires_ms: Some(2_000),
+                    },
+                    epoch,
+                    now_us,
+                );
+                assert_eq!(
+                    held.looks.len(),
+                    1,
+                    "fresh current-epoch look must really be admitted"
+                );
+                assert_eq!(held.looks[0].at_us, now_us);
+                Some(
+                    serde_json::json!({"epoch": epoch, "cutoff_us": held.cutoff_us, "admitted_at_us": now_us, "deque_len": held.looks.len()}),
+                )
+            } else {
+                None
+            };
+            let count = if privacy { 2 } else { *looks.last().unwrap() };
+            eyes.publish_json(monotonic_us(), &two_faces_payload(count))
+                .unwrap();
+            let latest = bus.latest(lamp_msgs::Faces::TOPIC).unwrap().unwrap();
+            assert_eq!(
+                latest.header.expires_ms, None,
+                "expiry is explicitly outside this layer"
+            );
+            assert!(!latest.expired);
             let now_us = monotonic_us();
             let held = heeding.heed(1, (now_us, now_us + 1_000_000), "Okay yeah sure.", None);
             let room = crate::room_told::room().lock().unwrap().at(now_us);
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
-            diagnostic.report(&heeding, now_us, room, held, held_on, privacy);
+            eprintln!(
+                "two_faces_deterministic {}",
+                serde_json::json!({"held_on": held_on, "looks": looks, "privacy": privacy, "query_us": now_us, "latest_non_expiring": true, "fresh_after_privacy": fresh_after_privacy, "room": format!("{room:?}"), "held": held})
+            );
             assert_eq!((room, held), expected, "{held_on} {looks:?} {privacy}");
         }
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// `LAMP_NAME_OR_FOLLOW_UP` on this route, through the thread and the
