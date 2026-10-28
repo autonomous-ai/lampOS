@@ -27,6 +27,12 @@ pub const ABSENT_FOR_US: u64 = 3_000_000;
 pub const LEFT_AFTER_US: u64 = 5_000_000;
 /// A sound class's score that counts as heard.
 pub const SOUND_BAR: f64 = 0.5;
+/// A privacy lease not heard from this long is private: a voice that stalls
+/// stops renewing it, and the microphone is then closed to everyone else.
+pub const PRIVACY_LAPSE_US: u64 = 1_000_000;
+/// The bus thread hands on a repeated state message at least this often, so
+/// [`Watch::lapse`] knows the privacy lease is still renewed.
+pub const REPEAT_EVERY_US: u64 = 250_000;
 /// The sound classes told, never `speech`.
 pub const SOUND_CLASSES: [&str; 4] = ["music", "laughter", "door", "footsteps"];
 
@@ -56,6 +62,8 @@ pub struct Watch {
     talking: bool,
     paused: bool,
     private: bool,
+    /// When the privacy lease was last heard; none before the first.
+    privacy_us: Option<u64>,
     asleep: bool,
     light: Value,
     mood: Value,
@@ -166,6 +174,7 @@ impl Watch {
                 self.flag(asleep, |watch| &mut watch.asleep, LeaseWhy::Asleep)
             }
             "voice/privacy" => {
+                self.privacy_us = Some(now_us);
                 let private = Self::kept_of(topic, payload) == Some(json!(true));
                 self.flag(private, |watch| &mut watch.private, LeaseWhy::Private)
             }
@@ -179,6 +188,28 @@ impl Watch {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// Whether the bus thread may pass over a state message whose key is
+    /// `key`: the same as the one it last handed on (`sent`, with when) and
+    /// handed on under [`REPEAT_EVERY_US`] ago.
+    pub fn passes_over(sent: Option<&(Value, u64)>, key: &Value, now_us: u64) -> bool {
+        sent.is_some_and(|(last, at)| last == key && now_us.saturating_sub(*at) < REPEAT_EVERY_US)
+    }
+
+    /// Time passing with no message: a privacy lease last heard
+    /// [`PRIVACY_LAPSE_US`] ago or more is private, as the voice's own
+    /// microphone gate holds it (harness-reviewer's P3 on #4031). Before the
+    /// first lease nothing lapses: a lamp whose voice doesn't publish one
+    /// isn't private forever.
+    pub fn lapse(&mut self, now_us: u64) -> Vec<Out> {
+        let lapsed = self
+            .privacy_us
+            .is_some_and(|heard| now_us.saturating_sub(heard) >= PRIVACY_LAPSE_US);
+        if !lapsed || self.private {
+            return Vec::new();
+        }
+        self.flag(true, |watch| &mut watch.private, LeaseWhy::Private)
     }
 
     /// The state `get` answers for `kind`.
@@ -326,6 +357,50 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// A voice that stops renewing its privacy lease leaves the lamp private
+    /// once [`PRIVACY_LAPSE_US`] passes, and a lease heard again opens it.
+    #[test]
+    fn a_privacy_lease_that_stops_coming_is_private() {
+        let open = json!({"permitted": true, "physical_muted": false});
+        let mut watch = Watch::new();
+        assert!(
+            watch.lapse(10 * S).is_empty(),
+            "no lease yet: nothing lapses"
+        );
+        assert!(watch.take("voice/privacy", &open, 10 * S).is_empty());
+        assert!(watch.lapse(10 * S + PRIVACY_LAPSE_US - 1).is_empty());
+        let out = watch.lapse(10 * S + PRIVACY_LAPSE_US);
+        assert_eq!(out[0], Out::Lose(None, LeaseWhy::Private));
+        assert_eq!(watch.state(StateKind::Lamp)["private"], true);
+        assert!(watch.lapse(20 * S).is_empty(), "lost once, not every tick");
+        assert_eq!(
+            kinds(&watch.take("voice/privacy", &open, 20 * S)),
+            [EventKind::LampChanged]
+        );
+        assert_eq!(watch.state(StateKind::Lamp)["private"], false);
+    }
+
+    /// The bus thread hands on a repeat at least every [`REPEAT_EVERY_US`],
+    /// so a renewed lease never looks lapsed; a new key goes on at once.
+    #[test]
+    fn a_repeated_state_message_is_handed_on_now_and_then() {
+        let key = json!(false);
+        let sent = (key.clone(), 5 * S);
+        assert!(!Watch::passes_over(None, &key, 5 * S));
+        assert!(Watch::passes_over(
+            Some(&sent),
+            &key,
+            5 * S + REPEAT_EVERY_US - 1
+        ));
+        assert!(!Watch::passes_over(
+            Some(&sent),
+            &key,
+            5 * S + REPEAT_EVERY_US
+        ));
+        assert!(!Watch::passes_over(Some(&sent), &json!(true), 5 * S + 1));
+        const { assert!(REPEAT_EVERY_US * 2 < PRIVACY_LAPSE_US) };
     }
 
     /// A state topic's message whose [`Watch::kept_of`] is the last one's

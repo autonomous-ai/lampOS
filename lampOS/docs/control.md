@@ -82,7 +82,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `time` | the client's own schedule | the lamp's clock and zone | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
 
-lamp-control reads each topic on its own thread. A state topic's message that says nothing new for these, the same privacy, pause, sleep, talking, light or mood as the last one, is passed over on that thread and never handed to the door. `voice/privacy` alone comes a hundred times a second (its lease, renewed every 10 ms), and handing each one on was lamp-control's idle CPU: 2% of a core on lamp-75c9.
+lamp-control reads each topic on its own thread. A state topic's message that says nothing new for these, the same privacy, pause, sleep, talking, light or mood as the last one, is passed over on that thread and never handed to the watch that turns the bus into events; a repeat still goes on every 250 ms. `voice/privacy` alone comes a hundred times a second (its lease, renewed every 10 ms), and handing each one on was half of lamp-control's idle CPU on lamp-75c9 (2.1% of a core before, 1.1% after; the rest is that thread reading them). A privacy lease not heard from for 1 s counts as private: every lease is lost with `private` and `lamp.changed` says so, until the lease is heard again. That is later than the voice's own microphone gate, which closes once a lease is 50 ms old; lamp-control says it 1 to 1.25 s after the last lease (the 250 ms refresh and check), so a running voice, renewing every 10 ms, never reads as private. Each message is timed when its thread receives it, and every message already come is taken before a lapse is judged, so a lamp-control held up by a slow save doesn't read a renewed lease as lapsed. Before the first lease nothing lapses, so a lamp whose voice publishes none is never private for that.
 
 **Actions:**
 
@@ -330,6 +330,7 @@ connection closed), `slumped` (the body gave way under load and let go). Ids are
   hasn't lapsed. While suspended, the lease is still the holder's, so nobody
   else may take the part, and its clock runs.
 - **Lost:** an act on a lost lease is refused with how it ended.
+- **A voice restart** (an update, a crash, `systemctl restart lamp-voice`) stops its privacy lease for over a second, so every lease is lost with `private` ("Events": a lease not heard from for 1 s). A client takes its lease again once `lamp.changed` says `private` is false.
 
 ### Actions
 
