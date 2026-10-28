@@ -920,6 +920,18 @@ impl Days {
             )
             .optional()?)
     }
+    /// Every event day kept for this person's records, by id, the earliest
+    /// of each, in one query: the kept list's ([`Self::kept_with`]) days for
+    /// its reply (#3987).
+    pub fn event_days(&self, person: &Person) -> Result<std::collections::HashMap<u64, String>> {
+        let mut statement = self.db.prepare(
+            "SELECT e.id,min(d.day) FROM event_days d JOIN entries e ON e.rid=d.rid WHERE e.person=?1 GROUP BY e.id",
+        )?;
+        let rows = statement.query_map(params![person.as_str()], |row| {
+            Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?))
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
     fn find(
         &self,
         person: &Person,

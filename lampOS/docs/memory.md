@@ -310,7 +310,9 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
 
 - `append`, `remember`: `{"ok":true,"id":3}`. `heard` or `said` may be left out.
 - `kept`: `entries` of `{id, at_unix_ms, text}`, the newest that fit in
-  `max_bytes` of text, oldest first. With `"observations":true` (the Days
+  `max_bytes` of text, oldest first; the Days store adds `on`
+  (`YYYY-MM-DD`) to a kept thing with an event day, as search does, so the
+  voice tells that day apart from when it was said (#3987). With `"observations":true` (the Days
   store's, #3113) the person's current observations are listed too, by the
   same ids, for a forget by name; the legacy store ignores it.
 - `recall`: `entries` of `{"kind":"exchange", id, at_unix_ms, heard, said}` or
@@ -1139,7 +1141,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     something it was shown as kept, by that id. The ids the model sees: a
     session note's facts carry `id`, recall's `found` items `source_id`,
     and with the switch each hit line of the second route ends
-    `(when, source_id N)`. The voice sends `replaces` with `shown`, what
+    `(said when; source_id N)`. The voice sends `replaces` with `shown`, what
     this session was shown of that scope: its sources (the note, recall,
     things it kept) and the hits told by id, which are never sources. The
     store checks it ([the rule](memory-days.md#request-contract)). Accepted,
@@ -1713,6 +1715,24 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `on`'s weekday within 7 days (14 with tuần sau/tới), and tháng N with a
   day number for `on`'s month and day. "Dentist on Friday" with `on` a
   Thursday loses its `on`.
+  **A day the model left out** (#3987: on the tester's onboarding day,
+  28 Oct, a dental appointment on Friday was later spoken of as today):
+  the voice gives `on` itself only when the call's own text names exactly
+  one day from tomorrow to 60 days on and the heard line names that same
+  day, neither says a repeat (a weekday's plural, "every", "each",
+  "weekly", "daily") or a past ("last", "ago", "yesterday", "was", "were",
+  "went", "had", "did", "saw", "met", "used"), and one of them says a
+  coming event ("is", "are", "will", "have", "has", "appointment",
+  "booked", "starts", "begins", "due", "remind", "tomorrow", "next",
+  "coming" …) (`remember::on::day_to_fill`). "My dentist appointment is on
+  Friday" said on Wednesday 28 October keeps Friday 30 October,
+  "tomorrow" the 29th, "next Tuesday" 10 November (8 to 14 days on, as
+  above). None for today ("on Friday" said on a Friday, "I fed the cat
+  today"), several days ("this week"), "I went to the dentist last
+  Friday", "I saw my sister on Sunday", or a fact whose own text names no
+  day though the line does ("my son starts school on Monday, remember his
+  name is Tom" keeps "his name is Tom" undated; the reviewers' P2s on
+  #4010). A model's `on` the words don't name is dropped, never replaced.
   Otherwise `on` is dropped before the memory is asked, never guessed
   (`tools.rs`, `remember::on::call_as_heard`): so too for a text from the
   app or a line the lamp wrote, which nobody said at the lamp. What is
@@ -1790,7 +1810,7 @@ On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `sea
 - **The room's** are told with a line that they were said in this room and that the lamp can't tell who said them or who is asking, as the session note's room part says.
 - **A person's own** are told with a line that they are the person's own, the one at the lamp now, to be told as theirs ("you told me"), never as something someone here or someone else said (`remember::HITS_OWN_NOTE`, #3504, N9). On lamp-06c1 on 27 Oct, with the line missing, a hit from her own scope was told as "someone in this room once said theirs was hibiscus tea" (journal `(theirs) hits_told=1`). About 150 bytes more on such a turn; no extra round.
 - **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked. On the final words it runs off the worker's runtime (`spawn_blocking`). On the early words of a prepared chat it runs inline, where the chat begins, so a slow memory can hold that line's audio for up to the same 60 ms.
-- **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
+- **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago it was said in words (`said today`) and, for one with an event day (`on`, in the kept list's answer), that day from today apart from it (`the day: tomorrow, Friday 30 October`, `remember::day_it_is_about`; #3987: "my dental appointment on Friday (today)" read as an appointment today). Tested in `a_hit_line_tells_the_day_a_kept_thing_is_about_apart_from_when_it_was_said`. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
 - **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
 - **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's) hits_told=H bytes_told=B`, with no words: `H` kept things told and `B` bytes of their text as told (each cut to 160 characters), both 0 when nothing was told, so a day's disclosure adds up from the journal (#2510 take 1 c, `remember::hits_journal_line`).
 - **Tests:** in `remember::tests`, `a_vietnamese_kept_thing_is_found_with_or_without_its_accents`, `english_hit_words_are_as_before_but_the_memorys_common_words`, `vietnamese_function_words_alone_are_never_a_hit`, `unaccented_function_words_find_no_accented_kept_thing`, `search_common_is_the_memorys_own_list` (the voice's mirror of `search::COMMON` held to the memory's own source), `the_journal_line_counts_what_was_told_and_never_says_it` and `the_hits_switch_is_off_unless_exactly_on`.

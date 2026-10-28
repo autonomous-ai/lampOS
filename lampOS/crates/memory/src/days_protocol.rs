@@ -322,13 +322,28 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             person,
             max_bytes,
             observations,
-        } => value(Response::Kept {
-            entries: store.kept_with(
-                &one(person)?,
+        } => {
+            let person = one(person)?;
+            let kept = store.kept_with(
+                &person,
                 max_bytes.unwrap_or(4096).min(16384) as usize,
                 observations,
-            )?,
-        }),
+            )?;
+            let mut answer = value(Response::Kept {
+                entries: kept.clone(),
+            });
+            // As search: the day a kept thing is about, so the voice tells it
+            // apart from the day it was said (#3987). Older readers ignore it.
+            let days = store.event_days(&person)?;
+            if let Some(entries) = answer["entries"].as_array_mut() {
+                for (entry, kept) in entries.iter_mut().zip(&kept) {
+                    if let Some(day) = days.get(&kept.id) {
+                        entry["on"] = json!(day);
+                    }
+                }
+            }
+            answer
+        }
         Request::Recall {
             person,
             query,
@@ -722,6 +737,33 @@ mod tests {
         assert_eq!(found["ok"], true, "{found}");
         assert_eq!(found["entries"][0]["id"], kept["id"]);
         assert_eq!(found["entries"][0]["on"], "2026-10-17");
+    }
+
+    /// #3987: the kept list carries a kept thing's day as search does, and
+    /// none on an undated one, so the voice tells the day apart from when
+    /// it was said.
+    #[test]
+    fn kept_returns_the_day_attached_to_a_dated_fact() {
+        let (_scratch, mut store) = Scratch::new("kept-event-day");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let dated = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"My dentist appointment is on Friday","on":"2026-10-16"}),
+        );
+        let plain = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"I take my coffee black"}),
+        );
+        let kept = send(&mut store, json!({"op":"kept","person":person}));
+        assert_eq!(kept["ok"], true, "{kept}");
+        let entries = kept["entries"].as_array().unwrap();
+        assert_eq!(entries.len(), 2, "{kept}");
+        let of = |id: &Value| entries.iter().find(|entry| entry["id"] == *id).unwrap();
+        assert_eq!(of(&dated["id"])["on"], "2026-10-16");
+        assert!(of(&plain["id"]).get("on").is_none(), "{kept}");
     }
 
     /// #3613 on the wire: `forget` with `selective:true` takes an unlinked
