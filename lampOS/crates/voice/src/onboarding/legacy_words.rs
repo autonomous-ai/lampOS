@@ -1,5 +1,6 @@
 //! Independent pre-move prompt bytes for unchanged semantic tests and parity.
-pub const SIT_NOTE: &str = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Sit where you usually sit and look at me. I'll tell you when I see you.\")";
+pub const SIT_NOTE: &str = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Let's get set up first. It takes a few minutes. Just do what I ask, and you can ask me anything once we're done. Sit where you usually sit and look at me. I'll tell you when I see you.\")";
+pub const SIT_OFFER: &str = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Sit where you usually sit and look at me. I'll tell you when I see you.\")";
 pub const SIT_NO_FACE: &str = "(Say only this, nothing before or after it: \"I can't see your face yet. Sit where you usually sit, and look at me.\")";
 pub const SIT_CLOSER: &str = "(Say only this, nothing before or after it: \"You're a little far. Move me closer to you, or stay as you are.\")";
 pub const SIT_TURN: &str = "(Say only this, nothing before or after it: \"I can see you at the edge of my view. Turn my head toward you until I'm facing you, or stay as you are.\")";
@@ -13,9 +14,8 @@ pub const WHO_AGAIN: &str =
     "(That was not their name. Ask exactly this: \"Sorry, what should I call you?\")";
 pub const ROOM_SOUNDS_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"May I notice music and laughter in the room? Nothing is recorded. Just say yes or no.\" Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
 pub const FACE_EXPRESSIONS_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"May I notice when people look happy or upset, so I can answer more warmly? A yes covers everyone at this lamp. I never say it aloud and keep no pictures. Just say yes or no.\" Then call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
-pub const TOUCH_NOTE: &str =
-    "(Say only this, nothing before or after it: \"Tap the top of my head once, then let go.\")";
-pub const TOUCH_OFFER: &str = "(Say only this, nothing before or after it: \"One more thing: tap the top of my head once, then let go.\")";
+pub const TOUCH_NOTE: &str = "(Say only this, nothing before or after it: \"Next, let's check my touch. Tap the top of my head once with your finger, then let go.\")";
+pub const TOUCH_OFFER: &str = "(Say only this, nothing before or after it: \"One more thing: let's check my touch. Tap the top of my head once with your finger, then let go.\")";
 pub const TOUCH_REMIND: &str = "(Say only this, nothing before or after it: \"I didn't feel that. Touch the very top of my head with your fingertip, once.\")";
 pub const TOUCH_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I felt that.\")";
@@ -30,9 +30,9 @@ pub const NEAR_AGAIN: &str =
     "(Say only this, nothing before or after it: \"Got it. Say 'Hey Lamp' once more.\")";
 pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")";
 pub const NEAR_DONE: &str =
-    "(Say only this, nothing before or after it: \"Got it, I know how you call me from there.\")";
+    "(Say only this, nothing before or after it: \"Got it, that's three.\")";
 pub const NEAR_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
-pub const SENTENCE_FIRST: &str = "(Say only this, nothing before or after it: \"Now say a sentence to me from your seat, anything at all, so I get used to your voice.\")";
+pub const SENTENCE_FIRST: &str = "(Say only this, nothing before or after it: \"Now say any sentence to me, the way you'd talk to me.\")";
 pub const SENTENCE_LOUDER: &str = "(Say only this, nothing before or after it: \"Say another sentence from your seat, a little louder.\")";
 pub const SENTENCE_CLOSER: &str = "(Say only this, nothing before or after it: \"Come a little closer and say another sentence.\")";
 pub const SENTENCE_AGAIN: &str =
