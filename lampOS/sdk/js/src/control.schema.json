@@ -836,6 +836,20 @@
           "minLength": 1,
           "maxLength": 49152,
           "description": "This part's bytes, base64 (36 KiB of the package at most)."
+        },
+        "asks": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "body",
+              "camera",
+              "light",
+              "look",
+              "speak"
+            ]
+          },
+          "uniqueItems": true,
+          "description": "Part 0 only: what the computer showed the person this package asks, sorted. Required when the package is signed; the lamp refuses asks_differ when its own list differs. A check for honest tools only: the skill is held to the pairing's grants whatever it says."
         }
       },
       "required": [
