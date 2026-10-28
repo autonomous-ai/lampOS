@@ -727,28 +727,34 @@ pub fn watch_bus(
     watch: Arc<Mutex<Watch>>,
     shared: Arc<Shared>,
 ) -> std::io::Result<()> {
-    let (sent, mut taken) = mpsc::unbounded_channel::<(String, Value)>();
+    let (sent, mut taken) = mpsc::unbounded_channel::<(String, Value, u64)>();
     for topic in TOPICS {
         let mut subscriber = bus.subscribe(topic, "control")?;
         let sent = sent.clone();
+        let clock = shared.clone();
         std::thread::spawn(move || {
-            // What `watch` last read from this topic: a state message that
-            // says the same is passed over here, not handed on (lamp-75c9's
-            // idle CPU was `voice/privacy`'s hundred a second).
-            let mut kept: Option<Value> = None;
+            // What `watch` last read from this topic, and when: a state
+            // message that says the same is passed over here, not handed on
+            // (lamp-75c9's idle CPU was `voice/privacy`'s hundred a second),
+            // but a repeat still goes on now and then for `Watch::lapse`.
+            let mut kept: Option<(Value, u64)> = None;
             loop {
                 match subscriber.recv(Duration::from_secs(1)) {
                     Ok(Some(message)) => {
                         let Ok(payload) = message.json() else {
                             continue;
                         };
-                        if let Some(now) = Watch::kept_of(topic, &payload) {
-                            if kept.as_ref() == Some(&now) {
+                        // When it came, not when the runtime gets to it: a
+                        // runtime held up (a slow save) mustn't make a lease
+                        // renewed in time look late (Fourteen's P3 on #4041).
+                        let now_us = clock.now_us();
+                        if let Some(key) = Watch::kept_of(topic, &payload) {
+                            if Watch::passes_over(kept.as_ref(), &key, now_us) {
                                 continue;
                             }
-                            kept = Some(now);
+                            kept = Some((key, now_us));
                         }
-                        if sent.send((topic.to_owned(), payload)).is_err() {
+                        if sent.send((topic.to_owned(), payload, now_us)).is_err() {
                             return;
                         }
                     }
@@ -759,9 +765,20 @@ pub fn watch_bus(
         });
     }
     tokio::spawn(async move {
-        while let Some((topic, payload)) = taken.recv().await {
-            let now = shared.now_us();
-            let outs = watch.lock().expect("watch").take(&topic, &payload, now);
+        // A privacy lease that stops coming lapses with no message to say
+        // so: checked every LEASE_TICK, and only once every message already
+        // come is taken (`biased`), so a stall never judges a lease before
+        // its renewal waiting in the queue.
+        let mut tick = tokio::time::interval(LEASE_TICK);
+        loop {
+            let outs = tokio::select! {
+                biased;
+                taken = taken.recv() => {
+                    let Some((topic, payload, came_us)) = taken else { return };
+                    watch.lock().expect("watch").take(&topic, &payload, came_us)
+                }
+                _ = tick.tick() => watch.lock().expect("watch").lapse(shared.now_us()),
+            };
             shared.deliver(outs);
         }
     });
