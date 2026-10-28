@@ -1536,6 +1536,21 @@ fn past_greeting(text: &str) -> &str {
     text
 }
 
+/// What follows a line's opening call of the lamp by its name as itself,
+/// past one greeting at most ("Hey, Lamp. …", "Lamp, …", "Hello. Hey
+/// Lamp, …"), set off as [`first_word_set_off`] reads it; `None` when the
+/// line opens with no such call, or the call is all there is.
+fn name_call_rest(text: &str) -> Option<&str> {
+    let text = past_greeting(text);
+    let (start, end) = first_word_set_off(text)?;
+    let word = &text[start..end];
+    if !(word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb")) {
+        return None;
+    }
+    let rest = text[end..].trim_start_matches(|c: char| !c.is_alphanumeric());
+    (!rest.is_empty()).then_some(rest)
+}
+
 /// Whether `text` says the lamp's name as itself, "Lamp" or "Lamb", as a
 /// word of its own.
 fn says_the_name(text: &str) -> bool {
@@ -1665,7 +1680,20 @@ pub(crate) fn wake_not_a_name(
     if !(named && keep_heard) {
         return None;
     }
-    let (word, rest) = wake_heard_as(text)?;
+    let Some((word, rest)) = wake_heard_as(text) else {
+        // The name heard as itself is no part of what they said to keep
+        // either (lamp-06c1, 28 Oct: "They said: Hey, Lamp. …" kept): the
+        // line is held without the call, and the model is told nothing.
+        if let Some(rest) = name_call_rest(text)
+            && let Ok(mut thread) = crate::thread::THREAD.lock()
+        {
+            thread.line_of(request, rest);
+            eprintln!(
+                "lamp-voice second: request {request}: it opens by calling the lamp by name: its line is kept without the call (LAMP_MEMORY_KEEP_HEARD)"
+            );
+        }
+        return None;
+    };
     if let Ok(mut thread) = crate::thread::THREAD.lock() {
         thread.line_of(request, rest);
     }

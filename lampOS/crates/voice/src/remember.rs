@@ -3335,6 +3335,18 @@ fn room_forget_told(mut told: Value, person: Option<&str>, on: bool) -> Value {
                 told["scope_note"] = json!(
                     "Say that nothing matching was removed from what this room remembers. A known face can also ask to forget their own memory."
                 );
+                // The note's own example wins over `scope_note` (lamp-06c1,
+                // 28 Oct, N8e: "Nothing was kept about pork" with no word of
+                // the room), so the example names the room too.
+                if let Some(about) = told.get("about").and_then(Value::as_str).map(str::to_owned) {
+                    told["note"] = json!(format!(
+                        "I couldn't find anything about {about} in what this room remembers, so I forgot nothing, and nothing else instead, and I won't keep anything more from this conversation. Tell them plainly, such as \"I couldn't find anything about {about} in what I keep for the room.\""
+                    ));
+                } else if let Some(note) = told.get("note").and_then(Value::as_str) {
+                    told["note"] = json!(format!(
+                        "{note} It was looked for in what this room remembers: say so."
+                    ));
+                }
             }
             None => {}
         }
@@ -21624,6 +21636,53 @@ mod tests {
             room_forget_told(json!({"forgotten": true}), None, false)
                 .get("scope")
                 .is_none()
+        );
+    }
+
+    /// lamp-06c1, 28 Oct (N8e): an unknown speaker's "forget that I don't
+    /// eat pork" matched nothing in the room's memory, and the reply said
+    /// only "Nothing was kept about pork": the note's own example was
+    /// followed, not `scope_note`. Its example now names the room.
+    #[test]
+    fn an_unknown_speakers_forget_that_matches_nothing_says_it_looked_in_the_rooms() {
+        let named = room_forget_told(
+            json!({"forgotten": false, "about": "pork", "note": "I couldn't find anything about pork, so I forgot nothing."}),
+            None,
+            true,
+        );
+        let note = named["note"].as_str().unwrap();
+        assert!(
+            note.contains("anything about pork in what this room remembers"),
+            "{note}"
+        );
+        assert!(note.contains("in what I keep for the room."), "{note}");
+        let unnamed = room_forget_told(
+            json!({"forgotten": false, "note": "Nothing I keep of them is about that, so I forgot nothing."}),
+            None,
+            true,
+        );
+        assert!(
+            unnamed["note"]
+                .as_str()
+                .unwrap()
+                .ends_with("It was looked for in what this room remembers: say so."),
+        );
+        // Someone known: their own scope, the note as it was.
+        let theirs = json!({"forgotten": false, "about": "pork", "note": "I couldn't find anything about pork."});
+        assert_eq!(room_forget_told(theirs.clone(), Some(MAI), true), theirs);
+        // A match keeps its own answer and gains only the room's words.
+        let removed = room_forget_told(
+            json!({"forgotten": true, "count": 1, "about": "pork"}),
+            None,
+            true,
+        );
+        assert_eq!(removed["about"], "pork");
+        assert!(removed.get("note").is_none());
+        assert!(
+            removed["scope_note"]
+                .as_str()
+                .unwrap()
+                .contains("removed from what this room")
         );
     }
 
