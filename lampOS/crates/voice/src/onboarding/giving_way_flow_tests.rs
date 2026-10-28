@@ -709,17 +709,17 @@ fn the_steps_lines_are_the_skills() {
     for (line, words) in [
         (
             GIVE_ASK,
-            "Put your hand on my head and move it gently, any way, just a little. I'll tell you when.",
+            "Take my head and tilt it gently to one side, then let go. I'll tell you when.",
         ),
         (
             GIVE_AGAIN,
-            "I didn't feel my head move. Put your hand on my head and move it gently, any way, just a little. I'll tell you when.",
+            "I didn't feel my head move. Take my head and tilt it gently to one side, then let go. I'll tell you when.",
         ),
         (GIVE_FELT, "That's it, now let go."),
         (GIVE_MORE, "A little more, then let go."),
         (
             GIVE_PROMPT,
-            "Put your hand on my head and move it a little, any way you like. I'll go with your hand.",
+            "Take my head and tilt it gently to one side. I'll go with your hand.",
         ),
         (GIVE_DONE, "Got it, my head moved with your hand."),
         (

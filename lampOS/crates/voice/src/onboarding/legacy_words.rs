@@ -38,11 +38,11 @@ pub const SENTENCE_AGAIN: &str =
 pub const SENTENCE_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I hear you well from there.\")";
 pub const SENTENCE_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't hear you well enough this time. I'll get used to your voice as we talk.\")";
-pub const GIVE_ASK: &str = "(Say only this, nothing before or after it: \"Put your hand on my head and move it gently, any way, just a little. I'll tell you when.\")";
-pub const GIVE_AGAIN: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move. Put your hand on my head and move it gently, any way, just a little. I'll tell you when.\")";
+pub const GIVE_ASK: &str = "(Say only this, nothing before or after it: \"Take my head and tilt it gently to one side, then let go. I'll tell you when.\")";
+pub const GIVE_AGAIN: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move. Take my head and tilt it gently to one side, then let go. I'll tell you when.\")";
 pub const GIVE_FELT: &str =
     "(Say only this, nothing before or after it: \"That's it, now let go.\")";
-pub const GIVE_PROMPT: &str = "(Say only this, nothing before or after it: \"Put your hand on my head and move it a little, any way you like. I'll go with your hand.\")";
+pub const GIVE_PROMPT: &str = "(Say only this, nothing before or after it: \"Take my head and tilt it gently to one side. I'll go with your hand.\")";
 pub const GIVE_MORE: &str =
     "(Say only this, nothing before or after it: \"A little more, then let go.\")";
 pub const GIVE_DONE: &str =
