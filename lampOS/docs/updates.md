@@ -431,6 +431,33 @@ remain without a canonical envelope; the helper does not claim an atomic
 replacement or guaranteed recovery from a lost runner. The old bytes are
 retained and no automatic deletion follows.
 
+**GitHub's 5xx and a re-run (#4103).** On 28 Oct GitHub answered 504 three
+times in this job and in a promotion, each after the release was already
+made, and a re-run was refused ("immutable release already exists"), so
+that build could never be promoted. Now:
+
+- **A read is asked again.** A `gh api` GET or an asset download that
+  GitHub answers 500, 502, 503 or 504 is asked again after 5, 15 and 30 s,
+  then refused. A 4xx, or any other failure, is never asked again.
+  `lampos-promote` reads GitHub the same way (`github.rs`, `retried`).
+- **A change is never repeated blind.** A 5xx on `gh release create` or on
+  the stage's `gh release upload` can come after GitHub made the change, so
+  the helper reads what is there and goes on only if it is there. The
+  renames are not retried; their failure is put back as above.
+- **A re-run goes on from where it stopped.** Re-running the failed job
+  keeps the run's number, so the sequence is the same, and the job signs
+  the same bytes again (Ed25519 is deterministic). If this sequence's release
+  exists, it must carry this commit and every asset it has byte for byte,
+  or the re-run is refused as before. One cut short inside `gh release
+  create` (a 5xx between its uploads, in this run or an earlier one) gets
+  only its missing assets, once the ones it has are checked, and then every
+  asset is checked again. A matching release is used as is, and its
+  notes are changed to name this attempt (`attempt N`), since the promote
+  tool reads the run's success from that attempt. A stage left by a failed
+  switch is used again only if it holds these bytes. If the channel's head
+  is already this build's envelope, the job finishes without touching it.
+  A newer head refuses as stale, as before.
+
 `min_updater` remains a signed level, not the build sequence:
 `manifest::UPDATER` is 8 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
@@ -447,7 +474,9 @@ external commands simulated, and `.github/scripts/lampos-publish-cli-test.py`
 against the just-built updater with a disposable test key, local files
 and simulated GitHub. These cover checksums, upload inventory/readback,
 sequence races, refusal paths, both promotion renames and failed
-restoration; the CLI rehearsal checks the actual publisher/verification
+restoration, a 5xx on each read and after each change, and a re-run over
+its own release, over a switched channel and over a release that differs;
+the CLI rehearsal checks the actual publisher/verification
 contract. They do not publish or use the real secret.
 
 `.github/scripts/lampos-publish-artifact-test.py` also checks the artifact

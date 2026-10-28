@@ -14,6 +14,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 
 REPO = "autonomous-ai/lampOS"
 CHANNEL = "lamp-voice"
@@ -26,6 +27,11 @@ AUTH_TOKENS = frozenset({"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GIT
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 BINARY = re.compile(r"lamp-[a-z0-9-]{1,39}\Z")
 DIAGNOSTIC_LIMIT = 320
+# GitHub's own 5xx (#4103: three 504s on 28 Oct) is retried after these
+# pauses, only for a read. A failed change is never repeated blind: the run
+# reads what GitHub did and goes on from there, now or on a re-run.
+SERVER_ERROR = re.compile(rb"\bHTTP 50[0234]\b")
+RETRY_PAUSES = (5, 15, 30)
 ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|$))")
 KEY_SHAPED = re.compile(
     r"eyJ[A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]*){2,4}|"
@@ -36,6 +42,10 @@ KEY_SHAPED = re.compile(
 
 class Refused(Exception):
     pass
+
+
+class ServerError(Refused):
+    """GitHub answered 500, 502, 503 or 504: its trouble, not a refusal."""
 
 
 def require(ok, why):
@@ -156,6 +166,8 @@ class Commands:
                 message += f": {self.diagnostic(result.stderr)}"
                 # Promotion recovery can wrap the exception; retain its cause now.
                 print(message, file=sys.stderr)
+                if SERVER_ERROR.search(result.stderr or b""):
+                    raise ServerError(message)
             raise Refused(message)
         return result.stdout if output is None else b""
 
@@ -171,9 +183,20 @@ class Publisher:
         self.updater = None
         self.public_key = None
         self.work = None
+        self.sleep = time.sleep
 
     def command(self, *words, output=None):
         return self.commands.run(words, output=output)
+
+    def retried(self, call):
+        """`call`, a read, again after each pause while GitHub answers 5xx."""
+        for pause in RETRY_PAUSES:
+            try:
+                return call()
+            except ServerError as error:
+                print(f"GitHub answered {error}; read again in {pause} s", file=sys.stderr)
+                self.sleep(pause)
+        return call()
 
     def api(self, endpoint, method="GET", fields=None, pages=False):
         words = ["gh", "api", "--method", method]
@@ -182,7 +205,10 @@ class Publisher:
         for key, value in (fields or {}).items():
             words += ["-f", f"{key}={value}"]
         words.append(f"repos/{REPO}/{endpoint}")
-        result = decode_json(self.command(*words))
+        if method == "GET":
+            result = decode_json(self.retried(lambda: self.command(*words)))
+        else:
+            result = decode_json(self.command(*words))
         if pages:
             require(isinstance(result, list) and all(isinstance(page, list) for page in result), "uncertain GitHub page inventory")
             return [entry for page in result for entry in page]
@@ -373,8 +399,10 @@ class Publisher:
         return {asset["name"]: asset for asset in entries}
 
     def download(self, asset, path):
-        with path.open("wb") as output:
-            self.command("gh", "api", f"repos/{REPO}/releases/assets/{asset['id']}", "-H", "Accept: application/octet-stream", output=output)
+        def once():
+            with path.open("wb") as output:
+                self.command("gh", "api", f"repos/{REPO}/releases/assets/{asset['id']}", "-H", "Accept: application/octet-stream", output=output)
+        self.retried(once)
         require(path.stat().st_size == asset["size"], "downloaded asset size differs")
 
     def head(self):
@@ -398,19 +426,73 @@ class Publisher:
             return left is None and right is None
         return (left["release"]["id"], left["asset"]["id"], left["sha256"], left["sequence"]) == (right["release"]["id"], right["asset"]["id"], right["sha256"], right["sequence"])
 
+    def notes(self):
+        return f"Built and tested from {self.sha}; ARM64 workflow run {self.env['GITHUB_RUN_ID']}, attempt {self.env['GITHUB_RUN_ATTEMPT']}, sequence {self.sequence}.\n"
+
     def create_release(self, tag, files):
         notes = self.work / "release-notes.txt"
-        notes.write_text(f"Built and tested from {self.sha}; ARM64 workflow run {self.env['GITHUB_RUN_ID']}, attempt {self.env['GITHUB_RUN_ATTEMPT']}, sequence {self.sequence}.\n")
+        notes.write_text(self.notes())
         self.command("gh", "release", "create", tag, "--repo", REPO, "--target", self.sha, "--title", f"lampOS {tag}", "--notes-file", notes, "--prerelease", "--latest=false", *files)
 
-    def verify_assets(self, release, inventory):
+    def build_release(self, tag, stage, inventory):
+        """This sequence's immutable release, made now or by an earlier
+        attempt of this run, and checked whole: its commit and every asset
+        byte for byte. One that differs in anything is refused (#4103)."""
+        release = self.releases().get(tag)
+        if release is None:
+            self.tag_absent(tag)
+            try:
+                self.create_release(tag, [stage / name for name in sorted(inventory)])
+            except ServerError:
+                # A 5xx can come after GitHub made it: read what is there.
+                if tag not in self.releases():
+                    raise
+            release = self.releases().get(tag)
+            resumed = False
+        else:
+            print(f"{tag} already exists; checking it is this build's", file=sys.stderr)
+            resumed = True
+        require(release is not None and release.get("target_commitish") == self.sha and release.get("draft") is False and release.get("prerelease") is True, "immutable release identity differs")
+        self.complete_assets(tag, release, stage, inventory)
+        if resumed:
+            # The promote tool reads the run's success from the attempt the
+            # notes name, so they name this attempt, which finishes the job.
+            value = self.api(f"releases/{release['id']}", method="PATCH", fields={"body": self.notes()})
+            require(isinstance(value, dict) and value.get("id") == release["id"] and value.get("body") == self.notes(), "release notes update was not confirmed")
+        return release, resumed
+
+    def verify_assets(self, release, inventory, names=None):
         assets = self.assets(release)
         require(set(assets) == set(inventory), "uploaded asset inventory differs")
-        for name, expected in inventory.items():
+        for name in sorted(inventory if names is None else names):
+            expected = inventory[name]
             require(assets[name]["size"] == expected["size"], "uploaded asset size differs")
             downloaded = self.work / "downloaded-asset"
             self.download(assets[name], downloaded)
             require(file_info(downloaded) == expected, "uploaded asset hash differs")
+
+    def complete_assets(self, tag, release, stage, inventory):
+        """This release's assets whole: one cut short by a 5xx inside `gh
+        release create` gets only its missing ones, and only once every one
+        it has is this build's, byte for byte (Reviewer-two's P3 on #4121)."""
+        assets = self.assets(release)
+        require(set(assets) <= set(inventory), "uploaded asset inventory differs")
+        missing = sorted(set(inventory) - set(assets))
+        if not missing:
+            self.verify_assets(release, inventory)
+            return
+        print(f"{tag} lacks {len(missing)} of its assets; checking the rest, then uploading those", file=sys.stderr)
+        for name in sorted(assets):
+            require(assets[name]["size"] == inventory[name]["size"], "uploaded asset size differs")
+            downloaded = self.work / "downloaded-asset"
+            self.download(assets[name], downloaded)
+            require(file_info(downloaded) == inventory[name], "uploaded asset hash differs")
+        try:
+            self.command("gh", "release", "upload", tag, *[stage / name for name in missing], "--repo", REPO)
+        except ServerError:
+            # It may have landed: the check below reads what is there.
+            pass
+        self.verify_assets(release, inventory, missing)
 
     def rename(self, asset, name):
         value = self.api(f"releases/assets/{asset['id']}", method="PATCH", fields={"name": name})
@@ -442,8 +524,15 @@ class Publisher:
         shutil.copyfile(stage / ENVELOPE, staged)
         if previous:
             release = previous["release"]
-            require(staged_name not in self.assets(release), "staged envelope already exists")
-            self.command("gh", "release", "upload", HEAD, staged, "--repo", REPO)
+            # Left by an earlier attempt whose switch failed and was put back:
+            # used again only when it is these bytes (#4103).
+            left = self.assets(release).get(staged_name)
+            if left is None:
+                try:
+                    self.command("gh", "release", "upload", HEAD, staged, "--repo", REPO)
+                except ServerError:
+                    if staged_name not in self.assets(release):
+                        raise
         else:
             require(self.head() is None, "channel appeared before bootstrap")
             self.create_release(HEAD, [staged])
@@ -481,23 +570,26 @@ class Publisher:
         with tempfile.TemporaryDirectory(prefix="lampos-publish-") as folder:
             self.work = Path(folder)
             stage, inventory = self.prepare(retained)
-            repo = decode_json(self.command("gh", "api", f"repos/{REPO}"))
+            repo = decode_json(self.retried(lambda: self.command("gh", "api", f"repos/{REPO}")))
             require(isinstance(repo, dict) and repo.get("full_name") == REPO and repo.get("private") is False, "wrong or inaccessible public repository")
             tag = f"{HEAD}-{self.sequence}"
-            require(tag not in self.releases(), "immutable release already exists")
-            self.tag_absent(tag)
             previous = self.head()
+            if previous and previous["sequence"] == self.sequence and tag in self.releases():
+                # An earlier attempt switched the channel, then failed after:
+                # finished once the head is this build's envelope, byte for byte,
+                # checked before the release's notes name this attempt.
+                require(previous["sha256"] == digest(stage / ENVELOPE), "channel head at this sequence is not this build")
+                release, resumed = self.build_release(tag, stage, inventory)
+                require(resumed, "channel head at this sequence is not this build")
+                return {"published": tag, "commit": self.sha, "sequence": self.sequence, "run_id": self.env["GITHUB_RUN_ID"], "attempt": self.env["GITHUB_RUN_ATTEMPT"], "previous_asset": None, "resumed": True}
             if previous:
                 require(self.sequence > previous["sequence"], "candidate sequence is stale or repeated")
             else:
                 require(self.env.get(BOOTSTRAP) == "on", "initial channel requires LAMPOS_UPDATE_BOOTSTRAP=on")
-            self.create_release(tag, [stage / name for name in sorted(inventory)])
-            release = self.releases().get(tag)
-            require(release is not None and release.get("target_commitish") == self.sha and release.get("draft") is False and release.get("prerelease") is True, "immutable release identity differs")
-            self.verify_assets(release, inventory)
+            release, resumed = self.build_release(tag, stage, inventory)
             require(self.same_head(previous, self.head()), "channel changed during build upload")
             self.promote(stage, previous)
-            return {"published": tag, "commit": self.sha, "sequence": self.sequence, "run_id": self.env["GITHUB_RUN_ID"], "attempt": self.env["GITHUB_RUN_ATTEMPT"], "previous_asset": previous["asset"]["id"] if previous else None}
+            return {"published": tag, "commit": self.sha, "sequence": self.sequence, "run_id": self.env["GITHUB_RUN_ID"], "attempt": self.env["GITHUB_RUN_ATTEMPT"], "previous_asset": previous["asset"]["id"] if previous else None, "resumed": resumed}
 
 
 def main():
