@@ -590,9 +590,26 @@ impl Run<'_, '_> {
                 .ok()
                 .and_then(|states| states.into_iter().find(|state| state.unit == unit))
                 .is_some_and(|state| state.active == "failed");
-            let proved = crate::writer_swap::done(&folder)
-                .is_some_and(|done| crate::writer_swap::proved(&folder, &done));
-            if failed {
+            let done = crate::writer_swap::done(&folder);
+            let proved = done
+                .as_ref()
+                .is_some_and(|done| crate::writer_swap::proved(&folder, done));
+            // A `back` that began by the second of the refresh may be the
+            // copy before's, which a refresh landing mid-run leaves to fail
+            // after the unit's `reset-failed`: waited past, to the next
+            // `back`, never put back for. Not known, it counts (El's P3 on
+            // #4178).
+            let before_refresh = done.as_ref().is_some_and(|done| {
+                self.world
+                    .systemd
+                    .back_began_unix_ms()
+                    .is_some_and(|began| began <= done.at_unix_ms)
+            });
+            if failed && before_refresh {
+                self.say(
+                    "the settings writer's back failed in a run that began before it was refreshed: the next back judges it",
+                );
+            } else if failed {
                 self.writer_op(crate::writer_swap::Op::PutBack, "its back failed");
             } else if proved {
                 self.writer_op(crate::writer_swap::Op::Proven, "its back ended well");
