@@ -97,7 +97,8 @@ async def _hello(args) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def parser() -> argparse.ArgumentParser:
+    """Every `lamp` command and option (the README's reference names each)."""
     parser = argparse.ArgumentParser(prog="lamp", description="lampOS control, v1")
     commands = parser.add_subparsers(dest="command", required=True)
     pair = commands.add_parser("pair", help="pair this computer with a lamp, with the owner's code")
@@ -125,7 +126,11 @@ def main(argv: list[str] | None = None) -> int:
     skill_check = skill_commands.add_parser("check", help="check skill folders against the skill format, 1 or 2")
     skill_check.add_argument("folders", nargs="+", help="each a folder with SKILL.md and skill.toml")
     skill_check.set_defaults(run=_skill_check)
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parser().parse_args(argv)
     try:
         return asyncio.run(args.run(args))
     except LampError as error:

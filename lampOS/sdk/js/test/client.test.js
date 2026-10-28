@@ -339,6 +339,38 @@ test('the examples call only what the client has', async () => {
   }
 });
 
+test('the README reference names every public call, command and option', async () => {
+  const { Lease } = await import('../src/client.js');
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const reference = readme.slice(readme.indexOf('## Reference'));
+  // The client's own plumbing, not for programs: what the calls go through.
+  const internal = new Set(['constructor', 'act', 'send', 'frame', 'renew', 'event']);
+  for (const [name, cls] of [['Lamp', Lamp], ['Lease', Lease]]) {
+    const own = [...Object.getOwnPropertyNames(cls.prototype), ...Object.getOwnPropertyNames(cls)
+      .filter((key) => typeof cls[key] === 'function' && !['length', 'name', 'prototype'].includes(key))];
+    for (const method of own.filter((key) => !internal.has(key))) {
+      assert.ok(new RegExp(`\\.${method}[(\`,]`).test(reference), `${name}.${method}`);
+    }
+  }
+  for (const word of ['info', 'grants', 'limits', 'find(', 'LAMPOS_HOME']) assert.ok(reference.includes(word), word);
+  for (const code of schema.errorCodes) assert.ok(reference.includes(`\`${code}\``), code);
+  for (const gesture of schema.gestures) assert.ok(reference.includes(`\`${gesture}\``), gesture);
+  for (const colour of schema.colours) assert.ok(reference.includes(`\`${colour}\``), colour);
+  // Every command and option of `lamp`, read from cli.js itself.
+  const cli = readFileSync(new URL('../src/cli.js', import.meta.url), 'utf8');
+  const options = Object.keys(Function(`return ${cli.match(/options: (\{[^\n]*\}),\n/)[1]}`)());
+  for (const option of options) assert.ok(reference.includes(`--${option}`), `--${option}`);
+  for (const command of [...cli.matchAll(/command === '([a-z]+)'/g)].map((m) => m[1])) {
+    assert.ok(reference.includes(`lamp ${command}`), `lamp ${command}`);
+  }
+  // Everything a computer can read: every event the schema lists, the two that
+  // come unasked, and every state `get` answers.
+  const readable = readme.slice(readme.indexOf('## Everything you can read'), readme.indexOf('## Reference'));
+  for (const event of [...schema.events, 'lease', 'done']) assert.ok(readable.includes(`| \`${event}\``), event);
+  for (const state of schema.states) assert.ok(readable.includes(`| \`${state}\``), state);
+  assert.ok(readable.includes('### Never readable'));
+});
+
 test('a refused subscription rejects with its typed error', async () => {
   await withLamp({ grants: ['body'] }, async (lamp) => {
     await assert.rejects(lamp.on('person.arrived', () => {}), byCode.no_grant);
