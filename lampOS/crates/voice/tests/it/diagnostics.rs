@@ -1,3 +1,8 @@
+//! The recorder's tests. Each finish waits the recorder's own most,
+//! `MAX_FINISH_WAIT` (1 s): these check what the files hold, not the
+//! worker's 500 ms finish policy. Their real file syncs can pass 500 ms on a
+//! busy host (#3315: 6 of 100 module runs on the office Mac, none at 1 s), as
+//! #3989 found for the sequence case. Production's waits are unchanged.
 use lamp_turn_owner::BootId;
 use lamp_voice::diagnostics::*;
 use lamp_voice::options::NoiseSuppression;
@@ -100,7 +105,7 @@ fn capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement() {
         recorder.try_capture(capture(at + 2, 2), &pre, &post),
         SubmitResult::Queued
     );
-    let report = recorder.finish(end(at + 3), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 3), MAX_FINISH_WAIT);
     assert!(report.valid, "{report:?}");
     assert_eq!(report.outcome, FinishOutcome::Complete);
     assert!(report.completion_marker_published);
@@ -171,7 +176,7 @@ fn processing_provenance_matches_pending_result_and_acknowledged_summary() {
             recorder.try_capture(capture(at + 1, 1), &[321; 160], &[123; 160]),
             SubmitResult::Queued
         );
-        let report = recorder.finish(end(at + 2), DEFAULT_FINISH_WAIT);
+        let report = recorder.finish(end(at + 2), MAX_FINISH_WAIT);
         assert!(report.valid, "{report:?}");
         let summary = report.summary.unwrap();
         assert_eq!(summary.software_processing, processing);
@@ -222,7 +227,7 @@ fn render_records_only_accepted_prefix_and_typed_priming_silence() {
         recorder.try_render(render(at + 2, 480, 3), &[100, -200, 300]),
         SubmitResult::Queued
     );
-    let report = recorder.finish(end(at + 3), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 3), MAX_FINISH_WAIT);
     assert!(report.valid, "{report:?}");
     let summary = report.summary.unwrap();
     assert_eq!(summary.render_frames, 483);
@@ -260,7 +265,7 @@ fn accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm() {
         recorder.try_render(render(at + 3, 243, 2), &[400, -500]),
         SubmitResult::Queued
     );
-    let report = recorder.finish(end(at + 4), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 4), MAX_FINISH_WAIT);
     assert!(
         report.valid,
         "the recorder may certify an explicitly discontinuous audio timeline: {report:?}"
@@ -294,7 +299,7 @@ fn capture_sequence_gap_and_unannounced_epoch_change_fail() {
             next.dsp_epoch = 2;
         }
         recorder.try_capture(next, &[1; 160], &[2; 160]);
-        let report = recorder.finish(end(at + 2), DEFAULT_FINISH_WAIT);
+        let report = recorder.finish(end(at + 2), MAX_FINISH_WAIT);
         assert!(!report.valid);
         assert_ne!(report.faults, 0);
         assert!(!path.join("complete.json").exists());
@@ -316,7 +321,7 @@ fn render_cursor_gap_does_not_insert_silence() {
     });
     recorder.try_render(render(at, 0, 3), &[1, 2, 3]);
     recorder.try_render(render(at + 1, 4, 3), &[4, 5, 6]);
-    let report = recorder.finish(end(at + 2), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 2), MAX_FINISH_WAIT);
     assert!(!report.valid);
     assert_eq!(
         fs::read(path.join("render_accepted.pcm16le"))
@@ -368,7 +373,7 @@ fn explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs() {
     next.dsp_epoch = 2;
     next.privacy_generation = 4;
     recorder.try_capture(next, &[3; 160], &[4; 160]);
-    let report = recorder.finish(end(at + 5), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 5), MAX_FINISH_WAIT);
     assert!(report.valid, "{report:?}");
     let events = rows(&path);
     assert_eq!(events[4]["kind"], "reset");
@@ -388,7 +393,7 @@ fn closed_privacy_cannot_be_overridden_by_pcm_metadata() {
         open: false,
     });
     recorder.try_capture(capture(at + 1, 1), &[1; 160], &[2; 160]);
-    let report = recorder.finish(end(at + 2), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 2), MAX_FINISH_WAIT);
     assert!(!report.valid);
     assert!(!temp.0.join("audio/complete.json").exists());
 }
@@ -433,7 +438,7 @@ fn replaced_artifact_never_receives_original_pcm_or_valid_marker() {
     fs::write(&outside, b"do not overwrite").unwrap();
     std::os::unix::fs::symlink(&outside, path.join("pre_aec.pcm16le")).unwrap();
     recorder.try_capture(capture(at, 1), &[1; 160], &[2; 160]);
-    let report = recorder.finish(end(at + 1), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 1), MAX_FINISH_WAIT);
     assert!(!report.valid);
     assert_eq!(fs::read(outside).unwrap(), b"do not overwrite");
     assert!(!path.join("complete.json").exists());
@@ -455,11 +460,7 @@ fn duration_and_frame_shape_limits_disable_evidence_without_blocking() {
         recorder.try_capture(capture(at + 1_000_001, 1), &[1; 160], &[2; 160]),
         SubmitResult::DurationLimit
     );
-    assert!(
-        !recorder
-            .finish(end(at + 1_000_001), DEFAULT_FINISH_WAIT)
-            .valid
-    );
+    assert!(!recorder.finish(end(at + 1_000_001), MAX_FINISH_WAIT).valid);
     let temp = Private::new();
     let mut recorder = Recorder::start(temp.config(StreamKind::Render)).unwrap();
     let at = recorder.started_at_us();
@@ -506,7 +507,7 @@ fn omitted_open_privacy_and_missing_opening_frames_are_invalid() {
                 &[2; 160],
             );
         }
-        let report = recorder.finish(end(at + 1), DEFAULT_FINISH_WAIT);
+        let report = recorder.finish(end(at + 1), MAX_FINISH_WAIT);
         assert!(!report.valid, "case {case}");
         assert!(!temp.0.join("audio/complete.json").exists());
     }
@@ -612,7 +613,7 @@ fn playback_reset_requires_matching_old_discard_and_advancing_epoch() {
         let mut next = render(at + 3, 0, 3);
         next.playback_epoch = 2;
         recorder.try_silence(next, SilenceKind::Prime, 3);
-        let report = recorder.finish(end(at + 4), DEFAULT_FINISH_WAIT);
+        let report = recorder.finish(end(at + 4), MAX_FINISH_WAIT);
         assert_eq!(report.valid, case == 0, "{report:?}");
     }
 }
@@ -639,7 +640,7 @@ fn audio_fault_end_is_incomplete_even_with_good_written_pcm() {
             at_us: at + 2,
             reason: EndReason::Fault,
         },
-        DEFAULT_FINISH_WAIT,
+        MAX_FINISH_WAIT,
     );
     assert!(!report.valid);
     assert!(!report.completion_marker_published);
@@ -668,7 +669,7 @@ fn replacement_directory_and_existing_final_marker_cannot_be_certified() {
             fs::write(path.join("complete.json"), b"existing marker").unwrap();
         }
         recorder.try_capture(capture(at + 1, 1), &[1; 160], &[2; 160]);
-        let report = recorder.finish(end(at + 2), DEFAULT_FINISH_WAIT);
+        let report = recorder.finish(end(at + 2), MAX_FINISH_WAIT);
         assert!(!report.valid);
         if directory_swap {
             assert!(!path.join("pre_aec.pcm16le").exists());
@@ -698,6 +699,6 @@ fn repeated_privacy_observation_does_not_reset_the_render_cursor() {
         open: true,
     });
     recorder.try_render(render(at + 3, 0, 3), &[4, 5, 6]);
-    let report = recorder.finish(end(at + 4), DEFAULT_FINISH_WAIT);
+    let report = recorder.finish(end(at + 4), MAX_FINISH_WAIT);
     assert!(!report.valid);
 }
