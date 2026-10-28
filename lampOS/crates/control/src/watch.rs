@@ -6,8 +6,9 @@
 //! - **Events,** by edge, never by every message: someone arrived (a face
 //!   after none for [`ABSENT_FOR_US`]) or left (none for [`LEFT_AFTER_US`]),
 //!   turned to or from the lamp, stood up; the lamp's name heard; a sound
-//!   class rising past [`SOUND_BAR`]; a touch or the button; the lamp
-//!   talking, paused, private or asleep.
+//!   class rising past [`SOUND_BAR`]; a hand seen, moved, opened or closed,
+//!   or gone, at most every [`HAND_EVERY_US`]; a touch or the button; the
+//!   lamp talking, paused, private or asleep.
 //! - **Words heard** go out only as [`Out::Heard`], for the server to match
 //!   against each connection's own phrases: the words themselves never
 //!   leave the lamp.
@@ -36,6 +37,15 @@ pub const PRIVACY_LAPSE_US: u64 = 1_000_000;
 /// The bus thread hands on a repeated state message at least this often, so
 /// [`Watch::lapse`] knows the privacy lease is still renewed.
 pub const REPEAT_EVERY_US: u64 = 250_000;
+/// A hand not heard of this long is gone: `humans/hands/tracked` sends one
+/// message per look that sees a hand, and none without one (Ten's topic).
+pub const HAND_GONE_US: u64 = 1_000_000;
+/// A hand is told at most this often, and only when it is news.
+pub const HAND_EVERY_US: u64 = 250_000;
+/// How far a hand moves, or grows, as a share of the picture, to be news.
+pub const HAND_MOVED: f64 = 0.05;
+/// A hand the tracker is less sure of than this isn't one.
+pub const HAND_BAR: f64 = 0.5;
 /// The sound classes told, never `speech`.
 pub const SOUND_CLASSES: [&str; 4] = ["music", "laughter", "door", "footsteps"];
 
@@ -54,6 +64,51 @@ pub enum Out {
     Lose(Option<Part>, LeaseWhy),
 }
 
+/// A hand in the picture, as `humans/hands/tracked` says it: the palm's
+/// centre from the left and the top, the palm's width, each a share of the
+/// picture's width or height, never the picture or its keypoints.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Hand {
+    pub x: f64,
+    pub y: f64,
+    pub size: f64,
+    pub open: bool,
+    pub confidence: f64,
+}
+
+impl Hand {
+    /// One from the bus, if it is one: every share from 0 to 1, and the
+    /// tracker sure enough.
+    pub fn of(payload: &Value) -> Option<Self> {
+        let share = |key: &str| {
+            payload[key]
+                .as_f64()
+                .filter(|value| (0.0..=1.0).contains(value))
+        };
+        let hand = Self {
+            x: share("x")?,
+            y: share("y")?,
+            size: share("size")?,
+            open: payload["open"].as_bool()?,
+            confidence: share("confidence")?,
+        };
+        (hand.confidence >= HAND_BAR).then_some(hand)
+    }
+
+    /// Whether it says anything `told` didn't.
+    fn news_over(&self, told: &Self) -> bool {
+        self.open != told.open
+            || (self.x - told.x).abs() >= HAND_MOVED
+            || (self.y - told.y).abs() >= HAND_MOVED
+            || (self.size - told.size).abs() >= HAND_MOVED
+    }
+
+    fn told(&self) -> Value {
+        let two = |value: f64| (value * 100.0).round() / 100.0;
+        json!({"seen": true, "x": two(self.x), "y": two(self.y), "size": two(self.size), "open": self.open, "confidence": two(self.confidence)})
+    }
+}
+
 /// The newest of everything the door reads.
 #[derive(Debug, Default)]
 pub struct Watch {
@@ -69,8 +124,16 @@ pub struct Watch {
     privacy_us: Option<u64>,
     asleep: bool,
     light: Value,
+    /// What the ring draws now (`light/drawn`): the person's light, or a
+    /// light a computer or a skill asked for over it; none until it says.
+    shows: Option<Value>,
     mood: Value,
     sounds: [bool; 4],
+    /// The newest hand heard, and when.
+    hand: Option<(Hand, u64)>,
+    /// The last hand told, none once its going is told, and when.
+    hand_told: Option<Hand>,
+    hand_told_us: Option<u64>,
 }
 
 impl Watch {
@@ -98,7 +161,7 @@ impl Watch {
                     .as_str()
                     .is_some_and(|state| state != "resting")
             )),
-            "light/state" => Some(
+            "light/state" | "light/drawn" => Some(
                 json!({"on": payload["on"], "colour": payload["colour"], "level": payload["level"]}),
             ),
             "mood/state" => Some(
@@ -112,6 +175,13 @@ impl Watch {
     pub fn take(&mut self, topic: &str, payload: &Value, now_us: u64) -> Vec<Out> {
         match topic {
             "humans/faces/tracked" => self.faces(payload, now_us),
+            "humans/hands/tracked" => match Hand::of(payload) {
+                Some(hand) => {
+                    self.hand = Some((hand, now_us));
+                    self.hand_news(now_us)
+                }
+                None => Vec::new(),
+            },
             // A side only when the bus gives one: the schema has no null
             // side (found by `event_schema`, #3868).
             "room/stood_up" => vec![Out::Event(
@@ -185,6 +255,10 @@ impl Watch {
                 self.light = Self::kept_of(topic, payload).unwrap_or_default();
                 Vec::new()
             }
+            "light/drawn" => {
+                self.shows = Self::kept_of(topic, payload);
+                Vec::new()
+            }
             "mood/state" => {
                 self.mood = Self::kept_of(topic, payload).unwrap_or_default();
                 Vec::new()
@@ -205,14 +279,45 @@ impl Watch {
     /// own microphone gate closes (harness-reviewer's P3 on #4031). Before the
     /// first lease nothing lapses: a lamp whose voice doesn't publish one
     /// isn't private forever.
+    ///
+    /// A hand not heard of for [`HAND_GONE_US`] is gone, and one held back
+    /// by [`HAND_EVERY_US`] is told now.
     pub fn lapse(&mut self, now_us: u64) -> Vec<Out> {
+        let mut out = self.hand_news(now_us);
         let lapsed = self
             .privacy_us
             .is_some_and(|heard| now_us.saturating_sub(heard) >= PRIVACY_LAPSE_US);
-        if !lapsed || self.private {
+        if lapsed && !self.private {
+            out.extend(self.flag(true, |watch| &mut watch.private, LeaseWhy::Private));
+        }
+        out
+    }
+
+    /// The hand, by edge: seen after none, moved or grown by [`HAND_MOVED`],
+    /// opened or closed, at most every [`HAND_EVERY_US`] with the newest
+    /// held back until then; and gone, once.
+    fn hand_news(&mut self, now_us: u64) -> Vec<Out> {
+        let Some((hand, heard_us)) = self.hand else {
+            return Vec::new();
+        };
+        if now_us.saturating_sub(heard_us) >= HAND_GONE_US {
+            self.hand = None;
+            if self.hand_told.take().is_none() {
+                return Vec::new();
+            }
+            self.hand_told_us = Some(now_us);
+            return vec![Out::Event(EventKind::Hand, json!({"seen": false}))];
+        }
+        let news = self.hand_told.is_none_or(|told| hand.news_over(&told));
+        let due = self
+            .hand_told_us
+            .is_none_or(|told| now_us.saturating_sub(told) >= HAND_EVERY_US);
+        if !news || !due {
             return Vec::new();
         }
-        self.flag(true, |watch| &mut watch.private, LeaseWhy::Private)
+        self.hand_told = Some(hand);
+        self.hand_told_us = Some(now_us);
+        vec![Out::Event(EventKind::Hand, hand.told())]
     }
 
     /// The state `get` answers for `kind`.
@@ -222,7 +327,15 @@ impl Watch {
             StateKind::Presence => {
                 json!({"count": self.count, "near": self.near, "facing": self.facing})
             }
-            StateKind::Light => self.light.clone(),
+            // The person's own light as before, and what shows beside it.
+            StateKind::Light => match (&self.light, &self.shows) {
+                (light, None) => light.clone(),
+                (light, Some(shows)) => {
+                    let mut state = light.as_object().cloned().unwrap_or_default();
+                    state.insert("shows".to_owned(), shows.clone());
+                    Value::Object(state)
+                }
+            },
             StateKind::Mood => self.mood.clone(),
             StateKind::Lamp => {
                 json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
@@ -385,6 +498,54 @@ mod tests {
         assert_eq!(watch.state(StateKind::Lamp)["private"], false);
     }
 
+    /// A hand is told by edge and at most every [`HAND_EVERY_US`], the
+    /// newest held back until then, and gone once after [`HAND_GONE_US`]
+    /// with no message: the topic sends none without a hand.
+    #[test]
+    fn a_hand_is_told_by_edge_rate_limited_and_gone_after_silence() {
+        let hand = |x: f64, open: bool| json!({"x": x, "y": 0.5, "size": 0.2, "open": open, "confidence": 0.9, "t": 1});
+        let told = |out: &[Out]| match out {
+            [Out::Event(EventKind::Hand, value)] => value.clone(),
+            other => panic!("one hand event, not {other:?}"),
+        };
+        let mut watch = Watch::new();
+        let topic = "humans/hands/tracked";
+        assert_eq!(
+            told(&watch.take(topic, &hand(0.3, true), S)),
+            json!({"seen": true, "x": 0.3, "y": 0.5, "size": 0.2, "open": true, "confidence": 0.9})
+        );
+        // Still, or nearly: nothing, at camera rate.
+        assert!(watch.take(topic, &hand(0.31, true), S + 33_000).is_empty());
+        // Moved, but too soon: held back, and told at the next check.
+        assert!(watch.take(topic, &hand(0.5, true), S + 66_000).is_empty());
+        assert!(watch.lapse(S + HAND_EVERY_US - 1).is_empty());
+        assert_eq!(told(&watch.lapse(S + HAND_EVERY_US))["x"], 0.5);
+        assert!(watch.lapse(S + 2 * HAND_EVERY_US).is_empty(), "told once");
+        // Closed: news.
+        let closed = told(&watch.take(topic, &hand(0.5, false), 2 * S));
+        assert_eq!(closed["open"], false);
+        // Not a hand: out of the picture, unsure, or no `open`.
+        for payload in [
+            json!({"x": 1.5, "y": 0.5, "size": 0.2, "open": true, "confidence": 0.9}),
+            json!({"x": 0.9, "y": 0.5, "size": 0.2, "open": true, "confidence": 0.2}),
+            json!({"x": 0.9, "y": 0.5, "size": 0.2, "confidence": 0.9}),
+        ] {
+            assert!(watch.take(topic, &payload, 3 * S).is_empty(), "{payload}");
+        }
+        // Silence: gone after HAND_GONE_US from the last message, once.
+        assert!(watch.lapse(2 * S + HAND_GONE_US - 1).is_empty());
+        assert_eq!(
+            told(&watch.lapse(2 * S + HAND_GONE_US)),
+            json!({"seen": false})
+        );
+        assert!(watch.lapse(10 * S).is_empty());
+        assert_eq!(
+            told(&watch.take(topic, &hand(0.5, false), 11 * S))["seen"],
+            true
+        );
+        assert_eq!(EventKind::Hand.needs(), Some(crate::protocol::Grant::Look));
+    }
+
     /// The bus thread hands on a repeat at least every [`REPEAT_EVERY_US`],
     /// so a renewed lease never looks lapsed; a new key goes on at once.
     #[test]
@@ -443,6 +604,12 @@ mod tests {
                 json!({"on": true, "colour": "warm", "level": 2}),
             ),
             (
+                "light/drawn",
+                json!({"on": true, "colour": "red", "level": 3, "at": 1}),
+                json!({"on": true, "colour": "red", "level": 3, "at": 2}),
+                json!({"on": true, "colour": "warm", "level": 1}),
+            ),
+            (
                 "mood/state",
                 json!({"energy": 0.5, "warmth": 0.4, "awake": true, "asleep": false, "at": 1}),
                 json!({"energy": 0.5, "warmth": 0.4, "awake": true, "asleep": false, "at": 2}),
@@ -478,6 +645,7 @@ mod tests {
         }
         for topic in [
             "humans/faces/tracked",
+            "humans/hands/tracked",
             "voice/heard",
             "ears/classes",
             "body/hand",
@@ -650,6 +818,47 @@ mod tests {
         assert_eq!(
             watch.state(StateKind::Light),
             json!({"on": true, "colour": "warm", "level": 3})
+        );
+    }
+
+    /// `get`'s light: the person's own as before, and what the ring draws
+    /// as `shows` (lamp-a0ae, 29 Oct: light/state warm 1 while light/drawn
+    /// was a computer's red 3).
+    #[test]
+    fn the_light_state_is_the_persons_own_and_what_shows() {
+        let mut watch = Watch::new();
+        assert_eq!(watch.state(StateKind::Light), Value::Null, "nothing heard");
+        let red = json!({"on": true, "colour": "red", "level": 3, "source": "ring"});
+        watch.take("light/drawn", &red, S);
+        assert_eq!(
+            watch.state(StateKind::Light),
+            json!({"shows": {"on": true, "colour": "red", "level": 3}})
+        );
+        watch.take(
+            "light/state",
+            &json!({"on": true, "colour": "warm", "level": 1}),
+            S,
+        );
+        assert_eq!(
+            watch.state(StateKind::Light),
+            json!({"on": true, "colour": "warm", "level": 1, "shows": {"on": true, "colour": "red", "level": 3}})
+        );
+        // A ring that says nothing more leaves its last draw: `shows`
+        // doesn't lapse with light/drawn's 3 s (control.md says so).
+        watch.lapse(60 * S);
+        assert_eq!(
+            watch.state(StateKind::Light)["shows"],
+            json!({"on": true, "colour": "red", "level": 3})
+        );
+        // The request lapses: the ring draws the person's light again.
+        watch.take(
+            "light/drawn",
+            &json!({"on": true, "colour": "warm", "level": 1}),
+            2 * S,
+        );
+        assert_eq!(
+            watch.state(StateKind::Light)["shows"],
+            json!({"on": true, "colour": "warm", "level": 1})
         );
     }
 }

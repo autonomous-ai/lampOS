@@ -7,6 +7,12 @@
 //! - **Held** with `{"hold":{"for_ms":30000}}`, renewed every
 //!   [`RENEW_EVERY`], so a door that hangs gives the lamp its own life back
 //!   within 30 s.
+//! - **Following the hand** in view while the computer's `look` at `hand`
+//!   stands: each hold says `"follow":"hand"` then, and is said again at
+//!   once when that starts or stops; a hold without it follows nothing. The
+//!   body does the fast loop on the lamp, from `humans/hands/tracked`; the
+//!   door never sees the picture. A body that doesn't know `follow`
+//!   refuses the hold, which ends the computer's lease as `released`.
 //! - **Let go** when no computer holds `body` any more: the door says
 //!   `{"let_go":true}` and closes, and the body ends its lease at once.
 //! - **The body's own end** of it, `lost` with why, ends the protocol's
@@ -15,16 +21,25 @@
 //!   `suspended`/`held` for a conversation are already the door's own from
 //!   the bus, so they are not told twice. A `refused` is written to the
 //!   journal, and the door asks again at its next renewal.
+//! - **A computer's `look`** goes on the same connection, so it never
+//!   outlives the lease it came under (Nine on #3997): `{"look":…}`, each
+//!   answered once by the body, in order, and told to the computer as its
+//!   `done`: `finished` with the angles the head reached and whether they
+//!   were cut to its reach, or `cut_short` or `dropped` with why. Looks still
+//!   owed when the connection goes are `cut_short`, why `reconnected`, or
+//!   `released` when the door let go.
 
+use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::UnixStream;
 
+use crate::parts::Events;
 use crate::protocol::{LeaseWhy, Part};
 use crate::server::Shared;
 use crate::watch::Out;
@@ -36,10 +51,81 @@ pub const RENEW_EVERY: Duration = Duration::from_secs(10);
 /// How often the door checks whether `body` is held.
 pub const CHECK_EVERY: Duration = Duration::from_millis(250);
 
+/// The client whose `look` at `hand` stands, if any: the body follows the
+/// hand only while that client holds `body` ([`follows`]).
+pub type Follower = Arc<std::sync::Mutex<Option<String>>>;
+
+/// Whether the body follows the hand this check: only for the follower
+/// while it holds `body`. A follower that no longer holds it is cleared,
+/// so a next holder, even one that takes the body before any check sees it
+/// free, never starts out following (the local leader's P3).
+pub fn follows(follower: &mut Option<String>, holder: Option<&str>) -> bool {
+    if follower.is_some() && follower.as_deref() != holder {
+        *follower = None;
+    }
+    follower.is_some()
+}
+
+/// A computer's `look`, for the body: who asked, its request, and the line.
+#[derive(Debug)]
+pub struct Look {
+    pub client: String,
+    pub re: u64,
+    pub line: String,
+}
+
+/// Where `parts.rs` sends a `look`.
+pub type Looks = tokio::sync::mpsc::UnboundedSender<Look>;
+
+/// The looks sent and not yet answered, oldest first.
+type Owed = Arc<Mutex<VecDeque<(String, u64)>>>;
+
+/// The body's answer to a look, as the computer's `done`.
+pub fn done_of(line: &str, re: u64) -> Option<Value> {
+    let said: Value = serde_json::from_str(line).ok()?;
+    let how = match said["look"].as_str()? {
+        "there" => "finished",
+        "cut_short" => "cut_short",
+        "refused" => "dropped",
+        _ => return None,
+    };
+    let mut done = serde_json::json!({"ev": "done", "re": re, "how": how});
+    if how == "finished" {
+        for field in ["yaw", "pitch", "clamped"] {
+            done[field] = said[field].clone();
+        }
+    } else {
+        done["why"] = said["why"].clone();
+    }
+    Some(done)
+}
+
+/// A look that never reached the body.
+fn dropped(events: &Events, look: &Look, why: &str) {
+    events(
+        &look.client,
+        serde_json::json!({"ev": "done", "re": look.re, "how": "dropped", "why": why}),
+    );
+}
+
+/// Every look still owed ends: the connection it went on is gone.
+fn end_owed(owed: &Owed, events: &Events, why: &str) {
+    let ended: Vec<_> = owed.lock().expect("owed").drain(..).collect();
+    for (client, re) in ended {
+        events(
+            &client,
+            serde_json::json!({"ev": "done", "re": re, "how": "cut_short", "why": why}),
+        );
+    }
+}
+
 /// What the door says to the body this check.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Say {
-    Hold,
+    /// Held, following the hand or not.
+    Hold {
+        follow: bool,
+    },
     LetGo,
 }
 
@@ -47,20 +133,27 @@ pub enum Say {
 #[derive(Debug, Default)]
 pub struct Holding {
     asked_us: Option<u64>,
+    /// Whether the last hold said to follow the hand.
+    following: bool,
 }
 
 impl Holding {
-    /// `wanted`: a computer holds the protocol's `body` lease now.
-    pub fn step(&mut self, wanted: bool, now_us: u64) -> Option<Say> {
+    /// `wanted`: a computer holds the protocol's `body` lease now;
+    /// `follow`: its `look` at `hand` stands.
+    pub fn step(&mut self, wanted: bool, follow: bool, now_us: u64) -> Option<Say> {
         let renew_us = u64::try_from(RENEW_EVERY.as_micros()).unwrap_or(u64::MAX);
         match (wanted, self.asked_us) {
             (true, None) => {
                 self.asked_us = Some(now_us);
-                Some(Say::Hold)
+                self.following = follow;
+                Some(Say::Hold { follow })
             }
-            (true, Some(at)) if now_us.saturating_sub(at) >= renew_us => {
+            (true, Some(at))
+                if now_us.saturating_sub(at) >= renew_us || follow != self.following =>
+            {
                 self.asked_us = Some(now_us);
-                Some(Say::Hold)
+                self.following = follow;
+                Some(Say::Hold { follow })
             }
             (false, Some(_)) => {
                 self.asked_us = None;
@@ -111,7 +204,10 @@ fn why_of(why: &str) -> Option<LeaseWhy> {
 
 fn line_of(say: &Say) -> String {
     match say {
-        Say::Hold => format!("{{\"hold\":{{\"for_ms\":{HOLD_MS}}}}}\n"),
+        Say::Hold { follow: false } => format!("{{\"hold\":{{\"for_ms\":{HOLD_MS}}}}}\n"),
+        Say::Hold { follow: true } => {
+            format!("{{\"hold\":{{\"for_ms\":{HOLD_MS},\"follow\":\"hand\"}}}}\n")
+        }
         Say::LetGo => "{\"let_go\":true}\n".to_owned(),
     }
 }
@@ -122,7 +218,19 @@ fn line_of(say: &Say) -> String {
 /// newer holder's lease; and its end (the body restarted) is seen at the
 /// next check, so the door asks again within [`CHECK_EVERY`], not at the
 /// next renewal (Sixth's and Fourteen's P3s on #3900).
-pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
+///
+/// `follower` is set by a `look` at `hand` (`crate::parts::Lamp::following`)
+/// and cleared here once its client no longer holds `body` ([`follows`]).
+pub async fn hold(
+    path: PathBuf,
+    shared: Arc<Shared>,
+    follower: Follower,
+    events: Events,
+    mut looks: tokio::sync::mpsc::UnboundedReceiver<Look>,
+) {
+    let owed: Owed = Arc::default();
+    // Looks asked before the body's hold was taken, sent once it is.
+    let mut waiting: Vec<(String, Look)> = Vec::new();
     let mut holding = Holding::default();
     let mut writer: Option<tokio::net::unix::OwnedWriteHalf> = None;
     let current = Arc::new(AtomicU64::new(0));
@@ -131,16 +239,57 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
     let mut check = tokio::time::interval(CHECK_EVERY);
     check.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
-        check.tick().await;
+        tokio::select! {
+            _ = check.tick() => {}
+            Some(look) = looks.recv() => {
+                let sent = match writer.as_mut() {
+                    Some(write) => {
+                        owed.lock().expect("owed").push_back((look.client.clone(), look.re));
+                        write.write_all(format!("{}\n", look.line).as_bytes()).await.is_ok()
+                    }
+                    // The computer holds `body`, and the door takes the body's
+                    // hold at its next check: the look waits for it, at most
+                    // one check (Nine's P3 on #4023).
+                    None => match shared.body_lease() {
+                        Some(lease) => {
+                            waiting.push((lease, look));
+                            true
+                        }
+                        None => {
+                            dropped(&events, &look, "the body is not held");
+                            true
+                        }
+                    },
+                };
+                if !sent {
+                    writer = None;
+                    current.fetch_add(1, Ordering::AcqRel);
+                    holding.gone();
+                    end_owed(&owed, &events, "reconnected");
+                }
+                continue;
+            }
+        }
         if writer.is_some() && ended.load(Ordering::Acquire) {
             writer = None;
             holding.gone();
+            end_owed(&owed, &events, "reconnected");
         }
-        let wanted = shared.body_held();
-        let Some(say) = holding.step(wanted, lamp_ipc::monotonic_us()) else {
+        let holder = shared.body_holder();
+        let wanted = holder.is_some();
+        // A look still waiting when nobody holds `body` any more is the
+        // old asker's, never a later holder's (the Reviewer-lead's P2 on
+        // #4023).
+        if !wanted {
+            for (_, look) in waiting.drain(..) {
+                dropped(&events, &look, "the body lease ended");
+            }
+        }
+        let following = follows(&mut follower.lock().expect("follower"), holder.as_deref());
+        let Some(say) = holding.step(wanted, following, lamp_ipc::monotonic_us()) else {
             continue;
         };
-        if writer.is_none() && say == Say::Hold {
+        if writer.is_none() && matches!(say, Say::Hold { .. }) {
             match UnixStream::connect(&path).await {
                 Ok(stream) => {
                     told_unreachable = false;
@@ -149,17 +298,26 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
                     let generation = current.fetch_add(1, Ordering::AcqRel) + 1;
                     ended = Arc::new(AtomicBool::new(false));
                     let (shared, current, ended) = (shared.clone(), current.clone(), ended.clone());
+                    let (owed, events) = (owed.clone(), events.clone());
                     tokio::spawn(async move {
                         let mut lines = BufReader::new(read).lines();
                         while let Ok(Some(line)) = lines.next_line().await {
                             if current.load(Ordering::Acquire) != generation {
                                 break;
                             }
-                            if line.contains("\"refused\"") {
+                            if line.contains("\"lease\":\"refused\"") {
                                 eprintln!("lamp-control: the body refused its lease: {line}");
                             }
                             if let Some(out) = heard(&line) {
                                 shared.deliver(vec![out]);
+                            }
+                            if line.contains("\"look\"") {
+                                let asker = owed.lock().expect("owed").pop_front();
+                                if let Some((client, re)) = asker
+                                    && let Some(done) = done_of(&line, re)
+                                {
+                                    events(&client, done);
+                                }
                             }
                         }
                         ended.store(true, Ordering::Release);
@@ -174,6 +332,9 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
                         told_unreachable = true;
                     }
                     holding.gone();
+                    for (_, look) in waiting.drain(..) {
+                        dropped(&events, &look, "the body's lease socket can't be reached");
+                    }
                     continue;
                 }
             }
@@ -181,13 +342,48 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
         let Some(write) = writer.as_mut() else {
             continue;
         };
-        let sent = write.write_all(line_of(&say).as_bytes()).await;
+        let mut sent = write.write_all(line_of(&say).as_bytes()).await;
+        if sent.is_ok() && matches!(say, Say::Hold { .. }) {
+            // Only those asked under the lease that holds the body now: one
+            // let go and taken again inside a check is another lease.
+            let now_held = shared.body_lease();
+            let (ours, theirs): (Vec<_>, Vec<_>) = std::mem::take(&mut waiting)
+                .into_iter()
+                .partition(|(lease, _)| Some(lease) == now_held.as_ref());
+            for (_, look) in theirs {
+                dropped(&events, &look, "the body lease ended");
+            }
+            let mut looks = ours.into_iter().map(|(_, look)| look);
+            for look in looks.by_ref() {
+                owed.lock()
+                    .expect("owed")
+                    .push_back((look.client.clone(), look.re));
+                sent = write.write_all(format!("{}\n", look.line).as_bytes()).await;
+                if sent.is_err() {
+                    break;
+                }
+            }
+            // The connection failed partway: those not sent never reached
+            // the body (the sent ones end with `owed`, `reconnected`).
+            for look in looks {
+                dropped(&events, &look, "the body's lease socket can't be reached");
+            }
+        }
         if sent.is_err() || say == Say::LetGo {
             // Closed: the body ends its lease at once, and anything its
             // reader still hears is from a connection gone.
             writer = None;
             current.fetch_add(1, Ordering::AcqRel);
             holding.gone();
+            let why = if sent.is_err() {
+                "reconnected"
+            } else {
+                "released"
+            };
+            end_owed(&owed, &events, why);
+            for (_, look) in waiting.drain(..) {
+                dropped(&events, &look, "the body is not held");
+            }
         }
     }
 }
@@ -200,22 +396,101 @@ mod tests {
 
     #[test]
     fn held_while_wanted_renewed_and_let_go() {
+        let hold = Some(Say::Hold { follow: false });
         let mut holding = Holding::default();
-        assert_eq!(holding.step(false, 0), None);
-        assert_eq!(holding.step(true, S), Some(Say::Hold));
-        assert_eq!(holding.step(true, 5 * S), None);
-        assert_eq!(holding.step(true, 11 * S), Some(Say::Hold));
-        assert_eq!(holding.step(false, 12 * S), Some(Say::LetGo));
-        assert_eq!(holding.step(false, 13 * S), None);
+        assert_eq!(holding.step(false, false, 0), None);
+        assert_eq!(holding.step(true, false, S), hold);
+        assert_eq!(holding.step(true, false, 5 * S), None);
+        assert_eq!(holding.step(true, false, 11 * S), hold);
+        assert_eq!(holding.step(false, false, 12 * S), Some(Say::LetGo));
+        assert_eq!(holding.step(false, false, 13 * S), None);
         // A connection gone: held again at once when still wanted.
-        assert_eq!(holding.step(true, 14 * S), Some(Say::Hold));
+        assert_eq!(holding.step(true, false, 14 * S), hold);
         holding.gone();
-        assert_eq!(holding.step(true, 15 * S), Some(Say::Hold));
+        assert_eq!(holding.step(true, false, 15 * S), hold);
         assert_eq!(
-            line_of(&Say::Hold),
+            line_of(&Say::Hold { follow: false }),
             "{\"hold\":{\"for_ms\":30000}}\n".to_owned()
         );
         assert_eq!(line_of(&Say::LetGo), "{\"let_go\":true}\n".to_owned());
+    }
+
+    /// The local leader's P3: A follows, A's lease ends and B takes the body
+    /// before a check sees it free; B's holds follow nothing.
+    #[test]
+    fn only_the_follower_holding_the_body_follows() {
+        let mut follower = Some("c_a".to_owned());
+        assert!(follows(&mut follower, Some("c_a")));
+        assert!(!follows(&mut follower, Some("c_b")));
+        assert_eq!(follower, None, "cleared, not kept for A's return");
+        assert!(!follows(&mut follower, Some("c_a")));
+        let mut follower = Some("c_a".to_owned());
+        assert!(!follows(&mut follower, None));
+        assert_eq!(follower, None);
+        assert!(!follows(&mut None, Some("c_a")));
+    }
+
+    /// A follow started or stopped is said at once, not at the next renewal,
+    /// and each renewal says it again.
+    #[test]
+    fn a_follow_is_said_at_once_and_with_every_hold() {
+        let follow = Some(Say::Hold { follow: true });
+        let mut holding = Holding::default();
+        assert_eq!(
+            holding.step(true, false, S),
+            Some(Say::Hold { follow: false })
+        );
+        assert_eq!(holding.step(true, true, S + 250_000), follow);
+        assert_eq!(holding.step(true, true, 2 * S), None);
+        assert_eq!(holding.step(true, true, 12 * S), follow);
+        assert_eq!(
+            holding.step(true, false, 12 * S + 250_000),
+            Some(Say::Hold { follow: false })
+        );
+        // A new connection while following: its first hold follows.
+        holding.step(true, true, 13 * S);
+        holding.gone();
+        assert_eq!(holding.step(true, true, 13 * S + 250_000), follow);
+        assert_eq!(
+            line_of(&Say::Hold { follow: true }),
+            "{\"hold\":{\"for_ms\":30000,\"follow\":\"hand\"}}\n".to_owned()
+        );
+    }
+
+    #[test]
+    fn the_bodys_answer_to_a_look_is_the_computers_done() {
+        assert_eq!(
+            done_of(
+                r#"{"look":"there","yaw":-10.0,"pitch":5.0,"clamped":true}"#,
+                7
+            ),
+            Some(
+                serde_json::json!({"ev": "done", "re": 7, "how": "finished", "yaw": -10.0, "pitch": 5.0, "clamped": true})
+            )
+        );
+        assert_eq!(
+            done_of(r#"{"look":"cut_short","why":"hand"}"#, 8),
+            Some(serde_json::json!({"ev": "done", "re": 8, "how": "cut_short", "why": "hand"}))
+        );
+        assert_eq!(
+            done_of(r#"{"look":"refused","why":"the body is not held"}"#, 9).unwrap()["how"],
+            "dropped"
+        );
+        assert_eq!(done_of(r#"{"lease":"held"}"#, 1), None);
+        let owed: Owed = Arc::default();
+        owed.lock()
+            .unwrap()
+            .extend([("c_1".to_owned(), 3), ("c_2".to_owned(), 4)]);
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        end_owed(&owed, &events, "reconnected");
+        let told = told.lock().unwrap();
+        assert_eq!(told.len(), 2);
+        assert_eq!(told[1].0, "c_2");
+        assert_eq!(told[1].1["why"], "reconnected");
+        assert!(owed.lock().unwrap().is_empty());
     }
 
     #[test]

@@ -33,6 +33,8 @@ REFUSED_GESTURES = ("idle", "scanning")
 # A body lease for one look or move, never renewed: released at `done`, or
 # left to lapse if `done` doesn't come (Nine, #3504 13:27).
 ACTION_LEASE_MS = 10_000
+# The body actions lamp-control ends with a `done` after its `{"to": "body"}`.
+DONE_FOLLOWS = {"look"}
 # The longest `lamp_wait_for` waits, so one call can't hold an agent's turn.
 MOST_WAIT_S = 120
 # What `lamp://events/recent` keeps.
@@ -47,6 +49,7 @@ EVENT_NEEDS = {
     "person.left": "look",
     "person.stood_up": "look",
     "person.facing": "look",
+    "hand": "look",
     "phrase.heard": "hear",
     "name.heard": "hear",
     "sound.heard": "sound",
@@ -191,10 +194,11 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not ended.done():
                     ended.set_result(("done", "refused", None))
                 raise refused(error) from error
-            if sent.get("to"):
+            if sent.get("to") and op not in DONE_FOLLOWS:
                 # Handed to a part (`{"to": "body"}`): no `done` follows, so
                 # the tool ends now and the lease lapses by itself (blue's
-                # P3 on #3813, lamp-control part 4, #3805).
+                # P3 on #3813, lamp-control part 4, #3805). A `look`'s does
+                # follow, once the head is there (docs/control.md, "Looking").
                 return f"{op} taken by the {sent['to']}; its lease lapses within {ACTION_LEASE_MS // 1000} s"
             try:
                 what, how, why_ended = await asyncio.wait_for(asyncio.shield(ended), ACTION_LEASE_MS / 1000)
@@ -326,7 +330,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             at: Literal["face", "name", "ahead"] | None = None, yaw: float | None = None, pitch: float | None = None
         ) -> str:
             """Turn the head: at the face in view, toward who said its name, ahead, or to `yaw`/`pitch`
-            in degrees (right and up positive), within its reach."""
+            in degrees (right and up positive), within its reach. On a lamp today only `ahead` and
+            `yaw`/`pitch` are carried out, with lamp-control's `--lease-socket`."""
             if at is None:
                 target: Any = {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
             else:

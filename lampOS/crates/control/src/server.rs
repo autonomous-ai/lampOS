@@ -305,6 +305,17 @@ impl Shared {
         })
     }
 
+    /// Events for a client's later answers, as `parts` are given them: the
+    /// body lease's `done` for a `look` (`crate::body_lease::hold`).
+    pub fn events(self: &Arc<Self>) -> crate::parts::Events {
+        let shared = Arc::downgrade(self);
+        Arc::new(move |client: &str, event: Value| {
+            if let Some(shared) = shared.upgrade() {
+                shared.send_to(client, event);
+            }
+        })
+    }
+
     /// Sends `event` to every connection of `client`.
     fn send_to(&self, client: &str, event: Value) {
         for open in self.open.lock().expect("open").values() {
@@ -329,16 +340,28 @@ impl Shared {
         self.ahead_us.fetch_add(by, Ordering::Relaxed);
     }
 
-    /// Whether a computer holds the protocol's `body` lease now: the door
+    /// The client holding the protocol's `body` lease now, if any: the door
     /// then holds the body's own (`crate::body_lease`).
-    pub fn body_held(&self) -> bool {
+    pub fn body_holder(&self) -> Option<String> {
         let now = self.now_us();
         self.door
             .lock()
             .expect("door")
             .leases()
             .holder(crate::protocol::Part::Body, now)
-            .is_some()
+            .map(str::to_owned)
+    }
+
+    /// The `body` lease held now, by its id: a look asked under one is
+    /// never sent under another (the Reviewer-lead's P3 on #4023).
+    pub fn body_lease(&self) -> Option<String> {
+        let now = self.now_us();
+        self.door
+            .lock()
+            .expect("door")
+            .leases()
+            .holding(crate::protocol::Part::Body, now)
+            .map(str::to_owned)
     }
 
     /// What the bus said, handed on: each event to every connection that
@@ -354,16 +377,23 @@ impl Shared {
                     let mut event = fields;
                     event["ev"] = serde_json::to_value(kind).unwrap_or_default();
                     event["at"] = Value::String(at.clone());
+                    let mut sent = Vec::new();
                     for open in self.open.lock().expect("open").values() {
                         let granted = kind
                             .needs()
                             .is_none_or(|grant| open.grants.contains(&grant));
-                        if open.client.is_some() && granted && open.events.contains(&kind) {
-                            let _ = open.outbox.send(event.clone());
+                        if let Some(client) = &open.client
+                            && granted
+                            && open.events.contains(&kind)
+                            && open.outbox.send(event.clone()).is_ok()
+                        {
+                            sent.push(client.clone());
                         }
                     }
+                    self.journal_events(&sent, &event["ev"], now);
                 }
                 Out::Heard(text) => {
+                    let mut heard = Vec::new();
                     for open in self.open.lock().expect("open").values() {
                         if open.client.is_none()
                             || !open.grants.contains(&Grant::Hear)
@@ -372,9 +402,15 @@ impl Shared {
                             continue;
                         }
                         for phrase in phrases_in(&text, &open.phrases) {
-                            let _ = open.outbox.send(serde_json::json!({"ev": "phrase.heard", "at": at, "phrase": phrase}));
+                            if open.outbox.send(serde_json::json!({"ev": "phrase.heard", "at": at, "phrase": phrase})).is_ok()
+                                && let Some(client) = &open.client
+                            {
+                                heard.push(client.clone());
+                            }
                         }
                     }
+                    // The kind alone: never the phrase, nor what was said.
+                    self.journal_events(&heard, &serde_json::json!("phrase.heard"), now);
                 }
                 Out::Suspend(part, why) => {
                     let changes = self
@@ -402,10 +438,30 @@ impl Shared {
         }
     }
 
+    /// Each event sent, by kind and computer (docs/control.md, "The
+    /// journal"), once the connections' lock is let go.
+    fn journal_events(&self, clients: &[String], kind: &Value, now_us: u64) {
+        if clients.is_empty() {
+            return;
+        }
+        let kind = kind.as_str().unwrap_or("event");
+        let mut door = self.door.lock().expect("door");
+        for client in clients {
+            door.journal_event(client, kind, now_us);
+        }
+    }
+
     /// Sends each lease change to every connection of its client.
     fn tell(&self, changes: Vec<crate::lease::Change>) {
         if changes.is_empty() {
             return;
+        }
+        {
+            let now = self.now_us();
+            let mut door = self.door.lock().expect("door");
+            for change in &changes {
+                door.journal_lease(change, now);
+            }
         }
         let open = self.open.lock().expect("open");
         for change in changes {
@@ -454,7 +510,11 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
         loop {
             tick.tick().await;
             let now = ticking.now_us();
-            let changes = ticking.door.lock().expect("door").leases().lapse(now);
+            let changes = {
+                let mut door = ticking.door.lock().expect("door");
+                door.journal_tick(now);
+                door.leases().lapse(now)
+            };
             ticking.tell(changes);
         }
     });
@@ -717,8 +777,9 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 14] = [
+pub const TOPICS: [&str; 16] = [
     "humans/faces/tracked",
+    "humans/hands/tracked",
     "room/stood_up",
     "name/heard",
     "voice/heard",
@@ -730,6 +791,7 @@ pub const TOPICS: [&str; 14] = [
     "voice/mute",
     "voice/privacy",
     "light/state",
+    "light/drawn",
     "mood/state",
     "controls/touch",
 ];

@@ -41,7 +41,8 @@ example runs this way: `greet.js`, `follow.js`, `phrase.js`, `pomodoro.js`,
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light,
-and `play`, `sound`, `look` and `joints` refused (`refused`,
+`look` refused as "the body's lease socket is not on here" (no product
+unit passes it yet), and `play`, `sound` and `joints` refused (`refused`,
 "not routed yet: waits for …"), in lamp-control's own words, so a program
 built against it meets the same refusals on a lamp. `--everything` answers
 every op instead.
@@ -86,6 +87,7 @@ await lamp.closed();
   | `person.arrived`, `person.left` | `count`, `near` (0–1, share of the picture's height) | `look` |
   | `person.stood_up` | `side` | `look` |
   | `person.facing` | `facing` | `look` |
+  | `hand` | `seen`; when seen, `x`, `y` (the palm's centre, 0–1 from the left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. By edge, at most 4 a second; `seen: false` once, 1 s after the last hand | `look` |
   | `phrase.heard` | `phrase`: one you registered (`on(..., { phrases })`), never what else was said | `hear` |
   | `name.heard` | | `hear` |
   | `sound.heard` | `class`, `score` | `sound` |

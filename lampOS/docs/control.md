@@ -14,7 +14,7 @@ SDKs generate from.
 - **piece 1** (#3715): the protocol's messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the rates (`rate.rs`), with their tests;
 - **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
 - **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Its actions were refused until piece 4.
-- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event, and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` and `joints` (the body's lease socket), `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
+- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event, and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` at `ahead` or `{yaw, pitch}` goes on the body's lease socket under the lease the door holds (`body_lease.rs`), its end a `done` with the angles reached; `look` at `hand` has the body follow the hand in view, said with the body's lease (below). `look` at `face` or `name` is refused as out of this release ("not in this release: look at a face or a name"); `joints`, `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
 - **piece 5**: the bus as events, lease signals and state (`watch.rs`, with `--bus-root`). Events go out by edge, never per message: someone arrived or left, turned to or from the lamp, or stood up; the lamp's name heard; a sound class past its bar (never `speech`); a touch or the button; the lamp talking, paused, private or asleep. Each goes only to a connection subscribed to it that holds its grant. Words heard are matched on the lamp against each connection's own phrases, and only the phrase leaves it. Talking suspends every lease and resting holds them again; a hand on the body, a stop, a pause, privacy or sleep loses them. `get` answers presence (counts, never who), the light, the inner state and the lamp's own.
 - **piece 6**: the body's lease (`body_lease.rs`): with `--lease-socket`, a computer's `body` lease holds lamp-body's own, so the lamp's own life stands back, and the body's end of it is the computer's (`slumped` added to the whys).
 - **piece 7**: skills pushed from a computer (`push.rs`, with `--manage-socket`): the `skills` grant, `skill.push` in parts, `skill.list` and `skill.remove`, each asked of root's manage helper off the door's lock, and a revoke turning the computer's pushed skills off. The helper's side is lamp-skills' (Eighth's piece B); until it is in, the helper refuses what it doesn't know.
@@ -62,7 +62,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `body` | `gesture`, `move`, `play`, `look`, `joints`; with `light`, `express` |
 | `light` | `light`; with `body`, `express` |
 | `speak` | `say`, `sound` |
-| `look` | presence events and state: arrivals, leavings, facing, standing up. Positions, never who |
+| `look` | presence events and state: arrivals, leavings, facing, standing up, a hand in view. Positions, never who |
 | `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard` |
 | `sound` | `sound.heard`, by class |
 | `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer") |
@@ -74,6 +74,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `person.arrived`, `person.left` | `count`, `near` (share of the picture's height) | `humans/faces/tracked`, as skills' `appears` and `absent_for` | `look` |
 | `person.stood_up` | `side` | `room/stood_up` | `look` |
 | `person.facing` | `facing` | `humans/faces/tracked` | `look` |
+| `hand` | `seen`; when seen, `x`, `y` (the palm's centre, a share of the picture from its left and top), `size` (the palm's width, a share of the picture's), `open`, `confidence` | `humans/hands/tracked`: one message per look that sees a hand, none without. Told when first seen, moved or grown by 0.05, opened or closed, at most every 250 ms with the newest held back until then; `seen: false` once, 1 s after the last message. A message under 0.5 confidence, or a share outside 0 to 1, is no hand. Never the picture, keypoints or the tracker's clock | `look` |
 | `phrase.heard` | `phrase`: one the client registered | `voice/heard`, matched on the lamp: the client is told which phrase, **never what was said** | `hear` |
 | `name.heard` | | `name/heard` | `hear` |
 | `sound.heard` | `class` (`knock`, `music`, …), `score` | `ears/classes` | `sound` |
@@ -90,7 +91,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 |---|---|---|---|---|
 | `express` | `feeling`, `strength` 0–1 (0.5) | the `feelings` skill's (#3691) move on `mood.sock` `{move}` and its light as a `light/request`, so one set of feelings (below) | `body`, `light` | no |
 | `gesture` | `name`, one of 19 built-in clips (below) | `mood.sock` `{gesture}` | `body` | no |
-| `look` | `at`: `face`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive) | `gaze.sock`, body goals, within the gaze reach | `body` (and `look` for `face`) | body |
+| `look` | `at`: `face`, `hand`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive). `hand` follows it until `stop`, another look or the lease ends | `ahead` and `{yaw, pitch}`: the body's lease socket `{look}`, eased to and held while the lease is, inside the gaze's reach and the pose's bounds (below); `hand` with the lease socket's hold; `face` and `name` refused, "not in this release: look at a face or a name" | `body` (and `look` for `face` and `hand`) | body |
 | `move` | `step_ms` 40–1,000, `frames` (2–500) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
@@ -145,13 +146,38 @@ Tests keep the compiled moves equal to the skill's files, the table equal to
 its `[[do]]`, and the light equal to lamp-skills' for every light a person may
 have on.
 
+**Looking** (`look`, `crates/body/src/lease.rs` `Looking`, the door's
+`body_lease.rs`): with `--lease-socket` on both lamp-body and lamp-control,
+a look goes to the body as `{"look":{"yaw":Y,"pitch":P}}` or
+`{"look":"ahead"}` on the lease connection the door holds for the computer,
+so it never outlives that lease, and only the holder's connection is read.
+- **Where:** degrees become counts (4,096 a turn). The base turns right with
+  fewer counts and the head looks up with fewer. They are cut to the base's
+  reach (`--reach`'s yaw, or the gaze's `--gaze-reach` if larger) and the head's
+  (`--reach` up and down), and every pose's own bounds still hold.
+- **How:** eased to as the gaze's own look is, in its place while held, and
+  held there while the lease is. When the lease ends or is let go, the head
+  goes back to the pose's own direction. A suspended lease (a conversation)
+  keeps the look for when it is held again.
+- **Its end:** the body answers each look once, `there` when the head and
+  base are within 6 counts of goals that have stopped moving for 10 steps
+  (0.2 s), or `cut_short`. The door makes that the computer's `done`.
+- **On a product lamp** no unit passes `--lease-socket` yet, so `look` is
+  refused there as "the body's lease socket is not on here" until both units
+  do (lamp-control's after #3876, lamp-body's with it).
+
 **Colours and patterns:** the ten of `lamp_msgs::Light::COLOURS` (`yellow`,
 `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`),
 and the three of `PatternKind`: `breathe`, `candle`, `pulse`. A light never
 blinks or flashes. A test in `lamp-msgs` keeps the schema's lists in step.
 
 **State** (`get`, or the events above): presence (`count`, `near`,
-`facing`, never who), the light (the person's own and what shows), mood
+`facing`, never who), the light (the person's own, `on`, `colour` and
+`level` from `light/state`, and `shows`, what the ring draws now from
+`light/drawn`: the person's light, or one a computer or skill asked for
+over it; each left out until the lamp has said it; a ring that stops
+leaves `shows` at its last draw, though `light/drawn` itself lapses in 3 s),
+mood
 (`mood/state`'s energy, warmth, awake, asleep), and `lamp_state`.
 
 **Never through this door:** camera frames, audio, transcripts, face prints
@@ -184,6 +210,7 @@ lamp-control clients
 - **Off by default:** `serve` runs only with `LAMP_CONTROL=on`; otherwise it says so and exits 0. No product unit passes it yet.
 - **The parts it reaches:** `--mood-socket` (the body's gestures and moves), `--say-socket` (the voice), `--bus-root` (light requests out; events and state in) and `--boot-id` (the clock a light request names, `/proc/sys/kernel/random/boot_id` by default). A part not given is refused with "not reachable from lamp-control here".
 - **The body's lease:** with `--lease-socket` (lamp-body's, docs/body.md "Held by lamp-control"), while a computer holds `body` the door holds the body too, so the lamp's own life (the rest glance, Expression's offsets, a stand timing out) stands back. It holds for 30 s, renewed every 10 s, and lets go when no computer holds `body`. The body's own end of it (`lost` for a hand, privacy, a pause, a sleep, a slump or a lapse) ends the computer's `body` lease with that why, a lapse as `expired`; a why the door doesn't know, or a hold the body refuses, ends it as `released`, so a computer never thinks the lamp's own life stands back when it doesn't. A body that restarts is held again at the next 250 ms check, and a line from a connection the door has dropped is ignored. A body that can't be reached is journaled once, and the lamp's own life goes on.
+- **Following a hand:** a `look` at `hand` under the `body` lease has each hold say `"follow":"hand"` (`{"hold":{"for_ms":30000,"follow":"hand"}}`), said at once when it starts or stops, not at the next renewal; a hold without it follows nothing. lamp-body does the fast loop on the lamp from `humans/hands/tracked`, so the picture and the loop never leave it. It ends with the holder's `stop` (never rated), another look (rated as motion, one in 2 s), or the lease ending, and a new holder never starts out following. A body that doesn't know `follow` refuses the hold, which ends the lease as `released`, as any refused hold does.
 - **The quiet hours:** `--quiet-hours HH:MM-HH:MM` (or `LAMP_CONTROL_QUIET`; the flag wins) is this lamp's window, 22:00-07:00 unless set, and `off` turns them off; it is read once at the start, and a bad value (a window whose ends are the same minute too) stops lamp-control there. The window is journaled at start and said in hello's `limits`. `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. A zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC.
 - **Skill push:** with `--manage-socket` (root's manage helper, `/run/lampos-skills-manage/manage.sock`), the skill ops are served and a pushed package is kept in `--state-dir`'s `push/` for the helper ("Skills pushed from a computer" below). Without it, each is refused with "skill push is not on this lamp".
 - **The certificate:** made on first start in `--state-dir` (`/var/lib/lampos-control`): P-256, valid to 2100, `cert.der` and `key.der`, the key 0600. Its pin, the certificate's SHA-256 in hex, is journaled at start and returned with every pairing code.
@@ -343,16 +370,26 @@ connection closed), `slumped` (the body gave way under load and let go). Ids are
 {"id":12,"op":"joints","lease":"l_81","targets":{"pitch":4.0,"yaw":-12.0},"within_ms":300}
 {"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}
 {"id":14,"op":"say","text":"Build passed."}
-{"id":16,"op":"play","name":"wave"}
-{"id":17,"op":"sound","name":"chime"}
+{"id":16,"op":"play","name":"sway"}
+{"id":17,"op":"sound","name":"hum"}
 {"id":15,"op":"stop"}
 ```
 
 A reply comes when the action is taken. A long one also ends with
 `{"ev":"done","re":11,"how":"finished","why":"…"}`, `how` one of
-`finished`, `cut_short`, `dropped`. Today only `say` ends with `done`:
-`finished` once it's spoken, or `dropped` with the voice's own word and why
-(`expired`, `refused: …`, `dropped: …`, or the voice not reached). `gesture`
+`finished`, `cut_short`, `dropped`. Today `say` and `look` end with `done`.
+`say`'s is `finished` once it's spoken, or `dropped` with the voice's own word
+and why (`expired`, `refused: …`, `dropped: …`, or the voice not reached).
+`look`'s is `finished` once the head is there, with `yaw` and `pitch` as
+reached and `clamped` when the body held them inside its reach; or
+`cut_short` (a conversation, the lease ending, another look, a hand or
+anything else holding the head for 5 s, `reconnected` or `released`), or
+`dropped` (the body not held, or its lease socket not reached). A look asked
+right after `lease.take`, before the door has taken the body's hold (its
+check runs every 250 ms), waits for that hold rather than being dropped; if
+`body` is let go first, it is `dropped` ("the body lease ended"), and it is
+only ever sent under the lease it was asked under, never another taken in its
+place. `gesture`
 and `move` answer `{"to":"body"}` once the body has them, and no `done`
 follows yet: the body plays or drops them by its own checks and doesn't say
 which back. An SDK's wait for them returns at the answer.
@@ -386,7 +423,7 @@ which back. An SDK's wait for them returns at the answer.
 | `lease.release` | `lease` | — | — |
 | `express` | `feeling` (a lowercase name, the `feelings` skill's), `strength` 0–1 (0.5) | `body` + `light` | — |
 | `gesture` | `name` (a built-in, not `idle` or `scanning`) | `body` | — |
-| `look` | `at`: `"face"` (+ `look`), `"name"`, `"ahead"`, or `{yaw, pitch}` in degrees (±180, ±90) | `body` | body |
+| `look` | `at`: `"face"` (+ `look`), `"hand"` (+ `look`, followed), `"name"`, `"ahead"`, or `{yaw, pitch}` in degrees (±180, ±90); `"face"` and `"name"` are refused in this release, "not in this release: look at a face or a name" | `body` | body |
 | `move` | `step_ms` 40–1,000, `frames` 2–500 of five joints (body counts from home), first and last all 0, lasting 1.5–10 s ((frames − 1) × `step_ms`), within the body's reach and speed (`lamp_body::moves::check`) | `body` | body |
 | `play` | `name` (a recorded move of the client's package) | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |

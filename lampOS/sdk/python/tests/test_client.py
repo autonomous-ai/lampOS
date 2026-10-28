@@ -259,6 +259,31 @@ def test_the_fake_answers_express_as_lamp_control_does(tmp_path):
     run(go())
 
 
+def test_the_fake_answers_look_as_lamp_control_does(tmp_path):
+    # blue's P2 and P3 on #4023: `face` and `name` refused in parts.rs's
+    # words; an angle taken by the body, its `done` with where it got to.
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                dones = []
+                lamp.on("done", dones.append)
+                async with lamp.lease("body", for_ms=5000):
+                    for at, why in [("face", "not in this release: look at a face or a name"), ("name", "not in this release: look at a face or a name")]:
+                        with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                            await lamp.look(at)
+                        assert why in raised.value.why
+                    assert (await lamp.look(yaw=-10, pitch=5))["to"] == "body"
+                    for _ in range(50):
+                        if dones:
+                            break
+                        await asyncio.sleep(0.01)
+                (done,) = dones
+                assert (done["how"], done["yaw"], done["pitch"], done["clamped"]) == ("finished", -10.0, 5.0, False)
+
+    run(go())
+
+
 def test_actions_send_the_schemas_fields_and_wait_for_done(tmp_path):
     async def go():
         async with FakeLamp() as fake:
@@ -404,7 +429,7 @@ def test_the_fake_says_done_and_lease_changes_to_whoever_they_are_for(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000) as lease:
-                    waiting = asyncio.ensure_future(lamp.play("wave", wait=True))
+                    waiting = asyncio.ensure_future(lamp.play("sway", wait=True))
                     while not fake.asked("play"):
                         await asyncio.sleep(0.01)
                     await fake.lease_event(lease.id, "suspended", "conversation")
@@ -731,13 +756,17 @@ def test_a_fake_like_lamp_control_refuses_what_it_doesnt_route(tmp_path):
         async with FakeLamp(grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
-                with pytest.raises(errors.BY_CODE["refused"]) as raised:
-                    async with lamp.lease("body", for_ms=5000):
+                # `play` is one of the lamp's own moves; any other name is bad_request.
+                async with lamp.lease("body", for_ms=5000):
+                    assert (await lamp.play("sway"))["to"] == "body"
+                    # Refused before it reaches the lamp: the schema names the six.
+                    with pytest.raises(errors.BY_CODE["bad_request"]):
                         await lamp.play("wave")
-                assert raised.value.why == "not routed yet: waits for client packages"
                 await lamp.express("glad")
                 assert (await lamp.gesture("nod"))["to"] == "body"
                 await lamp.light("warm", 3, 1_000)
+                # The hum is routed, as lamp-control's sound.
+                assert (await lamp.sound("hum"))["to"] == "voice"
 
     run(go())
 
@@ -756,6 +785,6 @@ def test_the_fake_checks_the_lease_before_the_routing_refusal(tmp_path):
                 async with lamp.lease("body", for_ms=5000):
                     with pytest.raises(errors.BY_CODE["refused"]) as raised:
                         await lamp.look("face")
-                    assert raised.value.why.startswith("not routed yet")
+                    assert raised.value.why == "the body's lease socket is not on here"
 
     run(go())

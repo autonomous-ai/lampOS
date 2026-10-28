@@ -20,9 +20,15 @@
 //! more than `skill`. With the parts' own caller check (#3720, Ten's caps)
 //! the body and the ring hold `lamp-control` to `skill` as well.
 //!
-//! Not routed yet, each refused with what it waits for: `look` and `joints`
-//! (the body's lease socket, Ten's piece 4), `play` and `sound` (a client's
-//! package, with the Store's packaging). State and events from the bus come in their own piece.
+//! - `look` at `ahead` or `{yaw, pitch}` → the body's lease socket, under
+//!   the lease the door holds for the computer (`crate::body_lease`); its
+//!   end comes later as a `done` event, with the angles the head reached.
+//!
+//! `look` at `face` and at `name` are not in this release, and refused as
+//! that. Not routed yet, each refused with what it waits for: `joints` (a
+//! goal stream on the lease socket), `play` and `sound` (a client's package,
+//! with the Store's packaging). State and events from the
+//! bus come in their own piece.
 
 use std::collections::HashMap;
 use std::io::{BufReader, Write as _};
@@ -35,7 +41,7 @@ use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority}
 use serde_json::{Value, json};
 
 use crate::feelings;
-use crate::protocol::{Error, ErrorCode, Op, Pattern, StateKind};
+use crate::protocol::{Angles, Error, ErrorCode, LookAt, LookTarget, Op, Pattern, StateKind};
 use crate::session::Parts;
 
 /// How long a `say` may wait to begin before the voice lets it go.
@@ -62,6 +68,9 @@ impl LightOut for lamp_bus::Publisher {
     }
 }
 
+/// `look` at `face` and at `name`: out of this release.
+pub const NOT_IN_THIS_RELEASE: &str = "not in this release: look at a face or a name";
+
 /// The lamp's parts, as `lamp-control` reaches them.
 pub struct Lamp {
     pub body: Option<PathBuf>,
@@ -70,6 +79,9 @@ pub struct Lamp {
     /// The boot's id, which a light request's clock names.
     pub clock_id: String,
     pub events: Events,
+    /// Where a `look` goes: the body's lease socket, through the door's
+    /// hold of it (`--lease-socket`).
+    looks: Option<crate::body_lease::Looks>,
     /// Each client's light still asked for, to give back at its `stop`.
     lights: HashMap<String, (Light, u64)>,
     /// What the bus says, for `get` (docs/control.md, "Events").
@@ -79,6 +91,10 @@ pub struct Lamp {
     /// `until_us` is read against: not the door's own, which starts with
     /// lamp-control (the Reviewer-lead's P2 on #3805).
     clock: fn() -> u64,
+    /// Whether the body follows the hand in view while the lease holds,
+    /// told to it on the lease socket (`crate::body_lease`); none without
+    /// one.
+    follow: Option<crate::body_lease::Follower>,
 }
 
 impl Lamp {
@@ -96,6 +112,7 @@ impl Lamp {
             clock_id,
             events,
             lights: HashMap::new(),
+            looks: None,
             watch: None,
             // Never blocking under the door's lock: a full mood queue is
             // the body busy, said (the Reviewer-lead's P3 on #3805).
@@ -103,12 +120,25 @@ impl Lamp {
                 .and_then(|socket| socket.set_nonblocking(true).map(|()| socket))
                 .ok(),
             clock: lamp_ipc::monotonic_us,
+            follow: None,
         }
     }
 
     /// Another clock for claims, for tests.
     pub fn with_clock(mut self, clock: fn() -> u64) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// `look` at `hand` follows it, through the body's lease socket.
+    pub fn following(mut self, follow: crate::body_lease::Follower) -> Self {
+        self.follow = Some(follow);
+        self
+    }
+
+    /// Sends a `look` to the body's lease socket through the door's hold.
+    pub fn looking(mut self, looks: crate::body_lease::Looks) -> Self {
+        self.looks = Some(looks);
         self
     }
 
@@ -204,6 +234,40 @@ impl Lamp {
         Ok(answer)
     }
 
+    fn look(&self, client: &str, re: u64, at: &LookAt) -> Result<Value, Error> {
+        // A look at `hand` starts the body following it (said on each hold);
+        // any other look ends that, said or not.
+        let hand = *at == LookAt::Target(LookTarget::Hand);
+        match &self.follow {
+            Some(follow) => *follow.lock().expect("follower") = hand.then(|| client.to_owned()),
+            None if hand => return Err(waits_for("the body's lease socket")),
+            None => {}
+        }
+        let look = match at {
+            LookAt::Target(LookTarget::Hand) => return Ok(json!({"to": "body", "follow": "hand"})),
+            LookAt::Angles(Angles { yaw, pitch }) => json!({"yaw": yaw, "pitch": pitch}),
+            LookAt::Target(LookTarget::Ahead) => json!("ahead"),
+            // Out of this release, said as that (the local leader, 29 Oct).
+            LookAt::Target(LookTarget::Face | LookTarget::Name) => {
+                return Err(Error::new(ErrorCode::Refused, NOT_IN_THIS_RELEASE));
+            }
+        };
+        let Some(looks) = &self.looks else {
+            return Err(Error::new(
+                ErrorCode::Refused,
+                "the body's lease socket is not on here",
+            ));
+        };
+        looks
+            .send(crate::body_lease::Look {
+                client: client.to_owned(),
+                re,
+                line: json!({ "look": look }).to_string(),
+            })
+            .map_err(|_| not_here("the body's lease"))?;
+        Ok(json!({"to": "body"}))
+    }
+
     fn ask_ring(
         &mut self,
         client: &str,
@@ -239,10 +303,28 @@ impl Lamp {
     }
 
     fn say(&self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
+        self.to_voice(
+            client,
+            re,
+            json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS}),
+        )
+    }
+
+    /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
+    /// no model), through the same queue, quiet, rarity and privacy gates as
+    /// a skill's sound; its outcome is a `done`, as a say's is.
+    fn sound(&self, client: &str, re: u64) -> Result<Value, Error> {
+        self.to_voice(
+            client,
+            re,
+            json!({"skill": "control", "cue": "hum", "expires_in_ms": SAY_EXPIRES_MS}),
+        )
+    }
+
+    fn to_voice(&self, client: &str, re: u64, line: Value) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
-        let line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
         let events = self.events.clone();
         let client = client.to_owned();
         // Off the door's lock, connecting included (the Reviewer-lead's P3
@@ -332,9 +414,17 @@ impl Parts for Lamp {
                 for_ms,
             } => self.light(client, colour, *level, *pattern, *for_ms),
             Op::Say { text } => self.say(client, re, text),
-            Op::Look { .. } | Op::Joints { .. } => Err(waits_for("the body's lease socket")),
+            Op::Look { at } => self.look(client, re, at),
+            Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength),
-            Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
+            // Only the hum today (protocol.rs refuses any other name).
+            Op::Sound { .. } => self.sound(client, re),
+            // The lamp's own recorded move, whole, as its skill sends it;
+            // protocol.rs refused any other name.
+            Op::Play { name } => match crate::plays::named(name) {
+                Some(file) => self.to_body(json!({ "move": file }), client),
+                None => Err(Error::new(ErrorCode::BadRequest, "no such move")),
+            },
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
     }
@@ -347,6 +437,12 @@ impl Parts for Lamp {
     }
 
     fn stop(&mut self, client: &str, _: u64) {
+        if let Some(follow) = &self.follow {
+            let mut follower = follow.lock().expect("follower");
+            if follower.as_deref() == Some(client) {
+                *follower = None;
+            }
+        }
         // The light given back now: the same light, lapsing at once.
         let now_us = (self.clock)();
         if let Some((light, until_us)) = self.lights.remove(client)
@@ -408,6 +504,20 @@ mod tests {
         let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
         assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));
         assert_eq!(sent["priority"], "skill");
+        // `play`: the lamp's own move, whole, as its skill ships it.
+        assert_eq!(
+            lamp.act("c_1", 3, &op(r#"{"id":3,"op":"play","name":"sway"}"#), 0)
+                .unwrap(),
+            json!({"to": "body"})
+        );
+        let length = body.recv(&mut buffer).unwrap();
+        let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+        let sway: Value = serde_json::from_str(crate::plays::PLAYS[3].1).unwrap();
+        assert_eq!(sent["move"], sway);
+        assert_eq!(
+            (&sent["source"], &sent["priority"]),
+            (&json!("control:c_1"), &json!("skill"))
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -621,12 +731,121 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// `look` at `hand` follows it through the lease socket's hold; any
+    /// other look, or its own client's `stop`, ends that.
+    #[test]
+    fn a_look_at_the_hand_follows_it_until_another_look_or_a_stop() {
+        let at_hand = op(r#"{"id":1,"op":"look","at":"hand"}"#);
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
+        let error = lamp.act("c_1", 1, &at_hand, 0).unwrap_err();
+        assert!(error.why.contains("lease socket"), "{}", error.why);
+        let follow = crate::body_lease::Follower::default();
+        let following = || follow.lock().unwrap().clone();
+        let mut lamp =
+            Lamp::new(None, None, None, "boot".into(), quiet()).following(follow.clone());
+        assert_eq!(
+            lamp.act("c_1", 1, &at_hand, 0).unwrap(),
+            json!({"to": "body", "follow": "hand"})
+        );
+        assert_eq!(following().as_deref(), Some("c_1"));
+        let ahead = op(r#"{"id":2,"op":"look","at":"ahead"}"#);
+        assert!(lamp.act("c_1", 2, &ahead, 0).is_err());
+        assert_eq!(following(), None, "another look ends it");
+        lamp.act("c_1", 3, &at_hand, 0).unwrap();
+        lamp.stop("c_2", 0);
+        assert_eq!(following().as_deref(), Some("c_1"), "another client's stop");
+        lamp.stop("c_1", 0);
+        assert_eq!(following(), None);
+    }
+
+    /// `look` goes to the door's hold of the body's lease, as a line the
+    /// body reads, with who asked and the request it answers.
+    #[test]
+    fn a_look_goes_on_the_bodys_lease_as_its_line() {
+        let (looks, mut looked) = tokio::sync::mpsc::unbounded_channel();
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet()).looking(looks);
+        assert_eq!(
+            lamp.act(
+                "c_1",
+                10,
+                &op(r#"{"id":10,"op":"look","at":{"yaw":-10,"pitch":5}}"#),
+                0
+            )
+            .unwrap(),
+            json!({"to": "body"})
+        );
+        let look = looked.try_recv().unwrap();
+        assert_eq!((look.client.as_str(), look.re), ("c_1", 10));
+        assert_eq!(
+            serde_json::from_str::<Value>(&look.line).unwrap(),
+            json!({"look": {"yaw": -10.0, "pitch": 5.0}})
+        );
+        lamp.act("c_1", 11, &op(r#"{"id":11,"op":"look","at":"ahead"}"#), 0)
+            .unwrap();
+        assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"ahead"}"#);
+    }
+
+    /// `sound` is the lamp's own short hum: the voice's built-in cue on the
+    /// say socket, with say's gates and outcome (in this release, #3504).
+    #[test]
+    fn a_sound_is_the_voices_own_hum_and_its_outcome_comes_as_done() {
+        let dir = dir("sound");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let mut out = &stream;
+            writeln!(out, r#"{{"event":"begun","at_us":5}}"#).unwrap();
+            writeln!(out, r#"{{"outcome":"spoken"}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        assert_eq!(
+            lamp.act("c_1", 14, &op(r#"{"id":14,"op":"sound","name":"hum"}"#), 0)
+                .unwrap(),
+            json!({"to": "voice"})
+        );
+        let asked = voice.join().unwrap();
+        assert_eq!(
+            asked,
+            json!({"skill": "control", "cue": "hum", "expires_in_ms": 30000})
+        );
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            told.lock().unwrap()[0],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 14, "how": "finished"})
+            )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn what_is_not_routed_yet_says_what_it_waits_for() {
         let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
         for (frame, waits) in [
-            (r#"{"id":1,"op":"look","at":"ahead"}"#, "lease socket"),
-            (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
+            (
+                r#"{"id":1,"op":"look","at":"ahead"}"#,
+                "lease socket is not on",
+            ),
+            (r#"{"id":1,"op":"look","at":"face"}"#, NOT_IN_THIS_RELEASE),
+            (r#"{"id":1,"op":"look","at":"name"}"#, NOT_IN_THIS_RELEASE),
+            (
+                r#"{"id":1,"op":"joints","lease":"l_1","targets":{"pitch":4.0},"within_ms":300}"#,
+                "lease socket",
+            ),
         ] {
             let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();
             assert!(error.why.contains(waits), "{frame}: {}", error.why);
