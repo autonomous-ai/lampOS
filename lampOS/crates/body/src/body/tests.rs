@@ -8001,7 +8001,7 @@ fn a_shoulder_resting_short_at_the_same_place_is_counted_once() {
     let stop = |stall: &mut Stall, goal: u16, is: Sample| {
         let mut held = (0, 0);
         for _ in 0..=STALL_STEPS {
-            if stall.step(goal, is, goal) {
+            if stall.step(goal, is, goal, None) {
                 held.0 += 1;
                 held.1 += usize::from(!stall.again);
             }
@@ -8012,23 +8012,23 @@ fn a_shoulder_resting_short_at_the_same_place_is_counted_once() {
     assert_eq!(stop(&mut stall, 2_659, rest), (1, 1));
     // A scene moves the goal 25 counts: let go, the same rest again: held,
     // so it stops pushing, but not counted.
-    assert!(stall.holding(2_684).is_none());
+    assert!(stall.holding(2_684, None).is_none());
     assert_eq!(stop(&mut stall, 2_684, rest), (1, 0));
     // It moves freely to 2,750 for 100 steps, unloaded, then stalls at the
     // old 2,629 again at a load of 500: a new stall, counted.
-    assert!(stall.holding(2_800).is_none());
+    assert!(stall.holding(2_800, None).is_none());
     let free = Sample {
         position: 2_750,
         load: 20,
         ..rest
     };
     for _ in 0..100 {
-        assert!(!stall.step(2_750, free, 2_750));
+        assert!(!stall.step(2_750, free, 2_750, None));
     }
     let pushed = Sample { load: 500, ..rest };
     assert_eq!(stop(&mut stall, 2_659, pushed), (1, 1));
     // A hand lifts it 70 counts and holds it there: counted.
-    assert!(stall.holding(2_720).is_none());
+    assert!(stall.holding(2_720, None).is_none());
     let lifted = Sample {
         position: 2_699,
         ..rest
@@ -8052,7 +8052,7 @@ fn a_standing_arm_carrying_its_own_weight_counts_no_stall_and_a_push_well_over_i
     // An hour of steps, the goal moved a little now and then as a scene does.
     for step in 0..180_000u32 {
         let goal = 2_030 + (step / 3_000 % 5) as u16 * 10;
-        assert!(!stall.step(goal, standing, goal), "step {step}");
+        assert!(!stall.step(goal, standing, goal, None), "step {step}");
     }
     // A hand holding it at a load well over what it stands with.
     let pushed = Sample {
@@ -8060,13 +8060,13 @@ fn a_standing_arm_carrying_its_own_weight_counts_no_stall_and_a_push_well_over_i
         ..standing
     };
     let counted = (0..u32::from(STALL_STEPS))
-        .filter(|_| stall.step(2_030, pushed, 2_030) && !stall.again)
+        .filter(|_| stall.step(2_030, pushed, 2_030, None) && !stall.again)
         .count();
     assert_eq!(counted, 1);
     // The head keeps 100: the same push of 112 counts there.
     let mut head = Stall::default();
     let counted = (0..u32::from(STALL_STEPS))
-        .filter(|_| head.step(2_030, standing, 2_030) && !head.again)
+        .filter(|_| head.step(2_030, standing, 2_030, None) && !head.again)
         .count();
     assert_eq!(counted, 1);
 }
@@ -14802,22 +14802,22 @@ fn a_stall_is_carried_only_away_from_where_the_joint_last_rested() {
         status: 0,
     };
     let stall_on = |stall: &mut Stall, goal: u16, is: Sample| {
-        (0..u32::from(STALL_STEPS) + 1).any(|_| stall.step(goal, is, goal))
+        (0..u32::from(STALL_STEPS) + 1).any(|_| stall.step(goal, is, goal, None))
     };
     let mut stall = Stall::default();
     // Held at 1800, then a look to 1600 that trails it by 5 and rests at
     // 1605, unpressed (inside what counts as arrived, over the jitter).
     for _ in 0..50 {
-        assert!(!stall.step(1_800, at(1_800, 30), 1_800));
+        assert!(!stall.step(1_800, at(1_800, 30), 1_800, None));
     }
     for step in 0..50u16 {
         let goal = 1_800 - (step * 4).min(200);
-        assert!(!stall.step(goal, at(goal + 5, 30), goal));
+        assert!(!stall.step(goal, at(goal + 5, 30), goal, None));
     }
     // Lifted to 2100, it comes up to 1700 and stalls there under its weight.
     for step in 0..24u16 {
         let goal = 1_600 + (step * 20).min(500);
-        assert!(!stall.step(goal, at(1_605 + step * 4, 60), goal));
+        assert!(!stall.step(goal, at(1_605 + step * 4, 60), goal, None));
     }
     assert!(stall_on(&mut stall, 2_100, at(1_700, 150)));
     assert!(!stall.carried, "{stall:?}");
@@ -14825,13 +14825,220 @@ fn a_stall_is_carried_only_away_from_where_the_joint_last_rested() {
     // it: a stop on the way is carried.
     let mut stall = Stall::default();
     for _ in 0..50 {
-        assert!(!stall.step(2_044, at(2_044, 30), 2_044));
+        assert!(!stall.step(2_044, at(2_044, 30), 2_044, None));
     }
     let mut carried = false;
     for count in 1..=14u16 {
         for _ in 0..50 {
-            carried |= stall.step(2_044, at(2_044 - count, 120), 2_044) && stall.carried;
+            carried |= stall.step(2_044, at(2_044 - count, 120), 2_044, None) && stall.carried;
         }
     }
     assert!(carried, "{stall:?}");
+}
+
+/// A gesture that lifts the head 110 counts and holds it there for 2.4 s,
+/// then brings it back, as glad's peak did on lamp-06c1 (#3691).
+static HELD_LIFT: Clip = Clip {
+    name: "held_lift",
+    step_ms: 200,
+    frames: &held(-110, 0),
+};
+/// The same, turning the base 60 counts as well.
+static HELD_LIFT_TURN: Clip = Clip {
+    name: "held_lift_turn",
+    step_ms: 200,
+    frames: &held(-110, 60),
+};
+
+/// Eased out over 0.6 s, held 2.4 s and eased back: pitch `lift`, yaw `turn`.
+const fn held(lift: i16, turn: i16) -> [[i16; 5]; 18] {
+    const SHARE: [i16; 18] = [
+        0, 36, 73, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 73, 36, 0,
+    ];
+    let mut frames = [[0i16; 5]; 18];
+    let mut index = 0;
+    while index < 18 {
+        frames[index][0] = lift * SHARE[index] / 100;
+        frames[index][2] = turn * SHARE[index] / 100;
+        index += 1;
+    }
+    frames
+}
+
+/// One step of a held-lift run: when, the pitch's goal and position, a
+/// hand said, the gesture being made.
+type LiftStep = (Duration, [u16; 3], [u16; 3], bool, Option<&'static str>);
+
+/// A standing lamp at rest under `--give-way`, whose head pitch stops 27
+/// counts short of any lift at 130 (its own weight), asked for `clip` at
+/// 10 s. `prepare` sets up the servos further.
+fn held_lift_run(
+    clip: Option<&'static Clip>,
+    prepare: impl FnOnce(&mut Lamp),
+) -> (BodyReport, Vec<LiftStep>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.heavy = Some((PITCH, 0.0, 27.0, 130));
+    prepare(&mut lamp);
+    let limits = Limits {
+        give_way: Some(GiveWay::Return),
+        ..gesture_limits()
+    };
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut asked_once = false;
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let due = !asked_once && time.get() >= Duration::from_secs(10);
+            asked_once |= due;
+            Asked {
+                gesture: due.then_some(clip).flatten(),
+                ..Asked::default()
+            }
+        },
+        |glimpse| {
+            seen.push((
+                seen_at.get(),
+                glimpse.goals,
+                glimpse.positions,
+                glimpse.hand,
+                glimpse.gesture,
+            ));
+        },
+    );
+    (report, seen)
+}
+
+/// A gesture that lifts the head and holds it there longer than the stall
+/// rule waits, on a head that stops short under its own weight (glad on
+/// lamp-06c1, #3691): the stall holds it at the peak, but the move's return
+/// frames bring it home, and the rest that follows is the pose it stands
+/// in, not where it stalled. With the hold keyed on the mood pose alone it
+/// stayed 83 counts up until the run ended.
+#[test]
+fn a_move_stalled_under_the_heads_weight_comes_home_on_its_return() {
+    let (report, seen) = held_lift_run(Some(&HELD_LIFT), |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.gestures, 1, "{report:?}");
+    assert!(report.stalls[0] >= 1, "never stalled: {report:?}");
+    assert!(seen.iter().all(|step| !step.3), "no hand was on it");
+    let pose = report.standing.expect("stood").pose[0];
+    let over = seen.iter().rfind(|step| step.4.is_some()).unwrap().0;
+    // The stall held it at its peak, well up.
+    assert!(
+        seen.iter()
+            .any(|step| step.4.is_some() && step.1[0] + 50 < pose && step.1[0] == step.2[0]),
+        "never held at its peak"
+    );
+    // From a second after the move until the lamp is told to stop, at
+    // the pose it stands in.
+    let after: Vec<_> = seen
+        .iter()
+        .filter(|step| step.0 > over + Duration::from_secs(1) && step.0 < Duration::from_secs(30))
+        .collect();
+    assert!(after.len() > 500, "{}", after.len());
+    for step in after {
+        assert!(step.1[0].abs_diff(pose) <= STOOD_JITTER, "{step:?}");
+        assert!(step.2[0].abs_diff(pose) <= STOOD_JITTER, "{step:?}");
+    }
+}
+
+/// A gentle hand on the base during the same move (the stall rule's hand,
+/// #4056): the base is given way to and said as a hand, and stays where
+/// the hand holds it through the move's return, while the head the move
+/// lifted comes home.
+#[test]
+fn a_hand_in_a_move_is_still_given_way_to_and_said() {
+    let (from, until) = (Duration::from_millis(15_500), Duration::from_secs(25));
+    let held_at = HOME[2] + 60 + 26;
+    let (report, seen) = held_lift_run(Some(&HELD_LIFT_TURN), |lamp| {
+        lamp.hand = Some((from, until, YAW, f32::from(held_at)));
+        lamp.strains = vec![(from, until, YAW, 116)];
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.eased, [0; 3], "under its bound: {report:?}");
+    assert!(report.stalls[2] >= 1, "{report:?}");
+    let hand: Vec<Duration> = seen
+        .iter()
+        .filter(|step| step.3)
+        .map(|step| step.0)
+        .collect();
+    assert!(!hand.is_empty(), "never said a hand: {report:?}");
+    assert!(hand.iter().all(|at| *at >= from), "{hand:?}");
+    let pose = report.standing.expect("stood").pose[0];
+    let over = seen.iter().rfind(|step| step.4.is_some()).unwrap().0;
+    for step in seen
+        .iter()
+        .filter(|step| step.0 > over + Duration::from_secs(1) && step.0 < until)
+    {
+        // The base is not pushed back from the hand by the return.
+        assert!(step.1[2].abs_diff(step.2[2]) <= STALL_SLACK, "{step:?}");
+        assert!(step.2[2].abs_diff(held_at) <= STALL_SLACK, "{step:?}");
+        assert!(step.2[0].abs_diff(pose) <= STOOD_JITTER, "{step:?}");
+    }
+}
+
+/// A stall with no move is held on what is wanted of the joint alone, as
+/// before: until that moves `WAKE_COUNTS`. One made in a move is held on
+/// what is wanted with the move laid over, and ends with the move; one a
+/// hand carried in a move is held as with no move.
+#[test]
+fn a_stall_in_a_move_is_held_on_the_move_and_one_without_as_before() {
+    let at = |position: u16, load: u16| Sample {
+        position,
+        load,
+        temperature: 40,
+        status: 0,
+    };
+    let stalled = |moving: Option<u16>| {
+        let mut stall = Stall::default();
+        for _ in 0..50 {
+            assert!(!stall.step(1_800, at(1_800, 30), 1_800, moving));
+        }
+        // Lifted to 1700, it stops 27 short under its weight.
+        let stopped = (0..u32::from(STALL_STEPS) + 1)
+            .any(|_| stall.step(1_700, at(1_727, 130), 1_800, moving.map(|_| 1_700)));
+        assert!(stopped, "{stall:?}");
+        assert!(!stall.carried, "{stall:?}");
+        stall
+    };
+    let wake = WAKE_COUNTS as u16;
+    // No move: held while what is wanted stays, whatever else.
+    let mut stall = stalled(None);
+    assert!(!stall.with_move);
+    for _ in 0..500 {
+        assert_eq!(stall.holding(1_800, None), Some(1_727));
+        assert_eq!(stall.holding(1_800 + wake - 1, Some(1_000)), Some(1_727));
+    }
+    assert_eq!(stall.holding(1_800 + wake, None), None);
+    // In a move: held while the move stays, let go on its return.
+    let mut stall = stalled(Some(1_700));
+    assert!(stall.with_move);
+    assert_eq!(stall.holding(1_800, Some(1_700 + wake - 1)), Some(1_727));
+    assert_eq!(stall.holding(1_800, Some(1_700 + wake)), None);
+    // And let go once it is over.
+    let mut stall = stalled(Some(1_700));
+    assert_eq!(stall.holding(1_800, Some(1_700)), Some(1_727));
+    assert_eq!(stall.holding(1_800, None), None);
+    // A hand carrying it in a move: held as with no move.
+    let mut stall = Stall::default();
+    for _ in 0..50 {
+        assert!(!stall.step(2_044, at(2_044, 30), 2_044, Some(2_044)));
+    }
+    let carried = (1..=14u16).any(|count| {
+        (0..50)
+            .any(|_| stall.step(2_044, at(2_044 - count, 120), 2_044, Some(2_104)) && stall.carried)
+    });
+    assert!(carried, "{stall:?}");
+    assert!(!stall.with_move);
+    assert!(stall.holding(2_044, Some(2_000)).is_some());
 }
