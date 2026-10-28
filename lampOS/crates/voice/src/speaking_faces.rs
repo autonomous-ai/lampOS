@@ -498,6 +498,36 @@ impl SpeakingFaces {
             && still * 2 < during.len()
     }
 
+    /// For the journal when no face was seen speaking a line: how many of
+    /// the eyes' own looks it had, how many held one face only, and of
+    /// `face`'s (the known one, `boot/f3`) how many read speaking, still or
+    /// unread. Counts only, no id or name.
+    pub fn sight_told(&self, face: Option<&str>, from: Instant, to: Instant) -> String {
+        let Ok(looks) = self.looks.lock() else {
+            return String::new();
+        };
+        let during: Vec<_> = looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= from && look.at <= to && !look.boot.is_empty())
+            .collect();
+        let own = |look: &Look, ids: &[String]| {
+            face.is_some_and(|face| ids.iter().any(|id| format!("{}/{id}", look.boot) == face))
+        };
+        let (mut one, mut yes, mut still, mut seen) = (0, 0, 0, 0);
+        for look in &during {
+            one += usize::from(look.tracked.len() == 1);
+            seen += usize::from(own(look, &look.tracked));
+            yes += usize::from(own(look, &look.speaking));
+            still += usize::from(own(look, &look.still));
+        }
+        format!(
+            "{} looks, {one} with one face; the known face in {seen}, read speaking in {yes}, still in {still}, unread in {}",
+            during.len(),
+            seen.saturating_sub(yes + still)
+        )
+    }
+
     /// Whether the person the eyes know at the lamp now (`known`, its face
     /// beside it, [`Self::known_with_boot`]) is `person`, and their face was
     /// in view at `since` ([`Self::in_view_at`]): a known face named after a
@@ -754,8 +784,23 @@ pub fn named_alone(
 /// person's, given whether it stayed `theirs` ([`not_theirs`]): the passing
 /// face ids only, never a name or the line's words. `None` when no face was
 /// seen speaking it and it stayed theirs (the switch off): nothing to tell.
-pub fn seen_speaking_note(speakers: &[String], theirs: bool) -> Option<String> {
+/// With `known_face` the known face as read for the line (`boot/f3`), or
+/// none: a face seen speaking that is that face, kept as the room's, was
+/// the known face while the eyes' known file named someone else, not
+/// another face (lamp-29e7, 28 Oct 18:54:27, request 35: the file changed
+/// just before).
+pub fn seen_speaking_note(
+    speakers: &[String],
+    theirs: bool,
+    known_face: Option<&str>,
+) -> Option<String> {
     match (speakers, theirs) {
+        ([id], false) if known_face == Some(id.as_str()) => Some(format!(
+            "seen speaking it: the known face (id {id}), but the eyes' known file named someone else when read"
+        )),
+        ([id], false) if known_face.is_none() => Some(format!(
+            "seen speaking it: a face (id {id}), with no known face read for this boot of the eyes"
+        )),
         ([], true) => None,
         ([], false) => Some("no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)".to_owned()),
         ([id], true) => Some(format!(
@@ -807,7 +852,11 @@ mod tests {
         let ids = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
         let note = |speakers: &[&str]| {
             let speakers = ids(speakers);
-            seen_speaking_note(&speakers, !not_theirs(&speakers, &lan, known(), true))
+            seen_speaking_note(
+                &speakers,
+                !not_theirs(&speakers, &lan, known(), true),
+                Some("b/f1"),
+            )
         };
         assert_eq!(
             note(&["b/f1"]).as_deref(),
@@ -826,7 +875,22 @@ mod tests {
             Some("no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)")
         );
         // Off, no face seen leaves it theirs: nothing to tell.
-        assert_eq!(seen_speaking_note(&[], true), None);
+        assert_eq!(seen_speaking_note(&[], true, None), None);
+        // lamp-29e7's request 35: the known face itself, kept as the room's
+        // because the known file named someone else as it was read; and a
+        // face with no known face read at all.
+        assert_eq!(
+            seen_speaking_note(&ids(&["b/f1"]), false, Some("b/f1")).as_deref(),
+            Some(
+                "seen speaking it: the known face (id b/f1), but the eyes' known file named someone else when read"
+            )
+        );
+        assert_eq!(
+            seen_speaking_note(&ids(&["b/f2"]), false, None).as_deref(),
+            Some(
+                "seen speaking it: a face (id b/f2), with no known face read for this boot of the eyes"
+            )
+        );
         for speakers in [&[][..], &["b/f1"], &["b/f2"], &["b/f1", "b/f2"]] {
             let note = note(speakers).unwrap_or_default();
             assert!(!note.contains(name) && !note.contains(&lan), "{note}");
@@ -940,6 +1004,27 @@ mod tests {
         // Nobody in view at all.
         let (eyes, from, to) = seen(&[&[][..]; 4]);
         assert!(!eyes.alone_in_view("b/f1", from, to));
+    }
+
+    /// lamp-29e7 (28 Oct 18:48): 18 of 20 lines read with no face
+    /// speaking, and the journal could not say why. Counts only: looks,
+    /// looks with one face, and the known face's reads.
+    #[test]
+    fn the_sight_of_a_line_no_face_was_seen_speaking_is_told_in_counts() {
+        let (eyes, from, to) = seen(&[
+            &[("f1", No)],
+            &[("f1", No), ("f2", Unknown)],
+            &[("f1", Unknown)],
+            &[("f1", Yes)],
+        ]);
+        assert_eq!(
+            eyes.sight_told(Some("b/f1"), from, to),
+            "4 looks, 3 with one face; the known face in 4, read speaking in 1, still in 2, unread in 1"
+        );
+        assert_eq!(
+            eyes.sight_told(None, from, to),
+            "4 looks, 3 with one face; the known face in 0, read speaking in 0, still in 0, unread in 0"
+        );
     }
 
     #[test]
