@@ -463,8 +463,77 @@ it's journaled once a computer a night. With this lamp's window `off`
 nothing is refused, even while its time isn't known. Besides that setting,
 the owner's per-client allowance, with the app's setting, will be the only
 thing that lifts it (Fourteen, Eighth and Nine on #3504). Every command and its answer is
-journaled as one line (client id and name, op, result); the app can show the
-last 100 and revoke a client, which closes its connections at once.
+journaled as one line (client id and name, op, result: "The journal"
+below); the app can show the last 100 and revoke a client, which closes its
+connections at once.
+
+## The journal
+
+`lamp-control` writes one journal line for every command and its answer,
+every lease the lamp takes back, suspends or holds again, and every event it
+sends (`crates/control/src/journal.rs`).
+
+**Command lines.** Each says:
+- the computer: its id and, when plain (letters, digits, `_` and `-`, 32
+  at most), the name it paired with. Any other name is written "a name the
+  door doesn't write", and the id alone names the computer. A plain name can
+  still name a person (a first name and `-mac`), so the journal holds what
+  the developer chose to call their computer;
+- the op, and what it asked in its harmless fields, so two requests that
+  went to the same place can be told apart:
+  - `light`: colour, level, pattern (or steady) and `for_ms`;
+  - `gesture`, `play` and `sound`: the name;
+  - `move`: how many frames, and `step_ms`;
+  - `express`: the feeling and strength;
+  - `look`: the target, or its angles;
+  - `get`: the states;
+  - `subscribe` and `unsubscribe`: the events;
+  - `lease.take`: the parts and `for_ms`, and `lease.renew` its `for_ms`;
+  - a name a computer chose is written only as a plain word (letters,
+    digits, `_` and `-`, 32 at most), otherwise as "a name the door doesn't
+    write";
+- how it ended: `ok` and where it went, or `refused` with the refusal's code
+  (never its why, which may echo what was asked), and `closing` when the
+  connection closes after it;
+- the time the door took, in ms.
+
+```
+lamp-control: c_3f9a (lab-mac): light (red, level 4, pulse, for_ms 5000): ok, to the ring, by light/request, 0.2 ms
+lamp-control: c_3f9a (lab-mac): say (28 characters, tag 3c1e07a9): ok, to the voice, by say.sock, 0.3 ms
+lamp-control: c_3f9a (lab-mac): gesture (nod): refused: no_grant, 0.0 ms
+lamp-control: c_3f9a (lab-mac): lease l_9 lost (hand)
+lamp-control: c_3f9a (lab-mac): event phrase.heard sent
+```
+
+**Where a command goes:**
+- `light` goes to the ring, by `light/request`.
+- `gesture` and `move` go to the body, by `mood.sock`.
+- `express` goes to both.
+- `say` goes to the voice, by `say.sock`.
+- `look` goes to the body, by `lease.sock`, once it is routed; until then
+  it's refused, and a refusal names no place.
+- `skill.push`, `skill.list` and `skill.remove` go to the skill helper.
+- Everything else is answered by the door itself.
+- A command before `hello` names `-`, and a frame that isn't a request is
+  "a frame it couldn't read".
+
+**Never in a line:**
+- a `say`'s words: only how many characters, and 8 hex of an HMAC-SHA-256
+  under a key `lamp-control` makes at start and never writes, so two lines
+  can be told apart while this door runs, but a guessed sentence can't be
+  checked against the journal;
+- the phrases a computer listens for or heard;
+- a pairing's code, key or proof, or a hello's signature;
+- a lease's `why`;
+- a pushed skill's bytes;
+- any other field of a command.
+
+An event's line names its kind and the computer, never its fields.
+
+**At most 10 lines a second for each computer.** Past that, its next second
+begins with one line, `c_3f9a: N more not logged`: at the computer's next
+line, or at the door's next 250 ms tick once the second is over, whichever
+comes first. So a burst followed by silence still says it.
 
 ## The SDKs
 
@@ -647,7 +716,6 @@ These pieces follow one PR each, each off by default:
 - each action routed to the part that does it, under the lamp's own user,
   with the priority stamped by `lamp-control`, never the caller's word;
 - the events from the bus;
-- the journal line per command;
 - the app's switches;
 - the SDKs (blue, `sdk/python` and `sdk/js`) and `lamp-mcp` (Eighth,
   `sdk/mcp`).
