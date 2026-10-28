@@ -80,7 +80,6 @@ LAMP_CONTROL_REFUSES = {
     "look": "the body's lease socket is not on here",
     "joints": "not routed yet: waits for a goal stream on the body's lease socket",
     "play": "not routed yet: waits for client packages",
-    "sound": "not routed yet: waits for client packages",
 }
 
 
@@ -658,8 +657,9 @@ class FakeLamp:
             if self.auto_done:
                 at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
                 await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
-        elif op == "say":
-            # As lamp-control: the voice takes it, and its `done` follows.
+        elif op in ("say", "sound"):
+            # As lamp-control: the voice takes it (a sound is its hum), and
+            # its `done` follows.
             await self._ok(ws, id_, to="voice")
             if self.auto_done:
                 await self.done(id_)
