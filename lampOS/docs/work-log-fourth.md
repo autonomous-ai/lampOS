@@ -1,3 +1,16 @@
+## 2026-10-28 12:3x ICT — #4010 landed; #3472 carry pushed and read
+
+**#4010** (#3987): Reviewer-lead's P2 (a day named elsewhere in the line put on another fact) and Reviewer-two's P2 (a past day kept as a coming one; a model `on` overwritten) are fixed in `c9605f66b`.
+- The fill now needs: no model `on`; the call's own text and the line naming the same single day; no past or repeat word; and a coming word.
+- Both readers cleared it, and own ARM64 and Clippy were green. It merged in train #4024 (lamp-voice `33ec91df6`).
+- The first builder's 4ace check: right in the same session; the after-restart ask was not judged (name missed) and is re-run this afternoon.
+- I missed Friday's 10:44 Queue takeover of #4010 and pushed the fix after it; Friday let it land. #3987's memory side (the session note's facts carry no day) is handed to Friday.
+
+**#3472:** carried onto `677c3b6ce` as `15cfb2b79`, one commit, an equal range, with today's onboarding train in 10 of its files and the text merging cleanly.
+- Mac: fmt and Clippy (Voice, Eyes, Update, Skills) clean. Voice and Eyes 4,608 passed, 2 failed: a reports test sharing state in one process and `light_call`'s timing bound, each passing alone. Readers 3+2+3/0.
+- ARM64 and every CI job green. READ-OK `15cfb2b79` from Reviewer-two and Reviewer-three, the spoken-stop composition checked.
+- Still a draft under the physical activation hold. No device action.
+
 ## 2026-10-28 10:5x ICT — #3987 cause found and PR #4010; consent carry meets #3739
 
 The session moved from Codex to Claude Code at 09:20.
