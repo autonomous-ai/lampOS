@@ -2293,7 +2293,9 @@ reading of how tired anyone is.
 **The yes:** they count only while the face-expressions yes that gates
 `humans/seems` is kept, checked at most every 2 s. When the yes is
 withdrawn, the sitting's count goes to 0 at once, and no yawn counts until
-the yes is back. A closed camera forgets the count too, as it forgets the
+the yes is back. Because of that 2 s check, a withdrawal and a new yes
+inside one 2 s window are never seen as a withdrawal, and a yawn counted in
+that window still counts (Fourteen's P3 on #3898). A closed camera forgets the count too, as it forgets the
 sitter's prints. Each look offered to the yawn thread carries
 what its frame was captured under: the permission's own hold
 (`Permit::held`, another at every close and every permission after one ran

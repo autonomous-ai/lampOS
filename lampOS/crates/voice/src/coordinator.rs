@@ -14046,9 +14046,6 @@ fn dispatch_speaker_chunk(
     Ok(first_notice.then(|| (current.owner, current.notice.evidence())))
 }
 
-/// Queue threshold before appending PCM: a start, the largest accepted prefix
-/// and what arrives while it drains. One terminal End may follow at this bound;
-/// total command capacity is 65 in standard mode or 115 in duplex mode.
 /// What follows a request's Start at once, before any of its sound: the
 /// sentence's `CountOnly` (#1803), then `Onboarding` while the walk is
 /// under way, so a `go_to_sleep` the request calls is answered not now
@@ -14091,6 +14088,9 @@ fn sleep_not_now(
                 .unwrap_or(false))
 }
 
+/// Queue threshold before appending PCM: a start, the largest accepted prefix
+/// and what arrives while it drains. One terminal End may follow at this bound;
+/// total command capacity is 65 in standard mode or 115 in duplex mode.
 const PROVIDER_QUEUE_BOUND: usize = 64;
 
 /// A longer hold accepts a longer prefix; the queue keeps the same spare
