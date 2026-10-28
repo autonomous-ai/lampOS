@@ -544,6 +544,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     let mut hearings = Hearings::new(arguments.least);
     // Whatever the switches are: a missed call shows how near it came.
     let mut under_bars = UnderBars::new(arguments.near.unwrap_or(arguments.least));
+    if let Some(line) = under_bars.off() {
+        log(&line);
+    }
     let mut counted = Counted::default();
     let (mut total_heard, mut total_steps) = (0u64, 0u64);
     let mut source = Source::default();
@@ -837,6 +840,18 @@ impl UnderBars {
             minute: None,
             not_written: 0,
         }
+    }
+
+    /// The start-up line when no run can ever be written: a `--near` at or
+    /// under [`UNDER_BARS_LEAST`] leaves nothing between the floor and the
+    /// bar (Sixth's P3 on #3947).
+    fn off(&self) -> Option<String> {
+        (self.bar <= UNDER_BARS_LEAST).then(|| {
+            format!(
+                "under its bars is off: bar={} is at or under its floor {UNDER_BARS_LEAST}",
+                self.bar
+            )
+        })
     }
 
     /// A judged score, as the name's hearings are given it.
@@ -1222,6 +1237,31 @@ mod tests {
             .into_iter()
             .zip(0..)
             .filter_map(|(score, step)| under.score(score, at(step)))
+            .collect();
+        assert!(lines.is_empty(), "{lines:?}");
+    }
+
+    /// A near bar at or under the floor leaves no run to write, and says so
+    /// once at start; any bar over it says nothing.
+    #[test]
+    fn under_its_bars_says_at_start_when_it_is_off() {
+        assert_eq!(
+            UnderBars::new(0.2).off().as_deref(),
+            Some("under its bars is off: bar=0.2 is at or under its floor 0.2")
+        );
+        assert!(UnderBars::new(0.05).off().is_some());
+        assert_eq!(UnderBars::new(0.21).off(), None);
+        assert_eq!(UnderBars::new(DEFAULT_NEAR).off(), None);
+        assert_eq!(UnderBars::new(DEFAULT_LEAST).off(), None);
+        // And it is true: a run of 0.19 under a 0.2 bar is no line.
+        let start = Instant::now();
+        let mut under = UnderBars::new(0.2);
+        let lines: Vec<String> = [0.01, 0.19, 0.19, 0.01]
+            .into_iter()
+            .zip(0..)
+            .filter_map(|(score, step)| {
+                under.score(score, start + Duration::from_millis(80 * step))
+            })
             .collect();
         assert!(lines.is_empty(), "{lines:?}");
     }
