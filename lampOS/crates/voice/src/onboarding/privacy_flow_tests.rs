@@ -578,7 +578,7 @@ fn a_storage_failure_retries_no_write_until_an_explicit_mailbox_redo() {
     let redo = ToolCall {
         id: "redo".into(),
         name: REDO.into(),
-        args: json!({}),
+        args: json!({"step": "all"}),
     };
     assert_eq!(run(&walk.file, &redo).0, json!({"ok":true}));
     let deadline = Instant::now() + Duration::from_secs(3);
@@ -606,7 +606,7 @@ fn a_consumed_redo_mailbox_batch_is_not_replayed_by_the_next_voice_cycle() {
     let redo = ToolCall {
         id: "redo".into(),
         name: REDO.into(),
-        args: json!({}),
+        args: json!({"step": "all"}),
     };
     assert_eq!(run(&first.file, &redo).0, json!({"ok":true}));
     first.drain_storage_for_test(2 * T);
