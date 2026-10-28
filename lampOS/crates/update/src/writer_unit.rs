@@ -1,8 +1,8 @@
 //! The fixed one-shot unit that refreshes the settings writer (#3689,
 //! docs/updates.md, "The writer's one-shot unit").
 //!
-//! **Unwired:** no round calls [`run`] yet, and `writer-refresh` is not a
-//! command yet. A round's sandbox may write `/etc/systemd/system` but not
+//! A round runs it to refresh, put back or prove the settings writer
+//! (crate::writer_swap). A round's sandbox may write `/etc/systemd/system` but not
 //! `/usr/local/lib/lampos`, where the fixed writer is. So a round writes
 //! [`TEXT`] as [`UNIT`] and starts it. systemd then runs the confirmed
 //! lamp-update as root under this unit's own sandbox, which may write only
