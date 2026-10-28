@@ -224,6 +224,42 @@ fn invalid_sequence_bounds_words_and_slots_are_refused() {
     assert!(parse("kind = \"core\"").is_err());
 }
 
+/// Every shipped "Say only this" line has its exact words for the second
+/// route's fallback (`onboarding::fixed_words`, lamp-52e6 28 Oct 16:42);
+/// every line asking the model to ask, wait or call has none.
+#[test]
+fn every_shipped_say_only_line_has_fixed_words_and_no_other_line_does() {
+    fn strings(value: &toml::Value, into: &mut Vec<String>) {
+        match value {
+            toml::Value::String(text) if text.starts_with('(') => into.push(text.clone()),
+            toml::Value::Table(table) => table.values().for_each(|value| strings(value, into)),
+            toml::Value::Array(items) => items.iter().for_each(|value| strings(value, into)),
+            _ => {}
+        }
+    }
+    let mut notes = Vec::new();
+    strings(&toml::from_str::<toml::Value>(SHIPPED).unwrap(), &mut notes);
+    let (mut fixed, mut led) = (0, 0);
+    for note in &notes {
+        let words = crate::onboarding::fixed_words(note);
+        if note.starts_with("(Say only this, nothing before or after it: \"") {
+            let words = words.unwrap_or_else(|| panic!("{note}"));
+            assert!(!words.contains('"') && note.contains(words), "{note}");
+            fixed += 1;
+        } else {
+            assert_eq!(words, None, "{note}");
+            led += 1;
+        }
+    }
+    assert!(fixed > 30 && led > 5, "{fixed} {led}");
+    assert_eq!(
+        crate::onboarding::fixed_words(
+            "(Say only this, nothing before or after it: \"Hi.\" Then call setup_step.)"
+        ),
+        None
+    );
+}
+
 /// The onboarding file as lamp-voice shipped it before #3769, which an
 /// older updater's `install` still writes from its own built-in copy.
 pub(crate) const BEFORE_3769: &str = include_str!("before_3769.toml");

@@ -8049,6 +8049,20 @@ async fn answer(
     let by_name = crate::attention::begins_with_the_name(&said) && !says_stop(&said);
     let words = Message::user(said.clone());
     let event_words = said.clone();
+    // One of the onboarding walk's fixed lines, written by the lamp: if its
+    // chat has not begun in time, its exact words are said as they are
+    // rather than the walk's line left unsaid (lamp-52e6, 28 Oct 16:42).
+    // Never a person's line, a reminder, a look or an add-on's quoted line.
+    let mut fixed = matches!(
+        asked,
+        Asker::Written {
+            looking: false,
+            search: false,
+            quoted: false
+        }
+    )
+    .then(|| crate::onboarding::fixed_words(&said).map(str::to_owned))
+    .flatten();
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
     // round 1.
@@ -8304,6 +8318,14 @@ async fn answer(
                                 began.elapsed().as_millis()
                             );
                             queue.push(COULD_NOT_LOOK.to_owned()).await?;
+                            return Ok(());
+                        }
+                        Err(_) if fixed.is_some() => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the onboarding line's own words are said",
+                                began.elapsed().as_millis()
+                            );
+                            queue.push(fixed.take().unwrap_or_default()).await?;
                             return Ok(());
                         }
                         Err(_) => {
