@@ -411,9 +411,9 @@ then, as privacy always is once available. Never done: the bound adds no
 evidence. A restart re-arms the wait.
 
 The runner gives the model two short sentences to say and nothing else,
-about 3-5 s spoken: "Find my privacy switch <verified location>. Turn it
-off, then back on." (`onboarding.steps.privacy` in the skill data; off =
-closed = microphones off, so the words end with the lamp hearing). The attempt is
+about 3-5 s spoken: "Find my privacy switch <verified location>. Close it,
+then open it again." (`onboarding.steps.privacy` in the skill data; closed =
+microphones off, so the words end with the lamp hearing). The attempt is
 armed as the invitation's turn begins (its words taken for that turn, the
 `onboarding_privacy_armed` row), not when the turn ends: a fresh close from
 then on counts, even while the lamp is still saying it. That close mutes the
