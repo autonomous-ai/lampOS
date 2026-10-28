@@ -21,6 +21,13 @@ ExecStart=/opt/lampOS/setup/current/lamp-setup wake
 # The release socket the voice asks on, /run/lampos-waking/release.sock; gone when it ends.
 RuntimeDirectory=lampos-waking
 RuntimeDirectoryMode=0700
+# Its sandbox (#3710): it writes only that socket and the ring's device, /dev/spidev3.0. So the whole file
+# system is read-only to it but its runtime directory, which systemd keeps writable; /dev stays as it is.
+# No home, its own /tmp, and nothing it starts gains privileges.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
 Restart=no
 StandardOutput=journal
 StandardError=journal
