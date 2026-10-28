@@ -153,6 +153,10 @@ const LIMP_LAG: u16 = 11;
 /// resting short) and under the 100 to 150 lamp-52e6's shoulder pushes with
 /// for as long as it stands, 22 to 34 counts short of its goal.
 const STALL_STEPS: u16 = 75;
+/// A head or base joint told to stop pushing is said as a hand
+/// (`body/hand`) for this many steps (half a second): long enough for the
+/// voice to read it, never so long a rest against something reads as one.
+const STALL_HAND_STEPS: u16 = 25;
 const STALL_LOAD: u16 = 100;
 /// A standing shoulder or elbow carries the arm: it counts as pushing only
 /// over the load it read once stood up plus this. On lamp-4ace the shoulder
@@ -4876,6 +4880,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // its own weight at its rest is not a hand: lamp-06c1's head read 124 to
     // 136 there, over half its 240, and said a push 8 times a second.
     let mut felt = [false; 3];
+    // Steps left that a head or base joint the stall rule just gave way
+    // under is said as a hand ([`STALL_HAND_STEPS`]).
+    let mut stalled_hand = [0u16; 3];
     // What each joint read on its last step neither held, a hand nor over
     // its bound: its own weight.
     let mut rest_load = [0u16; 3];
@@ -6363,7 +6370,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // A hand from the test input is said as a push too, so what
             // ends on a push (a skill's search, the voice's) can be run
             // from it (#2904).
-            hand: (0..3).any(|index| held[index] && felt[index]) || test_held,
+            hand: (0..3).any(|index| (held[index] && felt[index]) || stalled_hand[index] > 0)
+                || test_held,
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
             looks_dropped,
@@ -6401,7 +6409,20 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     continue;
                 }
                 let is = samples[COMMANDED[index].index()];
-                if stalls[index].step(written[index], is, wanted_of[index].round() as u16) {
+                let stopped =
+                    stalls[index].step(written[index], is, wanted_of[index].round() as u16);
+                // A gentle hand turning the head is followed by this rule
+                // alone, under the load that eases it (lamp-29e7 on 8080:
+                // the roll put 34 counts over a minute at 100 to 144, its
+                // bound 150, and no hand was ever said): giving way here is
+                // to a hand too, said for `STALL_HAND_STEPS` from the stop.
+                // Not a rest found at the same place again (`again`).
+                stalled_hand[index] = if stopped && !stalls[index].again {
+                    STALL_HAND_STEPS
+                } else {
+                    stalled_hand[index].saturating_sub(1)
+                };
+                if stopped {
                     if !stalls[index].again {
                         report.stalls[index] = report.stalls[index].saturating_add(1);
                     }
