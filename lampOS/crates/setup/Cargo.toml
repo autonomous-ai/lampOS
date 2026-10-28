@@ -46,6 +46,9 @@ webpki-roots = "1"
 # A password holding `"` written as its WPA PSK (PBKDF2-HMAC-SHA1, src/wifi.rs):
 # the ring rustls already builds.
 ring = "0.17"
+# A recovery request's key against the lamp's own, in constant time (src/serve.rs,
+# #3020), as lamp-surround's operator token.
+subtle = "2"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

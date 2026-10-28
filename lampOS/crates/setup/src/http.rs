@@ -119,6 +119,18 @@ async fn setup(State(shared): State<Arc<Shared>>, body: Bytes) -> Response {
             failure("the request is not valid JSON"),
         );
     };
+    // The recovery hotspot is open (#3020): only the owner's key moves a
+    // set-up lamp onto another network, checked before anything else.
+    let recovering = shared.status.lock().unwrap().runtime_phase == crate::recover::RECOVERING;
+    if recovering
+        && !crate::serve::recovery_key_matches(&request.llm_api_key, &shared.config.credential)
+    {
+        eprintln!("lamp-setup: recover: a request without this lamp's own key was refused");
+        return json(
+            StatusCode::FORBIDDEN,
+            failure("this lamp's own key is needed to set its Wi-Fi again"),
+        );
+    }
     let accepted = match check(&request, &shared.config) {
         Ok(accepted) => accepted,
         Err(why) => return json(StatusCode::BAD_REQUEST, failure(&why)),
