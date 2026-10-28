@@ -14546,7 +14546,7 @@ fn a_base_stuck_short_of_its_goal_still_ends_on_tracking() {
 fn a_head_joint_given_way_under_a_gentle_hand_is_said_as_a_hand() {
     let s = Duration::from_secs;
     let ran = |mood: Mood, prepare: &dyn Fn(&mut Lamp)| {
-        let (mut lamp, mut clock) = folded(s(14));
+        let (mut lamp, mut clock) = folded(s(45));
         lamp.arm_moves = true;
         lamp.overload_clears = 1;
         prepare(&mut lamp);
@@ -14581,6 +14581,28 @@ fn a_head_joint_given_way_under_a_gentle_hand_is_said_as_a_hand() {
     assert!(report.stalls[1] >= 1, "{report:?}");
     assert!(!hand.is_empty(), "never said a hand: {report:?}");
     assert!(hand.iter().all(|at| *at >= s(7)), "{hand:?}");
+    // The same push as slow as hers was over the minute, a count a second,
+    // its load 120 for two seconds then 100 (not pressed) for half of one,
+    // over and over.
+    let (report, hand) = ran(Mood::Resting, &|lamp| {
+        lamp.hands = (0..30u64)
+            .map(|second| {
+                let from = s(7 + second);
+                (from, from + s(1), ROLL, 2_044.0 - second as f32)
+            })
+            .chain(std::iter::once((s(37), s(60), ROLL, 2_044.0 - 29.0)))
+            .collect();
+        lamp.strains = (0..106u64)
+            .map(|half| {
+                let from = Duration::from_millis(7_000 + half * 500);
+                let load = if half % 5 == 4 { 100 } else { 120 };
+                (from, from + Duration::from_millis(500), ROLL, load)
+            })
+            .collect();
+    });
+    assert_eq!(report.eased, [0; 3], "under its bound: {report:?}");
+    assert!(report.stalls[1] >= 1, "{report:?}");
+    assert!(!hand.is_empty(), "a slow hand never said: {report:?}");
     // A pitch stuck 30 counts short of every goal at 120 as the lamp
     // listens and looks, never moved by anything.
     let (report, hand) = ran(Mood::Listening, &|lamp| {
