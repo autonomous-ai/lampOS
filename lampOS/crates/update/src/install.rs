@@ -3213,7 +3213,7 @@ mod tests {
         // #4074: the eyes and their helper name the product's camera by its
         // ids, no port and no node: every lamp-eyes since 20 Oct (#2190)
         // finds the one camera with the ids on any port at each open, and
-        // every channel's helper since stable 8250 (#4091) does the same.
+        // every channel's helper since stable 8250 (#4077) does the same.
         assert_eq!(usb(unit("lamp-eyes.service")), "01da:5875");
         assert!(!unit("lamp-eyes.service").contains("--device"));
         assert_eq!(usb(unit("lamp-eyes-camera@.service")), "01da:5875");
