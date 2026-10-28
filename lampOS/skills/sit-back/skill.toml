@@ -29,7 +29,7 @@ body = true
 # shorter than 20 s does not end it; one longer does, so a person shifting
 # about near the line is not nudged.
 [[trigger]]
-name = "slouch"
+name = "leaned_in"
 topic = "room/activity"
 field = "state"
 equals = "leaning_in"
@@ -48,7 +48,12 @@ equals = "at_desk"
 for = "1m"
 gap = "10s"
 rearm = "leaves"
-follows = { trigger = "slouch", within = "15m" }
+follows = { trigger = "leaned_in", within = "15m" }
+
+[[while]]                 # twelve minutes into this sitting: the warm word is for sitting back, not for
+topic = "room/activity"   # coming back (a gap over 2 minutes is a new sitting, sitting_s from 0); the
+field = "sitting_s"       # word itself can't come sooner (2 minutes' baseline, then ten leaned in)
+above = 720
 
 [[while]]                 # nobody else in view: never said in front of others
 topic = "humans/faces/tracked"
@@ -71,22 +76,33 @@ for = "5s"                # nothing heard or said for 5 s, as Welcome back waits
 from = "22:00"
 to = "08:00"
 
+# Two words in a row nobody noticed (no turn to the lamp, no move, nothing
+# heard, within a minute): it rests until the next morning, as the other
+# wellbeing nudges do. Only the word counts; the warm word after it is not a
+# nudge (`follows`).
+[rest]
+after_ignored = 2
+
 # One nudge an hour between the wellbeing skills.
 [budget]
 group = "wellbeing"
 per_hour = 1
 
 # The wellbeing skills' one function (#1685): it stops the one that came
-# last, or with all, every one.
+# last, or with all, every one. The model is told the `about` of the first
+# wellbeing skill in folder order; this one says the same as A comfort break's
+# and A meal check's, so sitting back is named whichever of the three is on.
+# With only the product's wellbeing skills before it, theirs is told, which
+# does not name sitting back; the function still stops the last nudge.
 [stop]
 tool = "wellbeing_nudges"
-about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word that it's a good moment for a short break, a word to sit back after a long while leaned in, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word that it's a good moment for a short break, a question at lunch or dinner time whether they've eaten, a word to sit back after a long while leaned in, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
 
 [ask]
 policy = "nudge"
 
 [[do]]
-on = "slouch"
+on = "leaned_in"
 body = { look_at = "face" }
 say = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health."
 

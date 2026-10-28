@@ -625,7 +625,7 @@ struct SoonerFile {
     lasting: String,
 }
 
-/// `follows = { trigger = "slouch", within = "15m" }`.
+/// `follows = { trigger = "leaned_in", within = "15m" }`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FollowsFile {
