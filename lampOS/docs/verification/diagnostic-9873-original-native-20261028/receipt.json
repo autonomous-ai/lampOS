@@ -1,0 +1,127 @@
+{
+  "head": "9873c542ff2f3ecef64ec414adcc6f383fa0b85a",
+  "authored_parent": "5b018ca5d0278f5c3655548c00c41a45ab58e9db",
+  "authored_tree": "7609685246f554ba166e4451dc2de01652e67948",
+  "child_two_owned_blobs_exact": true,
+  "parent_two_hand_blobs_include_upstream_spoken_sleep_changes": true,
+  "original_ARM": {
+    "run": 40603825772,
+    "native_watcher_session": 87139,
+    "actual_exit": 0,
+    "actual_chunk": "07517c",
+    "collection_native_session": 30148,
+    "collection_actual_exit": 0,
+    "collection_chunk": "e9841f"
+  },
+  "original_Linux_Clippy": {
+    "run": 40603825773,
+    "published_head": "9873c542ff2f3ecef64ec414adcc6f383fa0b85a",
+    "supported_watch_exit": 0,
+    "native_chunk": "b0213e",
+    "collection_native_session": 60649,
+    "collection_exit": 0,
+    "collection_chunk": "84d4f7",
+    "source_API_native_session": 45004,
+    "source_API_exit": 0,
+    "source_API_chunk": "2e8cd5",
+    "actual_checkout": "c07f43c30e5d3511d3ed47cef9ad7aac79d4d3e0",
+    "actual_tree": "b123ebd838ce6503429fe6bb9339daac76445f5f",
+    "parents": [
+      "c6520a4c02468bdba72b96040e84963de2ef6b1e",
+      "9873c542ff2f3ecef64ec414adcc6f383fa0b85a"
+    ],
+    "child_two_owned_files_exact": true,
+    "parent_three_files_exact": false,
+    "parent_hand_code_and_tests_have_upstream_spoken_sleep_additions": true,
+    "full_authored_tree_equal": false,
+    "changed_paths_from_authored_tree": 46,
+    "ARM_pending": false,
+    "artifact_downloaded": false
+  },
+  "native_runtime": {
+    "selected": 7870,
+    "PASS_unique": 7870,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "selected_unrun": 0,
+    "duplicate_identities": 0,
+    "retries": 0,
+    "summary_skips": 54,
+    "summary_skip_identities_not_invented": true,
+    "required18_PASS_once": 18,
+    "sequence_subset_once": {
+      "event": "PASS",
+      "duration": "0.018s",
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+      "raw_line": 7842
+    },
+    "upstream_spoken_sleep_control_once": {
+      "event": "PASS",
+      "duration": "0.007s",
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::a_sleep_asked_aloud_is_a_hands_sleep_but_never_during_onboarding",
+      "raw_line": 5014
+    }
+  },
+  "separate_harnesses": {
+    "doc_targets": 47,
+    "doc_PASS": 4,
+    "doc_FAIL": 0,
+    "relay_aggregate_PASS": 1,
+    "process_distinct_PASS": 13,
+    "process_FAIL": 0,
+    "not_added_to_nextest": true
+  },
+  "artifact_metadata_only": {
+    "id": 12780876070,
+    "compressed_bytes": 118808852,
+    "API_and_upload_digest": "sha256:7534e6ab4f1acf12c6ff760b9de0d964215831e7920de90505c14c0439f83198",
+    "exported_binaries_reported": 48,
+    "exported_examples_reported": 2,
+    "archive_downloaded": false,
+    "headers_independently_verified": false,
+    "pins_or_installed_bytes_claimed": false
+  },
+  "historical_failures": {
+    "old_child_ARM": 40551384357,
+    "old_child_counts": {
+      "PASS": 5097,
+      "FAIL": 1,
+      "selected_unrun": 2698
+    },
+    "old_parent_ARM": 40588908587,
+    "old_parent_counts": {
+      "PASS": 6466,
+      "FAIL": 3,
+      "selected_unrun": 1336
+    },
+    "remain_FAILED": true,
+    "cause_claimed": false
+  },
+  "host_275_result_is_separate_source_bound_evidence": true,
+  "limits": [
+    "Actual merge source differs in 46 paths from the authored child tree; whole-tree equality is not claimed.",
+    "Both child-owned source blobs match, while two inherited hand files include upstream spoken-sleep additions.",
+    "New native passes neither explain nor reclassify historical failures.",
+    "No target, canonical source, index, branch, or log worktree was changed by this audit.",
+    "No artifact download, installed-byte pins, physical acceptance, deployment, or readiness transition is claimed."
+  ],
+  "log_zip_sha256": {
+    "40603825772": "05ac5d8fb0e984a41225f101ca4807f89b289ef93a0391f7be9cf9ec3526e9e7",
+    "40603825773": "4fc4f4fcd04298857bc3e31fc069916869c11a127cea962818a60dc92dcc99a8"
+  },
+  "status": "Original ARM64 and Linux Clippy passed; no readiness transition is claimed.",
+  "actual_checkout": "c07f43c30e5d3511d3ed47cef9ad7aac79d4d3e0",
+  "actual_tree": "b123ebd838ce6503429fe6bb9339daac76445f5f",
+  "parents": [
+    "c6520a4c02468bdba72b96040e84963de2ef6b1e",
+    "9873c542ff2f3ecef64ec414adcc6f383fa0b85a"
+  ],
+  "authored_vs_actual_changed_paths": 46,
+  "private_receipt_sha256": "b341dbb256790d096303466e1baeab134bc24fff6611b85ee1c440edf1a179e3",
+  "source_API_commit_sha256": "924bc2ebfa56ef6a71e02562aedf23f99a909c1b2c2e3e562ee30b8e54072ce2",
+  "source_API_tree_sha256": "36696c439766470d93099d0c50661ae9bf94431fe2f1b84b7a6dd1305a44d82e",
+  "all_prior_failures_preserved": true
+}

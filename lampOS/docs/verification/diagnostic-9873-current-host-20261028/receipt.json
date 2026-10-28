@@ -1,0 +1,560 @@
+{
+  "head": "9873c542ff2f3ecef64ec414adcc6f383fa0b85a",
+  "parent": "5b018ca5d0278f5c3655548c00c41a45ab58e9db",
+  "tree": "7609685246f554ba166e4451dc2de01652e67948",
+  "host": "x86_64-apple-darwin",
+  "status": "Host gate passed; original new-head native gates separate.",
+  "compiler": {
+    "native_session": 87768,
+    "actual_exit": 0,
+    "chunk": "4aaf25",
+    "release_sha256": "39e4eaca550624f1c081b31a48853d5f279cf6debd6bc2db2df14c8043b53860",
+    "stages": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 14.13717047002865,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "metadata",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "metadata",
+          "--offline",
+          "--locked",
+          "--format-version=1"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 1.0734974960214458,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "1",
+          "--workspace",
+          "--all-targets",
+          "--message-format=json",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 4.898937420977745,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "workspace-build",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "build",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "1",
+          "--workspace",
+          "--message-format=json"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 1.101792583009228,
+        "owned_session_empty": true
+      }
+    ]
+  },
+  "runtime": {
+    "native_session": 5109,
+    "actual_exit": 0,
+    "chunk": "979a58",
+    "release_sha256": "094abd51e8769ad7044ecfbfbaa28c988fb060b70b9a8618dafc57ac21bc54c8",
+    "counts": {
+      "accounting_valid": true,
+      "all_selected_terminal": true,
+      "selected_cases": 275,
+      "passed_including_LEAK": 275,
+      "clean_passed": 275,
+      "passed_but_LEAK": 0,
+      "failed": 0,
+      "ignored_discovery_and_human_SKIP": 0,
+      "ignored_JSON_terminals": 0,
+      "raw_nextest_exit": 0,
+      "failed_keys": [],
+      "leaky_keys": [],
+      "timeout_case_count": 0,
+      "suite_terminal_rows_retained": 2,
+      "suite_rows_not_independent_test_counts": true,
+      "selected_unique": 275,
+      "passed_unique": 275,
+      "unrun_selected": 0,
+      "required_sequence_passed": 1,
+      "required_diagnostics_passed": 18,
+      "sequence_subset_not_added_to_total": true,
+      "repeated_selected_cases": 0,
+      "Parent_count_credit": false,
+      "old275_credit": false
+    },
+    "documentation_separate": {
+      "actual_exit": 0,
+      "rows": [
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "2",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ]
+      ],
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "separate_from_runtime": true
+    },
+    "operations": [
+      {
+        "stage": "integration-list",
+        "actual_exit": 0,
+        "elapsed_seconds": 479.2535095940111,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "integration-run",
+        "actual_exit": 0,
+        "elapsed_seconds": 17.876606122008525,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "workspace-doctests",
+        "actual_exit": 0,
+        "elapsed_seconds": 440.2933321840246,
+        "owned_session_empty": true
+      }
+    ]
+  },
+  "source_stable": true,
+  "prior_retained_metadata_unchanged": true,
+  "all_owned_sessions_groups_closed": true,
+  "failed_driver_witnesses_created": 0,
+  "original_runner_sha256": "d2512f45520f75744c2f7927b36c676d53e1354b11f4032ae1624cc9834ad8d0",
+  "unlaunched_extra_postdocs_check_variant_preserved_not_executed": true,
+  "runtime_input_guard_boundary": "before and after the whole Voice-it run; later Cargo docs boundary separate",
+  "old_275_or_Parent_credit_transferred": false,
+  "historical_failed_runs": {
+    "old_child_ARM": 40551384357,
+    "old_child_counts": {
+      "PASS": 5097,
+      "FAIL": 1,
+      "selected_unrun": 2698
+    },
+    "old_parent_ARM": 40588908587,
+    "old_parent_counts": {
+      "PASS": 6466,
+      "FAIL": 3,
+      "selected_unrun": 1336
+    },
+    "remain_FAILED": true,
+    "original_cause_claimed": false
+  },
+  "saved_evidence_sha256": {
+    "source-freeze.json": "af18692f9b27067ec24e178b03d744aa0dc5483a37cce3f19e19896fcd11657d",
+    "source-mtimes.json": "a65806b7c6f6687938aae4981380a25f59f09137d0cfe2e34718c1716ceaff08",
+    "runtime-build-inputs.json": "a020c342e779f8cef2d95ec22d4b84f08cfb4b99940a60142549ae8baabd3dd8",
+    "compiler-artifact-provenance.json": "ecf604faa1a5dffa43b621fdb6fae680d735fc2f7f17b23151d67da8b0eb2e6e",
+    "union-terminal-ledger.json": "c4f9dc5186ebb677e9a1989ef8e2ce4424ee46945e39c497d7e0c564414df46f",
+    "required18-diagnostics-terminal-ledger.json": "9feddcc3b462ebf1d355718c6caa76495b456faf44a446678aa2c32fc4384e96",
+    "required-sequence-terminal-ledger.json": "03f4cf5bcaad170a9cc51b42d3677b2c127dfd93aa6c80f6cad76695505de788",
+    "runner-selection.json": "fe1751cf4023db2609ffa242136ae13c36370e7ec6457b0f21cddb8cecfece94"
+  },
+  "limits": [
+    "Saved metadata and hashes only; no current target file was read.",
+    "275 whole Voice-it tests include 18 diagnostics and the one sequence control; these are not additive.",
+    "Four documentation tests are separate.",
+    "Operation elapsed times are host process boundaries, not hardware or acoustic latency.",
+    "No source, index, target, log worktree, or remote state was changed by this audit.",
+    "No artifact download, pins, deployment, physical acceptance, or readiness transition is claimed."
+  ]
+}

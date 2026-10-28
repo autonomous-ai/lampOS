@@ -1,0 +1,139 @@
+{
+  "boundary": "before and after the whole Voice-it run; later Cargo docs boundary separate",
+  "live_target_read_by_audit": false,
+  "rows": [
+    {
+      "name": "lamp-voice",
+      "role": "normal companion",
+      "path": "target/debug/lamp-voice",
+      "sha256": "b6b635b2460f9cc90ace850775b2f090126638b35eda2ae10e4b045f0ea87cab",
+      "size": 40823544,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice",
+      "role": "test driver",
+      "path": "target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "fdf9ff702b08102589ff986a2ba6490c4ac99b04ae412375225a4af382cdfd9f",
+      "size": 117384928,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::it",
+      "role": "test driver",
+      "path": "target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "c4c794f3f9c933f0602f4ba4296ab64eed46461c8823f5f0d50a7fc8703ad599",
+      "size": 94650468,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::release_pair",
+      "role": "test driver",
+      "path": "target/debug/deps/release_pair-92e5f959ae720155",
+      "sha256": "5d42a1db2079690335e44d7ac6da7490cfdd47ac8641cb16ad554dcde8721f60",
+      "size": 4822788,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::bin/lamp-voice",
+      "role": "test driver",
+      "path": "target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "38e712846fa22e90ae6f9ea8a98d40f7c9d2abbab6b27065efa7adbe427a301e",
+      "size": 1119920,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::example/render_line_second",
+      "role": "test driver",
+      "path": "target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "262ca84845806936da6b40b0d672f6084f26ab631273840bac087e273038d1c9",
+      "size": 1435616,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::example/stop_words_stt_replay",
+      "role": "test driver",
+      "path": "target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "4973c6b3c3da87679d70039553ae0148f780e85a144ee4c6c57204a0dd343abf",
+      "size": 2729424,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    }
+  ]
+}

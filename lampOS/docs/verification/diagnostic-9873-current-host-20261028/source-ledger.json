@@ -1,0 +1,101 @@
+{
+  "head": "9873c542ff2f3ecef64ec414adcc6f383fa0b85a",
+  "tree": "7609685246f554ba166e4451dc2de01652e67948",
+  "authored_base": "5b018ca5d0278f5c3655548c00c41a45ab58e9db",
+  "owned_path_count": 2,
+  "parent_preserved_path_count": 3,
+  "required_count": 18,
+  "rows": [
+    {
+      "path": "lampOS/crates/voice/src/hand_controls.rs",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "233a2c6f0d5a01241020031c5ebb688ef2ceea72"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "233a2c6f0d5a01241020031c5ebb688ef2ceea72"
+      },
+      "same_as_tested": true,
+      "owned_change": false,
+      "parent_owned_change": true,
+      "published_sha256": "6f7ccdebf95bc841bdc57de1d8d042e32d92fffb5b96577a9282ba5cfa510df6",
+      "whole_file_equal_prior_4cd": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "ed5029cc4dfd47eba12d017d7f6ea1687a83bd88"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "ed5029cc4dfd47eba12d017d7f6ea1687a83bd88"
+      },
+      "same_as_tested": true,
+      "owned_change": false,
+      "parent_owned_change": true,
+      "published_sha256": "c19bd7259a707d26651fa722b1266878a18c5aa952ab6830c42a334c1aa25d29",
+      "whole_file_equal_prior_4cd": true
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "a86c8e10871ac53cb79802addb177078ebc5e5be"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "a86c8e10871ac53cb79802addb177078ebc5e5be"
+      },
+      "same_as_tested": true,
+      "owned_change": true,
+      "parent_owned_change": false,
+      "published_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "whole_file_equal_prior_4cd": true
+    },
+    {
+      "path": "lampOS/docs/realtime-tests.md",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "1d529515bacbf8ac6cc7df4e41ae0a9ce0f0f013"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "1d529515bacbf8ac6cc7df4e41ae0a9ce0f0f013"
+      },
+      "same_as_tested": true,
+      "owned_change": false,
+      "parent_owned_change": true,
+      "published_sha256": "fd1ae380f4465ae866e30928d335e01eb66637b828faeaeeb70110a66b1da9b6",
+      "whole_file_equal_prior_4cd": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "published": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "89924bf63ccd3230b8021cf9a189a30ab00dc1b2"
+      },
+      "tested": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "89924bf63ccd3230b8021cf9a189a30ab00dc1b2"
+      },
+      "same_as_tested": true,
+      "owned_change": true,
+      "parent_owned_change": false,
+      "published_sha256": "daecb04228dff4bbbbd9d32014dd0392a81304eb52fa6ac54aafded1787fb21d",
+      "whole_file_equal_prior_4cd": true
+    }
+  ],
+  "sequence_is_subset_of_18": true
+}
