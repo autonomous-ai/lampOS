@@ -128,6 +128,7 @@ export function openPackage(data) {
     if (!pathOk(entry?.path)) throw bad(`${JSON.stringify(entry?.path)}: a skill's paths are at most ${MOST_DEPTH} parts of letters, digits, -, _ and ., none beginning with a dot`);
   }
   let author = null;
+  let publicKey = null;
   const signed = read.get(SIGNATURE);
   if (signed) {
     read.delete(SIGNATURE);
@@ -147,6 +148,7 @@ export function openPackage(data) {
       throw bad(`${SIGNATURE} does not match ${MANIFEST}: the package was changed after it was signed`);
     }
     author = fields.key;
+    publicKey = publicBytes.toString('base64');
   }
   const files = new Map();
   for (const entry of listed) {
@@ -157,7 +159,8 @@ export function openPackage(data) {
     read.delete(`${name}/${entry.path}`);
   }
   if (read.size) throw bad(`${[...read.keys()].sort()[0]} is in the package but not in ${MANIFEST}`);
-  return { name, version, author, files };
+  // `public`: the author's whole key, base64 of its 32 bytes (null when not signed).
+  return { name, version, author, public: publicKey, files };
 }
 
 // At most `cap` bytes from a web stream, refused at the first byte past it:
@@ -182,8 +185,16 @@ export async function readCapped(body, cap = PACKAGE_MAX) {
 // to a URL for it. https only, no redirect to another scheme, and at most
 // 1 MiB read (Fourteen's point 4 on #3504). Nothing in it is run or unpacked
 // here: `openPackage` checks it in memory.
-export async function fetchPackage(url, { redirects = 5 } = {}) {
+export async function fetchPackage(url, options = {}) {
+  return (await fetchFrom(url, options)).data;
+}
+
+// fetchPackage, and the URL the bytes came from after any redirect, so the
+// person can be shown the host (Fourteen on #3997). A URL carrying a name or
+// password is refused: nothing of the person's goes to a host.
+export async function fetchFrom(url, { redirects = 5 } = {}) {
   let at = new URL(url);
+  if (at.username || at.password) throw new LampError(`https://${at.hostname}/…: a URL with a name or password in it is refused`, { code: 'bad_request' });
   for (let hop = 0; ; hop += 1) {
     if (at.protocol !== 'https:') {
       const why = hop ? 'a redirect away from https is refused' : 'a shared skill is fetched over https only';
@@ -201,7 +212,7 @@ export async function fetchPackage(url, { redirects = 5 } = {}) {
       continue;
     }
     if (!response.ok) throw new LampError(`${at}: ${response.status}`, { code: 'bad_request' });
-    return readCapped(response.body);
+    return { data: await readCapped(response.body), url: at.toString() };
   }
 }
 

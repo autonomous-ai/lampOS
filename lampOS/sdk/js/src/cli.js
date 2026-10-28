@@ -21,12 +21,12 @@ import { fake } from './fake.js';
 import { LampError } from './errors.js';
 import { Keyring } from './keys.js';
 import { GRANTS_ASKED, asksOf, fingerprint, openPackage, pack } from './push.js';
-import { Indexes, find as findInIndexes, makeIndex, openIndex, readSource, refresh } from './indexes.js';
+import { Indexes, find as findInIndexes, hostOf, makeIndex, older, openIndex, readSource, refresh } from './indexes.js';
 import { parse as parseToml } from 'smol-toml';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, sign: { type: 'boolean' }, out: { type: 'string' }, yes: { type: 'boolean' }, 'url-base': { type: 'string' }, seq: { type: 'string' }, from: { type: 'string' } },
+  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, sign: { type: 'boolean' }, out: { type: 'string' }, yes: { type: 'boolean' }, force: { type: 'boolean' }, 'url-base': { type: 'string' }, seq: { type: 'string' }, from: { type: 'string' } },
 });
 const [command, arg, third, fourth] = positionals;
 
@@ -72,11 +72,14 @@ async function main() {
     return index(third, positionals.slice(3));
   } else if (command === 'skill' && arg === 'browse') {
     const query = (third ?? '').toLowerCase();
-    for (const listing of await refresh(new Indexes(new Keyring().folder))) {
+    const { listings, unread } = await refresh(new Indexes(new Keyring().folder));
+    for (const listing of listings) {
       for (const entry of listing.skills) {
         if (entry.name.toLowerCase().includes(query)) console.log(`${entry.name}\t${entry.version}\tsigned by key ${entry.author}\tasks ${entry.asks.join(', ') || 'nothing'}\tindex ${listing.name}`);
       }
     }
+    for (const [name, why] of unread) console.error(`index ${name} could not be read: ${why}`);
+    if (unread.length) return 1;
   } else if (command === 'skill' && arg === 'keygen') {
     const ring = new Keyring();
     const made = !ring.authorKey();
@@ -145,6 +148,8 @@ async function index(sub, rest) {
     const held = indexes.all()[listing.name];
     if (held && held.public !== listing.public) throw new LampError(`an index named ${listing.name} is kept already, by key ${held.key}: remove it first`, { code: 'refused' });
     showIndex(listing);
+    if (rest[0].includes('://')) console.log(`  from ${hostOf(rest[0])}`);
+    if (held && held.url !== rest[0]) console.log(`  index ${listing.name} is kept from ${held.url}: now from ${rest[0]}`);
     if (!values.yes && !(await ask(`Keep index ${listing.name}, and trust only key ${listing.publisher} to change it? [y/N] `))) {
       console.log('not added');
       return 1;
@@ -169,11 +174,13 @@ async function install(source, lampId) {
   // looked up in the indexes kept here and checked against its entry.
   if (!source.includes('://') && !existsSync(source) && /^[a-z0-9-]{1,64}$/.test(source)) {
     const found = await findInIndexes(new Indexes(new Keyring().folder), source, { fromIndex: values.from });
-    console.log(`from index ${found.listing.name}, published by key ${found.listing.publisher}, not the Store`);
+    console.log(`from index ${found.listing.name}, published by key ${found.listing.publisher}, not the Store; fetched from ${hostOf(found.entry.url)}`);
     data = found.data;
   } else {
     data = await readSource(source);
+    if (source.includes('://')) console.log(`fetched from ${hostOf(source)}`);
   }
+  // What the person reads comes from the package itself, never from an index's entry.
   const opened = openPackage(data);
   let asks = [];
   try {
@@ -186,12 +193,18 @@ async function install(source, lampId) {
   console.log(opened.author ? `  signed by key ${opened.author}, not the Store` : '  not signed, not the Store');
   for (const ask of asks) console.log(`  it ${GRANTS_ASKED[ask]} (${ask})`);
   if (asks.includes('camera')) console.log("  It asks for the camera's picture: the lamp keeps it off until the owner says yes in the app.");
-  if (!values.yes && !(await ask(`Put ${opened.name} on your lamp? [y/N] `))) {
-    console.log('not installed');
-    return 1;
-  }
   const lamp = await Lamp.connect(lampId);
   try {
+    // The same signer's older version is still a valid package: said first, and taken only with --force (Fourteen on #3997).
+    const kept = lamp.grants.includes('skills') ? (await lamp.skills()).find((s) => s.name === opened.name) : undefined;
+    if (kept && older(opened.version, String(kept.version)) && !values.force) {
+      console.log(`${opened.name} ${opened.version} is older than the ${kept.version} on your lamp: --force to put it back`);
+      return 1;
+    }
+    if (!values.yes && !(await ask(`Put ${opened.name} on your lamp? [y/N] `))) {
+      console.log('not installed');
+      return 1;
+    }
     const skill = await lamp.installPackage(data);
     console.log(`${skill.name} ${skill.version} installed, ${skill.on ? 'on' : 'off'}${skill.held ? `, held: ${skill.held}` : ''}`);
   } finally {
