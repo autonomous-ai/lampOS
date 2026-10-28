@@ -612,9 +612,11 @@ name begun over the prompt's last word is answered early, as a hearing is
 come back as `StepCallHeard`, so they are never a call by text. When a call's
 line began in the window and ended with its words not back yet, the try's
 judgement waits for them at most 1.5 s more (`TEXT_WAIT_US`): a "Lamp" begun
-near 6 s has its words back about a second later; once its words come back
-as more than the name, or its turn ends without them, the try waits no
-longer. Known limit: a call heard only by text starts at the line's first
+near 6 s has its words back about a second later; once its turn ends
+without `StepCallHeard` (its words were more than the name, or none), the try
+waits no longer. Only that turn's own end clears it: a finished transcript
+names no line, and an earlier line's late words would have emptied the call
+line's place (the Reviewer-lead on #4006). Known limit: a call heard only by text starts at the line's first
 speech block, so a breath or a sound just before "Lamp" moves its rise
 window earlier, and the call's loudest moment may fall past it. Tests:
 `lamp_near_call::tests::a_line_heard_as_the_name_alone_counts_with_its_rise`,
@@ -686,7 +688,17 @@ model and nothing of an answer is played, on Gemini Live and on the second
 route (`LAMP_VOICE_ROUTE=second`) alike, since both are the coordinator's
 `rig.provider`. Its record says `onboarding_near_call` (the endpoint's field
 and the turn's outcome), not `not_speech`, so it is not counted as a short
-sound. Outside the window, and with no near-call try open, nothing changes;
+sound. On the second route a line told as the step's call (`StepCall`, below) is
+not held (#3923): the route never answers the name alone, and its End must
+go on for its words to come back as the step's call by text. On c0a4 (head
+9d4d3e0d9) each call began about 0.8 s after its prompt and lamp-name heard
+something of it, so it was held and dropped at its End: the route logged
+no words for it ("speech to text kept ready" and nothing at the line's
+end); a "Hey Lamp" after such a line (request 7) was answered, likely with
+the held line's kept sound going on into it. On Gemini Live the hold
+stands. Test:
+`coordinator::tests::second_route::a_call_begun_after_the_prompt_and_heard_by_the_detector_still_reaches_the_step_by_text`.
+Outside the window, and with no near-call try open, nothing changes;
 Stop, mute and physical privacy are not touched. Tests:
 `coordinator::tests::second_route::a_call_in_the_near_call_window_is_not_answered_on_either_route`,
 `coordinator::tests::second_route::a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window`,
