@@ -350,6 +350,18 @@ impl Remote for Github {
     fn upload(&mut self, tag: &str, name: &str, bytes: &[u8]) -> Result<()> {
         Self::upload_file(tag, name, bytes, None)
     }
+    fn delete(&mut self, id: u64) -> Result<()> {
+        command(
+            &words(&[
+                "api",
+                "--method",
+                "DELETE",
+                &format!("repos/{REPO}/releases/assets/{id}"),
+            ]),
+            Output::Bytes(MAX_JSON),
+        )?;
+        Ok(())
+    }
     fn rename(&mut self, id: u64, name: &str) -> Result<Asset> {
         self.json(&words(&[
             "api",

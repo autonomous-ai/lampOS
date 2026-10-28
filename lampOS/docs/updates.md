@@ -454,8 +454,10 @@ a later sequence, are always kept) and the stages left by older sequences,
 oldest first and 250 at most a run (`MOST_PRUNED`). It never deletes the
 head, deletes nothing after a failed or put-back switch, and a cleanup that
 fails is said in the log, leaving the build published and the rest for the
-next run. Not done yet: the stable feed's release (`lampos-stable`) gains
-backups the same way at its slower pace of a few promotes a day.
+next run. The promote tool does the same on the stable feed's release
+(`lampos-stable`) after a verified promotion
+(`lampos-promote::KEEP_BACKUPS`, `MOST_PRUNED`), at its slower pace of a few
+promotes a day.
 
 **GitHub's 5xx and a re-run (#4103).** On 28 Oct GitHub answered 504 three
 times in this job and in a promotion, each after the release was already
