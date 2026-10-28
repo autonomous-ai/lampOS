@@ -1064,6 +1064,33 @@ fn a_computers_answer_is_kept_for_each_engine_unless_it_refused() {
     assert_eq!(engines_asked(&rig), 5);
 }
 
+/// Devin Cloud isn't one of Harness's engines (`--engine devin-cloud` is a
+/// usage error there), so its hand-over asks nothing (Ten's P3 on #4033).
+#[test]
+fn a_devin_cloud_hand_over_asks_the_computer_nothing() {
+    let mut rig = Rig::new();
+    rig.config.engines_ready = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "engines":engines_row(json!({"signedIn":false})),
+        "new":step(json!({"ok":true,"machineId":MACHINE,"agent":{
+            "id":CLOUD,"name":"lamp-task-001","engine":"devin-cloud",
+            "permissionMode":null,"bypassPermission":null,"location":"cloud",
+            "cloud":{"place":"Devin's cloud","state":"starting"}}}))
+    }));
+    let mut cloud = launch();
+    cloud.target.engine = EngineKind::DevinCloud;
+    cloud.target.project = String::new();
+    assert_eq!(
+        rig.cli().launch(&cloud),
+        LaunchOutcome::Created {
+            agent_id: CLOUD.into()
+        }
+    );
+    assert_eq!(engines_asked(&rig), 0);
+    assert_eq!(news(&rig), 1);
+}
+
 /// A computer slow to answer costs the hand-over at most the read bound
 /// (`ENGINES_PROBE_TIMEOUT`, here the test's shorter one), and the work
 /// still goes; its no-answer is kept, so the next hand-over waits for
