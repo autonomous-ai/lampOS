@@ -1,0 +1,493 @@
+{
+  "comments_scope": {
+    "PR_comments_available": 41,
+    "Queue_request": 6456113203,
+    "all_later_comments_read_ids": [
+      6452142836,
+      6455361916,
+      6455722591,
+      6455844201,
+      6456082736,
+      6456112797,
+      6456179372,
+      6456388735
+    ],
+    "prior_Third_post": 6450397983,
+    "prior_d168_review_and_12_local_controls_retained": true,
+    "review_comments": 0,
+    "reviews": 0
+  },
+  "f441_whole_runtime_not_equal": true,
+  "inherited_felt_None_additions_vs_f441": 2,
+  "limits": [
+    "No local tests, compiler, bank, code edits, artifact access, device or public posts.",
+    "New Body debug-only control is not credited by release native7856 or prior Third12; its own qualification remains separate.",
+    "47 published source/input rows independently verified; unpublished private94-record CI metadata census not independently audited.",
+    "Old failed Mood/Journal observations and unknown causes remain unchanged; no physical latency acceptance."
+  ],
+  "live_PR_source_identity": {
+    "API_baseRefOid_is_authored_parent": false,
+    "API_baseRefOid_snapshot": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+    "actual_authored_parent_from_Git_and_commit_API": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+    "actual_authored_parent_tree": "4d4416e974636ef6e69c2d34cc95b817321d9dce",
+    "head": "6a40ceed7c8d38f80eaab65ca56f297bf9496c39",
+    "merge_base_with_API_target_snapshot_from_Git": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+    "moving_target_branch": "lamp-voice",
+    "no_runtime_or_latest_base_inference": true
+  },
+  "live_head_at_read": "6a40ceed7c8d38f80eaab65ca56f297bf9496c39",
+  "original29f_native_evidence": {
+    "Doc3_once_inside_native_scope": true,
+    "Expression341_matches_host_case_names": true,
+    "actual_parents": [
+      "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+      "29f30f8dc444546b3915dd6cebd815f2ca67191a"
+    ],
+    "actual_preview": "a109b8ecfb6e254b48ac49fcbef552a0abd9c519",
+    "actual_tree": "2fc5101c30dabb8f12ca5650bcd61436cd6095d6",
+    "aggregate_skips": 54,
+    "authored_to_actual_delta": [
+      "M\tlampOS/tools/played/README.md",
+      "M\tlampOS/tools/played/make-skill-test.sh",
+      "M\tlampOS/tools/played/make-skill.sh",
+      "M\tlampOS/tools/played/stand-in.sh"
+    ],
+    "authored_tree": "56225a6a1248aca155f53711b7a2caee751a4051",
+    "bad": 0,
+    "commit": "1b6e0180dc68fe249e445fe69ed40aab798a6e26",
+    "excluded_exact_reprints": 34,
+    "manifests_verified": {
+      "entries_verified": 6,
+      "manifest_sha256": "81c3fc5c92536b5aa5cfaaa7444cf8b3dd37f10b32323eea81e82d2bb7b42928"
+    },
+    "raw_log_checkouts": {
+      "ARM64": "a109b8ecfb6e254b48ac49fcbef552a0abd9c519",
+      "Linux-clippy": "a109b8ecfb6e254b48ac49fcbef552a0abd9c519"
+    },
+    "required2_once": true,
+    "retry_markers": 0,
+    "selected_unrun": 0,
+    "unique_primary_PASS": 7856,
+    "whole_tree_equal_authored": false
+  },
+  "owned_files_modes_blobs": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "29f30f8dc444546b3915dd6cebd815f2ca67191a": "100644 blob 4e1eb67ce0fd0bff90ffb80b1c8352126ef9f422\tlampOS/crates/expression/tests/runtime.rs",
+      "6a40ceed7c8d38f80eaab65ca56f297bf9496c39": "100644 blob 4e1eb67ce0fd0bff90ffb80b1c8352126ef9f422\tlampOS/crates/expression/tests/runtime.rs",
+      "a109b8ecfb6e254b48ac49fcbef552a0abd9c519": "100644 blob 4e1eb67ce0fd0bff90ffb80b1c8352126ef9f422\tlampOS/crates/expression/tests/runtime.rs",
+      "d168fa939905531a3257f80a335a69dcfd528027": "100644 blob 4e1eb67ce0fd0bff90ffb80b1c8352126ef9f422\tlampOS/crates/expression/tests/runtime.rs"
+    },
+    "lampOS/docs/expression.md": {
+      "29f30f8dc444546b3915dd6cebd815f2ca67191a": "100644 blob 45c62eb8b678e522dd6c92e23e7940832ba31b05\tlampOS/docs/expression.md",
+      "6a40ceed7c8d38f80eaab65ca56f297bf9496c39": "100644 blob 45c62eb8b678e522dd6c92e23e7940832ba31b05\tlampOS/docs/expression.md",
+      "a109b8ecfb6e254b48ac49fcbef552a0abd9c519": "100644 blob 45c62eb8b678e522dd6c92e23e7940832ba31b05\tlampOS/docs/expression.md",
+      "d168fa939905531a3257f80a335a69dcfd528027": "100644 blob 45c62eb8b678e522dd6c92e23e7940832ba31b05\tlampOS/docs/expression.md"
+    }
+  },
+  "owned_full_files_preimages_and_literal_payload_equal_d168_29f_6a40": true,
+  "parents": {
+    "29f30f8dc444546b3915dd6cebd815f2ca67191a": [
+      "2b73dd03073947c62b3d10593f293aa9ab954410"
+    ],
+    "6a40ceed7c8d38f80eaab65ca56f297bf9496c39": [
+      "c0ae5afa8376b6282eef1b6bacbe516d924c654b"
+    ],
+    "a109b8ecfb6e254b48ac49fcbef552a0abd9c519": [
+      "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+      "29f30f8dc444546b3915dd6cebd815f2ca67191a"
+    ],
+    "d168fa939905531a3257f80a335a69dcfd528027": [
+      "3aa752f73914d0f29fc90edb010a3a7fa1cf526b"
+    ]
+  },
+  "payload_sha256": "0f6e2eac8712d23bb3f057a34db4b03424d194b5aff0a9511e8c0e163c32f889",
+  "producer_evidence": {
+    "Doc3_exact_raw_PASS": {
+      "doc-ci-paths": [
+        "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+        "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths"
+      ],
+      "doc-install": [
+        "every_part_of_the_lamp_waits_for_setups_marker_itself"
+      ]
+    },
+    "Expression_total": 341,
+    "commit": "65e2a782d6e8f8e14aa99c66a1c34609c474095b",
+    "host_driver_raw_PASS_counts": {
+      "bin": 4,
+      "it": 281,
+      "lib": 28,
+      "runtime": 28
+    },
+    "manifests_verified": {
+      "entries_verified": 12,
+      "manifest_sha256": "596d3b5e47bd12d66c3b47100ed5db532d4f0034932ee4a5cc443b8a11ff3327"
+    },
+    "no_new_host_test_run": true,
+    "prior_prefix_resource_controller_remains_failed": true,
+    "required2_once": [
+      "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+    ],
+    "zero_case_docs": true
+  },
+  "requested_head": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+  "review_disposition": {
+    "P1": [],
+    "P2": [],
+    "d168_12_host_controls_remain_historical": true,
+    "draft_train_latest_base_disposition": "First policy and Root spotcheck, not a moving-tip source HOLD.",
+    "proposed_READ_OK_head": "6a40ceed7c8d38f80eaab65ca56f297bf9496c39",
+    "scope": "Exact live-head SOURCE CARRY ONLY, with independently checked29f producer/native receipts remaining source-bound. No6a40 execution qualification or train-ready disposition."
+  },
+  "schema": "third-mood-source-carry-29f-and-live6a40-v1",
+  "source_carry": {
+    "29f_to_live_delta": [
+      "M\t.github/workflows/lampos-sdk.yml",
+      "M\tlampOS/sdk/python/README.md",
+      "M\tlampOS/sdk/python/src/lampos/skillcheck.py",
+      "M\tlampOS/sdk/python/tests/test_skillcheck.py",
+      "M\tlampOS/tools/played/README.md",
+      "M\tlampOS/tools/played/make-skill-test.sh",
+      "M\tlampOS/tools/played/make-skill.sh",
+      "M\tlampOS/tools/played/stand-in.sh"
+    ],
+    "47_selected_input_rows_equal_29f_native_live": [
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 05ebfb6628f0caec9b5a4d462f183aa5d617b982\t.github/scripts/lampos-pr-crates.py",
+        "path": ".github/scripts/lampos-pr-crates.py",
+        "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob c1a4b4479b284e52f3ff37701cd55734783040b3\t.github/workflows/lampos-arm64.yml",
+        "path": ".github/workflows/lampos-arm64.yml",
+        "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 04d2b49b5065c00f567e91ce271e2ba04669bb16\t.github/workflows/lampos-clippy.yml",
+        "path": ".github/workflows/lampos-clippy.yml",
+        "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+        "path": "lampOS/.cargo/config.toml",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169\tlampOS/.config/nextest.toml",
+        "path": "lampOS/.config/nextest.toml",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      },
+      {
+        "d168_equal": false,
+        "entry": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9\tlampOS/Cargo.lock",
+        "path": "lampOS/Cargo.lock",
+        "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+        "path": "lampOS/Cargo.toml",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 9f180e0e1f52e1c8dad3bcd915d97026acb805e1\tlampOS/crates/expression/Cargo.toml",
+        "path": "lampOS/crates/expression/Cargo.toml",
+        "sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob b7a9435554fe0a69f9f61631ddab29a932503d38\tlampOS/crates/expression/examples/recent_playout_cost.rs",
+        "path": "lampOS/crates/expression/examples/recent_playout_cost.rs",
+        "sha256": "b90ecd01284b0ba8be2aebb0fccf1fca2b43fd216e9dedf8c89b63d338c98bd3"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob f1fa4f24bdb05ef1b3fea054f20498553ffd7ab1\tlampOS/crates/expression/examples/replay_cost.rs",
+        "path": "lampOS/crates/expression/examples/replay_cost.rs",
+        "sha256": "13cabe07608834d2e26d01a3fe92942cb78e7d9baa6389d5d4986f894b5c551f"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 25fb87c4e21d05a25fbc2a2fe65d5207ea1736b3\tlampOS/crates/expression/examples/rest_cost.rs",
+        "path": "lampOS/crates/expression/examples/rest_cost.rs",
+        "sha256": "78635deca8f50acb2bfe80691813957c3cfb967c08a6bb2b88fda8dd2837ca29"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 348a9bda82239825f2baa937d08fb8a05d6c9f3a\tlampOS/crates/expression/src/alive.rs",
+        "path": "lampOS/crates/expression/src/alive.rs",
+        "sha256": "411bd581f5226289d41d43f152e811dd5fd3c75999d6e9c2c3d7d6258b70be84"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 375b99b93edffcf4a7c73629a4811e71df779992\tlampOS/crates/expression/src/catalogue.rs",
+        "path": "lampOS/crates/expression/src/catalogue.rs",
+        "sha256": "f3aab49e4090f43affef9f857646fcca1fa64edbb39c9538011f4471b93d42ab"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 61b207e7fac0ccdd1032b294d64694f997c1b402\tlampOS/crates/expression/src/engine.rs",
+        "path": "lampOS/crates/expression/src/engine.rs",
+        "sha256": "130290ecf60a64b30bc4bd5f190485debcf22b75228c785e4d2ecd0643e3f458"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob c989f26013e989e16bc4df4d0cd3febe60528cb6\tlampOS/crates/expression/src/lib.rs",
+        "path": "lampOS/crates/expression/src/lib.rs",
+        "sha256": "863fbef6e93f0bceb5724f5f4d91a911589c2bf2e32c12a0872938a10988f614"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob a3e18e7a1c9786e0cb9447e10927898db506aa1f\tlampOS/crates/expression/src/local_time.rs",
+        "path": "lampOS/crates/expression/src/local_time.rs",
+        "sha256": "7d24d58f2a61db0bcf8bffea09777d6a525c83fe9fc1d9efcc80426c45609663"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 7d6887e592bf26ca43f537fe05bfd5aaa9f300e8\tlampOS/crates/expression/src/main.rs",
+        "path": "lampOS/crates/expression/src/main.rs",
+        "sha256": "c9795e4b997111045241366b8da0dcbe913b66f83e3801d41c0f4d8ad99e1537"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob b8d5b8e42571513e08762ca4cee85dedc33876cf\tlampOS/crates/expression/src/replay.rs",
+        "path": "lampOS/crates/expression/src/replay.rs",
+        "sha256": "4b705a0ccc23a42be9e0714602c861d3c9fa5a9123a24ccceba3abbcd070646f"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob e788cdb890c472224b3e8ff6d847f31f634196dc\tlampOS/crates/expression/src/rest.rs",
+        "path": "lampOS/crates/expression/src/rest.rs",
+        "sha256": "c0db3b6c42b79d329aaf019d3a778ee43faf1359c038aa48b896e1033631c587"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 5d3c147791b0413f0f0ea8a2aa0c42c5c2e4e205\tlampOS/crates/expression/src/runtime.rs",
+        "path": "lampOS/crates/expression/src/runtime.rs",
+        "sha256": "ecc10ed90806472967453dde30ebca572ecde0ac9dc54780dd18b0bc3e284a99"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 504d533261b208c4a95f1fca437c9ee0fb72c289\tlampOS/crates/expression/src/speaking.rs",
+        "path": "lampOS/crates/expression/src/speaking.rs",
+        "sha256": "36f1a722c4a94dfa04359b4ab58313be24ef607b5eef85f5956321677b224938"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob fea10ef4abbb5a276257fa6dc6d8d2b39c2b7851\tlampOS/crates/expression/src/startle.rs",
+        "path": "lampOS/crates/expression/src/startle.rs",
+        "sha256": "2a9b4d4a9ddf9ff06d9f95aa0f1e240588f5992869fe916a08f0b4c11f627b07"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob a497d6abdb4505f818684a23fd5fb4b73586a169\tlampOS/crates/expression/src/unplug.rs",
+        "path": "lampOS/crates/expression/src/unplug.rs",
+        "sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob e77ba1f0e57206b7c2a6c6b965730dc0140c4eea\tlampOS/crates/expression/tests/it/alive_engine.rs",
+        "path": "lampOS/crates/expression/tests/it/alive_engine.rs",
+        "sha256": "2d35197caa451a9e06f8cfdb585e7ee2cdf89e67aec9baabfc1b349f6a31eabb"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 5c26f789c245f0a1dbb7b5f52a52f0ff0852b3e3\tlampOS/crates/expression/tests/it/alive_replay.rs",
+        "path": "lampOS/crates/expression/tests/it/alive_replay.rs",
+        "sha256": "d024e40bf13313cfb137a4a784fa672e4a220c7a1a83a32d8cddd821d86d91d0"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 201a0fff65af40b3d1949a6279491b3ee9d8ad9d\tlampOS/crates/expression/tests/it/catalogue_playout.rs",
+        "path": "lampOS/crates/expression/tests/it/catalogue_playout.rs",
+        "sha256": "71b4526b4f254967ec8eb62a385dc51ecf902feae7a53322b040b500fbfe1d3c"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 73ed1416e74ea3e079774f7fa2a87e05c4895853\tlampOS/crates/expression/tests/it/catalogue_rest.rs",
+        "path": "lampOS/crates/expression/tests/it/catalogue_rest.rs",
+        "sha256": "a092aa5ded2963e669f08dac1023e027354269fd6439520b3ac998123fbaeaca"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 662df7dcb9ce85a727388d023a720676eec20896\tlampOS/crates/expression/tests/it/engine.rs",
+        "path": "lampOS/crates/expression/tests/it/engine.rs",
+        "sha256": "23502e3c01275c0e8d8954b339b02b5032211de76766b6537bd6a6315b0f80eb"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 95a6206f4d1a089a9bdacbf1e957842c57f834b1\tlampOS/crates/expression/tests/it/forward.rs",
+        "path": "lampOS/crates/expression/tests/it/forward.rs",
+        "sha256": "4035afc8e49190f023585f0aabc49f63291b12c1ddc9e44fc2b03f781056e3f4"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob a1ed2b78d2e165c774d7797294aa5246d8fe430d\tlampOS/crates/expression/tests/it/local_time.rs",
+        "path": "lampOS/crates/expression/tests/it/local_time.rs",
+        "sha256": "cd3bd113b60d1a5edafaf0d0bc39dc89c5a4dee973aa92e4d92c61daef7b97e2"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 9481dff035649bfab549126a82a98cf1314c71fb\tlampOS/crates/expression/tests/it/main.rs",
+        "path": "lampOS/crates/expression/tests/it/main.rs",
+        "sha256": "bdc1773a832be94688cae180361d99946dad6ed8d5f4b7e8a30455a8406d3e7f"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 32b413b364edb3a727951475968d0b33a75ec1ee\tlampOS/crates/expression/tests/it/program.rs",
+        "path": "lampOS/crates/expression/tests/it/program.rs",
+        "sha256": "610170b349b44813b2ecf2083493c759e43bacc33461fec982d1ea5d08009a78"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 5381a1ab0f636b11fa1d9d5a3eba8cc40194b3d5\tlampOS/crates/expression/tests/it/recent_playout.rs",
+        "path": "lampOS/crates/expression/tests/it/recent_playout.rs",
+        "sha256": "52c4803bac0d113c3f16978576651f84b086e387fd645542bf0f64a7853bfc99"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 67acd66ef12af17a87d23482c4bde173c5603a86\tlampOS/crates/expression/tests/it/recent_playout_replay.rs",
+        "path": "lampOS/crates/expression/tests/it/recent_playout_replay.rs",
+        "sha256": "98f0adca8ac814be6c59af5b277020a4fd0bf875a3f6721b2bf6eb8ce8b3a530"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 19d058d3a764f9eabd57b8727977083690244b07\tlampOS/crates/expression/tests/it/recent_playout_runtime.rs",
+        "path": "lampOS/crates/expression/tests/it/recent_playout_runtime.rs",
+        "sha256": "80910fc320c3d42040d7b4753a868e60763d61eb969aa47816e91463685ebac2"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob ebbe3d89ade386951f701816283df54a20a0b4c3\tlampOS/crates/expression/tests/it/replay.rs",
+        "path": "lampOS/crates/expression/tests/it/replay.rs",
+        "sha256": "7e7db38ebf628e1d38bda40e822ec912cf45d2446675510234bb0bf361c3acd3"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob d24c5b5610a6c9a7c5b3074db6feb5e4c5b66c42\tlampOS/crates/expression/tests/it/rest_engine.rs",
+        "path": "lampOS/crates/expression/tests/it/rest_engine.rs",
+        "sha256": "767f1ee7b73ad1f005af1839a5aa2206fdf6257a83a65003b9f0215bd777618e"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob bd18ee2f7ea20355d4006a62274f9d3753119e93\tlampOS/crates/expression/tests/it/rest_replay.rs",
+        "path": "lampOS/crates/expression/tests/it/rest_replay.rs",
+        "sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 505b07a5a427f177a1d9421812f70369a6725e4e\tlampOS/crates/expression/tests/it/rest_requests.rs",
+        "path": "lampOS/crates/expression/tests/it/rest_requests.rs",
+        "sha256": "de88407d77189a0bc90ba1ba0c402d897eb1615e16b31bee31aaeb498b7305cb"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 483b0b458d81f5cd53c906d05d40cd2115b60428\tlampOS/crates/expression/tests/it/speaking_engine.rs",
+        "path": "lampOS/crates/expression/tests/it/speaking_engine.rs",
+        "sha256": "57b9836642025cc9899f05e7b66ce3accd1c3574c7f7dc5e14655930ce2e65c6"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 008cb67a5878c137102e01bb1a9e457a1099a411\tlampOS/crates/expression/tests/it/sudden_engine.rs",
+        "path": "lampOS/crates/expression/tests/it/sudden_engine.rs",
+        "sha256": "d62bc622cfa679b12c074c61484bdb6bb7a686a89e5afbea249eaff5ed08c85f"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 4e1eb67ce0fd0bff90ffb80b1c8352126ef9f422\tlampOS/crates/expression/tests/runtime.rs",
+        "path": "lampOS/crates/expression/tests/runtime.rs",
+        "sha256": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+        "path": "lampOS/crates/voice/src/service_trace.rs",
+        "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 2b3ea62843a2f8534d4c8a6532ddf167805ab227\tlampOS/crates/voice/src/session_reader/tests.rs",
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob 45c62eb8b678e522dd6c92e23e7940832ba31b05\tlampOS/docs/expression.md",
+        "path": "lampOS/docs/expression.md",
+        "sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c"
+      },
+      {
+        "d168_equal": false,
+        "entry": "100644 blob 1ded79654d818eb44a919571dcbf793aaa7c9e82\tlampOS/docs/install.md",
+        "path": "lampOS/docs/install.md",
+        "sha256": "fe7e224611d50e7a0a9bf57efef90fec9bb1b4d282f7fcd5c0899e5d6898ab84"
+      },
+      {
+        "d168_equal": true,
+        "entry": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+        "path": "lampOS/rust-toolchain.toml",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      }
+    ],
+    "Cargo_lock_change": "Only lamp-control adds existing lamp-local-time dependency; no external package/version delta.",
+    "Cargo_lock_only_dependency_edge_delta": {
+      "added": [
+        "lamp-local-time"
+      ],
+      "package": "lamp-control",
+      "removed": []
+    },
+    "Cargo_lock_parsed_package_versions_sources_checksums_equal": true,
+    "Expression_and_msg_source_diff_empty": true,
+    "all_transitive_inputs_or_private94_record_census_claimed": false,
+    "body_lease_change_scope": "New closed six LOST_WHYS constant, debug-only Said::lost assertion and tests; Expression uses unchanged lamp_body::pause_in, no Expression lease callsites. Body measure binary changes are not Expression dependency binary inputs.",
+    "conservative_local_path_dependency_closure": {
+      "lampOS/crates/body/Cargo.toml": "lamp-body",
+      "lampOS/crates/bus/Cargo.toml": "lamp-bus",
+      "lampOS/crates/expression/Cargo.toml": "lamp-expression",
+      "lampOS/crates/ipc/Cargo.toml": "lamp-ipc",
+      "lampOS/crates/keeper/Cargo.toml": "lamp-keeper",
+      "lampOS/crates/lean/Cargo.toml": "lamp-lean",
+      "lampOS/crates/local-time/Cargo.toml": "lamp-local-time",
+      "lampOS/crates/msgs/Cargo.toml": "lamp-msgs",
+      "lampOS/crates/turn-owner/Cargo.toml": "lamp-turn-owner",
+      "lampOS/crates/update/Cargo.toml": "lamp-update"
+    },
+    "control_lease_changes": "New control body_lease bridge and protocol/session changes exist upstream but lamp-control is outside the conservative Expression local path dependency closure. No Mood policy edit inferred.",
+    "d168_to_29f_changed_within47": [
+      "lampOS/Cargo.lock",
+      "lampOS/docs/install.md"
+    ],
+    "d168_to_29f_changes_within_local_dependency_packages": [
+      "M\tlampOS/crates/body/src/bin/lamp-body-measure.rs",
+      "M\tlampOS/crates/body/src/lease.rs",
+      "M\tlampOS/crates/local-time/src/lib.rs",
+      "M\tlampOS/crates/local-time/tests/local_time.rs",
+      "M\tlampOS/crates/update/src/head_touch.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture/codec.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+      "A\tlampOS/crates/update/src/head_touch/plan_output.rs",
+      "A\tlampOS/crates/update/src/head_touch/plan_output/tests.rs"
+    ],
+    "live_head_tree": "837e5bca7b4cb4a1beea5d1463a114bf122a4a2f",
+    "local_time_change_scope": "Only additive quiet-hours constants/function plus tests; existing LocalTime/SystemZone API implementation and Expression re-export unchanged. No new quiet_hours callsite in Expression.",
+    "unchanged_direct_reader_dependency_file_sha256": {
+      "lampOS/crates/body/src/pause_in.rs": "25be39033efd04726ab997048f793c19b7a25633e2809ae021de7a357533de5a",
+      "lampOS/crates/body/src/unplug.rs": "e82d160ea17c64c49c55ac34774a6007c4d90c5052d2b4e6be5a6e941d6c79e7",
+      "lampOS/crates/expression/src/local_time.rs": "7d24d58f2a61db0bcf8bffea09777d6a525c83fe9fc1d9efcc80426c45609663",
+      "lampOS/crates/keeper/src/lib.rs": "9c87316d1358df4d45c47f32a283eacef45b5331d99e7337d4ff80ad5d809888",
+      "lampOS/crates/msgs/src/lib.rs": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b"
+    },
+    "update_dependency_change_scope": "Existing keeper/update dependency closure gains bounded capture/plan modules and shared projector formatter entry; not whole-dependency-source equality. New29f producer/native receipts remain source-bound, no old12 replay or dependency qualification transfer."
+  },
+  "utc": "2026-10-28T00:09:46.121334+00:00"
+}

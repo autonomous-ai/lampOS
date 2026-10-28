@@ -1,0 +1,1030 @@
+{
+  "all_native_handles_closed": true,
+  "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "authored_tree": "9c03245f9b0e276565897b79456460b0a3d0e5ac",
+  "commands": [
+    "gh pr view3543 --json head/base/state/body/comments/files/checks (read-only)",
+    "git ls-tree/show/diff/range-diff exact immutable refs",
+    "gh api specified original attempts/jobs; gh run view --job --log (text only)",
+    "git source-object fetch if absent, without ref/branch mutation",
+    "Python source/mode/patch and scoped current log/source reconciliation only"
+  ],
+  "comment_context": {
+    "First_current_train_rule_cited_by_PR": "6456076191",
+    "current_other_reader_READ_OK": "6456505184",
+    "new_comments_read": [
+      {
+        "createdAt": "2026-10-27T21:14:07Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6453722257"
+      },
+      {
+        "createdAt": "2026-10-27T21:16:46Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6453777436"
+      },
+      {
+        "createdAt": "2026-10-27T21:51:43Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6454524274"
+      },
+      {
+        "createdAt": "2026-10-27T22:40:17Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6455360889"
+      },
+      {
+        "createdAt": "2026-10-27T22:55:25Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6455604166"
+      },
+      {
+        "createdAt": "2026-10-27T22:58:18Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6455651002"
+      },
+      {
+        "createdAt": "2026-10-27T22:59:18Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6455667936"
+      },
+      {
+        "createdAt": "2026-10-27T23:02:26Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6455722115"
+      },
+      {
+        "createdAt": "2026-10-27T23:05:36Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6455773464"
+      },
+      {
+        "createdAt": "2026-10-27T23:12:55Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6455896410"
+      },
+      {
+        "createdAt": "2026-10-27T23:24:56Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6456082132"
+      },
+      {
+        "createdAt": "2026-10-27T23:41:56Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6456336482"
+      },
+      {
+        "createdAt": "2026-10-27T23:51:16Z",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6456505184"
+      }
+    ],
+    "previous_Third_READ_OK": "6453722257",
+    "producer_current_original_request": "6456082132",
+    "request_ID_correction": {
+      "6456086858": "Ten SDK merged-tree result, not a Reader carry request; not reviewed further"
+    },
+    "requested_Queue": "6456083265"
+  },
+  "current_PR_snapshot": {
+    "API_base_as_reported": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "draft": false,
+    "snapshot_sha256": "d6a8f872a87ef4bc26e1d3e3b5e396869c4d37306cdc7e61b1bf01bc13acab21",
+    "state": "OPEN"
+  },
+  "current_originals": {
+    "actual_preview": "b5c85b49a21f0ddbed59810413c3e19ba4acff76",
+    "actual_tree": "4b5e0fb18ac4b29a18c6de138b366e7e06ff10b6",
+    "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "authored_to_actual_delta": [
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "f85bd04a47173e02e491c40847941332eb780015",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+          "type": "blob"
+        },
+        "path": "lampOS/crates/update/src/head_touch.rs"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "73ff1d98449036be0e7cb518e742e066b12e609b",
+          "type": "blob"
+        },
+        "authored": null,
+        "path": "lampOS/crates/update/src/head_touch/plan_output.rs"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "00a0acca0c909e32b24891474d3b46a6cc20d06b",
+          "type": "blob"
+        },
+        "authored": null,
+        "path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "eb6d9e9abed58e19a146d54dfa7d817ce20f9521",
+          "type": "blob"
+        },
+        "authored": null,
+        "path": "lampOS/docs/head-touch-plan-output.md"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "0e8ac9a4d30560523022ac050d64184bf1804634",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "9c29653056a211f84aed8f67b5a37d8723772c87",
+          "type": "blob"
+        },
+        "path": "lampOS/docs/reuse-decisions.md"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "bc10513689c3c029589d029b226c00b6294bd108",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+          "type": "blob"
+        },
+        "path": "lampOS/docs/updates.md"
+      }
+    ],
+    "authored_tree": "9c03245f9b0e276565897b79456460b0a3d0e5ac",
+    "consumed11": [
+      {
+        "actual_preview": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864\tlampOS/crates/voice/src/session_reader.rs",
+        "authored": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864\tlampOS/crates/voice/src/session_reader.rs",
+        "equal": true,
+        "path": "lampOS/crates/voice/src/session_reader.rs"
+      },
+      {
+        "actual_preview": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+        "authored": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+        "equal": true,
+        "path": "lampOS/crates/voice/src/service_trace.rs"
+      },
+      {
+        "actual_preview": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609\tlampOS/crates/voice/src/session_state.rs",
+        "authored": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609\tlampOS/crates/voice/src/session_state.rs",
+        "equal": true,
+        "path": "lampOS/crates/voice/src/session_state.rs"
+      },
+      {
+        "actual_preview": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd\tlampOS/crates/voice/src/process.rs",
+        "authored": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd\tlampOS/crates/voice/src/process.rs",
+        "equal": true,
+        "path": "lampOS/crates/voice/src/process.rs"
+      },
+      {
+        "actual_preview": "100644 blob bb924518301e324ebc1d22fd1407854b09406501\tlampOS/crates/voice/src/lib.rs",
+        "authored": "100644 blob bb924518301e324ebc1d22fd1407854b09406501\tlampOS/crates/voice/src/lib.rs",
+        "equal": true,
+        "path": "lampOS/crates/voice/src/lib.rs"
+      },
+      {
+        "actual_preview": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+        "authored": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+        "equal": true,
+        "path": "lampOS/Cargo.toml"
+      },
+      {
+        "actual_preview": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2\tlampOS/crates/voice/Cargo.toml",
+        "authored": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2\tlampOS/crates/voice/Cargo.toml",
+        "equal": true,
+        "path": "lampOS/crates/voice/Cargo.toml"
+      },
+      {
+        "actual_preview": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+        "authored": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+        "equal": true,
+        "path": "lampOS/rust-toolchain.toml"
+      },
+      {
+        "actual_preview": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+        "authored": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+        "equal": true,
+        "path": "lampOS/.cargo/config.toml"
+      },
+      {
+        "actual_preview": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169\tlampOS/.config/nextest.toml",
+        "authored": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169\tlampOS/.config/nextest.toml",
+        "equal": true,
+        "path": "lampOS/.config/nextest.toml"
+      },
+      {
+        "actual_preview": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9\tlampOS/Cargo.lock",
+        "authored": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9\tlampOS/Cargo.lock",
+        "equal": true,
+        "path": "lampOS/Cargo.lock"
+      }
+    ],
+    "current_native_named_Reader15_Trace7": [
+      {
+        "actual_function_lines": [
+          608,
+          620
+        ],
+        "actual_function_sha256": "5440b88a38ae26a684d8000f07536ffcc9114432beb40e2d9dd77f608c485edc",
+        "binary": "lamp-voice",
+        "line": 7374,
+        "name": "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+        "ordinal": 6515,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/service_trace.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          622,
+          633
+        ],
+        "actual_function_sha256": "0773c08c22a341e10d71949b508d02c33ff2087ad6ac135308927053bb762e52",
+        "binary": "lamp-voice",
+        "line": 7375,
+        "name": "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+        "ordinal": 6516,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/service_trace.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          653,
+          664
+        ],
+        "actual_function_sha256": "e444a92f944616a78cdd2c1fe9e27b5593cc4e36ef51c61d6017cb05453b22fa",
+        "binary": "lamp-voice",
+        "line": 7376,
+        "name": "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+        "ordinal": 6517,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/service_trace.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          744,
+          801
+        ],
+        "actual_function_sha256": "466ac0663f3640879aef025e1fbf3dcaf0cddab878095bfb9837784fd3239cd4",
+        "binary": "lamp-voice",
+        "line": 7377,
+        "name": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+        "ordinal": 6518,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/service_trace.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          716,
+          742
+        ],
+        "actual_function_sha256": "2bffbdd6d72ed14c801fc948e983508eaff34918f337741d245996914e84f5ca",
+        "binary": "lamp-voice",
+        "line": 7378,
+        "name": "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+        "ordinal": 6519,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/service_trace.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          667,
+          713
+        ],
+        "actual_function_sha256": "f15fa1e9e8d4a01c297fb99463d727177947cb0175b9a22204b515fa95f77c42",
+        "binary": "lamp-voice",
+        "line": 7379,
+        "name": "service_trace::tests::shared_session_rotation_keeps_granted_descriptors_and_private_health",
+        "ordinal": 6520,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/service_trace.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          635,
+          651
+        ],
+        "actual_function_sha256": "9c4148e5d9b0facef426894374cbea5e035fc0c99e4a4dba4e7ddea8582017d0",
+        "binary": "lamp-voice",
+        "line": 7380,
+        "name": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+        "ordinal": 6521,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/service_trace.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          96,
+          115
+        ],
+        "actual_function_sha256": "9665b5a6dd1e8e7ab8cb415dc4c4d36f8fa861d8dca9c70e6e150b13a5a782b6",
+        "binary": "lamp-voice",
+        "line": 7388,
+        "name": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+        "ordinal": 6529,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          757,
+          779
+        ],
+        "actual_function_sha256": "d9f54673d2e825222a0351a056de658aec366fe79562aca606568ed124bd88bb",
+        "binary": "lamp-voice",
+        "line": 7389,
+        "name": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+        "ordinal": 6530,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          118,
+          139
+        ],
+        "actual_function_sha256": "715dfc19836533b1b29a3c6f6540f4d2574cde08fbde0a117e12bfc03ccd5b59",
+        "binary": "lamp-voice",
+        "line": 7390,
+        "name": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+        "ordinal": 6531,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          808,
+          828
+        ],
+        "actual_function_sha256": "69aef0f0282226f938e8749e89378b06eb60fbcc699f7ef7c58e32a7ff4554d9",
+        "binary": "lamp-voice",
+        "line": 7391,
+        "name": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+        "ordinal": 6532,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          976,
+          1004
+        ],
+        "actual_function_sha256": "f7c0c74fe5ec4a87727621ef0dfd1bf05afe049a3f2b6d823e2a47ef328f579b",
+        "binary": "lamp-voice",
+        "line": 7392,
+        "name": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+        "ordinal": 6533,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          707,
+          754
+        ],
+        "actual_function_sha256": "8cf0e263923b6e9ddb6a4e7653dd47bc21fbfa580c5f4a381aa36d3b8a2bd14c",
+        "binary": "lamp-voice",
+        "line": 7393,
+        "name": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+        "ordinal": 6534,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          362,
+          404
+        ],
+        "actual_function_sha256": "42630fad65a5617cba060a021640493cc9737cab698795c6cdd2b94b5fe863c4",
+        "binary": "lamp-voice",
+        "line": 7394,
+        "name": "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+        "ordinal": 6535,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          663,
+          704
+        ],
+        "actual_function_sha256": "dd469192c69b013b318b1ec097d4286ae0d4eebe845c3e8140e2c13d1677fa2b",
+        "binary": "lamp-voice",
+        "line": 7395,
+        "name": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+        "ordinal": 6536,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          634,
+          660
+        ],
+        "actual_function_sha256": "e09a17bfad985918c64e47180f6ab4c044a72559506d890202bb52aa7f770bf0",
+        "binary": "lamp-voice",
+        "line": 7396,
+        "name": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+        "ordinal": 6537,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          290,
+          359
+        ],
+        "actual_function_sha256": "e76c3cc3242a0a656ac0789064f1fefc94aa17d1f8e4d51aaa9ee37c75d35221",
+        "binary": "lamp-voice",
+        "line": 7397,
+        "name": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+        "ordinal": 6538,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          599,
+          631
+        ],
+        "actual_function_sha256": "969ad17035755f01a26c5dfda294652a4970f730f07e08d864ba33755dd0fa6d",
+        "binary": "lamp-voice",
+        "line": 7398,
+        "name": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+        "ordinal": 6539,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          830,
+          840
+        ],
+        "actual_function_sha256": "15d177a037facd7f4a5533acfb56084bd590eca939c7081629cd7b43fe659e92",
+        "binary": "lamp-voice",
+        "line": 7399,
+        "name": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+        "ordinal": 6540,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          842,
+          973
+        ],
+        "actual_function_sha256": "ae5538ce3e692fed8725452db8afe2e245a159595a05447c1e093e99c9ba1162",
+        "binary": "lamp-voice",
+        "line": 7400,
+        "name": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+        "ordinal": 6541,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          563,
+          596
+        ],
+        "actual_function_sha256": "8a6ad322464e89b9e6ea1491b3c27c765b4f6a8c60079c79525bc5aa1671f97d",
+        "binary": "lamp-voice",
+        "line": 7401,
+        "name": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors",
+        "ordinal": 6542,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      },
+      {
+        "actual_function_lines": [
+          62,
+          93
+        ],
+        "actual_function_sha256": "971e8113a6c8fc28af53dbe1e4cac1d1a6c6fd442a819b6da86bdaf9c76843c1",
+        "binary": "lamp-voice",
+        "line": 7402,
+        "name": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+        "ordinal": 6543,
+        "selected": 7857,
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "status": "PASS"
+      }
+    ],
+    "current_scoped_counts": {
+      "Reader_PASS_once": 15,
+      "Trace_PASS_once": 7,
+      "bad": 0
+    },
+    "full_7857_unique_status_census_independently_repeated": false,
+    "head": "fcf2c5c9193ddaf930adc04c834b91627bb97b77",
+    "limits": [
+      "This binds current original attempt1 metadata, full-text checkout and only current22 named Reader/Trace rows/function source. No whole-native aggregate unique/reprint/docs audit duplicated here.",
+      "Current7857 native/full3885 Mac and Doc3 counts remain producer/R2 evidence, not oldECC execution relabeled.",
+      "Actual preview differs from authored in6 Update projection/docs paths, not current Reader/Trace dependencies or controls.",
+      "Ignored DAC remains ignored/unrun; no privileged or device acceptance, old539/matchedMain failure cause or waiver.",
+      "First current-train merged-tree gate still supplies final latest-base check."
+    ],
+    "observed_phase_summary_only": "     Summary [ 171.503s] 7857 tests run: 7857 passed, 54 skipped",
+    "ordered_parents_API_and_Git": [
+      "2b73dd03073947c62b3d10593f293aa9ab954410",
+      "fcf2c5c9193ddaf930adc04c834b91627bb97b77"
+    ],
+    "originals": {
+      "arm": {
+        "actual_checkout": "b5c85b49a21f0ddbed59810413c3e19ba4acff76",
+        "attempt": 1,
+        "conclusion": "success",
+        "job": 122520095499,
+        "log_sha256": "2cf394786e8c7b7ef9ad7daf16504b7a79f1d590cb57c8a1cf5d5836c8d7c26b",
+        "run": 40598411153,
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job"
+          },
+          {
+            "conclusion": "success",
+            "name": "system packages"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4"
+          },
+          {
+            "conclusion": "success",
+            "name": "publication failure tests (offline, no signing secret)"
+          },
+          {
+            "conclusion": "success",
+            "name": "Rust 1.96.0"
+          },
+          {
+            "conclusion": "success",
+            "name": "artifact provenance regression (offline, disposable Cargo workspace)"
+          },
+          {
+            "conclusion": "success",
+            "name": "stable promotion tests (offline, disposable test key)"
+          },
+          {
+            "conclusion": "success",
+            "name": "restore the cache"
+          },
+          {
+            "conclusion": "success",
+            "name": "unchanged source files get the cached build's times back"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "record fresh source times for a cold publication build"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run taiki-e/install-action@v2"
+          },
+          {
+            "conclusion": "success",
+            "name": "build (release, the lamps' binaries)"
+          },
+          {
+            "conclusion": "success",
+            "name": "every built lamp-* binary is classified for the lamp-os package"
+          },
+          {
+            "conclusion": "success",
+            "name": "build the two selected artifact examples without filename collisions"
+          },
+          {
+            "conclusion": "success",
+            "name": "publication CLI rehearsal (local test key and simulated GitHub only)"
+          },
+          {
+            "conclusion": "success",
+            "name": "which crates a pull request tests"
+          },
+          {
+            "conclusion": "success",
+            "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)"
+          },
+          {
+            "conclusion": "success",
+            "name": "doc tests and the own-harness tests (nextest runs neither)"
+          },
+          {
+            "conclusion": "success",
+            "name": "export only current Cargo targets and their SHA-256"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "discard the isolated example target before saving the cache"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "save the cache"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job"
+          }
+        ]
+      },
+      "linux": {
+        "actual_checkout": "b5c85b49a21f0ddbed59810413c3e19ba4acff76",
+        "attempt": 1,
+        "conclusion": "success",
+        "job": 122520094167,
+        "log_sha256": "121aef1ea055db15b0408f666efbb01b20c71dcc4708308b1cc5518c87c44e2c",
+        "run": 40598411121,
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job"
+          },
+          {
+            "conclusion": "success",
+            "name": "system packages"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4"
+          },
+          {
+            "conclusion": "success",
+            "name": "Rust 1.96.0"
+          },
+          {
+            "conclusion": "success",
+            "name": "stable promotion formatting and strict Clippy"
+          },
+          {
+            "conclusion": "success",
+            "name": "formatting (whole workspace, pinned Rust)"
+          },
+          {
+            "conclusion": "success",
+            "name": "restore the cache"
+          },
+          {
+            "conclusion": "success",
+            "name": "unchanged source files get the cached build's times back"
+          },
+          {
+            "conclusion": "success",
+            "name": "clippy (every crate and target, warnings as errors)"
+          },
+          {
+            "conclusion": "skipped",
+            "name": "save the cache"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job"
+          }
+        ]
+      }
+    },
+    "owned2": [
+      {
+        "actual_preview": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7\tlampOS/crates/voice/src/session_reader/tests.rs",
+        "authored": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7\tlampOS/crates/voice/src/session_reader/tests.rs",
+        "equal": true,
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+      },
+      {
+        "actual_preview": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151\tlampOS/docs/realtime-tests.md",
+        "authored": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151\tlampOS/docs/realtime-tests.md",
+        "equal": true,
+        "path": "lampOS/docs/realtime-tests.md"
+      }
+    ],
+    "prior_ECC10_host_runtime_transferred": false,
+    "producer_and_R2_full_native_census_remains_separate": true,
+    "status": "CURRENT_ORIGINAL_METADATA_AND_READER_TRACE_SOURCE_BOUND",
+    "strict_Linux_command": [
+      {
+        "line": 512,
+        "text": "##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings"
+      },
+      {
+        "line": 513,
+        "text": "cargo clippy --locked --workspace --all-targets -- -D warnings"
+      }
+    ],
+    "whole_tree_equal_authored": false
+  },
+  "hashes": {
+    "arm_full_log": "2cf394786e8c7b7ef9ad7daf16504b7a79f1d590cb57c8a1cf5d5836c8d7c26b",
+    "binder_helper": "9da0ea8917af5e79c3d685ea6965348e2972dda503256cf8ce95229412a118f9",
+    "linux_full_log": "121aef1ea055db15b0408f666efbb01b20c71dcc4708308b1cc5518c87c44e2c",
+    "native_bindings": "c3ef22012d29f67b4567177615fed5e26aa4bdea6deda9c0d424129d315962b7",
+    "owned_patch_current": "76b419a2772f5ccedce1667871fe7f456c98e38af7ada6121bd285ff0808917d",
+    "owned_patch_old": "76b419a2772f5ccedce1667871fe7f456c98e38af7ada6121bd285ff0808917d",
+    "range_diff": "54d53aa25bc62c4c27bef5b39a6fedde951365e60560084e32d8804879e01f62",
+    "source_bindings": "69fe73262f05a12bb792e604c8ad33a3fecc27af8a4fd9c47d4432b006f95934"
+  },
+  "head": "fcf2c5c9193ddaf930adc04c834b91627bb97b77",
+  "limits": [
+    "No local Cargo/test/format/Clippy, target bank or saved-driver reads, artifact execution, device/provider action, code/branch mutation or public post.",
+    "Independent native scope is only original metadata/checkouts/source and22 named Reader/Trace primary rows; producer/R2 full7857unique/census/reprints/docs and Mac3885+Doc3 remain their own evidence.",
+    "Prior ECC10 host runtime remains ECC-only; old539 Reader and matchedMain/a17/R4dee failed cohorts remain failed, no cause/repair/waiver inferred.",
+    "No whole authored-tree equality: actual preview has6 additional Update projection/source/docs paths.",
+    "Privileged DAC current ignored/unrun and platform catalog distinctions remain; no privileged or physical/latency acceptance.",
+    "First current-train merged-tree original gate remains required; this carry read does not perform it."
+  ],
+  "no_product_edits_or_posts": true,
+  "pr": 3543,
+  "prior_local_runtime": {
+    "Reader": 4,
+    "Trace": 6,
+    "head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+    "receipt_sha256": "14c0bd4de1e9bcc68c8074ce109a3fe6c4a6262624a4dff453dddf3e403b7f86",
+    "total_PASS": 10,
+    "transferred": false
+  },
+  "prior_source_proofs": {
+    "2671aeabd": "89667c9587b8f4edbe5d887851036cb7e6b5186f00104b8ee2cce076590ba736",
+    "92fe22528": "a6cf14cb71c50e0fd54ab6dece878ab61fc214bddefcbed2c78bba06668a377e"
+  },
+  "recommended_disposition": "Carry Third source READ-OK to fcf2c5c91: unchanged complete owned bytes/modes/preimages/literalpatch and consumed source; current originals independently bound to actual preview with current22 named controls. Final current-train merged-tree gate remains; no additional manual authored carry requested by this read.",
+  "source_carry": {
+    "ECC_lock_identity_not_claimed": true,
+    "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "compared_source_read": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+    "complete_literal_full_index_patch_equal": true,
+    "consumed_context": [
+      {
+        "current": {
+          "mode_blob": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864\tlampOS/crates/voice/src/session_reader.rs",
+          "sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/crates/voice/src/session_reader.rs",
+        "prior92": {
+          "mode_blob": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864\tlampOS/crates/voice/src/session_reader.rs",
+          "sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+          "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/crates/voice/src/service_trace.rs",
+        "prior92": {
+          "mode_blob": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82\tlampOS/crates/voice/src/service_trace.rs",
+          "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609\tlampOS/crates/voice/src/session_state.rs",
+          "sha256": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/crates/voice/src/session_state.rs",
+        "prior92": {
+          "mode_blob": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609\tlampOS/crates/voice/src/session_state.rs",
+          "sha256": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd\tlampOS/crates/voice/src/process.rs",
+          "sha256": "6f953350bc4176ec56f697b45a9907db581b4e216bafbc2ed3a74954433e9875"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/crates/voice/src/process.rs",
+        "prior92": {
+          "mode_blob": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd\tlampOS/crates/voice/src/process.rs",
+          "sha256": "6f953350bc4176ec56f697b45a9907db581b4e216bafbc2ed3a74954433e9875"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob bb924518301e324ebc1d22fd1407854b09406501\tlampOS/crates/voice/src/lib.rs",
+          "sha256": "2030bd46cd3ac00edc7f10e516b14c80058787c2ca6bd43078615b62c04be06f"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/crates/voice/src/lib.rs",
+        "prior92": {
+          "mode_blob": "100644 blob bb924518301e324ebc1d22fd1407854b09406501\tlampOS/crates/voice/src/lib.rs",
+          "sha256": "2030bd46cd3ac00edc7f10e516b14c80058787c2ca6bd43078615b62c04be06f"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/Cargo.toml",
+        "prior92": {
+          "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2\tlampOS/crates/voice/Cargo.toml",
+          "sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/crates/voice/Cargo.toml",
+        "prior92": {
+          "mode_blob": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2\tlampOS/crates/voice/Cargo.toml",
+          "sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/rust-toolchain.toml",
+        "prior92": {
+          "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+          "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/.cargo/config.toml",
+        "prior92": {
+          "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+          "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169\tlampOS/.config/nextest.toml",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+        },
+        "equal_to92": true,
+        "equal_toECC": true,
+        "path": "lampOS/.config/nextest.toml",
+        "prior92": {
+          "mode_blob": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169\tlampOS/.config/nextest.toml",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+        }
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9\tlampOS/Cargo.lock",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+        },
+        "equal_to92": true,
+        "equal_toECC": false,
+        "path": "lampOS/Cargo.lock",
+        "prior92": {
+          "mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9\tlampOS/Cargo.lock",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+        }
+      }
+    ],
+    "earlier_source_read": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+    "full_Voice_Bus_IPC_Msgs_and_manifest_lock_config_tree_delta": "",
+    "head": "fcf2c5c9193ddaf930adc04c834b91627bb97b77",
+    "historical539_and_matched_Main_failures_waived": false,
+    "historical_ECC10_host_runtime_transferred": false,
+    "incoming_classification": "Name near-miss journal and Name docs; private unwired Update collector/codec plus docs; install guide root clarification. No change to consumed Reader/Trace/session/process source or dependency resolution versus92.",
+    "incoming_paths": [
+      "M\tlampOS/crates/name/src/main.rs",
+      "M\tlampOS/crates/update/src/head_touch.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture/codec.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "A\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+      "A\tlampOS/docs/head-touch-capture.md",
+      "A\tlampOS/docs/head-touch-codec.md",
+      "M\tlampOS/docs/install.md",
+      "M\tlampOS/docs/name.md",
+      "M\tlampOS/docs/reuse-decisions.md",
+      "M\tlampOS/docs/updates.md"
+    ],
+    "limits": [
+      "Git/source only, no Cargo/bank/working-tree edits.",
+      "Current producer host parallel3885 and current original native7857 are separate execution scopes, not oldECC10 transfer.",
+      "First current-train merged-tree gate remains final latest-base condition."
+    ],
+    "literal_patch_sha256": "76b419a2772f5ccedce1667871fe7f456c98e38af7ada6121bd285ff0808917d",
+    "owned": [
+      {
+        "current": {
+          "mode_blob": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7\tlampOS/crates/voice/src/session_reader/tests.rs",
+          "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8"
+        },
+        "equal": true,
+        "old": {
+          "mode_blob": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7\tlampOS/crates/voice/src/session_reader/tests.rs",
+          "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8"
+        },
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151\tlampOS/docs/realtime-tests.md",
+          "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708"
+        },
+        "equal": true,
+        "old": {
+          "mode_blob": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151\tlampOS/docs/realtime-tests.md",
+          "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708"
+        },
+        "path": "lampOS/docs/realtime-tests.md"
+      }
+    ],
+    "platform_catalog_note_retained": {
+      "Mac_only_ACL_fallback_historical_pass": 1,
+      "ignored_privileged_DAC_unrun_on_Mac": 1,
+      "note": "Additive90ec correction retained; no current execution/census credit.",
+      "ordinary_linux_only_unrun_on_Mac": 12,
+      "portable_Mac_pass_historical": 3,
+      "source_catalog_linux": 16
+    },
+    "preimages": [
+      {
+        "current": {
+          "mode_blob": "100644 blob 2b3ea62843a2f8534d4c8a6532ddf167805ab227\tlampOS/crates/voice/src/session_reader/tests.rs",
+          "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+        },
+        "equal": true,
+        "old": {
+          "mode_blob": "100644 blob 2b3ea62843a2f8534d4c8a6532ddf167805ab227\tlampOS/crates/voice/src/session_reader/tests.rs",
+          "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+        },
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+      },
+      {
+        "current": {
+          "mode_blob": "100644 blob 214fe40e2a4c95752ba696650f565f99bdcb64e3\tlampOS/docs/realtime-tests.md",
+          "sha256": "b885100883ec66b00a70210fcbffa2b3a9e4001d373f531623546bc9cfb1a944"
+        },
+        "equal": true,
+        "old": {
+          "mode_blob": "100644 blob 214fe40e2a4c95752ba696650f565f99bdcb64e3\tlampOS/docs/realtime-tests.md",
+          "sha256": "b885100883ec66b00a70210fcbffa2b3a9e4001d373f531623546bc9cfb1a944"
+        },
+        "path": "lampOS/docs/realtime-tests.md"
+      }
+    ],
+    "range_diff": "1:  92fe225289 = 1:  fcf2c5c919 lampOS: wait for reader fixture completion within owned roots\n",
+    "raw_author_message_preserved": {
+      "author_sha256": "e4b97016215da8f1336a88b8e9cd8631b347137e6728e33a0bd2588fdb85b7b7",
+      "message_sha256": "412a6663b180192c68c7d28cca6cab9ab5cd1133683c8f8e52ddd0a9638497fa"
+    },
+    "status": "SOURCE_COMPONENT_CAN_CARRY_NO_NEW_P1_P2",
+    "tree": "9c03245f9b0e276565897b79456460b0a3d0e5ac"
+  },
+  "source_findings_P1": [],
+  "source_findings_P2": [],
+  "status": "PROPOSED_SCOPED_READ_OK_SOURCE_CARRY_AND_CURRENT_ORIGINAL_BINDINGS"
+}
