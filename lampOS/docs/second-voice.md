@@ -2744,6 +2744,35 @@ after a take-over, but now for every turn:
   reviewer-lead's P2 on #3628). Tests: `a reply never says it kept something with no remember
   call`, `a turn offered no function is never held for a claim` and
   `remember::tests::a_reply_that_says_it_kept_something_is_known_by_its_opening`.
+- **A reply never offers to keep what its `remember` call keeps** (finding
+  K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
+  Kept — library now, not the bakery." in one breath). On by default, on
+  every turn of this route. A sentence that offers to keep
+  (`remember::offers_a_keep`: a question asked by the lamp, "me", "should
+  I", "shall I", "can I", "may I", with "keep/save that, this, it, those,
+  them" or "remember/note" and what it takes; and "mình/tôi/em … nhớ/lưu
+  … nhé/không/có muốn") is held, with the sentences after it, to its
+  round's end (`remember::OfferHold`). Beside a `remember` call, or after
+  one of the same request ran, the offer is not said and the rest is, in
+  its order; with none, all of it is said where it was. "Shall I keep the
+  light on?", "Do you want me to remember to remind you?", "What should I
+  call you?" and "Bạn có nhớ không?" are no offer. The `remember`
+  description adds "never also ask whether to keep it" (35 bytes). A
+  `remember` call the store then refuses still leaves its offer unsaid.
+  The early cut of a reply's first words (a clause, or
+  `cutting_first_words`) waits while the opening may yet be an offer
+  (`remember::may_offer_a_keep`: "Want", "Do you want", "Want me to keep",
+  "Should I", "mình … nhớ"), so "Want me to keep that as the change?" is
+  never said as "Want me to keep" first; "Let me check", "Can I help" and
+  "Do you want to hear" are cut as before (the Reviewer-lead's and
+  Reviewer-two's P2 on #4076). A turn ended on `NOT_KEPT_LINE` says what
+  was held first (Reviewer-two's P3).
+  Tests: `an offer to keep is not said beside the remember that keeps it`,
+  `an offer to keep is not cut early into first words`, `a held offer is
+  said before the line that nothing was kept`,
+  `remember::tests::an_opening_that_may_yet_offer_to_keep_waits`,
+  `remember::tests::an_offer_to_keep_is_known_by_its_question` and
+  `remember::tests::an_offer_held_to_the_round_end_is_left_out_only_beside_a_keep`.
 - **"Not for me" written as words, with `LAMP_NOT_FOR_ME_WORDS=on`** (off
   unless set): on a line told `worker::CONVERSATION_ALONE`, a reply that
   is "not for me" (`not_speech::opens_not_for_me`) ends as the
