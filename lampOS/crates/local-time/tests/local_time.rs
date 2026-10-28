@@ -303,3 +303,56 @@ fn the_quiet_hours_are_ten_at_night_to_seven_in_the_morning() {
         saigon.minute_of_day(ms("2026-10-28T05:00:00Z"))
     ));
 }
+
+/// A lamp's own window (`--quiet-hours`): the default as before, `off`, one
+/// across midnight and one within a day; bad values refused (#3504).
+#[test]
+fn a_lamps_quiet_window_is_read_from_its_setting() {
+    use lamp_local_time::QuietWindow;
+    assert_eq!(
+        QuietWindow::parse("22:00-07:00"),
+        Ok(Some(QuietWindow::DEFAULT))
+    );
+    assert_eq!(QuietWindow::DEFAULT.to_string(), "22:00 to 07:00");
+    assert_eq!(QuietWindow::parse(" off "), Ok(None));
+    let late = QuietWindow::parse("23:30-06:15").unwrap().unwrap();
+    for (minute, quiet) in [
+        (23 * 60 + 29, false),
+        (23 * 60 + 30, true),
+        (0, true),
+        (6 * 60 + 14, true),
+        (6 * 60 + 15, false),
+    ] {
+        assert_eq!(late.contains(minute), quiet, "{minute}");
+    }
+    let lunch = QuietWindow::parse("13:00-14:00").unwrap().unwrap();
+    assert_eq!(lunch.to_string(), "13:00 to 14:00");
+    for (minute, quiet) in [
+        (12 * 60 + 59, false),
+        (13 * 60, true),
+        (13 * 60 + 59, true),
+        (14 * 60, false),
+        (0, false),
+    ] {
+        assert_eq!(lunch.contains(minute), quiet, "{minute}");
+    }
+    assert_eq!(
+        QuietWindow::parse("7:00-9:30"),
+        Ok(Some(QuietWindow { from: 420, to: 570 }))
+    );
+    for bad in [
+        "",
+        "on",
+        "22-07",
+        "22:00",
+        "22:00-24:00",
+        "25:00-07:00",
+        "22:60-07:00",
+        "22:00-07:0",
+        "-1:00-07:00",
+        "22:00-22:00",
+        "22:00 - 07:00 x",
+    ] {
+        assert!(QuietWindow::parse(bad).is_err(), "{bad:?}");
+    }
+}
