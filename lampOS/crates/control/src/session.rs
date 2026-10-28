@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use ring::rand::SystemRandom;
 use serde_json::{Value, json};
 
+use crate::journal::{self, Journal};
 use crate::lease::{Change, Leases, Refusal};
 use crate::pairing::{self, Clients, Codes, PairRefused};
 use crate::protocol::{
@@ -148,6 +149,8 @@ pub struct Door {
     /// What the helper must be told of pairings, in order: drained by the
     /// server into one queue, so a later change is never served first.
     helper_changes: Vec<Value>,
+    /// One line for every command and its answer ([`crate::journal`]).
+    journal: Journal,
 }
 
 /// The most `skill.list` and `skill.remove` with the helper at once, all
@@ -243,7 +246,51 @@ impl Door {
             last_rev: 0,
             asking: BTreeSet::new(),
             helper_changes: Vec::new(),
+            journal: Journal::default(),
         }
+    }
+
+    /// The door's lines handed to `journal`, not stderr (tests).
+    pub fn with_journal(mut self, journal: Journal) -> Self {
+        self.journal = journal;
+        self
+    }
+
+    /// `client` by its id and paired name, as a line names it.
+    fn who(&self, client: &str) -> String {
+        journal::who(
+            client,
+            self.clients.get(client).map(|paired| paired.name.as_str()),
+        )
+    }
+
+    /// A lease the lamp took back, or suspended, or held again
+    /// (docs/control.md, "The journal").
+    pub fn journal_lease(&mut self, change: &Change, now_us: u64) {
+        let state = json!(change.state);
+        let why = change
+            .why
+            .map(|why| format!(" ({})", json!(why).as_str().unwrap_or_default()))
+            .unwrap_or_default();
+        let line = format!(
+            "{}: lease {} {}{why}",
+            self.who(&change.client),
+            change.lease,
+            state.as_str().unwrap_or_default()
+        );
+        self.journal.line(&change.client, now_us, &line);
+    }
+
+    /// The door's tick: lines left out past a computer's second are said
+    /// ([`Journal::tick`]).
+    pub fn journal_tick(&mut self, now_us: u64) {
+        self.journal.tick(now_us);
+    }
+
+    /// An event sent to `client`: its kind, never its fields.
+    pub fn journal_event(&mut self, client: &str, kind: &str, now_us: u64) {
+        let line = format!("{}: event {kind} sent", self.who(client));
+        self.journal.line(client, now_us, &line);
     }
 
     /// The quiet hours held on the door (lamp-control's `serve` always
@@ -433,10 +480,48 @@ impl Door {
         now_us: u64,
         wall_s: u64,
     ) -> Outcome {
-        let request = match protocol::parse(frame) {
-            Ok(request) => request,
-            Err(refused) => return reply_refused(refused.re, refused.error),
+        let started = std::time::Instant::now();
+        let before = session.client.clone();
+        let (outcome, op, fields, went) = match protocol::parse(frame) {
+            Ok(request) => {
+                let (op, fields, went) = (
+                    journal::op_name(&request.op),
+                    self.journal.fields(&request.op),
+                    journal::went(&request.op),
+                );
+                let outcome = self.answer(session, request, parts, now_us, wall_s);
+                (outcome, op, fields, went)
+            }
+            Err(refused) => (
+                reply_refused(refused.re, refused.error),
+                "a frame it couldn't read",
+                String::new(),
+                "",
+            ),
         };
+        // The computer as it is after the command (a hello names it), or as
+        // it was before (a revoke forgets it).
+        let client = session.client.clone().or(before);
+        let client = client.as_deref().unwrap_or(journal::NOBODY);
+        let ms = started.elapsed().as_secs_f64() * 1000.0;
+        let line = format!(
+            "{}: {op}{fields}: {}, {ms:.1} ms",
+            self.who(client),
+            answered(&outcome, went)
+        );
+        self.journal.line(client, now_us, &line);
+        outcome
+    }
+
+    /// One command's answer, `handle`'s own.
+    fn answer(
+        &mut self,
+        session: &mut Session,
+        request: protocol::Request,
+        parts: &mut dyn Parts,
+        now_us: u64,
+        wall_s: u64,
+    ) -> Outcome {
         let re = request.id;
         let refuse = |code: ErrorCode, why: String| reply_refused(Some(re), Error::new(code, why));
         let op = request.op;
@@ -891,6 +976,25 @@ pub fn event_of(change: &Change) -> Value {
     protocol::lease_event(&change.lease, change.state, change.why)
 }
 
+/// How a command ended, for its line: `ok` and where it went, handed to the
+/// skill helper, or the refusal's code, never its why (it may carry what was
+/// asked).
+fn answered(outcome: &Outcome, went: &str) -> String {
+    let closing = if outcome.close { ", closing" } else { "" };
+    if outcome.ask.is_some() {
+        return format!("handed to the skill helper{closing}");
+    }
+    let Some(reply) = outcome.send.first() else {
+        return format!("no answer{closing}");
+    };
+    if reply["ok"] == json!(true) {
+        format!("ok, to {went}{closing}")
+    } else {
+        let code = reply["error"]["code"].as_str().unwrap_or("unknown");
+        format!("refused: {code}{closing}")
+    }
+}
+
 fn ok(re: u64, with: Value) -> Outcome {
     Outcome {
         send: vec![protocol::ok(re, with)],
@@ -1026,6 +1130,119 @@ mod tests {
         );
         assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
         (door, session, fake)
+    }
+
+    /// docs/control.md, "The journal": one line a command, naming the
+    /// computer by id and paired name, its op, how it ended and where it
+    /// went, and the time it took; never a say's words, a phrase, a proof or
+    /// a signature. Leases taken back and events sent are lines too.
+    #[test]
+    fn every_command_is_one_journal_line_with_nothing_it_carried() {
+        let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let into = lines.clone();
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None).with_journal(
+            Journal::to(move |line| into.lock().unwrap().push(line.to_owned())),
+        );
+        let mut fake = Fake::default();
+        let computer = Computer::new(3);
+        let code = door.issue_code([Grant::Light, Grant::Speak, Grant::Hear].into(), 0);
+        let (mut session, welcome) = door.open();
+        let pair = computer.pair_frame(&code, &welcome);
+        let hello = computer.hello_frame(&welcome);
+        let said = "The build on desk two passed.";
+        let frames = [
+            pair.clone(),
+            hello.clone(),
+            r#"{"id":3,"op":"light","colour":"blue","level":2,"for_ms":10000}"#.to_owned(),
+            json!({"id": 4, "op": "say", "text": said}).to_string(),
+            r#"{"id":5,"op":"subscribe","events":["phrase.heard"],"phrases":["good night lamp"]}"#
+                .to_owned(),
+            r#"{"id":6,"op":"gesture","name":"nod"}"#.to_owned(),
+            "not json".to_owned(),
+        ];
+        for (n, frame) in frames.iter().enumerate() {
+            door.handle(&mut session, frame, &mut fake, S + n as u64, 1);
+        }
+        let client = pairing::client_id(&computer.key());
+        // Its paired name, "Dev's laptop", isn't a plain word: the id names it.
+        let who = format!("{client} (a name the door doesn't write)");
+        door.journal_lease(
+            &Change {
+                client: client.clone(),
+                lease: "l_9".into(),
+                state: protocol::LeaseState::Lost,
+                why: Some(protocol::LeaseWhy::Hand),
+            },
+            2 * S,
+        );
+        door.journal_event(&client, "phrase.heard", 2 * S);
+        let lines = lines.lock().unwrap().clone();
+        let shape = |line: &str| {
+            // The time each took, then nothing after it.
+            let (head, ms) = line.rsplit_once(", ").unwrap();
+            assert!(
+                ms.ends_with(" ms") && ms[..ms.len() - 3].parse::<f64>().is_ok(),
+                "{line}"
+            );
+            head.to_owned()
+        };
+        assert_eq!(shape(&lines[0]), "lamp-control: -: pair: ok, to the door");
+        assert_eq!(
+            shape(&lines[1]),
+            format!("lamp-control: {who}: hello: ok, to the door")
+        );
+        assert_eq!(
+            shape(&lines[2]),
+            format!(
+                "lamp-control: {who}: light (blue, level 2, steady, for_ms 10000): ok, to the ring, by light/request"
+            )
+        );
+        assert_eq!(
+            shape(&lines[3]),
+            format!(
+                "lamp-control: {who}: say ({}): ok, to the voice, by say.sock",
+                door.journal.said(said)
+            )
+        );
+        assert_eq!(
+            shape(&lines[4]),
+            format!("lamp-control: {who}: subscribe (phrase.heard): ok, to the door")
+        );
+        assert_eq!(
+            shape(&lines[5]),
+            format!("lamp-control: {who}: gesture (nod): refused: no_grant")
+        );
+        assert_eq!(
+            shape(&lines[6]),
+            format!("lamp-control: {who}: a frame it couldn't read: refused: bad_request")
+        );
+        assert_eq!(
+            lines[7],
+            format!("lamp-control: {who}: lease l_9 lost (hand)")
+        );
+        assert_eq!(
+            lines[8],
+            format!("lamp-control: {who}: event phrase.heard sent")
+        );
+        assert_eq!(lines.len(), 9);
+        // Nothing a command carried is in any line.
+        let pair: Value = serde_json::from_str(&pair).unwrap();
+        let hello: Value = serde_json::from_str(&hello).unwrap();
+        let carried = [
+            said,
+            "desk two",
+            "good night lamp",
+            pair["proof"].as_str().unwrap(),
+            pair["key"].as_str().unwrap(),
+            hello["sig"].as_str().unwrap(),
+            code.as_str(),
+            "Dev's laptop",
+        ];
+        for line in &lines {
+            for secret in carried {
+                assert!(!line.contains(secret), "{secret:?} in {line}");
+            }
+        }
     }
 
     /// Fourteen's P2 on #3868: a computer holds at most 16 phrases across
