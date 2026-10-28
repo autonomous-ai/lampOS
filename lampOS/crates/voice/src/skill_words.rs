@@ -215,6 +215,12 @@ pub struct NewsWords {
     /// says the built-in words, so one written before it still passes.
     #[serde(default = "failed_folder")]
     pub failed_folder: String,
+    /// ...or did not, as `{who}` isn't signed in on `{computer}`
+    /// (lamp-tasks' `serve --engines-ready`, openharness#1788). A skill
+    /// without it says the built-in words, so one written before it still
+    /// passes.
+    #[serde(default = "failed_signed_out")]
+    pub failed_signed_out: String,
     /// Two or three finished, told together: `{how_many}`, `{each}`,
     /// `{first}` and `{goes_on}`.
     pub together: String,
@@ -259,6 +265,11 @@ fn failed_folder() -> String {
     "The work the person asked you to hand over, \"{asked}\", did not reach {who}: the folder it works in isn't on {computer}, so it could not start. Tell them that in one plain, light sentence, with no technical words or paths, and that the folder has to be made there first.".into()
 }
 
+/// [`NewsWords::failed_signed_out`]'s words, built in.
+fn failed_signed_out() -> String {
+    "The work the person asked you to hand over, \"{asked}\", did not reach {who}, as it isn't signed in on {computer}, so it could not start. Tell them that in one plain, light sentence, with no technical words, and that it has to be signed in there first.".into()
+}
+
 impl NewsWords {
     /// FALLBACK (#940): what the voice said before Task news had its own
     /// `[news.words]`, said for one release when the installed skill has
@@ -282,6 +293,7 @@ impl NewsWords {
             failed: "The work the person asked you to hand over, \"{asked}\", did not reach {who}: it could not be started just now. Tell them in one plain, light sentence, with no technical words, and offer to try again.".into(),
             failed_unsure: "The work the person asked you to hand over, \"{asked}\", may not have reached {who}: you cannot tell whether it started. Tell them in one plain, light sentence, with no technical words, and offer to try again.".into(),
             failed_folder: failed_folder(),
+            failed_signed_out: failed_signed_out(),
             together: "News from {how_many} pieces of work you handed over for the person. {each} Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. No code, lists, file paths or links.{goes_on} No question.".into(),
             together_each: "{who} finished \"{asked}\" {when}: \"{answer}\".".into(),
             two: "two".into(),
@@ -345,6 +357,11 @@ impl NewsWords {
                 (
                     "failed_folder",
                     &self.failed_folder,
+                    &["asked", "computer", "who"],
+                ),
+                (
+                    "failed_signed_out",
+                    &self.failed_signed_out,
                     &["asked", "computer", "who"],
                 ),
                 (
@@ -442,6 +459,7 @@ impl NewsWords {
                 ("failed", note(&self.failed, &[])),
                 ("failed_unsure", note(&self.failed_unsure, &[])),
                 ("failed_folder", note(&self.failed_folder, &[])),
+                ("failed_signed_out", note(&self.failed_signed_out, &[])),
                 (
                     "together",
                     note(
@@ -639,14 +657,17 @@ mod tests {
 
     /// Each line has exactly its slots, a slot named twice twice; and a
     /// value filled in is never read as a slot.
-    /// A Task news written before `failed_folder` (#2840) still passes,
-    /// with the built-in words for it, and the skill's own are the same.
+    /// A Task news written before `failed_folder` (#2840) and
+    /// `failed_signed_out` (openharness#1788) still passes, with the
+    /// built-in words for them, and the skill's own are the same.
     #[test]
     fn a_task_news_without_the_folder_words_passes_with_the_built_in_ones() {
         let text = std::fs::read_to_string(skills().join("task-news/skill.toml")).unwrap();
         let older: String = text
             .lines()
-            .filter(|line| !line.starts_with("failed_folder = "))
+            .filter(|line| {
+                !line.starts_with("failed_folder = ") && !line.starts_with("failed_signed_out = ")
+            })
             .map(|line| format!("{line}\n"))
             .collect();
         assert_ne!(older, text);
@@ -656,8 +677,12 @@ mod tests {
         std::fs::write(dir.join("task-news/skill.toml"), older).unwrap();
         let read = read(&dir, "task-news", "news", NewsWords::checked);
         std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(read.unwrap().failed_folder, failed_folder());
-        assert_eq!(NewsWords::in_dir(&skills()).failed_folder, failed_folder());
+        let read = read.unwrap();
+        assert_eq!(read.failed_folder, failed_folder());
+        assert_eq!(read.failed_signed_out, failed_signed_out());
+        let installed = NewsWords::in_dir(&skills());
+        assert_eq!(installed.failed_folder, failed_folder());
+        assert_eq!(installed.failed_signed_out, failed_signed_out());
     }
 
     #[test]

@@ -260,6 +260,31 @@ and has to be made there first. Without it, and for every other failed
 `new`, the task stays `uncertain` with `new_failed`, and the lamp says the
 work may not have started.
 
+**`serve --engines-ready`** (openharness#1788, off unless set): before
+`new`, right after the `machines --json` preflight, the computer is asked
+about the named engine alone, `harness machines engines MACHINE --engine
+ENGINE --json` (Harness's `engines_probe`, over the machine link;
+openharness#1888). An answer that refuses nothing is kept 5 minutes for
+each computer and engine (`ENGINES_KEPT`), so later hand-overs ask nothing;
+a refusal is never kept, so a person who signs in and asks again is asked
+of afresh. Each ask is given at
+most 8 s (`ENGINES_PROBE_TIMEOUT`; Harness reads the engine in a login shell
+of 5 s at most there). Only a known no refuses:
+- `firstPrompt: false` ends the task `not_sent` with `engine_no_prompt`,
+  told as a plain failure;
+- `signedIn: false` (read for Claude Code and Codex only) ends it `not_sent`
+  with `engine_signed_out`, and the voice tells it with Task news'
+  `failed_signed_out` words: the work didn't start, as the engine isn't
+  signed in on their computer, and it has to be signed in there first.
+
+`null`, no row for that computer and engine, a failed exit, a timeout, or an
+older Harness without the command is no refusal, and is kept as long, so a
+computer that can't say costs one ask. Hermes' `signedIn` is always `null`,
+so a hand-over to Hermes is never refused by it. Each ask says how it went
+in one journal line, never naming the computer: `tasks: asked the computer
+about ENGINE: engine_signed_out | engine_no_prompt | no refusal | it could
+not say | CODE, T ms`.
+
 The engine allowlist is `codex`, `claude`, `opencode`, `devin`,
 `devin-cloud` or `hermes` (Hermes since #3504, 27 Oct: Harness launches it
 with its first prompt as `hermes chat -q`, with no permission modes, so it
@@ -298,7 +323,8 @@ so nothing can start twice, and a named target's hand-overs all start.
 Every hand-over says how it went in one journal line, whatever the outcome
 (on everywhere, no switch): `tasks: lamp-task-N: dispatch STATE [CODE] (exit
 N, T s, stderr: LAST)`. STATE is `accepted`, `pending`, `not_sent` or
-`uncertain`, with its code (`new_failed`, `folder_missing`, `timeout` …);
+`uncertain`, with its code (`new_failed`, `folder_missing`,
+`engine_signed_out`, `timeout` …);
 `exit` is the last Harness call's status, `no exit` when none ended (a
 timeout, or refused before any call); LAST is stderr's last line with words,
 at most 160 characters, with only what can't be the person's kept: quoted

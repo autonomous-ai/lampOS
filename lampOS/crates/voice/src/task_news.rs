@@ -1252,9 +1252,11 @@ fn read_once_with(
             // news too: the lamp said it was handing it over.
             if let Some(failed) = failed_hand_over(item, now) {
                 let key = format!("{store}:{id}:hand-over");
-                // The computer has no such folder: lamp-tasks says so only
-                // with `serve --folder-missing` (#2840).
-                let folder = item["dispatch"]["code"] == "folder_missing";
+                // The computer has no such folder, or the engine isn't
+                // signed in on it: lamp-tasks says so only with `serve
+                // --folder-missing` (#2840) and `serve --engines-ready`
+                // (openharness#1788).
+                let code = item["dispatch"]["code"].as_str();
                 // An app's ask that surely never reached the agent is
                 // settled; one that may have stays `making` (#2813).
                 if !failed && let Some(keeping) = made {
@@ -1263,7 +1265,7 @@ fn read_once_with(
                 if !told.contains(&key)
                     && !offered.contains(&key)
                     && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
-                    && let Some(note) = note_failed(&words, &task, failed, folder)
+                    && let Some(note) = note_failed(&words, &task, failed, code)
                 {
                     news.push(News {
                         key,
@@ -1445,8 +1447,13 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
 /// like other news ([`fitted`]): the task's words are cut first
 /// (reviewer-two's P2 on #2875). A missing folder's note with a computer
 /// name that leaves no room says "their computer"; still over, it is told
-/// as a plain failure.
-fn note_failed(words: &NewsWords, task: &Value, unsure: bool, folder: bool) -> Option<String> {
+/// as a plain failure. So is an engine not signed in on the computer.
+fn note_failed(
+    words: &NewsWords,
+    task: &Value,
+    unsure: bool,
+    code: Option<&str>,
+) -> Option<String> {
     let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
     let who = who(task);
     let say = |line: &str, computer: &str| {
@@ -1457,9 +1464,15 @@ fn note_failed(words: &NewsWords, task: &Value, unsure: bool, folder: bool) -> O
             ))
         })
     };
-    if folder && !unsure {
-        let note = say(&words.failed_folder, &their_computer(task))
-            .or_else(|| say(&words.failed_folder, "their computer"));
+    let refused = match code {
+        Some("folder_missing") => Some(&words.failed_folder),
+        Some("engine_signed_out") => Some(&words.failed_signed_out),
+        _ => None,
+    };
+    if let Some(line) = refused
+        && !unsure
+    {
+        let note = say(line, &their_computer(task)).or_else(|| say(line, "their computer"));
         if note.is_some() {
             return note;
         }
@@ -2168,6 +2181,9 @@ mod tests {
     };
 
     /// Task news' own words, as the repository has them.
+    /// lamp-tasks' code for a folder that isn't on the computer (#2840).
+    const FOLDER: Option<&str> = Some("folder_missing");
+
     fn own() -> NewsWords {
         NewsWords::in_dir(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills"))
     }
@@ -2454,7 +2470,7 @@ mod tests {
                 }
                 for unsure in [false, true] {
                     said(
-                        note_failed(&words, &task, unsure, false),
+                        note_failed(&words, &task, unsure, None),
                         before::note_failed(&task, unsure),
                     );
                 }
@@ -3650,13 +3666,13 @@ mod tests {
             failed_hand_over(&item("accepted", true, "boot-a", NOW), &now()),
             None
         );
-        let told = note_failed(&own(), &task("claude", json!([])), false, false).unwrap();
+        let told = note_failed(&own(), &task("claude", json!([])), false, None).unwrap();
         assert!(
             told.contains("did not reach Claude Code") && told.contains("offer to try again"),
             "{told}"
         );
         assert!(
-            note_failed(&own(), &task("codex", json!([])), true, false)
+            note_failed(&own(), &task("codex", json!([])), true, None)
                 .unwrap()
                 .contains("may not have reached Codex")
         );
@@ -3667,7 +3683,7 @@ mod tests {
     /// naming the computer; only a sure failure is.
     #[test]
     fn a_hand_over_to_a_missing_folder_says_the_folder_is_not_on_that_computer() {
-        let told = note_failed(&own(), &task("claude", json!([])), false, true).unwrap();
+        let told = note_failed(&own(), &task("claude", json!([])), false, FOLDER).unwrap();
         assert!(
             told.contains("did not reach Claude Code")
                 && told.contains("the folder it works in isn't on their computer")
@@ -3677,8 +3693,37 @@ mod tests {
         );
         // Not sure it didn't start: told as before.
         assert_eq!(
-            note_failed(&own(), &task("claude", json!([])), true, true),
-            note_failed(&own(), &task("claude", json!([])), true, false)
+            note_failed(&own(), &task("claude", json!([])), true, FOLDER),
+            note_failed(&own(), &task("claude", json!([])), true, None)
+        );
+    }
+
+    /// `serve --engines-ready` (openharness#1788): a hand-over refused as
+    /// the engine isn't signed in on the computer is told as that, naming
+    /// the computer; only a sure failure is, and any other code is told as
+    /// a plain failure.
+    #[test]
+    fn a_hand_over_to_an_engine_signed_out_says_it_is_not_signed_in_there() {
+        let signed_out = Some("engine_signed_out");
+        let told = note_failed(&own(), &task("codex", json!([])), false, signed_out).unwrap();
+        assert!(
+            told.contains("did not reach Codex, as it isn't signed in on their computer")
+                && told.contains("it has to be signed in there first")
+                && !told.contains("lamp-tasks"),
+            "{told}"
+        );
+        assert_eq!(
+            note_failed(&own(), &task("codex", json!([])), true, signed_out),
+            note_failed(&own(), &task("codex", json!([])), true, None)
+        );
+        assert_eq!(
+            note_failed(
+                &own(),
+                &task("codex", json!([])),
+                false,
+                Some("engine_no_prompt")
+            ),
+            note_failed(&own(), &task("codex", json!([])), false, None)
         );
     }
 
@@ -3701,7 +3746,8 @@ mod tests {
         // The longest words leave no room for the task's: they are cut away.
         for (words, kept) in [(own(), true), (longest, false)] {
             for (unsure, folder) in [(false, true), (false, false), (true, false)] {
-                let told = note_failed(&words, &long, unsure, folder).unwrap();
+                let told =
+                    note_failed(&words, &long, unsure, folder.then_some("folder_missing")).unwrap();
                 assert!(told.len() <= most, "{} bytes", told.len());
                 assert!(told.ends_with(')'), "{told}");
                 assert_eq!(told.contains('界'), kept || !folder, "{told}");
@@ -3715,7 +3761,7 @@ mod tests {
             }
         }
         // A short one is as before: nothing cut.
-        let short = note_failed(&own(), &task("claude", json!([])), false, true).unwrap();
+        let short = note_failed(&own(), &task("claude", json!([])), false, FOLDER).unwrap();
         assert!(short.contains("Suggest three 'friendly' names for a desk lamp"));
     }
 
