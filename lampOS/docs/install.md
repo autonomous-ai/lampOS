@@ -188,7 +188,7 @@ that. So the product's eyes name the camera by its ids alone, `--usb
 01da:5875`, with no port and no `--device`, and take the one camera with
 those ids on whichever port it is, refusing none or two (eyes.md, #2190,
 #4074). Their camera helper names `01da:5875` with no port too, which every
-channel's helper takes since stable 8250 (#4091). The install test holds
+channel's helper takes since stable 8250 (#4077). The install test holds
 both units to it.
 
 **Different: one lamp behind the other.** lamp-4ace has switches lamp-52e6

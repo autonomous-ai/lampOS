@@ -597,7 +597,7 @@ as before.
   (`too_soon` with `ago_s`, `no_device`, `not_the_camera`, `several`,
   `error`). The product's helper unit names `01da:5875` with no port, as
   the eyes do: every channel carries a helper that takes the ids alone since
-  stable 8250 (#4091), so a lamp whose camera is on another port is
+  stable 8250 (#4077), so a lamp whose camera is on another port is
   re-authorized too.
 - **Narrow:** it reads nothing from whoever connects, so it can't be pointed
   at another device; a port that isn't digits, `-` and `.` makes no path; at
