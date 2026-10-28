@@ -21,20 +21,47 @@ pub const LINE: &str = "Okay, I'll stop there.";
 /// six; a longer line asks for more than a stop and goes to the model.
 const MOST_WORDS: usize = 6;
 
-/// Whether `text` asks the lamp to stop, and nothing more: a stop word or
-/// pair ([`crate::stop_words::stop_phrase`]: "stop", "enough", "hold on",
-/// never after "don't"), or "never mind", in a line of at most
-/// [`MOST_WORDS`] words. "Stop them." (speech to text's "Stop"), "Stop it.",
-/// "Stop telling the story.", "That's enough." and "Okay, enough." all are.
+/// Whether `text` asks the lamp to stop, and nothing more: "stop" or
+/// "enough" (never after "don't", [`crate::stop_words::stop_phrase`]) or
+/// "never mind", in a line of at most [`MOST_WORDS`] words that asks
+/// nothing. "Stop them." (speech to text's "Stop"), "Stop it.", "Stop
+/// telling the story.", "That's enough." and "Okay, enough." are; "Wait,
+/// what?", "Hold on, who?" and "Quiet, what was that?" are questions for the
+/// model, as are the other stop words alone (Nine's and Eighth's P2s on
+/// #4004).
 pub fn is_stop_request(text: &str) -> bool {
     let words = crate::not_speech::plain_words(text);
-    if words.is_empty() || words.len() > MOST_WORDS {
+    if words.is_empty() || words.len() > MOST_WORDS || asks(text, &words) {
         return false;
     }
-    crate::stop_words::stop_phrase(text)
-        || words
-            .windows(2)
-            .any(|pair| pair[0] == "never" && pair[1] == "mind")
+    let mind = words
+        .windows(2)
+        .any(|pair| pair[0] == "never" && pair[1] == "mind");
+    mind || (words
+        .iter()
+        .any(|word| matches!(word.as_str(), "stop" | "enough"))
+        && crate::stop_words::stop_phrase(text))
+}
+
+/// Words that open or carry a question.
+const ASKING: &[&str] = &[
+    "what", "who", "whom", "whose", "why", "how", "where", "when", "which", "can", "could",
+    "would", "will", "did", "do", "does", "is", "are", "was", "were", "should", "may",
+];
+
+/// Whether the line asks something: a question mark, or a question word.
+fn asks(text: &str, words: &[String]) -> bool {
+    text.contains('?') || words.iter().any(|word| ASKING.contains(&word.as_str()))
+}
+
+/// Whether every word of a stop is, in order, among the lamp's own answer
+/// so far: a story's "Stop it!" heard back over its voice, too short for
+/// the own-echo rule (`own_echo::HELD_LEAST`), is never answered as a stop
+/// (the Reviewer-lead's P2 on #4004).
+pub fn could_be_echo(heard: &str, said: &str) -> bool {
+    let heard = crate::not_speech::plain_words(heard);
+    let said = crate::not_speech::plain_words(said);
+    !heard.is_empty() && said.windows(heard.len()).any(|run| run == heard.as_slice())
 }
 
 /// The worker's flags for the switch, from the coordinator's environment.
@@ -75,6 +102,19 @@ mod tests {
     }
 
     #[test]
+    fn a_stop_the_lamp_itself_just_said_could_be_its_echo() {
+        assert!(could_be_echo(
+            "Stop it!",
+            "The ogre roared, stop it! and the frogs went quiet."
+        ));
+        assert!(!could_be_echo(
+            "Stop it.",
+            "The ogre roared and the frogs went quiet."
+        ));
+        assert!(!could_be_echo("", "Stop it."));
+    }
+
+    #[test]
     fn a_plain_ask_to_stop_is_one_in_its_own_words() {
         // #3985's five, and 29e7's two.
         for stop in [
@@ -86,7 +126,6 @@ mod tests {
             "Stop them.",
             "Stop telling story.",
             "Okay, okay, stop telling the story.",
-            "Lamp, hold on.",
             "Never mind.",
         ] {
             assert!(is_stop_request(stop), "{stop}");
@@ -102,6 +141,14 @@ mod tests {
             "Tell me more about the ogre.",
             "Stop, and tell me what the weather is like tomorrow.",
             "Okay, what happened to the ogre in the end?",
+            "Wait, what did you say?",
+            "Wait, what?",
+            "Hold on, who?",
+            "Quiet, what was that?",
+            "Wait.",
+            "Pause.",
+            "Is that enough",
+            "Can you stop",
         ] {
             assert!(!is_stop_request(not), "{not}");
         }

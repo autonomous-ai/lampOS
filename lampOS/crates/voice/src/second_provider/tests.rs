@@ -14105,6 +14105,47 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
     }
 }
 
+/// #4004 (the Reviewer-lead's P2): the lamp's own "Stop it!" heard back over
+/// its voice, with `LAMP_SPOKEN_STOP_ENDS` on, is never answered "Okay, I'll
+/// stop there.": its words are the lamp's own answer's.
+#[tokio::test(start_paused = true)]
+async fn the_lamps_own_stop_heard_back_is_held_not_answered_as_a_stop() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Tell me about the ogre.".to_owned()),
+                Ok("Stop it!".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Stop it!"), Ok(ChatEvent::Done)],
+                vec![text("Mm."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.holding_own_echo(true).ending_spoken_stops(true);
+    spoken_turn(&mut engine);
+    turn(&mut engine).await;
+    engine.submit(start_over(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let echo = turn(&mut engine).await;
+    // Too short for the own-echo rule, so asked as before this switch,
+    // never answered with the stop line.
+    assert!(
+        !echo
+            .iter()
+            .any(|line| line.contains(crate::spoken_stop::LINE)),
+        "{echo:?}"
+    );
+    assert_eq!(script.asked.lock().unwrap().len(), 2);
+}
+
 /// #3026 (`LAMP_SECOND_UNFINISHED_WAIT`): while a line is heard, the
 /// coordinator is told when its words so far come to end unfinished and
 /// when they no longer do, the class only; without the switch, never.
