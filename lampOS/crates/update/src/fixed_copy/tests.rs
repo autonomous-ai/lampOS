@@ -40,7 +40,13 @@ fn a_new_copy_is_run_beside_and_then_renamed_in_executable() {
     let path = folder.path().join("lamp-update-back");
     let ran = RefCell::new(Vec::new());
     let placed = place(&path, b"new", None, &mut good(&ran)).unwrap();
-    assert_eq!(placed, Placed::Replaced { before: None });
+    assert_eq!(
+        placed,
+        Placed::Replaced {
+            before: None,
+            synced: true
+        }
+    );
     assert_eq!(fs::read(&path).unwrap(), b"new");
     assert_eq!(mode(&path), 0o755);
     assert_eq!(
@@ -73,7 +79,8 @@ fn the_same_bytes_not_executable_are_written_again() {
     assert_eq!(
         placed,
         Placed::Replaced {
-            before: Some(sha256_hex(b"same"))
+            before: Some(sha256_hex(b"same")),
+            synced: true,
         }
     );
     assert_eq!(mode(&path), 0o755);
@@ -90,7 +97,8 @@ fn the_copy_replaced_is_kept_with_its_mode_before_the_rename() {
     assert_eq!(
         placed,
         Placed::Replaced {
-            before: Some(sha256_hex(b"old"))
+            before: Some(sha256_hex(b"old")),
+            synced: true,
         }
     );
     assert_eq!(fs::read(&path).unwrap(), b"new");
@@ -209,7 +217,8 @@ fn a_real_program_is_run_and_its_answer_checked() {
     assert_eq!(
         placed,
         Placed::Replaced {
-            before: Some(sha256_hex(b"old"))
+            before: Some(sha256_hex(b"old")),
+            synced: true,
         }
     );
     assert_eq!(fs::read(&path).unwrap(), ANSWERS.as_bytes());
