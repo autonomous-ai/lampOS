@@ -5,7 +5,7 @@ use lamp_msgs::{
     ClockStamp, Concentration, ControlGesture, Diagnostic, ExpressionBody, ExpressionLight,
     ExpressionState, Faces, JointState, Level, Light, NameHeard, PersonActivity, RoomState,
     ScheduleDue, Speech, SuddenSound, TouchEvent, TouchState, VoiceMute, VoicePlayout,
-    VoiceProgress, VoiceSound, VoiceState, VoiceTiming,
+    VoiceProgress, VoiceRemarked, VoiceSound, VoiceState, VoiceTiming,
 };
 use std::{
     fs::{self, File, OpenOptions},
@@ -48,6 +48,9 @@ pub const HEAD_INPUTS: [(&str, &str); 3] = [
     (TouchState::TOPIC, TouchState::TYPE),
     (VoiceMute::TOPIC, VoiceMute::TYPE),
 ];
+/// The voice's remarks about the lamp (#4175), read only with
+/// `LAMP_REMARK_GLANCE=on`.
+pub const REMARK_INPUTS: [(&str, &str); 1] = [(VoiceRemarked::TOPIC, VoiceRemarked::TYPE)];
 
 /// Whether a `lamp/online` message says the internet cannot be reached: only
 /// a fresh, valid one with `online` false. Stale, absent or unknown is not.
@@ -134,6 +137,14 @@ const DRAIN_LIMIT: usize = 32;
 pub const REST_REQUESTS_ENVIRONMENT: &str = "LAMP_REST_REQUESTS";
 
 pub fn rest_requests_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// A glance when someone in a busy room said something about the lamp and
+/// the voice said nothing (#4175). Off unless set.
+pub const REMARK_GLANCE_ENVIRONMENT: &str = "LAMP_REMARK_GLANCE";
+
+pub fn remark_glance_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
@@ -231,6 +242,7 @@ pub fn input_from_message(
     let expected = INPUTS
         .iter()
         .chain(&HEAD_INPUTS)
+        .chain(&REMARK_INPUTS)
         .find(|(name, _)| *name == topic)
         .ok_or_else(|| invalid(format!("unsupported expression input {topic}")))?
         .1;
@@ -332,7 +344,11 @@ pub fn input_from_message(
             stamp,
             value: message.parse()?,
         },
-        _ => unreachable!("INPUTS, HEAD_INPUTS and this match list the same topics"),
+        VoiceRemarked::TOPIC => Input::Remarked {
+            stamp,
+            value: message.parse()?,
+        },
+        _ => unreachable!("INPUTS, HEAD_INPUTS, REMARK_INPUTS and this match list the same topics"),
     })
 }
 
@@ -633,6 +649,17 @@ impl Service {
                 .push(bus.subscribe_typed(topic, "expression", kind)?);
         }
         self.privacy = Some(bus.clone());
+        Ok(self)
+    }
+
+    /// Also read the voice's remarks about the lamp (`voice/remarked`,
+    /// #4175), for the glance at a remark the catalogue was given. Off unless
+    /// `LAMP_REMARK_GLANCE=on`.
+    pub fn with_remark_glance(mut self, bus: &Bus) -> io::Result<Self> {
+        for (topic, kind) in REMARK_INPUTS {
+            self.inputs
+                .push(bus.subscribe_typed(topic, "expression", kind)?);
+        }
         Ok(self)
     }
 

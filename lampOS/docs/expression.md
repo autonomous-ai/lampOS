@@ -205,6 +205,34 @@ file equals the old clip, the product with it glances exactly as before, a
 catalogue's own sudden clip is never played, and a file without a bounded
 `[startle]` is refused).
 
+## The glance at a remark (#4175)
+
+Off unless `LAMP_REMARK_GLANCE=on`. In a busy room, a line the voice holds
+as a remark about the lamp ("That lamp is cute." between two colleagues,
+`LAMP_REMARK_ABOUT_IT`, [second-voice.md](second-voice.md)) gets no words;
+the voice says it on the bus as `voice/remarked` (`VoiceRemarked`, its
+request's number alone). With the switch, `lamp-expression serve` subscribes
+to it and adds the clip "glance at a remark" (`startle::remark`): the
+startle's own move from the Startle skill's file, frame for frame, so the
+lamp looks up a little, as a creature that heard itself mentioned would,
+and lets it go. Without the startle's file there is no remark glance either,
+and the journal says why. It has its own trigger (`Trigger::Remarked`) and
+its own memory of the last remark, so it never shares the startle's 30 s:
+- once a remark, and at most once a minute (`REMARK_COOLDOWN_US`), so a
+  room that keeps talking about the lamp gets one glance, not a stare;
+- only while resting or listening, never while the lamp thinks or speaks;
+- only within 1.5 s of the remark's publishing (`REMARK_STROKE_US`): a late
+  glance reads as a machine catching up. The window counts from when the
+  voice holds the line, after its words are read, not from when it was said;
+- stopped for work (`stop_when_concentrating`), and like the startle it
+  needs fresh joints and an unheld turn.
+
+A catalogue's own `remarked` clip is never played: it is dropped as the
+catalogue is read and named once. Tests: `tests/it/remark_engine.rs` and
+`tests/runtime.rs` (the topic read only with the switch, aged by wall time).
+Not measured on a lamp yet: the time from the end of the remark to the
+glance.
+
 ## Optional idle layer, sleep and waking
 
 Task 36 (#714), in [alive.md](alive.md): with an `alive` part in the
@@ -481,6 +509,7 @@ legacy observation age; it does not convert transcripts into audio timing.
 | `room/state` | Voice: fresh quiet evidence permits optional nods, sway, unsolicited gaze and rest; unknown, busy or expired evidence suppresses them. A held turn's reactive face target is the gaze exception |
 | `name/heard` | Name listener: contextual evidence only, never proof of admission or readiness |
 | `ears/sudden` / `SuddenSound` | Ears ([ears.md](ears.md)): a short sound that rose suddenly out of the room's quiet starts the optional `sudden` clip; a sound that went on starts nothing |
+| `voice/remarked` / `VoiceRemarked` | Only with `LAMP_REMARK_GLANCE=on`: a line the voice held as a remark about the lamp in a busy room starts the "glance at a remark" clip once, at most once a minute ([The glance at a remark](#the-glance-at-a-remark-4175); #4175) |
 | `controls/gesture` / `ControlGesture` | Controls: with an `alive` part, an enabled tap or stroke wakes a sleeping lamp ([alive.md](alive.md)); a long press does not |
 | `schedule/due` / `ScheduleDue` | Schedule: with an `alive` part, a notice newly due wakes a sleeping lamp, once for each delivery |
 | The local time of day (not a topic) | `serve --zone system` or `--utc-offset-minutes N` itself, at start and every minute; `import` with either, from a recording's wall clock. Only sleep reads it |

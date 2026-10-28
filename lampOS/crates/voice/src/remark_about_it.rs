@@ -171,6 +171,8 @@ mod tests {
             "Make the lamp brighter, please.",
             "Make the lamp brighter.",
             "Dim the lamp, please.",
+            "Shut off the lamp.",
+            "Shut the lamp off.",
             "Is the lamp on?",
             // Its moves and a stated need (Reviewer-three's narrower P2 on
             // #4201).

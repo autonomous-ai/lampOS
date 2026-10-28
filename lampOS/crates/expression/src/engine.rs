@@ -5,8 +5,8 @@ use lamp_msgs::{
     BodyOffsets, ClockStamp, Concentration, ControlGesture, ExpressionBody, ExpressionFace,
     ExpressionGaze, ExpressionLease, ExpressionLight, ExpressionState, Faces, JointState, Light,
     NameHeard, PersonActivity, Room, RoomState, ScheduleDue, Speech, SuddenSound, TouchEvent,
-    TouchState, Voice, VoiceEvent, VoiceMute, VoicePlayout, VoiceProgress, VoiceSound, VoiceState,
-    VoiceTiming,
+    TouchState, Voice, VoiceEvent, VoiceMute, VoicePlayout, VoiceProgress, VoiceRemarked,
+    VoiceSound, VoiceState, VoiceTiming,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, VecDeque};
@@ -25,7 +25,7 @@ pub const MAX_PLAYOUT_FRAMES: usize = 128;
 /// that is still running could come back, and `lamp-voice.service` (one unit,
 /// `KillMode=mixed`) does not allow that.
 pub const MAX_VOICE_SESSIONS: usize = 32;
-const STREAMS: usize = 21;
+const STREAMS: usize = 22;
 const CONTEXT_BYTES: usize = 16 * 1024;
 
 /// Arrival time is supplied separately to ingest. Stamps retain the source
@@ -114,6 +114,13 @@ pub enum Input {
         stamp: ClockStamp,
         value: VoiceMute,
     },
+    /// Someone in a busy room said something about the lamp and the voice
+    /// said nothing (`voice/remarked`, #4175): one glance, with
+    /// `LAMP_REMARK_GLANCE=on`.
+    Remarked {
+        stamp: ClockStamp,
+        value: VoiceRemarked,
+    },
 }
 
 /// The name `Input::DayTime` goes by where a topic is asked for.
@@ -142,7 +149,8 @@ impl Input {
             | Self::DayTime { stamp, .. }
             | Self::HeadTouch { stamp, .. }
             | Self::HeadHand { stamp, .. }
-            | Self::VoiceMute { stamp, .. } => stamp,
+            | Self::VoiceMute { stamp, .. }
+            | Self::Remarked { stamp, .. } => stamp,
         }
     }
 
@@ -169,6 +177,7 @@ impl Input {
             Self::HeadTouch { .. } => TouchEvent::TOPIC,
             Self::HeadHand { .. } => TouchState::TOPIC,
             Self::VoiceMute { .. } => VoiceMute::TOPIC,
+            Self::Remarked { .. } => VoiceRemarked::TOPIC,
         }
     }
 
@@ -195,6 +204,7 @@ impl Input {
             Self::HeadTouch { .. } => 18,
             Self::HeadHand { .. } => 19,
             Self::VoiceMute { .. } => 20,
+            Self::Remarked { .. } => 21,
         }
     }
 
@@ -271,7 +281,7 @@ impl Input {
                     ));
                 }
             }
-            Self::VoiceState { .. } | Self::Room { .. } => {}
+            Self::VoiceState { .. } | Self::Room { .. } | Self::Remarked { .. } => {}
         }
         Ok(())
     }
@@ -290,6 +300,7 @@ pub struct Output {
 struct ClipState {
     pause_seen: Option<u64>,
     sudden_seen: Option<u64>,
+    remarked_seen: Option<u64>,
     started: Option<u64>,
     last_started: Option<u64>,
     last_completed: Option<u64>,
@@ -340,6 +351,8 @@ pub struct Engine {
     pause_since: Option<u64>,
     /// When the newest short sudden sound was heard, as Expression received it.
     sudden_since: Option<u64>,
+    /// When the newest remark about the lamp was said (#4175).
+    remarked_since: Option<u64>,
     clips: Vec<ClipState>,
     playout: VecDeque<VoicePlayout>,
     recent_playout: Option<RecentLevel>,
@@ -368,6 +381,33 @@ pub struct Engine {
     /// The skill that claims the night's sleep (#940), while its claim is
     /// fresh: only with rest requests on.
     sleep_claim: Option<String>,
+}
+
+/// One glance at a moment `heard` (a sudden sound or a remark), not yet
+/// `seen`: started now if inside its stroke and past its cooldown, else let
+/// go. Returns the moment once it is due, so it is never taken twice.
+fn glance_once(
+    runtime: &mut ClipState,
+    seen: Option<u64>,
+    heard: Option<u64>,
+    clip: &crate::Behaviour,
+    now_us: u64,
+) -> Option<u64> {
+    let heard = heard?;
+    let start = heard.saturating_add(clip.delay_us);
+    if seen == Some(heard) || now_us < start {
+        return None;
+    }
+    if runtime.started.is_none()
+        && now_us <= start.saturating_add(clip.stroke_us)
+        && runtime
+            .last_started
+            .is_none_or(|last| now_us.saturating_sub(last) >= clip.cooldown_us)
+    {
+        runtime.started = Some(now_us);
+        runtime.last_started = Some(now_us);
+    }
+    Some(heard)
 }
 
 impl Engine {
@@ -412,6 +452,7 @@ impl Engine {
             has_speech: false,
             pause_since: None,
             sudden_since: None,
+            remarked_since: None,
             clips,
             playout: VecDeque::new(),
             recent_playout: None,
@@ -726,8 +767,9 @@ impl Engine {
                 // A finishing nod has already observed a genuine pause. Once
                 // its allowed Thinking transition happens, Voice need not keep
                 // publishing the Listening detector's quiet heartbeat.
-                // A glance at a sudden sound is the room's and finishes.
-                if clip.trigger != Trigger::Sudden
+                // A glance at a sudden sound or a remark is the room's and
+                // finishes.
+                if !clip.trigger.is_rooms()
                     && !self.voice.as_ref().is_some_and(|voice| {
                         voice.state == Voice::Thinking
                             && clip.trigger == Trigger::Pause
@@ -757,9 +799,10 @@ impl Engine {
         self.pause_since = None;
         // A sudden sound is the room's, not the voice's: it outlives a turn,
         // and a glance already under way finishes. It still stops if the lamp
-        // begins to speak, since its clip is not allowed while speaking.
+        // begins to speak, since its clip is not allowed while speaking. So
+        // does a glance at a remark (#4175).
         for (behaviour, clip) in self.catalogue.behaviours.iter().zip(&mut self.clips) {
-            if behaviour.trigger != Trigger::Sudden {
+            if !behaviour.trigger.is_rooms() {
                 clip.started = None;
             }
             clip.pause_seen = None;
@@ -974,9 +1017,10 @@ impl Engine {
                     self.has_speech = true;
                     self.pause_since = None;
                     // Speech stops what the lamp was doing for the voice; a
-                    // glance at a sudden sound is the room's and finishes.
+                    // glance at a sudden sound or a remark is the room's and
+                    // finishes.
                     for (behaviour, clip) in self.catalogue.behaviours.iter().zip(&mut self.clips) {
-                        if behaviour.trigger != Trigger::Sudden {
+                        if !behaviour.trigger.is_rooms() {
                             clip.started = None;
                         }
                     }
@@ -1077,6 +1121,9 @@ impl Engine {
                     self.sudden_since = Some(stamp.at_us);
                 }
             }
+            // Its own moment, never the startle's: a remark and a bang each
+            // keep their own once and their own cooldown (#4175).
+            Input::Remarked { stamp, .. } => self.remarked_since = Some(stamp.at_us),
         }
         self.update_rest_eligibility(now_us);
         self.marks[stream] = Some((stamp.at_us, stamp.sequence));
@@ -1299,7 +1346,7 @@ impl Engine {
                         && voice.state == Voice::Thinking
                         && clip.trigger == Trigger::Pause
                         && clip.continue_in.contains(&Voice::Thinking);
-                    if !carry && clip.trigger != Trigger::Sudden {
+                    if !carry && !clip.trigger.is_rooms() {
                         runtime.started = None;
                     }
                 }
@@ -1604,8 +1651,10 @@ impl Engine {
                 || (!clip.states.contains(&clip_mode) && !continuing)
                 || (clip.quiet_only && room != Room::Quiet)
                 || (clip.stop_when_concentrating && concentrating)
-                || (matches!(clip.trigger, Trigger::Pause | Trigger::Sudden)
-                    && (held || !joints_fresh))
+                || (matches!(
+                    clip.trigger,
+                    Trigger::Pause | Trigger::Sudden | Trigger::Remarked
+                ) && (held || !joints_fresh))
             {
                 self.clips[index].started = None;
                 continue;
@@ -1694,26 +1743,26 @@ impl Engine {
                     .as_ref()
                     .and_then(|v| now_us.checked_sub(v.at_us.saturating_add(clip.delay_us))),
                 Trigger::Concentrating if concentrating => Some(0),
+                // A glance answers a sound or a remark now or not at all:
+                // one heard by a stalled loop is let go, as a living thing
+                // lets go of a sound it missed, and a second inside the
+                // cooldown gets nothing.
                 Trigger::Sudden => {
                     let runtime = &mut self.clips[index];
-                    if let Some(heard) = self.sudden_since {
-                        let start = heard.saturating_add(clip.delay_us);
-                        if runtime.sudden_seen != Some(heard) && now_us >= start {
-                            runtime.sudden_seen = Some(heard);
-                            // A glance answers a sound now or not at all: one
-                            // heard by a stalled loop is let go, as a living
-                            // thing lets go of a sound it missed, and a second
-                            // inside the cooldown gets nothing.
-                            if runtime.started.is_none()
-                                && now_us <= start.saturating_add(clip.stroke_us)
-                                && runtime.last_started.is_none_or(|last| {
-                                    now_us.saturating_sub(last) >= clip.cooldown_us
-                                })
-                            {
-                                runtime.started = Some(now_us);
-                                runtime.last_started = Some(now_us);
-                            }
-                        }
+                    let seen = runtime.sudden_seen;
+                    if let Some(heard) = glance_once(runtime, seen, self.sudden_since, clip, now_us)
+                    {
+                        runtime.sudden_seen = Some(heard);
+                    }
+                    runtime.started.and_then(|at| now_us.checked_sub(at))
+                }
+                Trigger::Remarked => {
+                    let runtime = &mut self.clips[index];
+                    let seen = runtime.remarked_seen;
+                    if let Some(heard) =
+                        glance_once(runtime, seen, self.remarked_since, clip, now_us)
+                    {
+                        runtime.remarked_seen = Some(heard);
                     }
                     runtime.started.and_then(|at| now_us.checked_sub(at))
                 }

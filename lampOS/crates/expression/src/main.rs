@@ -41,6 +41,8 @@ into, a three-second hold puts it to sleep, a tap wakes it (docs/alive.md, #711)
 --offline-face draws listening as not ready while lamp/online says the lamp is offline.\n\
 --startle reads the startle, a glance at a sudden sound, from its skill's file (#2822): serve\n\
 reads /var/lib/lampOS/skills/startle/skill.toml without it, replay none. No other startle.\n\
+LAMP_REMARK_GLANCE=on glances once, with the startle's move, when someone in a busy room said\n\
+something about the lamp and the voice said nothing (voice/remarked, #4175); off otherwise.\n\
 No command opens hardware, launches a provider, or changes a device's service settings.";
 
 #[derive(Debug, Default)]
@@ -304,10 +306,25 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
         (None, "serve") => Some(PathBuf::from(startle::INSTALLED)),
         (None, _) => None,
     };
+    // The glance at a remark (#4175) is the startle's move, off unless
+    // `LAMP_REMARK_GLANCE=on`: without the startle there is none.
+    let remark_glance = runtime::remark_glance_on(
+        std::env::var(runtime::REMARK_GLANCE_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
     if let Some(path) = startle {
         match startle::read(&path) {
             Ok(clip) => {
                 eprintln!("lamp-expression: the startle from {}", path.display());
+                if remark_glance {
+                    match startle::remark(&clip) {
+                        Ok(remark) => catalogue.behaviours.push(remark),
+                        Err(error) => eprintln!(
+                            "lamp-expression: no glance at a remark until a restart: {error}"
+                        ),
+                    }
+                }
                 catalogue.behaviours.push(clip);
             }
             Err(error) => eprintln!("lamp-expression: no startle until a restart: {error}"),
@@ -370,6 +387,9 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     }
     if rest_requests {
         service = service.with_rest_requests(&bus)?;
+    }
+    if remark_glance {
+        service = service.with_remark_glance(&bus)?;
     }
     if args.offline_face {
         service = service.with_offline_face(&bus);
