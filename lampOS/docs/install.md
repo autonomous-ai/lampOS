@@ -1201,11 +1201,12 @@ in the manifest. When they differ it says, e.g.
 7071's; run build 7071's, /opt/lampOS/update/current/lamp-update install,
 to write its units`, and goes on: it does not refuse, and writes the units as before.
 A running file that cannot be read says only `this lamp-update could not
-be checked against build <N>'s: <why>`. The build's own says nothing, and
-an install that ends before its units says nothing of it. Shown only in
+be checked against build <N>'s: <why>`. The build's own says nothing, a
+build that carries no `lamp-update` has nothing to check against and says
+nothing, and an install that ends before its units says nothing of it. Shown only in
 tests (`crates/update/tests/install.rs`,
 `a_lamp_update_not_the_builds_own_is_named_and_install_still_writes_the_units`
-and the three beside it), not yet on a lamp.
+and the four beside it), not yet on a lamp.
 
 So a unit can meet a binary older than itself. `lamp-actions` and
 `lamp-skills` exit 2 on an option they don't know, and with
