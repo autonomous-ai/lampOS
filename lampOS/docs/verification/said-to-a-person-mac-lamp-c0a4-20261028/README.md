@@ -15,11 +15,18 @@ Mac, which sits close to the lamp.
   as the lamp wrote it, in the lamp's local time (+07:00). The journal never
   holds the words heard.
 
-**Read:** one hearing at or over the bar, voice 2's "Ma'am, could you pass me
-the salt please?" at 0.92, was answered (request 2). Three later lines were
-answered as a conversation going on (requests 4, 8 and 9). Requests 3 and 7
-were held as said to someone named. The control (request 12) was answered,
-"the text shows it was called". The switch's hold line ("its first word, set
-off, is said to a person") did not appear. Why request 2 was let out is not
-in the journal: the first word as speech to text wrote it, or another sign
-(the Mac is close, `busy-near`). See #3945.
+**Read:** one hearing at or over the bar during a line, voice 2's "Ma'am,
+could you pass me the salt please?" at 0.92, was answered (request 2: "its
+name was heard in the room's sound"). The switch's first-word check never
+shows for it. Request 8 shows that check ("its first word, set off, doesn't
+sound like it"); request 2 does not. Four more of the 18 lines were answered:
+request 6 as "the first thing said after the lamp's own news" (request 5 was
+the lamp's own news), and requests 4, 8 and 9 as a conversation going on. So
+the answered lines are requests 2, 4, 6, 8 and 9. Requests 3 and 7 were held
+as said to someone named, and 11 as a short sound. A second hearing over the
+bar, 0.95 at 23:11:48, went with request 10, which heard no words, so nothing
+was answered. The control (request 12) was answered, "the text shows it was
+called". The switch's hold line ("its first word, set off, is said to a
+person") does not appear. Why request 2's first word wasn't checked, or what
+else let it out (the Mac is close, `busy-near`), isn't in the journal. See
+#3945. Counts corrected after Reviewer-two's read on #4170.
