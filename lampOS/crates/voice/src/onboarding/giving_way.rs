@@ -3,8 +3,12 @@
 //!
 //! The invitation is one exact token on `onboarding/pending`, as the privacy
 //! and near-call steps' are: the core onboarding skill asks the say service
-//! for it, and only the whole invitation's playback opens a try. The try's
-//! window is in Unix milliseconds, as the bus's headers are; the coordinator's
+//! for it, and only the whole invitation's playback opens a try's minute.
+//! The body is listened to from the moment the invitation is taken to be
+//! said, though: a person pushes as soon as they are asked, while the lamp
+//! is still saying it, and does not push again (lamp-29e7, 28 Oct, #3702:
+//! the body said the hand 15 s before the try opened). The try's window is
+//! in Unix milliseconds, as the bus's headers are; the coordinator's
 //! monotonic clock is only its deadline and the clock-jump check. The body's
 //! own `since_us` is its monotonic clock and is never read as a time here.
 //!
@@ -19,14 +23,22 @@
 //! ([`BEFORE_MS`]): the body gives way where the hand already has it, its
 //! goal there, a step before it says the hand (lamp-52e6, 27 Oct, #3504),
 //! so the last goal before the push is already the hand's.
+//! The lamp is never silent through the minute (#3702): the first push of a
+//! try is answered at once (`give_felt`), and a try with nothing felt
+//! [`PROMPT_AFTER_US`] into its minute is prompted once (`give_prompt`),
+//! and a push let go before the head moved enough is asked for a little
+//! more (`give_more`).
 //! The model may only skip it. Nothing here asks the body for anything.
 //! What it saw and decided is said on the journal (`lamp-voice: giving_way:`).
 #[cfg(test)]
-pub use super::legacy_words::{GIVE_AGAIN, GIVE_ASK, GIVE_DONE, GIVE_FAILED};
+pub use super::legacy_words::{
+    GIVE_AGAIN, GIVE_ASK, GIVE_DONE, GIVE_FAILED, GIVE_FELT, GIVE_MORE, GIVE_PROMPT,
+};
 
 use super::{
-    Delivery, FRESH_MS, GONE_US, MOST_UNSAID, NOT_SAID, Onboarding, Outcome, SIT_GIVE_UP_US,
-    START_QUIET_US, STEP_GIVE_UP_US, Step, TIMED_OUT_QUIET_US, fresh_token, near::CLOCK_SLACK_MS,
+    Delivery, FRESH_MS, GONE_US, GUIDE_EVERY_US, MOST_UNSAID, NOT_SAID, Onboarding, Outcome,
+    SIT_GIVE_UP_US, START_QUIET_US, STEP_GIVE_UP_US, Step, TIMED_OUT_QUIET_US, fresh_token,
+    near::CLOCK_SLACK_MS,
 };
 use lamp_turn_owner::BootId;
 use serde_json::json;
@@ -55,6 +67,9 @@ const WINDOW_MS: u64 = WINDOW_US / 1_000;
 pub(super) const MOST_TRIES: u8 = 2;
 /// The bus is read at most this often.
 const LOOK_EVERY_US: u64 = 20_000;
+/// A try with nothing felt this far into its minute is prompted once:
+/// touch's guide time, a few seconds, never a silent minute (#3702).
+const PROMPT_AFTER_US: u64 = GUIDE_EVERY_US;
 
 /// One reading from the body, validated and dated in Unix milliseconds.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -194,10 +209,16 @@ struct Offer {
 }
 
 struct Window {
-    /// Unix milliseconds, read when the whole invitation's playback was known.
+    /// Unix milliseconds when the invitation was taken to be said: the body
+    /// is read from then (#3702).
+    from_ms: u64,
+    /// Unix milliseconds, read when the whole invitation's playback was
+    /// known; until then, `from_ms`.
     ended_ms: u64,
     /// The coordinator's clock then: the deadline and the clock-jump check only.
     ended_us: u64,
+    /// The whole invitation was played: the minute runs.
+    open: bool,
 }
 
 #[derive(Default)]
@@ -217,6 +238,9 @@ pub(super) struct GivingWayFlow {
     moved: Option<Moved>,
     /// Pushes the body said in this try, for the journal.
     pushes: u32,
+    /// This try's `give_felt`, and its `give_prompt`, are owed or said.
+    felt_said: bool,
+    prompted: bool,
     /// Invitations the voice never said, offered again ([`MOST_UNSAID`]).
     unsaid: u8,
 }
@@ -341,10 +365,24 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
+        let attempt = offer.attempt;
+        // The body is read from now: a push while the lamp is still saying
+        // it is the try's (#3702).
+        let from_ms = (self.unix_clock)();
+        self.giving.forget_push();
+        self.giving.pushes = 0;
+        self.giving.felt_said = false;
+        self.giving.prompted = false;
+        self.giving.window = Some(Window {
+            from_ms,
+            ended_ms: from_ms,
+            ended_us: now_us,
+            open: false,
+        });
         // A second try within the walk says what didn't work and how to do
         // it (#3769); a re-offer later opens as the first did
         // (Reviewer-three's P3 on #3781).
-        if offer.attempt > 1
+        if attempt > 1
             && !self.desired.steps.contains_key(Step::GivingWay.name())
             && let Some(again) = &self.definition.words.give_again
         {
@@ -387,7 +425,7 @@ impl Onboarding {
             .as_ref()
             .is_some_and(|offer| offer.token == token && offer.bound.is_none())
         {
-            self.giving.offer = None;
+            self.forget_giving();
             self.giving.retry_after_us = now_us.saturating_add(1_000_000);
         }
     }
@@ -439,13 +477,19 @@ impl Onboarding {
             flow_end(self, now_us);
             return;
         }
-        self.giving.forget_push();
-        self.giving.pushes = 0;
-        eprintln!("lamp-voice: giving_way: the invitation was played whole; the try is open");
-        self.giving.window = Some(Window {
-            ended_ms: (self.unix_clock)(),
+        // A push felt while it was said is kept: the minute runs from here.
+        let ended_ms = (self.unix_clock)();
+        let window = self.giving.window.get_or_insert(Window {
+            from_ms: ended_ms,
+            ended_ms,
             ended_us: now_us,
+            open: true,
         });
+        (window.ended_ms, window.ended_us, window.open) = (ended_ms, now_us, true);
+        eprintln!(
+            "lamp-voice: giving_way: the invitation was played whole; the try is open, {} push(es) felt while it was said",
+            self.giving.pushes
+        );
     }
 
     /// One reading from the body. Judged as it comes, on the loop, without
@@ -454,9 +498,9 @@ impl Onboarding {
         let Some(window) = self.giving.window.as_ref() else {
             return;
         };
-        let (ended_ms, ended_us) = (window.ended_ms, window.ended_us);
+        let (from_ms, ended_ms, ended_us) = (window.from_ms, window.ended_ms, window.ended_us);
         if let Some(at_ms) = felt.at_ms()
-            && (at_ms < ended_ms || at_ms > ended_ms.saturating_add(WINDOW_MS))
+            && (at_ms < from_ms || at_ms > ended_ms.saturating_add(WINDOW_MS))
         {
             return;
         }
@@ -500,6 +544,12 @@ impl Onboarding {
                     );
                 }
                 flow.pushed = true;
+                // Answered at once, on the first push of a try (#3702).
+                if !std::mem::replace(&mut flow.felt_said, true)
+                    && let Some(line) = &self.definition.words.give_felt
+                {
+                    self.owed = Some(line.clone());
+                }
             }
             Felt::Hand { pushed: false, .. } => {
                 if !flow.pushed {
@@ -519,6 +569,12 @@ impl Onboarding {
                     }
                 );
                 if !given_way {
+                    // Let go before the head moved enough: a little more,
+                    // each time (#3702). Too hard is never a failure: the
+                    // body gives way.
+                    if let Some(line) = &self.definition.words.give_more {
+                        self.owed = Some(line.clone());
+                    }
                     return;
                 }
                 let expected_ms = ended_ms + now_us.saturating_sub(ended_us) / 1_000;
@@ -540,12 +596,27 @@ impl Onboarding {
     /// A try's minute ended without the evidence. Run every loop, whatever
     /// storage is doing, as the evidence is judged.
     pub(super) fn giving_judge(&mut self, now_us: u64) {
-        if self
+        let Some(open_us) = self
             .giving
             .window
             .as_ref()
-            .is_some_and(|window| now_us.saturating_sub(window.ended_us) >= WINDOW_US)
+            .filter(|window| window.open)
+            .map(|window| now_us.saturating_sub(window.ended_us))
+        else {
+            return;
+        };
+        // Nothing felt a few seconds into the minute: prompted once, never
+        // a silent minute (#3702).
+        let flow = &mut self.giving;
+        if open_us >= PROMPT_AFTER_US
+            && flow.pushes == 0
+            && !std::mem::replace(&mut flow.prompted, true)
+            && let Some(line) = &self.definition.words.give_prompt
         {
+            eprintln!("lamp-voice: giving_way: nothing felt yet; prompted once");
+            self.owed = Some(line.clone());
+        }
+        if open_us >= WINDOW_US {
             eprintln!(
                 "lamp-voice: giving_way: the try's minute ended, not given way; the body said a hand {} times",
                 self.giving.pushes
@@ -577,6 +648,7 @@ impl Onboarding {
             self.led = None;
             return;
         }
+        // Listening for a hand, from the invitation's start.
         if self.giving.window.is_some() {
             return;
         }
