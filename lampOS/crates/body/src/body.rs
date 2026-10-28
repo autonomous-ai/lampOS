@@ -331,36 +331,45 @@ pub fn own_ranges_from(value: Option<&str>) -> bool {
 /// refuse and leave the joint short of.
 const OWN_RANGE_MARGIN: u16 = 20;
 
-/// Steps a joint off its goal may go without turning toward it and still be
-/// following: a tenth of a second. A hand that catches it stops it turning.
-const FOLLOW_STILL_STEPS: u16 = 5;
+/// The window over which a joint off its goal must have turned toward it to
+/// be following: five steps, a tenth of a second.
+const FOLLOW_STEPS: usize = 5;
 
-/// The least a step's turn toward the goal counts as one: over a servo's
-/// count or two of noise at rest.
-const FOLLOW_STEP: u16 = 2;
+/// The least net turn toward the goal over [`FOLLOW_STEPS`] that is
+/// following: over a held servo's reading jitter (two counts back and forth
+/// nets nothing), under a servo's slowest follow.
+const FOLLOW_NET: u16 = 4;
 
-/// A joint off its goal that turned toward it, by at least [`FOLLOW_STEP`],
-/// within the last [`FOLLOW_STILL_STEPS`]: following a goal that moved
-/// faster than it turns. Not whether the gap shrank: while a goal ramps away
-/// faster than the servo gathers speed, the gap grows though the joint turns
-/// toward it, and on lamp-52e6 (28 Oct, 8001) that read as a hand 52 times in
-/// 15 minutes, the base given way every 2.3 s through a turn (the
-/// Reviewer-lead's P2s on #3925). A hand holds it still or turns it away.
-fn following(not_toward_for: u16) -> bool {
-    not_toward_for < FOLLOW_STILL_STEPS
-}
-
-/// A joint's turn this step, kept as the steps since it last turned toward
-/// its goal ([`following`]). On its track, and on the first step off it, the
-/// count starts again.
-fn note_turn(last: &mut u16, not_toward_for: &mut u16, goal: u16, position: u16, off_track: u8) {
-    let toward = goal.abs_diff(position) + FOLLOW_STEP <= goal.abs_diff(*last);
-    if off_track <= 1 || toward {
-        *not_toward_for = 0;
-    } else {
-        *not_toward_for = not_toward_for.saturating_add(1);
+/// A joint's positions over the last [`FOLLOW_STEPS`], and whether it turned
+/// toward its goal by at least [`FOLLOW_NET`] since the oldest of them:
+/// following a goal that moved faster than it turns. Not whether the gap
+/// shrank: while a goal ramps away faster than the servo gathers speed, the
+/// gap grows though the joint turns toward it; on lamp-52e6 (28 Oct, 8001)
+/// that read as a hand 52 times in 15 minutes. Not step to step: a held
+/// joint's reading jitters, and a two-count step back toward the goal every
+/// other step kept it "following" for good (the Reviewer-lead's P2s on
+/// #3925). On its track, and on the first step off it, the window starts
+/// again from here. A hand holds it still or turns it away.
+fn note_turn(
+    recent: &mut [u16; FOLLOW_STEPS],
+    seen: &mut usize,
+    goal: u16,
+    position: u16,
+    off_track: u8,
+) -> bool {
+    if off_track <= 1 {
+        *recent = [position; FOLLOW_STEPS];
+        *seen = 0;
+        return true;
     }
-    *last = position;
+    let slot = *seen % FOLLOW_STEPS;
+    let then = recent[slot];
+    recent[slot] = position;
+    // Until the window is full (and `pushed` waits longer: `load_steps`, six),
+    // only a joint not turned away is following.
+    let net = if *seen < FOLLOW_STEPS { 0 } else { FOLLOW_NET };
+    *seen += 1;
+    goal.abs_diff(position) + net <= goal.abs_diff(then)
 }
 
 /// The window a head or base goal must be inside for a joint whose servo
@@ -4849,10 +4858,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // in a row over it.
     let mut gave_at = [0u16; 3];
     let mut on_track_at = [0u16; 3];
-    // Each joint's position a step ago, and the steps since it last turned
-    // toward its goal ([`following`]).
-    let mut last_position = [0u16; 3];
-    let mut not_toward_for = [0u16; 3];
+    // Each joint's last positions off its track ([`note_turn`]).
+    let mut recent = [[0u16; FOLLOW_STEPS]; 3];
+    let mut seen = [0usize; 3];
 
     let mut held_from = [0u16; 3];
     let mut in_hand = [0u16; 3];
@@ -6714,14 +6722,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // that jumped faster than it turns, and its load is the move's:
             // lamp-52e6 on 27 Oct "met resistance" 98 times in four hours
             // with nobody near, each a two-second hitch in a glance.
-            note_turn(
-                &mut last_position[index],
-                &mut not_toward_for[index],
+            let following = note_turn(
+                &mut recent[index],
+                &mut seen[index],
                 written[index],
                 is.position,
                 off_track[index],
             );
-            let following = following(not_toward_for[index]);
             let pushed = in_a_hand
                 && off_track[index] >= limits.load_steps.max(1)
                 && is.load > STALL_LOAD
