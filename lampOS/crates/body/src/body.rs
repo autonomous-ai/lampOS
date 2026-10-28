@@ -4737,6 +4737,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // Each joint's last positions off its track ([`note_turn`]).
     let mut recent = [[0u16; FOLLOW_STEPS]; 3];
     let mut seen = [0usize; 3];
+    // Each joint's steps off its track not following it (the tracking stop).
+    let mut stuck = [0u8; 3];
 
     let mut held_from = [0u16; 3];
     let mut in_hand = [0u16; 3];
@@ -6605,6 +6607,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 is.position,
                 off_track[index],
             );
+            // The tracking stop is for a servo stuck, not turning toward its
+            // goal: steps a joint follows a goal that outruns it (judged on a
+            // full window) do not count. On lamp-52e6 (28 Oct, 09:39) a base
+            // following a goal faster than it turns, no longer given way as a
+            // hand, stayed over 30 off for 10 steps, ended on tracking, let go
+            // and the standing lamp fell with nobody near.
+            stuck[index] = if off_track[index] <= 1 {
+                off_track[index]
+            } else if following && seen[index] > FOLLOW_STEPS {
+                0
+            } else {
+                stuck[index].saturating_add(1)
+            };
             let pushed = in_a_hand
                 && off_track[index] >= limits.load_steps.max(1)
                 && is.load > STALL_LOAD
@@ -6675,7 +6690,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 velocity[index] = 0.0;
                 off_track[index] = 0;
                 report.rested_short[index] = report.rested_short[index].saturating_add(1);
-            } else if off_track[index] >= limits.tracking_steps && short_steps[index] == 0 {
+            } else if stuck[index] >= limits.tracking_steps && short_steps[index] == 0 {
                 surprise.get_or_insert(Stop::Tracking {
                     joint: joint.id(),
                     goal: written[index],

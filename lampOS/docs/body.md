@@ -177,14 +177,23 @@ nothing in its way either time.
 
 Under `--give-way`, a joint off its goal by more than its tracking for six
 steps while it reads over 100 gives way too, as a hand holding it; but not
-one that has come nearer its goal, by more than 6 counts, than where it last
-tracked, and came nearer still within the last 5 steps, a tenth of a second
-(`closing_on`, `FOLLOW_STILL_STEPS`): that one is following a goal that jumped faster than
-it turns, and its load is the move's. On lamp-52e6 on 27 October, before
-this, the head pitch and the base gave way 98 times in four hours with
-nobody near, each a two-second hitch in a glance. A hand that catches it
-partway stops it closing, and it gives way as before (the Reviewer-lead on
-#3925; `a_joint_closing_on_its_goal_is_following_not_pushed`).
+one that turned toward its goal by at least 4 counts over the last 5 steps,
+a tenth of a second (`note_turn`, `FOLLOW_STEPS`, `FOLLOW_NET`): that one is
+following a goal that moved faster than it turns, and its load is the
+move's. On lamp-52e6 on 27 October, before this, the head pitch and the base
+gave way 98 times in four hours with nobody near, each a two-second hitch in
+a glance. A hand that catches it partway holds it still or turns it away,
+and it gives way as before (the Reviewer-lead on #3925;
+`a_joint_turning_toward_its_goal_is_following_not_pushed`). A following
+joint does not count toward the tracking stop either: that stop is for a
+servo stuck, not turning toward its goal, and counts only the steps a joint
+is off its track and not following (`stuck`). On lamp-52e6 on 28 October at
+09:39 a base following a goal faster than it turns, no longer given way,
+stayed over 30 off for 10 steps, ended on tracking (joint 1, goal 1,908, at
+1,961), let go, and the standing lamp fell with nobody touching it
+(`a_base_following_a_goal_that_outruns_it_does_not_end_on_tracking`). A
+servo stuck short of its goal still ends on tracking
+(`a_base_stuck_short_of_its_goal_still_ends_on_tracking`).
 
 The bounds for the head and the base were 170 and 150 until 2026-10-13.
 With everything above in place the head still gave way now and then when

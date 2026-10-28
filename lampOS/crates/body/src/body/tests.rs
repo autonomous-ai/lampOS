@@ -14388,3 +14388,98 @@ fn a_base_given_way_and_held_still_under_its_bound_is_not_a_hand() {
         assert!(seen.iter().all(|g| !g.hand), "limp {limp}: {report:?}");
     }
 }
+
+/// lamp-52e6, 28 Oct, 09:39: a base following a goal that moves faster
+/// than it turns stayed more than 30 off it for over 10 steps at a load of
+/// 120. Following, it is not a hand (#3925), and not a stuck servo either:
+/// it does not end the run on tracking, which lets go and dropped the
+/// standing lamp with nobody near. Here the base lifts toward fewer counts
+/// no faster than 60 counts a second, after a face 300 counts round.
+#[test]
+fn a_base_following_a_goal_that_outruns_it_does_not_end_on_tracking() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.climb = Some((YAW, 60.0));
+    lamp.strains = vec![(Duration::ZERO, Duration::from_secs(8), YAW, 120)];
+    let looking = Looking::new([342, 200], [400, 120]).unwrap();
+    let limits = Limits {
+        give_way: Some(GiveWay::Return),
+        ..Limits::folded_with(Tuning {
+            reach: [100, 15, 30, 150],
+            speed: 120,
+            servo_speed: 300,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let tracking = usize::from(limits.tracking_steps);
+    let seen_from = Rc::new(Cell::new((f32::from(HOME[2]), f32::from(HOME[0]))));
+    let eyes = face_at(seen_from.clone(), &clock.time, (-300.0, 0.0));
+    let (mut off, mut longest) = (0usize, 0usize);
+    let report = run_looking(
+        &mut lamp,
+        &mut clock,
+        limits,
+        None,
+        None,
+        Some(looking),
+        || Some((Mood::Listening, 100)),
+        eyes,
+        |glimpse| {
+            seen_from.set((
+                f32::from(glimpse.positions[2]),
+                f32::from(glimpse.positions[0]),
+            ));
+            off = if glimpse.goals[2].abs_diff(glimpse.positions[2]) > 30 {
+                off + 1
+            } else {
+                0
+            };
+            longest = longest.max(off);
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(longest > 2 * tracking, "off its goal {longest} steps only");
+    assert_eq!(report.eased, [0; 3], "{report:?}");
+}
+
+/// A base stuck 100 counts short of any goal, not turning toward it, at a
+/// load under `STALL_LOAD` (so not a hand): it still ends on tracking.
+#[test]
+fn a_base_stuck_short_of_its_goal_still_ends_on_tracking() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.short = Some((YAW, 100.0));
+    lamp.strains = vec![(Duration::ZERO, Duration::from_secs(8), YAW, 90)];
+    let looking = Looking::new([342, 200], [400, 120]).unwrap();
+    let limits = Limits {
+        give_way: Some(GiveWay::Return),
+        ..Limits::folded_with(Tuning {
+            reach: [100, 15, 30, 150],
+            speed: 120,
+            servo_speed: 300,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let seen_from = Rc::new(Cell::new((f32::from(HOME[2]), f32::from(HOME[0]))));
+    let eyes = face_at(seen_from.clone(), &clock.time, (300.0, 0.0));
+    let report = run_looking(
+        &mut lamp,
+        &mut clock,
+        limits,
+        None,
+        None,
+        Some(looking),
+        || Some((Mood::Listening, 100)),
+        eyes,
+        |glimpse| {
+            seen_from.set((
+                f32::from(glimpse.positions[2]),
+                f32::from(glimpse.positions[0]),
+            ));
+        },
+    );
+    assert!(
+        matches!(report.stop, Stop::Tracking { joint: 1, .. }),
+        "{report:?}"
+    );
+}
