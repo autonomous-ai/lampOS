@@ -163,7 +163,7 @@ export class FakeLamp {
     let going = this.pushing;
     if (request.part === 0) {
       if (going && going.client !== client) return this.refuse(ws, id, 'busy', "another computer's push is in flight");
-      going = this.pushing = { client, part: -1, chunks: [] };
+      going = this.pushing = { client, part: -1, chunks: [], asks: request.asks };
     } else if (!going || going.client !== client || request.part !== going.part + 1) {
       return this.refuse(ws, id, 'bad_request', 'parts out of order');
     }
@@ -184,6 +184,7 @@ export class FakeLamp {
       return this.refuse(ws, id, 'bad_request', error.why ?? error.message);
     }
     if (opened.name !== request.name) return this.refuse(ws, id, 'refused', 'not a package of that skill');
+    if (opened.author && !going.asks) return this.refuse(ws, id, 'bad_request', 'a signed package is pushed with asks on part 0');
     const kept = this.pushed.get(request.name);
     if (kept && kept.client !== client) return this.refuse(ws, id, 'refused', "another computer's skill has that name");
     let asks = [];

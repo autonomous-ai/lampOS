@@ -693,6 +693,10 @@ test('a shared package is installed with its asks on part 0, and refused before 
     await assert.rejects(lamp.installPackage(body), byCode.no_grant);
     await assert.rejects(lamp.installPackage(Buffer.from(signed.toString('latin1').replace('speak = true', 'speak = TRUE'), 'latin1')), (error) => /does not match lamp-skill.json/.test(error.why));
     assert.equal(fake.asked('skill.push').length, pushes.length);
+    // A signed package sent without asks, as a plain push would: the lamp requires them.
+    const sha256 = createHash('sha256').update(signed).digest('hex');
+    await assert.rejects(lamp.request('skill.push', { name: 'desk-wave', sha256, size: signed.length, part: 0, parts: 1, data: signed.toString('base64') }),
+      (error) => error.code === 'bad_request' && /asks on part 0/.test(error.why));
   });
   // The same table as the Python SDK's asks_of test.
   const { parse } = await import('smol-toml');

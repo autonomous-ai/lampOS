@@ -354,6 +354,9 @@ class FakeLamp:
         if opened.name != request["name"]:
             await self._refuse(ws, id_, "refused", "not a package of that skill")
             return
+        if opened.author and "asks" not in going["request"]:
+            await self._refuse(ws, id_, "bad_request", "a signed package is pushed with asks on part 0")
+            return
         kept = self.pushed.get(request["name"])
         if kept and kept["client"] != client:
             await self._refuse(ws, id_, "refused", "another computer's skill has that name")

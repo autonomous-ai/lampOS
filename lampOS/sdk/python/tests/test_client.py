@@ -1083,6 +1083,9 @@ def test_a_shared_package_is_installed_with_its_asks_on_part_0(tmp_path, monkeyp
                 with pytest.raises(LampError, match="does not match lamp-skill.json"):
                     await lamp.install_package(signed.replace(b"speak = true", b"speak = TRUE"))
                 assert len(fake.asked("skill.push")) == len(pushes)
+                # A signed package sent without asks, as a plain push would: the lamp requires them.
+                with pytest.raises(errors.BY_CODE["bad_request"], match="asks on part 0"):
+                    await lamp._send_package(push.Package("desk-wave", "0.2.0", signed))
 
     run(go())
 
