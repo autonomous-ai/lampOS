@@ -27,6 +27,9 @@ Environment=LAMP_SKILLS_ASK=skip
 Environment=LAMP_SKILL_ROUTINES=on
 # A skill's light is asked of the ring (#1132): the ring's half is the voice's LAMP_LIGHT_REQUESTS (17 Oct).
 Environment=LAMP_LIGHT_REQUESTS=on
+# A skill's gestures and moves say who asks, `skill:<name>` at `skill`, stamped by the runner (#1252), which the body
+# weighs with --arbitration on (#940): the lamp programming protocol's phase 0 (#3504, 27 Oct).
+Environment=LAMP_BODY_REQUESTS=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
 # [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).
 # --state-dir: the skills a person turned off with a skill's [stop], one name a line in off, kept

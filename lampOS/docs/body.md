@@ -1713,6 +1713,13 @@ is who asks weighed, and off, `source` and `priority` (even `null`) are
 read and not weighed, so a stamped gesture plays as an unstamped one; off,
 `priority` is kept only for an unprompted gesture to give way (below).
 So the callers' stamping and every lamp's switch need not flip together.
+The product's units turn both on together, `--arbitration on` in
+`lamp-body.service` and `LAMP_BODY_REQUESTS=on` in `lamp-skills.service`:
+the lamp programming protocol's phase 0 (Nine's design on #3504, 27 Oct),
+so a skill's or an outside controller's gesture gives way to the
+conversation's and a person's before outside code gets in. Pinned by
+`the_product_unit_weighs_who_asks_for_a_gesture` (lamp-body) and
+`the_product_unit_stamps_who_asks_for_a_gesture` (lamp-skills).
 `lamp-skills` stamps `skill:<name>` at `skill` with `LAMP_BODY_REQUESTS=on`
 ([skills.md](skills.md), #1252); the voice sends its gestures unstamped,
 so they are the conversation's.
