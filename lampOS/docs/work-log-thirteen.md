@@ -196,3 +196,14 @@ Ready for lamp-voice: yes (#4147)
   - Product lamps have `LAMP_SETTINGS_WIFI` and `LAMP_WIFI_RECOVERY` off, so a lamp whose Wi-Fi changes says nothing. Words for #3020's recovery are proposed to Sixth.
   - The pinned `wifi_lost` clip still has the old words (#3743).
   - The app's Head line has gone to Mobile.
+
+### #3743, the recovery hotspot's line (with Sixth's #3020)
+
+Ready for lamp-voice: yes (#4157)
+
+- Behind `LAMP_WIFI_RECOVERY`: as the hotspot first opens for a loss, `recover` plays the recording `wifi_recovering`: "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app." Tested at `3601148422`.
+- Gate: setup 38/0, 167/0, 6/0; audio notice 9/0; voice notices+say 70/0; switches 2/0; clippy and fmt clean.
+- Test render from the Mac: 5.44 s. Not committed.
+- No lamp run: a product voice refuses a test clip, and the production render needs a person to listen first.
+- The notices release waits for a build that has both #4094 and #4157.
+- #4147: READ-OK from Second, Reviewer-two and Reviewer-three; ARM64 green; NEXT TRAIN posted.
