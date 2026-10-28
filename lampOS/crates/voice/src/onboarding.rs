@@ -4785,7 +4785,9 @@ mod tests {
             Some(Outcome::NotAvailable)
         );
         assert!(!face_expressions_file(&room).exists());
-        assert!(FACE_EXPRESSIONS_NOTE.contains("I never say it aloud and keep no pictures."));
+        assert!(FACE_EXPRESSIONS_NOTE.contains(
+            "A yes covers everyone at this lamp. I never say it aloud and keep no pictures."
+        ));
     }
 
     #[test]
