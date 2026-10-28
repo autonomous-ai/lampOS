@@ -41,18 +41,18 @@ fn relink(lamp: &Lamp, target: &str) {
 #[test]
 fn the_confirmed_build_running_with_no_switch_waiting_is_ready() {
     let lamp = lamp(b"new");
-    ready(lamp.root.path(), &lamp.records, &lamp.lock, b"new").unwrap();
+    ready(lamp.root.path(), &lamp.lock, b"new").unwrap();
 }
 
 #[test]
 fn a_switch_waiting_or_one_that_cannot_be_read_is_not_settled() {
     let lamp = lamp(b"new");
     own::begin(&lamp.records, OTHER, BUILD).unwrap();
-    let why = ready(lamp.root.path(), &lamp.records, &lamp.lock, b"new").unwrap_err();
+    let why = ready(lamp.root.path(), &lamp.lock, b"new").unwrap_err();
     assert!(why.contains("waits to be confirmed"), "{why}");
 
     fs::write(lamp.records.join("self.json"), b"{not json").unwrap();
-    let why = ready(lamp.root.path(), &lamp.records, &lamp.lock, b"new").unwrap_err();
+    let why = ready(lamp.root.path(), &lamp.lock, b"new").unwrap_err();
     assert!(why.contains("not settled"), "{why}");
 }
 
@@ -61,11 +61,11 @@ fn a_running_lamp_update_that_is_not_the_build_named_is_not_ready() {
     let lamp = lamp(b"new");
     // Put back to OTHER while this one still runs.
     relink(&lamp, OTHER);
-    let why = ready(lamp.root.path(), &lamp.records, &lamp.lock, b"new").unwrap_err();
+    let why = ready(lamp.root.path(), &lamp.lock, b"new").unwrap_err();
     assert!(why.contains("not the build"), "{why}");
     // The build named, changed under the same name since this one started.
     let lamp = super::tests::lamp(b"changed");
-    let why = ready(lamp.root.path(), &lamp.records, &lamp.lock, b"new").unwrap_err();
+    let why = ready(lamp.root.path(), &lamp.lock, b"new").unwrap_err();
     assert!(why.contains("not the build"), "{why}");
 }
 
@@ -80,7 +80,7 @@ fn a_link_that_names_no_build_or_a_binary_that_is_no_file_is_refused() {
     ] {
         relink(&lamp, target);
         assert!(
-            ready(lamp.root.path(), &lamp.records, &lamp.lock, b"new").is_err(),
+            ready(lamp.root.path(), &lamp.lock, b"new").is_err(),
             "{target}"
         );
     }
@@ -93,9 +93,9 @@ fn a_link_that_names_no_build_or_a_binary_that_is_no_file_is_refused() {
         &binary,
     )
     .unwrap();
-    let why = ready(lamp.root.path(), &lamp.records, &lamp.lock, b"old").unwrap_err();
+    let why = ready(lamp.root.path(), &lamp.lock, b"old").unwrap_err();
     assert!(why.contains("not a regular file"), "{why}");
 
     fs::remove_file(on_root(lamp.root.path(), CURRENT)).unwrap();
-    assert!(ready(lamp.root.path(), &lamp.records, &lamp.lock, b"new").is_err());
+    assert!(ready(lamp.root.path(), &lamp.lock, b"new").is_err());
 }
