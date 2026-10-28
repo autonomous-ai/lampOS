@@ -46,6 +46,14 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_ONBOARDING_FILE";
 /// "who you are" falls back to the name heard, and "where you sit" takes a
 /// steady face after its guide while the head moves (row 10 try 4 on
 /// lamp-52e6). Off: the walk as before.
+/// How long "who you are" waits, after the yes to the face question, for the
+/// face to be saved before it ends done with the name only. The model calls
+/// `remember_my_face` in its answer to that yes, a few seconds on, and the
+/// eyes answer in about 1.7 s (lamp-29e7): well inside it, so the step is
+/// never done before a face that is being saved is kept (the lead's merge
+/// condition on #1711).
+const FACE_SAVE_WAIT_US: u64 = 15_000_000;
+
 pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 /// The provider worker's flag: the onboarding file, whose mailbox it writes.
 pub const FLAG: &str = "--onboarding-file";
@@ -440,6 +448,10 @@ enum Confirm {
 #[derive(Clone, Copy, Debug, Default)]
 struct Answers {
     name: bool,
+    /// With a face to keep: when the face question was answered after the
+    /// name (a yes), so the step ends done at [`FACE_SAVE_WAIT_US`] if no face
+    /// is saved by then.
+    face_answered_us: Option<u64>,
     quiet_hours: bool,
     hello: bool,
 }
@@ -1691,7 +1703,18 @@ impl Onboarding {
                 // here. On lamp-29e7 (28 Oct, 8001) a name and a yes ended it
                 // at 08:50:29 and no face was kept.
                 if led.heard.name && agrees(&words) {
+                    if face_kept {
+                        led.heard.face_answered_us.get_or_insert(now_us);
+                    }
                     !face_kept
+                } else if face_kept && led.heard.name && refuses(&words) {
+                    // The face question's no, after a name: done, the name
+                    // only, no face (the Reviewer-lead's P2 on #3992: taken
+                    // as the name's no, the give-up asked the name again).
+                    eprintln!(
+                        "lamp-voice: onboarding: who_you_are heard a no to the face: done, no face kept"
+                    );
+                    true
                 } else if names_someone(text, &words) {
                     if !led.heard.name {
                         eprintln!(
@@ -2076,6 +2099,25 @@ impl Onboarding {
                     .push(json!({"kind":"onboarding_guide","step":step.name(),"at_us":now_us}));
                 return Some(self.definition.words.touch_remind.as_str().into());
             }
+            return None;
+        }
+        // A yes to the face with no face saved in [`FACE_SAVE_WAIT_US`] (a
+        // refused save, the eyes away, or no call): done, the name only, not
+        // left silent until the give-up (the Reviewer-lead's P2 on #3992).
+        if step == Step::WhoYouAre
+            && led
+                .heard
+                .face_answered_us
+                .is_some_and(|at| now_us.saturating_sub(at) >= FACE_SAVE_WAIT_US)
+        {
+            eprintln!(
+                "lamp-voice: onboarding: who_you_are: no face saved after the yes: done, the name only"
+            );
+            self.nudge_record(false, now_us);
+            self.records
+                .push(json!({"kind":"onboarding_heard","step":step.name(),
+                "name_kept":false,"at_us":now_us}));
+            self.finish(step, Outcome::Done, None, now_us);
             return None;
         }
         if step != Step::WhereYouSit {
@@ -3923,16 +3965,47 @@ mod tests {
     /// saved ends it (lamp-29e7, 28 Oct: ended on the yes, no face kept).
     #[test]
     fn with_a_face_to_keep_a_name_and_a_yes_wait_for_the_face() {
-        let mut room = Room::new("face-kept");
+        // The ways a person says yes to the face (the lead's merge condition
+        // on #1711): never done before the face is kept, the model's save
+        // coming a few seconds on.
+        for yes in ["Yes.", "No problem.", "Of course!", "Sure, go ahead."] {
+            let mut room = Room::new("face-kept");
+            room.walk.face_kept = true;
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            room.walk.heard("You can call me, Marie.", room.at);
+            room.walk.heard(yes, room.at);
+            room.wait(5 * S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), None, "{yes}");
+            face_saved(&room.walk.file);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done), "{yes}");
+        }
+    }
+
+    /// The Reviewer-lead's P2s on #3992: with a face to keep, a no to the
+    /// face question ends it done with the name, and a yes with no face saved
+    /// ends it done after `FACE_SAVE_WAIT_US`, not at the give-up.
+    #[test]
+    fn with_a_face_to_keep_a_no_or_no_save_still_ends_it_with_the_name() {
+        let mut room = Room::new("face-no");
         room.walk.face_kept = true;
         assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
         assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
         room.walk.heard("You can call me, Marie.", room.at);
-        room.walk.heard("Yes, of course.", room.at);
+        room.walk.heard("No, please don't.", room.at);
         room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+
+        let mut room = Room::new("face-unsaved");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.walk.heard("Sure.", room.at);
+        room.wait(FACE_SAVE_WAIT_US - S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), None);
-        face_saved(&room.walk.file);
-        room.wait(S, Some(NEAR_MIDDLE));
+        room.wait(2 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
