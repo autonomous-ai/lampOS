@@ -27,8 +27,11 @@ pub const ABSENT_FOR_US: u64 = 3_000_000;
 pub const LEFT_AFTER_US: u64 = 5_000_000;
 /// A sound class's score that counts as heard.
 pub const SOUND_BAR: f64 = 0.5;
-/// A privacy lease not heard from this long is private: a voice that stalls
+/// A privacy lease not handed on this long is private: a voice that stalls
 /// stops renewing it, and the microphone is then closed to everyone else.
+/// The bus thread hands a repeat on every [`REPEAT_EVERY_US`] and the check
+/// runs every 250 ms, so that is 0.75 to 1.25 s after the last lease heard
+/// (the Reviewer-lead's P3 on #4041).
 pub const PRIVACY_LAPSE_US: u64 = 1_000_000;
 /// The bus thread hands on a repeated state message at least this often, so
 /// [`Watch::lapse`] knows the privacy lease is still renewed.
@@ -197,9 +200,9 @@ impl Watch {
         sent.is_some_and(|(last, at)| last == key && now_us.saturating_sub(*at) < REPEAT_EVERY_US)
     }
 
-    /// Time passing with no message: a privacy lease last heard
-    /// [`PRIVACY_LAPSE_US`] ago or more is private, as the voice's own
-    /// microphone gate holds it (harness-reviewer's P3 on #4031). Before the
+    /// Time passing with no message: a privacy lease last handed on
+    /// [`PRIVACY_LAPSE_US`] ago or more is private, later than the voice's
+    /// own microphone gate closes (harness-reviewer's P3 on #4031). Before the
     /// first lease nothing lapses: a lamp whose voice doesn't publish one
     /// isn't private forever.
     pub fn lapse(&mut self, now_us: u64) -> Vec<Out> {
