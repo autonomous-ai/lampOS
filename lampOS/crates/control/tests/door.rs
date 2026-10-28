@@ -547,6 +547,7 @@ async fn a_body_lease_holds_the_body_and_the_bodys_end_is_told() {
     tokio::spawn(lamp_control::body_lease::hold(
         path.clone(),
         lamp.shared.clone(),
+        Arc::default(),
     ));
     let mut socket = paired(&lamp, json!(["body"]), 11).await;
     let take = send(
@@ -587,6 +588,177 @@ async fn a_body_lease_holds_the_body_and_the_bodys_end_is_told() {
     assert_eq!(lines.next_line().await.unwrap(), None);
 }
 
+/// The hand end to end, on a bus in a folder: `humans/hands/tracked` as Ten
+/// publishes it reaches a computer with `look` as a `hand` event, and gone
+/// after a second of silence; a `look` at `hand` under the `body` lease
+/// tells the body to follow it with the hold, at once, and `stop` ends
+/// that.
+#[tokio::test]
+async fn a_hand_on_the_bus_is_told_and_a_look_at_it_has_the_body_follow() {
+    let follow = lamp_control::body_lease::Follower::default();
+    let events: lamp_control::parts::Events = Arc::new(|_: &str, _: Value| {});
+    let parts = lamp_control::parts::Lamp::new(None, None, None, "boot".into(), events)
+        .following(follow.clone());
+    let lamp = lamp_with("hand", Box::new(parts)).await;
+    let bus = lamp_bus::Bus::new(lamp.dir.join("bus")).unwrap();
+    let watch = Arc::new(std::sync::Mutex::new(lamp_control::watch::Watch::new()));
+    server::watch_bus(&bus, watch, lamp.shared.clone()).unwrap();
+    let path = lamp.dir.join("lease.sock");
+    let body = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(lamp_control::body_lease::hold(
+        path.clone(),
+        lamp.shared.clone(),
+        follow,
+    ));
+    let mut socket = paired(&lamp, json!(["body", "look"]), 14).await;
+    let subscribed = send(
+        &mut socket,
+        json!({"id": 3, "op": "subscribe", "events": ["hand"]}),
+    )
+    .await;
+    assert_eq!(subscribed["ok"], true, "{subscribed}");
+    let mut hands = bus
+        .publisher("humans/hands/tracked", lamp_bus::Kind::Event, "eyes")
+        .unwrap();
+    let seen =
+        json!({"x": 0.42, "y": 0.61, "size": 0.18, "open": true, "confidence": 0.93, "t": 1});
+    hands.publish_json(1, &seen).unwrap();
+    let told = next(&mut socket).await;
+    assert_eq!(told["ev"], "hand", "{told}");
+    assert_eq!(
+        (
+            &told["seen"],
+            &told["x"],
+            &told["y"],
+            &told["size"],
+            &told["open"]
+        ),
+        (
+            &json!(true),
+            &json!(0.42),
+            &json!(0.61),
+            &json!(0.18),
+            &json!(true)
+        ),
+        "{told}"
+    );
+    assert!(
+        told.get("t").is_none(),
+        "the lamp's clock stays on the lamp"
+    );
+    let gone = tokio::time::timeout(Duration::from_secs(3), next(&mut socket))
+        .await
+        .expect("gone after a second's silence");
+    assert_eq!(
+        (&gone["ev"], &gone["seen"]),
+        (&json!("hand"), &json!(false))
+    );
+    // Following: under the body lease only, said with the hold at once.
+    let take = send(
+        &mut socket,
+        json!({"id": 4, "op": "lease.take", "parts": ["body"], "for_ms": 30000}),
+    )
+    .await;
+    let (stream, _) = tokio::time::timeout(Duration::from_secs(2), body.accept())
+        .await
+        .expect("the door holds the body")
+        .unwrap();
+    let (read, _write) = stream.into_split();
+    let mut lines = tokio::io::BufReader::new(read).lines();
+    assert_eq!(take["lease"], "l_1", "{take}");
+    async fn line(
+        lines: &mut tokio::io::Lines<tokio::io::BufReader<tokio::net::unix::OwnedReadHalf>>,
+    ) -> String {
+        tokio::time::timeout(Duration::from_secs(1), lines.next_line())
+            .await
+            .expect("said within a second, not at the next renewal")
+            .unwrap()
+            .unwrap()
+    }
+    assert_eq!(line(&mut lines).await, r#"{"hold":{"for_ms":30000}}"#);
+    let look = send(&mut socket, json!({"id": 5, "op": "look", "at": "hand"})).await;
+    assert_eq!(look["ok"], true, "{look}");
+    assert_eq!(
+        line(&mut lines).await,
+        r#"{"hold":{"for_ms":30000,"follow":"hand"}}"#
+    );
+    // `stop` ends it, never rated as a look is (one motion in 2 s).
+    let stopped = send(&mut socket, json!({"id": 6, "op": "stop"})).await;
+    assert_eq!(stopped["ok"], true, "{stopped}");
+    assert_eq!(line(&mut lines).await, r#"{"hold":{"for_ms":30000}}"#);
+}
+
+/// The local leader's P3: A follows the hand, A's lease ends, B takes the
+/// body; B's hold never says follow, whether the door let go between them
+/// or B took the body before a check saw it free.
+#[tokio::test]
+async fn a_follow_ends_with_its_clients_lease_and_never_passes_to_the_next_holder() {
+    let follow = lamp_control::body_lease::Follower::default();
+    let events: lamp_control::parts::Events = Arc::new(|_: &str, _: Value| {});
+    let parts = lamp_control::parts::Lamp::new(None, None, None, "boot".into(), events)
+        .following(follow.clone());
+    let lamp = lamp_with("hand-next", Box::new(parts)).await;
+    let path = lamp.dir.join("lease.sock");
+    let body = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(lamp_control::body_lease::hold(
+        path.clone(),
+        lamp.shared.clone(),
+        follow,
+    ));
+    let take = |id: u64| json!({"id": id, "op": "lease.take", "parts": ["body"], "for_ms": 30000});
+    let accept = || async {
+        let (stream, _) = tokio::time::timeout(Duration::from_secs(2), body.accept())
+            .await
+            .expect("the door holds the body")
+            .unwrap();
+        let (read, write) = stream.into_split();
+        (tokio::io::BufReader::new(read).lines(), write)
+    };
+    async fn line(
+        lines: &mut tokio::io::Lines<tokio::io::BufReader<tokio::net::unix::OwnedReadHalf>>,
+    ) -> Option<String> {
+        tokio::time::timeout(Duration::from_secs(2), lines.next_line())
+            .await
+            .expect("said in time")
+            .unwrap()
+    }
+    let mut a = paired(&lamp, json!(["body", "look"]), 15).await;
+    // One pairing try a second: the door's clock moves on past it.
+    lamp.shared.move_clock_on(Duration::from_millis(1_100));
+    let mut b = paired(&lamp, json!(["body", "look"]), 16).await;
+    assert_eq!(send(&mut a, take(3)).await["lease"], "l_1");
+    let (mut lines, _write) = accept().await;
+    assert_eq!(
+        line(&mut lines).await.unwrap(),
+        r#"{"hold":{"for_ms":30000}}"#
+    );
+    let look = send(&mut a, json!({"id": 4, "op": "look", "at": "hand"})).await;
+    assert_eq!(look["ok"], true, "{look}");
+    assert_eq!(
+        line(&mut lines).await.unwrap(),
+        r#"{"hold":{"for_ms":30000,"follow":"hand"}}"#
+    );
+    // A's lease ends, and B takes the body at once.
+    let released = send(
+        &mut a,
+        json!({"id": 5, "op": "lease.release", "lease": "l_1"}),
+    )
+    .await;
+    assert_eq!(released["ok"], true, "{released}");
+    assert_eq!(send(&mut b, take(3)).await["lease"], "l_2");
+    let next = line(&mut lines).await;
+    let first_for_b = match next.as_deref() {
+        // The door let go between them: B's hold comes on a new connection.
+        Some(r#"{"let_go":true}"#) | None => {
+            let (mut lines, _write) = accept().await;
+            line(&mut lines).await.unwrap()
+        }
+        // B took the body before a check saw it free.
+        Some(said) => said.to_owned(),
+    };
+    assert_eq!(first_for_b, r#"{"hold":{"for_ms":30000}}"#);
+}
+
 /// Sixth's and Fourteen's P3s on #3900: a body that restarts (its end of the
 /// socket closes with nothing said) is held again at the next check, not at
 /// the next renewal 10 s on; and a hold the body refuses ends the computer's
@@ -601,6 +773,7 @@ async fn a_restarted_body_is_held_again_at_once_and_a_refused_hold_is_told() {
     tokio::spawn(lamp_control::body_lease::hold(
         path.clone(),
         lamp.shared.clone(),
+        Arc::default(),
     ));
     let mut socket = paired(&lamp, json!(["body"]), 12).await;
     let take = send(
@@ -656,6 +829,7 @@ async fn a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease() {
     tokio::spawn(lamp_control::body_lease::hold(
         path.clone(),
         lamp.shared.clone(),
+        Arc::default(),
     ));
     let mut socket = paired(&lamp, json!(["body"]), 13).await;
     let take = |id: u64| json!({"id": id, "op": "lease.take", "parts": ["body"], "for_ms": 30000});

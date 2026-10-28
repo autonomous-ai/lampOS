@@ -7,6 +7,12 @@
 //! - **Held** with `{"hold":{"for_ms":30000}}`, renewed every
 //!   [`RENEW_EVERY`], so a door that hangs gives the lamp its own life back
 //!   within 30 s.
+//! - **Following the hand** in view while the computer's `look` at `hand`
+//!   stands: each hold says `"follow":"hand"` then, and is said again at
+//!   once when that starts or stops; a hold without it follows nothing. The
+//!   body does the fast loop on the lamp, from `humans/hands/tracked`; the
+//!   door never sees the picture. A body that doesn't know `follow`
+//!   refuses the hold, which ends the computer's lease as `released`.
 //! - **Let go** when no computer holds `body` any more: the door says
 //!   `{"let_go":true}` and closes, and the body ends its lease at once.
 //! - **The body's own end** of it, `lost` with why, ends the protocol's
@@ -36,10 +42,28 @@ pub const RENEW_EVERY: Duration = Duration::from_secs(10);
 /// How often the door checks whether `body` is held.
 pub const CHECK_EVERY: Duration = Duration::from_millis(250);
 
+/// The client whose `look` at `hand` stands, if any: the body follows the
+/// hand only while that client holds `body` ([`follows`]).
+pub type Follower = Arc<std::sync::Mutex<Option<String>>>;
+
+/// Whether the body follows the hand this check: only for the follower
+/// while it holds `body`. A follower that no longer holds it is cleared,
+/// so a next holder, even one that takes the body before any check sees it
+/// free, never starts out following (the local leader's P3).
+pub fn follows(follower: &mut Option<String>, holder: Option<&str>) -> bool {
+    if follower.is_some() && follower.as_deref() != holder {
+        *follower = None;
+    }
+    follower.is_some()
+}
+
 /// What the door says to the body this check.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Say {
-    Hold,
+    /// Held, following the hand or not.
+    Hold {
+        follow: bool,
+    },
     LetGo,
 }
 
@@ -47,20 +71,27 @@ pub enum Say {
 #[derive(Debug, Default)]
 pub struct Holding {
     asked_us: Option<u64>,
+    /// Whether the last hold said to follow the hand.
+    following: bool,
 }
 
 impl Holding {
-    /// `wanted`: a computer holds the protocol's `body` lease now.
-    pub fn step(&mut self, wanted: bool, now_us: u64) -> Option<Say> {
+    /// `wanted`: a computer holds the protocol's `body` lease now;
+    /// `follow`: its `look` at `hand` stands.
+    pub fn step(&mut self, wanted: bool, follow: bool, now_us: u64) -> Option<Say> {
         let renew_us = u64::try_from(RENEW_EVERY.as_micros()).unwrap_or(u64::MAX);
         match (wanted, self.asked_us) {
             (true, None) => {
                 self.asked_us = Some(now_us);
-                Some(Say::Hold)
+                self.following = follow;
+                Some(Say::Hold { follow })
             }
-            (true, Some(at)) if now_us.saturating_sub(at) >= renew_us => {
+            (true, Some(at))
+                if now_us.saturating_sub(at) >= renew_us || follow != self.following =>
+            {
                 self.asked_us = Some(now_us);
-                Some(Say::Hold)
+                self.following = follow;
+                Some(Say::Hold { follow })
             }
             (false, Some(_)) => {
                 self.asked_us = None;
@@ -111,7 +142,10 @@ fn why_of(why: &str) -> Option<LeaseWhy> {
 
 fn line_of(say: &Say) -> String {
     match say {
-        Say::Hold => format!("{{\"hold\":{{\"for_ms\":{HOLD_MS}}}}}\n"),
+        Say::Hold { follow: false } => format!("{{\"hold\":{{\"for_ms\":{HOLD_MS}}}}}\n"),
+        Say::Hold { follow: true } => {
+            format!("{{\"hold\":{{\"for_ms\":{HOLD_MS},\"follow\":\"hand\"}}}}\n")
+        }
         Say::LetGo => "{\"let_go\":true}\n".to_owned(),
     }
 }
@@ -122,7 +156,10 @@ fn line_of(say: &Say) -> String {
 /// newer holder's lease; and its end (the body restarted) is seen at the
 /// next check, so the door asks again within [`CHECK_EVERY`], not at the
 /// next renewal (Sixth's and Fourteen's P3s on #3900).
-pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
+///
+/// `follower` is set by a `look` at `hand` (`crate::parts::Lamp::following`)
+/// and cleared here once its client no longer holds `body` ([`follows`]).
+pub async fn hold(path: PathBuf, shared: Arc<Shared>, follower: Follower) {
     let mut holding = Holding::default();
     let mut writer: Option<tokio::net::unix::OwnedWriteHalf> = None;
     let current = Arc::new(AtomicU64::new(0));
@@ -136,11 +173,13 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
             writer = None;
             holding.gone();
         }
-        let wanted = shared.body_held();
-        let Some(say) = holding.step(wanted, lamp_ipc::monotonic_us()) else {
+        let holder = shared.body_holder();
+        let wanted = holder.is_some();
+        let following = follows(&mut follower.lock().expect("follower"), holder.as_deref());
+        let Some(say) = holding.step(wanted, following, lamp_ipc::monotonic_us()) else {
             continue;
         };
-        if writer.is_none() && say == Say::Hold {
+        if writer.is_none() && matches!(say, Say::Hold { .. }) {
             match UnixStream::connect(&path).await {
                 Ok(stream) => {
                     told_unreachable = false;
@@ -200,22 +239,65 @@ mod tests {
 
     #[test]
     fn held_while_wanted_renewed_and_let_go() {
+        let hold = Some(Say::Hold { follow: false });
         let mut holding = Holding::default();
-        assert_eq!(holding.step(false, 0), None);
-        assert_eq!(holding.step(true, S), Some(Say::Hold));
-        assert_eq!(holding.step(true, 5 * S), None);
-        assert_eq!(holding.step(true, 11 * S), Some(Say::Hold));
-        assert_eq!(holding.step(false, 12 * S), Some(Say::LetGo));
-        assert_eq!(holding.step(false, 13 * S), None);
+        assert_eq!(holding.step(false, false, 0), None);
+        assert_eq!(holding.step(true, false, S), hold);
+        assert_eq!(holding.step(true, false, 5 * S), None);
+        assert_eq!(holding.step(true, false, 11 * S), hold);
+        assert_eq!(holding.step(false, false, 12 * S), Some(Say::LetGo));
+        assert_eq!(holding.step(false, false, 13 * S), None);
         // A connection gone: held again at once when still wanted.
-        assert_eq!(holding.step(true, 14 * S), Some(Say::Hold));
+        assert_eq!(holding.step(true, false, 14 * S), hold);
         holding.gone();
-        assert_eq!(holding.step(true, 15 * S), Some(Say::Hold));
+        assert_eq!(holding.step(true, false, 15 * S), hold);
         assert_eq!(
-            line_of(&Say::Hold),
+            line_of(&Say::Hold { follow: false }),
             "{\"hold\":{\"for_ms\":30000}}\n".to_owned()
         );
         assert_eq!(line_of(&Say::LetGo), "{\"let_go\":true}\n".to_owned());
+    }
+
+    /// The local leader's P3: A follows, A's lease ends and B takes the body
+    /// before a check sees it free; B's holds follow nothing.
+    #[test]
+    fn only_the_follower_holding_the_body_follows() {
+        let mut follower = Some("c_a".to_owned());
+        assert!(follows(&mut follower, Some("c_a")));
+        assert!(!follows(&mut follower, Some("c_b")));
+        assert_eq!(follower, None, "cleared, not kept for A's return");
+        assert!(!follows(&mut follower, Some("c_a")));
+        let mut follower = Some("c_a".to_owned());
+        assert!(!follows(&mut follower, None));
+        assert_eq!(follower, None);
+        assert!(!follows(&mut None, Some("c_a")));
+    }
+
+    /// A follow started or stopped is said at once, not at the next renewal,
+    /// and each renewal says it again.
+    #[test]
+    fn a_follow_is_said_at_once_and_with_every_hold() {
+        let follow = Some(Say::Hold { follow: true });
+        let mut holding = Holding::default();
+        assert_eq!(
+            holding.step(true, false, S),
+            Some(Say::Hold { follow: false })
+        );
+        assert_eq!(holding.step(true, true, S + 250_000), follow);
+        assert_eq!(holding.step(true, true, 2 * S), None);
+        assert_eq!(holding.step(true, true, 12 * S), follow);
+        assert_eq!(
+            holding.step(true, false, 12 * S + 250_000),
+            Some(Say::Hold { follow: false })
+        );
+        // A new connection while following: its first hold follows.
+        holding.step(true, true, 13 * S);
+        holding.gone();
+        assert_eq!(holding.step(true, true, 13 * S + 250_000), follow);
+        assert_eq!(
+            line_of(&Say::Hold { follow: true }),
+            "{\"hold\":{\"for_ms\":30000,\"follow\":\"hand\"}}\n".to_owned()
+        );
     }
 
     #[test]

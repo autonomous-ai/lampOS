@@ -290,6 +290,7 @@ class FakeLamp:
     # The grant each event and state needs, as lamp-control's own (#3736).
     EVENT_GRANT = {
         "person.arrived": "look", "person.left": "look", "person.stood_up": "look", "person.facing": "look",
+        "hand": "look",
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
     }
 
@@ -300,7 +301,7 @@ class FakeLamp:
             return ["look"] if "presence" in request.get("state", []) else []
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
-            return ["body", "look"] if op == "look" and request.get("at") == "face" else ["body"]
+            return ["body", "look"] if op == "look" and request.get("at") in ("face", "hand") else ["body"]
         return {
             "express": ["body", "light"],
             "light": ["light"],
