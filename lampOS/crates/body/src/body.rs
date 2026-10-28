@@ -331,32 +331,36 @@ pub fn own_ranges_from(value: Option<&str>) -> bool {
 /// refuse and leave the joint short of.
 const OWN_RANGE_MARGIN: u16 = 20;
 
-/// Steps a joint off its goal may go without coming nearer it and still be
-/// following: a tenth of a second. A hand that catches it stops it closing.
+/// Steps a joint off its goal may go without turning toward it and still be
+/// following: a tenth of a second. A hand that catches it stops it turning.
 const FOLLOW_STILL_STEPS: u16 = 5;
 
-/// A joint off its goal that is nearer it, by more than [`STALL_SLACK`],
-/// than where it last tracked, and that came nearer it within the last
-/// [`FOLLOW_STILL_STEPS`]: turning toward a goal that jumped faster than it
-/// turns. A hand holds it still or moves it away (the Reviewer-lead's P2 on
-/// #3925: caught partway, it stops closing).
-fn closing_on(goal: u16, position: u16, tracked_at: u16, not_nearer_for: u16) -> bool {
-    goal.abs_diff(position) + STALL_SLACK < goal.abs_diff(tracked_at)
-        && not_nearer_for < FOLLOW_STILL_STEPS
+/// The least a step's turn toward the goal counts as one: over a servo's
+/// count or two of noise at rest.
+const FOLLOW_STEP: u16 = 2;
+
+/// A joint off its goal that turned toward it, by at least [`FOLLOW_STEP`],
+/// within the last [`FOLLOW_STILL_STEPS`]: following a goal that moved
+/// faster than it turns. Not whether the gap shrank: while a goal ramps away
+/// faster than the servo gathers speed, the gap grows though the joint turns
+/// toward it, and on lamp-52e6 (28 Oct, 8001) that read as a hand 52 times in
+/// 15 minutes, the base given way every 2.3 s through a turn (the
+/// Reviewer-lead's P2s on #3925). A hand holds it still or turns it away.
+fn following(not_toward_for: u16) -> bool {
+    not_toward_for < FOLLOW_STILL_STEPS
 }
 
-/// A joint's distance from its goal this step, kept as its nearest since it
-/// left its track and the steps since it last came nearer. On its track, and
-/// on the first step off it, the count starts again from this step's gap: a
-/// goal that jumped is measured from where the jump left the joint, not from
-/// the small gap it had while tracking (the Reviewer-lead's P2 on #3925).
-fn note_gap(nearest: &mut u16, not_nearer_for: &mut u16, gap: u16, off_track: u8) {
-    if off_track <= 1 || gap < *nearest {
-        *nearest = gap;
-        *not_nearer_for = 0;
+/// A joint's turn this step, kept as the steps since it last turned toward
+/// its goal ([`following`]). On its track, and on the first step off it, the
+/// count starts again.
+fn note_turn(last: &mut u16, not_toward_for: &mut u16, goal: u16, position: u16, off_track: u8) {
+    let toward = goal.abs_diff(position) + FOLLOW_STEP <= goal.abs_diff(*last);
+    if off_track <= 1 || toward {
+        *not_toward_for = 0;
     } else {
-        *not_nearer_for = not_nearer_for.saturating_add(1);
+        *not_toward_for = not_toward_for.saturating_add(1);
     }
+    *last = position;
 }
 
 /// The window a head or base goal must be inside for a joint whose servo
@@ -4845,10 +4849,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // in a row over it.
     let mut gave_at = [0u16; 3];
     let mut on_track_at = [0u16; 3];
-    // Each joint's distance from its goal at its nearest since it last came
-    // nearer, and the steps since then ([`closing_on`]).
-    let mut nearest = [u16::MAX; 3];
-    let mut not_nearer_for = [0u16; 3];
+    // Each joint's position a step ago, and the steps since it last turned
+    // toward its goal ([`following`]).
+    let mut last_position = [0u16; 3];
+    let mut not_toward_for = [0u16; 3];
+
     let mut held_from = [0u16; 3];
     let mut in_hand = [0u16; 3];
     // Whether a joint held where it gave way is said as in a hand
@@ -6709,18 +6714,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // that jumped faster than it turns, and its load is the move's:
             // lamp-52e6 on 27 Oct "met resistance" 98 times in four hours
             // with nobody near, each a two-second hitch in a glance.
-            note_gap(
-                &mut nearest[index],
-                &mut not_nearer_for[index],
-                written[index].abs_diff(is.position),
-                off_track[index],
-            );
-            let following = closing_on(
+            note_turn(
+                &mut last_position[index],
+                &mut not_toward_for[index],
                 written[index],
                 is.position,
-                on_track_at[index],
-                not_nearer_for[index],
+                off_track[index],
             );
+            let following = following(not_toward_for[index]);
             let pushed = in_a_hand
                 && off_track[index] >= limits.load_steps.max(1)
                 && is.load > STALL_LOAD
