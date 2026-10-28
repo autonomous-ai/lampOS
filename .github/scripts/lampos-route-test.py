@@ -16,7 +16,7 @@ REPO = "autonomous-ai/lampOS"
 
 def env(**over):
     base = {"LAMPOS_STUDIO": "on", "LAMPOS_STUDIO_BEAT": f"v1 {NOW - 20} 0 0 1",
-            "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice",
+            "GITHUB_EVENT_NAME": "push", "GITHUB_REF": R.BRANCH,
             "GITHUB_REPOSITORY": REPO, "FULL": "false", "PROMOTE": ""}
     base.update(over)
     return base

@@ -44,7 +44,7 @@ from datetime import datetime
 HOSTED = "ubuntu-22.04-arm"
 STUDIO = {"group": "lampos-studio", "labels": ["self-hosted", "linux", "arm64", "studio-trusted"]}
 LABEL = "studio-trusted"
-BRANCH = "refs/heads/lamp-voice"
+BRANCH = "refs/heads/devops007/studio-publish-e2e"  # trial only, never merged
 WORKFLOW = "lampos-arm64.yml"
 ROUTE_JOB = "lampOS — choose the ARM64 runner"
 

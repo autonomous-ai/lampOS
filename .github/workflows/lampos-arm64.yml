@@ -107,6 +107,10 @@ on:
       - '.github/tools/lampos-promote/**'
   workflow_dispatch:
     inputs:
+      trial_switch:
+        description: 'Trial only (never merged): LAMPOS_STUDIO for this run'
+        type: string
+        default: ''
       full:
         description: 'Full run: every test including the realtime group, four runners, one test at a time (the nightly run)'
         type: boolean
@@ -145,7 +149,7 @@ jobs:
   # this one has another and never fails.
   route:
     if: >-
-      ${{ github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS'
+      ${{ github.ref == 'refs/heads/devops007/studio-publish-e2e' && github.repository == 'autonomous-ai/lampOS'
       && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.full && !inputs.promote_sequence)) }}
     name: lampOS — choose the ARM64 runner
     runs-on: ubuntu-latest
@@ -166,7 +170,7 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          LAMPOS_STUDIO: ${{ vars.LAMPOS_STUDIO }}
+          LAMPOS_STUDIO: ${{ inputs.trial_switch || vars.LAMPOS_STUDIO }}
           LAMPOS_STUDIO_BEAT: ${{ vars.LAMPOS_STUDIO_BEAT }}
           FULL: ${{ inputs.full }}
           PROMOTE: ${{ inputs.promote_sequence }}
