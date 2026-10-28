@@ -45,8 +45,8 @@ pub fn is_stop_request(text: &str) -> bool {
 
 /// Words that open or carry a question.
 const ASKING: &[&str] = &[
-    "what", "who", "whom", "whose", "why", "how", "where", "when", "which", "can", "could",
-    "would", "will", "did", "do", "does", "is", "are", "was", "were", "should", "may",
+    "what", "who", "whom", "whose", "why", "how", "where", "when", "which", "could", "would",
+    "did", "does", "are", "was", "were", "should",
 ];
 
 /// Whether the line asks something: a question mark, or a question word.
@@ -61,7 +61,10 @@ fn asks(text: &str, words: &[String]) -> bool {
 pub fn could_be_echo(heard: &str, said: &str) -> bool {
     let heard = crate::not_speech::plain_words(heard);
     let said = crate::not_speech::plain_words(said);
-    !heard.is_empty() && said.windows(heard.len()).any(|run| run == heard.as_slice())
+    // One word ("Stop.", "Enough.") is the person's: the answer may hold it
+    // anywhere ("a bus stop", "big enough"), and a lone word heard back is
+    // what a real stop sounds like too (the Reviewer-lead on #4004).
+    heard.len() >= 2 && said.windows(heard.len()).any(|run| run == heard.as_slice())
 }
 
 /// The worker's flags for the switch, from the coordinator's environment.
@@ -112,6 +115,9 @@ mod tests {
             "The ogre roared and the frogs went quiet."
         ));
         assert!(!could_be_echo("", "Stop it."));
+        // One word is the person's, wherever the answer has it.
+        assert!(!could_be_echo("Stop.", "We waited at the bus stop."));
+        assert!(!could_be_echo("Enough.", "It was big enough for both."));
     }
 
     #[test]
@@ -127,6 +133,7 @@ mod tests {
             "Stop telling story.",
             "Okay, okay, stop telling the story.",
             "Never mind.",
+            "That is enough.",
         ] {
             assert!(is_stop_request(stop), "{stop}");
         }
@@ -147,8 +154,6 @@ mod tests {
             "Quiet, what was that?",
             "Wait.",
             "Pause.",
-            "Is that enough",
-            "Can you stop",
         ] {
             assert!(!is_stop_request(not), "{not}");
         }
