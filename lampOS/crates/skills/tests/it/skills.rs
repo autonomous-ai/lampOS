@@ -7919,7 +7919,47 @@ fn a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks(
 /// restarted; given again, the one after looks.
 #[test]
 fn a_skills_picture_waits_for_the_owners_yes_read_at_each_call() {
-    let program = ToolProgram::with("look", &search_with_found(), &[]);
+    picture_waits_for_the_yes(&search_with_found());
+}
+
+/// The same in format 2 (#3822's gap 7), where `camera` is the only
+/// picture: a search granted `camera` waits for the owner's yes alike.
+#[test]
+fn a_format_2_skills_picture_waits_for_the_owners_yes_read_at_each_call() {
+    picture_waits_for_the_yes(&format!(
+        "format = 2\n{}\n[permissions]\nspeak = true\nlight = true\nbody = true\ncamera = true\n",
+        search_with_found()
+    ));
+}
+
+/// Format 2's `look` is presence alone (#3822's gap 7): a skill granted
+/// only it hands the model no picture, so its function runs with no yes
+/// to the camera kept, and never asks one.
+#[test]
+fn a_format_2_presence_skill_needs_no_camera_yes() {
+    let toml = "format = 2\ntool = \"glow\"\n[[do]]\nlight = { colour = \"white\", for = \"1s\" }\n\
+                [permissions]\nlook = true\nlight = true\n";
+    let program = ToolProgram::with("glow", toml, &[]);
+    let camera = program
+        ._dir
+        .path()
+        .join("state")
+        .join(lamp_skills::CAMERA_FILE);
+    lamp_skills::keep_names(&camera, &Default::default()).unwrap();
+    let skill = load(&program._dir.path().join("skills").join("glow")).unwrap();
+    assert!(skill.permissions.look && !skill.permissions.sees_picture());
+    assert!(!skill.looks());
+    let answer = program.call("glow", "{}");
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert!(answer["result"].get("look").is_none(), "{answer}");
+    assert_eq!(program.colours(1), ["white"]);
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "");
+}
+
+/// A search whose `toml` hands the model the picture: refused whole without
+/// the owner's yes, looking with it, refused again once it is taken back.
+fn picture_waits_for_the_yes(toml: &str) {
+    let program = ToolProgram::with("look", toml, &[]);
     let camera = program
         ._dir
         .path()
