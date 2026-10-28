@@ -499,6 +499,15 @@ pub(crate) const SHORT_DONE_TOGETHER: &str = "Done.";
 /// conversation nobody began (the first builder at 21:03 on #1722).
 pub const NAME_SECOND_SIGN_ENVIRONMENT: &str = "LAMP_NAME_SECOND_SIGN";
 
+/// Where the worker reads whether, with [`NAME_SECOND_SIGN_ENVIRONMENT`], a
+/// hearing of the name at the line's start is no second sign of its own
+/// when the line's first word, set off, is said to a person
+/// ([`crate::attention::SAID_TO_A_PERSON`]), and a conversation with the
+/// lamp going on is one (`on`, and nothing else). On c0a4 "Ma'am, could you
+/// pass me the salt please?", said to a person, was heard at 0.95 to 0.99
+/// at its start and answered (#3945).
+pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON";
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;
@@ -1313,7 +1322,7 @@ fn sounds_like_the_name(word: &str) -> bool {
 /// Where a line's first word lies, when it is set off as a name is: past
 /// a greeting at most ("Hey"), followed by a comma or a stop, or the whole
 /// line, its own piece. Its byte range in `text`.
-fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
+pub(crate) fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
     let word_at = |from: usize| {
         let start = from + text[from..].find(|c: char| c.is_alphanumeric() || c == '\'')?;
         let len = text[start..]
