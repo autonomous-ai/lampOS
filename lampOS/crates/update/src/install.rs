@@ -3053,8 +3053,8 @@ mod tests {
 
     /// #2892: the eyes' camera helper is installed, its socket enabled and
     /// its template never, and it names the same camera and port as the
-    /// eyes, which ask it; #4074: on any port, since it differs by unit
-    /// (`3-1.1.4` on lamp-4ace, `3-1.3.4` on lamp-a63e).
+    /// eyes, which ask it; #4074: the eyes on any port, since it differs by
+    /// unit (`3-1.1.4` on lamp-4ace, `3-1.3.4` on lamp-a63e).
     #[test]
     fn the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera() {
         let unit = |name: &str| {
@@ -3074,9 +3074,10 @@ mod tests {
             let at = text.find("--usb ").unwrap() + "--usb ".len();
             text[at..].split_whitespace().next().unwrap().to_owned()
         };
+        // The same camera: the helper's ids are the eyes'.
         assert_eq!(
-            usb(unit("lamp-eyes-camera@.service")),
-            usb(unit("lamp-eyes.service"))
+            usb(unit("lamp-eyes-camera@.service")).split('@').next(),
+            Some(usb(unit("lamp-eyes.service")).as_str())
         );
         assert!(
             unit("lamp-eyes.service")
@@ -3087,14 +3088,19 @@ mod tests {
                 .contains("ListenStream=/run/lampos-eyes-camera/camera.sock")
         );
         assert!(unit("lamp-eyes-camera@.service").contains("lamp-eyes reauthorize-camera --usb"));
-        // #4074: both name the product's camera by its ids, no port, each
-        // once, and the eyes no node: every lamp-eyes since 20 Oct (#2190)
-        // finds the one camera with the ids on any port at each open.
+        // #4074: the eyes name the product's camera by its ids, no port and
+        // no node: every lamp-eyes since 20 Oct (#2190) finds the one camera
+        // with the ids on any port at each open. The helper keeps its port
+        // until every channel carries a lamp-eyes whose helper takes none:
+        // this unit comes from the updater's own build, the helper from the
+        // channel's, and an older one exits 2 without a port (the
+        // Reviewer-lead's P2 on #4077).
+        assert_eq!(usb(unit("lamp-eyes.service")), "01da:5875");
+        assert!(!unit("lamp-eyes.service").contains("--device"));
+        assert_eq!(usb(unit("lamp-eyes-camera@.service")), "01da:5875@3-1.1.4");
         for name in ["lamp-eyes.service", "lamp-eyes-camera@.service"] {
-            assert_eq!(usb(unit(name)), "01da:5875", "{name}");
             assert_eq!(unit(name).matches("--usb ").count(), 1, "{name}");
         }
-        assert!(!unit("lamp-eyes.service").contains("--device"));
     }
 
     /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from
