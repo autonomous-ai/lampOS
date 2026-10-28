@@ -920,6 +920,11 @@ struct Shared {
     cue_after: Duration,
     /// [`DOWN_LINE`], when switched on.
     down: Option<Arc<DownLine>>,
+    /// A stop said over the lamp's answer is answered with
+    /// [`crate::spoken_stop::LINE`], not asked of the model, its clip kept
+    /// once rendered (`LAMP_SPOKEN_STOP_ENDS`, #3985).
+    spoken_stop_ends: bool,
+    stop_line: Mutex<Option<Vec<i16>>>,
     /// A turn after a quiet spell opens with [`ANNOUNCEMENT`]: not when
     /// this route is the lamp's only voice (`LAMP_VOICE_ROUTE=second`).
     announce: bool,
@@ -2018,6 +2023,8 @@ impl Engine {
                 cues: None,
                 cue_after: CUE_AFTER,
                 down: None,
+                spoken_stop_ends: false,
+                stop_line: Mutex::new(None),
                 announce: true,
                 heard_last: Mutex::new(None),
                 lamp_said: Mutex::new((0, String::new())),
@@ -2771,6 +2778,16 @@ impl Engine {
     /// asks again, or hums (`LAMP_UNCLEAR_HUM`, `LAMP_MISHEARD_HUM`). A
     /// misheard cut-in hummed for has the next request told so
     /// ([`crate::misheard_hum::NOTE`]). Before any turn only.
+    /// A stop said over the lamp's answer ([`crate::spoken_stop`]) is
+    /// answered with its one line and kept in the thread, the model not
+    /// asked (`LAMP_SPOKEN_STOP_ENDS`, #3985). Before any turn only.
+    pub fn ending_spoken_stops(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.spoken_stop_ends = on;
+        }
+        self
+    }
+
     pub fn asking_again(mut self, cut_in: CutIn, ask: AskAgain) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.ask_again = Some((cut_in, ask));
@@ -5000,6 +5017,60 @@ async fn spoken(
     // Only current captured words authorize a recording: neither a carried
     // prefix nor the synthetic name below can supply a new spoken identity.
     turn.captured &= !text.trim().is_empty();
+    // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
+    // heard as "Stop them." was asked of the model, which said "Stop who?",
+    // then "Stop telling story." got "I wasn't telling a story"). The cut-in
+    // already stopped the answer; this line is answered here, in the route's
+    // voice, and kept in the thread as the lamp's, so the next turn sees the
+    // story, the stop and that the lamp stopped. Never carried words.
+    if shared.spoken_stop_ends
+        && marks.over_the_lamps_voice
+        && before
+            .as_ref()
+            .is_none_or(|before| before.trim().is_empty())
+        && crate::spoken_stop::is_stop_request(&text)
+    {
+        drop(prepared.take());
+        eprintln!(
+            "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)",
+            crate::spoken_stop::LINE
+        );
+        let said = shared
+            .emit(ProviderOutput::Transcript {
+                request: Some(request),
+                text: crate::spoken_stop::LINE.to_owned(),
+                finished: false,
+            })
+            .await;
+        if said {
+            let kept = shared.stop_line.lock().ok().and_then(|kept| kept.clone());
+            let clip = match kept {
+                Some(clip) => clip,
+                None => {
+                    let clip = render_line(&shared.services, crate::spoken_stop::LINE).await;
+                    if !clip.is_empty()
+                        && let Ok(mut kept) = shared.stop_line.lock()
+                    {
+                        *kept = Some(clip.clone());
+                    }
+                    clip
+                }
+            };
+            if (clip.is_empty() || cue(&shared, request, clip).await.is_ok())
+                && shared
+                    .emit(ProviderOutput::GenerationComplete { request })
+                    .await
+            {
+                shared
+                    .emit(ProviderOutput::TurnComplete {
+                        request,
+                        idle: true,
+                    })
+                    .await;
+            }
+        }
+        return;
+    }
     // What was heard in this request is told as heard; the model is asked
     // with the words of the one it goes on from before them.
     let went_on = before

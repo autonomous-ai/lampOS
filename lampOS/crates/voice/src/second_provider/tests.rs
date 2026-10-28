@@ -9718,6 +9718,58 @@ async fn a_line_begun_over_the_lamps_answer_is_told_it_cut_in() {
     assert!(after_stop[0].contains(&stopped), "{:?}", after_stop[0]);
 }
 
+/// #3985 (`LAMP_SPOKEN_STOP_ENDS`): on lamp-29e7 "Stop" heard as "Stop
+/// them." over a story was asked of the model ("Stop who?"). A short stop
+/// said over the lamp's answer is answered with the fixed line and the model
+/// is not asked; without the switch, not over the lamp's voice, or asking
+/// more than a stop, it is asked as before.
+#[tokio::test]
+async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
+    for stop in [
+        "Stop them.",
+        "Stop telling story.",
+        "That's enough.",
+        "Okay, enough.",
+    ] {
+        let asked = asked_with(
+            stop,
+            |engine| engine.telling_cut_ins(true).ending_spoken_stops(true),
+            start_marked(1, true, false, false),
+            false,
+            false,
+        )
+        .await;
+        assert!(asked.is_empty(), "{stop}: {asked:?}");
+    }
+    let off = asked_with(
+        "Stop them.",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(off.len(), 1, "{off:?}");
+    let quiet = asked_with(
+        "Stop them.",
+        |engine| engine.ending_spoken_stops(true),
+        start_marked(1, false, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(quiet.len(), 1, "{quiet:?}");
+    let more = asked_with(
+        "Stop, and tell me what the weather is like tomorrow.",
+        |engine| engine.ending_spoken_stops(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(more.len(), 1, "{more:?}");
+}
+
 /// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's
 /// words finished is told it may follow on from them, as the Live route
 /// tells it; not when its End marks a sound, nor when it was judged in a
