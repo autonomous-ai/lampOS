@@ -1205,17 +1205,22 @@ lamp-update, not broken.
 
 **A build put back across a reboot is tried once more** (#2810). When a
 switch begins, the round notes the build and this boot's kernel id
-(`/proc/sys/kernel/random/boot_id`) in `self-began`. A power cut or a reboot
+(`/proc/sys/kernel/random/boot_id`) in `self-began`. When `lamp-update-back`
+puts a build back, it notes the build and the boot it does so on in
+`self-put-back`. A power cut or a reboot
 in the switch's 10 minutes reads to `lamp-update-back` the same as a build
 that can't run. On a lamp with no clock of its own, the clock's jump at the
 next boot can also pass the deadline before the confirming round runs.
-- **Tried once more:** a refused build whose switch began on a boot that has
-  since ended. The round moves it from `self-refused` to `self-retried`
+- **Tried once more:** a refused build whose switch began on one boot and
+  was put back on another. An ordinary reboot later doesn't count: only the
+  boot of the put-back does. The round moves it from `self-refused` to `self-retried`
   (retried first, so a cut between the two leaves it refused for good), and
   says so.
 - **Final:** a build put back on the boot it began on (it failed, or hung
   past the deadline) stays refused, as before. So does one put back a second
-  time, or one whose boot is not known.
+  time, one whose boot is not known, or one put back by a
+  `lamp-update-back` that notes no boot (7071's, until the settings writer
+  is refreshed).
 - **Not covered:** a stop by hand without a reboot.
 - **Old updaters:** the rule is read by the lamp-update that runs. A lamp
   whose own updater is older (7071's) never retries, and still waits for a

@@ -2649,7 +2649,7 @@ impl Run<'_, '_> {
         if !self.config.self_switch
             || !ours
             || !newer
-            || own::refused_for_good(self.records.folder(), &self.config.root, &carried.sha256)
+            || own::refused_for_good(self.records.folder(), &carried.sha256)
         {
             return Outcome::Refused(why);
         }
@@ -2734,7 +2734,7 @@ impl Run<'_, '_> {
         let old = old.to_string_lossy().into_owned();
         if !unit::is_build_folder(&unit::folder(own::FOLDER, &old))
             || file_sha256(&link.join(own::BINARY)).is_ok_and(|sha| sha == file.sha256)
-            || own::refused_for_good(self.records.folder(), &self.config.root, &file.sha256)
+            || own::refused_for_good(self.records.folder(), &file.sha256)
         {
             return Ok(None);
         }

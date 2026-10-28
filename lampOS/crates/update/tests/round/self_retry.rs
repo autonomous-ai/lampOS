@@ -1,5 +1,6 @@
 //! An updater build put back is tried once more only when a reboot came
-//! in its minutes (#2810): its switch began on a boot that has since ended.
+//! in its minutes (#2810): its switch began on one boot and
+//! lamp-update-back put it back on another.
 use super::*;
 
 const BAD: &str = "#!/bin/sh\nexit 1\n";
@@ -30,6 +31,10 @@ fn a_build_put_back_on_the_boot_it_began_on_stays_refused() {
     let old = lamp.own_build();
     product_build_with_updater(&mut lamp, 2, BAD);
     switched_and_put_back(&mut lamp, "boot-a", "boot-a");
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    // An ordinary reboot hours later does not reopen it (Tests' P2 on
+    // #4131).
+    boot(&lamp, "boot-b");
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
     assert_eq!(lamp.own_build(), old);
 }
