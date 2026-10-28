@@ -55,6 +55,11 @@ pub enum NoticeKind {
     /// Neither the new Wi-Fi nor the old one could be joined after a change
     /// from the app (#1959): no network, so no cloud voice to say so.
     WifiLost,
+    /// The saved network gone 90 s, and setup's hotspot opened for the app
+    /// to set it again (#3020's `LAMP_WIFI_RECOVERY`, #3743): said once a
+    /// loss, by `lamp-setup recover`. An older voice refuses a manifest
+    /// that lists it, so it ships only after a build that knows it.
+    WifiRecovering,
 }
 
 /// Who may hear it.
