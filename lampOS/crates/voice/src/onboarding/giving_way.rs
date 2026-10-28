@@ -38,7 +38,7 @@ pub use super::legacy_words::{
 use super::{
     Delivery, FRESH_MS, GONE_US, GUIDE_EVERY_US, MOST_UNSAID, NOT_SAID, Onboarding, Outcome,
     SIT_GIVE_UP_US, START_QUIET_US, STEP_GIVE_UP_US, Step, TIMED_OUT_QUIET_US, fresh_token,
-    near::CLOCK_SLACK_MS,
+    near::CLOCK_SLACK_MS, unix_ms,
 };
 use lamp_turn_owner::BootId;
 use serde_json::json;
@@ -721,12 +721,21 @@ impl Onboarding {
             offered_us: now_us,
             bound: None,
         });
+        // Led anew (offered again later, or asked once the person is back):
+        // its unsaid count starts again, as the step's own, and a re-offer is
+        // dated so the skill's interval holds before the next (Third's P3 on
+        // #4045).
+        if let Some(led) = self.led.as_mut()
+            && led.asked_us.replace(now_us).is_none()
+        {
+            self.giving.unsaid = 0;
+            if let Some(kept) = self.desired.steps.get_mut(Step::GivingWay.name()) {
+                kept.offered_at_unix_s = Some(unix_ms() / 1_000);
+            }
+        }
         // Its budget is committed before the invitation is published.
         self.desired.giving_way_tries = attempt;
         self.save();
-        if let Some(led) = self.led.as_mut() {
-            led.asked_us = Some(now_us);
-        }
         self.records.push(
             json!({"kind":"onboarding_step","step":Step::GivingWay.name(),
             "state":"offered","try":attempt,"at_us":now_us}),
