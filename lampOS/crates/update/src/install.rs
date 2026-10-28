@@ -954,10 +954,12 @@ pub trait Host {
     /// writes the units it carries itself ([`PRODUCT`]), so one that is not
     /// the build's own is said ([`not_the_builds_updater`], #3733).
     fn running_sha256(&mut self) -> Result<String, String>;
+    /// Whether this run was handed over to already ([`HANDED_OVER`] set): it
+    /// hands over no further (#3733).
+    fn handed_over(&mut self) -> bool;
     /// Runs `exe`, the build's own lamp-update, in this process's place with
     /// the same arguments and [`HANDED_OVER`] set, so it writes its own
-    /// units (#3733). Returns only when that could not be done, with why: a
-    /// run handed over once is never handed over again.
+    /// units (#3733). Returns only when that could not be done, with why.
     fn hand_over(&mut self, exe: &Path) -> String;
 }
 
@@ -1025,11 +1027,12 @@ impl Host for System {
         file_sha256(&path).map_err(|error| format!("{}: {error}", path.display()))
     }
 
+    fn handed_over(&mut self) -> bool {
+        std::env::var_os(HANDED_OVER).is_some()
+    }
+
     fn hand_over(&mut self, exe: &Path) -> String {
         use std::os::unix::process::CommandExt;
-        if std::env::var_os(HANDED_OVER).is_some() {
-            return format!("{HANDED_OVER} is set: this run was handed over to already");
-        }
         // The records' lock is opened close-on-exec, so it is let go here
         // and the build's own lamp-update takes it again.
         let error = Command::new(exe)
@@ -1382,12 +1385,21 @@ pub fn install(
     let running = host.running_sha256();
     if let Some(line) = not_the_builds_updater(&manifest, running.clone()) {
         if let (Ok(_), Some(own)) = (&running, &own) {
-            say(&format!(
-                "handing over to build {}'s own lamp-update, {own}, to write its units",
-                manifest.sequence
-            ));
-            let why = host.hand_over(&config.on(own));
-            say(&format!("could not hand over: {why}"));
+            if host.handed_over() {
+                // The loop guard: the channel moved on between the two runs.
+                say(&format!(
+                    "this lamp-update was handed this install already, so it writes \
+                     its own units over build {}'s binaries",
+                    manifest.sequence
+                ));
+            } else {
+                say(&format!(
+                    "handing over to build {}'s own lamp-update, {own}, to write its units",
+                    manifest.sequence
+                ));
+                let why = host.hand_over(&config.on(own));
+                say(&format!("could not hand over: {why}"));
+            }
         }
         say(&line);
     }
