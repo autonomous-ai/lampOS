@@ -7836,7 +7836,12 @@ impl Heeding {
         {
             verdict = Some(crate::attention::Verdict::Hold(crate::turned_away::HELD));
         }
-        if busy && let Some(crate::attention::Verdict::Play(why)) = verdict {
+        // A stop said over the lamp's answer is not a short line of a busy
+        // room's either (the Reviewer-lead's P2 on #4019).
+        if busy
+            && !stop_over_the_lamp
+            && let Some(crate::attention::Verdict::Play(why)) = verdict
+        {
             verdict = busy_bar(why, heard, lamp_asked)
                 .map(crate::attention::Verdict::Hold)
                 .or(verdict);
@@ -20267,6 +20272,20 @@ mod tests {
                 held.then_some(super::LONE_WORDS),
                 "{switch} {over}"
             );
+        }
+        // In a busy room too, with someone else at the desk (the
+        // Reviewer-lead's P2 on #4019): not held as `BUSY_SHORT`.
+        for (switch, held) in [(true, false), (false, true)] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if switch {
+                heeding.hearing_spoken_stops();
+            }
+            heeding.began_over = Some(9);
+            let mut busy = signs(true, false);
+            busy.room = crate::room_told::Room::Busy;
+            let verdict = heeding.judge(9, line, "Stop them.", busy);
+            assert_eq!(verdict.is_some(), held, "{switch} {verdict:?}");
         }
         // With a name, a word or two is the lamp's.
         let mut heeding = super::Heeding::new(false, false, None, None);
