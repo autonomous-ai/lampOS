@@ -241,6 +241,13 @@ struct Script {
     /// With `heard_as_call`, an earlier line's words come back late, just
     /// before the call's own `StepCallHeard` (the Reviewer-lead on #4006).
     late_words_first: bool,
+    /// The step's try window opens only this many milliseconds from the
+    /// scenario's start, read as it comes (`near_window_ms` is then its
+    /// prompt's end): a line can begin before the step waits for a call.
+    near_opens_ms: Option<u64>,
+    /// With `heard_as_call`, the first call's words come back only once the
+    /// next line has begun.
+    heard_as_call_late: bool,
     /// Capture frames of speech in the person's first utterance, from frame
     /// 20 (60: 0.6 s, as long as a call).
     speech_frames: u64,
@@ -313,6 +320,8 @@ impl Script {
             near_name_ms: None,
             heard_as_call: false,
             late_words_first: false,
+            near_opens_ms: None,
+            heard_as_call_late: false,
             speech_frames: 60,
             speech_from: 20,
             echo_evidence: false,
@@ -538,6 +547,11 @@ struct Peers {
     held_answer: Option<(usize, Vec<ProviderOutput>)>,
     /// Controls' queue into the voice's hand controls (`Script::hand_stop`).
     hand: Option<crate::hand_controls::TestControls>,
+    /// The step's try window, opened at this time (`Script::near_opens_ms`).
+    near_opens: Option<(u64, crate::onboarding::near::NearFlow)>,
+    /// A call's words held back until the next line begins
+    /// (`Script::heard_as_call_late`).
+    call_words_held: Option<(usize, u64)>,
 }
 
 impl Peers {
@@ -558,6 +572,14 @@ impl Peers {
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
+        if self
+            .near_opens
+            .as_ref()
+            .is_some_and(|(at, _)| monotonic_us() >= *at)
+            && let Some((_, flow)) = self.near_opens.take()
+        {
+            TEST_NEAR.with(|near| *near.borrow_mut() = Some(flow));
+        }
         let ended = self.ended.len();
         TEST_MEMORY_FORGETS.with(|slot| {
             if slot
@@ -1011,6 +1033,20 @@ impl Peers {
                         session,
                         waiting_for_barrier: false,
                     });
+                    // The held call's words, back once this line began.
+                    if !live
+                        && let Some((at, held)) = self.call_words_held
+                        && held < request
+                        && at == index
+                    {
+                        self.call_words_held = Some((at, u64::MAX));
+                        let queued = &mut self.peers[index].queued;
+                        queued.push_back(ProviderOutput::StepCallHeard { request: held });
+                        queued.push_back(ProviderOutput::TurnComplete {
+                            request: held,
+                            idle: true,
+                        });
+                    }
                     if !live
                         && self.script.hears_at_start
                         && let Some(text) = self.script.second_hears
@@ -1120,6 +1156,10 @@ impl Peers {
                             matches!(input, ProviderInput::StepCall { request: called, .. } if *called == request)
                         })
                     {
+                        if self.script.heard_as_call_late && self.call_words_held.is_none() {
+                            self.call_words_held = Some((index, request));
+                            continue;
+                        }
                         let queued = &mut self.peers[index].queued;
                         if self.script.late_words_first {
                             queued.push_back(ProviderOutput::Transcript {
@@ -1663,18 +1703,26 @@ fn run(script: Script) -> Run {
     // The step's own rule, on the step's own evidence: its Unix clock is
     // the scenario's origin at `UNIX`.
     const UNIX: u64 = 1_760_000_000_000;
+    let near_flow = |from: u64| {
+        crate::onboarding::near::NearFlow::listening_for_test(
+            UNIX + from,
+            origin + from * 1_000,
+            &script
+                .near_name_ms
+                .map(|at| UNIX + at)
+                .into_iter()
+                .collect::<Vec<_>>(),
+        )
+    };
+    let near_opens = script
+        .near_opens_ms
+        .zip(script.near_window_ms)
+        .map(|(opens, from)| (origin + opens * 1_000, near_flow(from)));
     TEST_NEAR.with(|near| {
-        *near.borrow_mut() = script.near_window_ms.map(|from| {
-            crate::onboarding::near::NearFlow::listening_for_test(
-                UNIX + from,
-                origin + from * 1_000,
-                &script
-                    .near_name_ms
-                    .map(|at| UNIX + at)
-                    .into_iter()
-                    .collect::<Vec<_>>(),
-            )
-        })
+        *near.borrow_mut() = script
+            .near_window_ms
+            .filter(|_| near_opens.is_none())
+            .map(near_flow)
     });
     TEST_SENTENCE_WINDOW.with(|window| {
         window.set(
@@ -1738,6 +1786,8 @@ fn run(script: Script) -> Run {
         last_hand_publish_us: None,
         held_answer: None,
         hand,
+        near_opens,
+        call_words_held: None,
     };
     let started = crate::scenario_clock::instant();
     let mut reported = false;
@@ -5677,6 +5727,55 @@ fn a_call_begun_after_the_prompt_and_heard_by_the_detector_still_reaches_the_ste
     let calls = run.events("onboarding_text_call");
     assert_eq!(calls.len(), 1, "{}", run.summary());
     assert_eq!(calls[0]["taken"], true, "{calls:?}");
+}
+
+/// c0a4, 28 October (#3923, c2): "Hey Lamp." begun as the step was coming
+/// to wait for a call was answered as a turn, never told as the step's
+/// call. A line whose Start came before the step waited is told once it
+/// does, before its End, so the route leaves the name alone to the step.
+#[test]
+fn a_line_begun_before_the_step_waits_is_told_as_its_call_once_it_does() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        second: false,
+        only: true,
+        near_window_ms: Some(500),
+        near_opens_ms: Some(500),
+        second_hears: Some("Hey Lamp."),
+        heard_as_call: true,
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    let told = run.events("onboarding_step_call");
+    assert_eq!(told.len(), 1, "{}", run.summary());
+    assert_eq!(told[0]["late"], true, "{told:?}");
+    assert!(run.played(1).is_empty(), "{}", run.summary());
+    assert_eq!(run.events("onboarding_text_call").len(), 1);
+}
+
+/// c0a4, 28 October (#3923, c3): "Hey, Lamp." was left to the step, but the
+/// try's `said` stayed empty: a newer line told as the step's call took the
+/// one slot before the first call's words came back. Each call line keeps
+/// its own place, so the first one's words still reach the step.
+#[test]
+fn a_call_whose_words_come_back_after_the_next_line_began_still_reaches_the_step() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        second: false,
+        only: true,
+        near_window_ms: Some(0),
+        second_hears: Some("Hey, Lamp."),
+        heard_as_call: true,
+        heard_as_call_late: true,
+        speak_again: Some(When::Ended(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    let calls = run.events("onboarding_text_call");
+    let first: Vec<_> = calls.iter().filter(|call| call["turn"] == 1).collect();
+    assert_eq!(first.len(), 1, "{}", run.summary());
+    assert_eq!(first[0]["taken"], true, "{calls:?}");
 }
 
 /// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):

@@ -436,7 +436,7 @@ fn a_call_begun_late_has_its_words_waited_for_a_moment() {
     let prompt = play(&mut walk, 50 * S, 1_760_000_050_000, 3);
     room(&mut walk, &prompt, 6_000, 21.0);
     walk.near_call_line_ended(prompt.ended_us + 5_900_000);
-    walk.near_call_words_back();
+    walk.near_call_words_back(prompt.ended_us + 5_900_000);
     let judged = judge_at(&mut walk, &prompt, 7_300_000).expect("judged with no wait");
     assert_eq!(judged["why"], "the name wasn't heard");
 }
