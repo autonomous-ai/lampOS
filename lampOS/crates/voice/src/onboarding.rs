@@ -263,8 +263,14 @@ impl Outcome {
 pub(crate) enum Delivery {
     /// Played whole and heard: only this opens a try.
     Whole,
-    /// Some of it played, then cut (someone spoke over it, a gap).
+    /// Some of it played, then cut (someone spoke over it).
     Cut,
+    /// Played to its end and complete, with nobody's turn taken over it, but
+    /// with a gap in its playback: on lamp-52e6 a yield to the lamp's own
+    /// voice that resumed (#4035). Every word was said, though not as one
+    /// line: like [`Self::Unsaid`], the person was never asked as the step
+    /// asks, so it is no try of theirs.
+    Gapped,
     /// Nothing of it played (`no_audio_answer`, a provider that never
     /// began): the person was never asked, so it is no try of theirs.
     Unsaid,

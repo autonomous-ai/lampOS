@@ -810,13 +810,15 @@ impl Onboarding {
             match delivery {
                 Delivery::Whole => "whole",
                 Delivery::Cut => "cut",
+                Delivery::Gapped => "with a gap",
                 Delivery::Unsaid => "not said",
             },
             if offer.sentence { "sentence" } else { "call" }
         );
-        if delivery == Delivery::Unsaid {
+        if delivery == Delivery::Unsaid || delivery == Delivery::Gapped {
             // Never said, never asked: its prompt is given back, and none of
-            // the cut prompts' budget is spent (#3754).
+            // the cut prompts' budget is spent (#3754). So is one said
+            // through with a gap and nobody's turn taken over it (#4035).
             if *self.prompts(offer.sentence) == offer.prompt {
                 *self.prompts(offer.sentence) = offer.prompt - 1;
                 self.save();
@@ -828,8 +830,13 @@ impl Onboarding {
             } else {
                 "onboarding_near_try"
             };
+            let why = if delivery == Delivery::Unsaid {
+                NOT_SAID
+            } else {
+                "the prompt was played with a gap"
+            };
             self.records.push(json!({"kind":kind,"prompt":offer.prompt,
-                "accepted":false,"why":NOT_SAID,"offered_again":again,"at_us":now_us}));
+                "accepted":false,"why":why,"offered_again":again,"at_us":now_us}));
             if again {
                 self.near.retry_after_us = now_us.saturating_add(1_000_000);
             } else {
