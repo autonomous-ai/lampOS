@@ -95,6 +95,19 @@ def _feeling_move(request: dict) -> str | None:
     return name if step == 4 else f"{name}-{step * 25}"
 
 
+# A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
+# LightPattern::check, with the breath's low at 1): the least level each is
+# seen at, and the words it refuses with.
+PATTERN_LEAST_LEVEL = {
+    "breathe": (2, "a breath's low is from 1 to under the light's level"),
+    "candle": (3, "a candle flickers at level 3 and up"),
+    "pulse": (2, "a pulse is seen at level 2 and up"),
+}
+# The ring plays one pulse a minute for one asker, and drops a second without a
+# word to the computer (lamp_msgs' PULSE_GAP_US): the door has answered by then.
+PULSE_GAP_S = 60.0
+
+
 def _now() -> str:
     return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -138,6 +151,11 @@ class FakeLamp:
         # The newest light a computer asked for, and until when (the fake's
         # `clock`): what the ring shows while it lasts (`light_state`).
         self.shown: tuple[dict, float] | None = None
+        # Each pulse the ring would play, and each it would drop as a second
+        # within a minute from the same computer: (client, the light request).
+        self.pulses_played: list[tuple[str, dict]] = []
+        self.pulses_dropped: list[tuple[str, dict]] = []
+        self._pulsed: dict[str, float] = {}
         self.clock = time.monotonic
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
@@ -363,9 +381,6 @@ class FakeLamp:
             # As lamp-control's session.rs answers `get`: the states under `state`, each by the name asked (`lamp`, not
             # `lamp.changed`'s `lamp_state`) (harness-reviewer's lamp run on 75c9, 28 Oct).
             await self._ok(ws, id_, state={k: self.light_state() if k == "light" else self.state.get(k) for k in request["state"]})
-        elif op == "light":
-            self._show(request)
-            await self._ok(ws, id_)
         elif op == "lease.take":
             if any(set(request["parts"]) & set(h["parts"]) for h in self.leases.values()):
                 await self._refuse(ws, id_, "busy", "another client holds it")
@@ -386,6 +401,26 @@ class FakeLamp:
             # As lamp-control routes them: the body takes them, and no
             # `done` follows.
             await self._ok(ws, id_, to="body")
+        elif op == "light":
+            # As lamp-control's parts.rs: the pattern checked first, then to the
+            # ring, which keeps its own one-pulse-a-minute (not said back).
+            least, why = PATTERN_LEAST_LEVEL.get(request.get("pattern"), (1, ""))
+            if request["level"] < least:
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "refused", why)
+                return
+            if request.get("pattern") == "pulse":
+                now = self.clock()
+                if now - self._pulsed.get(client, -PULSE_GAP_S) < PULSE_GAP_S:
+                    # The ring shows it without its pulse (ring_light.rs's
+                    # start_moving starts it "as already played"): its colour
+                    # and level steady, the old light replaced.
+                    self.pulses_dropped.append((client, request))
+                else:
+                    self._pulsed[client] = now
+                    self.pulses_played.append((client, request))
+            self._show(request)
+            await self._ok(ws, id_, to="ring")
         elif op == "express":
             # As lamp-control's feelings.rs: the feelings skill's three, its
             # move to the body (smaller below strength 0.5) and its light; no

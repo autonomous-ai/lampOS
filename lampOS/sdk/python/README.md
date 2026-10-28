@@ -114,7 +114,10 @@ asyncio.run(main())
 - **In your tests:** `lampos.testing.FakeLamp(grants=...)` is the same fake
   lamp: `emit(event, **fields)`, `refuse_next(op, code, why)`,
   `done(re)`, `lease_event(lease, state, why)`, and `requests` /
-  `received` for what it took.
+  `received` for what it took. Its `light` keeps lamp-control's pattern levels
+  (a `breathe` at level 1 is refused) and answers `{"to": "ring"}`.
+  `pulses_dropped` lists a second pulse within a minute, which the ring shows
+  steady, without its pulse (and says nothing).
 
 **When the lamp restarts** (every update), the connection closes and
 `wait_closed()` returns: a long-running program connects again, for example

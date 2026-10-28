@@ -150,6 +150,17 @@ have on.
 `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`),
 and the three of `PatternKind`: `breathe`, `candle`, `pulse`. A light never
 blinks or flashes. A test in `lamp-msgs` keeps the schema's lists in step.
+- **Levels:** each pattern has a least level, checked before the ring
+  (`LightPattern::check`, `parts.rs`). A `breathe` needs level 2 or up, since its
+  low is level 1. A `candle` needs 3 or up, and a `pulse` 2 or up. Under that the
+  light is `refused` with the ring's own words.
+- **Pulses:** the ring plays at most one `pulse` a minute for one computer
+  (`PULSE_GAP_US`, counted from when a pulse was drawn). A second within the
+  minute is still shown, its colour and level steady, but without its pulse
+  (`ring_light.rs`'s `start_moving` starts it "as already played"). The door has
+  answered `{"to":"ring"}` by then, so nothing says so. A program that renews a
+  pulsing light keeps its colour lit, but it pulses once a minute at most
+  (lamp-a0ae, 29 Oct).
 
 **State** (`get`, or the events above): presence (`count`, `near`,
 `facing`, never who), the light (the person's own, `on`, `colour` and

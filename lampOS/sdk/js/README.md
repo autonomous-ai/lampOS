@@ -111,7 +111,10 @@ await lamp.closed();
 - **Refusals** reject with typed errors: `byCode.rate` (with `retryMs`),
   `byCode.no_grant`, `byCode.private`, ...
 - **In your tests:** `FakeLamp` from `lampos/testing` is the same fake lamp:
-  `emit`, `refuseNext`, `done`, `leaseEvent`, `requests`, `received`.
+  `emit`, `refuseNext`, `done`, `leaseEvent`, `requests`, `received`. Its
+  `light` keeps lamp-control's pattern levels (a `breathe` at level 1 is refused)
+  and answers `{"to":"ring"}`. `pulsesDropped` lists a second pulse within a
+  minute, which the ring shows steady, without its pulse (and says nothing).
 
 **When the lamp restarts** (every update), the connection closes and
 `lamp.closed()` resolves: a long-running program connects again, for
