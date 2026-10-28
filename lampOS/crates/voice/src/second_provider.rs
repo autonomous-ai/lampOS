@@ -5017,60 +5017,6 @@ async fn spoken(
     // Only current captured words authorize a recording: neither a carried
     // prefix nor the synthetic name below can supply a new spoken identity.
     turn.captured &= !text.trim().is_empty();
-    // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
-    // heard as "Stop them." was asked of the model, which said "Stop who?",
-    // then "Stop telling story." got "I wasn't telling a story"). The cut-in
-    // already stopped the answer; this line is answered here, in the route's
-    // voice, and kept in the thread as the lamp's, so the next turn sees the
-    // story, the stop and that the lamp stopped. Never carried words.
-    if shared.spoken_stop_ends
-        && marks.over_the_lamps_voice
-        && before
-            .as_ref()
-            .is_none_or(|before| before.trim().is_empty())
-        && crate::spoken_stop::is_stop_request(&text)
-    {
-        drop(prepared.take());
-        eprintln!(
-            "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)",
-            crate::spoken_stop::LINE
-        );
-        let said = shared
-            .emit(ProviderOutput::Transcript {
-                request: Some(request),
-                text: crate::spoken_stop::LINE.to_owned(),
-                finished: false,
-            })
-            .await;
-        if said {
-            let kept = shared.stop_line.lock().ok().and_then(|kept| kept.clone());
-            let clip = match kept {
-                Some(clip) => clip,
-                None => {
-                    let clip = render_line(&shared.services, crate::spoken_stop::LINE).await;
-                    if !clip.is_empty()
-                        && let Ok(mut kept) = shared.stop_line.lock()
-                    {
-                        *kept = Some(clip.clone());
-                    }
-                    clip
-                }
-            };
-            if (clip.is_empty() || cue(&shared, request, clip).await.is_ok())
-                && shared
-                    .emit(ProviderOutput::GenerationComplete { request })
-                    .await
-            {
-                shared
-                    .emit(ProviderOutput::TurnComplete {
-                        request,
-                        idle: true,
-                    })
-                    .await;
-            }
-        }
-        return;
-    }
     // What was heard in this request is told as heard; the model is asked
     // with the words of the one it goes on from before them.
     let went_on = before
@@ -5307,6 +5253,68 @@ async fn spoken(
                 _ => break None,
             }
         };
+    }
+    // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
+    // heard as "Stop them." was asked of the model, which said "Stop who?",
+    // then "Stop telling story." got "I wasn't telling a story"). The cut-in
+    // already stopped the answer; this line is answered here, in the route's
+    // voice, and kept in the thread as the lamp's, so the next turn sees the
+    // story, the stop and that the lamp stopped. Never carried words.
+    // Judged after the echo, held and heed verdicts, so the lamp's own
+    // "Stop it!" heard back, or desk talk not for it, is never answered
+    // (the Reviewer-lead's P2 on #4004).
+    if shared.spoken_stop_ends
+        && !echoed
+        && !held
+        && heeded.is_none()
+        && marks.over_the_lamps_voice
+        && !went_on
+        && crate::spoken_stop::is_stop_request(&text)
+        && !shared
+            .lamp_said
+            .lock()
+            .is_ok_and(|said| crate::spoken_stop::could_be_echo(&text, &said.1))
+    {
+        drop(prepared.take());
+        eprintln!(
+            "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)",
+            crate::spoken_stop::LINE
+        );
+        let said = shared
+            .emit(ProviderOutput::Transcript {
+                request: Some(request),
+                text: crate::spoken_stop::LINE.to_owned(),
+                finished: false,
+            })
+            .await;
+        if said {
+            let kept = shared.stop_line.lock().ok().and_then(|kept| kept.clone());
+            let clip = match kept {
+                Some(clip) => clip,
+                None => {
+                    let clip = render_line(&shared.services, crate::spoken_stop::LINE).await;
+                    if !clip.is_empty()
+                        && let Ok(mut kept) = shared.stop_line.lock()
+                    {
+                        *kept = Some(clip.clone());
+                    }
+                    clip
+                }
+            };
+            if (clip.is_empty() || cue(&shared, request, clip).await.is_ok())
+                && shared
+                    .emit(ProviderOutput::GenerationComplete { request })
+                    .await
+            {
+                shared
+                    .emit(ProviderOutput::TurnComplete {
+                        request,
+                        idle: true,
+                    })
+                    .await;
+            }
+        }
+        return;
     }
     // A held echo's journal line, with its counts, is said above.
     if let Some(why) = heeded.filter(|_| !echoed) {
