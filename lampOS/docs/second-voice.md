@@ -3625,6 +3625,21 @@ after a take-over, but now for every turn:
   Held talk, talk past the lamp, another voice and the same speaker's
   carry are unchanged. Off, one look is enough, as before. If the looks
   cannot be subscribed to, two faces make no room busy, said once.
+- **The owner named by default in a reply** (`LAMP_PERSON_NAME_BY_DEFAULT=on`,
+  #3884, the first builder's call on 28 Oct): with `LAMP_PERSON_NAME`, each
+  reply is told the person speaking is most likely the one who set the lamp
+  up (`person::by_default`), unless there is a sign of someone else now
+  (`person::someone_else_now`): another voice in the conversation (the
+  rule's own `another_person`, told through `Heeding::telling_another_voice`),
+  more than one face in view, one face the eyes don't know as the owner, or
+  the eyes knowing someone else. No face in view, the owner looking away, is
+  no sign. For the reply only: the line's scope, memory and every keep,
+  recall and forget stay as the rule below decides. On lamp-29e7 (8250) the
+  owner alone at the lamp right after setup asked "what's my name?" and was
+  not answered: the camera read their mouth speaking on 2 of 18 lines, so no
+  rule needing a face seen speaking could carry it. Without a name, or off:
+  nothing. `the owner is not named by default: WHY` in the journal when a
+  sign holds.
 - **A line is a known person's only when their own face was seen speaking
   it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,
   a line admitted as the known person's is narrowed to the room only when
