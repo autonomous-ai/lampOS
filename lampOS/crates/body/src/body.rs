@@ -342,6 +342,20 @@ fn closing_on(goal: u16, position: u16, tracked_at: u16, not_nearer_for: u16) ->
         && not_nearer_for < FOLLOW_STILL_STEPS
 }
 
+/// A joint's distance from its goal this step, kept as its nearest since it
+/// left its track and the steps since it last came nearer. On its track, and
+/// on the first step off it, the count starts again from this step's gap: a
+/// goal that jumped is measured from where the jump left the joint, not from
+/// the small gap it had while tracking (the Reviewer-lead's P2 on #3925).
+fn note_gap(nearest: &mut u16, not_nearer_for: &mut u16, gap: u16, off_track: u8) {
+    if off_track <= 1 || gap < *nearest {
+        *nearest = gap;
+        *not_nearer_for = 0;
+    } else {
+        *not_nearer_for = not_nearer_for.saturating_add(1);
+    }
+}
+
 /// The window a head or base goal must be inside for a joint whose servo
 /// stores `range` (registers 9 and 11): the range less `OWN_RANGE_MARGIN`
 /// either side. A servo storing the whole turn, 0..=4095, was never
@@ -6571,16 +6585,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // that jumped faster than it turns, and its load is the move's:
             // lamp-52e6 on 27 Oct "met resistance" 98 times in four hours
             // with nobody near, each a two-second hitch in a glance.
-            let gap = written[index].abs_diff(is.position);
-            if gap < nearest[index] {
-                nearest[index] = gap;
-                not_nearer_for[index] = 0;
-            } else {
-                not_nearer_for[index] = not_nearer_for[index].saturating_add(1);
-            }
-            if off_track[index] == 0 {
-                nearest[index] = gap;
-            }
+            note_gap(
+                &mut nearest[index],
+                &mut not_nearer_for[index],
+                written[index].abs_diff(is.position),
+                off_track[index],
+            );
             let following = closing_on(
                 written[index],
                 is.position,

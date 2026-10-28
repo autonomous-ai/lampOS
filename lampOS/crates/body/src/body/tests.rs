@@ -5375,6 +5375,44 @@ fn a_joint_closing_on_its_goal_is_following_not_pushed() {
     assert!(!closing_on(2_215, 2_095, 2_015, FOLLOW_STILL_STEPS));
 }
 
+/// The Reviewer-lead's P2 on #3925, step by step: a joint tracking a few
+/// counts off its goal, the goal jumping 40 counts, the joint closing on it
+/// for six steps (as long as `pushed` takes), then caught by a hand and held.
+/// It is following while it closes, from the jump, and not once held.
+#[test]
+fn a_jumped_goal_is_measured_from_the_jump_not_from_the_track() {
+    let (goal, tracked_at): (u16, u16) = (2_061, 2_025);
+    let (mut nearest, mut still) = (u16::MAX, 0);
+    let mut following = Vec::new();
+    // On track, then off it from the jump: (position, steps off track).
+    let steps: [(u16, u8); 13] = [
+        (2_058, 0),
+        (2_058, 0),
+        (2_025, 1),
+        (2_028, 2),
+        (2_031, 3),
+        (2_034, 4),
+        (2_037, 5),
+        (2_040, 6),
+        (2_040, 7),
+        (2_040, 8),
+        (2_040, 9),
+        (2_040, 10),
+        (2_040, 11),
+    ];
+    for (position, off) in steps {
+        note_gap(&mut nearest, &mut still, goal - position, off);
+        following.push(closing_on(goal, position, tracked_at, still));
+    }
+    // Closing at the sixth step off track, where `pushed` would first fire.
+    assert!(following[7], "{following:?}");
+    // Held by a hand: no nearer for FOLLOW_STILL_STEPS, and no longer following.
+    assert!(
+        !following[7 + usize::from(FOLLOW_STILL_STEPS)],
+        "{following:?}"
+    );
+}
+
 /// lamp-06c1, 23 Oct: a head pitch that reads 124 to 136 at its own rest,
 /// over `STALL_LOAD`, with nothing on it and its position unmoving all
 /// night. Given way to a short push, it is let go after its ease and is
