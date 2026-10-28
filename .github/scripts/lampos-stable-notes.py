@@ -75,8 +75,10 @@ class Notes:
         left = max(0, int(compare.get("total_commits", len(commits))) - len(commits))
         found = {}
         for commit in commits[:MOST_COMMITS]:
+            # GitHub also names open and closed pull requests whose branch
+            # holds the commit; only one that was merged brought it.
             for pull in self.api(f"commits/{commit['sha']}/pulls"):
-                if pull.get("base", {}).get("ref") == "lamp-voice":
+                if pull.get("base", {}).get("ref") == "lamp-voice" and pull.get("merged_at"):
                     found.setdefault(pull["number"], pull["title"])
         listed = {}
         for number, title in found.items():
