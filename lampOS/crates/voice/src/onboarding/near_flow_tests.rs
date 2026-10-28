@@ -305,7 +305,7 @@ fn a_hearing_begun_at_six_seconds_counts_and_one_a_millisecond_later_does_not() 
 /// whose words were the lamp's name alone (#3923, `StepCallHeard`).
 fn by_text(walk: &mut Onboarding, prompt: &Prompt, after_ms: i64) -> Option<u64> {
     let began_us = (prompt.ended_us as i64 + after_ms * 1_000) as u64;
-    walk.near_text_call(began_us, began_us + 600_000)
+    walk.near_text_call(began_us, began_us + 600_000).ok()
 }
 
 /// The try judged `after_us` past the prompt's end.
@@ -364,7 +364,10 @@ fn a_call_heard_only_by_text_counts_with_its_rise_and_says_so() {
     assert_eq!(judged["accepted"], false, "{judged}");
     assert_eq!(walk.kept().near_call_tries.len(), 1);
     // Outside a try's window the step takes no line.
-    assert_eq!(walk.near_text_call(70 * S, 70 * S + 600_000), None);
+    assert_eq!(
+        walk.near_text_call(70 * S, 70 * S + 600_000),
+        Err("no call's try is open")
+    );
 }
 
 /// The same "Lamp" heard by the detector and by speech to text is one call,
