@@ -2536,6 +2536,10 @@ impl lamp_update::install::Host for InstallHost {
         Err("not asked of this lamp".into())
     }
 
+    fn handed_over(&mut self) -> bool {
+        false
+    }
+
     fn hand_over(&mut self, _: &std::path::Path) -> String {
         "not asked of this lamp".into()
     }
