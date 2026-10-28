@@ -172,6 +172,9 @@ const ARM_STALL_MARGIN: u16 = 100;
 /// learned and it keeps `STALL_LOAD` until it stands under this.
 const ARM_CARRIES_MOST: u16 = STALL_LOAD + ARM_STALL_MARGIN;
 const STALL_SLACK: u16 = 6;
+/// A held servo's reading jitter, two counts back and forth: a joint this
+/// close to its goal stands there.
+const STOOD_JITTER: u16 = 2;
 /// Arrived: this close to the wanted pose and this slow, for this many steps.
 const ARRIVED_COUNTS: f32 = 6.0;
 const ARRIVED_SPEED: f32 = 15.0;
@@ -3474,10 +3477,11 @@ struct Stall {
     /// they began.
     steps: u16,
     at: u16,
-    /// Where it was when it began to be pressed off its goal, this time:
-    /// a hand carries it from there, away from the goal; a joint short of
-    /// its goal under its own weight, or against a shelf, stays.
-    pressed_from: Option<u16>,
+    /// Where it last stood unpressed at its goal (`STOOD_JITTER`), or was
+    /// last held: a hand carries it from there, away from the goal, however
+    /// slowly and whatever its load does on the way; a joint short of a new
+    /// goal under its own weight, or against a shelf, came toward it.
+    stood_at: Option<u16>,
     /// The stop just made was of a joint carried away from its goal while
     /// pressed, more than `STALL_SLACK`: a hand moved it.
     pub(crate) carried: bool,
@@ -3517,11 +3521,12 @@ impl Stall {
         });
         self.pressed = is.load > bound;
         let pushing = goal.abs_diff(is.position) > STALL_SLACK && self.pressed;
-        self.pressed_from = if pushing {
-            self.pressed_from.or(Some(is.position))
-        } else {
-            None
-        };
+        // At its goal, give or take a held servo's jitter, and not pressed:
+        // a hand easing it off, its load dipping now and then, would carry
+        // this along with it.
+        if !self.pressed && goal.abs_diff(is.position) <= STOOD_JITTER {
+            self.stood_at = Some(is.position);
+        }
         let away = self
             .last_at
             .is_some_and(|at| at.abs_diff(is.position) > STALL_SLACK);
@@ -3543,10 +3548,12 @@ impl Stall {
             return false;
         }
         self.steps = 0;
-        self.carried = self.pressed_from.is_some_and(|from| {
+        self.carried = self.stood_at.is_some_and(|from| {
             is.position.abs_diff(from) > STALL_SLACK
                 && goal.abs_diff(is.position) > goal.abs_diff(from)
         });
+        // Held here from now on: a hand carrying it on goes from here.
+        self.stood_at = Some(is.position);
         self.hold = Some((wanted, is.position));
         self.held = 0;
         self.again = self
