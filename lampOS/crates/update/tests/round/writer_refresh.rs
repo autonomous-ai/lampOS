@@ -184,3 +184,54 @@ fn no_switch_of_lamp_updates_own_leans_on_a_writer_not_proved_yet() {
         lamp.said.iter().rev().take(3).collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn a_new_writer_whose_first_apply_fails_is_put_back_after_that_apply() {
+    let (mut lamp, _) = lamp_with_settings();
+    // update/current names the lamp-update that runs; an older writer is at
+    // the fixed path.
+    let hash = sha("lamp-update 1");
+    let folder = lamp.root.join(format!("opt/lampOS/update/{hash}"));
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("lamp-update"), "lamp-update 1").unwrap();
+    std::os::unix::fs::symlink(&hash, lamp.root.join("opt/lampOS/update/current")).unwrap();
+    let back = lamp.root.join(BACK.trim_start_matches('/'));
+    fs::create_dir_all(back.parent().unwrap()).unwrap();
+    fs::write(&back, "old writer").unwrap();
+    lamp.config.writer_from = Some(writer_swap::Running::new(b"lamp-update 1".to_vec()));
+    let (root, records) = (lamp.root.clone(), lamp.records());
+    lamp.systemd.writer = Some(Box::new(move || {
+        writer_swap::refresh(
+            &root,
+            &records,
+            b"lamp-update 1",
+            lamp_update::records::unix_ms(),
+            &mut |path: &Path| Ok(fixed_copy::answer(&sha256_hex(&fs::read(path).unwrap()))),
+        )
+        .map(|_| ())
+    }));
+    // The new writer's first apply fails before it writes anything.
+    lamp.systemd.applier = Some(Box::new(|| {
+        Err("lamp-update-apply.service: exit status: 1".into())
+    }));
+    publish_settings(
+        &mut lamp,
+        2,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(BACK), "old writer");
+    assert!(!lamp.exists(PREV));
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    let said = |text: &str| lamp.said.iter().position(|line| line.contains(text));
+    let (refreshed, put_back) = (
+        said("the settings writer is now build"),
+        said("is put back (its first apply failed)"),
+    );
+    assert!(refreshed.is_some() && put_back.is_some(), "{:?}", lamp.said);
+    assert!(refreshed < put_back);
+}
