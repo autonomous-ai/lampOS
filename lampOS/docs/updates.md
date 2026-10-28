@@ -2785,8 +2785,17 @@ bound. Until the refreshed writer is proved:
   first `apply` by the new writer failed, the round asks the unit to rename
   `.prev` back over it (`Op::PutBack`). The apply's own undo runs first,
   with the writer that made it, when it wrote anything; a writer that
-  failed before its first write is put back all the same. The build put back is kept in
-  `writer-refresh.done` and never asked to be the writer again.
+  failed before its first write is put back all the same. The build put
+  back is kept in `writer-refresh.done` and never asked to be the writer
+  again.
+- **A failed `back` that began before the refresh** is not the new
+  writer's. The copy before's `back` may be mid-run when the refresh lands,
+  and fail after the unit's `reset-failed`. So a `failed` counts only when
+  systemd's `ExecMainStartTimestamp` of the back unit (whole seconds) is
+  after the refresh's `at_unix_ms`. One in the refresh's own second or
+  before is waited past, to the next `back`, and said (`… back failed in a
+  run that began before it was refreshed: the next back judges it`). When
+  systemd can't say, it counts (El's P3 on #4178).
 
 `installed_units` leaves out the writer's unit, as it leaves out
 lamp-update's own. It starts `update/current` too, and taken for a part it

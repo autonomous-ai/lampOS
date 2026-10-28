@@ -47,6 +47,14 @@ pub trait Systemd {
     fn start_writer_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot start the writer's unit".to_owned())
     }
+    /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
+    /// milliseconds to the second below (`ExecMainStartTimestamp`): none
+    /// when it never began, or when systemd cannot say. A `failed` from a
+    /// `back` that began before a refresh is the copy before's, not the new
+    /// writer's (El's P3 on #4178).
+    fn back_began_unix_ms(&mut self) -> Option<u64> {
+        None
+    }
     /// The last line the unit's own program wrote to the journal since this
     /// program last restarted it, cleaned ([`clean_line`]); none before a
     /// restart, or when it said nothing since (#1505). Only ever asked of a
@@ -151,6 +159,22 @@ impl Systemd for Systemctl {
             ]),
             JOURNAL_WITHIN,
         )
+    }
+
+    fn back_began_unix_ms(&mut self) -> Option<u64> {
+        let stdout = show_within(
+            Command::new("systemctl").args([
+                "show",
+                "--timestamp=unix",
+                "--property=ExecMainStartTimestamp",
+                "--value",
+                "--",
+                crate::writer_swap::BACK_UNIT,
+            ]),
+            JOURNAL_WITHIN,
+        )
+        .ok()?;
+        began_unix_ms(&stdout)
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {
@@ -337,6 +361,13 @@ pub fn output_within(command: &mut Command, within: Duration) -> Option<String> 
 /// not start, it ran on or a child it left held its pipes (the group is
 /// killed), its output passed 1 MiB, or it failed, in its own trimmed words
 /// on stderr. A stalled query never holds its caller past `within`.
+/// `systemctl show --timestamp=unix`'s `@SECONDS`, in milliseconds; none
+/// for the empty value of a unit that never began.
+fn began_unix_ms(value: &str) -> Option<u64> {
+    let seconds: u64 = value.trim().strip_prefix('@')?.parse().ok()?;
+    seconds.checked_mul(1000)
+}
+
 fn show_within(command: &mut Command, within: Duration) -> Result<String, String> {
     let stdout = query::output_and_stderr_within(command, Instant::now() + within).map_err(
         |error| match error.kind() {
@@ -637,6 +668,14 @@ mod tests {
         assert!(!not_loaded(
             "systemctl stop lamp-a.service: exit status: 1: Job for lamp-a.service failed."
         ));
+    }
+
+    #[test]
+    fn a_units_last_start_is_read_from_systemds_unix_seconds() {
+        assert_eq!(began_unix_ms("@1761670800\n"), Some(1_761_670_800_000));
+        // A unit that never began, and words that are not a time.
+        assert_eq!(began_unix_ms("\n"), None);
+        assert_eq!(began_unix_ms("Tue 2026-10-28 17:00:00 UTC"), None);
     }
 
     fn sh(script: &str) -> Command {

@@ -236,6 +236,9 @@ struct FakeSystemd {
     /// What starting the settings writer's one-shot runs: none, and the
     /// start is refused (a systemd that cannot).
     writer: Option<Box<dyn FnMut() -> Result<(), String>>>,
+    /// When the settings writer's `back` last began, in Unix ms: none, and
+    /// systemd cannot say.
+    back_began: Option<u64>,
     /// The next reload stops the round dead, as a power cut would.
     cut_at_reload: bool,
     /// Independent recovery must be explicitly armed by a self-update fixture.
@@ -374,6 +377,10 @@ impl Systemd for FakeSystemd {
             "Id={unit}\nLoadState=loaded\nFragmentPath=/etc/systemd/system/{unit}\nDropInPaths=\nUnitFileState=static\n",
             unit = lamp_update::writer_unit::UNIT
         ))
+    }
+
+    fn back_began_unix_ms(&mut self) -> Option<u64> {
+        self.back_began
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {
@@ -550,6 +557,7 @@ impl Lamp {
             failing: 0,
             applier: None,
             writer: None,
+            back_began: None,
             cut_at_reload: false,
             self_recovery: Err("lamp-update-back.timer is not active".into()),
             self_recovery_queries: 0,
