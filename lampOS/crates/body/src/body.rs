@@ -3510,6 +3510,13 @@ struct Stall {
     hold: Option<(u16, u16)>,
     /// Steps it has been held so far.
     held: u16,
+    /// The hold was made while a move played and was not carried by a
+    /// hand: it is keyed on what is wanted with the move laid over, so the
+    /// move's later frames (its return) still drive the joint, and it ends
+    /// with the move. A head lifted and held by a gesture stalls against
+    /// its own weight; latched on the mood pose alone it stayed up for
+    /// minutes, and the rest then took that pose as its own (#3691).
+    with_move: bool,
     /// Where it last stopped. A joint that stops there again (a standing
     /// shoulder resting short of its goal under its own weight, each time a
     /// scene or the rest moves its goal a little) is held again quietly: on
@@ -3536,9 +3543,10 @@ struct Stall {
 
 impl Stall {
     /// One step of a joint whose goal is `goal` and of which `wanted` is
-    /// wanted. True when it has just been told to stop pushing; `again`
+    /// wanted; `moving`, while a move plays, is that with the move's offset
+    /// laid over. True when it has just been told to stop pushing; `again`
     /// then says whether that was where it last stopped (not to be counted).
-    fn step(&mut self, goal: u16, is: Sample, wanted: u16) -> bool {
+    fn step(&mut self, goal: u16, is: Sample, wanted: u16, moving: Option<u16>) -> bool {
         let bound = self
             .carries
             .map_or(self.least.unwrap_or(STALL_LOAD), |load| {
@@ -3584,6 +3592,8 @@ impl Stall {
         });
         // Held here from now on: a hand carrying it on goes from here.
         self.stood_at = Some(is.position);
+        self.with_move = moving.is_some() && !self.carried;
+        let wanted = moving.filter(|_| self.with_move).unwrap_or(wanted);
         self.hold = Some((wanted, is.position));
         self.held = 0;
         self.again = self
@@ -3594,10 +3604,12 @@ impl Stall {
     }
 
     /// Where it is held, while what is wanted of it has not moved
-    /// `WAKE_COUNTS` from what was wanted when it stalled.
-    fn holding(&mut self, wanted: u16) -> Option<u16> {
-        match self.hold {
-            Some((was, at)) if f32::from(wanted.abs_diff(was)) < WAKE_COUNTS => {
+    /// `WAKE_COUNTS` from what was wanted when it stalled. A hold made in a
+    /// move (`with_move`) is judged on `moving`, and ends with the move.
+    fn holding(&mut self, wanted: u16, moving: Option<u16>) -> Option<u16> {
+        let wanted = if self.with_move { moving } else { Some(wanted) };
+        match (self.hold, wanted) {
+            (Some((was, at)), Some(wanted)) if f32::from(wanted.abs_diff(was)) < WAKE_COUNTS => {
                 self.held = self.held.saturating_add(1);
                 Some(at)
             }
@@ -6007,6 +6019,26 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             kept = [0.0; 3];
             stalls.iter_mut().for_each(|stall| stall.hold = None);
         }
+        // A gesture is laid over the pose, outside what follows the mood.
+        // A head that does not tilt when it stands does not tilt in a
+        // gesture either: on lamp-4ace that joint turns a round head about
+        // its own axis, which nobody sees.
+        let over_of: [f32; 3] = std::array::from_fn(|index| {
+            if index == 1 && limits.stand_roll <= limits.roll {
+                0.0
+            } else {
+                gesture_now[index]
+            }
+        });
+        // What is wanted of each joint with the move laid over, while one
+        // plays: a stall in a move is held against this (`Stall::with_move`).
+        let moving_of = |wanted_of: &[f32; 3], index: usize| {
+            gesturing.then(|| {
+                (wanted_of[index] + over_of[index])
+                    .round()
+                    .clamp(0.0, 4_095.0) as u16
+            })
+        };
         for (index, offset) in offsets.into_iter().enumerate() {
             if blind {
                 continue;
@@ -6072,20 +6104,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 high[index].max(commanded[index]),
             );
             commanded[index] = (commanded[index] + velocity[index] * step).clamp(floor, ceiling);
-            // A gesture is laid over the pose, outside what follows the mood.
             let least = if index == 0 {
                 f32::from(limits.pitch_floor)
             } else {
                 0.0
             };
-            // A head that does not tilt when it stands does not tilt in a
-            // gesture either: on lamp-4ace that joint turns a round head
-            // about its own axis, which nobody sees.
-            let over = if index == 1 && limits.stand_roll <= limits.roll {
-                0.0
-            } else {
-                gesture_now[index]
-            };
+            let over = over_of[index];
             // A head lifting from rest is led, never past its bounds; and so
             // is one coming back up after a glance dipped it, while it is
             // still below its way: from below, lamp-52e6's head stopped 26
@@ -6136,9 +6160,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // else is wanted of it.
         if limits.give_way.is_some() && !blind {
             for index in 0..3 {
-                if let Some(at) = stalls[index].holding(wanted_of[index].round() as u16) {
+                let moving = moving_of(&wanted_of, index);
+                if let Some(at) = stalls[index].holding(wanted_of[index].round() as u16, moving) {
                     goals[index] = at;
-                    commanded[index] = f32::from(at);
+                    // Held in a move, the move stays laid over its way, so
+                    // that once let go it goes on from here, not from here
+                    // plus the move again.
+                    let over = if stalls[index].with_move {
+                        over_of[index]
+                    } else {
+                        0.0
+                    };
+                    commanded[index] = f32::from(at) - over;
                     velocity[index] = 0.0;
                 }
             }
@@ -6168,7 +6201,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         if arm_goals[index] == wanted {
                             stalls[3 + index].hold = None;
                         }
-                    } else if let Some(at) = stalls[3 + index].holding(wanted) {
+                    } else if let Some(at) = stalls[3 + index].holding(wanted, None) {
                         arm_goals[index] = at;
                     }
                 }
@@ -6503,8 +6536,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     continue;
                 }
                 let is = samples[COMMANDED[index].index()];
-                let stopped =
-                    stalls[index].step(written[index], is, wanted_of[index].round() as u16);
+                let stopped = stalls[index].step(
+                    written[index],
+                    is,
+                    wanted_of[index].round() as u16,
+                    moving_of(&wanted_of, index),
+                );
                 // A gentle hand turning the head is followed by this rule
                 // alone, under the load that eases it (lamp-29e7 on 8080:
                 // the roll put 34 counts over a minute at 100 to 144, its
@@ -6532,7 +6569,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     } else if stall.carries.is_none() && is.load <= ARM_CARRIES_MOST {
                         stall.carries = Some(is.load);
                     }
-                    if stall.step(arm_written[index], is, arm_written[index]) {
+                    if stall.step(arm_written[index], is, arm_written[index], None) {
                         if !stall.again {
                             report.stalls[3 + index] = report.stalls[3 + index].saturating_add(1);
                         }

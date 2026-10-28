@@ -2579,7 +2579,17 @@ the next start found it 99 counts off its way and the lamp would not
 stand. Otherwise it is held there
 until what is wanted of it moves 20 counts or more from what was wanted
 when it stalled (a new mood, the arm rising or folding), and then follows
-again. Torque is never written off for that. A joint that stops again within
+again. A head or base joint that stalls while a gesture plays, and was not
+carried there by a hand (the hand case, below in "A hand on the bus"), is
+held instead until what is wanted of it with the gesture laid over moves 20
+counts, so the gesture's later frames (its return) still drive it, and in
+any case no longer than the gesture: the rest that follows is then the pose
+the lamp stands in, never where it stalled. On lamp-06c1 (#3691) glad held
+the head 110 counts up for 1.6 s, it stalled 27 counts short under its own
+weight, and held on the mood pose alone it stayed up through the gesture's
+return; the rest then kept that pose for 2.5 minutes. A stall a hand
+carried in a gesture is held as with no gesture. Torque is never written
+off for that. A joint that stops again within
 6 counts of where it last stopped is held again (it still stops pushing,
 which `--overload release` counts on) but not counted in `stalls` and not
 logged; a joint that has moved freely away, unloaded, for a second forgets
