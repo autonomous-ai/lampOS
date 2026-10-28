@@ -954,7 +954,16 @@ pub trait Host {
     /// writes the units it carries itself ([`PRODUCT`]), so one that is not
     /// the build's own is said ([`not_the_builds_updater`], #3733).
     fn running_sha256(&mut self) -> Result<String, String>;
+    /// Runs `exe`, the build's own lamp-update, in this process's place with
+    /// the same arguments and [`HANDED_OVER`] set, so it writes its own
+    /// units (#3733). Returns only when that could not be done, with why: a
+    /// run handed over once is never handed over again.
+    fn hand_over(&mut self, exe: &Path) -> String;
 }
+
+/// Set on the lamp-update an install hands over to ([`Host::hand_over`]):
+/// it hands over no further, whatever it finds.
+pub const HANDED_OVER: &str = "LAMP_UPDATE_HANDED_OVER";
 
 /// The machine itself: only with the root `/`.
 pub struct System;
@@ -1014,6 +1023,20 @@ impl Host for System {
             std::env::current_exe().map_err(|error| error.to_string())?
         };
         file_sha256(&path).map_err(|error| format!("{}: {error}", path.display()))
+    }
+
+    fn hand_over(&mut self, exe: &Path) -> String {
+        use std::os::unix::process::CommandExt;
+        if std::env::var_os(HANDED_OVER).is_some() {
+            return format!("{HANDED_OVER} is set: this run was handed over to already");
+        }
+        // The records' lock is opened close-on-exec, so it is let go here
+        // and the build's own lamp-update takes it again.
+        let error = Command::new(exe)
+            .args(std::env::args_os().skip(1))
+            .env(HANDED_OVER, "1")
+            .exec();
+        format!("{}: {error}", exe.display())
     }
 
     fn utc_offset_minutes(&mut self, zone: &str) -> Result<i32, String> {
@@ -1348,12 +1371,24 @@ pub fn install(
         records_lost,
         mut changed,
         made,
+        own,
     } = before_units(config, channel, host, say)
         .map_err(|why| format!("{UNITS_NOT_WRITTEN}: {why}"))?;
 
-    // The units below are this program's own (`PRODUCT`), not the build's:
-    // a lamp-update other than the build's own is said, and install goes on.
-    if let Some(line) = not_the_builds_updater(&manifest, host.running_sha256()) {
+    // The units below are this program's own (`PRODUCT`), not the build's.
+    // A lamp-update known to be another than the build's own hands over to
+    // the build's, placed above, to write the build's units (#3733); one
+    // that cannot is said, and install goes on with its own.
+    let running = host.running_sha256();
+    if let Some(line) = not_the_builds_updater(&manifest, running.clone()) {
+        if let (Ok(_), Some(own)) = (&running, &own) {
+            say(&format!(
+                "handing over to build {}'s own lamp-update, {own}, to write its units",
+                manifest.sequence
+            ));
+            let why = host.hand_over(&config.on(own));
+            say(&format!("could not hand over: {why}"));
+        }
         say(&line);
     }
 
@@ -1672,6 +1707,8 @@ struct Early {
     changed: Vec<String>,
     /// The build folders this run made.
     made: Vec<String>,
+    /// The build's own lamp-update, placed: `/opt/lampOS/update/<build>/lamp-update`.
+    own: Option<String>,
 }
 
 /// Install up to its units: the build, the lock, the head reader's
@@ -1774,16 +1811,17 @@ fn before_units(
     // lamp-update-back, a copy of this build's lamp-update at a fixed path:
     // written here alone, never by a round, which cannot even write it, so
     // a lamp-update that cannot start is still put back (#1680).
+    let mut own = None;
     if let Some(((part, _), build)) = wanted
         .iter()
         .zip(&builds)
         .find(|((part, _), _)| part.binary == crate::own::BINARY)
     {
-        let from = config
-            .on(&unit::folder(&part.folder, build))
-            .join(&part.binary);
+        let placed = format!("{}{}", unit::folder(&part.folder, build), part.binary);
+        let from = config.on(&placed);
         let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
         put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+        own = Some(placed);
     }
 
     Ok(Early {
@@ -1794,6 +1832,7 @@ fn before_units(
         records_lost,
         changed,
         made,
+        own,
     })
 }
 
