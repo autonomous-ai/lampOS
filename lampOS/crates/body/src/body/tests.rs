@@ -5357,60 +5357,67 @@ fn a_head_held_off_its_goal_by_a_hand_at_a_low_load_is_in_the_hand() {
     );
 }
 
-/// lamp-52e6, 27 Oct, 01:26:22: the base's goal jumped to 2,061 from 2,025
-/// where it last tracked; 2,037 four steps on, at a load of 104, it was
-/// closing on it, not held. A hand holding it, or pushing it away, is not.
+/// #3925: a joint turning toward a goal that moved faster than it turns is
+/// following, whether the gap shrinks or, while the goal ramps away, grows;
+/// held still or turned away by a hand, it is not. Step by step, as the
+/// loop calls them: (goal, position, steps off track).
 #[test]
-fn a_joint_closing_on_its_goal_is_following_not_pushed() {
-    assert!(closing_on(2_061, 2_037, 2_025, 0));
-    assert!(closing_on(1_700, 1_741, 1_768, 0));
-    // Held where it last tracked, or pushed away from its goal: a hand.
-    assert!(!closing_on(2_061, 2_025, 2_025, 0));
-    assert!(!closing_on(2_061, 2_020, 2_025, 0));
-    // Lamp-52e6's base turned 38 counts off its goal by a hand.
-    assert!(!closing_on(2_015, 2_053, 2_015, 0));
-    // Caught partway: nearer than where it tracked, but no nearer for a
-    // tenth of a second (the Reviewer-lead's P2 on #3925).
-    assert!(closing_on(2_215, 2_095, 2_015, FOLLOW_STILL_STEPS - 1));
-    assert!(!closing_on(2_215, 2_095, 2_015, FOLLOW_STILL_STEPS));
-}
-
-/// The Reviewer-lead's P2 on #3925, step by step: a joint tracking a few
-/// counts off its goal, the goal jumping 40 counts, the joint closing on it
-/// for six steps (as long as `pushed` takes), then caught by a hand and held.
-/// It is following while it closes, from the jump, and not once held.
-#[test]
-fn a_jumped_goal_is_measured_from_the_jump_not_from_the_track() {
-    let (goal, tracked_at): (u16, u16) = (2_061, 2_025);
-    let (mut nearest, mut still) = (u16::MAX, 0);
-    let mut following = Vec::new();
-    // On track, then off it from the jump: (position, steps off track).
-    let steps: [(u16, u8); 13] = [
-        (2_058, 0),
-        (2_058, 0),
-        (2_025, 1),
-        (2_028, 2),
-        (2_031, 3),
-        (2_034, 4),
-        (2_037, 5),
-        (2_040, 6),
-        (2_040, 7),
-        (2_040, 8),
-        (2_040, 9),
-        (2_040, 10),
-        (2_040, 11),
-    ];
-    for (position, off) in steps {
-        note_gap(&mut nearest, &mut still, goal - position, off);
-        following.push(closing_on(goal, position, tracked_at, still));
+fn a_joint_turning_toward_its_goal_is_following_not_pushed() {
+    let walk = |steps: &[(u16, u16, u8)]| {
+        let (mut last, mut still) = (steps[0].1, 0);
+        steps
+            .iter()
+            .map(|&(goal, position, off)| {
+                note_turn(&mut last, &mut still, goal, position, off);
+                following(still)
+            })
+            .collect::<Vec<_>>()
+    };
+    // lamp-52e6, 27 Oct, 01:26:22: the base's goal jumped from 2,025 to
+    // 2,061, the base closing on it.
+    let closing = walk(&[
+        (2_025, 2_025, 0),
+        (2_061, 2_025, 1),
+        (2_061, 2_028, 2),
+        (2_061, 2_031, 3),
+        (2_061, 2_034, 4),
+        (2_061, 2_037, 5),
+        (2_061, 2_040, 6),
+    ]);
+    assert!(closing.iter().all(|f| *f), "{closing:?}");
+    // lamp-52e6, 28 Oct (8001): a goal ramping away faster than the base
+    // gathers speed; the gap grows, the base turns toward it all the same.
+    let ramping = walk(&[
+        (1_991, 1_991, 0),
+        (1_955, 1_989, 1),
+        (1_920, 1_985, 2),
+        (1_885, 1_979, 3),
+        (1_850, 1_971, 4),
+        (1_815, 1_961, 5),
+        (1_780, 1_949, 6),
+    ]);
+    assert!(ramping.iter().all(|f| *f), "{ramping:?}");
+    // Caught partway and held (a count of noise either way): following for
+    // FOLLOW_STILL_STEPS steps, then not.
+    let mut held = vec![(2_215, 2_015, 0), (2_215, 2_040, 1), (2_215, 2_070, 2)];
+    for step in 0..8u8 {
+        held.push((2_215, 2_095 + u16::from(step % 2), 3 + step));
     }
-    // Closing at the sixth step off track, where `pushed` would first fire.
-    assert!(following[7], "{following:?}");
-    // Held by a hand: no nearer for FOLLOW_STILL_STEPS, and no longer following.
-    assert!(
-        !following[7 + usize::from(FOLLOW_STILL_STEPS)],
-        "{following:?}"
-    );
+    let held = walk(&held);
+    assert!(held[3], "{held:?}");
+    assert!(!held[3 + usize::from(FOLLOW_STILL_STEPS)], "{held:?}");
+    // Turned away from its goal by a hand: never following past the first.
+    let away = walk(&[
+        (2_015, 2_015, 0),
+        (2_015, 2_030, 1),
+        (2_015, 2_045, 2),
+        (2_015, 2_060, 3),
+        (2_015, 2_075, 4),
+        (2_015, 2_090, 5),
+        (2_015, 2_105, 6),
+        (2_015, 2_120, 7),
+    ]);
+    assert!(!away[7], "{away:?}");
 }
 
 /// lamp-06c1, 23 Oct: a head pitch that reads 124 to 136 at its own rest,
