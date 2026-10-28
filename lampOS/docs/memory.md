@@ -401,6 +401,17 @@ drink, unless the answer is already in the conversation
 know" with no call, P40 called it and said black coffee). Words for the
 model, not a guarantee; memory still searches only the asker's scope.
 
+A known person's recall whose words ask only about themself ("myself",
+"what I told you about me", "về tôi", "bản thân"; every word in
+`remember::ABOUT_THEMSELF`, one of them "me", "myself", "mine", "mình",
+"tôi", "bản" or "thân", and no day or span) is also told their kept things,
+first: voice asks their `kept` list (`NOTE_BYTES`) after the search and puts
+at most six that the search did not give before its entries, marked theirs
+(`remember::about_themself`, `kept_as_found`). Without it, "what have I told
+you about myself this week?" matched only their small talk and was answered
+"nothing much about yourself" though they had six kept things (lamp-06c1, 28
+Oct night, R2). Any other word asks as before.
+
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:
