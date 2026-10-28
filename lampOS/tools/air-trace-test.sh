@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Tests for air-trace.sh with no lamp: a stand-in ssh runs the lamp's side here, and a stand-in lamp-bus records a
-# made-up air/state (80, then 400 from 5.5 s in) and voice/state. The case folder it writes is checked, and
-# that nothing is left of the lamp's temp folder or the recording. With LAMP_SKILLS=PATH (a built lamp-skills), the
-# written case, its verdict filled in as none = true, is also run by `lamp-skills test`.
+# made-up air/state (80, then 400 from 5.5 s in), voice/state and (for dusty-air) a face. The case folder it writes
+# is checked, for smoky-air and dusty-air, and that nothing is left of the lamp's temp folder, the recording or its
+# raw copy on the Mac; and that a case that cannot be written keeps the raw recording, on the Mac and the lamp, and
+# exits nonzero. With LAMP_SKILLS=PATH (a built lamp-skills), each written case, its verdict filled in as
+# none = true, is also run by `lamp-skills test`.
 # Run: lampOS/tools/air-trace-test.sh   (about 45 s)
 set -uo pipefail
 
@@ -31,7 +33,7 @@ args = sys.argv[1:]
 assert args[0] == "record", args
 dir, topics = args[1], args[2:args.index("--seconds")]
 seconds = float(args[args.index("--seconds") + 1])
-types = {"air/state": "lamp_msgs/AirState", "voice/state": "lamp_msgs/VoiceState"}
+types = {"air/state": "lamp_msgs/AirState", "voice/state": "lamp_msgs/VoiceState", "humans/faces/tracked": "lamp_msgs/Faces"}
 files = {t: open(os.path.join(dir, t.replace("/", "_") + ".jsonl"), "a") for t in topics}
 def put(topic, line):
     files[topic].write(json.dumps(line, separators=(",", ":")) + "\n")
@@ -46,6 +48,8 @@ for t in topics:
     put(t, {"topic": t, "declaration": {"type": types[t], "version": 1, "kind": "latest"}})
 if "voice/state" in topics:
     msg("voice/state", 1, {"state": "resting"})
+if "humans/faces/tracked" in topics:
+    msg("humans/faces/tracked", 1, {"faces": [{"confidence": 0.9, "id": "p", "xmin": 0.4, "xmax": 0.6, "ymin": 0.35, "ymax": 0.6}]})
 if os.environ.get("FAKE_SILENT"):
     time.sleep(seconds); sys.exit(0)
 end = time.time() + seconds
@@ -59,18 +63,19 @@ while time.time() < end:
 STAND_IN
 chmod +x "$T/bin/ssh" "$T/bin/lamp-bus"
 
-skills_copy() { # a fresh copy of smoky-air's tests to write into
-  rm -rf "$T/skills" && mkdir -p "$T/skills" && cp -R "$REAL_SKILLS/smoky-air" "$T/skills/"
+skills_copy() { # a fresh copy of smoky-air's and dusty-air's tests to write into
+  rm -rf "$T/skills" && mkdir -p "$T/skills" && cp -R "$REAL_SKILLS/smoky-air" "$REAL_SKILLS/dusty-air" "$T/skills/"
 }
 run() { # run STDIN ARGS...: air-trace.sh against the stand-ins
   local input=$1; shift
   rm -f "$T/ssh.args"
   printf "$input" | FAKE_DIR=$T LAMP_HOST=stand-in LAMP_SSH=$T/bin/ssh LAMP_BUS=$T/bin/lamp-bus \
-    AIR_REMOTE_TMP=$T/lamp-tmp AIR_SKILLS_DIR=$T/skills AIR_PRE_S=3 AIR_POST_S=5 AIR_FIRST_S=4 AIR_LINGER_S=1 \
+    AIR_REMOTE_TMP=$T/lamp-tmp AIR_SKILLS_DIR=$T/skills AIR_PRE_S=3 AIR_POST_S=5 AIR_FIRST_S=4 AIR_LINGER_S=${LINGER:-1} \
     PLAYED_OUT=$T/out "$SCRIPT" "$@" >"$T/stdout" 2>&1
 }
 lamp_tmp_empty() { [ -z "$(ls -A "$T/lamp-tmp")" ]; }
 no_recorder() { sleep 0.3; ! pgrep -f "$T/bin/lamp-bus record" >/dev/null; }
+no_raw_left() { [ -z "$(ls -d "$T"/out/air-trace/*.raw 2>/dev/null)" ]; }
 only_lamp_bus_commands() { # every command on the "lamp" is the side's own sh, with one of its commands
   ! grep -vE '^sh -s -- (check|start|count|stop|fetch|clean) ' "$T/ssh.args"
 }
@@ -109,6 +114,7 @@ check "the lamp's temp folder is removed" lamp_tmp_empty
 check "the recording is stopped" no_recorder
 check "only the side's commands ran on the lamp" only_lamp_bus_commands
 check "a log written" [ -n "$(ls "$T/out/air-trace/" 2>/dev/null)" ]
+check "the raw recording on the Mac is removed once the case is written" no_raw_left
 if [ -n "${LAMP_SKILLS:-}" ]; then
   check "lamp-skills fails it while the verdict is open" bash -c "! '$LAMP_SKILLS' test '$T/skills/smoky-air' >/dev/null 2>&1"
   printf 'none = true\n' >>"$C/expect.toml"
@@ -148,6 +154,45 @@ run "" "Bad Name"
 check "an EVENT that is not a folder name exits 2" [ $? -eq 2 ]
 run "" --skill stuffy-air toast-test
 check "another skill exits 2" [ $? -eq 2 ]
+
+check "no raw recording is left by the runs that wrote nothing before it was stopped" no_raw_left
+
+# 8. dusty-air: its three topics, a face among them, and its line offered.
+skills_copy
+run "\n\n" --skill dusty-air dust-test "a duster shaken 1 m away"
+status=$?
+C=$T/skills/dusty-air/tests/dust-test
+check "a dusty-air run exits 0 ($(tail -1 "$T/stdout"))" [ "$status" -eq 0 ]
+check "it records dusty-air's topics" grep -q "^sh -s -- start .* air/state voice/state humans/faces/tracked$" "$T/ssh.args"
+check "dusty-air's case holds its three topics" [ "$(ls "$C" | tr '\n' ' ')" = "air_state.jsonl expect.toml humans_faces_tracked.jsonl voice_state.jsonl " ]
+check "the face is in" grep -q '"topic":"humans/faces/tracked","kind"' "$C/humans_faces_tracked.jsonl"
+check "the note is in" grep -q "a duster shaken 1 m away" "$C/expect.toml"
+check "dusty-air's line is offered, not smoky-air's" bash -c "grep -q '^# args = { text = \"The air here has been very dusty' '$C/expect.toml' && ! grep -q 'reads like smoke' '$C/expect.toml'"
+check "and the lamp's temp folder is removed" lamp_tmp_empty
+check "and the raw recording on the Mac" no_raw_left
+if [ -n "${LAMP_SKILLS:-}" ]; then
+  printf 'none = true\n' >>"$C/expect.toml"
+  "$LAMP_SKILLS" test "$T/skills/dusty-air" >"$T/skills.out" 2>&1
+  check "lamp-skills reads the dusty-air case ($(tail -1 "$T/skills.out"))" grep -q "cases pass" "$T/skills.out"
+fi
+
+# 9. A case that cannot be written (its tests folder read-only): the raw recording is kept, on the Mac and on the
+# lamp, and the run exits nonzero, saying where.
+skills_copy
+chmod a-w "$T/skills/smoky-air/tests"
+LINGER=60 run "\n\n" toast-test
+status=$?
+chmod u+w "$T/skills/smoky-air/tests"
+RAW=$(ls -d "$T"/out/air-trace/toast-test-*.raw 2>/dev/null | head -1)
+check "a failed write exits nonzero ($status)" [ "$status" -ne 0 ]
+check "and writes no case" [ ! -e "$T/skills/smoky-air/tests/toast-test" ]
+check "and leaves no .part" [ ! -e "$T/skills/smoky-air/tests/toast-test.part" ]
+check "the raw recording is kept on the Mac" bash -c "[ -n '$RAW' ] && [ \$(grep -c '\"header\"' '$RAW/air_state.jsonl') -ge 10 ] && [ -s '$RAW/voice_state.jsonl' ]"
+check "and said where" grep -qF "on this Mac in $RAW" "$T/stdout"
+check "the lamp's copy is kept too" bash -c "ls '$T'/lamp-tmp/air-trace.*/air_state.jsonl >/dev/null 2>&1"
+check "and said where" grep -qF "on the lamp in stand-in:$T/lamp-tmp/air-trace." "$T/stdout"
+check "the recording is stopped" no_recorder
+rm -rf "$T"/lamp-tmp/* "$RAW"   # the lamp's own linger would, a minute on
 
 sleep 1.5   # the lamp side's linger
 check "nothing left in the lamp's temp" lamp_tmp_empty

@@ -69,8 +69,14 @@ and an `expect.toml` with `clock`, the two marks and the PM2.5 before and
 after. Its verdict is left for the person who saw the event: until it is
 filled in (`none = true`, or the three calls with their `at`),
 `lamp-skills test` fails the case. A placeholder's folder is replaced, its
-event lines kept; any other folder is kept unless `--force`. `--dry-run`
+event lines kept; any other folder is kept unless `--force`. The raw
+recording stays on the Mac (`~/lamp-played/air-trace/EVENT-<time>.raw/`)
+and on the lamp until the case is written and read back the same; if it
+cannot be, the tool says where both are and exits nonzero. `--dry-run`
 says what it would do. Its stand-in test is `tools/air-trace-test.sh`.
+The lamp is reached by key only, as `lampOS/docs/joining.md` says: if it
+still takes only a password, the person runs `ssh-copy-id
+orangepi@<lamp>.local` once first.
 
 1. **Kettle**, boiling 50 cm from the base for 1 minute: `kettle-steam`.
    Then the same at 2 m: `kettle-steam-2m`. The design's done line asks
@@ -81,6 +87,17 @@ says what it would do. Its stand-in test is `tools/air-trace-test.sh`.
    blow): `candle-blown-out`.
 4. **A match** struck and blown out at 50 cm (Enter, Enter at once):
    `match`.
+5. **Dust**, for Dusty air (`--skill dusty-air`, which also records
+   `humans/faces/tracked`): a duster shaken 1 m from the base for 1
+   minute, the person at the desk:
+
+       LAMP_HOST=<lamp> lampOS/tools/air-trace.sh --skill dusty-air dust-shaken-1m "duster shaken 1 m away, 1 minute, person at the desk"
+
+   It writes `lampOS/skills/dusty-air/tests/dust-shaken-1m/`. Dusty air
+   speaks only after an hour over 125, so a short event is a never case
+   (`none = true`); an hour-long dusty spell is the same command with
+   `AIR_POST_S=3600 AIR_CAP_S=5400` (the recording ends by itself at
+   `AIR_CAP_S`).
 
 One run of each is enough for provisional numbers. Then fill in each
 verdict, run `lamp-skills test lampOS/skills/smoky-air`, and set the
