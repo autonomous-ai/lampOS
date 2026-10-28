@@ -2389,6 +2389,17 @@ impl Run<'_, '_> {
             ));
         }
         self.prune(state);
+        // A part new to the lamp, taken away: the folder of its builds goes
+        // too once pruned empty, as `install` leaves none (jarvis's P3 on
+        // #4065). One with anything left in it stays.
+        for link in backs
+            .iter()
+            .filter_map(|back| back.added.as_ref()?.link.as_ref())
+        {
+            if let Some(builds) = self.config.on(link).parent() {
+                let _ = fs::remove_dir(builds);
+            }
+        }
         Outcome::RolledBack {
             sequence: build.sequence,
             why,
