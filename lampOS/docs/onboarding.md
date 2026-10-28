@@ -605,7 +605,8 @@ far in (a slow "Hey, … Lamp", or a cough before it that speech to text left
 out), are one call; so are two hearings of the detector begun within 1.5 s
 (`ONE_HEARING_MS`), or both inside one such line (c0a4: one "Hey Lamp" heard
 twice, 1.1 s apart), at the first one's start and the surer score; calls
-said further apart stay two: a hearing at 0.95 or more
+said further apart stay two (so a quick "Lamp. Lamp." under 1.5 s is one
+try, not refused as heard more than once): a hearing at 0.95 or more
 stays the detector's (`heard_by: name`, its score kept); one under 0.95 that
 the line confirms counts as `heard_by: text`. A hearing under 0.95 with no
 such line is still refused as unsure: the detector's bar is not lowered. A
@@ -621,7 +622,9 @@ near 6 s has its words back about a second later; once its turn ends
 without `StepCallHeard` (its words were more than the name, or none), the try
 waits no longer. Only that turn's own end clears it: a finished transcript
 names no line, and an earlier line's late words would have emptied the call
-line's place (the Reviewer-lead on #4006). Known limit: a call heard only by text starts at the line's trigger,
+line's place (the Reviewer-lead on #4006). A slow "Hey, … Lamp" whose pause ended early
+(`--early-end-ms`) and went on as a new turn keeps the start of the line
+given up (`a_slow_call_whose_pause_ended_early_keeps_its_start`). Known limit: a call heard only by text starts at the line's trigger,
 a few blocks into its speech, so a breath or a sound just before "Lamp" moves its rise
 window earlier, and the call's loudest moment may fall past it. Tests:
 `lamp_near_call::tests::a_line_heard_as_the_name_alone_counts_with_its_rise`,

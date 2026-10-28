@@ -248,6 +248,8 @@ struct Script {
     /// With `heard_as_call`, the first call's words come back only once the
     /// next line has begun.
     heard_as_call_late: bool,
+    /// The end sent early (`--early-end-ms`), in 10 ms blocks of quiet.
+    early_end_blocks: Option<u16>,
     /// Capture frames of speech in the person's first utterance, from frame
     /// 20 (60: 0.6 s, as long as a call).
     speech_frames: u64,
@@ -322,6 +324,7 @@ impl Script {
             late_words_first: false,
             near_opens_ms: None,
             heard_as_call_late: false,
+            early_end_blocks: None,
             speech_frames: 60,
             speech_from: 20,
             echo_evidence: false,
@@ -1611,7 +1614,7 @@ fn run(script: Script) -> Run {
         paused: Box::new(|| false),
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
-        early_end_blocks: None,
+        early_end_blocks: script.early_end_blocks,
         early_finalize: false,
         open_name: script.open_name,
         call_takes_next: script.call_takes_next,
@@ -5803,6 +5806,50 @@ fn a_calls_start_is_its_own_lines_not_a_sound_before_it() {
     assert_eq!(calls[0]["taken"], true, "{calls:?}");
     let began = calls[0]["began_unix_ms"].as_u64().unwrap() - UNIX;
     assert!((1_400..=2_000).contains(&began), "{began} ms: {calls:?}");
+}
+
+/// The Reviewer-lead on #4006: a slow "Hey, … Lamp" whose pause ends early
+/// (`--early-end-ms`) and then goes on is a new turn, given up and continued.
+/// It keeps the line's own start, so its call is still taken from when the
+/// person began, not refused for a start not known.
+#[test]
+fn a_slow_call_whose_pause_ended_early_keeps_its_start() {
+    let _one = super::pilot_faults::one_session();
+    const UNIX: u64 = 1_760_000_000_000;
+    let run = run(Script {
+        second: false,
+        only: true,
+        near_window_ms: Some(0),
+        early_end_blocks: Some(20),
+        speak_again: Some(When::Ended(1)),
+        second_hears: Some("Hey, Lamp."),
+        heard_as_call: true,
+        // The piece given up has its words back only once the line goes on.
+        heard_as_call_late: true,
+        ..Script::question(Live::Answer(12))
+    });
+    let continued = run
+        .events("input_admitted")
+        .into_iter()
+        .any(|row| row["admission_basis"] == "continued_after_early_end");
+    assert!(continued, "{}", run.summary());
+    let taken: Vec<_> = run
+        .events("onboarding_text_call")
+        .into_iter()
+        .filter(|call| call["taken"] == true)
+        .collect();
+    // The piece and the line going on are one line, from its first start.
+    assert!(!taken.is_empty(), "{}", run.summary());
+    for call in &taken {
+        let began = call["began_unix_ms"].as_u64().unwrap() - UNIX;
+        assert!(began <= 700, "{began} ms: {taken:?}");
+    }
+    assert!(
+        taken
+            .iter()
+            .all(|call| call["began_unix_ms"] == taken[0]["began_unix_ms"]),
+        "{taken:?}"
+    );
 }
 
 /// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):
