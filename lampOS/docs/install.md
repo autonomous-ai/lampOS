@@ -1285,6 +1285,13 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   (standard unless named, as the lamp's `/etc/autonomous/hardware-profile`
   says) each is compared with that variant's, and one that differs is a
   finding; without it, each is only said.
+- **The settings writer's one-shot**, `lamp-update-writer.service`, is the
+  updater's own: a round writes it to refresh the writer, and install never
+  does (updates.md, "The writer's one-shot unit", #3689). It is said as
+  `the updater's`, not `not in the product`, and compared with the text the
+  checking lamp-update carries. One that differs, or one read from anywhere
+  but `/etc/systemd/system/`, is a finding. A lamp that never refreshed its
+  writer has none, and that is no finding.
 - **A masked unit** (`# Unit NAME is masked.`) is a finding too.
 - It ends with **0** when everything is `same` and nothing else is found,
   **1** when not, and **2** for a wrong option or a file it cannot read, so a
