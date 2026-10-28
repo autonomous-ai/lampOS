@@ -19,6 +19,10 @@ moment, which in an office it seldom has, so nobody arriving was greeted.
 Now the room's talk counts 5 s and the lamp's own speech 30 s, and the chance
 waits up to a minute while the person stays.
 
+The hello is asked with `expires_ms = 60000` (#2861): its say lives a
+minute, as the chance's `wait` does, so a turn the lamp takes as it is asked
+and the voice's 15 s quiet after it leave it time to begin.
+
 The synthetic cases' faces are one box, 0.25 of the picture's height, every
 second; `voice/state` every second. The recordings hold boxes and ids, no
 pictures, and no `voice/heard`.

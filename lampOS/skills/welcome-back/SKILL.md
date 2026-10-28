@@ -23,6 +23,11 @@ people walking past or speak into a conversation.
   `who = true` in its permissions (no other skill has it), the voice tells
   the note a known face's name, and to be one beat warmer to someone who
   comes by often; the typed name is in its instruction.
+- **The hello's life:** a minute, as the chance's `wait` (`expires =
+  "60s"`). A room line the lamp answers as the hello is asked, and the
+  voice's 15 s quiet after that turn, take more than a say's default 30 s,
+  so it was spent before it began (#2861). Not begun in the minute, it is
+  spent: one arrival never gets a late or a second hello.
 - **The only hello:** the voice has none of its own (#2825), so one arrival
   gets one hello.
 
