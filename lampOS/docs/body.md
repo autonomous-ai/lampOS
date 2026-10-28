@@ -3187,7 +3187,14 @@ again within a hold's length (`EASE_STEPS`, 2 s) of its last hold keeps
 where it first gave. A hand on lamp-52e6 (2026-10-27) turned the base about
 30 counts a hold, each a stop-pushing of its own at loads of 104 to 160
 under its 220; from where each hold began it never moved 15 counts, and
-`pushed` was never said. Once started, it stays while
+`pushed` was never said. A head or base joint the stall rule tells to
+stop pushing (`--give-way`: over 100 for 1.5 s without moving, its goal
+then where it is) is said as a push too, for half a second
+(`STALL_HAND_STEPS`), unless it is a rest found at the same place again:
+a gentle hand turning the head is followed by that rule alone, under the
+load that eases it (lamp-29e7 on 8080: the roll put 34 counts over a
+minute at 100 to 144, its bound 150, and `pushed` was never said, so
+onboarding's giving_way failed with the base held). Once started, it stays while
 the joint is more than 15 counts off where it first gave, or reads over
 half its bound and over its own resting load by a quarter of its bound (a
 press at 300 easing to 130 on a pitch bound 240, that read 25 before, is
