@@ -331,12 +331,15 @@ impl NearFlow {
     /// part listens for a call: kept as evidence when it began from the
     /// history kept before the prompt's end (one over its last word is
     /// answered early) to the window's end. Its Unix start when kept;
-    /// otherwise it is ignored. Its end tells a hearing begun inside it,
+    /// otherwise it is ignored, and why. Its end tells a hearing begun inside it,
     /// however far in, as its own call.
-    pub(crate) fn text_call(&mut self, began_us: u64, ended_us: u64) -> Option<u64> {
-        let (began_ms, ended_ms) = self.call_unix_ms(began_us)?;
-        if began_ms < ended_ms.saturating_sub(HISTORY_MS) || began_ms > ended_ms + WINDOW_MS {
-            return None;
+    pub(crate) fn text_call(&mut self, began_us: u64, ended_us: u64) -> Result<u64, &'static str> {
+        let (began_ms, ended_ms) = self.call_unix_ms(began_us).ok_or("no call's try is open")?;
+        if began_ms < ended_ms.saturating_sub(HISTORY_MS) {
+            return Err("it began well before the prompt ended");
+        }
+        if began_ms > ended_ms + WINDOW_MS {
+            return Err("it began after the try's window");
         }
         let line_ended_ms = self
             .call_unix_ms(ended_us.max(began_us))
@@ -349,7 +352,7 @@ impl NearFlow {
             began_ms,
             ended_ms: line_ended_ms,
         }));
-        Some(began_ms)
+        Ok(began_ms)
     }
 
     /// The call's line begun at `began_us` ended its turn with words more
@@ -866,9 +869,13 @@ impl Onboarding {
     /// A line begun at `began_us` whose words were the lamp's name alone
     /// (#3923, the second route's `StepCallHeard`): a call, while this step
     /// is led and its name part listens for one ([`NearFlow::text_call`]).
-    pub(crate) fn near_text_call(&mut self, began_us: u64, ended_us: u64) -> Option<u64> {
+    pub(crate) fn near_text_call(
+        &mut self,
+        began_us: u64,
+        ended_us: u64,
+    ) -> Result<u64, &'static str> {
         if !self.collecting() {
-            return None;
+            return Err("the step is not led");
         }
         self.near.text_call(began_us, ended_us)
     }

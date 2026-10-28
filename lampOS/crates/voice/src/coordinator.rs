@@ -5298,11 +5298,11 @@ fn step_call(onboarding: Option<&crate::onboarding::Onboarding>) -> bool {
 
 /// A call's line begun at `began_us` whose words were the lamp's name alone
 /// (#3923): the step's call heard by speech to text. Its Unix start when the
-/// step took it.
+/// step took it; why not, otherwise.
 fn near_text_call(
     onboarding: Option<&mut crate::onboarding::Onboarding>,
     (began_us, ended_us): (u64, u64),
-) -> Option<u64> {
+) -> std::result::Result<u64, &'static str> {
     #[cfg(test)]
     if let Some(taken) = TEST_NEAR.with(|near| {
         near.borrow_mut()
@@ -5311,7 +5311,9 @@ fn near_text_call(
     }) {
         return taken;
     }
-    onboarding.and_then(|walk| walk.near_text_call(began_us, ended_us))
+    onboarding.map_or(Err("no walk"), |walk| {
+        walk.near_text_call(began_us, ended_us)
+    })
 }
 
 /// The step's call lines kept at once: the words of a line begun before the
@@ -5701,6 +5703,11 @@ fn conversation_with_gate_inner(
     // name alone. A few, newest last: a line begun before an earlier one's
     // words are back leaves that one's place to it (c0a4, 28 Oct).
     let mut step_call_lines: VecDeque<(u64, Option<(u64, u64)>)> = VecDeque::new();
+    // The turn in hand and when its speech set the detector off (its
+    // candidate's trigger), the start a call's line is measured from
+    // (#3923). Not the oldest speech block kept: blocks are kept from
+    // outside any turn too, and on c0a4 that start was 2.5 s early.
+    let mut line_began: Option<(u64, u64)> = None;
     // Its words as they come, in memory only, until the last piece: on
     // Live they come in pieces, all of which are counted.
     let mut sentence_heard: Option<String> = None;
@@ -7607,14 +7614,18 @@ fn conversation_with_gate_inner(
                         .iter()
                         .position(|(turn, _)| *turn == request)
                         .and_then(|at| step_call_lines.remove(at));
-                    let taken = line
-                        .and_then(|(_, spoken)| spoken)
-                        .and_then(|spoken| near_text_call(onboarding.as_mut(), spoken));
-                    record(
-                        trace,
-                        json!({"kind":"onboarding_text_call","turn":request,
-                            "taken":taken.is_some(),"at_us":monotonic_us()}),
-                    )?;
+                    let taken = match line {
+                        None => Err("not a call's line in hand"),
+                        Some((_, None)) => Err("its line's start was not known"),
+                        Some((_, Some(spoken))) => near_text_call(onboarding.as_mut(), spoken),
+                    };
+                    let mut row = json!({"kind":"onboarding_text_call","turn":request,
+                        "taken":taken.is_ok(),"at_us":monotonic_us()});
+                    match taken {
+                        Ok(began_ms) => row["began_unix_ms"] = json!(began_ms),
+                        Err(why) => row["why"] = json!(why),
+                    }
+                    record(trace, row)?;
                 }
                 ProviderOutput::SleepAsked { request } => {
                     // Asked once its line has been heard whole, or at the
@@ -9391,6 +9402,7 @@ fn conversation_with_gate_inner(
                         controls.as_ref(),
                         onboarding.as_ref(),
                     );
+                    let trigger_us = accepted.candidate.trigger_read_at_us;
                     snapshot = commit_admitted_input(
                         owner,
                         reply,
@@ -9413,6 +9425,9 @@ fn conversation_with_gate_inner(
                     if not_now {
                         onboarding_marked = reply.as_ref().map(|current| current.owner.turn());
                     }
+                    line_began = reply
+                        .as_ref()
+                        .map(|current| (current.owner.turn(), trigger_us));
                     last_publish = monotonic_us();
                     // Begun while how_you_sound waits for a call (#3504):
                     // the second route leaves a line that is only the name
@@ -9763,11 +9778,11 @@ fn conversation_with_gate_inner(
                     if let Some((_, spoken)) = step_call_lines
                         .iter_mut()
                         .find(|(turn, _)| *turn == current.owner.turn())
-                        && let (Some((began, _)), Some((ended, _))) =
-                            (speech_levels.front(), speech_levels.back())
+                        && let Some((_, began)) =
+                            line_began.filter(|(turn, _)| *turn == current.owner.turn())
                     {
-                        *spoken = Some((*began, *ended));
-                        near_call_line_ended(onboarding.as_mut(), *began);
+                        *spoken = Some((began, input_end_us.max(began)));
+                        near_call_line_ended(onboarding.as_mut(), began);
                     }
                     // The sentence's line ending (begun in its window,
                     // count-only): its speech and the room microphone's
