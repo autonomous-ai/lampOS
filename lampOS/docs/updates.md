@@ -2540,3 +2540,14 @@ on them (`records::Lock`, which knows its folder), so a caller can't ask
 without holding that lock, and no switch of lamp-update's own begins while
 it is held. The refresh that will call it, still to be written, is to hold
 it until the copy is placed. **Unwired:** no command calls it yet.
+
+### Bounded saved ordinary plans (#3689)
+
+The private [plan container](ordinary-plan-container.md) explicitly encodes a
+successfully prepared result and reopens it against an externally protected
+plan identity and the original expected context. Exact envelope/preimage/Head
+bytes, all signed decisions and projected order remain separate and immutable.
+Bounded framing and deterministic replay comparison refuse semantic changes;
+accepted nonsemantic metadata stays in the original container bytes. This is
+checked data without a State/live-file reader, durable publication, journal
+admission, apply grant, executor or restoration.

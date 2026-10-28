@@ -96,13 +96,14 @@ results remain complete and do not acquire apply or qualification authority.
 
 `PreparedOrdinary` owns the exact envelope, signed bytes, parsed manifest,
 preimages, saved Head facts, complete rows and projected order, while borrowing
-the immutable protected context. It is not serialized or independently durable.
+the immutable protected context. The separate [saved-plan container](ordinary-plan-container.md)
+can explicitly encode and recheck it; neither type is independently durable.
 No partial prepared result escapes a failure. Errors have one fixed value-free
 Display/Debug string; prepared Debug shows counts and content-change status.
 Neither representation exposes paths, text, key material or nested errors.
 
 Authenticated parent/context extraction, stable root ancestry and excluded
-writers, bounded durable encoding, publication and external plan-hash binding,
+writers, durable publication and protected external plan-hash binding,
 fresh journal grants, afterimage ownership, independent restoration, old-BACK
 compatibility, root bootstrap and physical power cuts remain separate #3689
 work. A future plan artifact is obtained after encoding/publication; it must
