@@ -300,6 +300,10 @@ Environment=LAMP_MEMORY_FORGET_ALL=on
 # pass above saw nothing more until the voice restarted (lamp-06c1, 27 Oct, Friday's N13 on #3504). The next
 # session opened fresh, with no resumption, starts the journal again and so the next conversation's pass.
 Environment=LAMP_MEMORY_JOURNAL_RESUMES=on
+# A thing the person already keeps, said again, is that kept thing, not a second one: on lamp-06c1 on 28 Oct
+# (build 8163, the product unit) "remember the meeting room is called orange" said again kept it twice (Friday's
+# run on #3504). A correction (`replaces`) always writes, and the room's scope is told as a first keep (#2176).
+Environment=LAMP_MEMORY_REMEMBER_ONCE=on
 # What the room kept, and the earlier exchanges a turn is given, were said by whoever was in the room then, never
 # necessarily the one asking: on lamp-4ace on 26 Oct (lamp-voice 2a8273ef2's product unit, played), a fresh
 # session's "how do I take my coffee?", after a room's "I take my coffee black" kept by nobody, was answered as the
