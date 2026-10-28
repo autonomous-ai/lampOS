@@ -6,6 +6,9 @@ name: lampOS Studio watchdog
 # GitHub-hosted (.github/scripts/lampos-route.py sweep). Each route job
 # sweeps too; this catches a stuck job when no new run comes along.
 #
+# It cancels and re-runs with the run's own GITHUB_TOKEN (actions: write
+# below), scoped to this repository; no other credential is used.
+#
 # Scheduled workflows run from the default branch only, so this file and the
 # script must be on main as well as lamp-voice.
 on:

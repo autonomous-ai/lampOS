@@ -171,6 +171,7 @@ jobs:
         run: python3 -I .github/scripts/lampos-route.py route
       # A Studio job the Studio left queued or running too long is cancelled
       # and its run started again, so its own route job sends it here.
+      # Both steps use this run's GITHUB_TOKEN, scoped to this repository.
       - name: rescue stuck Studio runs
         if: vars.LAMPOS_STUDIO == 'shadow' || vars.LAMPOS_STUDIO == 'canary' || vars.LAMPOS_STUDIO == 'on'
         continue-on-error: true
@@ -321,15 +322,17 @@ jobs:
       # lamp-voice's own, and one onto #1712's that found none (see the top). Not
       # a run by hand on another branch: no pull request reads its cache (the
       # reviewer on #2465).
+      # Never from the Studio: it skips the restore, so no key ever matches
+      # there, and hosted runs would restore a target built on another host.
       - name: discard the isolated example target before saving the cache
         if: >-
-          ${{ !cancelled() && matrix.shard == 1 && (github.ref == 'refs/heads/lamp-voice'
+          ${{ !cancelled() && matrix.shard == 1 && runner.environment == 'github-hosted' && (github.ref == 'refs/heads/lamp-voice'
           || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
         # The CI artifact has independent, checksummed copies of both examples.
         run: rm -rf -- lampOS/target/lampos-artifact-examples
       - name: save the cache
         if: >-
-          ${{ !cancelled() && matrix.shard == 1 && (github.ref == 'refs/heads/lamp-voice'
+          ${{ !cancelled() && matrix.shard == 1 && runner.environment == 'github-hosted' && (github.ref == 'refs/heads/lamp-voice'
           || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
         timeout-minutes: 10
         uses: actions/cache/save@v4
