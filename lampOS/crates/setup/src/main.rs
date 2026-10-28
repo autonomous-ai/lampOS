@@ -267,13 +267,13 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Ok(true)
         }
         "watch-reset" => {
-            let (bus, clock, until) = watch_options(&mut options)?;
             // Enabled, it hands the reset to a unit of its own (`detach`),
             // since lamp-setup-reset.service is read-only but the bus
             // (#3710): a reset run in here would fail on its journal after
             // the button, wiping nothing. So a plan without `detach` is
             // refused now, at start, where the unit shows failed (Fourteen's
-            // P3 on #4048). Every shipped plan has it.
+            // P3 on #4048), before the options are read: the clock's id is
+            // read from /proc, which a Mac has not. Every shipped plan has it.
             if enabled && plan.detach.is_empty() {
                 return Err(format!(
                     "{}: watch-reset --enable needs the plan's detach, the unit the reset runs in \
@@ -283,6 +283,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                 )
                 .into());
             }
+            let (bus, clock, until) = watch_options(&mut options)?;
             let act = || start_reset(&plan, &plan_path);
             // A power cut right after a reset's journal, before its marker
             // went, leaves both: the lamp started, so carry on with it here.
