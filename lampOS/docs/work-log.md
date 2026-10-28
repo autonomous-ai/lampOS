@@ -1,3 +1,17 @@
+## 28 October 2026, 13:35 +07 — #4009 landed, four rebased, item 2a opened
+
+Ready for lamp-voice: yes (#4007, two READ-OKs, once its rebased head is pushed); no (#3966, #3993 and #4008 wait on their rebased heads and a second read; #4047 is new and waits on reads and CI).
+
+#4009, the check of when the writer may be refreshed, landed in train #4024 (lamp-voice `33ec91df6`).
+
+#3966, #3993, #4007 and #4008 conflicted with lamp-voice from train 288 on. Each was rebased: first onto `33ec91df6`, then onto `1d9237584`. In each, the only conflict was `docs/updates.md`, where the neighbouring #3689 sections were all kept. Per file, the added and removed lines are the same as the reviewed patches, so the READ-OKs carry over. #3966 is now one commit (`08916c4209`), because its four earlier commits are already in lamp-voice. #3993 is that commit plus `b454e68906`. #4007 is `29db351d24`, #4008 is `f1ae44f0bb`. Mac gate on `33ec91df6`, all four: fmt and strict Clippy clean, 627 / 635 / 631 / 628 passed, 0 failed, 6 ignored, workspace builds. They aren't pushed yet: the session's force-push was refused by the permission check, and it is waiting for the owner.
+
+jarvis read #4007 (READ-OK, two P3s) and #4009 after it landed (one P3). All three go into the writer-refresh step: `.prev` cleared once the new copy has proved itself, a "replaced, not synced" result kept apart from "nothing replaced", and `ready` taking the held records lock. jarvis also asked whether an updater build put back after a power cut or a stop in its confirm window should stay refused for good. As built it does, and that's a real risk on a clockless lamp, so it is on #2810, after 2a.
+
+#3689 item 2's plan is posted (12:53): 2a, a part's templates, sockets and timers; 2b, adding a part; 2c, the updater's own unit. #4047 `61234dc0af` is 2a, at updater level 7. A template belongs to the part its `ExecStart=` starts through `current`. A socket that accepts each connection belongs to its template's part, and a timer to its service's part. The keeper's units, `lamp-update-back.timer` and a single-listener socket are left out. A round takes one only where the lamp has it and its part is installed through its link. It writes it with the part's switch: same journal, quiet checks, put-back and recovery. A template is never restarted; an active socket or timer is restarted and watched. Mac gate on `1d9237584`: 633 passed / 0 failed / 6 ignored, Clippy and fmt clean, workspace builds. Not shown on a real systemd or a 7071 lamp.
+
+Item 1 still waits on First's choice of writer plan (asked 09:59, no answer yet).
+
 ## 28 October 2026, 10:40 +07 — product-state reader ready, fixed-path copy, writer plan asked
 
 Ready for lamp-voice: yes (#3993, after #3966); no (#4007 is a draft until its ARM64 run is green).
