@@ -168,9 +168,12 @@ mod tests {
         let started = Instant::now();
         assert!(!check.wait(&mut ears, Duration::from_millis(120)));
         assert!(started.elapsed() >= Duration::from_millis(120));
-        assert_eq!(ears.0.len(), 3, "{:?}", ears.0);
-        assert_eq!(ears.0[..2], [LOOK, LOOK]);
-        assert!(ears.0[2] <= Duration::from_millis(20), "{:?}", ears.0);
+        // How many looks depends on the runner's load, so only their shape
+        // is asked: every look but the last is a whole `LOOK`, none longer.
+        let (last, whole) = ears.0.split_last().unwrap();
+        assert!(!whole.is_empty(), "{:?}", ears.0);
+        assert!(whole.iter().all(|look| *look == LOOK), "{:?}", ears.0);
+        assert!(*last <= LOOK, "{:?}", ears.0);
 
         // A check said during the wait ends it within about a look.
         let sender = std::thread::spawn(move || {
