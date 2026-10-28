@@ -1,3 +1,13 @@
+## 28 October 2026, 10:40 +07 — product-state reader ready, fixed-path copy, writer plan asked
+
+Ready for lamp-voice: yes (#3993, after #3966); no (#4007 is a draft until its ARM64 run is green).
+
+#3993 `abff938e5f`, the original-State product reader, is rebased onto lamp-voice `5fd8ab19da`. The two prerequisites already on lamp-voice dropped out, and both remaining commits have the same patch-ids as before. Under it is #3966's container commit, the same patch as `0850ceae2c`. Mac gate on this head: `cargo fmt --all --check`, strict `cargo clippy -p lamp-update --all-targets`, `cargo test -p lamp-update` 631 passed / 0 failed / 6 ignored, `cargo build --workspace`. ARM64 run 40621564070 passed on its rerun (the first try failed on a crates.io HTTP/2 download, not a test), and Linux Clippy 40621564005 is green. Reads asked on #3997.
+
+#4007 `669c0beb48`, new: `fixed_copy::place` and `lamp-update writer-probe`. It writes a copy of lamp-update beside a fixed root path, runs it once, and renames it in only when it answers with its own SHA-256, keeping the old copy as `.prev` if asked. It is unwired. 11 new tests, three of them running real programs as copies. Mac gate on lamp-voice `5fd8ab19da`: fmt and strict Clippy clean, 627 passed / 0 failed / 6 ignored, workspace builds. The real binary's probe printed the same hash as `shasum -a 256`.
+
+Asked First on #3689 (09:59) which writer plan to build: Seventh's swap with `.prev`, which can meet 30 Oct with one known limit (a new-folder file left behind if a new writer crashes mid-apply and its own undo can't run), or the independent guard in `settings-writer-refresh.md`, 3 Nov at the earliest. Both need #4007.
+
 ## 28 October 2026, 07:12 +07 — exact saved ordinary plans
 
 Ready for lamp-voice: no (#3966 is draft pending its own original native checks, independent reads and prerequisite acceptance).
