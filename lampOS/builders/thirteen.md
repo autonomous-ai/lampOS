@@ -33,8 +33,8 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: none
 - Log: [lampOS/docs/work-log-thirteen.md](https://github.com/autonomous-ai/lampOS/blob/lamp-thirteen/lampOS/docs/work-log-thirteen.md) on `lamp-thirteen`
 - Tasks: the `builder:thirteen` issues, in the order of the Queue issue
-  ([#3126](https://github.com/autonomous-ai/lampOS/issues/3126), continued
-  from #2602, #1722 and #705; the current one is the open `lampos-queue`
+  ([#3997](https://github.com/autonomous-ai/lampOS/issues/3997), continued
+  from #3504, #3126, #2602, #1722 and #705; the current one is the open `lampos-queue`
   issue).
 
 ## It may

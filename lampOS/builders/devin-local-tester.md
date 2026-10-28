@@ -36,7 +36,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: `deploy/lamp-a0ae/`
 - Log: `lampOS/docs/work-log-devin-local-tester.md`
 - Tasks: the `builder:devin-local-tester` issues, in the order of the Queue
-  issue ([#3126](https://github.com/autonomous-ai/lampOS/issues/3126))
+  issue ([#3997](https://github.com/autonomous-ai/lampOS/issues/3997))
 
 ## It may
 
