@@ -539,7 +539,14 @@ workflow change.
 ### One round
 
 `lamp-update once` is one round; `lamp-update serve` one every 15 minutes
-(`--every-s`), reading the bus in between. A round
+(`--every-s`), reading the bus in between. With `--apply on`, `serve` also
+reads the app's Check for update (`update/check`, #4153,
+`crates/update/src/app_check.rs`) between rounds, looking once a second: a
+check starts the next round at once instead of after the wait. It is the
+same round, with the same lock and quiet moment; a check that came while a
+round ran is dropped, never kept for after it, and at most one a minute
+starts a round. With nobody saying one, the wait is as before
+([cloud.md](cloud.md), "Check for update"). A round
 (`crates/update/src/round.rs`):
 
 1. **A switch cut short is put back.** If the journal of a switch is there
@@ -981,7 +988,10 @@ lamp-update starts, so the last result outlives a restart and its own
 switch. It is said again every minute and lasts three, so a lamp-update that
 died mid-round reads stale.
 lamp-cloud answers the app's `update.status` from it ([cloud.md](cloud.md)).
-A bus that cannot be used is said once, and the round goes on.
+A bus that cannot be used is said once, and the round goes on. The other
+way, the only thing a part may ask of lamp-update is a round sooner
+(`update/check`, #4153, above); a bus or topic that cannot be subscribed to
+is said once, and `serve` waits as before.
 
 To go back by hand to the build before the last switch:
 
@@ -2219,6 +2229,15 @@ Why the window can't be zero:
   and `deploy.sh` swaps the voice alone (`deploy/lamp-4ace/RUNBOOK.md:51`).
   lamp-06c1 runs a hand-swapped voice on an older build
   (`deploy/lamp-06c1/LAMP.md:2`).
+
+The app's Check for update (#4153) is one such change. An older
+lamp-update never subscribes to `update/check`, so it ignores it and its
+rounds go on every `--every-s`. A newer lamp-cloud beside it sees that
+nobody reads the topic (no subscriber took the message) and refuses with
+`lamp-update is not listening for a check`, so the app is never told a round
+started when none will. An older lamp-cloud never says a check, and a newer
+lamp-update waits as before. Even when one is taken, the app follows the
+round on `update.status`, not on the check's reply.
 
 Dependency order changes which side moves first; it does not remove the
 compatibility rule. The updater reads the managed base service files:
