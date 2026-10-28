@@ -24,6 +24,10 @@
 #   14. a unit file whose body begins with its own `# /etc/systemd/system/lamp-tasks.service` line, copied from a
 #      `systemctl cat` as lamp-4ace's is: only a drop-in's `.d/*.conf` header ends the unit's section, so it reads
 #      whole and the drop-in has the unit's ExecStart and clears the harness condition (Fourteen's P2 on #3665).
+#   15. PLAYED_CLOUD_ENV (make-skill.sh with MAKE_FROM=app): lamp-cloud gets a drop-in of its own with the switch and
+#      is restarted with the others; the guard and `out` take it out and restart it too (fourteen-P11 on #2814).
+#      Without it (case 1) lamp-cloud is never touched.
+#   16. a PLAYED_CLOUD_ENV setting that isn't NAME=VALUE: setup fails, says so, writes no drop-in, arms no guard.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
@@ -68,12 +72,13 @@ run() {  # USER EXECSTART MODE [TASKS]: the setup against the stand-in; its outp
     printf '[Service]\nUser=%s\nExecStart=%s\n' "$1" "$2"; } > "$root/unit"
   STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
     SYSTEMD_RUN=$root/systemd-run PLAYED_TASKS=${4:-} PLAYED_GUARD_S=${guard_s:-} \
-    PLAYED_TARGET=${target:-} PLAYED_VOICE_ENV=${voice_env:-} PLAYED_PLAN=${plan:-} \
+    PLAYED_TARGET=${target:-} PLAYED_VOICE_ENV=${voice_env:-} PLAYED_CLOUD_ENV=${cloud_env:-} PLAYED_PLAN=${plan:-} \
     sh "$here/stand-in.sh" "$3" > "$root/out" 2>&1
 }
 line="$root/new-tasks serve --enable --harness-as-person --dir $root/real-store --harness /usr/local/bin/harness --watch"
 tasks_drop=$root/units/lamp-tasks.service.d/zz-played-stand-in.conf
 voice_drop=$root/units/lamp-voice.service.d/zz-played-stand-in.conf
+cloud_drop=$root/units/lamp-cloud.service.d/zz-played-stand-in.conf
 
 # The real store, with a task the run must never see or change.
 mkdir -p "$root/real-store"
@@ -97,6 +102,7 @@ check "1. the guard is armed for an hour, before the first daemon-reload" \
 check "1. the guard puts back as out does: both drop-ins, a reload, both restarted, the folder" \
   'grep -qx "rm -f $tasks_drop $voice_drop; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $root/remote" "$root/guard"'
 check "1. its command carries no \$ for systemd to expand" '[ -s "$root/guard" ] && ! tail -n 1 "$root/guard" | grep -qF "\$"'
+check "1. without PLAYED_CLOUD_ENV lamp-cloud is never touched" '[ ! -e "$cloud_drop" ] && ! grep -q lamp-cloud "$root/calls" "$root/guard"'
 mv "$root/calls" "$root/calls.in"  # out's own calls only: in stops any guard before it arms its own
 STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
   sh "$here/stand-in.sh" out > "$root/out" 2>&1
@@ -230,5 +236,31 @@ check "14. it clears the real Harness's condition and keeps the unit's other one
    grep -qx "ConditionPathExists=$root/remote/harness" "$tasks_drop" && ! grep -q "=/usr/local/bin/harness$" "$tasks_drop"'
 STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
   sh "$here/stand-in.sh" out > "$root/out" 2>&1
+
+cloud_env="LAMP_APP_MAKE_SKILL=on"
+voice_env="LAMP_MAKE_SKILL=on LAMP_APP_MAKE_SKILL=on"
+run "$(id -un)" "$line" in; code=$?
+unset cloud_env voice_env
+check "15. with PLAYED_CLOUD_ENV, setup succeeds" '[ $code -eq 0 ]'
+check "15. lamp-cloud's drop-in has the switch" \
+  '[ "$(cat "$cloud_drop" 2>/dev/null)" = "$(printf "[Service]\nEnvironment=LAMP_APP_MAKE_SKILL=on")" ]'
+check "15. the voice's drop-in has both make-skill switches" \
+  'grep -qx "Environment=LAMP_MAKE_SKILL=on" "$voice_drop" && grep -qx "Environment=LAMP_APP_MAKE_SKILL=on" "$voice_drop"'
+check "15. lamp-cloud is restarted with the others" 'grep -qx "restart lamp-tasks lamp-voice lamp-cloud" "$root/calls"'
+check "15. the guard puts lamp-cloud's drop-in back and restarts it too" \
+  'grep -qx "rm -f $tasks_drop $voice_drop $cloud_drop; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice lamp-cloud; rm -rf $root/remote" "$root/guard"'
+rm -f "$root/calls"
+STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
+  sh "$here/stand-in.sh" out > "$root/out" 2>&1
+check "15. out takes lamp-cloud's drop-in out and restarts it, with no PLAYED_CLOUD_ENV of its own" \
+  '[ ! -e "$cloud_drop" ] && grep -qx "restart lamp-tasks lamp-voice lamp-cloud" "$root/calls"'
+
+cloud_env="LAMP_APP_MAKE_SKILL"
+run "$(id -un)" "$line" in; code=$?
+unset cloud_env
+check "16. a PLAYED_CLOUD_ENV that isn't NAME=VALUE fails" '[ $code -ne 0 ]'
+check "16. it says so" 'grep -q "PLAYED_CLOUD_ENV.s LAMP_APP_MAKE_SKILL is not NAME=VALUE" "$root/out"'
+check "16. no drop-in written, nothing restarted, no guard armed" \
+  '[ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] && [ ! -e "$cloud_drop" ] && ! grep -q -e restart -e "^systemd-run" "$root/calls" 2>/dev/null'
 
 exit $failed
