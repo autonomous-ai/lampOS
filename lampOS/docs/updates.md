@@ -1434,7 +1434,10 @@ lamp still on that `lamp-update-back` gets it in a round
 (`publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it`
 pins the five places as 7071 has them). lamp-skills reads it before the
 factory's `/etc/lampOS/skills/store-key.pub` ([skills.md](skills.md), "From
-the Skills Store"). Settings alone need
+the Skills Store"), and the build's key wins (`package.rs`). So a test lamp
+given the test environment's key with `--store-key` trusts only the
+production key after any round on the channel, because every round writes the
+file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
 (`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 6; a product service carrier raises the floor to 6.
