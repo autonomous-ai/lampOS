@@ -2582,3 +2582,13 @@ Bounded framing and deterministic replay comparison refuse semantic changes;
 accepted nonsemantic metadata stays in the original container bytes. This is
 checked data without a State/live-file reader, durable publication, journal
 admission, apply grant, executor or restoration.
+
+### Original product facts for closed ordinary replay (#3689)
+
+The private [present-only product projection](ordinary-product-context.md)
+retains exact externally hash/size-bound original State bytes and streams only
+installed/refused/selected recorded-writing facts for preparation. It preserves
+unknown metadata and unselected paths for a later signed release. Missing or
+corrupt input never invokes the ordinary loader's fallback. This deliberately
+limited projection is not full State validation, authentication, live capture,
+immutable publication, admission, execution or recovery acknowledgement.

@@ -25,8 +25,10 @@ trusted public key and offered writer bytes from outside the container. Its
 own context snapshot or hash cannot authenticate itself. In particular, the
 original selected product records must remain independently available across
 restart. Reconstructing them from mutable post-apply State changes the facts
-being verified and is unsupported. Authentication and extraction of that
-protected recovery context remain future parent work.
+being verified and is unsupported. The separate [original-product projection](ordinary-product-context.md)
+extracts bounded selected facts from retained present bytes. Authentication,
+pre-effect capture, immutable retention and assembly of the independently
+protected recovery context remain parent work.
 
 ## Complete decisions and exact projection order
 
