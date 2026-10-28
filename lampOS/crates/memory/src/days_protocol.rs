@@ -3,7 +3,7 @@
 use crate::{
     days::{Days, Error, Result, Wider},
     protocol::{self, Request, Response, Who},
-    store::{Ask, Day, Person},
+    store::{Ask, Day, Entry, Person},
     tidy,
 };
 use serde::Deserialize;
@@ -228,6 +228,24 @@ fn value(response: Response) -> Value {
     serde_json::to_value(response).expect("the response contains JSON values only")
 }
 
+/// A recall's answer, each kept entry with the day it is about (`on`) as
+/// `kept` and `search` give it (#3987): the voice tells it apart from the
+/// day it was said. Older readers ignore it.
+fn recalled_with_days(store: &Days, person: &Person, entries: &[Entry]) -> Result<Value> {
+    let mut answer = value(Response::Recalled {
+        entries: entries.to_vec(),
+    });
+    let days = store.event_days(person)?;
+    if let Some(told) = answer["entries"].as_array_mut() {
+        for (told, entry) in told.iter_mut().zip(entries) {
+            if let (Entry::Kept(_), Some(day)) = (entry, days.get(&entry.id())) {
+                told["on"] = json!(day);
+            }
+        }
+    }
+    Ok(answer)
+}
+
 fn legacy(store: &mut Days, request: Request) -> Result<Value> {
     Ok(match request {
         Request::Append {
@@ -350,12 +368,14 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             day,
             limit,
             max_bytes,
-        } => value(Response::Recalled {
-            entries: store.recall(
-                &one(person)?,
+        } => {
+            let person = one(person)?;
+            let entries = store.recall(
+                &person,
                 &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
-            )?,
-        }),
+            )?;
+            recalled_with_days(store, &person, &entries)?
+        }
         Request::ForgetLast { person, kind } => value(Response::Forgot {
             removed: store.forget_last(&one(person)?, kind)?,
         }),
@@ -415,8 +435,8 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_to,
             recall_v2,
         } => {
-            // `more` is said only for a span of days (#3627): every other
-            // answer is byte for byte what it was.
+            // `more` is said only for a span of days (#3627); dated kept
+            // entries can still carry `on` without a span (#3987).
             let spanned = day_from.is_some();
             let (day, last_day) = span(day, day_from, day_to)?;
             let wider = Wider {
@@ -467,20 +487,21 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_to,
             recall_v2,
         } => {
-            // `more` is said only for a span of days (#3627): every other
-            // answer is byte for byte what it was.
+            // `more` is said only for a span of days (#3627); dated kept
+            // entries can still carry `on` without a span (#3987).
             let spanned = day_from.is_some();
             let (day, last_day) = span(day, day_from, day_to)?;
             let wider = Wider {
                 last_day,
                 second: recall_v2,
             };
+            let person = one(person)?;
             let (entries, more) = store.recall_wider_more(
-                &one(person)?,
+                &person,
                 &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
                 wider,
             )?;
-            let mut recalled = value(Response::Recalled { entries });
+            let mut recalled = recalled_with_days(store, &person, &entries)?;
             if spanned {
                 recalled["more"] = json!(more);
             }
@@ -779,6 +800,100 @@ mod tests {
         let of = |id: &Value| entries.iter().find(|entry| entry["id"] == *id).unwrap();
         assert_eq!(of(&dated["id"])["on"], "2026-10-16");
         assert!(of(&plain["id"]).get("on").is_none(), "{kept}");
+    }
+
+    /// #3987: a recall, legacy or with #2176's fields, carries a kept
+    /// thing's day as `kept` does, and none on an undated one.
+    #[test]
+    fn recall_returns_the_day_attached_to_a_dated_fact() {
+        let (_scratch, mut store) = Scratch::new("recall-event-day");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let dated = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"My dentist appointment is on Friday","on":"2026-10-16"}),
+        );
+        let plain = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"The dentist is on Main Street"}),
+        );
+        for request in [
+            json!({"op":"recall","person":person,"query":"dentist"}),
+            json!({"op":"recall","person":person,"query":"dentist","recall_v2":true}),
+        ] {
+            let found = send(&mut store, request.clone());
+            assert_eq!(found["ok"], true, "{request} {found}");
+            let entries = found["entries"].as_array().unwrap();
+            assert_eq!(entries.len(), 2, "{request} {found}");
+            let of = |id: &Value| entries.iter().find(|entry| entry["id"] == *id).unwrap();
+            assert_eq!(of(&dated["id"])["on"], "2026-10-16", "{request}");
+            assert!(of(&plain["id"]).get("on").is_none(), "{request} {found}");
+        }
+    }
+
+    /// #3987 with #3627: a bounded span keeps the event day on its kept
+    /// entry while also saying that more matched than it returned.
+    #[test]
+    fn a_spanned_recall_keeps_both_the_event_day_and_more() {
+        let (_scratch, mut store) = Scratch::new("span-event-day-more");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let dated = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"Dentist appointment on Friday","on":"2026-10-16"}),
+        );
+        assert_eq!(dated["ok"], true, "{dated}");
+        for n in 0..2 {
+            let exchange = send(
+                &mut store,
+                json!({"op":"append","person":person,"at_unix_ms":NOW+n+1,"heard":format!("unrelated talk {n}"),"said":"okay"}),
+            );
+            assert_eq!(exchange["ok"], true, "{exchange}");
+        }
+        let found = send(
+            &mut store,
+            json!({"op":"recall","person":person,"day_from":"2026-10-08","day_to":"2026-10-13","recall_v2":true,"limit":1}),
+        );
+        assert_eq!(found["ok"], true, "{found}");
+        assert_eq!(found["more"], true, "{found}");
+        assert_eq!(found["entries"].as_array().unwrap().len(), 1, "{found}");
+        assert_eq!(found["entries"][0]["id"], dated["id"], "{found}");
+        assert_eq!(found["entries"][0]["on"], "2026-10-16", "{found}");
+    }
+
+    /// #3987: a session's note gives a dated fact its day, and an undated
+    /// one none, so a session opened after a restart is told the day too.
+    #[test]
+    fn a_session_note_gives_a_dated_fact_its_day() {
+        let (_scratch, mut store) = Scratch::new("note-event-day");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let dated = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"My dentist appointment is on Friday","on":"2026-10-16"}),
+        );
+        let plain = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"I take my coffee black"}),
+        );
+        let opened = send(
+            &mut store,
+            json!({"op":"session_open","person":person,"session":"s-1","max_bytes":4096}),
+        );
+        assert_eq!(opened["ok"], true, "{opened}");
+        let note: Value =
+            serde_json::from_str(opened["snapshot"]["note"].as_str().unwrap()).unwrap();
+        let facts = note["facts"].as_array().unwrap();
+        assert_eq!(facts.len(), 2, "{note}");
+        let of = |id: &Value| facts.iter().find(|fact| fact["id"] == *id).unwrap();
+        assert_eq!(of(&dated["id"])["on"], "2026-10-16");
+        assert!(of(&plain["id"]).get("on").is_none(), "{note}");
     }
 
     /// #3613 on the wire: `forget` with `selective:true` takes an unlinked

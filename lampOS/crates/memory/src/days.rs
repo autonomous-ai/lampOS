@@ -1319,6 +1319,10 @@ impl Days {
             text.clear();
         }
         let candidates:Vec<u64>=self.db.prepare("SELECT id FROM entries WHERE person=? AND active=1 AND kind IN ('kept','observation') ORDER BY CASE category WHEN 'promise' THEN 0 WHEN 'thread' THEN 1 ELSE 2 END,at_unix_ms DESC,id DESC LIMIT 256")?.query_map([person.as_str()],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        // The day a fact is about, apart from when it was said (#3987): a
+        // session opened after a restart told only "dentist on Friday" took
+        // it against the new day. Older voices ignore the field.
+        let days = self.event_days(person)?;
         for id in candidates {
             let record = self
                 .record(person, id)?
@@ -1329,7 +1333,11 @@ impl Days {
                 (Some(category), "observation") => category_name(category),
                 _ => PLAIN_FACT,
             };
-            facts.push(serde_json::json!({"id":id,"kind":category,"text":record.text}));
+            let mut fact = serde_json::json!({"id":id,"kind":category,"text":record.text});
+            if let Some(day) = days.get(&id) {
+                fact["on"] = serde_json::json!(day);
+            }
+            facts.push(fact);
             let next = render(&facts);
             if next.len() > cap {
                 facts.pop();
