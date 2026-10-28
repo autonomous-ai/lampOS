@@ -376,7 +376,8 @@ pub struct Progress {
     /// published (#1800): at most two, so a rebuilt walk cannot ask again.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub giving_way_tries: u8,
-    /// "Where you sit" was asked this setup/redo: its intro is said once,
+    /// "Where you sit"'s intro was heard this setup/redo (or went unheard
+    /// three times, `MOST_UNSAID` asks again): it is said once,
     /// and every later ask (nobody there, a pause, a restart) says the
     /// step's short `reoffer` line. An older build reads past it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -675,6 +676,15 @@ pub struct Onboarding {
     led: Option<Led>,
     /// A word owed before the next step: how "where you sit" ended.
     owed: Option<String>,
+    /// "Where you sit"'s intro was handed out by this tick, for the caller
+    /// to bind to its turn ([`Self::bind_opener`]).
+    opener_said: bool,
+    /// The turn the intro is said in: `opened` is kept only when it is
+    /// heard (the Reviewer-lead's P3 on #4095).
+    opener_turn: Option<(BootId, u64)>,
+    /// Intro turns not heard this walk: past [`MOST_UNSAID`] the intro is
+    /// kept as said anyway, so it is not repeated forever.
+    opener_unsaid: u8,
     seen_us: Option<u64>,
     read_us: Option<u64>,
     finished_recorded: bool,
@@ -858,6 +868,9 @@ impl Onboarding {
             fixture_storage: None,
             led: None,
             owed: None,
+            opener_said: false,
+            opener_turn: None,
+            opener_unsaid: 0,
             seen_us: None,
             read_us: None,
             finished_recorded: false,
@@ -1772,6 +1785,39 @@ impl Onboarding {
         self.near_binding()
             .or_else(|| self.giving_binding())
             .or_else(|| self.privacy_invitation_binding())
+            .or(self.opener_turn)
+    }
+
+    /// Binds "where you sit"'s intro, handed out by this loop's tick, to the
+    /// turn it is said in; false for any other note.
+    pub(crate) fn bind_opener(&mut self, voice_boot: BootId, turn: u64) -> bool {
+        if !std::mem::take(&mut self.opener_said) || turn == 0 {
+            return false;
+        }
+        self.opener_turn = Some((voice_boot, turn));
+        true
+    }
+
+    /// The intro is kept as said (`opened`) only when its turn was heard
+    /// whole or played through; cut or never said, the next ask says it
+    /// again, [`MOST_UNSAID`] times more at most.
+    fn opener_finished(&mut self, voice_boot: BootId, turn: u64, delivery: Delivery, now_us: u64) {
+        if self.opener_turn != Some((voice_boot, turn)) {
+            return;
+        }
+        self.opener_turn = None;
+        let heard = matches!(delivery, Delivery::Whole | Delivery::Gapped);
+        if !heard {
+            self.opener_unsaid = self.opener_unsaid.saturating_add(1);
+        }
+        let opened = heard || self.opener_unsaid > MOST_UNSAID;
+        self.records
+            .push(json!({"kind":"onboarding_opener","heard":heard,
+            "opened":opened,"at_us":now_us}));
+        if opened && !self.desired.opened {
+            self.desired.opened = true;
+            self.save();
+        }
     }
 
     pub(crate) fn invitation_refused(&mut self, token: u64, now_us: u64) {
@@ -1790,6 +1836,7 @@ impl Onboarding {
         self.near_invitation_finished(voice_boot, turn, delivery, now_us);
         self.giving_invitation_finished(voice_boot, turn, delivery, now_us);
         self.privacy_invitation_finished(voice_boot, turn, delivery, now_us);
+        self.opener_finished(voice_boot, turn, delivery, now_us);
     }
 
     pub fn kept(&self) -> &Progress {
@@ -2103,6 +2150,7 @@ impl Onboarding {
         face: Option<Framing>,
         still: bool,
     ) -> Option<String> {
+        self.opener_said = false;
         self.poll_storage(now_us);
         self.look_for_receipt_eyes();
         // Read every tick, so what came before the ask is never taken. One
@@ -2258,10 +2306,7 @@ impl Onboarding {
                     return None;
                 }
                 let opened = step == Step::WhereYouSit && self.desired.opened;
-                if step == Step::WhereYouSit && !opened {
-                    self.desired.opened = true;
-                    self.save();
-                }
+                self.opener_said = step == Step::WhereYouSit && !opened;
                 return Some(self.definition.note(step, opened).into());
             }
             return None;
@@ -2731,6 +2776,8 @@ impl Onboarding {
                 self.privacy_flow.waited_out = false;
                 self.privacy_flow.generation = 0;
                 self.desired = Progress::default();
+                self.opener_turn = None;
+                self.opener_unsaid = 0;
                 self.led = None;
                 self.owed = None;
                 self.finished_recorded = false;
@@ -3590,6 +3637,16 @@ mod tests {
         }
 
         fn wait(&mut self, for_us: u64, face: Option<Framing>) -> Vec<String> {
+            self.wait_played(for_us, face, Delivery::Whole)
+        }
+
+        /// As [`Self::wait`], each note's turn played as `delivery` says.
+        fn wait_played(
+            &mut self,
+            for_us: u64,
+            face: Option<Framing>,
+            delivery: Delivery,
+        ) -> Vec<String> {
             let mut notes = Vec::new();
             let until = self.at + for_us;
             while self.at < until {
@@ -3598,6 +3655,10 @@ mod tests {
                     self.walk
                         .tick(self.at, self.at - self.said, true, false, face, self.still)
                 {
+                    let (boot, turn) = (BootId::new([3; 16]).unwrap(), self.at + 1);
+                    if self.walk.bind_opener(boot, turn) {
+                        self.walk.invitation_finished(boot, turn, delivery, self.at);
+                    }
                     notes.push(note);
                     self.said = self.at;
                 }
@@ -5161,6 +5222,45 @@ mod tests {
             [crate::onboarding::skill::LATER, PREFERENCES_NOTE]
         );
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Later));
+    }
+
+    /// The pause drops the step being led; it is asked again after.
+    fn asked_again(room: &mut Room) {
+        for _ in 0..40 {
+            room.at += S;
+            assert_eq!(
+                room.walk
+                    .tick(room.at, 60 * S, true, true, Some(SIDE), true),
+                None
+            );
+        }
+        assert!(!room.walk.leading());
+    }
+
+    /// The intro is kept as said only when its turn was heard (the
+    /// Reviewer-lead's P3 on #4095): cut or never said, the next ask says
+    /// it again, and past [`MOST_UNSAID`] such asks it is kept anyway.
+    #[test]
+    fn the_intro_is_kept_as_said_only_when_heard() {
+        for heard in [Delivery::Whole, Delivery::Gapped] {
+            let mut room = Room::new("opener-heard");
+            assert_eq!(room.wait_played(4 * S, Some(SIDE), heard), [SIT_NOTE]);
+            assert!(room.walk.kept().opened, "{heard:?}");
+            asked_again(&mut room);
+            assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
+        }
+        let mut room = Room::new("opener-unheard");
+        for (unheard, last) in [
+            (Delivery::Cut, false),
+            (Delivery::Unsaid, false),
+            (Delivery::Cut, true),
+        ] {
+            assert_eq!(room.wait_played(4 * S, Some(SIDE), unheard), [SIT_NOTE]);
+            // The third unheard intro is kept as said: it is not repeated forever.
+            assert_eq!(room.walk.kept().opened, last, "{unheard:?}");
+            asked_again(&mut room);
+        }
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
     }
 
     #[test]
