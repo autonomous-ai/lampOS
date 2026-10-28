@@ -5301,17 +5301,34 @@ fn step_call(onboarding: Option<&crate::onboarding::Onboarding>) -> bool {
 /// step took it.
 fn near_text_call(
     onboarding: Option<&mut crate::onboarding::Onboarding>,
-    began_us: u64,
+    (began_us, ended_us): (u64, u64),
 ) -> Option<u64> {
     #[cfg(test)]
     if let Some(taken) = TEST_NEAR.with(|near| {
         near.borrow_mut()
             .as_mut()
-            .map(|flow| flow.text_call(began_us))
+            .map(|flow| flow.text_call(began_us, ended_us))
     }) {
         return taken;
     }
-    onboarding.and_then(|walk| walk.near_text_call(began_us))
+    onboarding.and_then(|walk| walk.near_text_call(began_us, ended_us))
+}
+
+/// A call's line whose words came back as more than the name, or ended with
+/// none (#3923): its try waits no longer for them.
+fn near_call_words_back(onboarding: Option<&mut crate::onboarding::Onboarding>) {
+    #[cfg(test)]
+    if TEST_NEAR.with(|near| {
+        near.borrow_mut()
+            .as_mut()
+            .map(crate::onboarding::near::NearFlow::call_words_back)
+            .is_some()
+    }) {
+        return;
+    }
+    if let Some(walk) = onboarding {
+        walk.near_call_words_back();
+    }
 }
 
 /// A call's line begun at `began_us` ended (#3923): the step waits a moment
@@ -5675,9 +5692,10 @@ fn conversation_with_gate_inner(
     // kept nowhere, and its answer is neither played, published nor kept.
     let mut sentence_turn: Option<u64> = None;
     // The turn told the second route as onboarding's call (`StepCall`,
-    // #3504), and, once its line ended, when its speech began (#3923): the
-    // start the step takes if its words come back as the lamp's name alone.
-    let mut step_call_line: Option<(u64, Option<u64>)> = None;
+    // #3504), and, once its line ended, when its speech began and ended
+    // (#3923): what the step takes if its words come back as the lamp's
+    // name alone.
+    let mut step_call_line: Option<(u64, Option<(u64, u64)>)> = None;
     // Its words as they come, in memory only, until the last piece: on
     // Live they come in pieces, all of which are counted.
     let mut sentence_heard: Option<String> = None;
@@ -7306,6 +7324,23 @@ fn conversation_with_gate_inner(
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
             }
+            // A call's line ended and its words came back as more than the
+            // name (the second route tells only the name alone, as
+            // `StepCallHeard`), or its turn ended without them (#3923): the
+            // step's try waits for nothing more.
+            if let Some((turn, Some(_))) = step_call_line
+                && (matches!(
+                    &event,
+                    ProviderOutput::Transcript {
+                        request: None,
+                        finished: true,
+                        ..
+                    }
+                ) || matches!(&event, ProviderOutput::TurnComplete { request, .. } if *request == turn))
+            {
+                step_call_line = None;
+                near_call_words_back(onboarding.as_mut());
+            }
             match event {
                 ProviderOutput::ReminderDeferred {
                     request,
@@ -7566,11 +7601,15 @@ fn conversation_with_gate_inner(
                 // (#3923): its speech's start goes to the step, which counts
                 // it only while its name part listens for a call.
                 ProviderOutput::StepCallHeard { request } => {
-                    let began = step_call_line
-                        .take()
-                        .filter(|(turn, _)| *turn == request)
-                        .and_then(|(_, began)| began);
-                    let taken = began.and_then(|began| near_text_call(onboarding.as_mut(), began));
+                    // Only this line's: a late one for another leaves the
+                    // slot to the line in it.
+                    let line = step_call_line.filter(|(turn, _)| *turn == request);
+                    if line.is_some() {
+                        step_call_line = None;
+                    }
+                    let taken = line
+                        .and_then(|(_, spoken)| spoken)
+                        .and_then(|spoken| near_text_call(onboarding.as_mut(), spoken));
                     record(
                         trace,
                         json!({"kind":"onboarding_text_call","turn":request,
@@ -9672,12 +9711,13 @@ fn conversation_with_gate_inner(
                     let input_end_us = audio.captured_at_us;
                     // A call's line ending (#3923): when its speech began,
                     // for its words, and the step waits a moment for them.
-                    if let Some((turn, began)) = step_call_line.as_mut()
+                    if let Some((turn, spoken)) = step_call_line.as_mut()
                         && *turn == current.owner.turn()
-                        && let Some((at, _)) = speech_levels.front()
+                        && let (Some((began, _)), Some((ended, _))) =
+                            (speech_levels.front(), speech_levels.back())
                     {
-                        *began = Some(*at);
-                        near_call_line_ended(onboarding.as_mut(), *at);
+                        *spoken = Some((*began, *ended));
+                        near_call_line_ended(onboarding.as_mut(), *began);
                     }
                     // The sentence's line ending (begun in its window,
                     // count-only): its speech and the room microphone's

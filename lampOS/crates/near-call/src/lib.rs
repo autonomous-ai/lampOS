@@ -43,7 +43,9 @@ pub const RISE_MS: u64 = 1_000;
 pub const ECHO_BEFORE_MS: u64 = 500;
 /// A line heard by speech to text as the name, and a detector's hearing,
 /// that began at most this far apart are one call: the detector's start
-/// and the line's first speech block mark the same "Lamp".
+/// and the line's first speech block mark the same "Lamp". So is a hearing
+/// begun inside the line, however far in (a slow "Hey, … Lamp", or a
+/// cough before it that speech to text left out).
 pub const ONE_CALL_MS: u64 = 1_000;
 /// Tries accepted for a result.
 pub const TRIES: usize = 3;
@@ -77,6 +79,8 @@ pub struct Hearing {
 pub struct Said {
     /// When the line's speech began.
     pub began_ms: u64,
+    /// When its speech ended.
+    pub ended_ms: u64,
 }
 
 /// One reading of the room's level (`RoomSound`, the ears, every 100 ms).
@@ -208,17 +212,20 @@ pub fn near_try_with_said(
         .filter(|hearing| window.contains(&hearing.began_ms))
         .copied()
         .collect();
-    let said: Vec<u64> = said
+    let said: Vec<Said> = said
         .iter()
-        .map(|line| line.began_ms)
-        .filter(|began| window.contains(began))
+        .filter(|line| window.contains(&line.began_ms))
+        .copied()
         .collect();
-    let one_call = |hearing: &Hearing, line: u64| hearing.began_ms.abs_diff(line) <= ONE_CALL_MS;
+    let one_call = |hearing: &Hearing, line: &Said| {
+        hearing.began_ms.abs_diff(line.began_ms) <= ONE_CALL_MS
+            || (line.began_ms..=line.ended_ms).contains(&hearing.began_ms)
+    };
     // Lines no hearing explains are calls of their own.
     let alone: Vec<u64> = said
         .iter()
-        .copied()
-        .filter(|&line| !heard.iter().any(|hearing| one_call(hearing, line)))
+        .filter(|line| !heard.iter().any(|hearing| one_call(hearing, line)))
+        .map(|line| line.began_ms)
         .collect();
     let (began_ms, score, heard_by) = match (heard.as_slice(), alone.as_slice()) {
         ([], []) => return Err(Rejected::NoHearing),
@@ -226,7 +233,7 @@ pub fn near_try_with_said(
             (hearing.began_ms, Some(hearing.score), HeardBy::Name)
         }
         // Under the bar, or not a number: only its words make it a call.
-        ([hearing], []) if said.iter().any(|&line| one_call(hearing, line)) => {
+        ([hearing], []) if said.iter().any(|line| one_call(hearing, line)) => {
             (hearing.began_ms, None, HeardBy::Text)
         }
         ([hearing], []) => {
@@ -428,9 +435,15 @@ mod tests {
         assert!(near_try(ENDED, &[heard(2_000, f32::NAN)], &room, &[]).is_err());
     }
 
+    /// A line of the name begun `after_ms` after the prompt, 0.6 s long.
     fn said(after_ms: u64) -> Said {
+        said_for(after_ms, 600)
+    }
+
+    fn said_for(after_ms: u64, long_ms: u64) -> Said {
         Said {
             began_ms: ENDED + after_ms,
+            ended_ms: ENDED + after_ms + long_ms,
         }
     }
 
@@ -453,6 +466,7 @@ mod tests {
         for outside in [
             Said {
                 began_ms: ENDED - 1,
+                ended_ms: ENDED + 599,
             },
             said(WINDOW_MS + 1),
         ] {
@@ -520,6 +534,48 @@ mod tests {
                 score: None,
                 heard_by: HeardBy::Text,
             })
+        );
+        // A sure hearing 1.2 s into its line (a slow "Hey, … Lamp", or a
+        // cough speech to text left out) is that line's call, the
+        // detector's with its score; one under the bar there counts by text.
+        assert_eq!(
+            near_try_with_said(
+                ENDED,
+                &[heard(3_200, 0.98)],
+                &[said_for(2_000, 1_600)],
+                &levels(0, 6_000, 3_400, 21.0),
+                &[]
+            ),
+            Ok(Try {
+                rise_db: 21.0,
+                score: Some(0.98),
+                heard_by: HeardBy::Name,
+            })
+        );
+        assert_eq!(
+            near_try_with_said(
+                ENDED,
+                &[heard(3_200, 0.9)],
+                &[said_for(2_000, 1_600)],
+                &levels(0, 6_000, 3_400, 21.0),
+                &[]
+            ),
+            Ok(Try {
+                rise_db: 21.0,
+                score: None,
+                heard_by: HeardBy::Text,
+            })
+        );
+        // Begun past the line's end and more than a second after it: two.
+        assert_eq!(
+            near_try_with_said(
+                ENDED,
+                &[heard(3_200, 0.98)],
+                &[said_for(2_000, 1_000)],
+                &room,
+                &[]
+            ),
+            Err(Rejected::TwoHearings)
         );
         // Two separate calls, each heard both ways, are still two.
         assert_eq!(
