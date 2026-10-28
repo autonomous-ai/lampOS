@@ -738,6 +738,23 @@ mod tests {
         }
     }
 
+    /// The repository's key is the Store's production key, as its keeper
+    /// posted it (#3692): one line, 32 bytes, fingerprint
+    /// `8717ddcdf9ac22fb`, so every build made from here carries it.
+    #[test]
+    fn the_repositorys_store_key_is_the_stores_production_key() {
+        let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy");
+        let setting = crate::install::store_key_setting(&deploy).unwrap().unwrap();
+        assert_eq!(setting.path, crate::install::STORE_KEY_SETTING);
+        assert_eq!(setting.mode.as_deref(), Some("0644"));
+        let keys = manifest::read_public_keys(setting.text.as_deref().unwrap()).unwrap();
+        let fingerprints: Vec<_> = keys.iter().map(manifest::fingerprint).collect();
+        assert_eq!(fingerprints, ["8717ddcdf9ac22fb"]);
+        let mut settings = crate::install::product_settings();
+        settings.push(setting);
+        manifest::check_settings(&settings).unwrap();
+    }
+
     #[test]
     fn the_images_files_are_carried_with_the_updater_they_need() {
         let folder = tempfile::tempdir().unwrap();
