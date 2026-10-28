@@ -1,3 +1,13 @@
+## 2026-10-29 06:00 — the first real promote over my pieces
+
+- **8389 is stable (promoted 04:23, run 40771220724).** Both of my promote-side pieces ran for real. The notes listed 33 PRs, all landed. The cleanup took the one stale stage (`staged-8163`), leaving 17 backups and 18 assets. Posted on #3976 and #4161, with a correction to each: I wrote 05:49 for a 05:47 post, and "16 backups" for 17.
+- **#4211** (train 330): a dry run of the notes against the live repo, 8327 to 8389 with writes blocked, listed 52 PRs, and 19 of them were open. GitHub's `commits/{sha}/pulls` also names open PRs whose branch holds a landed commit. Now a PR counts only with `merged_at`. It landed 34 minutes before the promote that used it.
+- **#4218** (train 331): two `updates.md` paragraphs still said nothing prunes and a retry after a partial upload is refused.
+- **#4222** (train 332) and **#4232** (train 334): a test holds the notes' `receipt[…]` reads to `Receipt`'s fields, since the notes step can't fail the job.
+- **Reads:** #4165 (carry), #4202, #4194 (my HOLD lifted, kit test reversed to fail), #4223 (kit test passes), #4183 (lamp-control's hand, P3: today's lamp-body refuses `follow`), #4235.
+- **#3729** not carried: the button-shutdown docs and `ShutdownSource::App` disagree with #3697's change-helper path, a choice for its author.
+- **Lesson:** other sessions build into the same `lampOS/target`. A 300-run loop ran a binary another session had rebuilt. Copy the test binary out first.
+
 ## 2026-10-29 00:55 — the update path through ship eve
 
 - **Publishing.** Every publish from 11:53Z was refused (403). The owner's token went in, and #3934 merged (by Leo's word, right after train 318) as `34fbd2c8f`. 8311 made its release, then hit a 504. 8327, 8335 and 8349 published clean. #3906 proposed closed.
