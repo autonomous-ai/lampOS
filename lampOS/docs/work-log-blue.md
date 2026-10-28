@@ -765,3 +765,6 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - #3979: skill check reads format 2, d812878979.
 - #2811 checkpoint (delivered, row passed on 06c1) and #3710 status (not started, waits on me) posted for the lead's issue sort.
 - blue/sdk-skill-push and blue/sdk-skill-sign rebased locally on #3910 3d5f0cd0c (range-diffs =; Python 74, JS 41); not pushed, as #3910 is taking P2 changes.
+- 08:47: #3978 READ-OK from Fourteen (f667a2bbb); #3979 being read. openharness#1488 merged 27 Oct, nothing owed.
+- Carried skill-push onto #3910 4c2fbcf02 (Nine's P2 fix: limits.manage, generations): conflicts with lamp-voice's fake tests resolved by keeping both. Pushed blue/sdk-skill-push 56b9f0a128 (Python 76, JS 40) and blue/sdk-skill-sign 4419386d96 (Python 79, JS 43).
+- Ten's install request shape on #3931 (skill.push + asks on part 0, asks_differ, signer_changed, author FPR16): answered yes. Asked for one lamp definition of asks to mirror with a shared table, and for the codes to land in the schema with both SDK copies.
