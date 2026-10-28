@@ -28,12 +28,12 @@ SUMMARISED = frozenset({"text", "data"})
 # phrase, events' fields, and a refusal's `why`.
 SHOWN = frozenset({
     "asleep", "at", "class", "client", "code", "colour", "count", "elbow", "error", "ev", "events",
-    "express", "facing", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
+    "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
     "mood", "most", "motion", "name", "near", "ok", "op", "parts", "pattern", "paused", "phrase",
     "phrases", "pitch", "presence", "press", "private", "push", "quiet_hours", "re", "refused",
     "retry_ms", "roll", "say", "say_max_chars", "score", "shoulder", "side", "skill", "skills",
-    "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "until", "v", "where",
+    "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "to", "until", "v", "where",
     "why", "within_ms", "yaw"
 })
 # A said text's tag is keyed with this process's own random key: the same text
