@@ -20,7 +20,7 @@ pub const TOUCH_REMIND: &str = "(Say only this, nothing before or after it: \"I 
 pub const TOUCH_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I felt that.\")";
 pub const TOUCH_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel a tap this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
-pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask exactly this first: \"Are there hours when I should keep quiet? For example, 'after ten at night', or 'no'.\" When they have answered, ask exactly this: \"May I say hello when you sit down?\" Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then say only: \"Got it, that's everything. You can ask me to redo the setup any time. Just ask me to redo the setup.\")";
+pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask exactly this first: \"Are there hours when I should keep quiet? For example, 'after ten at night', or 'no'.\" When they have answered, ask exactly this: \"May I say hello when you sit down?\" Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then say only: \"Got it, that's everything. You can ask me to redo the setup any time.\")";
 pub const PRIVACY_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones.\")";
 pub const PRIVACY_DONE_CAMERA: &str = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones and my camera.\")";
@@ -49,7 +49,7 @@ pub const GIVE_MORE: &str =
 pub const GIVE_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, my head moved with your hand.\")";
 pub const GIVE_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
-pub const PRIVACY_INVITATION: &str = "(Say only this, nothing before or after it: \"Find my privacy switch {location}. Turn it off, then back on.\" Do not explain it, claim success or ask a tool to mark privacy done.)";
+pub const PRIVACY_INVITATION: &str = "(Say only this, nothing before or after it: \"Find my privacy switch {location}. Close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)";
 pub const WHO_CONFIRM: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)";
 pub const WHERE_YOU_SIT_SKIPPED: &str =
     "(Say only this, nothing before or after it: \"Okay, we'll skip where you sit for now.\")";

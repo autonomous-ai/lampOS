@@ -20,7 +20,7 @@ schema, byte bounds, loading rules and activation boundary.
 For privacy, the runner supplies the verified device profile's switch location.
 If the location is missing, the step is unavailable: never guess where it is.
 The invitation is two short sentences the runner gives, about 3-5 s spoken
-("Find my privacy switch <location>. Turn it off, then back on."): say only
+("Find my privacy switch <location>. Close it, then open it again."): say only
 that. The person may close the switch while it is being said; that counts and
 the switch stops the lamp's words. Never promise a spoken reply while it is
 closed. The runner, not a model report, verifies close and reopen. Opening after five
