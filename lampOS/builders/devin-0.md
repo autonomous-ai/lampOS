@@ -27,7 +27,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: none
 - Log: `lampOS/docs/work-log-devin-0.md` on `lamp-devin-0`
 - Tasks: the `builder:devin-0` issues, in the order of the Queue issue
-  ([#3126](https://github.com/autonomous-ai/lampOS/issues/3126)). Its first
+  ([#3997](https://github.com/autonomous-ai/lampOS/issues/3997)). Its first
   proposal, once the first builder agrees: add-ons from an agent on the
   paired computer, over the lamp's LAN link with Harness
   ([addons.md](../docs/addons.md), "Harness (after 1.0)"; openharness#1485).

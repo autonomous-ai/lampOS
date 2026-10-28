@@ -24,7 +24,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: none
 - Log: [lampOS/docs/work-log.md](https://github.com/autonomous-ai/lampOS/blob/lamp-second/lampOS/docs/work-log.md) on `lamp-second`
 - Tasks: the `builder:second` issues, in the order of the Queue issue
-  ([#3126](https://github.com/autonomous-ai/lampOS/issues/3126), continued from #2602)
+  ([#3997](https://github.com/autonomous-ai/lampOS/issues/3997), continued from #3504)
 
 Its earlier work: the end-of-turn model's speed (1), the stop listener (3), the replay of the lamp's recordings (20), the end sent early (19), the reference that follows the microphone's clock (10).
 
@@ -33,7 +33,7 @@ Its earlier work: the end-of-turn model's speed (1), the stop listener (3), the 
 - Change the crates above, and the documents that belong to them, in the
   same commit.
 - Propose work as `second-P<n>` in its log and as a comment on the issue it
-  belongs to, or on the Queue issue (#3126, continued from #2602) when none fits, as joining.md's
+  belongs to, or on the Queue issue (#3997, continued from #3504) when none fits, as joining.md's
   `fifth-P8` says; it opens no issues and makes no labels.
 - Add and remove `status:` labels on, and comment on, its own issues.
 
