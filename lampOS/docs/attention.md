@@ -2367,6 +2367,40 @@ a colleague off camera, with no voice model, while the person faces the lamp,
 until a line is held. And a face on a screen or in a photo keeps the room
 busy, so a person alone with it needs the name.
 
+## A line said to a person is no call by its start (`LAMP_NAME_SAID_TO_A_PERSON`, #3945)
+
+On c0a4 a real "Ma'am, could you pass me the salt please?", said to a
+person, was heard by `lamp-name` at 0.95 to 0.99 at the line's start, and
+the lamp answered it: with `LAMP_NAME_SECOND_SIGN=on` (the product) a
+hearing at the line's start is its own second sign (second-voice.md). With
+`LAMP_NAME_SAID_TO_A_PERSON=on` as well, on the second route, it is not
+when the line's first word, set off as a name is (past a greeting, followed
+by a comma or a stop, or the whole line), is one said to a person
+(`attention::SAID_TO_A_PERSON`): ma'am, madam, sir, mum, dad, honey,
+sweetie, babe, dude, bro, buddy, guys, compared lower case with the
+apostrophe kept, a curly one read as a straight one. Every other second
+sign still lets it count: a face turned to the lamp, said close to it or
+to it from close, its words calling it, and, with this switch only, a
+conversation with the lamp going on (`Signs::going_on`, passed to
+`Attention::weigh_the_name`). Held, the line is judged as one with no
+name, and the journal says `its first word, set off, is said to a person
+("ma'am"), and nothing else shows it was called: not counted
+(LAMP_NAME_SAID_TO_A_PERSON)`, with the word from the list and where the
+hearing began, never the rest of the line. The lamp's name, "lamb", a word
+written for it (`STAND_INS`, `STAND_ALONE_INS`, `HEARD_FOR_THE_NAME`), a
+person's name of its shape (`NAMES_OF_ITS_SHAPE`) and a word that isn't
+alphabetic are never on the list, so "Lamp, …", "Blake, …" and
+"1. How are you today?" (#3923's lines) are answered as before. Its known
+costs: "man" and "mom" stay stand-ins, so "Man, …" is still read as a
+call by its words before the hearing matters; and a real "Lamp, …"
+written by the speech to text as "Ma'am, …" (#3923, name.md) is held
+unless a face, a conversation going on, or closeness shows the call. Lamp
+check on c0a4 (28 Oct, a person speaking, turned away): the one "Ma'am, …"
+lamp-name heard as the name (1.00, begun 0.9 s in) was held, the other
+"Ma'am, …" lines had no hearing and were left alone; "Lamp, what time is it in
+London?" and "Hey Lamp, are you there?" said to the lamp were answered. Off
+unless set.
+
 ## Switch
 
 `LAMP_ATTENTION=on` in the voice unit (the worker's `--attention`). Off by
