@@ -4,6 +4,9 @@
 the onboarding switch. Device qualification is outstanding; local evidence
 and rollout limitations are recorded with each PR.
 
+
+> **PARKED (#3702), 28 Oct:** giving way is out of the onboarding walk by the owner's call. lamp-voice sets the step unavailable (`set_giving_way_available(false)` in coordinator.rs), so it is kept `not_available` and never offered; touch is followed by room sounds. Its code, words and tests stay; to put it back, restore the availability condition kept in the comment there.
+
 ## What it is for
 
 A new lamp knows nothing: not where its person sits, not their name or
