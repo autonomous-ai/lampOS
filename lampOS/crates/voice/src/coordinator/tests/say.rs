@@ -1023,6 +1023,46 @@ fn an_add_ons_quoted_say_is_taken_by_the_second_route_alone() {
     assert_eq!(quoted_refused(false, "second"), None);
 }
 
+/// Sixth's P3 on #3835: a request begun while the walk is under way is
+/// marked right after its Start, in the same queue and before any of its
+/// sound, so the worker has the mark before the model can call
+/// `go_to_sleep`, and answers it not now: never the line, then a sleep
+/// refused. The sentence's `CountOnly` keeps its place first.
+#[test]
+fn a_request_begun_in_the_walk_is_marked_before_any_of_its_sound() {
+    let kinds = |marks: Vec<ProviderInput>| -> Vec<String> {
+        marks
+            .iter()
+            .map(|input| {
+                serde_json::to_value(input).unwrap()["kind"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect()
+    };
+    assert!(after_start(7, 3, false, false).is_empty());
+    assert_eq!(kinds(after_start(7, 3, false, true)), ["onboarding"]);
+    assert_eq!(kinds(after_start(7, 3, true, false)), ["count_only"]);
+    assert_eq!(
+        kinds(after_start(7, 3, true, true)),
+        ["count_only", "onboarding"]
+    );
+    let [
+        ProviderInput::Onboarding {
+            request,
+            privacy_generation,
+        },
+    ] = after_start(7, 3, false, true)[..]
+    else {
+        panic!("one Onboarding");
+    };
+    assert_eq!((request, privacy_generation), (7, 3));
+    // Off without the switch, and with no walk known.
+    assert!(!sleep_not_now(false, None, None));
+    assert!(!sleep_not_now(true, None, None));
+}
+
 /// "Lamp, go to sleep" (#3748, the reviewer-lead's P2 on #3835): its sleep
 /// is asked only once its line was heard whole, through the same turn's end
 /// a say's `spoken` takes.
