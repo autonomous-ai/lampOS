@@ -93,6 +93,9 @@ pub struct Real {
     /// The lamp's software update for the app, with `LAMP_APP_UPDATE=on`
     /// (#2194, `crate::update`).
     pub update_page: bool,
+    /// The app's checks for an update asked of lamp-update, with the same
+    /// switch (#4153, `crate::update::Checks`).
+    pub update_checks: crate::update::Checks,
     /// The keeper's restart socket, with `LAMP_APP_RESTART=on` (#2193,
     /// `system.reboot`).
     pub restart: Option<PathBuf>,
@@ -654,6 +657,10 @@ impl Lamp for Real {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
 
+    fn check_update(&mut self, now: Instant) -> Result<(), String> {
+        self.update_checks.ask(self.bus.as_ref(), now)
+    }
+
     fn restart(&mut self) -> Result<Value, String> {
         let socket = self
             .restart
@@ -848,6 +855,7 @@ mod tests {
             faces: None,
             schedule: None,
             update_page: false,
+            update_checks: Default::default(),
             restart: None,
             guard: None,
             make_skill: None,
@@ -923,6 +931,7 @@ mod tests {
             faces: None,
             schedule: None,
             update_page: false,
+            update_checks: Default::default(),
             restart: None,
             guard: None,
             make_skill: None,
@@ -1052,6 +1061,7 @@ mod tests {
             faces: None,
             schedule: None,
             update_page: false,
+            update_checks: Default::default(),
             restart: None,
             guard: None,
             make_skill: None,

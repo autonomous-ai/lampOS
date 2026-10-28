@@ -182,6 +182,7 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         faces: None,
         schedule: None,
         update_page: false,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,

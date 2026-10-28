@@ -161,6 +161,14 @@ pub trait Lamp {
         None
     }
 
+    /// Asks `lamp-update serve` for its next round now (`update.check`,
+    /// #4153, `crate::update::Checks`), at `now`: at most once a minute, and
+    /// only when a running lamp-update reads it. Only with
+    /// `LAMP_APP_UPDATE=on`.
+    fn check_update(&mut self, _now: std::time::Instant) -> Result<(), String> {
+        Err(not_here("update.check"))
+    }
+
     /// Asks the keeper to restart the lamp (`system.reboot`, #2193): its
     /// answer, given before the lamp goes down, or why not. Only with
     /// `LAMP_APP_RESTART=on`.
@@ -183,7 +191,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 38] = [
+pub const KINDS: [(&str, Switch); 39] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -225,6 +233,7 @@ pub const KINDS: [(&str, Switch); 38] = [
     ("skills.make", |lamp| lamp.make_skill().is_some()),
     ("skills.made", |lamp| lamp.make_skill().is_some()),
     ("update.status", |lamp| lamp.update_page()),
+    ("update.check", |lamp| lamp.update_page()),
     ("system.reboot", |lamp| lamp.restarts()),
 ];
 
@@ -454,6 +463,15 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The lamp's software update, for the app's Lamp 2 page (#2194):
         // only with `LAMP_APP_UPDATE=on`.
         "update.status" if on(lamp, kind) => crate::update::status(lamp.update_status()),
+        // The app's Check for update (#4153): `serve`'s next round now, not
+        // after its wait. Refused while a round runs and within a minute of
+        // the last; the round keeps its own lock and quiet moment.
+        "update.check" if on(lamp, kind) => {
+            let status = crate::update::status(lamp.update_status())?.unwrap_or_default();
+            crate::update::idle(&status)?;
+            lamp.check_update(std::time::Instant::now())?;
+            some(crate::update::started(status))
+        }
         // A restart from the app (#2193): asked of the keeper, never done
         // here; the keeper answers first and refuses under an update.
         "system.reboot" if on(lamp, kind) => lamp.restart().map(Some),
@@ -504,6 +522,10 @@ pub mod tests {
         pub guard: Option<std::path::PathBuf>,
         pub make_skill: Option<std::path::PathBuf>,
         pub update_page: bool,
+        /// The bus lamp-update's `update/status` is read from (#2194) and
+        /// `update.check` asks on, and the checks asked (#4153).
+        pub update_bus: Option<lamp_bus::Bus>,
+        pub update_checks: crate::update::Checks,
         pub restart: bool,
         /// What `recovery` says (#3020).
         pub recovery: bool,
@@ -595,6 +617,16 @@ pub mod tests {
         }
         fn update_page(&self) -> bool {
             self.update_page
+        }
+        fn update_status(&self) -> Option<lamp_bus::Message> {
+            self.update_bus
+                .as_ref()?
+                .latest(lamp_msgs::UpdateStatus::TOPIC)
+                .ok()
+                .flatten()
+        }
+        fn check_update(&mut self, now: std::time::Instant) -> Result<(), String> {
+            self.update_checks.ask(self.update_bus.as_ref(), now)
         }
         fn restarts(&self) -> bool {
             self.restart
@@ -1039,7 +1071,11 @@ pub mod tests {
                 |f| f.make_skill = Some(std::path::PathBuf::from("/nowhere/make.sock")),
                 &["skills.make", "skills.made"],
             ),
-            ("update page", |f| f.update_page = true, &["update.status"]),
+            (
+                "update page",
+                |f| f.update_page = true,
+                &["update.status", "update.check"],
+            ),
             ("restart", |f| f.restart = true, &["system.reboot"]),
         ];
         let always = [
@@ -1082,6 +1118,93 @@ pub mod tests {
             // Read only: asking again says the same.
             assert_eq!(said(&mut lamp), wanted, "{name} read again");
         }
+    }
+
+    /// #4153: `update.check` is answered only with `LAMP_APP_UPDATE=on`,
+    /// with `update.status`'s object and `"check": "started"` once a
+    /// running lamp-update has the check. Refused, with what the app shows,
+    /// while a round runs, within a minute of the last, and when no
+    /// lamp-update reads checks; nothing is sent then.
+    #[test]
+    fn the_app_asks_for_a_round_now_between_rounds_and_once_a_minute() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            ..lamp()
+        };
+        assert_eq!(
+            answer(&mut lamp, "update.check", &json!({})),
+            Err(not_here("update.check"))
+        );
+        lamp.update_page = true;
+        // No lamp-update reads checks (an older one, or none running): said,
+        // and not counted as asked.
+        assert_eq!(
+            answer(&mut lamp, "update.check", &json!({})),
+            Err(crate::update::NOT_LISTENING.to_owned())
+        );
+        let mut update = bus
+            .subscribe_typed(
+                lamp_msgs::UpdateCheck::TOPIC,
+                "update",
+                lamp_msgs::UpdateCheck::TYPE,
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        let started = answer(&mut lamp, "update.check", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            started,
+            json!({"running": null, "now": "unknown", "last": null, "stale": false, "check": "started"})
+        );
+        let heard = update
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .expect("one check on the bus");
+        assert_eq!(
+            heard.header.type_name.as_deref(),
+            Some(lamp_msgs::UpdateCheck::TYPE)
+        );
+        assert_eq!(
+            answer(&mut lamp, "update.check", &json!({})),
+            Err(crate::update::TOO_SOON.to_owned())
+        );
+        // A round under way is said first, whatever the minute.
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        says.publish_json(
+            0,
+            &lamp_msgs::UpdateStatus {
+                running: None,
+                now: "switching".into(),
+                last: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            answer(&mut lamp, "update.check", &json!({})),
+            Err(crate::update::RUNNING.to_owned())
+        );
+        assert!(
+            update
+                .recv(std::time::Duration::from_millis(100))
+                .unwrap()
+                .is_none(),
+            "a refused ask sends nothing"
+        );
+        // Off again: the kind is not here, as before.
+        lamp.update_page = false;
+        assert_eq!(
+            answer(&mut lamp, "update.check", &json!({})),
+            Err(not_here("update.check"))
+        );
     }
 
     /// A switch's name, how it is turned on, and the kinds it brings.

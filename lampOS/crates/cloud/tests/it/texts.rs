@@ -38,6 +38,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         faces: None,
         schedule: None,
         update_page: false,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,
