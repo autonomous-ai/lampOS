@@ -273,8 +273,12 @@ fn a_hand_still_on_the_head_is_not_done_and_two_tries_unfelt_fail() {
     let now = played.at(30_000);
     assert_eq!(settle(&mut walk, now), [GIVE_FELT]);
     assert_eq!(outcome(&walk), None);
-    // The minute ends: asked once more.
-    let now = played.at(60_000);
+    // Still held at the minute's end: waited for a little, then asked once
+    // more.
+    let now = played.at(64_000);
+    walk.tick(now, START_QUIET_US, true, false, face(), true);
+    assert!(walk.pending().invitations.is_empty());
+    let now = played.at(65_000);
     walk.tick(now, START_QUIET_US, true, false, face(), true);
     let played = play(&mut walk, now + 2 * S, 2);
     // The released message of the first push, late, is not this try's.
@@ -815,7 +819,7 @@ fn a_push_that_did_not_move_the_head_is_answered_then_prompted_once() {
     for tenth in 31..600 {
         said.extend(settle(&mut walk, played.at(tenth * 100)));
     }
-    assert_eq!(said, [GIVE_MORE]);
+    assert_eq!(said, [GIVE_MORE, GIVE_PROMPT]);
 }
 
 /// The body's joints with only `moved` off the middle: at `position`
@@ -907,4 +911,45 @@ fn no_push_at_all_is_prompted_each_try_then_failed_plainly() {
     }
     assert_eq!(said, [GIVE_PROMPT, GIVE_PROMPT, GIVE_FAILED]);
     assert_eq!(outcome(&walk), Some(Outcome::Failed));
+}
+
+/// The person pushes and talks over the invitation ("like this?"), which
+/// cuts it: the push is kept and the try goes on to done (the
+/// Reviewer-lead's P2 on #4002).
+#[test]
+fn a_push_while_talking_over_the_invitation_is_kept() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let token = offer(&mut walk, 10 * S);
+    let taken_ms = 1_760_000_000_000;
+    set_clock(taken_ms);
+    assert_eq!(walk.take_invitation(token, 10 * S).unwrap(), GIVE_ASK);
+    let boot = BootId::new([4; 16]).unwrap();
+    assert!(walk.bind_invitation(token, boot, 1));
+    let at = |after: u64| {
+        set_clock(taken_ms + after);
+        10 * S + after * 1_000
+    };
+    walk.giving_way_felt(joints(taken_ms + 1_000, 0.0, 0.0), at(1_000));
+    walk.giving_way_felt(hand(taken_ms + 1_080, true), at(1_080));
+    walk.giving_way_felt(joints(taken_ms + 1_160, 30.0, 30.0), at(1_160));
+    walk.invitation_finished(boot, 1, Delivery::Cut, at(2_000));
+    assert_eq!(settle(&mut walk, at(2_100)), [GIVE_FELT]);
+    walk.giving_way_felt(hand(taken_ms + 3_000, false), at(3_000));
+    assert_eq!(settle(&mut walk, at(3_100)), [GIVE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+/// A push begun at 59 s and let go at 61 s is done (the Reviewer-lead's P3
+/// on #4002).
+#[test]
+fn a_push_across_the_minutes_end_is_waited_for() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    push(&mut walk, &played, 59_000, 30.0, 30.0, false);
+    assert_eq!(settle(&mut walk, played.at(60_500)), [GIVE_FELT]);
+    walk.giving_way_felt(hand(played.ended_ms + 61_000, false), played.at(61_000));
+    assert_eq!(settle(&mut walk, played.at(61_100)), [GIVE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
 }
