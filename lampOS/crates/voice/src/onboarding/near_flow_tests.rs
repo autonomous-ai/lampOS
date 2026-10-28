@@ -484,6 +484,37 @@ fn a_call_begun_late_has_its_words_waited_for_a_moment() {
     assert_eq!(judged["why"], "the name wasn't heard");
 }
 
+/// A hearing under 0.95 is no call alone, so a try judged as soon as it is
+/// heard would refuse a call whose words are on their way: while its line's
+/// words are pending the try waits for them, or for the wait's end.
+#[test]
+fn a_weak_hearing_with_words_pending_waits_for_them() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 1_400, 22.0);
+    name(&mut walk, &prompt, 1_000, 0.9);
+    walk.near_call_line_ended(prompt.ended_us + 1_000_000);
+    assert_eq!(tick_at(&mut walk, &prompt, 2_300_000, 500_000), None);
+    by_text(&mut walk, &prompt, 1_000);
+    let judged =
+        tick_at(&mut walk, &prompt, 2_400_000, 500_000).expect("judged once its words are in");
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["heard_by"], "text");
+    // Words that never come: judged at the wait's end, the hearing refused.
+    let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
+    room(&mut walk, &prompt, 1_400, 22.0);
+    name(&mut walk, &prompt, 1_000, 0.9);
+    walk.near_call_line_ended(prompt.ended_us + 1_000_000);
+    assert_eq!(tick_at(&mut walk, &prompt, 8_799_999, 500_000), None);
+    let judged = tick_at(&mut walk, &prompt, 8_800_000, 500_000).expect("judged at the wait's end");
+    assert_eq!(judged["accepted"], false, "{judged}");
+    assert!(
+        judged["why"].as_str().unwrap().contains("under 0.95"),
+        "{judged}"
+    );
+}
+
 /// Three calls heard only by text make this home's bar.
 #[test]
 fn three_calls_heard_only_by_text_keep_a_bar() {
@@ -817,6 +848,88 @@ fn a_call_over_the_prompt_is_asked_again_with_the_same_line() {
     assert_eq!(call(&mut walk, 20 * S, 22.0, 2)["accepted"], true);
     assert_eq!(cut(&mut walk, 40 * S, 3), NEAR_AGAIN);
     assert_eq!(next_words(&mut walk, 50 * S), NEAR_AGAIN);
+}
+
+/// A tick at `after_us` past the prompt's end, the Unix clock with it, and
+/// `quiet_us` of quiet: the try judged then, if any.
+fn tick_at(walk: &mut Onboarding, prompt: &Prompt, after_us: u64, quiet_us: u64) -> Option<Value> {
+    let now = prompt.ended_us + after_us;
+    set_clock(prompt.ended_ms + after_us / 1_000);
+    walk.tick(now, quiet_us, true, false, face(), true);
+    walk.drain_storage_for_test(now);
+    walk.take_records()
+        .into_iter()
+        .rfind(|row| row["kind"] == "onboarding_near_try")
+}
+
+/// The Reviewer-lead's P3 on #4001: a call 1 s into the window was answered
+/// about 6 s later, so the person didn't know it had worked. A call heard is
+/// judged once its second of rise is in (1.3 s after it began, 0.7 s after
+/// its final hearing), and the answer waits only half a second of quiet: the
+/// next line is ready 0.7 s after the call was heard, not 5.7 s. A call over
+/// the prompt's last word gets the same verdict as before, as soon.
+#[test]
+fn a_heard_call_is_answered_at_once_not_after_seven_seconds() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 1_400, 22.0);
+    // Begun 1 s after the prompt's end, its final hearing at 1.6 s.
+    name(&mut walk, &prompt, 1_000, 0.98);
+    let heard_us = prompt.ended_us + 1_600_000;
+    assert_eq!(tick_at(&mut walk, &prompt, 2_299_999, 500_000), None);
+    let judged = tick_at(&mut walk, &prompt, 2_300_000, 500_000).expect("judged");
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["rise_db"].as_f64().unwrap() as f32, 22.0);
+    // Not with less than half a second of quiet: the person may go on.
+    let now = prompt.ended_us + 2_300_000;
+    walk.tick(now, 499_999, true, false, face(), true);
+    walk.drain_storage_for_test(now);
+    assert!(walk.pending().invitations.is_empty());
+    for _ in 0..2 {
+        walk.tick(now, 500_000, true, false, face(), true);
+        walk.drain_storage_for_test(now);
+    }
+    let pending = walk.pending();
+    assert!(pending.invitations[0].ready, "{pending:?}");
+    let token = pending.invitations[0].invitation;
+    assert_eq!(walk.take_invitation(token, now).unwrap(), NEAR_AGAIN);
+    let latency_us = now - heard_us;
+    eprintln!("how_you_sound: the answer is ready {latency_us} us after the call was heard");
+    assert!(latency_us <= S, "{latency_us}");
+    // Its answer played; a call over its last word: the same verdict as
+    // before, at 1.3 s.
+    let boot = BootId::new([3; 16]).unwrap();
+    assert!(walk.bind_invitation(token, boot, 2));
+    set_clock(1_760_000_030_000);
+    walk.invitation_finished(boot, 2, Delivery::Whole, 30 * S);
+    let prompt = Prompt {
+        token,
+        words: NEAR_AGAIN.into(),
+        ended_us: 30 * S,
+        ended_ms: 1_760_000_030_000,
+    };
+    room(&mut walk, &prompt, 300, 20.0);
+    over(&mut walk, &prompt, 300, 200, 0.98);
+    assert_eq!(tick_at(&mut walk, &prompt, 1_299_999, 500_000), None);
+    let judged = tick_at(&mut walk, &prompt, 1_300_000, 500_000).expect("judged");
+    assert_eq!(judged["why"], "answered_early", "{judged}");
+    assert_eq!(judged["offered_again"], true);
+    assert_eq!(next_words(&mut walk, 32 * S), NEAR_MISSED);
+}
+
+/// Nothing heard: the try is judged as before, at the window's end, its rise
+/// window and the delivery grace (7.3 s), and answered with a miss.
+#[test]
+fn with_nothing_heard_the_try_is_judged_at_seven_seconds() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 7_000, 2.0);
+    assert_eq!(tick_at(&mut walk, &prompt, 7_299_999, START_QUIET_US), None);
+    let judged = tick_at(&mut walk, &prompt, 7_300_000, START_QUIET_US).expect("judged");
+    assert_eq!(judged["why"], "the name wasn't heard", "{judged}");
+    assert_eq!(next_words(&mut walk, 20 * S), NEAR_MISSED);
 }
 
 /// The Reviewer-lead's P2 on #4001: an accepted call, then the person leaves

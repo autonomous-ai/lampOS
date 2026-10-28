@@ -670,6 +670,21 @@ for a Unix time. Evidence comes from the bus, dated by its headers:
 end (the 6 s window plus the 1 s rise of a hearing begun at its very end),
 keeping 1.5 s of earlier history so the half second of the lamp's own speech
 before a hearing is known; the try is judged 0.3 s after that for delivery.
+That 7.3 s is only for a try where nothing is heard. A call heard (any
+`name/heard` begun in the window, or over the prompt's last word) is judged as
+soon as its own second of rise is in, 1.3 s after it began, about 0.7 s after
+its final hearing; and the next prompt, its answer ("Got it. Once more." or
+"I didn't catch that. …"), waits only 0.5 s of quiet (`ANSWER_QUIET_US`),
+not the walk's 3 s, so it follows the call as a reply would (the
+Reviewer-lead's P3 on #4001: a call 1 s into the window was answered about
+6 s later). A call's line whose words are still pending (`TEXT_WAIT_US`,
+below) holds that early judgement until they come or the wait ends, so a
+hearing under 0.95 is not refused before its words can count it. The rules
+are the same; only a second name heard after the verdict is past the try,
+not a `TwoHearings` refusal. Tests:
+`a_heard_call_is_answered_at_once_not_after_seven_seconds`,
+`with_nothing_heard_the_try_is_judged_at_seven_seconds`,
+`a_weak_hearing_with_words_pending_waits_for_them`.
 `lamp_near_call::near_try` judges it: one hearing in the 6 s at 0.95 or more,
 mic1's largest rise over its quiet in the second after it began, and the lamp
 not speaking from 0.5 s before the hearing to 1 s after (speech elsewhere in
@@ -776,7 +791,7 @@ journal is rotated, so read it soon after the walk.
 
 **The reply is held.** An answer that starts within a second of the name
 spoils the try, and a model hearing its name answers ("Yes?"). So while a
-try's window is open, from the prompt's end to 7 s on, the voice holds its
+try's window is open, from the prompt's end to 7 s on or its verdict, the voice holds its
 reply to the call: an utterance in it that is only the name ends unanswered
 when it ends, however long it runs past the window, as a sound does. Only the
 name: the step must have heard it (`name/heard`, in the window, beginning no
