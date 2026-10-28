@@ -338,7 +338,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         @server.tool()
         async def lamp_move(step_ms: int, frames: list[list[int]]) -> str:
             """A move of your own: `frames` of 5 joint offsets in counts (pitch, roll, yaw, shoulder,
-            elbow), the first and last all 0, one every `step_ms` (20 to 1000). The body checks it."""
+            elbow), the first and last all 0, one every `step_ms` (40 to 1000), lasting 1.5 to 10 s. The body checks it."""
             return await with_body_lease("move", step_ms=step_ms, frames=frames)
 
     if allowed("light"):
