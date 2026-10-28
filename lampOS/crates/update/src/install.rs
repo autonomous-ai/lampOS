@@ -3168,8 +3168,8 @@ mod tests {
     }
 
     /// #2892: the eyes' camera helper is installed, its socket enabled and
-    /// its template never, and it names the same camera and port as the
-    /// eyes, which ask it; #4074: the eyes on any port, since it differs by
+    /// its template never, and it names the same camera as the eyes, which
+    /// ask it; #4074: both on any port, since it differs by
     /// unit (`3-1.1.4` on lamp-4ace, `3-1.3.4` on lamp-a63e).
     #[test]
     fn the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera() {
@@ -3192,8 +3192,8 @@ mod tests {
         };
         // The same camera: the helper's ids are the eyes'.
         assert_eq!(
-            usb(unit("lamp-eyes-camera@.service")).split('@').next(),
-            Some(usb(unit("lamp-eyes.service")).as_str())
+            usb(unit("lamp-eyes-camera@.service")),
+            usb(unit("lamp-eyes.service"))
         );
         assert!(
             unit("lamp-eyes.service")
@@ -3204,16 +3204,13 @@ mod tests {
                 .contains("ListenStream=/run/lampos-eyes-camera/camera.sock")
         );
         assert!(unit("lamp-eyes-camera@.service").contains("lamp-eyes reauthorize-camera --usb"));
-        // #4074: the eyes name the product's camera by its ids, no port and
-        // no node: every lamp-eyes since 20 Oct (#2190) finds the one camera
-        // with the ids on any port at each open. The helper keeps its port
-        // until every channel carries a lamp-eyes whose helper takes none:
-        // this unit comes from the updater's own build, the helper from the
-        // channel's, and an older one exits 2 without a port (the
-        // Reviewer-lead's P2 on #4077).
+        // #4074: the eyes and their helper name the product's camera by its
+        // ids, no port and no node: every lamp-eyes since 20 Oct (#2190)
+        // finds the one camera with the ids on any port at each open, and
+        // every channel's helper since stable 8250 (#4091) does the same.
         assert_eq!(usb(unit("lamp-eyes.service")), "01da:5875");
         assert!(!unit("lamp-eyes.service").contains("--device"));
-        assert_eq!(usb(unit("lamp-eyes-camera@.service")), "01da:5875@3-1.1.4");
+        assert_eq!(usb(unit("lamp-eyes-camera@.service")), "01da:5875");
         for name in ["lamp-eyes.service", "lamp-eyes-camera@.service"] {
             assert_eq!(unit(name).matches("--usb ").count(), 1, "{name}");
         }
