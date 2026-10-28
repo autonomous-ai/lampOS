@@ -406,6 +406,36 @@ fn a_call_heard_by_text_and_by_the_detector_is_one_try() {
     );
 }
 
+/// The Reviewer-lead on #4102: a call's line whose end went early
+/// (`--early-end-ms`) at 2.6 s and whose real End came at 4.2 s, with the
+/// detector's hearing begun at 3.5 s, between the two, and the line's words
+/// back after the End. The coordinator gives the step the span to the real
+/// End, so the hearing is inside the line: one call. Up to the early end
+/// alone, it would have been two.
+#[test]
+fn a_hearing_between_a_lines_early_end_and_its_real_end_is_inside_the_line() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for (turn, ended_ms, accepted) in [(1, 4_200, true), (2, 2_600, false)] {
+        let at = turn * 20 * S;
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 3_800, 21.0);
+        name(&mut walk, &prompt, 3_500, 0.98);
+        let began_us = prompt.ended_us + 2_000_000;
+        assert!(
+            walk.near_text_call(began_us, prompt.ended_us + ended_ms * 1_000)
+                .is_ok()
+        );
+        let judged = judge(&mut walk, &prompt);
+        assert_eq!(judged["accepted"], accepted, "{judged}");
+        if accepted {
+            assert_eq!(judged["heard_by"], "name", "{judged}");
+        } else {
+            assert_eq!(judged["why"], "the name was heard more than once");
+        }
+    }
+}
+
 /// A line of the name begun over the prompt's last word is answered early,
 /// as a hearing begun there is: offered again, never measured.
 #[test]
