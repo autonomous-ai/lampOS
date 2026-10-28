@@ -19,19 +19,19 @@ pub const TOUCH_OFFER: &str = "(Say only this, nothing before or after it: \"One
 pub const TOUCH_REMIND: &str = "(Say only this, nothing before or after it: \"I didn't feel that. Touch the very top of my head with your fingertip, once.\")";
 pub const TOUCH_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I felt that.\")";
-pub const TOUCH_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel a tap this time. That's fine, you can redo the setup later. Just say 'Hey Lamp, redo the setup.'\")";
-pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask exactly this first: \"Are there hours when I should keep quiet? For example, 'after ten at night', or 'no'.\" When they have answered, ask exactly this: \"May I say hello when you sit down?\" Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then say only: \"Got it, that's everything. You can ask me to redo the setup any time. Just say 'Hey Lamp, redo the setup.'\")";
+pub const TOUCH_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel a tap this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
+pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask exactly this first: \"Are there hours when I should keep quiet? For example, 'after ten at night', or 'no'.\" When they have answered, ask exactly this: \"May I say hello when you sit down?\" Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then say only: \"Got it, that's everything. You can ask me to redo the setup any time. Just ask me to redo the setup.\")";
 pub const PRIVACY_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones.\")";
 pub const PRIVACY_DONE_CAMERA: &str = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones and my camera.\")";
-pub const PRIVACY_FAILED: &str = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup. Just say 'Hey Lamp, redo the setup.'\")";
+pub const PRIVACY_FAILED: &str = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup. Just ask me to redo the setup.\")";
 pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat, the way you'd get my attention. I'll ask until I've heard you three times.\")";
 pub const NEAR_AGAIN: &str =
     "(Say only this, nothing before or after it: \"Got it. Say 'Hey Lamp' once more.\")";
 pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")";
 pub const NEAR_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I know how you call me from there.\")";
-pub const NEAR_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later. Just say 'Hey Lamp, redo the setup.'\")";
+pub const NEAR_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
 pub const SENTENCE_FIRST: &str = "(Say only this, nothing before or after it: \"Now say a sentence to me from your seat, anything at all, so I get used to your voice.\")";
 pub const SENTENCE_LOUDER: &str = "(Say only this, nothing before or after it: \"Say another sentence from your seat, a little louder.\")";
 pub const SENTENCE_CLOSER: &str = "(Say only this, nothing before or after it: \"Come a little closer and say another sentence.\")";
@@ -42,13 +42,13 @@ pub const SENTENCE_DONE: &str =
 pub const SENTENCE_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't hear you well enough this time. I'll get used to your voice as we talk.\")";
 pub const GIVE_ASK: &str = "(Say only this, nothing before or after it: \"Hold my head and tilt it gently to one side. Let go when I say so.\")";
 pub const GIVE_AGAIN: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move. Hold my head and tilt it gently to one side. Let go when I say so.\")";
-pub const GIVE_FELT: &str = "(Say only this, nothing before or after it: \"I feel your hand. Tilt me a little more, then let go.\")";
+pub const GIVE_FELT: &str = "(Say only this, nothing before or after it: \"I feel your hand. Tilt me gently, then let go.\")";
 pub const GIVE_PROMPT: &str = "(Say only this, nothing before or after it: \"Hold my head and tilt it gently to one side. Let go when I say so.\")";
 pub const GIVE_MORE: &str =
     "(Say only this, nothing before or after it: \"A little more, then let go.\")";
 pub const GIVE_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, my head moved with your hand.\")";
-pub const GIVE_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move this time. That's fine, you can redo the setup later. Just say 'Hey Lamp, redo the setup.'\")";
+pub const GIVE_FAILED: &str = "(Say only this, nothing before or after it: \"I didn't feel my head move this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
 pub const PRIVACY_INVITATION: &str = "(Say only this, nothing before or after it: \"Find my privacy switch {location}. Turn it off, then back on.\" Do not explain it, claim success or ask a tool to mark privacy done.)";
 pub const WHO_CONFIRM: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)";
 pub const WHERE_YOU_SIT_SKIPPED: &str =

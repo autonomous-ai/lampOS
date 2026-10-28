@@ -715,10 +715,7 @@ fn the_steps_lines_are_the_skills() {
             GIVE_AGAIN,
             "I didn't feel my head move. Hold my head and tilt it gently to one side. Let go when I say so.",
         ),
-        (
-            GIVE_FELT,
-            "I feel your hand. Tilt me a little more, then let go.",
-        ),
+        (GIVE_FELT, "I feel your hand. Tilt me gently, then let go."),
         (GIVE_MORE, "A little more, then let go."),
         (
             GIVE_PROMPT,
@@ -727,7 +724,7 @@ fn the_steps_lines_are_the_skills() {
         (GIVE_DONE, "Got it, my head moved with your hand."),
         (
             GIVE_FAILED,
-            "I didn't feel my head move this time. That's fine, you can redo the setup later. Just say 'Hey Lamp, redo the setup.'",
+            "I didn't feel my head move this time. That's fine, you can redo the setup later. Just ask me to redo the setup.",
         ),
     ] {
         assert_eq!(said(line), words);
