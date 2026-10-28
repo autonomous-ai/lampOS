@@ -437,6 +437,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          `lamp-cloud`, which carries `messages/out` up as unasked news",
     ),
     (
+        "head-pat",
+        "an installable skill, not yet tried on a lamp (#3997, Part of #4133): it answers a pet \
+         Controls says only with `LAMP_HEAD_PET=on`, off on every lamp until the design owner \
+         and the growth lead try it",
+    ),
+    (
         "laugh-glance",
         "PARKED (#1669): dropped, the owner never asked to listen for other people laughing \
          (the lead, #1711, 21 Oct); kept, and off by being listed here",

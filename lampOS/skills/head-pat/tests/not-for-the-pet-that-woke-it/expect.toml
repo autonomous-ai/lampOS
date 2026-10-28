@@ -1,0 +1,9 @@
+# Asleep until the kept hand's wake at 19 s, the pet told apart at 19.2 s: nothing for it.
+# A later pet, at 90 s, awake for long: a line.
+clock = "10:00"
+
+[[expect]]
+at = "90s"
+within = "1s"
+call = "say"
+args = { text = ["Mm, that's nice.", "Oh, I like that.", "Hehe, that tickles.", "Aw, thank you.", "That feels good.", "Mmm. More of that, please.", "Oh, hello to you too."], priority = 8, expires_ms = 3000 }

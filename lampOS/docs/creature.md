@@ -93,6 +93,7 @@ head": nobody remembers which pad does what.
 | Keep your hand on its head, about a second | Leans a little into your hand, the eye warms and breathes slowly: pleased | #711, Expression, body |
 | Keep holding | The eye dims slowly, a visible countdown; at three seconds it goes to sleep: eye closes to a thin red line, head bows, microphones off. Let go before three seconds and it was only affection | #711, voice, Expression, body; never while onboarding is under way (#3747) |
 | Touch its head while it sleeps: a tap, or a hand that stays | Wakes: at the letting go, or after a second if the hand stays | #711, #3747 |
+| Pet its head: a hand sliding left and right, the two pads touched by turns | Leans in at a second as for a kept hand, then knows it is petted: no countdown and never sleep, however long. A short response, at most once a minute (Head pat's line, giggle or purr, the design owner's choice in the skill's file); silent asleep, in setup, in quiet hours and while it listens, thinks or speaks | #3997, #4133; `LAMP_HEAD_PET`, off until its lamp check |
 | The base strip | Nothing, for now; brightness is asked for by voice ("dimmer, please") | after the MVP |
 | Move its head by hand | Gives way, stays where you put it (it is lighting what you need), and only drifts back after a long while or when asked. A touch on the head pads while the body feels the head being pushed means nothing: no stop, no listening | #702-#703 (give-way), body, #711 |
 
@@ -215,8 +216,11 @@ What this changes in the design above:
   it; only its name, a touch, or a reminder you set.
 - **Working light:** while a person is working under it (a face close and
   still, or the light asked for), the body moves plainly and little.
-- **Touch:** three meanings only (a tap, a stroke, a hold), each answered
-  at once; a stroke answered all the while it lasts.
+- **Touch:** four meanings only (a tap, a stroke, a hold, and a pet: a
+  hand sliding left and right across the head), each answered at once; a
+  stroke answered all the while it lasts. A pet never puts it to sleep
+  (#3997, the first builder's yes; `LAMP_HEAD_PET`, off until tried on a
+  lamp).
 
 ## What Task 33 has not shown
 
