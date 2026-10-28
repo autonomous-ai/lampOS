@@ -14569,12 +14569,13 @@ fn a_head_joint_given_way_under_a_gentle_hand_is_said_as_a_hand() {
             .collect();
         (report, hand)
     };
-    // From 7 s a hand turns the roll 18 counts from where it stands
-    // (under the 30 that would ease it), at 120, and holds it there.
+    // The tester's push on lamp-29e7 at 13:48:29, the normal case: the
+    // roll turned 26 counts from its goal (2058 to 2032, under the 30 that
+    // would ease it) at 112 to 120, and held there.
     // Resting, as 29e7 was in the try: no listening tilt on the roll.
     let (report, hand) = ran(Mood::Resting, &|lamp| {
-        lamp.hand = Some((s(7), s(60), ROLL, 2_044.0 - 18.0));
-        lamp.strains = vec![(s(7), s(60), ROLL, 120)];
+        lamp.hand = Some((s(7), s(60), ROLL, 2_044.0 - 26.0));
+        lamp.strains = vec![(s(7), s(60), ROLL, 116)];
     });
     assert_eq!(report.eased, [0; 3], "under its bound: {report:?}");
     assert!(report.stalls[1] >= 1, "{report:?}");
