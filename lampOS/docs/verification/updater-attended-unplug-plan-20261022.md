@@ -50,7 +50,7 @@ planned human unplug. No receipt or missed deadline means abort, not unplug.
 - Verify executable fixed fallback, loaded/unmasked service and persistently
   enabled, active timer with the correct target, including the actual persistent
   unit files/overrides. Product readiness checks do not certify arbitrary overrides
-  ([recovery contract](../updates.md#lamp-update-switching-itself-lamp_update_self-off)).
+  ([recovery contract](../updates.md#lamp-update-switching-itself-lamp_update_self-on-for-the-product)).
   Evidence: ______.
 - Use real, distinct, qualified ARM64 updater binaries and a signed local trial
   channel. Review the installed-sequence manifest so ordinary parts/skills remain
