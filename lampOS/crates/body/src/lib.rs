@@ -54,6 +54,16 @@ pub mod trajectory;
 pub mod units;
 pub mod unplug;
 
+/// The most a lamp may raise its head's pitch stall bound to
+/// (`--head-stall-load`, `body::Limits::head_stall_load`): under the head's
+/// own load bound (240 for six steps), so a head pushed hard is still caught
+/// by that. Here, outside the Linux-only `body` module, so the binary's option
+/// is checked on every target. lamp-75c9's head stood up holds 140 short of
+/// its goal, so at 100 it was told to stop pushing 20 counts low every time it
+/// stood (28 Oct); at 230 it reached its goals with no stall in 18 minutes of
+/// following a hand.
+pub const HEAD_STALL_LOAD_MOST: u16 = 230;
+
 pub const JOINT_COUNT: usize = 5;
 /// A joint that gave way and then moved more than this many counts from
 /// where it gave way, while in a hand, was moved by the hand (`body.rs`,

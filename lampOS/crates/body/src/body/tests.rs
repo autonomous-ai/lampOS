@@ -1,5 +1,6 @@
 //! The body against five simulated servos: what it writes, where it stops.
 use super::*;
+use crate::HEAD_STALL_LOAD_MOST;
 use std::{cell::Cell, collections::VecDeque, rc::Rc};
 
 #[derive(Clone, Copy)]
@@ -6156,6 +6157,30 @@ fn a_joint_pushing_without_moving_is_told_to_stop_after_a_second_and_a_half() {
             .filter(|g| (Duration::from_secs(3)..Duration::from_secs(6)).contains(&clock_of(g)))
             .all(|g| g.goals[0] == 1_960)
     );
+}
+
+/// A head whose lamp holds more than 100 to stand (lamp-75c9's, 140 short of
+/// its goal) is told to stop pushing at the stall bound of 100, and not with
+/// its lamp's own `--head-stall-load` over that; pushed past it, it is.
+#[test]
+fn a_head_that_holds_more_to_stand_keeps_pushing_under_its_own_stall_bound() {
+    let ran = |head_stall_load: u16, load: u16| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(6));
+        lamp.short = Some((PITCH, 27.0));
+        // From a second on: a head found loaded over 170 is not started.
+        lamp.strains = vec![(Duration::from_secs(1), Duration::from_secs(60), PITCH, load)];
+        let news = || Some((Mood::Listening, 100));
+        let limits = Limits {
+            head_stall_load,
+            ..giving_way(GiveWay::Return)
+        };
+        let report = run(&mut lamp, &mut clock, limits, None, news, |_| {});
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        report.stalls
+    };
+    assert_eq!(ran(STALL_LOAD, 140), [1, 0, 0, 0, 0]);
+    assert_eq!(ran(HEAD_STALL_LOAD_MOST, 140), [0; 5]);
+    assert_eq!(ran(HEAD_STALL_LOAD_MOST, 235), [1, 0, 0, 0, 0]);
 }
 
 /// A standing shoulder that rests short of its goal and is pushed well over
