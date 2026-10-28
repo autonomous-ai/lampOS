@@ -132,3 +132,45 @@ list".
   - then the rate rule (at most one nod a sentence, a word 0.15 over its sentence, never two within 4 s), as catalogue keys for the arm hour's dense/sparse comparison;
   - on lamp-4ace: 75 nods to 10–12 a story, one settle each.
 - Row 2's lines are in `arm-hour.sh` (#2034). #1963: Third's P2 open (merge held).
+
+## 2026-10-28 — #3945, #4006, #3999, #3743
+
+The entries between 20 and 28 October are on the issues and pull requests
+themselves (#2901, #3711, #3743, #3923, #3945), and on the Queue (#2602,
+#3126, #3504, #3997).
+
+### #3945, a "Ma'am, …" said to a person is heard as the lamp's name
+
+Ready for lamp-voice: yes (#4082)
+
+- Off unless set: `LAMP_NAME_SAID_TO_A_PERSON`. It counts only with
+  `LAMP_NAME_SECOND_SIGN=on`.
+- Commit `e5b2584947`, on `thirteen/said-to-a-person`.
+- Gate:
+  - full lib 3969/19, the 19 timed tests on a loaded Mac; all 19 pass one
+    by one on the head;
+  - attention 64/0, name_near 5/0, said_to_a_person 3/0, second_sign 8/0;
+  - voice-eval switches 2/0;
+  - clippy and fmt clean.
+- lamp-c0a4, once, with a local ARM64 build of `0bd5317fe4` (the same change
+  before its rebase), as a /run drop-in: a person's "Ma'am, …" heard as the
+  name at 1.00 was held, and two "Lamp, …" calls were answered. Readings are
+  in `docs/verification/said-to-a-person-lamp-c0a4-20261028/`.
+- Not shown: more hearings of "Ma'am" (one in six raised one), and #3923's
+  played clips with the switch on.
+
+### Merged today
+
+- #4006: how_you_sound counts a call that speech to text heard (Part of
+  #3923), in train 294.
+- #3999: `LAMP_SECOND_SPEECH_TAGS` on in product (#2901), in train 285.
+- #3947: lamp-name logs its scores under the bars.
+
+### #3743, the no-Wi-Fi line
+
+Ready for lamp-voice: no
+
+- A test render of the new line from the Mac is 13.37 s, and the notice
+  loader refuses it: notices may be at most 10 s.
+- `thirteen/notice-15s` raises the limit to 15 s. A notices release with a
+  clip longer than 10 s must ship with or after a build carrying that limit.
