@@ -756,3 +756,12 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **28 Oct 02:50.** Ten's #3931 (`d111565fb`) is the lamp's reading half of signed packages. Cross-checked: a throwaway lamp-skills test (`nice`, `-j 4`) had `read_shared_package_bytes` read packages signed by Python and by JS. Both were read, `author` matched each SDK's fingerprint, and a same-length one-byte change was refused. Posted on #3931 as a cross-check, not a read. Reviewer-two is reading #3880 `6269476f1` and #3903 `bd03db072`, whose ARM64 and clippy are both green. harness-reviewer's READ-OK carries to #3910 `fdae1b51f`; Fourteen's re-read is still open.
 
 - **28 Oct 02:55.** The helper's rule for every builder, after the 02:21 OOM kill: `CARGO_BUILD_JOBS=4`, `RUST_TEST_THREADS=4`, one build or test at a time, and target folders cleared after each gate. Saved as a memory, and my scratchpad target (6.4 GB) is cleared. On `blue/sdk-skill-sign`, JS's `fetchPackage(url)` and `readCapped` follow Python's rules: https only, each redirect re-checked for https, and reading stops past 1 MiB (it cancels the stream). JS 41 passed. #3931 has READ-OKs from Eighth and Fourteen. Fourteen's P3 there: a Store package with the Store's `public` added would be labelled "not the Store", which is a lamp-side label question. Train 261 merged; Reviewer-two is still reading #3880 and #3903.
+
+## 28 Oct, 08:42
+
+- Back after the laptop's OOM kill at about 03:00; tick recreated, cargo capped.
+- #3903, #3880 (train) and #3921 (train 3933) landed.
+- #3978: the quiet_hours P3 on #3921 (door refuses with `quiet_hours`), f667a2bbb.
+- #3979: skill check reads format 2, d812878979.
+- #2811 checkpoint (delivered, row passed on 06c1) and #3710 status (not started, waits on me) posted for the lead's issue sort.
+- blue/sdk-skill-push and blue/sdk-skill-sign rebased locally on #3910 3d5f0cd0c (range-diffs =; Python 74, JS 41); not pushed, as #3910 is taking P2 changes.
