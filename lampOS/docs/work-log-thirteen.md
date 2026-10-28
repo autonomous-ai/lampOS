@@ -174,3 +174,14 @@ Ready for lamp-voice: no
   loader refuses it: notices may be at most 10 s.
 - `thirteen/notice-15s` raises the limit to 15 s. A notices release with a
   clip longer than 10 s must ship with or after a build carrying that limit.
+
+### Later on 28 Oct
+
+All merged by the train:
+- #4082: #3945's switch, off unless set, plus the Reviewer-lead's `going_on` P3 and the docs fix ARM64 caught.
+- #4094: #3743's 15 s notice limit. The notices release goes with or after it.
+- #4102 and #4110: the early-end P3 on #4006. #4110 carried the span fix that train 309 took without.
+- #4105: lamp-4ace's speech-tags numbers in switches.md.
+- #4106: Sixth's P3 on #3947.
+
+Ready for lamp-voice: nothing open.
