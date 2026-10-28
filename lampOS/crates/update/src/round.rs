@@ -28,7 +28,7 @@
 //! Without `apply` it stops after step 5 and says what it would do, having
 //! written nothing.
 use crate::{
-    apply,
+    apply, companion,
     fetch::{Channel, Fetch},
     image,
     judge::{Before, UnitState, Watch, part_of},
@@ -350,6 +350,9 @@ struct Change {
     /// A part started through its `current` link: the link, and the build
     /// it names before and after. Its unit is written only if it changes.
     link: Option<Link>,
+    /// One of a part's templates, sockets or timers (crate::companion),
+    /// not its service: its folder is its part's, and it moves nothing.
+    kind: Option<companion::Kind>,
 }
 
 /// A `current` link a switch moves.
@@ -607,7 +610,13 @@ impl Run<'_, '_> {
                 Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
             };
         }
-        let units: Vec<String> = changes.iter().map(|change| change.unit.clone()).collect();
+        // A template is never active itself, and never restarted: only its
+        // instances run.
+        let units: Vec<String> = changes
+            .iter()
+            .filter(|change| change.kind != Some(companion::Kind::Template))
+            .map(|change| change.unit.clone())
+            .collect();
         match self.world.systemd.states(&units) {
             Ok(states) => {
                 for change in &mut changes {
@@ -752,7 +761,9 @@ impl Run<'_, '_> {
         }
         let installed = installed_units(self.config)
             .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
-        let carried = self.carried_units(&manifest, &installed)?;
+        let companions = installed_companions(self.config)
+            .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
+        let carried = self.carried_units(&manifest, &installed, &companions)?;
         let taken = self.models_of(&manifest, state, &installed)?;
         let future_units: BTreeMap<String, String> = carried
             .iter()
@@ -795,6 +806,7 @@ impl Run<'_, '_> {
             self.config,
             &manifest,
             &installed,
+            &companions,
             &carried,
             &taken,
             &touched,
@@ -1273,9 +1285,32 @@ impl Run<'_, '_> {
         &mut self,
         manifest: &Manifest,
         installed: &[Installed],
+        companions: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, Outcome> {
         let mut carried = BTreeMap::new();
         for unit in &manifest.units {
+            if companion::kind(&unit.unit).is_some() {
+                // Only the product's (crate::manifest), and only where the
+                // lamp has it, belonging to a part it has.
+                let Some(ours) = owner(installed, companions, &unit.unit) else {
+                    continue;
+                };
+                let text = self.fetch_unit(manifest, unit)?;
+                let mut built = companions.clone();
+                built.insert(unit.unit.clone(), text.clone());
+                let before = &companions[&unit.unit];
+                if companion::starts(&unit.unit, &text) != companion::starts(&unit.unit, before)
+                    || owner(installed, &built, &unit.unit).map(|part| &part.unit)
+                        != Some(&ours.unit)
+                {
+                    return Err(Outcome::Refused(format!(
+                        "the product's {} does not start {} through {}current as the lamp's does",
+                        unit.unit, ours.program.binary, ours.program.builds
+                    )));
+                }
+                carried.insert(unit.unit.clone(), text);
+                continue;
+            }
             let Some(part) = installed.iter().find(|part| part.unit == unit.unit) else {
                 continue;
             };
@@ -1295,23 +1330,7 @@ impl Run<'_, '_> {
             } else if unit.lamp != self.config.lamp {
                 continue;
             }
-            let url = format!("{}{}", manifest.files_url, unit.file_name());
-            let mut bytes = Vec::new();
-            match self.world.channel.fetch(&url, unit.size, &mut bytes) {
-                Ok(_) => {}
-                Err(Fetch::Unreachable(why)) => return Err(Outcome::Unreachable(why)),
-                Err(error) => {
-                    return Err(Outcome::Refused(format!("{}: {error}", unit.file_name())));
-                }
-            }
-            if manifest::sha256_hex(&bytes) != unit.sha256 {
-                return Err(Outcome::Refused(format!(
-                    "{} does not match its SHA-256",
-                    unit.file_name()
-                )));
-            }
-            let text = String::from_utf8(bytes)
-                .map_err(|_| Outcome::Refused(format!("{} is not text", unit.file_name())))?;
+            let text = self.fetch_unit(manifest, unit)?;
             if product
                 && unit::linked(&text)
                     != Some((part.program.builds.clone(), part.program.binary.clone()))
@@ -1324,6 +1343,31 @@ impl Run<'_, '_> {
             carried.insert(unit.unit.clone(), text);
         }
         Ok(carried)
+    }
+
+    /// One unit of the build, fetched and checked against its SHA-256.
+    fn fetch_unit(
+        &mut self,
+        manifest: &Manifest,
+        unit: &manifest::Unit,
+    ) -> Result<String, Outcome> {
+        let url = format!("{}{}", manifest.files_url, unit.file_name());
+        let mut bytes = Vec::new();
+        match self.world.channel.fetch(&url, unit.size, &mut bytes) {
+            Ok(_) => {}
+            Err(Fetch::Unreachable(why)) => return Err(Outcome::Unreachable(why)),
+            Err(error) => {
+                return Err(Outcome::Refused(format!("{}: {error}", unit.file_name())));
+            }
+        }
+        if manifest::sha256_hex(&bytes) != unit.sha256 {
+            return Err(Outcome::Refused(format!(
+                "{} does not match its SHA-256",
+                unit.file_name()
+            )));
+        }
+        String::from_utf8(bytes)
+            .map_err(|_| Outcome::Refused(format!("{} is not text", unit.file_name())))
     }
 
     /// Step 5: room for a second copy of everything that changed, before
@@ -2777,6 +2821,45 @@ fn installed_units(config: &Config) -> io::Result<Vec<Installed>> {
     Ok(found)
 }
 
+/// A part's templates, sockets and timers on this lamp (crate::companion):
+/// each regular file of those names, by name. A linked one lives somewhere
+/// else, which is not this program's to change.
+fn installed_companions(config: &Config) -> io::Result<BTreeMap<String, String>> {
+    let mut found = BTreeMap::new();
+    for entry in fs::read_dir(config.on(&config.units))? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if companion::kind(&name).is_none() || !entry.file_type()?.is_file() {
+            continue;
+        }
+        found.insert(name, fs::read_to_string(entry.path())?);
+    }
+    Ok(found)
+}
+
+/// The installed part one of a part's other units on this lamp belongs to:
+/// started through its `current` link, as that unit starts it. None for
+/// one that starts no part (the keeper's) or a part not installed here.
+fn owner<'i>(
+    installed: &'i [Installed],
+    companions: &BTreeMap<String, String>,
+    name: &str,
+) -> Option<&'i Installed> {
+    let text = companions.get(name)?;
+    let lamps = |unit: &str| {
+        companions.get(unit).map(String::as_str).or_else(|| {
+            installed
+                .iter()
+                .find(|part| part.unit == unit)
+                .map(|part| part.text.as_str())
+        })
+    };
+    let (builds, binary) = companion::part(name, text, lamps)?;
+    installed.iter().find(|part| {
+        part.program.linked && part.program.builds == builds && part.program.binary == binary
+    })
+}
+
 /// The SHA-256 of a file on the lamp.
 pub(crate) fn file_sha256(path: &Path) -> io::Result<String> {
     let mut file = fs::File::open(path)?;
@@ -2888,10 +2971,12 @@ fn wants_of(
 }
 
 /// Step 4: what changes, unit by unit, in the order of a switch.
+#[allow(clippy::too_many_arguments)]
 fn plan(
     config: &Config,
     manifest: &Manifest,
     installed: &[Installed],
+    companions: &BTreeMap<String, String>,
     carried: &BTreeMap<String, String>,
     models: &[Model],
     touched: &[String],
@@ -2994,6 +3079,31 @@ fn plan(
             make,
             was_active: false,
             link,
+            kind: None,
+        });
+    }
+    // A part's templates, sockets and timers the build changes, written
+    // with the rest. Their part's folder is named, and none is made.
+    for (name, before) in companions {
+        let (Some(after), Some(owner)) = (carried.get(name), owner(installed, companions, name))
+        else {
+            continue;
+        };
+        if unit::same(after, before) {
+            continue;
+        }
+        let folder = owner.program.folder();
+        changes.push(Change {
+            unit: name.clone(),
+            part: part_of(&owner.program.binary).to_owned(),
+            before: before.clone(),
+            after: after.clone(),
+            old_folder: folder.clone(),
+            new_folder: folder,
+            make: None,
+            was_active: false,
+            link: None,
+            kind: companion::kind(name),
         });
     }
     // Refuse a graph with no safe order before installing or switching
@@ -3001,6 +3111,12 @@ fn plan(
     let mut texts: BTreeMap<&str, &str> = installed
         .iter()
         .map(|part| (part.unit.as_str(), part.text.as_str()))
+        .chain(
+            companions
+                .iter()
+                .filter(|(name, _)| owner(installed, companions, name).is_some())
+                .map(|(name, text)| (name.as_str(), text.as_str())),
+        )
         .collect();
     let rollback_order = unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))
         .map_err(|why| format!("the rollback unit order is refused: {why}"))?;

@@ -13,6 +13,7 @@
 //! and a kept file that turns one off.
 pub mod apply;
 pub mod check_units;
+pub mod companion;
 pub mod fetch;
 mod head_touch;
 pub mod image;

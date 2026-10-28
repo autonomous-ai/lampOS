@@ -32,11 +32,16 @@ pub const SCHEMA: u32 = 1;
 /// build's `models` (#1680). 3: its `settings` (#1680). 4: the image's
 /// own files, `image` (#1369). 5: the reset plan, `reset_plan` (#806).
 /// 6: ordinary product service units carried under [`PRODUCT_LAMP`].
-pub const UPDATER: u64 = 6;
+/// 7: a part's templates, sockets and timers under it too
+/// (crate::companion).
+pub const UPDATER: u64 = 7;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
 pub const PRODUCT_UNITS_UPDATER: u64 = 6;
+/// The level a build that carries a part's templates, sockets or timers
+/// needs: an older updater refuses their names, so it climbs first.
+pub const COMPANIONS_UPDATER: u64 = 7;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
@@ -801,10 +806,16 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
                 "a build with product units needs min_updater {PRODUCT_UNITS_UPDATER} or more"
             )));
         }
-        if !is_token(&unit.lamp) || !is_unit_name(&unit.unit) {
+        let companion = unit.lamp == PRODUCT_LAMP && crate::companion::kind(&unit.unit).is_some();
+        if !is_token(&unit.lamp) || !(is_unit_name(&unit.unit) || companion) {
             return Err(refused(format!(
                 "{:?} of {:?} is not a unit of a lamp",
                 unit.unit, unit.lamp
+            )));
+        }
+        if companion && manifest.min_updater.unwrap_or(1) < COMPANIONS_UPDATER {
+            return Err(refused(format!(
+                "a build with a part's templates, sockets or timers needs min_updater {COMPANIONS_UPDATER} or more"
             )));
         }
         if !units.insert((unit.lamp.as_str(), unit.unit.as_str())) {
@@ -1070,6 +1081,45 @@ mod tests {
         let (opened, kept) = open(&envelope, &public(&key)).unwrap();
         assert_eq!(opened, manifest());
         assert_eq!(kept, bytes);
+    }
+
+    #[test]
+    fn a_parts_templates_sockets_and_timers_are_only_the_products_and_need_level_seven() {
+        let key = throwaway();
+        let mut product = manifest();
+        product.units[0].lamp = PRODUCT_LAMP.into();
+        product.units[0].unit = "lamp-setup-wifi@.service".into();
+        for level in [Some(PRODUCT_UNITS_UPDATER), Some(COMPANIONS_UPDATER - 1)] {
+            product.min_updater = level;
+            let why = parse(&serde_json::to_vec(&product).unwrap()).unwrap_err().0;
+            assert!(why.contains("timers needs min_updater 7"), "{why}");
+        }
+        product.min_updater = Some(COMPANIONS_UPDATER);
+        for name in [
+            "lamp-setup-wifi@.service",
+            "lamp-setup-wifi.socket",
+            "lamp-records.timer",
+        ] {
+            product.units[0].unit = name.into();
+            parse(&serde_json::to_vec(&product).unwrap()).unwrap();
+            // A lamp's own folder carries services only.
+            let mut own = product.clone();
+            own.units[0].lamp = "lamp-4ace".into();
+            let why = parse(&serde_json::to_vec(&own).unwrap()).unwrap_err().0;
+            assert!(why.contains("is not a unit of a lamp"), "{why}");
+        }
+        for name in ["lampos.target", "lamp-x@1.service", "lampos-parts.slice"] {
+            product.units[0].unit = name.into();
+            let why = parse(&serde_json::to_vec(&product).unwrap()).unwrap_err().0;
+            assert!(why.contains("is not a unit of a lamp"), "{name}: {why}");
+        }
+        // An updater of level 6 climbs first.
+        product.units[0].unit = "lamp-records.timer".into();
+        let envelope = seal(&serde_json::to_vec(&product).unwrap(), &key).unwrap();
+        let why = open_as(&envelope, &public(&key), COMPANIONS_UPDATER - 1)
+            .unwrap_err()
+            .0;
+        assert!(why.contains("needs updater 7"), "{why}");
     }
 
     #[test]

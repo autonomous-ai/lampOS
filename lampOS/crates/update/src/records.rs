@@ -167,9 +167,10 @@ impl Journal {
         if units.len() != self.units.len()
             || saved.len() != order.len()
             || saved != units
-            || units
-                .iter()
-                .any(|name| !crate::manifest::is_unit_name(name) || *name == crate::round::OWN_UNIT)
+            || units.iter().any(|name| {
+                !(crate::manifest::is_unit_name(name) || crate::companion::kind(name).is_some())
+                    || *name == crate::round::OWN_UNIT
+            })
         {
             return Err(io::Error::other(
                 "the saved rollback order must name every changed managed unit exactly once",
