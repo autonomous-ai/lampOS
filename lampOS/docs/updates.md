@@ -1203,6 +1203,24 @@ byte-for-byte identical `lamp-update` stays refused, so a lamp seen with
 `self-refused` after an outage is waiting for a release that changes
 lamp-update, not broken.
 
+**A build put back across a reboot is tried once more** (#2810). When a
+switch begins, the round notes the build and this boot's kernel id
+(`/proc/sys/kernel/random/boot_id`) in `self-began`. A power cut or a reboot
+in the switch's 10 minutes reads to `lamp-update-back` the same as a build
+that can't run. On a lamp with no clock of its own, the clock's jump at the
+next boot can also pass the deadline before the confirming round runs.
+- **Tried once more:** a refused build whose switch began on a boot that has
+  since ended. The round moves it from `self-refused` to `self-retried`
+  (retried first, so a cut between the two leaves it refused for good), and
+  says so.
+- **Final:** a build put back on the boot it began on (it failed, or hung
+  past the deadline) stays refused, as before. So does one put back a second
+  time, or one whose boot is not known.
+- **Not covered:** a stop by hand without a reboot.
+- **Old updaters:** the rule is read by the lamp-update that runs. A lamp
+  whose own updater is older (7071's) never retries, and still waits for a
+  release that changes lamp-update.
+
 **An updater too old for a build** (#1680). When a signed build's
 `min_updater` is above this updater's `UPDATER`, the build names a
 `lamp-update` (read leniently, before the schema check), and the build is

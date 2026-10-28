@@ -61,6 +61,8 @@ mod restart_quiet;
 mod self_cuts;
 #[path = "round/self_recovery.rs"]
 mod self_recovery;
+#[path = "round/self_retry.rs"]
+mod self_retry;
 
 const CHANNEL: &str = "https://channel.test/lamp-voice/";
 
