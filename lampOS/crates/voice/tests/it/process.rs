@@ -11,6 +11,8 @@ use std::{
 
 #[test]
 fn real_worker_handshake_control_and_finite_shutdown() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
     let dir = SessionDirectory::create().unwrap();
     let boot = new_boot().unwrap();
     let mut worker = Worker::spawn(
@@ -47,6 +49,8 @@ fn real_worker_handshake_control_and_finite_shutdown() {
 /// put on the list (the one the records guard reads) fails here first.
 #[test]
 fn a_worker_role_not_on_the_voices_list_is_never_started() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
     let executable = Path::new(env!("CARGO_BIN_EXE_lamp-voice"));
     let dir = SessionDirectory::create().unwrap();
     let error = Worker::spawn(executable, &dir.path, "third", new_boot().unwrap(), &[])
@@ -82,6 +86,8 @@ fn a_worker_role_not_on_the_voices_list_is_never_started() {
 /// anything runs, so a command added there and not to the list fails here.
 #[test]
 fn every_command_the_voice_dispatches_is_on_its_list_and_no_other_runs() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
     let source = include_str!("../../src/main.rs");
     let mut dispatched = std::collections::BTreeSet::new();
     for marker in ["command==\"", "command == \""] {
@@ -123,6 +129,8 @@ fn every_command_the_voice_dispatches_is_on_its_list_and_no_other_runs() {
 /// The voice's helpers on its list are the programs it starts beside itself.
 #[test]
 fn the_voices_listed_helpers_are_the_ones_it_starts() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
     assert_eq!(
         lamp_voice_processes::HELPERS,
         [lamp_turn_end_wire::WORKER_EXECUTABLE]
@@ -138,6 +146,8 @@ fn the_voices_listed_helpers_are_the_ones_it_starts() {
 #[cfg(target_os = "linux")]
 #[test]
 fn a_worker_the_voice_starts_takes_its_roles_scheduling_on_every_thread() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
     use thread_priority::{
         NormalThreadSchedulePolicy, RealtimeThreadSchedulePolicy, ThreadPriority,
         ThreadPriorityValue, ThreadSchedulePolicy, set_thread_priority_and_policy,
