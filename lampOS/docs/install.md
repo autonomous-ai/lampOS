@@ -1203,6 +1203,10 @@ records' lock is let go at the `exec`, and the build's own `lamp-update`
 installs again: the binaries and links are already there, so it writes
 only what is missing, then the build's own units. Its own `changed`
 lines are the ones printed at the end; the first run's are not repeated.
+Between the `exec` letting the lock go and the build's own run taking it,
+a timer's round can take it first. The handed-over install then ends with
+`another lamp-update is at work` and `units not written`, changing
+nothing: run `install` again once the round is done (rare, and safe).
 A run with `LAMP_UPDATE_HANDED_OVER` set never hands over again: if the
 channel moved to a newer build between the two runs, it says `this
 lamp-update was handed this install already, so it writes its own units
