@@ -141,6 +141,24 @@ Queue, #3126). Only what differs for hardware is written here.
 Audio checks on two lamps at once are scheduled or isolated, so a lamp
 never hears another lamp's tone.
 
+## A new lamp at the factory
+
+Every lamp off the line goes through the same steps, from one Mac at the
+bench ([the hardware test README](../../robots/lamp/hardware/test/README.md),
+"Every new lamp"): flash the ship image, the camera in port 3-1.1.4,
+`factory-lamp.sh start`, the app setup, `RESET=yes factory-lamp.sh
+selftest`, `collect`, pack.
+
+**The servos come first.** A lamp whose servos never ran V1 HAL has
+neither of V1's servo settings (lamp-220c, 28 Oct): a maximum acceleration
+of 50, which the body's stand refuses, and no zero or limits of its own,
+so the head reads off its stop and lamp-4ace's stand drove lamp-220c's
+elbow into its body. `start` checks each lamp's servos before its run,
+stores V1's settings (nothing moves), and calibrates a lamp never
+calibrated with its person: each joint moved end to end by hand, the plan
+read, then written. A lamp left uncalibrated is skipped, never run. A
+servo replaced or a horn remounted is calibrated again.
+
 ## Stress tests (qualification)
 
 Stress tests can wear or damage a unit, so they run on a few qualification
@@ -194,8 +212,10 @@ The first items on the Hardware Queue, in order:
 3. **Port the hardware lead's bench scripts to V2** (a full component test
    and a burn-in). They were written for V1's runtime. On a V2 lamp they
    read through the lamp's own parts instead of stopping a service, never
-   count an unanswered question as a pass, and never write a servo
-   calibration: calibration is per lamp, in the servos' own memory.
+   count an unanswered question as a pass, and never write one lamp's servo
+   calibration into another: calibration is per lamp, in the servos' own
+   memory. A lamp's own comes only from its own hand sweep
+   (`servo-calib.py`, below).
 4. **The pilot:** 3–5 lamps by key, known-good ones and ones with a known
    fault, judged on whether faults are found and false failures avoided.
 5. **Hardware members' builders join**, and `hw-first` hands them the

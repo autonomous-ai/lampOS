@@ -129,6 +129,20 @@ sudo python3 factory-voice.py -- ./steps.sh --unit-id <ID> --write --from 4   # 
   `tools/factory-voice-test.py` tests it on a host with stand-ins (no lamp, no
   sound).
 
+## Every new lamp: the factory process
+
+The default, in this order, for every lamp off the line:
+
+1. **Flash** the ship image (the one on the Queue, its sha256 checked) and power the lamp on: it serves its `lamp-ID` hotspot.
+2. **The camera** in USB port 3-1.1.4.
+3. **`factory-lamp.sh start ID`**: the servos first. V1's settings are stored if missing (nothing moves). A lamp whose servos were never calibrated is calibrated there, with its person: fold it at rest, say yes, move each joint end to end by hand for 2 min, fold it back, read the plan, say yes. Then the unset run starts on the lamp and speaks each step: the head, the arm stand (hand on the arm), the inputs, the key, the gaze. `follow ID` watches it to `PASS unset`.
+4. **Set it up from the app.**
+5. **`RESET=yes factory-lamp.sh selftest IP`**: step 4, the self-test; a passed lamp is reset for packing.
+6. **`factory-lamp.sh collect ID…`**: every lamp's record in one table, `SERVOS` among it.
+7. Remove it from the factory account, and pack.
+
+A servo replaced or a horn remounted is calibrated again (`factory-lamp.sh calibrate ID`), then step 3 again.
+
 ## `tools/factory-lamp.sh` and `tools/factory-run.sh`: many lamps from one Mac
 
 Each lamp runs its own factory steps (`factory-run.sh`, started detached on
@@ -137,7 +151,7 @@ collects results, so one person keeps several lamps going at once:
 
 ```bash
 export LAMP_PASS=<lamp password> STEPS=<steps.sh from lamp-voice> STEPS_SHA=<its sha256> PROMPTS=prompts
-tools/factory-lamp.sh start 3e83 29e7 75c9     # unset lamps: ~20 s each over its hotspot, then the next
+tools/factory-lamp.sh start 3e83 29e7 75c9     # unset lamps: ~20 s each over its hotspot (+3 min to calibrate a new one), then the next
 tools/factory-lamp.sh follow 3e83              # optional: watch one lamp's run
 # … set every lamp up from the app (iPhone Auto-Join off) …
 RESET=yes tools/factory-lamp.sh selftest 172.168.20.180 172.168.20.189   # all at once, bench network
@@ -183,14 +197,16 @@ V1's two settings, and the stand fails without them (lamp-220c, 28 Oct):
 V1 stored the first at every start (lerobot `configure_motors`, `hal/follower/hal_follower.py`) and the second once by hand (`hal.calibrate`). All of it is in the servos' EEPROM: it survives a reflash, an update and the reset, and is redone only for a new servo or a remounted horn.
 
 ```bash
-tools/factory-lamp.sh calibrate 220c   # an unset lamp, a person at it: configure, sweep, the plan, then yes to write
+tools/factory-lamp.sh start 220c       # the default: a lamp never calibrated is calibrated first, with its person
+tools/factory-lamp.sh calibrate 220c   # on its own, after a servo or horn is changed: configure, sweep, the plan, yes
 sudo python3 servo-calib.py check      # read only: exit 0 calibrated, 3 not configured, 4 not calibrated
 ```
 
 - **Nothing is driven.** Torque must be off (lamp-body stopped); every write refuses otherwise.
 - **The sweep:** the lamp starts folded at rest, head on its stop; the person moves each joint end to end by hand (base turn, shoulder, elbow, head roll, head pitch) and folds it back. A joint moved under 400 counts refuses the plan.
 - **The plan** matches lamp-3e83: folded, the shoulder and elbow read 2047 and the head pitch 2010 (in the body's home range); yaw and roll have their swept range centred on 2047. Limits sit 30 counts inside the sweep on yaw, roll and pitch, so a joint is never sent into its hard stop; the shoulder and elbow keep 0–4095, as on lamp-3e83. lamp-220c calibrated this way stands at 2629,2564; lamp-3e83 at 2630,2562.
-- **The factory run** checks before the head is nudged: it stores V1's settings itself (nothing moves) and stops a lamp never calibrated with "factory-lamp.sh calibrate ID". Records `SERVOS` and `SERVO_OFFSETS`.
+- **`start`** checks every lamp's servos before its run and calibrates one never calibrated (`servos_ready`); a lamp left uncalibrated is skipped, never run.
+- **The factory run** checks again on the lamp before the head is nudged: it stores V1's settings itself (nothing moves) and stops a lamp never calibrated with "factory-lamp.sh calibrate ID". Records `SERVOS` and `SERVO_OFFSETS`.
 - **Test:** `tools/servo-calib-test.py` runs it against stand-in servos on a pty (no lamp).
 
 ## `tools/input-check.py`: every input in one window

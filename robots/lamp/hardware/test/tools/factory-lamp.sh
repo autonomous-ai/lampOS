@@ -6,6 +6,8 @@
 #
 #   factory-lamp.sh start ID...         lamps not set up, one after another:
 #                                       join lamp-ID's hotspot, copy the kit,
+#                                       its servos (a lamp never calibrated is
+#                                       calibrated here, by hand, ~3 min),
 #                                       start its run on the lamp, leave (~20 s)
 #   factory-lamp.sh follow ID           stay on lamp-ID's hotspot and print its
 #                                       run as it goes, until PASS or FAIL
@@ -14,8 +16,8 @@
 #                                       RESET=yes answers a passed one's reset
 #   factory-lamp.sh collect TARGET...   every lamp's record and status in one
 #                                       table ($STATE/factory-records.csv)
-#   factory-lamp.sh calibrate ID        an unset lamp whose servos were never
-#                                       calibrated, a person at it: V1's servo
+#   factory-lamp.sh calibrate ID        start's calibration on its own (after a
+#                                       servo or horn is changed): V1's servo
 #                                       settings, then a hand sweep of every
 #                                       joint, the plan shown, written on a yes
 #
@@ -47,7 +49,7 @@ STATE=${STATE:-$HOME/.factory-lamp}
 mkdir -p "$STATE/records"
 say() { echo "factory-lamp: $*"; }
 die() { echo "factory-lamp: FAILED: $*" >&2; exit 1; }
-usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 [[ $MODE =~ ^(start|follow|selftest|collect|calibrate)$ && $# -ge 1 ]] || usage
 if [[ $MODE == start || $MODE == selftest || $MODE == calibrate ]]; then
   [[ -f $STEPS ]] || die "no steps.sh at $STEPS"
@@ -128,6 +130,24 @@ bench() {  # a set-up lamp on the bench network: an IP, or lamp-ID.local; HOST a
   nc -z -G 3 "$HOST" 22 2>/dev/null
 }
 name() { lamp hostname | tail -1; }
+# The servos' own settings, in their EEPROM (servo-calib.py), before the run:
+# V1's two settings stored (nothing moves); a lamp never calibrated is
+# calibrated here with its person, who moves each joint by hand and says yes
+# to the plan. Nothing is driven. ID's kit is on the lamp; 0 when ready.
+servos_ready() {
+  local id=$1 a
+  lamp "python3 /home/orangepi/servo-calib.py check" >/dev/null && return 0
+  lamp "systemctl is-active -q lamp-body factory-run && echo BUSY" | grep -q BUSY && { say "lamp-$id: lamp-body or a factory run is driving the servos"; return 1; }
+  lamp "python3 /home/orangepi/servo-calib.py configure" >/dev/null || { say "lamp-$id: V1's servo settings were not kept"; return 1; }
+  lamp "python3 /home/orangepi/servo-calib.py check" >/dev/null && return 0
+  say "lamp-$id: its servos were never calibrated. Fold it at rest, head on its stop, and keep it still; when the sweep starts, move each joint end to end by hand (base turn, shoulder, elbow, head roll, head pitch) and fold it back within ${SWEEP_S:-120} s"
+  read -r -p "factory-lamp: start lamp-$id's sweep? [y/N] " a; [[ $a == y ]] || { say "lamp-$id: not calibrated"; return 1; }
+  ssh_once "python3 -u /home/orangepi/servo-calib.py sweep ${SWEEP_S:-120}" || { say "lamp-$id: the sweep gave no plan that fits: sweep again"; return 1; }
+  read -r -p "factory-lamp: write this plan into lamp-$id's servos? [y/N] " a; [[ $a == y ]] || { say "lamp-$id: nothing written"; return 1; }
+  lamp "python3 /home/orangepi/servo-calib.py apply" || { say "lamp-$id: the servos did not keep the plan"; return 1; }
+  lamp "python3 /home/orangepi/servo-calib.py check" >/dev/null || { say "lamp-$id: still not calibrated after the plan"; return 1; }
+  say "lamp-$id: calibrated"
+}
 unit() { echo "systemctl reset-failed factory-run >/dev/null 2>&1; systemctl is-active -q factory-run && { echo ALREADY RUNNING; exit 3; }; $*"; }
 
 case $MODE in
@@ -137,6 +157,7 @@ start)
     hotspot "$id" || { say "lamp-$id: its hotspot can't be joined (set up already, or off?)"; continue; }
     n=$(name); [[ $n == "lamp-$id" ]] || { say "lamp-$id: the lamp at $HOST says it is '$n': skipped"; continue; }
     kit || { say "lamp-$id: the kit could not be copied: skipped"; continue; }
+    servos_ready "$id" || { say "lamp-$id: skipped until its servos are calibrated (factory-lamp.sh calibrate $id)"; continue; }
     lamp "$(unit "systemd-run --unit=factory-run --collect --setenv=GAZE=${GAZE:-755,555} --setenv=NUDGE_TARGET=${NUDGE_TARGET:-2010} /home/orangepi/factory-run.sh unset $id && echo STARTED")" | grep -q STARTED \
       && say "lamp-$id: started; it says each step itself (follow: factory-lamp.sh follow $id)" \
       || say "lamp-$id: not started (a run is already going, or systemd-run failed)"
@@ -188,19 +209,13 @@ collect)
   done
   say "table: $csv" ;;
 calibrate)
-  # The servos' own settings, in their EEPROM (servo-calib.py): nothing is
-  # driven; the person moves each joint by hand and says yes to the plan.
+  # The same calibration start does, on its own: before a run, or again
+  # after a servo is replaced or a horn remounted.
   id=$1; [[ $id =~ ^[0-9a-f]{4}$ ]] || die "$id: not a lamp ID"
   hotspot "$id" || die "lamp-$id: its hotspot can't be joined (set up already, or off?)"
   [[ $(name) == "lamp-$id" ]] || die "the lamp at $HOST is not lamp-$id"
   kit || die "lamp-$id: the kit could not be copied"
-  lamp "systemctl is-active -q lamp-body factory-run && echo BUSY" | grep -q BUSY && die "lamp-$id: lamp-body or a factory run is driving the servos"
-  lamp "python3 /home/orangepi/servo-calib.py configure" || die "lamp-$id: V1's servo settings were not kept"
-  say "lamp-$id: fold it at rest, head on its stop, and keep it still; when the sweep starts, move each joint end to end by hand (base turn, shoulder, elbow, head roll, head pitch) and fold it back within ${SWEEP_S:-120} s"
-  read -r -p "factory-lamp: start the sweep? [y/N] " a; [[ $a == y ]] || die "not started"
-  ssh_once "python3 -u /home/orangepi/servo-calib.py sweep ${SWEEP_S:-120}" || die "lamp-$id: the sweep did not give a plan that fits: sweep again"
-  read -r -p "factory-lamp: write this plan into lamp-$id's servos? [y/N] " a; [[ $a == y ]] || die "nothing written"
-  lamp "python3 /home/orangepi/servo-calib.py apply" || die "lamp-$id: the servos did not keep the plan"
+  servos_ready "$id" || die "lamp-$id: not calibrated"
   lamp "python3 /home/orangepi/servo-calib.py check" | tail -2
-  say "lamp-$id: calibrated; next: factory-lamp.sh start $id" ;;
+  say "lamp-$id: next: factory-lamp.sh start $id" ;;
 esac
