@@ -1,5 +1,5 @@
 """`lamp skill check FOLDER`: a skill folder against the public skill format,
-version 1 (docs/skill-format.md), before it goes to a lamp or the Store.
+1 or 2 (docs/skill-format.md), before it goes to a lamp or the Store.
 
 It checks what can be checked off the lamp: the folder's files, SKILL.md's
 front matter, skill.toml's shape against the package's copy of

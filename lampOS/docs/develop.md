@@ -17,6 +17,8 @@ lamp.
 | step | state |
 |---|---|
 | The fake lamp, pairing, the SDKs, `lamp-mcp`, `lamp skill check` | merged |
+| `express`: a feeling as the feelings skill's own move and light | merged: #4020 |
+| `look` at `ahead` or an angle, under a body lease | pending: `ten/look` |
 | lamp-control as a product part, off by default | pending: #3876 |
 | The owner's "Add a developer computer" screen in the app | pending: a later piece of #3504 |
 | `lamp skill check` reading format 2 as the lamp does | merged: #3979 |
@@ -45,9 +47,9 @@ real pairings:
 LAMPOS_HOME=/tmp/lampos-try lamp fake
 ```
 
-It answers as a lamp does today. `gesture` and `move` are taken
-(`{"to": "body"}`). `express`, `play`, `sound`, `look` and `joints` are
-refused, in lamp-control's own words ("not routed yet: waits for …").
+It answers as a lamp does today. `gesture`, `move` and `express` are taken
+(`{"to": "body"}`). `play`, `sound`, `look` and `joints` are refused, in
+lamp-control's own words ("not routed yet: waits for …").
 `--everything` answers every op instead.
 
 ## 2. Your first program (3 minutes)
@@ -98,7 +100,7 @@ LAMPOS_HOME=/tmp/lampos-try python first.py
 
 Terminal 1 shows each request: `subscribe` (twice), `light`, `say`,
 `lease.take`, `gesture` and `lease.release`. Terminal 2 shows
-`connected to lamp-fake with ['body', 'light', 'speak', 'look', 'hear', 'sound']`,
+`connected to lamp-fake with ['body', 'light', 'speak', 'look', 'hear', 'sound', 'skills']`,
 then `heard: good night lamp` and `lease: held`.
 
 - **`hello`** is `Lamp.connect()`. It signs the lamp's nonce with this
@@ -228,7 +230,8 @@ The tools are `lamp_state`, `lamp_wait_for`, `lamp_gesture`, `lamp_light`,
 `lamp_say`, `lamp_look`, `lamp_move`, `lamp_express` and `lamp_stop`. Each
 is offered only with the grant it needs, takes its own short body lease,
 and keeps to the lamp's rates. A refusal comes back as the tool's error,
-in the lamp's words.
+in the lamp's words: until `look` lands (above), `lamp_look` is refused
+"not routed yet: waits for the body's lease socket".
 
 ## 5. A skill the lamp runs on its own (2 minutes)
 
