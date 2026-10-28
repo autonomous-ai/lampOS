@@ -31,7 +31,8 @@ pub trait Systemd {
     /// `systemctl restart`: returns once systemd has done it.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
     /// `systemctl stop`, of a unit a round added and takes away again
-    /// (crate::added). Refused unless a world can.
+    /// (crate::added): one systemd never loaded is stopped already.
+    /// Refused unless a world can.
     fn stop(&mut self, unit: &str) -> Result<(), String> {
         Err(format!("{unit} cannot be stopped here"))
     }
@@ -143,7 +144,12 @@ impl Systemd for Systemctl {
     }
 
     fn stop(&mut self, unit: &str) -> Result<(), String> {
-        run(&["stop", unit], self.restart_within)
+        // A unit systemd never loaded (its file written, the reload not
+        // reached) is stopped already: `systemctl stop` says so, exit 5.
+        match run(&["stop", unit], self.restart_within) {
+            Err(why) if why.contains("not loaded") => Ok(()),
+            done => done,
+        }
     }
 
     fn last_line(&mut self, unit: &str) -> Option<String> {
