@@ -1,3 +1,19 @@
+## 28 October 2026, 16:35 +07 — 2a landed, 2b in reads, five PRs wait on a push
+
+Ready for lamp-voice: no. #4065 waits on reads (its ARM64 and Linux Clippy are green). #3966, #3993, #4007, #4008 and #4051 are rebased and gated, but not pushed: the session's permission check refuses `--force-with-lease`, and that waits on the owner.
+
+#4047 (2a, a part's templates, sockets and timers, updater level 7) landed in train #4060 (lamp-voice `7517fe50b`). Reviewer-two's HOLD was that the publisher refuses a release asset with `@`. It was fixed in Rust, not Python: a manifest names a template `lamp-<x>.template.service`, and the round gives it back its `@` on the lamp. The publisher's CLI rehearsal passed locally.
+
+#4065 (2b, updater level 8): a round adds the product units `install` puts on a lamp that the lamp lacks, including a part new to it. Only on a lamp installed as the product (a managed updater, every part through its `current` link), and only units whose users the lamp has. Each is enabled as `install` enables it, by the links its `[Install]` asks for. The Reviewer-lead's P1 was that the first head started an added unit and watched it. A unit that ends at once (the waking face) would then put every build back and stick the lamp. Fixed in `54ec10f000`: an added unit is enabled for the next start and never started, as install leaves it. Also fixed: P2 (a stop of a unit never loaded is done), the P3s, and Fourth's two P3s (an enabling link already there is left both ways; the shadowing note). Mac gate: 644 passed, 0 failed.
+
+#4051 (jarvis's P3 on #4009): `ready` takes the records lock, and the lock knows its folder. It has jarvis's READ-OK and the Reviewer-lead's no-finding read.
+
+Rebased onto `7517fe50b` and gated: #3966 `86e2d9a232` (641/0), #3993 `84fb14ef43` (649/0), #4007 `74d44c3f14` (645/0), #4008 `e4a14df5c4` (642/0), #4051 `fb72b4ee04` (634/0). Each is the same patch as the one read.
+
+#2810: "every refused updater build gets one more try" broke eight tests whose point is that a build put back is never taken again. It's parked as a local commit. Proposed on the Queue (16:0x): retry once only if a reboot came between the switch's begin and its put-back (boot id), and a second put-back is final.
+
+#3689 item 1: still no answer from First on plan A or plan B (asked 09:59). Posted at 16:0x: plan A from 18:00 unless First says otherwise. Found while starting it: the round holds the records lock while it starts the writer's unit, so `writer-refresh` can't take it. Plan: a request in the records, written by the round under its lock, names the build `ready` passed.
+
 ## 28 October 2026, 13:35 +07 — #4009 landed, four rebased, item 2a opened
 
 Ready for lamp-voice: yes (#4007, two READ-OKs, once its rebased head is pushed); no (#3966, #3993 and #4008 wait on their rebased heads and a second read; #4047 is new and waits on reads and CI).
