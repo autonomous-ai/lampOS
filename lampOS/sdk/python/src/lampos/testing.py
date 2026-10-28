@@ -63,12 +63,19 @@ def _certificate() -> tuple[bytes, bytes]:
     return cert.public_bytes(serialization.Encoding.PEM), pem_key
 
 
+# `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
+LOOK_WAITS = {
+    "face": "not routed yet: waits for the body following a face under a lease",
+    "name": "not routed yet: waits for who's who",
+}
+
 # What lamp-control refuses today, in its own words (crates/control/src/
 # parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
 # lamp does now. `lamp fake` does.
 LAMP_CONTROL_REFUSES = {
-    "look": "not routed yet: waits for the body's lease socket",
-    "joints": "not routed yet: waits for the body's lease socket",
+    # No product unit passes --lease-socket yet (docs/control.md).
+    "look": "the body's lease socket is not on here",
+    "joints": "not routed yet: waits for a goal stream on the body's lease socket",
     "play": "not routed yet: waits for client packages",
     "sound": "not routed yet: waits for client packages",
 }
@@ -211,12 +218,12 @@ class FakeLamp:
 
     async def done(self, re: int, how: str = "finished", why: str | None = None) -> None:
         """End the action whose request id was `re`, to the client that asked."""
+        await self._send_done(re, {"how": how} if why is None else {"how": how, "why": why})
+
+    async def _send_done(self, re: int, fields: dict[str, Any]) -> None:
         ws = self._asker.get(re)
         if ws is not None:
-            event: dict[str, Any] = {"ev": "done", "re": re, "how": how}
-            if why is not None:
-                event["why"] = why
-            await ws.send(json.dumps(event))
+            await ws.send(json.dumps({"ev": "done", "re": re, **fields}))
 
     # The protocol.
 
@@ -368,6 +375,21 @@ class FakeLamp:
                 await self._refuse(ws, id_, "bad_request", "feeling: one of glad, lively, low")
                 return
             await self._ok(ws, id_, to="body", move=_feeling_move(request), light=True)
+        elif op == "look":
+            # As lamp-control with --lease-socket (parts.rs `look`): `face`
+            # and `name` aren't routed; `hand` is followed until a stop,
+            # another look or the lease ends, so no `done` follows it; the
+            # body takes the rest, and its `done` says where the head got to.
+            if isinstance(request["at"], str) and request["at"] in LOOK_WAITS:
+                await self._refuse(ws, id_, "refused", LOOK_WAITS[request["at"]])
+                return
+            if request["at"] == "hand":
+                await self._ok(ws, id_, to="body", follow="hand")
+                return
+            await self._ok(ws, id_, to="body")
+            if self.auto_done:
+                at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
+                await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
         elif op == "say":
             # As lamp-control: the voice takes it, and its `done` follows.
             await self._ok(ws, id_, to="voice")
