@@ -5852,6 +5852,41 @@ fn a_slow_call_whose_pause_ended_early_keeps_its_start() {
     );
 }
 
+/// The Reviewer-lead on #4006 (P3): a call's line whose end went early
+/// (`--early-end-ms`) and was not given up told the step it ended twice,
+/// at the early end and again at its End. Told once, at the early end, a
+/// try never waits again for words already on their way.
+#[test]
+fn a_call_line_ended_early_tells_the_step_its_end_once() {
+    let _one = super::pilot_faults::one_session();
+    TEST_LINE_ENDS.with(|ends| ends.set(0));
+    let run = run(Script {
+        second: false,
+        only: true,
+        near_window_ms: Some(0),
+        early_end_blocks: Some(20),
+        second_hears: Some("Hey Lamp"),
+        heard_as_call: true,
+        // Its words never come back, so its End finds its place still
+        // held; the scenario ends at its limit.
+        heard_as_call_late: true,
+        ..Script::question(Live::Answer(12))
+    });
+    let early = run.events("early_end");
+    assert_eq!(early.len(), 1, "{}", run.summary());
+    let continued = run
+        .events("input_admitted")
+        .into_iter()
+        .any(|row| row["admission_basis"] == "continued_after_early_end");
+    assert!(!continued, "{}", run.summary());
+    assert_eq!(
+        TEST_LINE_ENDS.with(|ends| ends.get()),
+        1,
+        "{}",
+        run.summary()
+    );
+}
+
 /// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):
 /// with the second route alone, a line whose words end before a name ("Hey
 /// Lamp, my name is"), its answer held, and speech again as soon as its End
