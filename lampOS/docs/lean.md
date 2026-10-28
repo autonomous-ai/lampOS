@@ -2,10 +2,13 @@
 
 `lamp-lean` computes the modelled centre of mass of five lamp joints and its
 signed distance from the base's footprint after an inward margin. It is an
-arithmetic library with no motor access, service, environment switch or Body
-wiring. Nothing in this addition changes how the lamp moves. A future caller
-must explicitly enable integration after measuring its unit and qualifying
-that integration.
+arithmetic library with no motor access, service or environment switch of its
+own. Body uses its model for V1's anti-tip rule only
+([`crates/body/src/cog.rs`](../crates/body/src/cog.rs), with the first
+software's model `deploy/lamp-4ace/lean-first-software.json` and V1's own
+limits; [body.md](body.md), "Not tipping over"). The footprint check below
+(`check_pose`, `check_movement`, `check_clip`) has no caller: one must enable
+it explicitly after measuring its unit and qualifying that integration.
 
 The supplied geometry is a **wholly synthetic stand-in**, not lamp-4ace's
 measurements or V1's estimated masses and limits. Passing with it proves only
@@ -193,14 +196,14 @@ This mathematical bound does not qualify servo tracking, lag or overshoot.
 
 The first builder owns integration. Preflight a standing transition or clip
 before its first movement, then check the combined target at the motor boundary.
-Body rounds final goals at [body.rs](../crates/body/src/body.rs), currently
-line 1702, before `send_goals` at 1710. Combine head and arm into all five
+Body rounds final goals in [body.rs](../crates/body/src/body.rs) before
+`send_goals`, which it calls from four places today. Combine head and arm into all five
 canonical coordinates. When the arm is not written, use fresh observed arm
 positions, not zeros or an assumed posture.
 
 The helper and rest, relaxation, cancellation and fault callers need explicit
-decisions too: currently `body.rs` lines 791, 1755, 1801, 2047 and 2063, and
-the startup hold at 1144. Rejecting every write from an already outside pose
+decisions too: each is one of `send_goals`' callers in `body.rs`, the startup
+hold among them. Rejecting every write from an already outside pose
 could prevent holding or stopping a push. Lean does not invent a recovery
 movement. The separate guarded controller has preflight and goal boundaries
 in [control.rs](../crates/body/src/control.rs), currently lines 759, 882 and
@@ -499,7 +502,7 @@ software's calibration kept on lamp-4ace
 (`/root/bootstrap/rollback/hal.previous/calibration/robots/hal_follower/hal.json`,
 dated 2026-08-21). Given the same angles, this check and the first
 software's own function put the centre of mass in the same place to within
-0.02 mm over 42 poses (the two rest and standing readings and 40 drawn at
+0.03 mm over 42 poses (the two rest and standing readings and 40 drawn at
 random); [a test](../crates/lean/tests/it/first_software.rs) keeps four of them.
 That shows the conversion is right. It does not make the file the lamp:
 
