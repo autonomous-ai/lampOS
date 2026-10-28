@@ -363,9 +363,18 @@ fn a_call_heard_only_by_text_counts_with_its_rise_and_says_so() {
     let judged = judge(&mut walk, &prompt);
     assert_eq!(judged["accepted"], false, "{judged}");
     assert_eq!(walk.kept().near_call_tries.len(), 1);
+    // A line given up at a pause and going on is told twice from one
+    // start: one line, one call.
+    let prompt = play(&mut walk, 60 * S, 1_760_000_060_000, 4);
+    room(&mut walk, &prompt, 2_400, 21.0);
+    by_text(&mut walk, &prompt, 2_000);
+    by_text(&mut walk, &prompt, 2_000);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["said"], json!([2_000]));
     // Outside a try's window the step takes no line.
     assert_eq!(
-        walk.near_text_call(70 * S, 70 * S + 600_000),
+        walk.near_text_call(80 * S, 80 * S + 600_000),
         Err("no call's try is open")
     );
 }

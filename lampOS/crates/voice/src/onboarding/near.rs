@@ -345,6 +345,16 @@ impl NearFlow {
             .call_unix_ms(ended_us.max(began_us))
             .map_or(began_ms, |(at, _)| at);
         self.awaited = None;
+        // A line given up at a pause and going on (a slow "Hey, … Lamp")
+        // keeps its start: its two words-backs are one line, not two calls.
+        if let Some(Seen::Said(line)) = self
+            .seen
+            .iter_mut()
+            .find(|seen| matches!(seen, Seen::Said(line) if line.began_ms == began_ms))
+        {
+            line.ended_ms = line.ended_ms.max(line_ended_ms);
+            return Ok(began_ms);
+        }
         if self.seen.len() >= MOST_SEEN {
             self.seen.remove(0);
         }
@@ -576,7 +586,8 @@ impl Onboarding {
             || self.near.listening.is_some()
     }
 
-    /// Bounded evidence, kept only while this step is led. Restart and
+    /// Bounded evidence, kept only while this step collects (`collecting`:
+    /// led, or a prompt of its own claimed or its try open). Restart and
     /// invalid evidence spoil a try being listened for.
     pub(crate) fn near_seen(&mut self, seen: Seen) {
         if !self.collecting() {
@@ -885,14 +896,14 @@ impl Onboarding {
         self.near.call_words_back(began_us);
     }
 
-    /// [`NearFlow::call_line_ended`], while this step is led.
+    /// [`NearFlow::call_line_ended`], while this step collects (`collecting`).
     pub(crate) fn near_call_line_ended(&mut self, began_us: u64) {
         if self.collecting() {
             self.near.call_line_ended(began_us);
         }
     }
 
-    /// [`NearFlow::waits_for_call`], while this step is led.
+    /// [`NearFlow::waits_for_call`], while this step collects (`collecting`).
     pub(crate) fn near_waits_for_call(&self) -> bool {
         self.collecting() && self.near.waits_for_call()
     }
