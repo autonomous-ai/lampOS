@@ -248,7 +248,8 @@ sudo python3 ring-check.py --within 2    # a stricter bound
   - Each of the self-test's ten colours is asked for exactly as lamp-selftest asks: `lamp_msgs/Light` on `light/test`, level 3, asked again every second.
   - It is seen on `light/drawn`, from the ring owner's own write receipts.
   - The bus is spoken directly (docs/bus.md), because the image has no `lamp-bus` binary.
-- **Records** `RING` and `RING_DRAW_S`, each colour's time.
+- **The warm-up:** the ring is busy for 10–15 s after lamp-selftest ends (lamp-220c, 28 Oct: whichever colours came first were late or never drawn, a different set each run, every later one in 0.02–0.04 s). So one colour (`warm`) is asked for first, until drawn, 15 s at most (`--warmup`), and not judged; then each of the ten within 4 s as before. A ring that never draws still fails.
+- **Records** `RING`, `RING_DRAW_S` (each colour's time) and `RING_WARMUP_S`.
 - **Exit:** 0 all in time, 1 some not, 3 none drawn (the privacy switch closed, or a turn owns the ring).
 - **Test:** `tools/ring-check-test.py` tests it against a stand-in ring owner (no lamp).
 
