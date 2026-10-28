@@ -62,7 +62,7 @@ function files(folder) {
 // of its 32 bytes (lamp-update's `manifest::fingerprint`).
 export const fingerprint = (publicBytes) => sha256(publicBytes).slice(0, 16);
 
-const rawPublic = (key) => {
+export const rawPublic = (key) => {
   const der = createPublicKey(key).export({ type: 'spki', format: 'der' });
   return der.subarray(der.length - 32);
 };

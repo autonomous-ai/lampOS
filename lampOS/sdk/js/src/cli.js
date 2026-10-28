@@ -5,10 +5,12 @@
 //   lamp hello [LAMP_ID]
 //   lamp fake [--every 10] [--cycles N]
 //   lamp skill push FOLDER [LAMP_ID] | lamp skill list [LAMP_ID] | lamp skill remove NAME [LAMP_ID]
-//   lamp skill install FILE|URL [LAMP_ID] [--yes]
+//   lamp skill install FILE|URL|NAME [LAMP_ID] [--from INDEX] [--yes]
+//   lamp skill index make NAME PACKAGE... --url-base URL --seq N | add URL | list | remove NAME
+//   lamp skill browse [QUERY]
 //   lamp skill keygen | lamp skill pack FOLDER [--sign] [--out DIR] | lamp skill check PACKAGE.tar
 import { createPublicKey } from 'node:crypto';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
@@ -18,12 +20,13 @@ import { PORT } from './schema.js';
 import { fake } from './fake.js';
 import { LampError } from './errors.js';
 import { Keyring } from './keys.js';
-import { GRANTS_ASKED, PACKAGE_MAX, asksOf, fetchPackage, fingerprint, openPackage, pack } from './push.js';
+import { GRANTS_ASKED, asksOf, fingerprint, openPackage, pack } from './push.js';
+import { Indexes, find as findInIndexes, makeIndex, openIndex, readSource, refresh } from './indexes.js';
 import { parse as parseToml } from 'smol-toml';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, sign: { type: 'boolean' }, out: { type: 'string' }, yes: { type: 'boolean' } },
+  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, sign: { type: 'boolean' }, out: { type: 'string' }, yes: { type: 'boolean' }, 'url-base': { type: 'string' }, seq: { type: 'string' }, from: { type: 'string' } },
 });
 const [command, arg, third, fourth] = positionals;
 
@@ -65,6 +68,15 @@ async function main() {
     }
   } else if (command === 'skill' && arg === 'install' && third) {
     return install(third, fourth);
+  } else if (command === 'skill' && arg === 'index' && third) {
+    return index(third, positionals.slice(3));
+  } else if (command === 'skill' && arg === 'browse') {
+    const query = (third ?? '').toLowerCase();
+    for (const listing of await refresh(new Indexes(new Keyring().folder))) {
+      for (const entry of listing.skills) {
+        if (entry.name.toLowerCase().includes(query)) console.log(`${entry.name}\t${entry.version}\tsigned by key ${entry.author}\tasks ${entry.asks.join(', ') || 'nothing'}\tindex ${listing.name}`);
+      }
+    }
   } else if (command === 'skill' && arg === 'keygen') {
     const ring = new Keyring();
     const made = !ring.authorKey();
@@ -100,7 +112,52 @@ async function main() {
     console.log(`${lamp.info.id}: grants ${lamp.grants.join(', ')}`);
     await lamp.close();
   } else {
-    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] | lamp skill push FOLDER | list | remove NAME [LAMP_ID] | lamp skill install FILE|URL [LAMP_ID] [--yes] | lamp skill keygen | pack FOLDER [--sign] [--out DIR] | check PACKAGE.tar');
+    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] | lamp skill push FOLDER | list | remove NAME [LAMP_ID] | lamp skill install FILE|URL|NAME [LAMP_ID] [--from INDEX] [--yes] | lamp skill index make|add|list|remove | lamp skill browse [QUERY] | lamp skill keygen | pack FOLDER [--sign] [--out DIR] | check PACKAGE.tar');
+    return 2;
+  }
+  return 0;
+}
+
+// Integrity, not trust: anyone can make a key (Fourteen, #3504).
+const showIndex = (listing) => console.log(`index ${listing.name}, published by key ${listing.publisher}, not the Store, seq ${listing.seq}, ${listing.skills.length} skills`);
+
+async function ask(question) {
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = (await prompt.question(question)).trim().toLowerCase();
+  prompt.close();
+  return answer === 'y' || answer === 'yes';
+}
+
+async function index(sub, rest) {
+  const indexes = new Indexes(new Keyring().folder);
+  if (sub === 'make' && rest.length >= 2 && values['url-base'] && values.seq !== undefined) {
+    const publisher = new Keyring().authorKey();
+    if (!publisher) throw new LampError('no author key to publish with: make one with `lamp skill keygen`', { code: 'bad_request' });
+    const packages = [];
+    for (const path of rest.slice(1)) packages.push(await readSource(path));
+    const data = makeIndex(rest[0], packages, values['url-base'], Number(values.seq), publisher);
+    const out = values.out ?? 'lamp-index.json';
+    writeFileSync(out, data);
+    showIndex(openIndex(data));
+    console.log(`written to ${out}`);
+  } else if (sub === 'add' && rest[0]) {
+    const listing = openIndex(await readSource(rest[0]));
+    const held = indexes.all()[listing.name];
+    if (held && held.public !== listing.public) throw new LampError(`an index named ${listing.name} is kept already, by key ${held.key}: remove it first`, { code: 'refused' });
+    showIndex(listing);
+    if (!values.yes && !(await ask(`Keep index ${listing.name}, and trust only key ${listing.publisher} to change it? [y/N] `))) {
+      console.log('not added');
+      return 1;
+    }
+    indexes.keep(rest[0], listing);
+    console.log(`index ${listing.name} added`);
+  } else if (sub === 'list') {
+    for (const [name, held] of Object.entries(indexes.all()).sort()) console.log(`${name}\tkey ${held.key}\tseq ${held.seq}\t${held.url}`);
+  } else if (sub === 'remove' && rest[0]) {
+    indexes.remove(rest[0]);
+    console.log(`index ${rest[0]} removed`);
+  } else {
+    console.error('usage: lamp skill index make NAME PACKAGE... --url-base URL --seq N [--out FILE] | add URL [--yes] | list | remove NAME');
     return 2;
   }
   return 0;
@@ -108,12 +165,14 @@ async function main() {
 
 async function install(source, lampId) {
   let data;
-  // A URL is fetched over https only; anything else is a file here.
-  if (source.includes('://')) {
-    data = await fetchPackage(source);
+  // A URL is fetched over https only; a file here is read; a skill's name is
+  // looked up in the indexes kept here and checked against its entry.
+  if (!source.includes('://') && !existsSync(source) && /^[a-z0-9-]{1,64}$/.test(source)) {
+    const found = await findInIndexes(new Indexes(new Keyring().folder), source, { fromIndex: values.from });
+    console.log(`from index ${found.listing.name}, published by key ${found.listing.publisher}, not the Store`);
+    data = found.data;
   } else {
-    if (statSync(source).size > PACKAGE_MAX) throw new LampError(`${source}: a shared skill is 1 MiB at most`, { code: 'bad_request' });
-    data = readFileSync(source);
+    data = await readSource(source);
   }
   const opened = openPackage(data);
   let asks = [];
@@ -127,14 +186,9 @@ async function install(source, lampId) {
   console.log(opened.author ? `  signed by key ${opened.author}, not the Store` : '  not signed, not the Store');
   for (const ask of asks) console.log(`  it ${GRANTS_ASKED[ask]} (${ask})`);
   if (asks.includes('camera')) console.log("  It asks for the camera's picture: the lamp keeps it off until the owner says yes in the app.");
-  if (!values.yes) {
-    const prompt = createInterface({ input: process.stdin, output: process.stdout });
-    const answer = (await prompt.question(`Put ${opened.name} on your lamp? [y/N] `)).trim().toLowerCase();
-    prompt.close();
-    if (answer !== 'y' && answer !== 'yes') {
-      console.log('not installed');
-      return 1;
-    }
+  if (!values.yes && !(await ask(`Put ${opened.name} on your lamp? [y/N] `))) {
+    console.log('not installed');
+    return 1;
   }
   const lamp = await Lamp.connect(lampId);
   try {

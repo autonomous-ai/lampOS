@@ -146,3 +146,22 @@ keeps off until the owner says yes in the app), asks you yes once (`--yes` skips
 it as `skill.push` with `asks` on part 0. In code, `lamp.installPackage(bytes)`
 and `asksOf(rules)`. The skill is held to your pairing's grants whatever it
 asks.
+
+### Indexes: lists of shared skills
+
+An index is a signed list of signed packages that anyone can host: a gist, a
+folder, a LAN share. It grants nothing, and nothing of it runs on the lamp:
+
+```sh
+lamp skill index make desk-things *.tar --url-base https://example.org/desk/ --seq 1   # publish: lamp-index.json, signed
+lamp skill index add https://example.org/desk/lamp-index.json   # keep it; pins its publisher's key, asking once
+lamp skill browse wave                                            # what your indexes list now
+lamp skill install desk-wave                                      # by name, from the index that lists it
+```
+
+The index is fetched as a package is: https only, 1 MiB at most. It must be
+signed by the key pinned when you added it, and never with a lower `seq` than
+the last one seen. `install NAME` fetches the entry's package and refuses it
+unless its SHA-256, size, signer and asks are the entry's. Then it asks you
+yes as for any shared package. A publisher is shown as "published by key
+FPR16, not the Store", never "verified".
