@@ -19,6 +19,8 @@
   .error { color: var(--bad); }
   .hint { font-size: 14px; color: var(--soft); margin-top: 6px; }
   [hidden] { display: none !important; }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin: 20px 0 0; font-weight: 600; }
+  .check input { width: auto; margin: 3px 0 0; }
 </style>
 </head>
 <body>
@@ -39,6 +41,8 @@
     <label for="name">Your name</label>
     <input id="name" maxlength="64" autocomplete="given-name">
     <div class="hint" id="zone-hint"></div>
+    <label class="check" for="reports"><input id="reports" type="checkbox"> Send health and crash reports</label>
+    <div class="hint">Numbers about how your lamp is running, and which part stopped if one does, to help us fix it. Never anything said, seen or kept. You can stop them any time from the app, or by asking the lamp.</div>
     <div class="error" id="form-error" role="alert"></div>
     <button id="go" type="button">Set up</button>
   </section>
@@ -172,6 +176,8 @@ $("go").addEventListener("click", async () => {
         device_id: params.get("device_id") || "",
         name: $("name").value,
         timezone: zone,
+        // A yes only when ticked; unticked, nothing is ever sent (#2862).
+        share_reports: $("reports").checked,
       }),
     });
   } catch (e) {

@@ -198,3 +198,19 @@ pub fn router(shared: Arc<Shared>) -> Router {
     }
     router.with_state(shared)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PAGE;
+
+    /// #2862: the lamp's own setup page asks about reports, with the box
+    /// unticked, and sends `share_reports` only from that box.
+    #[test]
+    fn the_setup_page_asks_about_reports_unticked_and_sends_only_the_box() {
+        assert!(PAGE.contains("<input id=\"reports\" type=\"checkbox\">"));
+        assert!(!PAGE.contains("id=\"reports\" type=\"checkbox\" checked"));
+        assert!(PAGE.contains("Send health and crash reports"));
+        assert!(PAGE.contains("share_reports: $(\"reports\").checked,"));
+        assert_eq!(PAGE.matches("share_reports").count(), 1);
+    }
+}
