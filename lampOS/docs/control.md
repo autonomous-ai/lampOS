@@ -370,8 +370,8 @@ connection closed), `slumped` (the body gave way under load and let go). Ids are
 {"id":12,"op":"joints","lease":"l_81","targets":{"pitch":4.0,"yaw":-12.0},"within_ms":300}
 {"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}
 {"id":14,"op":"say","text":"Build passed."}
-{"id":16,"op":"play","name":"wave"}
-{"id":17,"op":"sound","name":"chime"}
+{"id":16,"op":"play","name":"sway"}
+{"id":17,"op":"sound","name":"hum"}
 {"id":15,"op":"stop"}
 ```
 
