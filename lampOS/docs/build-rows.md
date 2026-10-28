@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-28 05:30 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-28 09:24 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 87.9% over 75 rows. Quality 67.5% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 88.6% over 75 rows. Quality 67.8% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -27,7 +27,7 @@ Written by the first builder from the team's review page at 2026-10-28 05:30 (+0
 | Sleep, and waking on its name | 1.00 | #749 #714 | fourth, second |  |
 | Reminders, timers, memory across days | 1.00 | #748 #743 | — |  |
 | Setup for a home, 5 s reset | 0.95 | #806 #1209 #2861 #3579 | first, el | 26 Oct 20:3x, up from 0.85: shown on lamp-52e6 with build 7071 (the lead’s agent, 20:10–20:28). |
-| A safe shutdown from the app and a long press | 0.00 | #3697 #3698 | — | 27 Oct 12:4x, new: the lead asked for it (#1711): today the only way to turn a lamp off is to pull the plug, which can corrupt the SD card. |
+| A safe shutdown from the app and a long press | 0.50 | #3697 #3698 #3713 #3735 | — | 28 Oct 09:3x, up from 0: the lamp side landed in train 283 (#3713, 09:14). |
 | Touch strip and head pads | 0.95 | #711 #1362 #2445 #2460 #2857 | first, third, fifth | 27 Oct 15:1x: found on the tester’s 7071 lamps: a hand kept 3 s put the lamp to sleep unsaid, in onboarding’s touch and giving-way steps, and they reset it (#3747, #3749). |
 | Two people at the lamp | 1.00 | #829 #1158 #1278 | fourth | All merged: day and night bars (#1158, 11:49) and a follow-up within 20 s told it may follow on (#1278, 13:57). |
 | “Stop” over its own voice | 1.00 | #828 #1047 #1264 | fourth | Built: stop words heard over its voice (#1047, 09:11) and listening gaps in its pauses (#1264, 11:52), both off until measured. |
@@ -104,7 +104,7 @@ Written by the first builder from the team's review page at 2026-10-28 05:30 (+0
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.82 | 0.85 | 26 Oct 14:5x, up from 0.8: on 6999 every reminder set was said: one cut off by people talking is offered again and said (#3523, Third), and the next one triggers the reminders skill again, so no 10 s wait. |
-| Onboarding, as a first-time person meets it | 0.45 | 0.90 | 27 Oct 18:0x, new row, scored honestly: the tester could not get through onboarding three times on two 7071 lamps (3e83, 29e7). |
+| Onboarding, as a first-time person meets it | 0.50 | 0.90 | 28 Oct 09:3x, up from 0.45: the tester’s two runs on 29e7 (8001): five of six steps done in the second, and giving way passed on the first push in the first. |
 | Remembers you: your name and what you told it | 0.65 | 0.90 | 28 Oct 05:3x, back up from 0.6: stable 7887 has Friday’s fast forget (#3871): on lamp-4ace a targeted forget answered in 375 ms and the lamp said “Gone”; |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
