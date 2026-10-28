@@ -2918,12 +2918,12 @@ pub fn serve(
         }
         // A hearing at the line's start is no second sign of its own on a
         // line said to a person ("Ma'am, …"), and a conversation going on
-        // is one (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
+        // gives back only that start (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
         if std::env::var(crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT)
             .is_ok_and(|value| value == "on")
         {
             eprintln!(
-                "lamp-voice second: with a second sign of the lamp's name asked, a hearing at the line's start counts for nothing alone when the line's first word, set off, is said to a person, and a conversation going on counts as one (LAMP_NAME_SAID_TO_A_PERSON)"
+                "lamp-voice second: with a second sign of the lamp's name asked, a hearing at the line's start counts for nothing alone when the line's first word, set off, is said to a person, unless a conversation is going on (LAMP_NAME_SAID_TO_A_PERSON)"
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.attention.hold_a_start_said_to_a_person(true);

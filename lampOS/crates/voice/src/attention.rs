@@ -1277,8 +1277,12 @@ impl Attention {
         } else {
             called(&self.heard)
         };
-        let start_counts = self.named_at_start && self.start_said_to_a_person().is_none();
-        let going_on = going_on && self.name_said_to_a_person;
+        let said_to_a_person = self.named_at_start && self.start_said_to_a_person().is_some();
+        let start_counts = self.named_at_start && !said_to_a_person;
+        // A conversation going on gives back only the start this switch
+        // held, never a second sign for other lines (#1722's rule; the
+        // Reviewer-lead's P3 on #4082).
+        let going_on = going_on && said_to_a_person;
         let alone = self.name_second_sign
             && self.named
             && !(turned == Some(true)
@@ -5019,6 +5023,15 @@ mod tests {
         attention.ask_a_second_sign_of_the_name(true);
         attention.began_at(1, 1, began);
         attention.name_heard_scored(began + 2_000_000, 0.996);
+        assert!(attention.weigh_the_name(None, true));
+        // With it, a conversation going on gives back only a held start: a
+        // hearing later in the line is still dropped, as before.
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.hold_a_start_said_to_a_person(true);
+        attention.began_at(1, 1, began);
+        attention.name_heard_scored(began + 2_000_000, 0.996);
+        attention.heard("Could you pass me the salt please?");
         assert!(attention.weigh_the_name(None, true));
         // Any other first word keeps the start's sign.
         for line in [

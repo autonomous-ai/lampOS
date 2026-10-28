@@ -2380,9 +2380,10 @@ by a comma or a stop, or the whole line), is one said to a person
 sweetie, babe, dude, bro, buddy, guys, compared lower case with the
 apostrophe kept, a curly one read as a straight one. Every other second
 sign still lets it count: a face turned to the lamp, said close to it or
-to it from close, its words calling it, and, with this switch only, a
-conversation with the lamp going on (`Signs::going_on`, passed to
-`Attention::weigh_the_name`). Held, the line is judged as one with no
+to it from close, its words calling it, and, with this switch only and only
+for a start it held, a conversation with the lamp going on
+(`Signs::going_on`, passed to `Attention::weigh_the_name`); for every other
+line a conversation going on is no second sign, as #1722 has it. Held, the line is judged as one with no
 name, and the journal says `its first word, set off, is said to a person
 ("ma'am"), and nothing else shows it was called: not counted
 (LAMP_NAME_SAID_TO_A_PERSON)`, with the word from the list and where the
