@@ -35,7 +35,7 @@ use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority}
 use serde_json::{Value, json};
 
 use crate::feelings;
-use crate::protocol::{Error, ErrorCode, Op, Pattern, StateKind};
+use crate::protocol::{Error, ErrorCode, LookAt, LookTarget, Op, Pattern, StateKind};
 use crate::session::Parts;
 
 /// How long a `say` may wait to begin before the voice lets it go.
@@ -79,6 +79,10 @@ pub struct Lamp {
     /// `until_us` is read against: not the door's own, which starts with
     /// lamp-control (the Reviewer-lead's P2 on #3805).
     clock: fn() -> u64,
+    /// Whether the body follows the hand in view while the lease holds,
+    /// told to it on the lease socket (`crate::body_lease`); none without
+    /// one.
+    follow: Option<crate::body_lease::Follower>,
 }
 
 impl Lamp {
@@ -103,12 +107,19 @@ impl Lamp {
                 .and_then(|socket| socket.set_nonblocking(true).map(|()| socket))
                 .ok(),
             clock: lamp_ipc::monotonic_us,
+            follow: None,
         }
     }
 
     /// Another clock for claims, for tests.
     pub fn with_clock(mut self, clock: fn() -> u64) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// `look` at `hand` follows it, through the body's lease socket.
+    pub fn following(mut self, follow: crate::body_lease::Follower) -> Self {
+        self.follow = Some(follow);
         self
     }
 
@@ -332,7 +343,20 @@ impl Parts for Lamp {
                 for_ms,
             } => self.light(client, colour, *level, *pattern, *for_ms),
             Op::Say { text } => self.say(client, re, text),
-            Op::Look { .. } | Op::Joints { .. } => Err(waits_for("the body's lease socket")),
+            Op::Look { at } => {
+                // Any other look ends a follow, said or not.
+                let hand = *at == LookAt::Target(LookTarget::Hand);
+                let Some(follow) = &self.follow else {
+                    return Err(waits_for("the body's lease socket"));
+                };
+                *follow.lock().expect("follower") = hand.then(|| client.to_owned());
+                if hand {
+                    Ok(json!({"to": "body", "follow": "hand"}))
+                } else {
+                    Err(waits_for("the body's lease socket"))
+                }
+            }
+            Op::Joints { .. } => Err(waits_for("the body's lease socket")),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength),
             Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
@@ -347,6 +371,12 @@ impl Parts for Lamp {
     }
 
     fn stop(&mut self, client: &str, _: u64) {
+        if let Some(follow) = &self.follow {
+            let mut follower = follow.lock().expect("follower");
+            if follower.as_deref() == Some(client) {
+                *follower = None;
+            }
+        }
         // The light given back now: the same light, lapsing at once.
         let now_us = (self.clock)();
         if let Some((light, until_us)) = self.lights.remove(client)
@@ -619,6 +649,33 @@ mod tests {
             )
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `look` at `hand` follows it through the lease socket's hold; any
+    /// other look, or its own client's `stop`, ends that.
+    #[test]
+    fn a_look_at_the_hand_follows_it_until_another_look_or_a_stop() {
+        let at_hand = op(r#"{"id":1,"op":"look","at":"hand"}"#);
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
+        let error = lamp.act("c_1", 1, &at_hand, 0).unwrap_err();
+        assert!(error.why.contains("lease socket"), "{}", error.why);
+        let follow = crate::body_lease::Follower::default();
+        let following = || follow.lock().unwrap().clone();
+        let mut lamp =
+            Lamp::new(None, None, None, "boot".into(), quiet()).following(follow.clone());
+        assert_eq!(
+            lamp.act("c_1", 1, &at_hand, 0).unwrap(),
+            json!({"to": "body", "follow": "hand"})
+        );
+        assert_eq!(following().as_deref(), Some("c_1"));
+        let ahead = op(r#"{"id":2,"op":"look","at":"ahead"}"#);
+        assert!(lamp.act("c_1", 2, &ahead, 0).is_err());
+        assert_eq!(following(), None, "another look ends it");
+        lamp.act("c_1", 3, &at_hand, 0).unwrap();
+        lamp.stop("c_2", 0);
+        assert_eq!(following().as_deref(), Some("c_1"), "another client's stop");
+        lamp.stop("c_1", 0);
+        assert_eq!(following(), None);
     }
 
     #[test]
