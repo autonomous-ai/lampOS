@@ -1192,6 +1192,21 @@ is off unless a drop-in turns it on, the state lamp-c0a4 was found in on
 27 Oct (#3733; which `lamp-update` ran there is not known). Install with
 the newest build's own `lamp-update`.
 
+**Install says when it is not the build's own `lamp-update`** (#3733).
+Once steps 1 to 4 are done, just before the units, it compares the sha256
+of the file it runs from (`/proc/self/exe`) with the build's `lamp-update`
+in the manifest. When they differ it says, e.g.
+`lamp-update: this lamp-update (sha256 4f1c09a2be77) is not build 7071's
+(9d3e5b10c4aa): the units written are this lamp-update's own, not build
+7071's; run build 7071's, /opt/lampOS/update/current/lamp-update install,
+to write its units`, and goes on: it does not refuse, and writes the units as before.
+A running file that cannot be read says only `this lamp-update could not
+be checked against build <N>'s: <why>`. The build's own says nothing, and
+an install that ends before its units says nothing of it. Shown only in
+tests (`crates/update/tests/install.rs`,
+`a_lamp_update_not_the_builds_own_is_named_and_install_still_writes_the_units`
+and the three beside it), not yet on a lamp.
+
 So a unit can meet a binary older than itself. `lamp-actions` and
 `lamp-skills` exit 2 on an option they don't know, and with
 `Restart=on-failure` they would loop, so their product units pass a new
