@@ -40,10 +40,21 @@ expect {
 EOF
 }
 
-ROUND='systemctl stop lamp-voice
-/opt/lampOS/update/current/lamp-update once --channel-url '"$URL"' --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on --quiet-wait-s 300 > /var/lib/lamp-test/force-update.log 2>&1
-echo "rc $?" >> /var/lib/lamp-test/force-update.log
-systemctl start lamp-voice lamp-update'
+# Up to three rounds: an old updater first switches to its own newer build
+# (LAMP_UPDATE_SELF=on; "build N needs updater 7 or newer, and this is
+# updater 5"), then the next round, run by the new one, switches the build.
+ROUND='L=/var/lib/lamp-test/force-update.log; : > $L
+systemctl stop lamp-update lamp-voice
+for round in 1 2 3; do
+  before=$(jq -r .installed.sequence /var/lib/lampos-update/state.json)
+  LAMP_UPDATE_SELF=on /opt/lampOS/update/current/lamp-update once --channel-url '"$URL"' --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on --quiet-wait-s 300 >> $L 2>&1
+  rc=$?; echo "round $round rc $rc" >> $L
+  after=$(jq -r .installed.sequence /var/lib/lampos-update/state.json)
+  [ "$after" != "$before" ] && break
+  grep -q "needs updater" $L || break
+done
+systemctl start lamp-voice lamp-update
+echo "rc $rc build $(jq -r .installed.sequence /var/lib/lampos-update/state.json)" >> $L'
 
 one() {
   local host=$1 out
