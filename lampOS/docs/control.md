@@ -603,7 +603,19 @@ on the lamp that run on their own".
 - **A change the helper doesn't answer** is asked again after 2 s and then
   20 s, three tries in all, before it is given up and journaled; later
   changes wait behind it, so the order holds. A refusal is an answer and
-  isn't asked again.
+  isn't asked again. Asking again is harmless: each change sets that
+  computer's state (off, or held to these grants), so one the helper
+  served but didn't answer in time is served the same way twice. That is
+  also why the journal's `gave up telling the helper … after 3 tries` line
+  ends "it may still be served": an ask that timed out after it was
+  written may have reached the helper.
+- **What the owner does then:** nothing else asks that change again, so
+  the journal line, with the computer's id and the change, is the owner's
+  cue. Revoking the computer tells the helper `off_pushed_by` again (if
+  the lost change was a revoke's, pair the computer again first), so its
+  pushed skills are off whichever change was lost; paired again, it pushes
+  them again under its grants then. A re-pair with the same grants tells
+  the helper nothing, so it isn't a way to send a lost `grants_pushed_by`.
 - **Not on before the helper's half:** no product unit passes
   `--manage-socket`, and it must not be passed before lamp-skills' manage
   helper keeps its record of revokes and grant changes (Eighth's piece B).
