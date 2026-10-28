@@ -1803,6 +1803,11 @@ never have asked or taken an answer on a lamp).
   Wrong or expired ids, expired codes and question/end states grant nothing.
   An unchanged-code keepalive never reopens a claim. A new heard invocation
   ("say it again") still returns the open code once through START.
+  Each code handed to the voice is one journal line, never its digits:
+  `tasks: sign-in N: code handed to a start` for a START answer with the
+  code, and `tasks: sign-in N: code claimed` for a granted claim. A lamp's
+  journal then counts the tellings: one, and one more for each "say it
+  again".
 - **The update boundary.** `sign_in_state` advertises `code_claims:1`, even
   with no session. New Voice requires it before START or automatic code
   delivery; an old or replaced Tasks that lacks/refuses the operation causes
