@@ -213,8 +213,13 @@ after the check is never loaded. A missing, relative or mismatched model
 publishes `invalid_model` every 500 ms and retains no audio. Loading and
 inference run on their own thread (`ears-classes`), never on capture or the
 Bus pump. Scores are independent sigmoids of the logits for Speech (0),
-Music (132) and Laughter (13), and Door (348) and Walk, footsteps (48) for
+Music (132) and Laughter (13), and Walk, footsteps (48) and a door for
 guard mode (#2562; read by `lamp-skills` only with `LAMP_GUARD_SOUNDS=on`).
+`door` is the highest of the door group: Door (348), Sliding door (351),
+Slam (352) and Knock (353), since a knock on a door is AudioSet's Knock, not
+Door. Tap (354) is left out: desk taps and typing raise it all day. The
+indices are `yamnet_class_map.csv`'s, the same in qai-hub-models v0.59.0's
+`labels/yamnet_labels.txt`.
 
 **Frontend and windows.** As the offline probe: 16 kHz, FFT 512, periodic
 Hann 400 centered in it, hop 160, magnitude, 64 HTK mel bands 125–7500 Hz,
