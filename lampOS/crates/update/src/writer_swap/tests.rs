@@ -79,7 +79,7 @@ fn the_units_program_acts_on_the_rounds_fresh_request_while_the_round_holds_the_
         lamp.root.path(),
         &lamp.records,
         b"new",
-        NOW + 1_000,
+        &|| NOW + 1_000,
         &mut good,
     )
     .unwrap();
@@ -102,11 +102,38 @@ fn the_units_program_acts_on_the_rounds_fresh_request_while_the_round_holds_the_
 }
 
 #[test]
+fn a_refresh_is_timed_once_the_copy_is_in_place_not_when_asked() {
+    // The probe stands in for the place's writes, syncs and probe, which
+    // may take seconds: a `back` the timer begins in them is still the copy
+    // before's, so the refresh is timed after (Reviewer-three's P3 on
+    // #4190).
+    let lamp = lamp();
+    let held = Records::new(lamp.records.clone()).lock().unwrap();
+    assert!(ask(lamp.root.path(), &held, b"new", NOW).unwrap());
+    let now = std::cell::Cell::new(NOW + 1_000);
+    let mut slow = |path: &Path| {
+        now.set(now.get() + 1_200);
+        good(path)
+    };
+    let done = refresh(
+        lamp.root.path(),
+        &lamp.records,
+        b"new",
+        &|| now.get(),
+        &mut slow,
+    )
+    .unwrap();
+    assert_eq!(writer(&lamp), "new");
+    assert_eq!(done.at_unix_ms, NOW + 2_200);
+    drop(held);
+}
+
+#[test]
 fn with_the_lock_held_and_no_fresh_request_for_these_bytes_nothing_is_replaced() {
     let lamp = lamp();
     let _held = Records::new(lamp.records.clone()).lock().unwrap();
     let run = |lamp: &Lamp, at: u64| {
-        refresh(lamp.root.path(), &lamp.records, b"new", at, &mut good).unwrap_err()
+        refresh(lamp.root.path(), &lamp.records, b"new", &|| at, &mut good).unwrap_err()
     };
     // No request: another lamp-update at work asked nothing.
     assert!(run(&lamp, NOW).contains("asked nothing"));
@@ -144,17 +171,24 @@ fn with_the_lock_held_and_no_fresh_request_for_these_bytes_nothing_is_replaced()
 #[test]
 fn by_hand_with_no_round_at_work_it_asks_ready_itself_under_the_lock() {
     let lamp = lamp();
-    let done = refresh(lamp.root.path(), &lamp.records, b"new", NOW, &mut good).unwrap();
+    let done = refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
     assert_eq!(done.before, Some(sha256_hex(b"old")));
     assert_eq!(writer(&lamp), "new");
     // Not the build update/current names: not ready, nothing replaced.
     let lamp = super::tests::lamp();
-    let why = refresh(lamp.root.path(), &lamp.records, b"stale", NOW, &mut good).unwrap_err();
+    let why = refresh(
+        lamp.root.path(),
+        &lamp.records,
+        b"stale",
+        &|| NOW,
+        &mut good,
+    )
+    .unwrap_err();
     assert!(why.contains("not the build"), "{why}");
     assert_eq!(writer(&lamp), "old");
     // A copy that does not answer: nothing replaced either.
     let mut bad = |_: &Path| Err("exit status: 1".to_owned());
-    let why = refresh(lamp.root.path(), &lamp.records, b"new", NOW, &mut bad).unwrap_err();
+    let why = refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut bad).unwrap_err();
     assert!(why.contains("nothing was replaced"), "{why}");
     assert_eq!(writer(&lamp), "old");
 }
@@ -163,7 +197,7 @@ fn by_hand_with_no_round_at_work_it_asks_ready_itself_under_the_lock() {
 fn op(lamp: &Lamp, op: Op, at: u64) -> Result<Done, String> {
     let held = Records::new(lamp.records.clone()).lock().unwrap();
     request(&held, b"new", op, at).unwrap();
-    let done = refresh(lamp.root.path(), &lamp.records, b"new", at, &mut good);
+    let done = refresh(lamp.root.path(), &lamp.records, b"new", &|| at, &mut good);
     drop(held);
     done
 }
@@ -171,7 +205,7 @@ fn op(lamp: &Lamp, op: Op, at: u64) -> Result<Done, String> {
 #[test]
 fn a_new_writer_whose_back_ended_well_since_is_proved_and_its_prev_removed() {
     let lamp = lamp();
-    refresh(lamp.root.path(), &lamp.records, b"new", NOW, &mut good).unwrap();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
     assert!(unproven(lamp.root.path(), &lamp.records));
     let done = super::done(&lamp.records).unwrap();
     // A `back` before the refresh, or by another writer, proves nothing.
@@ -191,7 +225,7 @@ fn a_new_writer_whose_back_ended_well_since_is_proved_and_its_prev_removed() {
 #[test]
 fn a_new_writer_that_failed_is_put_back_and_never_asked_again() {
     let lamp = lamp();
-    refresh(lamp.root.path(), &lamp.records, b"new", NOW, &mut good).unwrap();
+    refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
     let done = op(&lamp, Op::PutBack, NOW + 1).unwrap();
     assert_eq!(writer(&lamp), "old");
     assert_eq!(prev(&lamp), None);
@@ -214,7 +248,7 @@ fn a_new_writer_that_failed_is_put_back_and_never_asked_again() {
         lamp.root.path(),
         &lamp.records,
         b"newer",
-        NOW + 3,
+        &|| NOW + 3,
         &mut good,
     )
     .unwrap();
@@ -229,7 +263,7 @@ fn a_new_writer_that_failed_is_put_back_and_never_asked_again() {
         lamp.root.path(),
         &lamp.records,
         b"newer",
-        NOW + 5,
+        &|| NOW + 5,
         &mut good,
     )
     .unwrap();
@@ -243,7 +277,7 @@ fn nothing_is_unproven_before_a_refresh_or_when_the_writer_was_already_the_build
     let lamp = lamp();
     assert!(!unproven(lamp.root.path(), &lamp.records));
     fs::write(on_root(lamp.root.path(), BACK), "new").unwrap();
-    let done = refresh(lamp.root.path(), &lamp.records, b"new", NOW, &mut good).unwrap();
+    let done = refresh(lamp.root.path(), &lamp.records, b"new", &|| NOW, &mut good).unwrap();
     assert_eq!(done.before, None);
     assert!(!unproven(lamp.root.path(), &lamp.records));
 }

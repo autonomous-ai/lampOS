@@ -20,7 +20,7 @@ fn lamp() -> Lamp {
             &root,
             &records,
             b"lamp-update 1",
-            lamp_update::records::unix_ms(),
+            &lamp_update::records::unix_ms,
             &mut |path: &Path| Ok(fixed_copy::answer(&sha256_hex(&fs::read(path).unwrap()))),
         )
         .map(|_| ())
@@ -248,7 +248,7 @@ fn a_new_writer_whose_first_apply_fails_is_put_back_after_that_apply() {
             &root,
             &records,
             b"lamp-update 1",
-            lamp_update::records::unix_ms(),
+            &lamp_update::records::unix_ms,
             &mut |path: &Path| Ok(fixed_copy::answer(&sha256_hex(&fs::read(path).unwrap()))),
         )
         .map(|_| ())

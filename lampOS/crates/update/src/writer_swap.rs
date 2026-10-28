@@ -199,14 +199,18 @@ fn back_ok(records: &Path) -> Option<BackOk> {
 /// kept at [`PREV`]. With the records' lock held by another (the round that
 /// started the unit), only on a fresh request naming these bytes; with the
 /// lock free (by hand), only once `ready` says yes under it. The request
-/// is removed either way, and what was done is kept as [`DONE`].
+/// is removed either way, and what was done is kept as [`DONE`]. `clock`
+/// is Unix ms now: read for the request, and again for a refresh once the
+/// copy is in place, so every `back` begun of the copy before began by its
+/// [`Done::at_unix_ms`] (Reviewer-three's P3 on #4190).
 pub fn refresh(
     root: &Path,
     records: &Path,
     running: &[u8],
-    now_unix_ms: u64,
+    clock: &dyn Fn() -> u64,
     probe: &mut dyn FnMut(&Path) -> Result<String, String>,
 ) -> Result<Done, String> {
+    let now_unix_ms = clock();
     let held = Records::new(records.to_owned()).lock();
     // By hand, with no round at work, only a refresh.
     let op = match &held {
@@ -232,7 +236,7 @@ pub fn refresh(
                 build: sha256_hex(running),
                 before,
                 synced,
-                at_unix_ms: now_unix_ms,
+                at_unix_ms: clock(),
                 proven: false,
                 // A build put back before stays so through a later
                 // refresh (Seventh's P3 on #4107).

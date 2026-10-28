@@ -2811,6 +2811,9 @@ bound. Until the refreshed writer is proved:
   It is asked of the system bus, then of systemd's own socket
   (`/run/systemd/private`, as `systemctl` uses as root), since a lamp may
   run no D-Bus daemon. It is asked only of a `failed` unit.
+  The refresh's `at_unix_ms` is taken once the copy is in place, after
+  its writes, its probe (up to 20 s) and the rename. So every `back` that
+  began of the copy before began by it (Reviewer-three's P3 on #4190).
   One in the refresh's own millisecond or before is waited past, to the
   next `back`, and said (`… back failed in a
   run that began before it was refreshed: the next back judges it`). When
