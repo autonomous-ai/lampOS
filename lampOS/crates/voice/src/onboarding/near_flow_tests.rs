@@ -103,6 +103,8 @@ impl Drop for Store {
 /// One scripted try: the prompt's end on both clocks.
 struct Prompt {
     token: u64,
+    /// What the lamp was asked to say.
+    words: String,
     ended_us: u64,
     ended_ms: u64,
 }
@@ -130,7 +132,10 @@ fn offer(walk: &mut Onboarding, now: u64) -> u64 {
 fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
     let token = offer(walk, now);
     let words = walk.take_invitation(token, now).unwrap();
-    assert!(words.to_lowercase().contains("call my name"), "{words}");
+    assert!(
+        [NEAR_FIRST, NEAR_AGAIN, NEAR_MISSED].contains(&words.as_str()),
+        "{words}"
+    );
     let boot = BootId::new([3; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
     // The lamp spoke the prompt.
@@ -146,6 +151,7 @@ fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
     });
     Prompt {
         token,
+        words,
         ended_us: now,
         ended_ms: unix_ms,
     }
@@ -438,6 +444,131 @@ fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
     assert_eq!(cut(&mut walk, 60 * S, 3), (1, json!(false)));
     assert_eq!(walk.kept().near_call_prompts, 1);
     assert_eq!(call(&mut walk, 80 * S, 22.0, 4)["prompt"], 2);
+}
+
+/// The tester on lamp-29e7, 28 October (#3702): the lamp never said what
+/// to say or how many calls it wanted, so a bare "Lamp" four times felt like
+/// being asked over and over. The first prompt names the phrase and says it
+/// asks a few times; after an accepted call the next prompt is "Got it. Once
+/// more."; after a call not caught, "I didn't catch that. Say 'Hey Lamp'
+/// again, from your seat.", never the first prompt again. A first prompt cut before any try
+/// was judged says the first line again.
+#[test]
+fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
+    assert!(NEAR_FIRST.contains("say 'Hey Lamp'"), "{NEAR_FIRST}");
+    assert!(NEAR_FIRST.contains("I'll ask a few times."), "{NEAR_FIRST}");
+    assert!(
+        NEAR_AGAIN.contains("\"Got it. Once more.\""),
+        "{NEAR_AGAIN}"
+    );
+    assert!(
+        NEAR_MISSED.contains("\"I didn't catch that. Say 'Hey Lamp' again, from your seat.\""),
+        "{NEAR_MISSED}"
+    );
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let boot = BootId::new([3; 16]).unwrap();
+    // Cut before any try: the first line again.
+    let token = offer(&mut walk, 10 * S);
+    assert_eq!(walk.take_invitation(token, 10 * S).unwrap(), NEAR_FIRST);
+    assert!(walk.bind_invitation(token, boot, 1));
+    walk.invitation_finished(boot, 1, Delivery::Cut, 10 * S);
+    walk.drain_storage_for_test(10 * S);
+    let prompt = play(&mut walk, 20 * S, 1_760_000_020_000, 2);
+    assert_eq!(
+        prompt.words, NEAR_FIRST,
+        "the cut first prompt, offered again"
+    );
+    // Answered over its last word: not caught.
+    room(&mut walk, &prompt, 300, 20.0);
+    over(&mut walk, &prompt, 300, 200, 0.98);
+    assert_eq!(judge(&mut walk, &prompt)["why"], "answered_early");
+    let prompt = play(&mut walk, 40 * S, 1_760_000_040_000, 3);
+    assert_eq!(prompt.words, NEAR_MISSED);
+    room(&mut walk, &prompt, 2_400, 22.0);
+    name(&mut walk, &prompt, 2_000, 0.98);
+    assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
+    let prompt = play(&mut walk, 60 * S, 1_760_000_060_000, 4);
+    assert_eq!(prompt.words, NEAR_AGAIN, "after an accepted call");
+    // Nothing called: not caught.
+    room(&mut walk, &prompt, 7_000, 2.0);
+    assert_eq!(judge(&mut walk, &prompt)["accepted"], false);
+    let prompt = play(&mut walk, 80 * S, 1_760_000_080_000, 5);
+    assert_eq!(prompt.words, NEAR_MISSED, "after a refused try");
+}
+
+/// The words of the prompt after this one: offered and taken, not played.
+fn next_words(walk: &mut Onboarding, at: u64) -> String {
+    let token = offer(walk, at);
+    walk.take_invitation(token, at).unwrap()
+}
+
+/// The ways a real person gets the call wrong (#3702, the lead's merge
+/// condition), each from the step's first prompt, with the line the lamp says
+/// next. The walk sees only numbers: which phrase was said reaches it as the
+/// name detector's hearing and score. "Hey Lamp" and "Hey, Lamp" are what
+/// the detector is trained on (docs/name.md) and are heard at 0.98; a bare
+/// "Lamp" is what it misses (#3923), here an unsure 0.80 and no hearing at
+/// all. Loudness is mic1's rise over the room's quiet: quiet 4 dB (the
+/// office calls on lamp-52e6, row 10, rose 3.9 dB), normal 22 dB (the
+/// tests' seat calls, over the near rule's 18 dB default), loud 30 dB. A try
+/// does not judge loudness: any heard call is "Got it. Once more.", and
+/// whether the calls make a bar is decided at the end (16 to 24 dB, spread
+/// at most 10 dB).
+#[test]
+fn every_way_a_person_calls_gets_its_line() {
+    // (what was said, the detector's score or none, rise, the next line)
+    let cases = [
+        ("Hey Lamp, quiet", Some(0.98), 4.0, NEAR_AGAIN),
+        ("Hey Lamp, normal", Some(0.98), 22.0, NEAR_AGAIN),
+        ("Hey Lamp, loud", Some(0.98), 30.0, NEAR_AGAIN),
+        ("Hey, Lamp, quiet", Some(0.98), 4.0, NEAR_AGAIN),
+        ("Hey, Lamp, normal", Some(0.98), 22.0, NEAR_AGAIN),
+        ("Hey, Lamp, loud", Some(0.98), 30.0, NEAR_AGAIN),
+        ("Lamp unsure, quiet", Some(0.80), 4.0, NEAR_MISSED),
+        ("Lamp unsure, normal", Some(0.80), 22.0, NEAR_MISSED),
+        ("Lamp unsure, loud", Some(0.80), 30.0, NEAR_MISSED),
+        ("Lamp unheard, quiet", None, 4.0, NEAR_MISSED),
+        ("Lamp unheard, normal", None, 22.0, NEAR_MISSED),
+        ("Lamp unheard, loud", None, 30.0, NEAR_MISSED),
+        // A sentence without the name: the room rises, no name is heard.
+        ("a sentence instead of the name", None, 22.0, NEAR_MISSED),
+    ];
+    for (said, score, rise_db, line) in cases {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+        assert_eq!(prompt.words, NEAR_FIRST, "{said}");
+        room(&mut walk, &prompt, 2_400, rise_db);
+        if let Some(score) = score {
+            name(&mut walk, &prompt, 2_000, score);
+        }
+        let judged = judge(&mut walk, &prompt);
+        assert_eq!(judged["accepted"], line == NEAR_AGAIN, "{said}: {judged}");
+        assert_eq!(next_words(&mut walk, 20 * S), line, "{said}: {judged}");
+    }
+}
+
+/// A call said over the prompt cuts it: the same prompt is offered again
+/// with the line it had, the first while no try was judged and "Got it.
+/// Once more." after an accepted call.
+#[test]
+fn a_call_over_the_prompt_is_asked_again_with_the_same_line() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let boot = BootId::new([3; 16]).unwrap();
+    let cut = |walk: &mut Onboarding, at: u64, turn: u64| {
+        let token = offer(walk, at);
+        let words = walk.take_invitation(token, at).unwrap();
+        assert!(walk.bind_invitation(token, boot, turn));
+        walk.invitation_finished(boot, turn, Delivery::Cut, at);
+        walk.drain_storage_for_test(at);
+        words
+    };
+    assert_eq!(cut(&mut walk, 10 * S, 1), NEAR_FIRST);
+    assert_eq!(call(&mut walk, 20 * S, 22.0, 2)["accepted"], true);
+    assert_eq!(cut(&mut walk, 40 * S, 3), NEAR_AGAIN);
+    assert_eq!(next_words(&mut walk, 50 * S), NEAR_AGAIN);
 }
 
 /// The voice holds its reply to the name heard from the prompt's end to 7 s

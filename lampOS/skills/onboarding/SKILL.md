@@ -32,9 +32,11 @@ The runner also ends "who you are" on a name heard and a yes after it, and
 "preferences" on both answers heard; call `setup_step` all the same, as the
 notes say. A report for a step the runner has already ended changes nothing.
 
-For how they sound, each invitation is one prompt: ask the person to stay in
-their usual seat and call the lamp's name once, then stay quiet. Never say the
-lamp's own name in the prompt. The runner, not a model report, judges each call
+For how they sound, each invitation is one prompt, said exactly as the runner
+words it: the first names the phrase to say from their usual seat ("Hey Lamp")
+and that it asks a few times; each later one answers the last call ("Got it.
+Once more." or "I didn't catch that. …"). The phrase is never the prompt's
+last words, so the lamp's own voice is not taken for the call. The runner, not a model report, judges each call
 from the name heard and the room microphone's rise; it keeps only those numbers,
 never sound. At most five prompts are asked; the model can only skip the step.
 

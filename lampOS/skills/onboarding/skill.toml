@@ -42,8 +42,8 @@ after_answers = 1
 words = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)"
 
 [onboarding.steps.how_you_sound]
-first = "(Say only this, nothing before or after it: \"Now I'd like to learn how you call me. Stay in your seat, call my name once, the way you would to get my attention, then stay quiet.\")"
-reoffer = "(Say only this, nothing before or after it: \"Now I'd like to learn how you call me. Stay in your seat, call my name once, the way you would to get my attention, then stay quiet.\")"
+first = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask a few times.\")"
+reoffer = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask a few times.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip how you call me for now.\")"
 
 [onboarding.steps.touch]
@@ -88,7 +88,8 @@ touch_failed = "(Say only this, nothing before or after it: \"I didn't feel a ta
 privacy_done = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones.\")"
 privacy_done_camera = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones and my camera.\")"
 privacy_failed = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup.\")"
-near_again = "(Say only this, nothing before or after it: \"Call my name once more from your seat, the same way, then stay quiet.\")"
+near_again = "(Say only this, nothing before or after it: \"Got it. Once more.\")"
+near_missed = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")"
 near_done = "(Say only this, nothing before or after it: \"Got it, I know how you call me from there.\")"
 near_failed = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later.\")"
 sentence_first = "(Say only this, nothing before or after it: \"Now say a sentence to me from your seat, anything at all, so I get used to your voice.\")"

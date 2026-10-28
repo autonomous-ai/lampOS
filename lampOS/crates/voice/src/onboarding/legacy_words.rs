@@ -25,8 +25,9 @@ pub const PRIVACY_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones.\")";
 pub const PRIVACY_DONE_CAMERA: &str = "(Say only this, nothing before or after it: \"Got it, the switch closes my microphones and my camera.\")";
 pub const PRIVACY_FAILED: &str = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup.\")";
-pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Now I'd like to learn how you call me. Stay in your seat, call my name once, the way you would to get my attention, then stay quiet.\")";
-pub const NEAR_AGAIN: &str = "(Say only this, nothing before or after it: \"Call my name once more from your seat, the same way, then stay quiet.\")";
+pub const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Now I'll learn how you call me. From your seat, say 'Hey Lamp' the way you'd get my attention. I'll ask a few times.\")";
+pub const NEAR_AGAIN: &str = "(Say only this, nothing before or after it: \"Got it. Once more.\")";
+pub const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")";
 pub const NEAR_DONE: &str =
     "(Say only this, nothing before or after it: \"Got it, I know how you call me from there.\")";
 pub const NEAR_FAILED: &str = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later.\")";
