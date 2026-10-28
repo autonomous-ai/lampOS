@@ -3269,9 +3269,9 @@ after a take-over, but now for every turn:
     count the start when the line's first word, set off
     (`first_word_set_off`), is on `attention::SAID_TO_A_PERSON` (ma'am,
     madam, sir, mum, dad, honey, sweetie, babe, dude, bro, buddy, guys;
-    lower case, apostrophe kept, a curly one as straight), and counts a
-    conversation with the lamp going on (`Signs::going_on`) as a second
-    sign; a face turned to the lamp, closeness and its words calling it
+    lower case, apostrophe kept, a curly one as straight), and, for that
+    start only, counts a conversation with the lamp going on
+    (`Signs::going_on`) as a second sign, never for other lines; a face turned to the lamp, closeness and its words calling it
     count as before. The journal says `is said to a person ("ma'am"), and
     nothing else shows it was called: not counted
     (LAMP_NAME_SAID_TO_A_PERSON)`, counts and the list's word only. Never
