@@ -14537,22 +14537,20 @@ fn a_base_stuck_short_of_its_goal_still_ends_on_tracking() {
 
 /// A gentle hand turning the head of a standing lamp, under the load that
 /// eases it, is followed by the stall rule alone: said as a hand all the
-/// same, once, and never at rest (lamp-29e7 on 8080: the roll put 34
-/// counts over a minute at 100 to 144, its bound 150, and no hand was ever
-/// said, so onboarding's giving_way failed with the base held).
+/// same, and only after it began (lamp-29e7 on 8080: the roll put 34 counts
+/// over a minute at 100 to 144, its bound 150, and no hand was ever said,
+/// so onboarding's giving_way failed with the base held). A joint stuck
+/// short of its goal at the same load, never carried, is not a hand, nor is
+/// a lamp nobody touches.
 #[test]
 fn a_head_joint_given_way_under_a_gentle_hand_is_said_as_a_hand() {
     let s = Duration::from_secs;
-    let ran = |pressed: bool| {
+    let ran = |mood: Mood, prepare: &dyn Fn(&mut Lamp)| {
         let (mut lamp, mut clock) = folded(s(14));
         lamp.arm_moves = true;
         lamp.overload_clears = 1;
-        if pressed {
-            // Held 30 counts short of where it is sent, at 120, from 7 s.
-            lamp.short = Some((ROLL, 30.0));
-            lamp.strains = vec![(s(7), s(60), ROLL, 120)];
-        }
-        let news = || Some((Mood::Listening, 100));
+        prepare(&mut lamp);
+        let news = || Some((mood, 100));
         let time = clock.time.clone();
         let mut said = Vec::new();
         let report = run_standing(
@@ -14571,12 +14569,26 @@ fn a_head_joint_given_way_under_a_gentle_hand_is_said_as_a_hand() {
             .collect();
         (report, hand)
     };
-    let (report, hand) = ran(true);
+    // From 7 s a hand turns the roll 18 counts from where it stands
+    // (under the 30 that would ease it), at 120, and holds it there.
+    // Resting, as 29e7 was in the try: no listening tilt on the roll.
+    let (report, hand) = ran(Mood::Resting, &|lamp| {
+        lamp.hand = Some((s(7), s(60), ROLL, 2_044.0 - 18.0));
+        lamp.strains = vec![(s(7), s(60), ROLL, 120)];
+    });
     assert_eq!(report.eased, [0; 3], "under its bound: {report:?}");
     assert!(report.stalls[1] >= 1, "{report:?}");
     assert!(!hand.is_empty(), "never said a hand: {report:?}");
     assert!(hand.iter().all(|at| *at >= s(7)), "{hand:?}");
-    let (report, hand) = ran(false);
+    // A pitch stuck 30 counts short of every goal at 120 as the lamp
+    // listens and looks, never moved by anything.
+    let (report, hand) = ran(Mood::Listening, &|lamp| {
+        lamp.short = Some((PITCH, 30.0));
+        lamp.strains = vec![(Duration::ZERO, s(60), PITCH, 120)];
+    });
+    assert!(report.stalls[0] >= 1, "{report:?}");
+    assert!(hand.is_empty(), "{hand:?}");
+    let (report, hand) = ran(Mood::Listening, &|_| {});
     assert_eq!(report.stalls, [0; 5], "{report:?}");
     assert!(hand.is_empty(), "{hand:?}");
 }
