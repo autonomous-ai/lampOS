@@ -23,7 +23,8 @@ SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp"})
 SUMMARISED = frozenset({"text", "data"})
 # Every other field the protocol has, printed as it is. A test fails on any
 # field of control.schema.json in none of these, so a new one is decided here,
-# not found later in a log. Shown as they are, so on a terminal or in the logs
+# not found later in a log; and at run time a field in none of them prints as
+# `<not shown>`, so one from a newer lamp is hidden until decided (fails closed). Shown as they are, so on a terminal or in the logs
 # an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
 # phrase, events' fields, and a refusal's `why`.
 SHOWN = frozenset({
@@ -38,6 +39,13 @@ SHOWN = frozenset({
     "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "to", "until", "v", "where",
     "why", "within_ms", "x", "y", "yaw"
 })
+# Fields a lamp sends that the schema leaves open (`limits`, an `express`
+# answer, `mood`, `light`, a pushed skill's parts, Nine's `shows` and `hand`,
+# and a `look` at `hand`'s `follow`).
+SHOWN_BEYOND_SCHEMA = frozenset({
+    "joints_hz", "to", "move", "on", "energy", "warmth", "awake", "shows", "seen", "x", "y", "size", "open",
+    "confidence", "sha256", "part", "follow",
+})
 # A said text's tag is keyed with this process's own random key: the same text
 # gives the same tag within a run, and nobody holding the log can test a guess.
 _TAG_KEY = os.urandom(16)
@@ -46,6 +54,10 @@ _TAG_KEY = os.urandom(16)
 def on() -> bool:
     """Read at each frame, so setting LAMPOS_LOG in a running program takes effect."""
     return os.environ.get("LAMPOS_LOG", "").strip().lower() == "debug"
+
+
+def _decided(key: str) -> bool:
+    return key in SECRET or key in SUMMARISED or key in SHOWN or key in SHOWN_BEYOND_SCHEMA
 
 
 def redact(value: Any, key: str | None = None) -> Any:
@@ -59,7 +71,10 @@ def redact(value: Any, key: str | None = None) -> Any:
         return f"<{len(value)} chars>"
     if isinstance(value, dict):
         pairing = value.get("op") == "pair"
-        return {k: "<redacted>" if pairing and k == "code" else redact(v, k) for k, v in value.items()}
+        return {
+            k: "<redacted>" if pairing and k == "code" else redact(v, k) if _decided(k) else "<not shown>"
+            for k, v in value.items()
+        }
     if isinstance(value, list):
         return [redact(v) for v in value]
     return value
