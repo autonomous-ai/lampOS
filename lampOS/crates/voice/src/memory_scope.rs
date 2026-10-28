@@ -465,6 +465,9 @@ struct RequestContext {
     /// This request's own ask for everything was shown for its
     /// `forget_everything` ([`ScopeLease::mark_everything_asked`]).
     everything: AtomicBool,
+    /// Narrowed to the room, its reply still told the admitted person's
+    /// name ([`ScopeLease::name_for_reply`]).
+    named: AtomicBool,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -522,6 +525,7 @@ impl RequestScope {
                 scope,
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
+                named: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late: None,
@@ -565,6 +569,7 @@ impl RequestScope {
                 scope,
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
+                named: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late,
@@ -616,6 +621,27 @@ impl ScopeLease {
     /// scope again.
     pub fn narrow_to_room(&self) {
         self.context.narrowed.store(true, Ordering::Release);
+    }
+
+    /// A line narrowed to the room whose admitted person's face was alone in
+    /// view, none seen speaking it (`speaking_faces::named_alone`,
+    /// lamp-3e83): its reply is told their name, and nothing else. Its
+    /// scope, memory, thread and every keep, recall and forget stay the
+    /// room's ([`Self::scope`]); only [`Self::named_for_reply`] reads this
+    /// (reviewer-three's P2 on #4090).
+    pub fn name_for_reply(&self) {
+        self.context.named.store(true, Ordering::Release);
+    }
+
+    /// The admitted person whose name a narrowed line's reply is told
+    /// ([`Self::name_for_reply`]), while the lease is current. Never
+    /// authority to act: every memory boundary reads [`Self::scope`].
+    pub fn named_for_reply(&self) -> Option<&str> {
+        (self.is_current()
+            && self.context.narrowed.load(Ordering::Acquire)
+            && self.context.named.load(Ordering::Acquire))
+        .then(|| self.context.scope.person())
+        .flatten()
     }
 
     /// The known person this line was admitted as, whatever came after:
@@ -937,6 +963,32 @@ mod tests {
         assert_eq!(handed.scope(), Some(&ScopeSnapshot::room()));
         drop(owner);
         assert!(handed.scope().is_none());
+    }
+
+    /// lamp-3e83 (reviewer-three's P2 on #4090): a narrowed line named for
+    /// its reply gives its admitted person's name only through
+    /// `named_for_reply`; its scope is the room's at every boundary, and a
+    /// revoked lease names no one. Not narrowed, or not named: no name.
+    #[test]
+    fn a_narrowed_line_named_for_its_reply_still_reads_the_room() {
+        let person = ScopeSnapshot {
+            person: Some(Arc::from("p-0123456789abcdef")),
+            held: false,
+        };
+        let owner = RequestScope::new(key(1), person.clone());
+        let lease = owner.lease();
+        lease.name_for_reply();
+        assert_eq!(lease.named_for_reply(), None, "not narrowed");
+        assert_eq!(lease.scope(), Some(&person));
+        lease.narrow_to_room();
+        assert_eq!(lease.named_for_reply(), Some("p-0123456789abcdef"));
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        let other = RequestScope::new(key(2), person.clone());
+        other.lease().narrow_to_room();
+        assert_eq!(other.lease().named_for_reply(), None, "not named");
+        drop(owner);
+        assert_eq!(lease.named_for_reply(), None, "revoked");
+        assert!(lease.scope().is_none());
     }
 
     #[test]
