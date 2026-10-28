@@ -46,8 +46,9 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_ONBOARDING_FILE";
 /// "who you are" falls back to the name heard, and "where you sit" takes a
 /// steady face after its guide while the head moves (row 10 try 4 on
 /// lamp-52e6). Off: the walk as before.
-/// How long "who you are" waits, after the yes to the face question, for the
-/// face to be saved before it ends done with the name only. The model calls
+/// How long "who you are" waits, after the latest yes following the name
+/// (the face question's, as a rule), for the face to be saved before it ends
+/// done with the name only, once [`START_QUIET_US`] has been quiet. The model calls
 /// `remember_my_face` in its answer to that yes, a few seconds on, and the
 /// eyes answer in about 1.7 s (lamp-29e7): well inside it, so the step is
 /// never done before a face that is being saved is kept (the lead's merge
@@ -448,8 +449,8 @@ enum Confirm {
 #[derive(Clone, Copy, Debug, Default)]
 struct Answers {
     name: bool,
-    /// With a face to keep: when the face question was answered after the
-    /// name (a yes), so the step ends done at [`FACE_SAVE_WAIT_US`] if no face
+    /// With a face to keep: when the latest yes after the name was heard
+    /// (the face question's, as a rule), so the step ends done at [`FACE_SAVE_WAIT_US`] if no face
     /// is saved by then.
     face_answered_us: Option<u64>,
     quiet_hours: bool,
@@ -1703,18 +1704,15 @@ impl Onboarding {
                 // here. On lamp-29e7 (28 Oct, 8001) a name and a yes ended it
                 // at 08:50:29 and no face was kept.
                 if led.heard.name && agrees(&words) {
+                    // Every yes restarts the wait, so it runs from the
+                    // latest: the first is often the name's ("Marie,
+                    // right?"), and the face question, its yes, the model's
+                    // call and the save can all come after it (the
+                    // Reviewer-lead's P2 on #3992).
                     if face_kept {
-                        led.heard.face_answered_us.get_or_insert(now_us);
+                        led.heard.face_answered_us = Some(now_us);
                     }
                     !face_kept
-                } else if face_kept && led.heard.name && refuses(&words) {
-                    // The face question's no, after a name: done, the name
-                    // only, no face (the Reviewer-lead's P2 on #3992: taken
-                    // as the name's no, the give-up asked the name again).
-                    eprintln!(
-                        "lamp-voice: onboarding: who_you_are heard a no to the face: done, no face kept"
-                    );
-                    true
                 } else if names_someone(text, &words) {
                     if !led.heard.name {
                         eprintln!(
@@ -1728,6 +1726,16 @@ impl Onboarding {
                     }
                     led.heard.name = true;
                     false
+                } else if face_kept && led.heard.name && refuses(&words) && words.len() <= 4 {
+                    // The face question's no, after a name: done, the name
+                    // only, no face (the Reviewer-lead's P2 on #3992: taken
+                    // as the name's no, the give-up asked the name again).
+                    // Only a short line that names nobody: "No, it's Mary."
+                    // corrects the name above and keeps the step open.
+                    eprintln!(
+                        "lamp-voice: onboarding: who_you_are heard a no to the face: done, no face kept"
+                    );
+                    true
                 } else {
                     // "No" to the name the lamp checked: not known.
                     if refuses(&words) && led.heard.name {
@@ -2104,7 +2112,11 @@ impl Onboarding {
         // A yes to the face with no face saved in [`FACE_SAVE_WAIT_US`] (a
         // refused save, the eyes away, or no call): done, the name only, not
         // left silent until the give-up (the Reviewer-lead's P2 on #3992).
+        // Like the give-up it waits for quiet, but the short bar a step
+        // starts on ([`START_QUIET_US`]): a lamp mid-sentence, or the save
+        // still being talked through, is not cut off.
         if step == Step::WhoYouAre
+            && quiet_us >= START_QUIET_US
             && led
                 .heard
                 .face_answered_us
@@ -4007,6 +4019,54 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), None);
         room.wait(2 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// The Reviewer-lead's P2 on #3992: "No, it's Mary." after a name
+    /// corrects the name; it is not the face's no.
+    #[test]
+    fn with_a_face_to_keep_a_no_with_a_name_corrects_it_and_waits() {
+        let mut room = Room::new("face-no-name");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.walk.heard("No, it's Mary.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        assert!(room.walk.led.as_ref().is_some_and(|led| led.heard.name));
+        room.walk.heard("Yes.", room.at);
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        face_saved(&room.walk.file);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// The Reviewer-lead's P2 on #3992: the wait runs from the latest yes,
+    /// so a face saved 12 s after the face's yes, 18 s after the name's,
+    /// still ends the step, and nothing ends it before.
+    #[test]
+    fn with_a_face_to_keep_the_wait_runs_from_the_latest_yes() {
+        let mut room = Room::new("face-two-yes");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.walk.heard("Yes.", room.at);
+        room.wait(6 * S, Some(NEAR_MIDDLE));
+        room.walk.heard("Sure.", room.at);
+        room.wait(12 * S - S / 4, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        face_saved(&room.walk.file);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        let records = room.walk.take_records();
+        assert!(
+            records
+                .iter()
+                .any(|line| line["kind"] == "onboarding_face_saved"),
+            "{records:?}"
+        );
     }
 
     /// The first builder on #2526: with the nudge on, both of the
