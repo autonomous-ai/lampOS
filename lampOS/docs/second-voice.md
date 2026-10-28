@@ -2732,11 +2732,19 @@ after a take-over, but now for every turn:
   "got it", "done"…, a keep that takes what was kept: "Kept:", "Kept.",
   "kept that/it", "I've kept that", "I'll remember that/this/it", "I've
   saved it", "saved that", and "đã ghi nhớ", "mình sẽ nhớ", "đã lưu"
-  with anything after them); at the
-  first word that cannot, it goes on as before. "I'll keep it short",
-  "I'll keep the light on", "I'll remember to remind you at five", "Saved
-  your playlist", "Remembered! …", "Got it" and "Noted" claim nothing
-  (the reviewer-lead's P2 on #3628). A claim is held to the round's end: beside a `remember`
+  with anything after them). The softer claims count too (K3: lamp-06c1,
+  28 Oct night, "Noted — you work at a library now, not the bakery." and
+  "All right, I'll keep it in mind." with no call): "Noted" with what was
+  noted after a dash or colon, or "noted that"; "I'll keep it/that in
+  mind", "I'll bear that in mind", "I'll hold/hang on to that"; "mình nhớ
+  rồi", "đã ghi nhận". A soft claim is a claim only in a round with no
+  calls: beside any call it confirms that call ("Noted — timer set for ten
+  minutes." beside `set_timer`) and is said as it comes (Reviewer-three's
+  and Reviewer-two's P2 on #4137). At the first word that cannot begin a
+  claim, it goes on as before. "I'll keep it short", "I'll keep the light on",
+  "I'll remember to remind you at five", "Saved your playlist",
+  "Remembered! …", "Got it", "Got it, thanks", "Noted." and "Noted,
+  thanks." claim nothing (the reviewer-lead's P2 on #3628). A claim is held to the round's end: beside a `remember`
   call it is said. With none, its words are not said: beside other calls,
   those run and the next round is told nothing was kept
   (`KEEP_CLAIMED_UNKEPT`); alone, the model is told once and asked again,
