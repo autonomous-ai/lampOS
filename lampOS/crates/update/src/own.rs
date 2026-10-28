@@ -60,6 +60,8 @@ const REFUSED: &str = "self-refused";
 const RETRIED: &str = "self-retried";
 /// The build a switch began to, and the boot it began on (#2810).
 const BEGAN: &str = "self-began";
+/// The build `lamp-update-back` last put back, and the boot it did so on.
+const PUT_BACK: &str = "self-put-back";
 /// The kernel's id of this boot, new at every start.
 pub const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
 
@@ -220,7 +222,7 @@ fn settle(records: &Path, root: &Path, say: &mut dyn FnMut(&str)) -> Result<Unre
         done: false,
     }) = &known
     {
-        refuse(records, new)?;
+        refuse(records, root, new)?;
         replace_link(&on_root(root, CURRENT), old)
             .map_err(|error| format!("{CURRENT}: {error}"))?;
     }
@@ -252,7 +254,18 @@ fn settle(records: &Path, root: &Path, say: &mut dyn FnMut(&str)) -> Result<Unre
     Ok(settled)
 }
 
-fn refuse(records: &Path, build: &str) -> Result<(), String> {
+fn refuse(records: &Path, root: &Path, build: &str) -> Result<(), String> {
+    // The boot it is put back on, first: the retry rule reads it beside
+    // the boot its switch began on (Tests' P2 on #4131). Not known, it is
+    // not noted, and the build is never tried again.
+    if let Some(boot) = boot_id(root) {
+        write_whole(
+            &records.join(PUT_BACK),
+            format!("{build} {boot}\n").as_bytes(),
+            0o600,
+        )
+        .map_err(|error| format!("{PUT_BACK}: {error}"))?;
+    }
     let mut refused = refused(records);
     if !refused.iter().any(|known| known == build) {
         refused.push(build.to_owned());
@@ -297,12 +310,14 @@ fn builds_in(path: &Path) -> Vec<String> {
 /// in its ten minutes reads the same as a build that can't run, and on a
 /// lamp with no clock of its own the jump of its clock at the next boot can
 /// pass the deadline before the confirming round runs. So a build whose
-/// switch began on a boot that has since ended is tried once more. One put
-/// back on the boot it began on, or put back a second time, stays refused.
-pub fn refused_for_good(records: &Path, root: &Path, build: &str) -> bool {
+/// switch began on one boot and was put back on another is tried once
+/// more. One put back on the boot it began on, or put back a second time,
+/// or by a `lamp-update-back` that notes no boot (one older than this
+/// rule), stays refused.
+pub fn refused_for_good(records: &Path, build: &str) -> bool {
     refused(records).iter().any(|known| known == build)
         && (retried(records).iter().any(|known| known == build)
-            || !began_on_a_boot_since_ended(records, root, build))
+            || !put_back_on_another_boot(records, build))
 }
 
 /// This boot's id under `root`, when the kernel gives one.
@@ -325,14 +340,13 @@ pub(crate) fn note_began(records: &Path, root: &Path, build: &str) -> io::Result
     )
 }
 
-fn began_on_a_boot_since_ended(records: &Path, root: &Path, build: &str) -> bool {
-    let Ok(text) = fs::read_to_string(records.join(BEGAN)) else {
-        return false;
+fn put_back_on_another_boot(records: &Path, build: &str) -> bool {
+    let noted = |file: &str| {
+        let text = fs::read_to_string(records.join(file)).ok()?;
+        let (noted, boot) = text.trim().split_once(' ')?;
+        (noted == build).then(|| boot.to_owned())
     };
-    let Some((began, boot)) = text.trim().split_once(' ') else {
-        return false;
-    };
-    began == build && boot_id(root).is_some_and(|now| now != boot)
+    matches!((noted(BEGAN), noted(PUT_BACK)), (Some(began), Some(back)) if began != back)
 }
 
 /// A build put back once, taken again: written to `self-retried` first,
@@ -529,7 +543,7 @@ pub fn back(
         replace_link(&on_root(root, CURRENT), &pending.old)
             .map_err(|error| format!("{CURRENT}: {error}"))?;
     }
-    refuse(records, &pending.new)?;
+    refuse(records, root, &pending.new)?;
     end(records).map_err(|error| format!("{PENDING}: {error}"))?;
     say(&format!(
         "lamp-update's build {} did not confirm itself ({}): {CURRENT} names {} again",
