@@ -81,6 +81,16 @@ pub(crate) struct Words {
     pub(crate) sentence_failed: String,
     #[serde(default)]
     pub(crate) give_again: Option<String>,
+    /// #3702's lines, optional as #3769's are: said at once when the body
+    /// first feels a push in a try, and once when it feels none a few
+    /// seconds after the invitation.
+    #[serde(default)]
+    pub(crate) give_felt: Option<String>,
+    #[serde(default)]
+    pub(crate) give_prompt: Option<String>,
+    /// Said each time a push is let go before the head moved enough.
+    #[serde(default)]
+    pub(crate) give_more: Option<String>,
     pub(crate) give_done: String,
     pub(crate) give_failed: String,
     pub(crate) who_confirm: String,
@@ -191,6 +201,9 @@ impl Definition {
             ("touch_done", &self.words.touch_done),
             ("touch_failed", &self.words.touch_failed),
             ("give_again", &self.words.give_again),
+            ("give_felt", &self.words.give_felt),
+            ("give_prompt", &self.words.give_prompt),
+            ("give_more", &self.words.give_more),
         ] {
             if let Some(line) = line {
                 checked_words("onboarding words", &[(name, line, &[])])?;

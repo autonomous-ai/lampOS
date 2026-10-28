@@ -38,8 +38,11 @@ lamp's own name in the prompt. The runner, not a model report, judges each call
 from the name heard and the room microphone's rise; it keeps only those numbers,
 never sound. At most five prompts are asked; the model can only skip the step.
 
-For giving way, the invitation asks the person to take the lamp's head gently,
-move it a little and let go. The runner, not a model report, judges it from the
+For giving way, the invitation asks the person to put a hand on the lamp's head
+and move it gently, any way, just a little: any head joint counts, a nudge is
+enough, and the runner listens from the invitation's start. A felt push is
+answered at once ("now let go"), one let go too soon asks for a little more,
+and a quiet try is prompted once, in the runner's exact lines. The runner, not a model report, judges it from the
 body's own word that a hand moved the head, the body held it there and the
 hand let go. The skill asks nothing of the body; the model can only skip it.
 

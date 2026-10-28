@@ -138,6 +138,9 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
     assert_eq!(definition.words.touch_done.as_deref(), Some(TOUCH_DONE));
     assert_eq!(definition.words.touch_failed.as_deref(), Some(TOUCH_FAILED));
     assert_eq!(definition.words.give_again.as_deref(), Some(GIVE_AGAIN));
+    assert_eq!(definition.words.give_felt.as_deref(), Some(GIVE_FELT));
+    assert_eq!(definition.words.give_prompt.as_deref(), Some(GIVE_PROMPT));
+    assert_eq!(definition.words.give_more.as_deref(), Some(GIVE_MORE));
     for (step, line) in [
         (Step::WhereYouSit, WHERE_YOU_SIT_SKIPPED),
         (Step::HowYouSound, HOW_YOU_SOUND_SKIPPED),
@@ -237,6 +240,9 @@ fn a_file_without_the_3769_lines_still_loads() {
                 "touch_done = ",
                 "touch_failed = ",
                 "give_again = ",
+                "give_felt = ",
+                "give_prompt = ",
+                "give_more = ",
                 "skipped = ",
             ]
             .iter()
@@ -253,6 +259,9 @@ fn a_file_without_the_3769_lines_still_loads() {
         assert_eq!(definition.words.touch_done, None, "{what}");
         assert_eq!(definition.words.touch_failed, None, "{what}");
         assert_eq!(definition.words.give_again, None, "{what}");
+        assert_eq!(definition.words.give_felt, None, "{what}");
+        assert_eq!(definition.words.give_prompt, None, "{what}");
+        assert_eq!(definition.words.give_more, None, "{what}");
     }
 }
 
