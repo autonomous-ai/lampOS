@@ -11,10 +11,11 @@ on 2026-10-20 when taking this file onto `lamp-voice`.
 - **Person:** a colleague on the app (mobile) team who starts its sessions
   (named in the team's own channels, not in this public repository); a Claude
   Code session they start
-- **Lamp(s):** none, until its person or the first builder names one. Not
-  lamp-0c89: that one is `mobile`'s.
-- **Lamp address:** none
-- **Owner file:** none
+- **Lamp(s):** `lamp-9adf`, named by its person on 2026-10-28 for #2814's
+  done-when and the app's lamp checks. Not lamp-0c89: that one is `mobile`'s.
+- **Lamp address:** `lamp-9adf.local`
+- **Owner file:** [`deploy/lamp-9adf/LAMP.md`](../deploy/lamp-9adf/LAMP.md),
+  with `owner: fourteen`
 
 ## Branches it may push
 
