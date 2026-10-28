@@ -936,9 +936,10 @@ its only way back once its package carries the unit.
   for a loss, `recover` asks the voice's say service for the recording
   `wifi_recovering`, "I can't reach my Wi-Fi, so I've opened setup. Set my
   Wi-Fi again in the app." (`recover::SAY_OPENED`). It names no control and
-  sends nobody to the reset. Once a loss (`recover::says_opened`): not at a
-  reopening after a failed try of the saved network, and again only after
-  the lamp was back online. The voice stays up while the hotspot is open, as
+  sends nobody to the reset. Once a loss (`Recovery::says_opened`): not at a
+  reopening after a failed try of the saved network, nor after a try that
+  went back to lost (only slow, or busy; Second's P3 on #4157), and again
+  only after the lamp was back online. The voice stays up while the hotspot is open, as
   `recover` stops no unit. With no network there is no model, so it is the
   recording only, never words. One the voice doesn't hold (`not_provisioned`
   until its notices release, [failure-notices.md](failure-notices.md)) is

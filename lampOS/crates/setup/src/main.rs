@@ -475,7 +475,7 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
         let was = policy.recovering();
         let now_ms = u64::try_from(begun.elapsed().as_millis()).unwrap_or(u64::MAX);
         let act = policy.step(now_ms, seen);
-        let say_opened = lamp_setup::recover::says_opened(was, act);
+        let say_opened = policy.says_opened(act);
         match act {
             Some(Act::OpenHotspot) => {
                 eprintln!(
