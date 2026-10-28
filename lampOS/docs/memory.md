@@ -320,7 +320,9 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
   (`YYYY-MM-DD`): that local day's exchanges. With `query`: what in the kept
   list and the journal has any of its words as a whole word, whatever the
   case; more of the words rank first, then the newer. With both: that day's
-  exchanges that match. With neither: the newest exchanges.
+  exchanges that match. With neither: the newest exchanges. The Days store
+  adds `on` (`YYYY-MM-DD`) to a kept entry with an event day, as `kept`
+  does (#3987); the voice tells it as `event_on` beside today.
 - `forget_last` removes the entry with the person's highest id, of either kind:
   `{"ok":true,"removed":{"kind":"kept","id":2,"at_unix_ms":1791892800000}}` or
   `"removed":null`. Which entry, never its text. With `"kind"` (`kept` or
