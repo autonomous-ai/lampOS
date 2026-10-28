@@ -1,7 +1,8 @@
 //! When the settings writer may be refreshed (#3689, docs/updates.md,
 //! "When the writer may be refreshed").
 //!
-//! **Unwired:** no command calls [`ready`] yet. The refresh copies the
+//! A round's refresh (crate::writer_swap::ask) and `lamp-update
+//! writer-refresh` run by hand ask [`ready`]. The refresh copies the
 //! running lamp-update to the writer's fixed path. That is safe only once
 //! lamp-update's own switch is settled: `lamp-update-back`, the copy about to
 //! be replaced, is what puts an unconfirmed lamp-update back. So the refresh

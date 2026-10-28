@@ -163,8 +163,11 @@ pub fn request(held: &Lock, running: &[u8], op: Op, now_unix_ms: u64) -> Result<
 /// [`PREV`] is still there, and no switch of lamp-update's own may lean on
 /// it.
 pub fn unproven(root: &Path, records: &Path) -> bool {
-    done(records)
-        .is_some_and(|done| !done.proven && done.put_back.is_none() && done.before.is_some())
+    // A put-back's own record is proven (the copy before is the writer
+    // again), so `proven` alone tells; the build put back that a later
+    // refresh carries forward doesn't make that refresh proven
+    // (Reviewer-two's P2 on #4178).
+    done(records).is_some_and(|done| !done.proven && done.before.is_some())
         && fs::symlink_metadata(on_root(root, PREV)).is_ok()
 }
 
