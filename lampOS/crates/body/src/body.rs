@@ -3482,6 +3482,8 @@ struct Stall {
     /// slowly and whatever its load does on the way; a joint short of a new
     /// goal under its own weight, or against a shelf, came toward it.
     stood_at: Option<u16>,
+    /// The goal on the last step.
+    goal_was: Option<u16>,
     /// The stop just made was of a joint carried away from its goal while
     /// pressed, more than `STALL_SLACK`: a hand moved it.
     pub(crate) carried: bool,
@@ -3524,7 +3526,12 @@ impl Stall {
         // At its goal, give or take a held servo's jitter, and not pressed:
         // a hand easing it off, its load dipping now and then, would carry
         // this along with it.
-        if !self.pressed && goal.abs_diff(is.position) <= STOOD_JITTER {
+        // Nor a goal moved on from while unpressed: a joint resting a few
+        // counts short of the last one (under its weight, inside what
+        // counts as arrived) starts the next move from where it is.
+        let moved_on = self.goal_was.is_some_and(|was| was != goal);
+        self.goal_was = Some(goal);
+        if !self.pressed && (moved_on || goal.abs_diff(is.position) <= STOOD_JITTER) {
             self.stood_at = Some(is.position);
         }
         let away = self
