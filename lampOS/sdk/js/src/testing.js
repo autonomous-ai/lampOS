@@ -42,7 +42,6 @@ export const LAMP_CONTROL_REFUSES = Object.freeze({
   look: "the body's lease socket is not on here",
   joints: "not routed yet: waits for a goal stream on the body's lease socket",
   play: 'not routed yet: waits for client packages',
-  sound: 'not routed yet: waits for client packages',
 });
 // A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
 // LightPattern::check, with the breath's low at 1): the least level each is
@@ -564,7 +563,9 @@ export class FakeLamp {
         // follows.
         return this.ok(ws, id, { to: 'body' });
       case 'say':
-        // As lamp-control: the voice takes it, and its `done` follows.
+      case 'sound':
+        // As lamp-control: the voice takes it (a sound is its hum), and
+        // its `done` follows.
         this.ok(ws, id, { to: 'voice' });
         if (this.autoDone) this.done(id);
         return undefined;

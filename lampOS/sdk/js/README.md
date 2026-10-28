@@ -47,9 +47,10 @@ example runs this way: `tour.js` (every kind of call, one step at a time; with `
 `ci-light.js`.
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
-`express` as the feelings skill's move and light,
+`express` as the feelings skill's move and light, `say` and `sound`
+(`hum`, the lamp's own short hum) with `{"to": "voice"}` and their `done`,
 `look` refused as "the body's lease socket is not on here" (no product
-unit passes it yet), and `play`, `sound` and `joints` refused (`refused`,
+unit passes it yet), and `play` and `joints` refused (`refused`,
 "not routed yet: waits for …"), in lamp-control's own words, so a program
 built against it meets the same refusals on a lamp. `--everything` answers
 every op instead.

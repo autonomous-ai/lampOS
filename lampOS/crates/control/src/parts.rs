@@ -358,10 +358,28 @@ impl Lamp {
     }
 
     fn say(&self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
+        self.to_voice(
+            client,
+            re,
+            json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS}),
+        )
+    }
+
+    /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
+    /// no model), through the same queue, quiet, rarity and privacy gates as
+    /// a skill's sound; its outcome is a `done`, as a say's is.
+    fn sound(&self, client: &str, re: u64) -> Result<Value, Error> {
+        self.to_voice(
+            client,
+            re,
+            json!({"skill": "control", "cue": "hum", "expires_in_ms": SAY_EXPIRES_MS}),
+        )
+    }
+
+    fn to_voice(&self, client: &str, re: u64, line: Value) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
-        let line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
         let events = self.events.clone();
         let client = client.to_owned();
         // Off the door's lock, connecting included (the Reviewer-lead's P3
@@ -469,7 +487,9 @@ impl Parts for Lamp {
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
-            Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
+            // Only the hum today (protocol.rs refuses any other name).
+            Op::Sound { .. } => self.sound(client, re),
+            Op::Play { .. } => Err(waits_for("client packages")),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
     }
@@ -918,6 +938,53 @@ mod tests {
         lamp.act("c_1", 11, &op(r#"{"id":11,"op":"look","at":"ahead"}"#), 0)
             .unwrap();
         assert_eq!(looked.try_recv().unwrap().line, r#"{"look":"ahead"}"#);
+    }
+
+    /// `sound` is the lamp's own short hum: the voice's built-in cue on the
+    /// say socket, with say's gates and outcome (in this release, #3504).
+    #[test]
+    fn a_sound_is_the_voices_own_hum_and_its_outcome_comes_as_done() {
+        let dir = dir("sound");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let mut out = &stream;
+            writeln!(out, r#"{{"event":"begun","at_us":5}}"#).unwrap();
+            writeln!(out, r#"{{"outcome":"spoken"}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        assert_eq!(
+            lamp.act("c_1", 14, &op(r#"{"id":14,"op":"sound","name":"hum"}"#), 0)
+                .unwrap(),
+            json!({"to": "voice"})
+        );
+        let asked = voice.join().unwrap();
+        assert_eq!(
+            asked,
+            json!({"skill": "control", "cue": "hum", "expires_in_ms": 30000})
+        );
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            told.lock().unwrap()[0],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 14, "how": "finished"})
+            )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
