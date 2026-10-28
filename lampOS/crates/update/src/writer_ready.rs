@@ -7,7 +7,10 @@
 //! be replaced, is what puts an unconfirmed lamp-update back. So the refresh
 //! waits until no `self.json` is there, and copies only the build that
 //! `update/current` names, the one confirmed, which must be the one running.
-use crate::own::{self, BINARY, CURRENT, FOLDER};
+use crate::{
+    own::{self, BINARY, CURRENT, FOLDER},
+    records::Lock,
+};
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -17,7 +20,11 @@ use std::{
 /// lamp-update that runs: no switch of lamp-update's own waiting in
 /// `records`, and `update/current` under `root` naming a build whose
 /// lamp-update holds exactly those bytes. Why not, when not.
-pub fn ready(root: &Path, records: &Path, running: &[u8]) -> Result<(), String> {
+///
+/// `_held` is the records' lock (`Records::lock` of `records`), which the
+/// caller holds from here until the copy is placed: no switch of its own can
+/// begin in between, so the answer still holds when it is acted on.
+pub fn ready(root: &Path, records: &Path, _held: &Lock, running: &[u8]) -> Result<(), String> {
     match own::pending(records) {
         Ok(None) => {}
         Ok(Some(_)) => {

@@ -2464,4 +2464,6 @@ that can't be read counts as not settled), `update/current` names a build (a
 bare 64-hex name, not a path), and that build's `lamp-update` is a regular
 file holding exactly the bytes of the lamp-update that runs. A lamp-update
 put back while still running, a build changed under its name, or a link to
-anything else is refused, with why. **Unwired:** no command calls it yet.
+anything else is refused, with why. It takes the records' lock as held
+(`records::Lock`), so a caller can't ask without holding it, and holds it
+until the copy is placed. **Unwired:** no command calls it yet.
