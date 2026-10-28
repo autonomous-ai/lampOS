@@ -240,7 +240,10 @@ the journal and the marker's removal leaves both, so the lamp starts; then
 plain (no `.` or `..`, read from the text itself), at least two levels below a
 top directory, and outside the software (`/opt/lampOS`), the update trust
 (`/etc/lampOS/update`) and the system (`/usr`, `/boot`, `/home`, …); the
-journal must not be inside a wiped path. Without `--enable`, `watch-reset`
+journal must not be inside a wiped path. With `--enable`, `watch-reset`
+refuses a plan without `detach` at its start: its unit is read-only but the
+bus (#3710), so a reset run inside it would wipe nothing; every shipped plan
+hands the reset to `systemd-run`. Without `--enable`, `watch-reset`
 only logs a valid reset and `resume-reset` only says whether one is unfinished.
 `crates/setup/fixtures/reset-plan-example.json` is the plan for lamp-4ace's
 paths; the name and Wi-Fi entries are where setup writes them, and the voice's

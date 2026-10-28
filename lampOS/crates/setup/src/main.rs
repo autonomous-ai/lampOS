@@ -268,6 +268,21 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         }
         "watch-reset" => {
             let (bus, clock, until) = watch_options(&mut options)?;
+            // Enabled, it hands the reset to a unit of its own (`detach`),
+            // since lamp-setup-reset.service is read-only but the bus
+            // (#3710): a reset run in here would fail on its journal after
+            // the button, wiping nothing. So a plan without `detach` is
+            // refused now, at start, where the unit shows failed (Fourteen's
+            // P3 on #4048). Every shipped plan has it.
+            if enabled && plan.detach.is_empty() {
+                return Err(format!(
+                    "{}: watch-reset --enable needs the plan's detach, the unit the reset runs in \
+                     (as the shipped plan's systemd-run): without it the reset would run in this \
+                     read-only unit and wipe nothing",
+                    plan_path.display()
+                )
+                .into());
+            }
             let act = || start_reset(&plan, &plan_path);
             // A power cut right after a reset's journal, before its marker
             // went, leaves both: the lamp started, so carry on with it here.
