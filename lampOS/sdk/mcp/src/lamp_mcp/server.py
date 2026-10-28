@@ -157,7 +157,13 @@ class StrictMCP(FastMCP):
                     f"bad_request: {name} takes no {', '.join(unknown)}; "
                     + (f"it takes {', '.join(takes)}" if takes else "it takes no arguments")
                 )
-            missing = [needed for needed in tool.inputSchema.get("required", []) if needed not in (arguments or {})]
+            # A required argument given as null is missing too: none of these
+            # tools takes null for one (harness-reviewer's P3 on #4215).
+            missing = [
+                needed
+                for needed in tool.inputSchema.get("required", [])
+                if (arguments or {}).get(needed) is None
+            ]
             if missing:
                 raise ToolError(f"bad_request: {name} needs {', '.join(missing)}")
         return await super().call_tool(name, arguments)
