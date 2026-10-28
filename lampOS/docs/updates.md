@@ -2545,8 +2545,8 @@ put back while still running, a build changed under its name, or a link to
 anything else is refused, with why. It reads the records from the lock held
 on them (`records::Lock`, which knows its folder), so a caller can't ask
 without holding that lock, and no switch of lamp-update's own begins while
-it is held. The refresh that will call it, still to be written, is to hold
-it until the copy is placed. **Unwired:** no command calls it yet.
+it is held. The refresh (next sections, "The settings writer refreshed")
+asks it under the round's lock, held until the copy is placed.
 
 ### The writer's one-shot unit (#3689)
 
@@ -2572,8 +2572,8 @@ methods of the `Systemd` trait. A systemd that lacks them refuses. A start
 that runs past its bound ends only the waiting: systemd's job goes on, so
 its result is read from what the command leaves, not from the start.
 
-**Unwired:** no round calls `writer_unit::run` yet, and `writer-refresh` is
-not a command yet. The unit has been checked by its tests' reading of the
+A round runs it to refresh the settings writer ("The settings writer
+refreshed", below). The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
 
@@ -2607,6 +2607,66 @@ a file put at its path since it started can't answer for it.
 
 The probe shows that the copy starts on this lamp and that its bytes are the
 ones written. It does not show that its `back` or `apply` work: those are
-proved by their own first use. Nothing calls `place` yet: no round, unit or
-command. Its tests run real programs as copies: one that answers as
-lamp-update does, one that answers another SHA-256, and one that fails.
+proved by their own first use. `lamp-update writer-refresh` calls it (next).
+Its tests run real programs as copies: one that answers as lamp-update
+does, one that answers another SHA-256, and one that fails.
+
+### The settings writer refreshed (#3689)
+
+A round that applies refreshes the fixed settings writer
+(`/usr/local/lib/lampos/lamp-update-back`) from the lamp-update that runs,
+before it looks at a build. So the build's settings are written by the
+writer of the same build (`writer_swap`). It does so only when the writer is
+another copy. A lamp with no writer at all, installed before #1680, is left
+as it is: that copy is `install`'s to put there.
+
+- **The round's side** (`writer_swap::ask`), under its records' lock: it asks
+  `writer_ready::ready` (no switch of lamp-update's own waiting, and
+  `update/current` names the build that runs). Then it writes
+  `writer-refresh.request` in the records, naming that build's SHA-256, and
+  starts the writer's one-shot unit (above) and waits for it.
+- **The unit's side**, `lamp-update writer-refresh`, as root:
+  - The round holds the lock, so the program can't take it. It acts only on
+    a request naming its own bytes, written within the last 5 minutes.
+  - Run by hand with no round at work, it takes the lock and asks `ready`
+    itself.
+  - Either way it places its own bytes with `fixed_copy::place`, the copy
+    there kept as `lamp-update-back.prev`. It removes the request, and keeps
+    what it did as `writer-refresh.done` (the build now there, the one
+    before, whether the folder was synced).
+- **What the round says:** the writer is now this build, or why it is not.
+  A unit that can't run takes its request back and leaves the writer as it
+  was. A dry round (`check`) and a round given none of its own bytes (every
+  test but these) refresh nothing.
+
+**Proved, or put back.** A new writer is proved by its own `back`. The
+fallback's timer runs it every 2 minutes, and a `back` that ends well notes
+its own bytes' SHA-256 and the time in the records (`writer-back.ok`). A
+`back` that found the records' lock held (a round at work) ran no further
+than its start, and notes nothing. The writer's unit clears any failed state
+`lamp-update-back.service` still shows from the copy before, so a failure
+read later is the new writer's. A build put back stays put back through a
+later refresh. The unit's start is waited for 150 s, past its own 120 s
+bound. Until the refreshed writer is proved:
+
+- **No refresh over it.** A later round looks, and does nothing else with
+  the writer.
+- **No switch of lamp-update's own begins**, since that `back` is a switch's
+  only way back: the round says it waits.
+- **Proved:** once a `back` by this writer has ended well since the refresh,
+  the round asks the unit to remove `lamp-update-back.prev`
+  (`writer_swap::Op::Proven`). A later build of lamp-update may then refresh
+  it again.
+- **Put back:** when `lamp-update-back.service` has failed, or this round's
+  first `apply` by the new writer failed, the round asks the unit to rename
+  `.prev` back over it (`Op::PutBack`). The apply's own undo runs first,
+  with the writer that made it. The build put back is kept in
+  `writer-refresh.done` and never asked to be the writer again.
+
+`installed_units` leaves out the writer's unit, as it leaves out
+lamp-update's own. It starts `update/current` too, and taken for a part it
+would move that link as a part's switch, outside the self-switch and its way
+back. A test pins that. Not shown on a real systemd or a 7071 lamp: the tests
+run the unit's program in-process, and a writer's failed `back` is a fake
+systemd's failed state. No round test yet puts back a writer whose first
+`apply` failed: the tests take the `back` path.
