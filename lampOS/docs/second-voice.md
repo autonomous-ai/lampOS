@@ -632,6 +632,10 @@ order is kept. A written turn is the same from the chat on.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
+  first builder's played test on lamp-4ace on 28 Oct (`rUTAGS-0904`):
+  35 of 37 lines answered, both misses on the hearing side, first sound
+  1.50 s median and 4.25 s at most against 8001's own 1.63 s and 4.95 s,
+  no tag spoken as words. The
   spoken turns' character is followed by a short note
   (`speech_tags::NOTE`), only when the voice reads tags (below): the voice reads `[laughs]`, `[sighs]`,
   `[whispers]` and `[excited]`, to be used rarely, only where a person
