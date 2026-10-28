@@ -7,6 +7,7 @@
 // checked before sending, and a refusal rejects with its typed error.
 import { hostname } from 'node:os';
 import WebSocket from 'ws';
+import * as debug from './debug.js';
 import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
@@ -50,7 +51,12 @@ function open(host, port, pin) {
         reject(new WrongLamp(`the certificate at ${host} is not the lamp's: ${seen.slice(0, 16)}..., not ${pin.slice(0, 16)}...`));
       }
     });
-    ws.on('message', (data) => { frames.push(JSON.parse(data.toString())); wake?.(); });
+    ws.on('message', (data) => {
+      const frame = JSON.parse(data.toString());
+      debug.frame('<-', frame);
+      frames.push(frame);
+      wake?.();
+    });
     ws.on('close', () => wake?.());
     ws.on('error', reject);
     const next = async (ms = 10_000) => {
@@ -159,7 +165,11 @@ export class Lamp {
     this.leases = new Map();
     ws.removeAllListeners('message');
     for (const frame of frames.splice(0)) this.frame(frame);
-    ws.on('message', (data) => this.frame(JSON.parse(data.toString())));
+    ws.on('message', (data) => {
+      const frame = JSON.parse(data.toString());
+      debug.frame('<-', frame);
+      this.frame(frame);
+    });
     let answered = true;
     ws.on('pong', () => { answered = true; });
     this.keepalive = setInterval(() => {
@@ -193,10 +203,12 @@ export class Lamp {
     let reply;
     try {
       const key = keyring.public();
-      ws.send(JSON.stringify({
+      const ask = {
         id: 1, op: 'pair', name: (name ?? hostname()).slice(0, 64),
         key: b64(key), proof: b64(proof(code, Buffer.from(pin, 'hex'), key, welcome.nonceBytes)),
-      }));
+      };
+      debug.frame('->', ask);
+      ws.send(JSON.stringify(ask));
       reply = await next();
     } finally { ws.close(); }
     if (!reply.ok) throw fromReply(reply.error);
@@ -215,7 +227,9 @@ export class Lamp {
     const { ws, welcome, next, frames } = await open(host ?? pairing.host, pairing.port, pairing.fp);
     let reply;
     try {
-      ws.send(JSON.stringify({ id: 0, op: 'hello', client: pairing.client, sig: b64(keyring.hello(welcome.nonceBytes)) }));
+      const hello = { id: 0, op: 'hello', client: pairing.client, sig: b64(keyring.hello(welcome.nonceBytes)) };
+      debug.frame('->', hello);
+      ws.send(JSON.stringify(hello));
       reply = await next();
     } catch (error) { ws.close(); throw error; }
     if (!reply.ok) { ws.close(); throw fromReply(reply.error); }
@@ -244,7 +258,9 @@ export class Lamp {
     }
     return new Promise((resolve, reject) => {
       this.waiting.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, op, ...fields }), (error) => {
+      const sent = { id, op, ...fields };
+      debug.frame('->', sent);
+      this.ws.send(JSON.stringify(sent), (error) => {
         if (error && this.waiting.get(id)?.reject === reject) {
           this.waiting.delete(id);
           reject(new LampError(`the connection to the lamp closed: ${error.message}`, { code: 'closed' }));

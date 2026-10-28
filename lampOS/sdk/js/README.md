@@ -111,6 +111,15 @@ await lamp.closed();
 `lamp.closed()` resolves: a long-running program connects again, for
 example in a loop with a few seconds' pause.
 
+**Seeing every frame:** with `LAMPOS_LOG=debug`, every frame to and from the
+lamp is printed to stderr, one line each (`lampos -> {...}` sent, `lampos <-
+{...}` received). It's off by default. Nothing that would pair or say hello as
+this computer, or give away the lamp's pin, is printed: `proof`, `sig`, `key`,
+`nonce`, `pin` and `fp` show as `<redacted>`, and so does a pair request's
+`code`. A said `text` shows only as its
+length and the start of its SHA-256, and a pushed skill part's `data` only as
+its length.
+
 **Dependencies:** `ws` and the optional `bonjour-service` are caret ranges
 with no lock file, as a library's are: the application that uses it locks
 them.
