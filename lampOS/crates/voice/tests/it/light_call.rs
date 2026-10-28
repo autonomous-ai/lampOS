@@ -37,6 +37,8 @@ const PASS: Duration = Duration::from_millis(2);
 
 #[test]
 fn twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them() {
+    // No other test's disk flush beside these timed calls (`disk_flush`).
+    let _timing = crate::disk_flush::timing();
     // A short root: a Unix socket's address holds 103 bytes.
     let root = PathBuf::from(format!("/tmp/lvl-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
