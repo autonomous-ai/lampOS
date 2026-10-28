@@ -1054,7 +1054,7 @@ without restarting anything; the new updater runs from its next start.
 Replacing the link under a running updater is safe on Linux: the program
 already running stays mapped.
 
-### lamp-update switching itself (`LAMP_UPDATE_SELF`, off)
+### lamp-update switching itself (`LAMP_UPDATE_SELF`, on for the product)
 
 With `LAMP_UPDATE_SELF=on` in `lamp-update.service`'s environment, a round
 also moves lamp-update to its build's own binary (`own.rs`, #1680). Off, or
