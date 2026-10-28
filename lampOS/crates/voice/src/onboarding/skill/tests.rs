@@ -38,7 +38,7 @@ impl Drop for Folder {
 fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byte() {
     let definition = parse(SHIPPED).unwrap();
     let expected = [
-        (Step::WhereYouSit, SIT_NOTE, SIT_NOTE),
+        (Step::WhereYouSit, SIT_NOTE, SIT_OFFER),
         (Step::WhoYouAre, WHO_NOTE, WHO_NOTE),
         (Step::HowYouSound, NEAR_FIRST, NEAR_FIRST),
         (Step::Touch, TOUCH_NOTE, TOUCH_OFFER),
