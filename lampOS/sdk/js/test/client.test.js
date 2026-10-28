@@ -8,6 +8,9 @@ import { test } from 'node:test';
 import { Keyring, Lamp, LampError, NotPaired, WrongLamp, byCode, fromReply, schema } from '../src/index.js';
 import { FakeLamp } from '../src/testing.js';
 
+// A move the body plays (and lamp-control takes): 4 frames of 500 ms, 1.5 s in
+// all, from rest and back, well inside each joint's reach and speed.
+const PLAYABLE = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]];
 const folder = () => mkdtempSync(join(tmpdir(), 'lampos-test-'));
 const started = (t, options) => FakeLamp.start(options).then((fake) => { t.after(() => fake.stop()); return fake; });
 const until = async (ready) => { while (!ready()) await new Promise((r) => setTimeout(r, 10)); };
@@ -165,6 +168,72 @@ test('LAMPOS_LOG=debug logs each frame with its secrets redacted', async () => {
   }
 });
 
+// Moves the body would drop, and its words for each (lamp_body::moves::check;
+// the Python SDK's test has the same list).
+const UNPLAYABLE = [
+  [[[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, 'frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000'],
+  [[[0, 0, 0, 0, 0], [0, 0, 151, 0, 0], [0, 0, 0, 0, 0]], 1000, 'frames: a move this body cannot play: frame 1 takes joint 2 151 counts, farther than 150'],
+  [[[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, null], // 2 s: one the body plays
+  [[...Array(7).fill([0, 0, 0, 0, 0]), ...Array(8).fill([0, 0, 0, 0, 300]), [0, 0, 0, 0, 0]], 100, 'frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800'],
+  [[[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, 'frames: start and end at home, all five 0'],
+];
+
+test('the move rules are the body\'s and lamp-control\'s own', async (t) => {
+  // The fakes' numbers, read against lamp-body's moves.rs and lamp-control's
+  // protocol.rs, so a change there fails here.
+  const { MOVE_FARTHEST, MOVE_FASTEST, MOVE_STEP_MS, MOVE_LASTS_MS, MOVE_FRAMES } = await import('../src/testing.js');
+  const body = new URL('../../../crates/body/src/moves.rs', import.meta.url);
+  const door = new URL('../../../crates/control/src/protocol.rs', import.meta.url);
+  if (!existsSync(body) || !existsSync(door)) return t.skip('the Rust crates are not beside this copy');
+  const [bodyText, doorText] = [readFileSync(body, 'utf8'), readFileSync(door, 'utf8')];
+  const numbers = (text) => [...text.matchAll(/[0-9][0-9_]*(?:\.[0-9]+)?/g)].map((m) => Number(m[0].replaceAll('_', '')));
+  assert.deepEqual(numbers(bodyText.match(/pub const FARTHEST: \[i16; 5\] = \[([^\]]*)\]/)[1]), MOVE_FARTHEST);
+  assert.deepEqual(numbers(bodyText.match(/pub const FASTEST: \[f32; 5\] = \[([^\]]*)\]/)[1]), MOVE_FASTEST);
+  const shortest = numbers(bodyText.match(/const SHORTEST_US: u64 = ([0-9_]+);/)[1])[0];
+  const longest = numbers(bodyText.match(/const LONGEST_US: u64 = ([0-9_]+);/)[1])[0];
+  assert.deepEqual([shortest / 1000, longest / 1000], MOVE_LASTS_MS);
+  assert.deepEqual(numbers(bodyText.match(/if !\(([0-9_]+)\.\.=([0-9_]+)\)\.contains\(&file\.step_ms\)/)[0]).slice(0, 2), MOVE_STEP_MS);
+  assert.deepEqual(numbers(doorText.match(/pub const STEP_MS: [^=]*= ([0-9_]+)\.\.=([0-9_]+);/)[0]).slice(-2), MOVE_STEP_MS);
+  assert.deepEqual(numbers(doorText.match(/pub const FRAMES: [^=]*= ([0-9_]+)\.\.=([0-9_]+);/)[0]).slice(-2), MOVE_FRAMES);
+});
+
+test('the fake refuses a move the body would drop, with its words, before the lease', async () => {
+  const { moveRefusal } = await import('../src/testing.js');
+  assert.equal(moveRefusal(500, PLAYABLE), null);
+  for (const [frames, stepMs, refusal] of UNPLAYABLE) assert.equal(moveRefusal(stepMs, frames), refusal, JSON.stringify(frames));
+  assert.equal(moveRefusal(20, PLAYABLE), 'step_ms: from 40 to 1000');
+  assert.equal(moveRefusal(500, [[0, 0, 0, 0, 0]]), 'frames: from 2 to 500');
+  await withLamp({}, async (lamp, fake) => {
+    // Refused before the lease is asked for, as lamp-control's protocol.rs checks it.
+    await assert.rejects(lamp.move(UNPLAYABLE[0][0], 200), (error) => error instanceof byCode.bad_request && error.message.includes('a move this body cannot play: it lasts 600 ms'));
+    await lamp.withLease(['body'], async () => {
+      for (const [frames, stepMs, refusal] of UNPLAYABLE) {
+        if (refusal === null) { await lamp.move(frames, stepMs); continue; }
+        await assert.rejects(lamp.move(frames, stepMs), (error) => error instanceof byCode.bad_request && error.why === refusal);
+      }
+      await lamp.move(PLAYABLE, 500);
+    }, { forMs: 5000 });
+    assert.equal(fake.asked('move').length, 2);
+  });
+});
+
+test('the fake refuses a move whose frames lamp-control cannot parse, and keeps the connection', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      for (const middle of [[1, 2], null, [0, 0, 'a', 0, 0], [0, 0, 1.5, 0, 0]]) {
+        // Sent past the client's own check, as another computer's code might.
+        const frames = [[0, 0, 0, 0, 0], middle, [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]];
+        await assert.rejects(lamp.send(lamp.nextId++, 'move', { step_ms: 500, frames }), (error) => error instanceof byCode.bad_request && error.why === 'frames: each frame is five whole counts');
+      }
+      for (const stepMs of [1.5, '500']) {
+        await assert.rejects(lamp.send(lamp.nextId++, 'move', { step_ms: stepMs, frames: PLAYABLE }), (error) => error instanceof byCode.bad_request && error.why === 'step_ms: a whole number of ms');
+      }
+      await lamp.move(PLAYABLE, 500);
+    }, { forMs: 5000 });
+    assert.equal(fake.asked('move').length, 1);
+  });
+});
+
 test('connect without a pairing says so', async () => {
   await assert.rejects(Lamp.connect(undefined, { keyring: new Keyring(folder()) }), NotPaired);
 });
@@ -301,7 +370,7 @@ test('a lease the lamp takes back is lost with its why', async () => {
       fake.loseLease(lease.id, 'hand');
       await until(() => lease.state === 'lost');
       assert.equal(lease.lostWhy, 'hand');
-      await assert.rejects(lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 40), byCode.no_lease);
+      await assert.rejects(lamp.move(PLAYABLE, 500), byCode.no_lease);
     }, { forMs: 1000 });
     assert.deepEqual(fake.asked('lease.release'), []);
   });
@@ -520,7 +589,7 @@ test('a waiting gesture or move returns at the body\'s answer', async () => {
   await withLamp({ autoDone: false }, async (lamp) => {
     await lamp.withLease(['body'], async () => {
       const nod = await lamp.gesture('nod', { wait: true });
-      const move = await lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0]], 40, { wait: true });
+      const move = await lamp.move(PLAYABLE, 500, { wait: true });
       assert.deepEqual([nod.ok, nod.to, move.ok, move.to], [true, 'body', true, 'body']);
     }, { forMs: 5000 });
     assert.equal(lamp.done.size, 0);
