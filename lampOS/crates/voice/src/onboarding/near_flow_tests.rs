@@ -305,7 +305,7 @@ fn a_hearing_begun_at_six_seconds_counts_and_one_a_millisecond_later_does_not() 
 /// whose words were the lamp's name alone (#3923, `StepCallHeard`).
 fn by_text(walk: &mut Onboarding, prompt: &Prompt, after_ms: i64) -> Option<u64> {
     let began_us = (prompt.ended_us as i64 + after_ms * 1_000) as u64;
-    walk.near_text_call(began_us)
+    walk.near_text_call(began_us, began_us + 600_000)
 }
 
 /// The try judged `after_us` past the prompt's end.
@@ -364,7 +364,7 @@ fn a_call_heard_only_by_text_counts_with_its_rise_and_says_so() {
     assert_eq!(judged["accepted"], false, "{judged}");
     assert_eq!(walk.kept().near_call_tries.len(), 1);
     // Outside a try's window the step takes no line.
-    assert_eq!(walk.near_text_call(70 * S), None);
+    assert_eq!(walk.near_text_call(70 * S, 70 * S + 600_000), None);
 }
 
 /// The same "Lamp" heard by the detector and by speech to text is one call,
@@ -425,12 +425,19 @@ fn a_call_begun_late_has_its_words_waited_for_a_moment() {
     let judged = judge_at(&mut walk, &prompt, 7_400_000).expect("judged once its words are in");
     assert_eq!(judged["accepted"], true, "{judged}");
     assert_eq!(judged["heard_by"], "text");
-    // Words that never come as the name: judged at the wait's end.
+    // Words that never come: judged at the wait's end.
     let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
     room(&mut walk, &prompt, 6_000, 21.0);
     walk.near_call_line_ended(prompt.ended_us + 5_900_000);
     assert_eq!(judge_at(&mut walk, &prompt, 8_700_000), None);
     let judged = judge_at(&mut walk, &prompt, 8_800_000).expect("judged at the wait's end");
+    assert_eq!(judged["why"], "the name wasn't heard");
+    // Words back as more than the name: judged at once, no wait added.
+    let prompt = play(&mut walk, 50 * S, 1_760_000_050_000, 3);
+    room(&mut walk, &prompt, 6_000, 21.0);
+    walk.near_call_line_ended(prompt.ended_us + 5_900_000);
+    walk.near_call_words_back();
+    let judged = judge_at(&mut walk, &prompt, 7_300_000).expect("judged with no wait");
     assert_eq!(judged["why"], "the name wasn't heard");
 }
 
