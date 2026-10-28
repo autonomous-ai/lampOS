@@ -30,10 +30,13 @@ export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droo
 // What lamp-control refuses today, in its own words (crates/control/src/
 // parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
 // lamp does now. `lamp fake` does.
+// `play`'s names: the lamp's own recorded moves (crates/control/src/plays.rs).
+export const LAMP_PLAYS = Object.freeze(['glad-lift', 'perk', 'low-droop', 'sway', 'watch-left', 'watch-right']);
 export const LAMP_CONTROL_REFUSES = Object.freeze({
   look: "not routed yet: waits for the body's lease socket",
   joints: "not routed yet: waits for the body's lease socket",
-  play: 'not routed yet: waits for client packages',
+  // Any other name than the lamp's own moves, refused as bad_request.
+  play: `name: one of the lamp's own moves, ${['glad-lift', 'perk', 'low-droop', 'sway', 'watch-left', 'watch-right'].join(', ')}`,
 });
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const LEASE_OPS = new Set(['look', 'move', 'play', 'joints']);
@@ -204,7 +207,8 @@ export class FakeLamp {
       const held = [...this.leases].filter(([, h]) => h.ws === ws && h.parts.includes('body')).map(([l]) => l);
       if (!held.length || (op === 'joints' && !held.includes(request.lease))) return this.refuse(ws, id, 'no_lease', 'take a body lease first');
     }
-    if (op in this.refuses) return this.refuse(ws, id, 'refused', this.refuses[op]);
+    const ownMove = op === 'play' && LAMP_PLAYS.includes(request.name);
+    if (op in this.refuses && !ownMove) return this.refuse(ws, id, op === 'play' ? 'bad_request' : 'refused', this.refuses[op]);
     this.requests.push(request);
     this.asker.set(id, ws);
     switch (op) {
@@ -243,6 +247,13 @@ export class FakeLamp {
         const move = step === 0 ? null : step === 4 ? name : `${name}-${step * 25}`;
         return this.ok(ws, id, { to: 'body', move, light: true });
       }
+      case 'play':
+        // As lamp-control: one of the lamp's own moves, to the body, and no
+        // `done` follows.
+        if (ownMove) return this.ok(ws, id, { to: 'body' });
+        this.ok(ws, id);
+        if (this.autoDone) this.done(id);
+        return undefined;
       case 'gesture':
       case 'move':
         // As lamp-control routes them: the body takes them, and no `done`

@@ -349,7 +349,7 @@ def test_the_fake_says_done_and_lease_changes_to_whoever_they_are_for(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000) as lease:
-                    waiting = asyncio.ensure_future(lamp.play("wave", wait=True))
+                    waiting = asyncio.ensure_future(lamp.play("sway", wait=True))
                     while not fake.asked("play"):
                         await asyncio.sleep(0.01)
                     await fake.lease_event(lease.id, "suspended", "conversation")
@@ -676,10 +676,12 @@ def test_a_fake_like_lamp_control_refuses_what_it_doesnt_route(tmp_path):
         async with FakeLamp(grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
-                with pytest.raises(errors.BY_CODE["refused"]) as raised:
-                    async with lamp.lease("body", for_ms=5000):
+                # `play` is one of the lamp's own moves; any other name is bad_request.
+                async with lamp.lease("body", for_ms=5000):
+                    assert (await lamp.play("sway"))["to"] == "body"
+                    # Refused before it reaches the lamp: the schema names the six.
+                    with pytest.raises(errors.BY_CODE["bad_request"]):
                         await lamp.play("wave")
-                assert raised.value.why == "not routed yet: waits for client packages"
                 await lamp.express("glad")
                 assert (await lamp.gesture("nod"))["to"] == "body"
                 await lamp.light("warm", 3, 1_000)

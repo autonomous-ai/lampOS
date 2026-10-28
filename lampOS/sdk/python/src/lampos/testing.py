@@ -66,10 +66,13 @@ def _certificate() -> tuple[bytes, bytes]:
 # What lamp-control refuses today, in its own words (crates/control/src/
 # parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
 # lamp does now. `lamp fake` does.
+# `play`'s names: the lamp's own recorded moves (crates/control/src/plays.rs).
+LAMP_PLAYS = ("glad-lift", "perk", "low-droop", "sway", "watch-left", "watch-right")
 LAMP_CONTROL_REFUSES = {
     "look": "not routed yet: waits for the body's lease socket",
     "joints": "not routed yet: waits for the body's lease socket",
-    "play": "not routed yet: waits for client packages",
+    # Any other name than the lamp's own moves, refused as bad_request.
+    "play": "name: one of the lamp's own moves, " + ", ".join(LAMP_PLAYS),
 }
 
 
@@ -324,8 +327,8 @@ class FakeLamp:
             if not held or (op == "joints" and request["lease"] not in held):
                 await self._refuse(ws, id_, "no_lease", "take a body lease first")
                 return
-        if op in self.refuses:
-            await self._refuse(ws, id_, "refused", self.refuses[op])
+        if op in self.refuses and not (op == "play" and request.get("name") in LAMP_PLAYS):
+            await self._refuse(ws, id_, "bad_request" if op == "play" else "refused", self.refuses[op])
             return
         self.requests.append(request)
         self._asker[id_] = ws
@@ -354,6 +357,10 @@ class FakeLamp:
         elif op == "lease.release":
             self.leases.pop(request["lease"], None)
             await self._ok(ws, id_)
+        elif op == "play" and request.get("name") in LAMP_PLAYS:
+            # As lamp-control: one of the lamp's own moves, to the body, and
+            # no `done` follows.
+            await self._ok(ws, id_, to="body")
         elif op in ("gesture", "move"):
             # As lamp-control routes them: the body takes them, and no
             # `done` follows.

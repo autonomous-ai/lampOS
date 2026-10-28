@@ -521,7 +521,12 @@ impl Op {
                 }
             }
             Self::Play { name } => {
-                plain_name(name, "name")?;
+                if crate::plays::named(name).is_none() {
+                    return Err(format!(
+                        "name: one of the lamp's own moves, {}",
+                        crate::plays::names()
+                    ));
+                }
             }
             // The lamp's own short hum, its one built-in chime; the
             // recorded notices (no Wi-Fi) are never a computer's to play.
@@ -882,7 +887,7 @@ mod tests {
             r#"{"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}"#.to_owned(),
             r#"{"id":14,"op":"say","text":"Build passed."}"#.to_owned(),
             r#"{"id":15,"op":"sound","name":"hum"}"#.to_owned(),
-            r#"{"id":16,"op":"play","name":"wave-hello"}"#.to_owned(),
+            r#"{"id":16,"op":"play","name":"sway"}"#.to_owned(),
             r#"{"id":17,"op":"stop"}"#.to_owned(),
         ];
         for frame in &frames {
@@ -955,6 +960,11 @@ mod tests {
             r#"{"id":1,"op":"sound","name":"chime"}"#.to_owned(),
             r#"{"id":1,"op":"sound","name":"wifi_lost"}"#.to_owned(),
             r#"{"id":1,"op":"sound","name":"../hum"}"#.to_owned(),
+            // Only the lamp's own recorded moves, by name: no clip of the
+            // body's (gesture's), no path, nothing made up.
+            r#"{"id":1,"op":"play","name":"nod"}"#.to_owned(),
+            r#"{"id":1,"op":"play","name":"wave"}"#.to_owned(),
+            r#"{"id":1,"op":"play","name":"../sway"}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":200,"pitch":0}}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":10,"pitch":5,"roll":30}}"#.to_owned(),
             r#"{"id":1,"op":"stop","lease":"l_1"}"#.to_owned(),
@@ -1089,7 +1099,7 @@ mod tests {
             Some(Part::Body)
         );
         assert_eq!(
-            lease(r#"{"id":1,"op":"play","name":"wave"}"#),
+            lease(r#"{"id":1,"op":"play","name":"sway"}"#),
             Some(Part::Body)
         );
         assert_eq!(

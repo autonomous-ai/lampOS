@@ -354,7 +354,12 @@ impl Parts for Lamp {
             Op::Express { feeling, strength } => self.express(client, feeling, *strength),
             // Only the hum today (protocol.rs refuses any other name).
             Op::Sound { .. } => self.sound(client, re),
-            Op::Play { .. } => Err(waits_for("client packages")),
+            // The lamp's own recorded move, whole, as its skill sends it;
+            // protocol.rs refused any other name.
+            Op::Play { name } => match crate::plays::named(name) {
+                Some(file) => self.to_body(json!({ "move": file }), client),
+                None => Err(Error::new(ErrorCode::BadRequest, "no such move")),
+            },
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
     }
@@ -428,6 +433,20 @@ mod tests {
         let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
         assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));
         assert_eq!(sent["priority"], "skill");
+        // `play`: the lamp's own move, whole, as its skill ships it.
+        assert_eq!(
+            lamp.act("c_1", 3, &op(r#"{"id":3,"op":"play","name":"sway"}"#), 0)
+                .unwrap(),
+            json!({"to": "body"})
+        );
+        let length = body.recv(&mut buffer).unwrap();
+        let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+        let sway: Value = serde_json::from_str(crate::plays::PLAYS[3].1).unwrap();
+        assert_eq!(sent["move"], sway);
+        assert_eq!(
+            (&sent["source"], &sent["priority"]),
+            (&json!("control:c_1"), &json!("skill"))
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -693,7 +712,10 @@ mod tests {
         let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
         for (frame, waits) in [
             (r#"{"id":1,"op":"look","at":"ahead"}"#, "lease socket"),
-            (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
+            (
+                r#"{"id":1,"op":"joints","lease":"l_1","targets":{"pitch":4.0},"within_ms":300}"#,
+                "lease socket",
+            ),
         ] {
             let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();
             assert!(error.why.contains(waits), "{frame}: {}", error.why);

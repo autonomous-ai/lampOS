@@ -19,6 +19,7 @@ pub mod feelings;
 pub mod lease;
 pub mod pairing;
 pub mod parts;
+pub mod plays;
 pub mod protocol;
 pub mod push;
 pub mod rate;

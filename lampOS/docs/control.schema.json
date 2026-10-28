@@ -616,7 +616,7 @@
       "additionalProperties": false
     },
     "play": {
-      "description": "A recorded move from the client's installed package; needs a body lease held by this client.",
+      "description": "One of the lamp's own recorded moves, the ones lampOS's skills ship, by name, sent whole and held to the body's own check; needs a body lease held by this client. The body's built-in clips are gesture's.",
       "type": "object",
       "properties": {
         "id": {
@@ -626,8 +626,14 @@
           "const": "play"
         },
         "name": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+          "enum": [
+            "glad-lift",
+            "perk",
+            "low-droop",
+            "sway",
+            "watch-left",
+            "watch-right"
+          ]
         }
       },
       "required": [

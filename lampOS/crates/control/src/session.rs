@@ -1279,7 +1279,7 @@ mod tests {
         assert_eq!(code_of(&subscribe), Some("no_grant"));
         let play = door.handle(
             &mut session,
-            r#"{"id":4,"op":"play","name":"wave"}"#,
+            r#"{"id":4,"op":"play","name":"sway"}"#,
             &mut fake,
             2 * S,
             1,
@@ -1295,7 +1295,7 @@ mod tests {
         assert_eq!(reply(&take)["lease"], "l_1");
         let play = door.handle(
             &mut session,
-            r#"{"id":6,"op":"play","name":"wave"}"#,
+            r#"{"id":6,"op":"play","name":"sway"}"#,
             &mut fake,
             3 * S,
             1,

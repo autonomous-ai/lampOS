@@ -449,8 +449,10 @@ test('a waiting action whose socket drops before the reply leaves no rejection u
 test('a fake like lamp-control refuses what it does not route yet', async () => {
   const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
   await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
+    // `play` is one of the lamp's own moves; any other name is bad_request.
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.play('wave'), (error) => error.code === 'refused' && error.why === 'not routed yet: waits for client packages');
+      assert.equal((await lamp.play('sway')).to, 'body');
+      await assert.rejects(lamp.play('wave'), (error) => error.code === 'bad_request' && error.why.startsWith("name: one of the lamp's own moves, glad-lift"));
     });
     await lamp.express('glad');
     assert.equal((await lamp.gesture('nod')).to, 'body');
