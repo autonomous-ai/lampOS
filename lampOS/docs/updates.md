@@ -554,7 +554,10 @@ check starts the next round at once instead of after the wait. It is the
 same round, with the same lock and quiet moment; a check that came while a
 round ran is dropped, never kept for after it, and at most one a minute
 starts a round. With nobody saying one, the wait is as before
-([cloud.md](cloud.md), "Check for update"). A round
+([cloud.md](cloud.md), "Check for update"). lamp-cloud is the one that
+says it, but the bus keeps no list of who may say a topic, so any part on
+the lamp's bus can start a round this way: still at most one a minute, and
+each under the quiet rule. A round
 (`crates/update/src/round.rs`):
 
 1. **A switch cut short is put back.** If the journal of a switch is there
