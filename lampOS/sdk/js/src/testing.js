@@ -70,7 +70,7 @@ export class FakeLamp {
     this.pings = 0;
     this.leases = new Map();
     this.subscribed = new Map();
-    this.state = { presence: { count: 0 }, light: {}, mood: {}, lamp_state: { talking: false, paused: false, private: false, asleep: false } };
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: {}, mood: {}, lamp: { talking: false, paused: false, private: false, asleep: false } };
     this.refusals = new Map();
     this.nextLease = 1;
   }
@@ -216,8 +216,9 @@ export class FakeLamp {
         request.events.forEach((e) => this.subscribed.get(ws).delete(e));
         return this.ok(ws, id);
       case 'get': {
-        const asked = new Set(request.state.map((s) => (s === 'lamp' ? 'lamp_state' : s)));
-        return this.ok(ws, id, Object.fromEntries(Object.entries(this.state).filter(([k]) => asked.has(k))));
+        // As lamp-control's session.rs answers `get`: the states under `state`, each by the name asked (`lamp`, not
+        // `lamp.changed`'s `lamp_state`) (harness-reviewer's lamp run on 75c9, 28 Oct).
+        return this.ok(ws, id, { state: Object.fromEntries(request.state.map((k) => [k, this.state[k] ?? null])) });
       }
       case 'lease.take': {
         const taken = [...this.leases.values()].some((h) => h.parts.some((p) => request.parts.includes(p)));

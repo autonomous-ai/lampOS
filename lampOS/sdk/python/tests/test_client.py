@@ -302,7 +302,9 @@ def test_get_answers_the_states_asked(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 state = await lamp.get("presence", "lamp")
-            assert state["presence"]["count"] == 2 and state["lamp_state"]["private"] is False
+            # As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
+            assert state == {"presence": {"count": 2, "near": 0.4, "facing": True},
+                             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False}}
 
     run(go())
 

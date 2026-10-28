@@ -136,10 +136,10 @@ class FakeLamp:
         self.leases: dict[str, dict] = {}
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
-            "presence": {"count": 0},
+            "presence": {"count": 0, "near": 0.0, "facing": False},
             "light": {},
             "mood": {},
-            "lamp_state": {"talking": False, "paused": False, "private": False, "asleep": False},
+            "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
         }
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
         self._connections: set[ServerConnection] = set()
@@ -337,8 +337,9 @@ class FakeLamp:
             self.subscribed[id(ws)].difference_update(request["events"])
             await self._ok(ws, id_)
         elif op == "get":
-            asked = {("lamp_state" if s == "lamp" else s) for s in request["state"]}
-            await self._ok(ws, id_, **{k: v for k, v in self.state.items() if k in asked})
+            # As lamp-control's session.rs answers `get`: the states under `state`, each by the name asked (`lamp`, not
+            # `lamp.changed`'s `lamp_state`) (harness-reviewer's lamp run on 75c9, 28 Oct).
+            await self._ok(ws, id_, state={k: self.state.get(k) for k in request["state"]})
         elif op == "lease.take":
             if any(set(request["parts"]) & set(h["parts"]) for h in self.leases.values()):
                 await self._refuse(ws, id_, "busy", "another client holds it")
