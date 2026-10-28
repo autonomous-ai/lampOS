@@ -34,8 +34,10 @@ agreement and missing-index/ancestor shapes are checked before allocating any
 decode buffer. Base64 encoded length must match the claimed old length; the
 library's conservative temporary decode buffer adds at most two bytes per
 file. JSON escape scratch space and ignored future metadata are bounded by
-the whole artifact limit and serde's nesting limit. No unbounded allocation
-or semantic extension is inferred from a future field.
+the 16 MiB whole-artifact limit. The pinned serde_json reader skips ignored
+future values iteratively, so its typed recursion limit is not a nesting guard
+for that metadata. No separate metadata-depth bound or semantic extension is
+inferred from a future field.
 
 `Bundle::decode` checks the expected SHA-256 and **exact size before parsing**.
 These use `writer_refresh::Artifact` as a content identity, not a signature

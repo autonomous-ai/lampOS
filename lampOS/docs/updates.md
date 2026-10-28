@@ -2412,3 +2412,14 @@ accepted; units, models, image/reset/tmpfiles/skills effects remain refused.
 The borrowed-context in-memory result is neither durable nor an apply grant.
 There is no State/live-file reader, runtime caller, capability bump, privileged
 writer, publication or restoration path.
+
+### Bounded saved ordinary plans (#3689)
+
+The private [plan container](ordinary-plan-container.md) explicitly encodes a
+successfully prepared result and reopens it against an externally protected
+plan identity and the original expected context. Exact envelope/preimage/Head
+bytes, all signed decisions and projected order remain separate and immutable.
+Bounded framing and deterministic replay comparison refuse semantic changes;
+accepted nonsemantic metadata stays in the original container bytes. This is
+checked data without a State/live-file reader, durable publication, journal
+admission, apply grant, executor or restoration.
