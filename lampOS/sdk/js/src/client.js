@@ -6,7 +6,9 @@
 // Every message is docs/control.schema.json's. Names the schema enumerates are
 // checked before sending, and a refusal rejects with its typed error.
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
+import { join } from 'node:path';
 import WebSocket from 'ws';
 import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
@@ -376,8 +378,20 @@ export class Lamp {
   // `skill`: what it asks, and whether it's on or held for the owner's yes.
   async pushSkill(folder) {
     if (!this.grants.includes('skills')) throw new byCode.no_grant('not granted: skills');
-    const { pack } = await import('./push.js');
-    return this.#sendPackage(pack(folder));
+    const { pack, rulesBeyond } = await import('./push.js');
+    const pkg = pack(folder);
+    // As the Python SDK's push_skill: a grant this pairing lacks, or what no
+    // grant allows, is refused here before a byte is sent.
+    const { parse } = await import('smol-toml');
+    let rules = null;
+    try {
+      rules = parse(readFileSync(join(folder, 'skill.toml'), 'utf8'));
+    } catch {
+      // pack read its version already; the lamp says what else is wrong.
+    }
+    const beyond = rules && rulesBeyond(rules, this.grants);
+    if (beyond) throw new byCode[beyond[0]](beyond[1]);
+    return this.#sendPackage(pkg);
   }
 
   // Put a shared package (`lamp skill pack`'s, signed or not) on the paired

@@ -611,6 +611,10 @@ test('a push without the skills grant, or of a core skill, sends nothing', async
   });
   await withLamp({ grants: ['light', 'skills'] }, async (lamp, fake) => {
     await assert.rejects(lamp.pushSkill(skillFolder('core', 'version = "0.1.0"\nkind = "core"\n')), (error) => error.code === 'refused' && /installable/.test(error.why));
+    // As the Python SDK: a grant the pairing lacks, or a raw topic, before a byte is sent.
+    await assert.rejects(lamp.pushSkill(skillFolder('lift', 'version = "0.1.0"\n[permissions]\nbody = true\n')), (error) => error.code === 'no_grant' && /body grant/.test(error.why));
+    await assert.rejects(lamp.pushSkill(skillFolder('raw', 'version = "0.1.0"\n[permissions]\ntopics = ["room/activity"]\n')), (error) => error.code === 'refused' && /raw topic/.test(error.why));
+    await assert.rejects(lamp.pushSkill(skillFolder('ears', 'version = "0.1.0"\n[permissions]\ntopics = ["ears/classes"]\n')), (error) => error.code === 'no_grant' && /format 2/.test(error.why));
     assert.equal(fake.asked('skill.push').length, 0);
   });
 });
@@ -648,6 +652,16 @@ test('a path lamp-skills refuses or no header holds is refused before packing', 
   writeFileSync(file, pack(skill('desk-long', `${'a'.repeat(100)}/w.json`)).data);
   assert.ok(execFileSync('tar', ['-tf', file], { encoding: 'utf8' }).split('\n').includes(`desk-long/${'a'.repeat(100)}/w.json`));
   assert.throws(() => pack(skill('desk-over', `${'a'.repeat(100)}/${'b'.repeat(100)}/c.json`)), (error) => /longer than a tar header holds/.test(error.why));
+});
+
+// Reviewer-lead's P2 on #4029, for JS too: the topics lamp-skills takes with
+// no grant (#3879's PUSHED_TOPICS) are never refused here.
+test('a push takes every topic lamp-skills takes', async () => {
+  const { rulesBeyond } = await import('../src/push.js');
+  for (const topic of ['clock/local', 'voice/state', 'lamp/pause', 'controls/touch']) {
+    assert.equal(rulesBeyond({ permissions: { topics: [topic] } }, ['skills']), null, topic);
+  }
+  assert.equal(rulesBeyond({ permissions: { topics: ['room/stood_up'] } }, ['skills'])[0], 'no_grant');
 });
 
 test('a package path outside its folder is refused before anything is written', async () => {

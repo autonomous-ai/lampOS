@@ -209,6 +209,10 @@ export async function fetchPackage(url, { redirects = 5 } = {}) {
 // grants, as the Python SDK's push.py has them (docs/control.md).
 const PERMISSION_GRANTS = { body: 'body', light: 'light', speak: 'speak' };
 const PRESENCE_TOPICS = ['humans/faces/tracked', 'room/stood_up'];
+// The topics a push may read, as lamp-skills' `PUSHED_TOPICS` (#3879): presence,
+// and those the protocol's events take with no grant (`time`, `lamp.changed`,
+// `touch`).
+const PUSHED_TOPICS = [...PRESENCE_TOPICS, 'clock/local', 'voice/state', 'lamp/pause', 'controls/touch'];
 const HEARD_TOPICS = ['voice/heard', 'name/heard', 'ears/classes'];
 const OUTSIDE = ['actions', 'messages', 'known_faces', 'who', 'output_limits', 'propose', 'core'];
 
@@ -241,9 +245,9 @@ export function rulesBeyond(rules, grants) {
     if (given && !(Array.isArray(given) && given.length === 0)) return ['refused', `[permissions] ${key} is outside the protocol's grants: a push refuses it`];
   }
   for (const topic of Array.isArray(permissions.topics) ? permissions.topics : []) {
-    if (HEARD_TOPICS.includes(topic)) return ['refused', `topic ${topic}: hear and sound wait for format 2's phrase and class lists`];
-    if (!PRESENCE_TOPICS.includes(topic)) return ['refused', `topic ${topic}: a raw topic is outside the protocol's grants`];
-    if (!grants.includes('look')) return ['no_grant', `topic ${topic} needs the look grant, which this computer doesn't hold`];
+    if (HEARD_TOPICS.includes(topic)) return ['no_grant', `topic ${topic}: hear and sound wait for format 2's phrase and class lists`];
+    if (!PUSHED_TOPICS.includes(topic)) return ['refused', `topic ${topic}: a raw topic is outside the protocol's grants`];
+    if (PRESENCE_TOPICS.includes(topic) && !grants.includes('look')) return ['no_grant', `topic ${topic} needs the look grant, which this computer doesn't hold`];
   }
   for (const [key, grant] of Object.entries(PERMISSION_GRANTS)) {
     if (permissions[key] && !grants.includes(grant)) return ['no_grant', `[permissions] ${key} needs the ${grant} grant, which this computer doesn't hold`];
