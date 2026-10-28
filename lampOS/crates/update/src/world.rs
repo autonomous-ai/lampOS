@@ -36,6 +36,17 @@ pub trait Systemd {
     fn stop(&mut self, unit: &str) -> Result<(), String> {
         Err(format!("{unit} cannot be stopped here"))
     }
+    /// `systemctl show` of [`crate::writer_unit::PROPERTIES`] for the
+    /// settings writer's one-shot, [`crate::writer_unit::UNIT`], and only
+    /// it. A systemd that cannot say refuses: the unit is then never started.
+    fn writer_unit_properties(&mut self) -> Result<String, String> {
+        Err("this systemd cannot show the writer's unit".to_owned())
+    }
+    /// `systemctl start` of [`crate::writer_unit::UNIT`], and only it:
+    /// returns once the one-shot has ended. A systemd that cannot refuses.
+    fn start_writer_unit(&mut self) -> Result<(), String> {
+        Err("this systemd cannot start the writer's unit".to_owned())
+    }
     /// The last line the unit's own program wrote to the journal since this
     /// program last restarted it, cleaned ([`clean_line`]); none before a
     /// restart, or when it said nothing since (#1505). Only ever asked of a
@@ -126,6 +137,24 @@ impl Systemd for Systemctl {
 
     fn reload(&mut self) -> Result<(), String> {
         run(&["daemon-reload"], self.restart_within)
+    }
+
+    fn writer_unit_properties(&mut self) -> Result<String, String> {
+        use crate::writer_unit::{PROPERTIES, UNIT};
+        show_within(
+            Command::new("systemctl").args([
+                "show",
+                "--no-pager",
+                &format!("--property={PROPERTIES}"),
+                "--",
+                UNIT,
+            ]),
+            JOURNAL_WITHIN,
+        )
+    }
+
+    fn start_writer_unit(&mut self) -> Result<(), String> {
+        run(&["start", crate::writer_unit::UNIT], self.restart_within)
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {

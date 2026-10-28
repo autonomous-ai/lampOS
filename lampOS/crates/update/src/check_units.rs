@@ -181,6 +181,10 @@ pub struct Report {
     /// The image's own units the lamp printed: compared with the
     /// variant's, or none when no image was given.
     pub image: BTreeMap<String, Option<Verdict>>,
+    /// The settings writer's one-shot, which a round writes and install
+    /// doesn't (crate::writer_unit, #3689): compared with this program's
+    /// own text, none when the lamp printed none.
+    pub writer: Option<Verdict>,
 }
 
 impl Report {
@@ -195,6 +199,7 @@ impl Report {
                 .image
                 .values()
                 .all(|verdict| matches!(verdict, None | Some(Verdict::Same)))
+            && matches!(self.writer, None | Some(Verdict::Same))
     }
 
     /// The report as printed, one line a finding.
@@ -244,6 +249,22 @@ impl Report {
                     for line in lines {
                         out.push_str(&format!("  {line}\n"));
                     }
+                }
+            }
+        }
+        match &self.writer {
+            None | Some(Verdict::Missing) => {}
+            Some(Verdict::Same) => out.push_str(&format!(
+                "the updater's: {}: same\n",
+                crate::writer_unit::UNIT
+            )),
+            Some(Verdict::Differs(lines)) => {
+                out.push_str(&format!(
+                    "the updater's: {}: differs\n",
+                    crate::writer_unit::UNIT
+                ));
+                for line in lines {
+                    out.push_str(&format!("  {line}\n"));
                 }
             }
         }
@@ -401,6 +422,18 @@ pub fn check_with_image(
                 }
             });
             report.image.insert(name.to_owned(), verdict);
+            continue;
+        }
+        if !product.contains_key(name) && name == crate::writer_unit::UNIT {
+            if file.path != format!("{}{name}", install::UNITS) {
+                report.elsewhere.push(file.path.clone());
+            }
+            let lines = differing(&trimmed(crate::writer_unit::TEXT), &file.text);
+            report.writer = Some(if lines.is_empty() {
+                Verdict::Same
+            } else {
+                Verdict::Differs(lines)
+            });
             continue;
         }
         if !product.contains_key(name) {
@@ -783,6 +816,45 @@ ExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker 9
 [Service]
 ExecStart=
 ";
+
+    #[test]
+    fn the_writers_one_shot_is_the_updaters_not_extra_and_compared_with_its_own_text() {
+        use crate::writer_unit::{TEXT, UNIT};
+        let printed = |path: &str, text: &str| format!("# {path}\n{text}\n");
+        let here = format!("/etc/systemd/system/{UNIT}");
+
+        let report = check(&BTreeMap::new(), &parse(&printed(&here, TEXT)));
+        assert!(report.extra.is_empty(), "{report:?}");
+        assert_eq!(report.writer, Some(Verdict::Same));
+        assert!(report.passes(), "{}", report.said());
+        assert!(
+            report
+                .said()
+                .contains(&format!("the updater's: {UNIT}: same"))
+        );
+
+        // A lamp that never refreshed its writer has none, and passes.
+        let report = check(&BTreeMap::new(), &parse(""));
+        assert_eq!(report.writer, None);
+        assert!(report.passes());
+
+        let changed = TEXT.replace("TimeoutStartSec=120", "TimeoutStartSec=infinity");
+        let report = check(&BTreeMap::new(), &parse(&printed(&here, &changed)));
+        assert!(matches!(&report.writer, Some(Verdict::Differs(lines)) if lines.len() == 2));
+        assert!(!report.passes());
+        assert!(
+            report
+                .said()
+                .contains(&format!("the updater's: {UNIT}: differs"))
+        );
+
+        let report = check(
+            &BTreeMap::new(),
+            &parse(&printed(&format!("/run/systemd/system/{UNIT}"), TEXT)),
+        );
+        assert_eq!(report.elsewhere, [format!("/run/systemd/system/{UNIT}")]);
+        assert!(!report.passes());
+    }
 
     #[test]
     fn the_images_unit_is_the_images_not_extra_and_compared_with_its_variant() {
