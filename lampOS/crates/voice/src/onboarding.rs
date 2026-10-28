@@ -2344,13 +2344,22 @@ impl Onboarding {
         let at_unix_s = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_secs());
+        // A re-offer that ends not available again keeps its date, so the
+        // next waits `reoffer_after_s` (the Reviewer-lead's P2 on #4045);
+        // only `next_step` reads it, and only for `not_available`.
+        let offered_at_unix_s = self
+            .desired
+            .steps
+            .get(step.name())
+            .and_then(|kept| kept.offered_at_unix_s)
+            .filter(|_| outcome == Outcome::NotAvailable);
         self.desired.steps.insert(
             step.name().to_owned(),
             Kept {
                 outcome,
                 at_unix_s,
                 framing,
-                offered_at_unix_s: None,
+                offered_at_unix_s,
             },
         );
         // The owner's #841 decision: giving way is the only onboarding
