@@ -73,6 +73,16 @@ pub struct ShutdownWatch<'a> {
     /// Starts `lamp-setup shutdown`: `Some` with `LAMP_SHUTDOWN` on; `None`
     /// off, when a valid request is only logged.
     pub start: Option<&'a mut dyn FnMut() -> io::Result<()>>,
+    /// Whether the runner `start` handed the shutdown to is still at work
+    /// (its unit, `lamp-setup-shutdown`, still loaded). Asked before each
+    /// start, in place of a flag set when `start` returns (the Reviewer-lead's
+    /// P2 on #3729): `start` returning only says the runner was handed the
+    /// shutdown, not that it took it. The runner refuses while an update
+    /// installs, and ends without powering off when a step fails; a flag
+    /// kept from that start would pass over every later hold this boot. The
+    /// unit is gone once the runner ends (`--collect`), so a later request
+    /// starts it again, and one while it works is `already turning off`.
+    pub running: &'a mut dyn FnMut() -> bool,
 }
 
 /// `None`: no requests are watched (the reset alone).
@@ -148,7 +158,6 @@ fn shutdown_asked(
     enabled: bool,
     now: &impl Fn() -> u64,
     log: &mut impl FnMut(&str),
-    shutting: &mut bool,
 ) {
     let request = match message.parse::<lamp_msgs::ShutdownRequest>() {
         Ok(request) => request,
@@ -179,12 +188,11 @@ fn shutdown_asked(
         (Ok(()), Some(_)) if !enabled => {
             log(&format!("{asked}: not acted on, --enable is not set"))
         }
-        (Ok(()), Some(_)) if *shutting => log(&format!("{asked}: already turning off")),
+        (Ok(()), Some(_)) if (watch.running)() => log(&format!("{asked}: already turning off")),
         (Ok(()), Some(start)) => {
             log(&format!("{asked}: turning the lamp off"));
-            match start() {
-                Ok(()) => *shutting = true,
-                Err(error) => log(&format!("the shutdown did not start: {error}")),
+            if let Err(error) = start() {
+                log(&format!("the shutdown did not start: {error}"));
             }
         }
     }
@@ -206,7 +214,6 @@ fn watch_with(
 ) -> io::Result<Watched> {
     let mut shadow = false;
     let mut refused = false;
-    let mut shutting = false;
     loop {
         if until.is_some_and(|until| Instant::now() >= until) {
             return Ok(if refused {
@@ -221,15 +228,7 @@ fn watch_with(
         if let Some(watch) = shutdown.as_mut() {
             wait = Duration::from_millis(50);
             if let Some(message) = watch.requests.recv(wait)? {
-                shutdown_asked(
-                    &message,
-                    watch,
-                    clock_id,
-                    enabled,
-                    &now,
-                    &mut log,
-                    &mut shutting,
-                );
+                shutdown_asked(&message, watch, clock_id, enabled, &now, &mut log);
             }
         }
         let Some(message) = touch.recv(wait)? else {
