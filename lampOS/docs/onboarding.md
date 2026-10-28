@@ -835,7 +835,11 @@ owes `give_more`, "A little more, then let go.", each time. The body says a
 hand once its load passes its bound or a joint is 15 counts (about 1.3°) off
 its goal, so a gentle nudge is enough and no hold is needed: "That's it, now
 let go." is the cue that it was enough. Too hard is never a failure (the body
-gives way), so no line warns of it. A newer line owed replaces one not yet said (done replaces the felt
+gives way), so no line warns of it. The prompt also comes 8 s after a push
+that was not enough, once a try. An invitation cut by the person talking while
+they push (`Delivery::Cut` with a push felt) keeps the push and opens the
+minute; a push still on at the minute's end is waited for `LET_GO_US` (5 s)
+to be let go (the Reviewer-lead's P2 and P3 on #4002). A newer line owed replaces one not yet said (done replaces the felt
 line). The words are the skill's (optional, as #3769's: an older file says
 none of them). Latency from the body's push to the line: the body says the hand
 on its next offered step (every 80 ms); the voice drains the bus at most every
