@@ -167,6 +167,71 @@ fn an_unnamed_line_keeps_the_name_it_opens_with() {
     assert_eq!(kept, "They said: my dog is Moe.");
 }
 
+/// N4b (lamp-06c1, 28 Oct): "Hey Lamp, guess what" was written "Hello.
+/// Gaswa, I changed jobs…", so the lamp kept "Gaswa" in the heard line and
+/// asked a known face what to call them. One greeting of the line's own,
+/// set off, is passed over before the name as heard.
+#[test]
+fn a_greeting_before_the_name_as_heard_is_passed_over() {
+    for (heard, word, rest) in [
+        (
+            "Hello. Gaswa, I changed jobs. I'm at the library now.",
+            "Gaswa",
+            "I changed jobs. I'm at the library now.",
+        ),
+        (
+            "Hi. Ramon, remember my locker is 12.",
+            "Ramon",
+            "remember my locker is 12.",
+        ),
+        (
+            "Good morning, Edeland. My dog is called Moe.",
+            "Edeland",
+            "My dog is called Moe.",
+        ),
+        (
+            "Xin chào, Ramon. Nhớ giúp tôi tủ số 12.",
+            "Ramon",
+            "Nhớ giúp tôi tủ số 12.",
+        ),
+    ] {
+        assert_eq!(wake_heard_as(heard), Some((word, rest)), "{heard}");
+    }
+    // A greeting before the name itself, a common opener or a day is left
+    // as it was; so is a greeting with nothing set off after it.
+    for heard in [
+        "Hello, Lamp. What time is it?",
+        "Hello. Thanks for that.",
+        "Good morning. Tomorrow, I see the dentist.",
+        "Hello.",
+        "Hello there, my dog is called Moe.",
+    ] {
+        assert_eq!(wake_heard_as(heard), None, "{heard}");
+    }
+}
+
+/// A greeting and a person's own name on a line lamp-name did not hear the
+/// name in are kept word for word; with the name heard, only the greeting
+/// and the word go.
+#[test]
+fn a_greeting_and_a_real_name_stay_when_the_name_was_not_heard() {
+    let now = Instant::now();
+    const HEARD: &str = "Hello, Tom here. Remember my locker is 12.";
+    assert_eq!(wake_not_a_name(9_904_401, HEARD, false, true), None);
+    let mut thread = crate::thread::THREAD.lock().unwrap();
+    thread.line_of(9_904_401, HEARD);
+    assert_eq!(thread.heard_for(9_904_401, now).as_deref(), Some(HEARD));
+    drop(thread);
+    const N11C: &str = "Hello. Gaswa, I changed jobs. I'm at the library now.";
+    let note = wake_not_a_name(9_904_402, N11C, true, true).expect("told");
+    assert!(note.contains("\"Gaswa\""), "{note}");
+    let mut thread = crate::thread::THREAD.lock().unwrap();
+    thread.line_of(9_904_402, N11C);
+    let kept = thread.heard_for(9_904_402, now).unwrap();
+    assert_eq!(kept, "I changed jobs. I'm at the library now.");
+    assert!(!kept.contains("Gaswa") && !kept.contains("Hello"), "{kept}");
+}
+
 /// What `KEEP_HEARD` keeps for the model's "Edeland's dog is called Moe."
 /// against the line held without the word: the heard line, not the wake.
 #[test]
