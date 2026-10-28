@@ -59,6 +59,8 @@ mod restart_quiet;
 mod self_cuts;
 #[path = "round/self_recovery.rs"]
 mod self_recovery;
+#[path = "round/writer_refresh.rs"]
+mod writer_refresh;
 
 const CHANNEL: &str = "https://channel.test/lamp-voice/";
 
@@ -227,6 +229,9 @@ struct FakeSystemd {
     /// What starting lamp-update-apply runs: none, and its start is skipped
     /// (a lamp without it), doing nothing.
     applier: Option<Box<dyn FnMut() -> Result<(), String>>>,
+    /// What starting the settings writer's one-shot runs: none, and the
+    /// start is refused (a systemd that cannot).
+    writer: Option<Box<dyn FnMut() -> Result<(), String>>>,
     /// The next reload stops the round dead, as a power cut would.
     cut_at_reload: bool,
     /// Independent recovery must be explicitly armed by a self-update fixture.
@@ -349,6 +354,26 @@ impl Systemd for FakeSystemd {
         self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
         Ok(())
+    }
+
+    fn writer_unit_properties(&mut self) -> Result<String, String> {
+        if self.writer.is_none() {
+            return Err("this systemd cannot show the writer's unit".into());
+        }
+        Ok(format!(
+            "Id={unit}\nLoadState=loaded\nFragmentPath=/etc/systemd/system/{unit}\nDropInPaths=\nUnitFileState=static\n",
+            unit = lamp_update::writer_unit::UNIT
+        ))
+    }
+
+    fn start_writer_unit(&mut self) -> Result<(), String> {
+        self.calls
+            .borrow_mut()
+            .push(format!("start {}", lamp_update::writer_unit::UNIT));
+        match self.writer.as_mut() {
+            Some(writer) => writer(),
+            None => Err("this systemd cannot start the writer's unit".into()),
+        }
     }
 
     fn last_line(&mut self, unit: &str) -> Option<String> {
@@ -514,6 +539,7 @@ impl Lamp {
             failing_after_restart: 0,
             failing: 0,
             applier: None,
+            writer: None,
             cut_at_reload: false,
             self_recovery: Err("lamp-update-back.timer is not active".into()),
             self_recovery_queries: 0,
@@ -543,6 +569,7 @@ impl Lamp {
             models: false,
             settings: false,
             product_settings: false,
+            writer_from: None,
             image: false,
         };
         Self {

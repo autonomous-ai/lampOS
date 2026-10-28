@@ -111,6 +111,10 @@ pub struct Config {
     /// `LAMP_UPDATE_IMAGE=on`: the image's own files a build carries are
     /// written the same way (crate::image, #1369).
     pub image: bool,
+    /// This program's own bytes, from which a round refreshes the settings
+    /// writer before it looks at a build (crate::writer_swap). None: the
+    /// writer is never refreshed.
+    pub writer_from: Option<crate::writer_swap::Running>,
 }
 
 impl Config {
@@ -398,6 +402,8 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         image_writes: Vec::new(),
         applying: None,
         rollback_order: None,
+        held: None,
+        apply_failed: false,
     };
     if !config.apply {
         let state = run.records.peek_state();
@@ -428,10 +434,10 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
             Err(outcome) => outcome,
         };
     }
-    let _lock = match run.records.lock() {
+    run.held = Some(match run.records.lock() {
         Ok(lock) => lock,
         Err(error) => return Outcome::Failed(error.to_string()),
-    };
+    });
     (run.world.phase)("checking");
     // A switch of lamp-update's own not yet confirmed: no round acts, so
     // an updater restarted in phase 2, or the old one run by hand, never
@@ -465,6 +471,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
             .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
         return outcome;
     }
+    run.refresh_writer();
     let mut outcome = run.acting();
     if let Some(too_old) = run.climb.take()
         && let Some(climbed) = run.climb(&too_old)
@@ -511,6 +518,11 @@ struct Run<'r, 'w> {
     /// Old startup order fixed before switching, including inactive changed
     /// units. None means an older journal must reconstruct its old graph.
     rollback_order: Option<Vec<String>>,
+    /// The records' lock, held for the whole round once taken.
+    held: Option<records::Lock>,
+    /// This round's `apply` of the build's settings failed: a writer not yet
+    /// proved is put back after the apply's own undo (crate::writer_swap).
+    apply_failed: bool,
 }
 
 /// A unit as it is to be put back.
@@ -528,6 +540,105 @@ struct Back {
 }
 
 impl Run<'_, '_> {
+    /// The settings writer refreshed from this lamp-update (#3689,
+    /// crate::writer_swap), before the round looks at a build, so this
+    /// round's settings are written by it. Asked under the round's lock
+    /// `held`, and done by the writer's one-shot unit (crate::writer_unit).
+    /// Only in a round that applies. What goes wrong is said, and the
+    /// writer the lamp has stays.
+    fn refresh_writer(&mut self) {
+        let Some(running) = self.config.writer_from.clone() else {
+            return;
+        };
+        if !self.config.apply {
+            return;
+        }
+        let folder = self.records.folder().to_owned();
+        // A writer refreshed and not proved yet is never refreshed over: its
+        // `back` that failed puts it back, and one that ended well since
+        // proves it. Until either, it is waited on.
+        if crate::writer_swap::unproven(&self.config.root, &folder) {
+            let unit = crate::writer_swap::BACK_UNIT;
+            let failed = self
+                .world
+                .systemd
+                .states(&[unit.to_owned()])
+                .ok()
+                .and_then(|states| states.into_iter().find(|state| state.unit == unit))
+                .is_some_and(|state| state.active == "failed");
+            let proved = crate::writer_swap::done(&folder)
+                .is_some_and(|done| crate::writer_swap::proved(&folder, &done));
+            if failed {
+                self.writer_op(crate::writer_swap::Op::PutBack, "its back failed");
+            } else if proved {
+                self.writer_op(crate::writer_swap::Op::Proven, "its back ended well");
+            }
+            return;
+        }
+        let build = manifest::sha256_hex(running.bytes());
+        let Some(held) = self.held.as_ref() else {
+            return;
+        };
+        let asked =
+            crate::writer_swap::ask(&self.config.root, held, running.bytes(), records::unix_ms());
+        let ran = match asked {
+            Ok(false) => return,
+            Ok(true) => crate::writer_unit::run(&self.config.root, self.world.systemd),
+            Err(why) => Err(why),
+        };
+        if let Err(why) = ran {
+            crate::writer_swap::forget(&folder);
+            self.say(&format!("the settings writer is not refreshed: {why}"));
+            return;
+        }
+        match crate::writer_swap::done(&folder) {
+            Some(done) if done.build == build => self.say(&format!(
+                "the settings writer is now build {}{}",
+                &build[..12],
+                if done.synced {
+                    ""
+                } else {
+                    ", but its folder could not be synced"
+                }
+            )),
+            _ => self.say(&format!(
+                "{} ran, and the settings writer is not build {}",
+                crate::writer_unit::UNIT,
+                &build[..12]
+            )),
+        }
+    }
+
+    /// The writer's unit asked to put a refreshed writer back, or to take
+    /// it as proved (crate::writer_swap), and what became of it said.
+    fn writer_op(&mut self, op: crate::writer_swap::Op, why: &str) {
+        let (Some(running), Some(held)) = (self.config.writer_from.clone(), self.held.as_ref())
+        else {
+            return;
+        };
+        let folder = self.records.folder().to_owned();
+        let ran = crate::writer_swap::request(held, running.bytes(), op, records::unix_ms())
+            .and_then(|()| crate::writer_unit::run(&self.config.root, self.world.systemd));
+        let line = match (op, ran) {
+            (crate::writer_swap::Op::PutBack, Ok(())) => {
+                format!(
+                    "the settings writer refreshed is put back ({why}): the copy before is the writer again"
+                )
+            }
+            (crate::writer_swap::Op::Proven, Ok(())) => {
+                format!(
+                    "the settings writer refreshed has proved itself ({why}): the copy before is removed"
+                )
+            }
+            (_, Ok(())) => return,
+            (_, Err(error)) => {
+                crate::writer_swap::forget(&folder);
+                format!("the settings writer could not be put back or proved ({why}): {error}")
+            }
+        };
+        self.say(&line);
+    }
+
     fn leave_completed_setup(&mut self, back: &Back, after: &str) -> bool {
         crate::setup_lifecycle::completed(
             &self.config.root,
@@ -1837,6 +1948,11 @@ impl Run<'_, '_> {
                 if let Err(why) = self.ask_apply(apply::Op::Back, sequence) {
                     troubles.push(format!("the settings cannot be put back: {why}"));
                 }
+                // Undone by the writer that made the apply; only then is a
+                // new writer whose first apply failed put back itself.
+                if self.apply_failed && crate::writer_swap::unproven(&self.config.root, &records) {
+                    self.writer_op(crate::writer_swap::Op::PutBack, "its first apply failed");
+                }
             } else {
                 // No back.json of this build: lamp-update-apply wrote
                 // nothing (it never ran, or failed before its first write),
@@ -1998,6 +2114,7 @@ impl Run<'_, '_> {
             let applied = self.ask_apply(apply::Op::Apply, build.sequence);
             self.settings_now(state);
             if let Err(why) = applied {
+                self.apply_failed = true;
                 return self.put_back(state, &build, &backs, None, why, String::new());
             }
             self.reset_plan_not_written(state);
@@ -2591,6 +2708,12 @@ impl Run<'_, '_> {
                 unit::folder(own::FOLDER, &old)
             ));
         }
+        // The writer's `back` is a switch's only way back: one refreshed and
+        // not proved yet is not leaned on (crate::writer_swap).
+        if crate::writer_swap::unproven(&self.config.root, self.records.folder()) {
+            self.say("lamp-update's own switch waits: the settings writer was refreshed and has not proved itself yet");
+            return Ok(None);
+        }
         own::begin(self.records.folder(), &old, &file.sha256)
             .map_err(|error| format!("self.json cannot be written: {error}"))?;
         replace_link(&link, &file.sha256).map_err(|error| {
@@ -2804,8 +2927,14 @@ fn installed_units(config: &Config) -> io::Result<Vec<Installed>> {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().into_owned();
         // A linked unit lives somewhere else, which is not this program's
-        // to change.
-        if !manifest::is_unit_name(&name) || name == OWN_UNIT || !entry.file_type()?.is_file() {
+        // to change. Neither is a unit of lamp-update's own: its service, and
+        // the writer's one-shot (crate::writer_unit), which starts
+        // `update/current` too and must never move that link as a part's.
+        if !manifest::is_unit_name(&name)
+            || name == OWN_UNIT
+            || name == crate::writer_unit::UNIT
+            || !entry.file_type()?.is_file()
+        {
             continue;
         }
         let text = fs::read_to_string(entry.path())?;
