@@ -537,7 +537,9 @@ guessed by default. The loader rejects symlink files, malformed/unknown fields,
 files above 4096 bytes, and empty/control-containing location phrases or
 phrases over 160 characters. Missing valid location evidence keeps privacy
 unavailable. Read the profile once in storage initialization, not on the interaction loop.
-The product path configuration does not enable `LAMP_ONBOARDING`.
+The product unit sets `LAMP_ONBOARDING=on` (`deploy/product/lamp-voice.service`)
+but no `LAMP_ONBOARDING_HARDWARE_PROFILE`, so on a product lamp the privacy
+step stays unavailable and its lines are never said (#4141).
 
 Immediate feedback remains independent of progress writes. A single storage
 worker belongs to the whole service, including its physical-mute cycles;
