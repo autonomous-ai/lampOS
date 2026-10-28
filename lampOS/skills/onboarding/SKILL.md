@@ -28,6 +28,15 @@ minutes expires the attempt; it is not successful evidence. Other steps keep
 the runner's 90-second timeout after 20 seconds of quiet. Skipping and redoing
 remain the runner's existing tools, not new functions of this skill.
 
+A step that ends with no attempt (no words heard, no push, tap or call, no
+switch close) is `later`, never `failed`: the runner says the skill's `later`
+line and the walk goes on. Only the runner's evidence decides it, never a
+report. Once the walk is over, with someone there and the room quiet, a
+`later` step is offered again with its `later_reoffer` line naming it, then
+its `reoffer` note: first `later_after_s`
+after the walk ends, then once after `reoffer_after_s`, twice at most. A
+`later` step counts as not done.
+
 The runner also ends "who you are" on a name heard and a yes after it, and
 "preferences" on both answers heard; call `setup_step` all the same, as the
 notes say. A report for a step the runner has already ended changes nothing.

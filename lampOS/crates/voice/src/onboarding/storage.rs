@@ -790,6 +790,7 @@ mod tests {
                         at_unix_s,
                         framing: None,
                         offered_at_unix_s: None,
+                        later_offers: 0,
                     },
                 );
             }
@@ -1025,6 +1026,7 @@ mod tests {
                 at_unix_s: 1,
                 framing: None,
                 offered_at_unix_s: None,
+                later_offers: 0,
             },
         );
         done.privacy_done_attempt = Some(lamp_turn_owner::BootId::new([7; 16]).unwrap());

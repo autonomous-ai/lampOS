@@ -247,6 +247,9 @@ pub enum Outcome {
     Skipped,
     Failed,
     NotAvailable,
+    /// Ended with no attempt: no words, push, tap or call heard (#3996).
+    /// Offered again after the walk; only the voice's evidence decides it.
+    Later,
 }
 
 impl Outcome {
@@ -326,12 +329,28 @@ pub struct Kept {
     /// When a step that was not available was last offered again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offered_at_unix_s: Option<u64>,
+    /// A `later` step's re-offers so far, at most [`MOST_LATER_OFFERS`].
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub later_offers: u8,
 }
+
+/// A `later` step is offered again at most this many times (#3996): first
+/// [`skill::Definition::later_after_s`] after the walk, then once after
+/// `reoffer_after_s`; past them it stays `later`, never nagging.
+const MOST_LATER_OFFERS: u8 = 2;
 
 /// The onboarding file: each step's outcome, by its name.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Progress {
+    /// Written so a build without `later` still reads it ([`steps_file`]).
+    #[serde(with = "steps_file")]
     pub steps: BTreeMap<String, Kept>,
+    /// The steps with no outcome yet in which an attempt was seen: words
+    /// heard, a push, a tap, a call or a switch close. Kept across a restart,
+    /// so a step tried before one never ends `later` (#3996, the
+    /// Reviewer-lead's P3). An older voice ignores it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tried: Vec<String>,
     /// Durable deduplication of verified physical-close/reopen completion.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub privacy_done_attempt: Option<BootId>,
@@ -361,6 +380,98 @@ pub struct Progress {
 
 fn is_zero(value: &u8) -> bool {
     *value == 0
+}
+
+/// The onboarding file's steps as a build from before `later` (#3996) reads
+/// them. That build's `Outcome` has no `later`, and its storage refuses a
+/// file it cannot parse, so a lamp put back to it (the updater's confirm
+/// window, #2810) would never go on with onboarding until a redo. A `later`
+/// step is written as the outcome that build gave such a step, `skipped`
+/// for privacy and `failed` for the rest, with `later: true` beside it,
+/// which that build's `Kept` reads past; it is read back here as `later`.
+mod steps_file {
+    use super::{Framing, Kept, Outcome, is_zero};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::BTreeMap;
+
+    #[derive(Serialize, Deserialize)]
+    struct OnFile {
+        outcome: Outcome,
+        at_unix_s: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        framing: Option<Framing>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        offered_at_unix_s: Option<u64>,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        later_offers: u8,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        later: bool,
+    }
+
+    /// What a build from before `later` gave a step that ended with no
+    /// attempt: privacy's invitations unanswered were `skipped`; every other
+    /// step's silence was `failed`.
+    pub(super) fn written_for(step: &str) -> Outcome {
+        if step == super::Step::Privacy.name() {
+            Outcome::Skipped
+        } else {
+            Outcome::Failed
+        }
+    }
+
+    pub fn serialize<S: Serializer>(
+        steps: &BTreeMap<String, Kept>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let on_file: BTreeMap<&str, OnFile> = steps
+            .iter()
+            .map(|(name, kept)| {
+                let later = kept.outcome == Outcome::Later;
+                let file = OnFile {
+                    outcome: if later {
+                        written_for(name)
+                    } else {
+                        kept.outcome
+                    },
+                    at_unix_s: kept.at_unix_s,
+                    framing: kept.framing,
+                    offered_at_unix_s: kept.offered_at_unix_s,
+                    later_offers: kept.later_offers,
+                    later,
+                };
+                (name.as_str(), file)
+            })
+            .collect();
+        on_file.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<BTreeMap<String, Kept>, D::Error> {
+        let on_file = BTreeMap::<String, OnFile>::deserialize(deserializer)?;
+        Ok(on_file
+            .into_iter()
+            .map(|(name, file)| {
+                // Only an outcome a `later` step is written as reads back
+                // as `later`; `later` itself is still read, from a file this
+                // branch wrote before it wrote it so.
+                let outcome =
+                    if file.later && matches!(file.outcome, Outcome::Failed | Outcome::Skipped) {
+                        Outcome::Later
+                    } else {
+                        file.outcome
+                    };
+                let kept = Kept {
+                    outcome,
+                    at_unix_s: file.at_unix_s,
+                    framing: file.framing,
+                    offered_at_unix_s: file.offered_at_unix_s,
+                    later_offers: file.later_offers,
+                };
+                (name, kept)
+            })
+            .collect())
+    }
 }
 
 impl Progress {
@@ -1311,6 +1422,7 @@ impl Onboarding {
             physical: receipt.physical.clone(),
         };
         let early = acquisition.physical.stamp.at_us <= attempt.delivered_at_us();
+        self.mark_tried(Step::Privacy);
         match attempt.observe_close(acquisition, now_us) {
             Ok(()) => Some(privacy::Checkpoint::new(attempt, self.privacy_path())),
             // A slide read just before the invitation began is the person
@@ -1533,6 +1645,12 @@ impl Onboarding {
                     at_unix_s: unix_ms() / 1000,
                     framing: None,
                     offered_at_unix_s: None,
+                    later_offers: self
+                        .desired
+                        .steps
+                        .get(Step::Privacy.name())
+                        .filter(|_| outcome == Outcome::Later)
+                        .map_or(0, |kept| kept.later_offers),
                 },
             );
             self.desired.privacy_done_attempt = attempt_id;
@@ -1543,14 +1661,12 @@ impl Onboarding {
                 json!({"kind":"onboarding_step","step":"privacy","outcome":outcome,"at_us":now_us}),
             );
             let camera = std::mem::take(&mut self.privacy_flow.camera_proven);
-            self.owed = Some(
-                match outcome {
-                    Outcome::Done if camera => self.definition.words.privacy_done_camera.as_str(),
-                    Outcome::Done => self.definition.words.privacy_done.as_str(),
-                    _ => self.definition.words.privacy_failed.as_str(),
-                }
-                .to_owned(),
-            );
+            self.owed = Some(match outcome {
+                Outcome::Done if camera => self.definition.words.privacy_done_camera.clone(),
+                Outcome::Done => self.definition.words.privacy_done.clone(),
+                Outcome::Later => self.definition.later_line(),
+                _ => self.definition.words.privacy_failed.clone(),
+            });
             self.erase_on_commit = true;
             self.save();
             self.poll_storage(now_us);
@@ -1587,7 +1703,13 @@ impl Onboarding {
             return;
         }
         if self.desired.privacy_invitation_tries >= 2 {
-            self.privacy_flow.pending_result = Some((Outcome::Skipped, None));
+            // No close seen in either invitation is no attempt (#3996).
+            let outcome = if self.was_tried(Step::Privacy) {
+                Outcome::Skipped
+            } else {
+                Outcome::Later
+            };
+            self.privacy_flow.pending_result = Some((outcome, None));
             return;
         }
         if !ready || now_us < self.privacy_flow.retry_after_us {
@@ -1715,6 +1837,7 @@ impl Onboarding {
     /// asked-back name and yes end the step, keeping the name, so the two
     /// never both end it (the first builder on #2526).
     pub fn heard(&mut self, text: &str, now_us: u64) {
+        self.heard_words(text);
         let nudge = self.nudge;
         let face_kept = self.face_kept;
         let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) else {
@@ -1917,6 +2040,7 @@ impl Onboarding {
     /// A line the person finished saying: with the nudge on, an answer to
     /// a step the model ends (the skill's nudge) being led.
     pub fn heard_line(&mut self, text: &str) {
+        self.heard_words(text);
         let Some(led) = self.led.as_mut().filter(|led| {
             self.nudge && led.asked_us.is_some() && self.definition.nudge(led.step).is_some()
         }) else {
@@ -2038,10 +2162,26 @@ impl Onboarding {
             return None;
         }
         if self.led.as_ref().is_none_or(|led| led.step != step) {
+            // A `later` step is offered again only with someone there and the
+            // room quiet, and opens with its one line naming the step, said
+            // before its own invitation (the first builder's P2 on #4012).
+            let later = self
+                .desired
+                .steps
+                .get(step.name())
+                .is_some_and(|kept| kept.outcome == Outcome::Later);
+            if later && !(can_speak && face.is_some() && quiet_us >= START_QUIET_US) {
+                return None;
+            }
+            self.begin_later_offer(step);
             self.led = Some(Led {
                 step,
                 ..Led::default()
             });
+            if later && let Some(line) = self.definition.later_reoffer(step) {
+                self.owed = Some(line.to_owned());
+                return None;
+            }
         }
         if step == Step::Privacy {
             if self
@@ -2131,8 +2271,9 @@ impl Onboarding {
                 self.finish(step, Outcome::Done, None, now_us);
                 self.owed = self.definition.words.touch_done.clone();
             } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
-                self.finish(step, Outcome::Failed, None, now_us);
-                self.owed = self.definition.words.touch_failed.clone();
+                // No touch felt is no attempt: later, not failed (#3996).
+                self.finish(step, Outcome::Later, None, now_us);
+                self.owed = Some(self.definition.later_line());
             } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
                 led.guided_us = Some(now_us);
                 self.records
@@ -2171,6 +2312,9 @@ impl Onboarding {
                 // The name's words are not kept: the record says so.
                 let named = step == Step::WhoYouAre && led.heard.name;
                 let asked_again = led.asked_again;
+                if led.answers > 0 {
+                    self.mark_tried(step);
+                }
                 self.nudge_record(false, now_us);
                 if named {
                     self.records
@@ -2196,8 +2340,16 @@ impl Onboarding {
                         asked_again: asked_again + 1,
                         ..Led::default()
                     });
-                } else {
+                } else if self.was_tried(step)
+                    || !matches!(step, Step::WhoYouAre | Step::Preferences)
+                {
+                    // Room sounds and face expressions: silence is a no,
+                    // kept as before, so each stays off (#3996's list).
                     self.finish(step, Outcome::Failed, None, now_us);
+                } else {
+                    // Nothing heard in any ask: later, said so (#3996).
+                    self.finish(step, Outcome::Later, None, now_us);
+                    self.owed = Some(self.definition.later_line());
                 }
                 return None;
             }
@@ -2334,10 +2486,16 @@ impl Onboarding {
             .copied()
             .find(|step| !self.desired.steps.contains_key(step.name()))
             .or_else(|| {
-                // One being offered again now is led to its end.
+                // One being offered again now is led to its end, a `later`
+                // one from its naming line on, before it is asked.
                 self.led
                     .as_ref()
-                    .filter(|led| led.asked_us.is_some())
+                    .filter(|led| {
+                        led.asked_us.is_some()
+                            || self.desired.steps.get(led.step.name()).is_some_and(|kept| {
+                                kept.outcome == Outcome::Later || kept.later_offers > 0
+                            })
+                    })
                     .map(|led| led.step)
             })
             .or_else(|| {
@@ -2345,12 +2503,101 @@ impl Onboarding {
                     self.step_available(*step)
                         && self.desired.steps.get(step.name()).is_some_and(|kept| {
                             kept.outcome == Outcome::NotAvailable
+                                // One that came from `later` and has had its
+                                // re-offers is never asked again (#3996).
+                                && kept.later_offers < MOST_LATER_OFFERS
                                 && kept.offered_at_unix_s.is_none_or(|at| {
                                     unix_s.saturating_sub(at) >= self.definition.reoffer_after_s
                                 })
                         })
                 })
             })
+            .or_else(|| {
+                // A step nobody tried (#3996): once the walk is over, first
+                // `later_after_s` after its end, then once `reoffer_after_s`
+                // after that offer; at most [`MOST_LATER_OFFERS`] times.
+                let ended = self
+                    .desired
+                    .steps
+                    .values()
+                    .map(|kept| kept.at_unix_s)
+                    .max()
+                    .unwrap_or(0);
+                self.definition.order.iter().copied().find(|step| {
+                    self.step_available(*step)
+                        && self.desired.steps.get(step.name()).is_some_and(|kept| {
+                            kept.outcome == Outcome::Later
+                                && kept.later_offers < MOST_LATER_OFFERS
+                                && match kept.offered_at_unix_s.filter(|_| kept.later_offers > 0) {
+                                    None => {
+                                        unix_s.saturating_sub(ended)
+                                            >= self.definition.later_after_s
+                                    }
+                                    Some(at) => {
+                                        unix_s.saturating_sub(at) >= self.definition.reoffer_after_s
+                                    }
+                                }
+                        })
+                })
+            })
+    }
+
+    /// Words said while a step that is answered in words is led: an
+    /// attempt, so its end is `failed`, never `later` (#3996).
+    fn heard_words(&mut self, text: &str) {
+        if let Some(step) = self
+            .led
+            .as_ref()
+            .filter(|led| led.asked_us.is_some())
+            .map(|led| led.step)
+            .filter(|step| matches!(step, Step::WhoYouAre | Step::Preferences))
+            && text.chars().any(char::is_alphanumeric)
+        {
+            self.mark_tried(step);
+        }
+    }
+
+    /// An attempt seen in `step` while it is led, kept in the progress file.
+    pub(super) fn mark_tried(&mut self, step: Step) {
+        if !self.was_tried(step) {
+            self.desired.tried.push(step.name().to_owned());
+            self.save();
+        }
+    }
+
+    /// Whether an attempt was seen in `step` since it was last ended: one
+    /// that ends with none is `later`, never `failed` (#3996).
+    pub(super) fn was_tried(&self, step: Step) -> bool {
+        self.desired.tried.iter().any(|tried| tried == step.name())
+    }
+
+    /// A `later` step led again: counted as one of its re-offers, and its
+    /// own tries given back, so the person has the step's whole chance.
+    fn begin_later_offer(&mut self, step: Step) {
+        let Some(kept) = self.desired.steps.get_mut(step.name()) else {
+            return;
+        };
+        // A `later` step, or one that came from `later` and whose offer was
+        // left unsaid: each such offer counts toward the cap (the first
+        // builder's P2 on #4012).
+        if kept.outcome != Outcome::Later
+            && !(kept.outcome == Outcome::NotAvailable && kept.later_offers > 0)
+        {
+            return;
+        }
+        kept.later_offers = kept.later_offers.saturating_add(1);
+        kept.offered_at_unix_s = Some(unix_ms() / 1_000);
+        match step {
+            Step::GivingWay => self.desired.giving_way_tries = 0,
+            Step::Privacy => self.desired.privacy_invitation_tries = 0,
+            Step::HowYouSound => {
+                self.desired.near_call_tries.clear();
+                self.desired.near_call_prompts = 0;
+                self.desired.sentence_prompts = 0;
+            }
+            _ => {}
+        }
+        self.save();
     }
 
     /// The move to ask of the body for a step just done, once.
@@ -2368,13 +2615,21 @@ impl Onboarding {
             .map_or(0, |since| since.as_secs());
         // A re-offer that ends not available again keeps its date, so the
         // next waits `reoffer_after_s` (the Reviewer-lead's P2 on #4045);
-        // only `next_step` reads it, and only for `not_available`.
-        let offered_at_unix_s = self
-            .desired
-            .steps
-            .get(step.name())
-            .and_then(|kept| kept.offered_at_unix_s)
-            .filter(|_| outcome == Outcome::NotAvailable);
+        // only `next_step` reads it, and only for `not_available`. A `later`
+        // step offered again keeps its count and when it was offered too, so
+        // it is offered at most [`MOST_LATER_OFFERS`] times; kept through
+        // `not_available` (an invitation left unsaid), so the cap is never
+        // escaped (the Reviewer-lead's P3 on #4012).
+        let kept = self.desired.steps.get(step.name());
+        let later_offers = kept
+            .filter(|kept| {
+                matches!(outcome, Outcome::Later | Outcome::NotAvailable) && kept.later_offers > 0
+            })
+            .map_or(0, |kept| kept.later_offers);
+        let offered_at_unix_s = kept
+            .filter(|_| outcome == Outcome::NotAvailable || later_offers > 0)
+            .and_then(|kept| kept.offered_at_unix_s);
+        self.desired.tried.retain(|tried| tried != step.name());
         self.desired.steps.insert(
             step.name().to_owned(),
             Kept {
@@ -2382,6 +2637,7 @@ impl Onboarding {
                 at_unix_s,
                 framing,
                 offered_at_unix_s,
+                later_offers,
             },
         );
         // The owner's #841 decision: giving way is the only onboarding
@@ -3110,6 +3366,158 @@ mod tests {
         y: -0.1,
     };
 
+    /// lamp-voice's `Outcome`, `Kept` and `Progress` as they were before
+    /// `later` (origin/lamp-voice ab8713b73b), field for field: the reader a
+    /// lamp put back by the updater (#2810) has.
+    mod before_later {
+        use super::super::{BootId, Framing};
+        use serde::Deserialize;
+        use std::collections::BTreeMap;
+
+        #[derive(Debug, PartialEq, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        pub enum Outcome {
+            Done,
+            Skipped,
+            Failed,
+            NotAvailable,
+        }
+
+        #[derive(Debug, Deserialize)]
+        pub struct Kept {
+            pub outcome: Outcome,
+            pub at_unix_s: u64,
+            #[serde(default)]
+            pub framing: Option<Framing>,
+            #[serde(default)]
+            pub offered_at_unix_s: Option<u64>,
+        }
+
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        pub struct Progress {
+            pub steps: BTreeMap<String, Kept>,
+            #[serde(default)]
+            pub privacy_done_attempt: Option<BootId>,
+            #[serde(default)]
+            pub privacy_invitation_tries: u8,
+            #[serde(default)]
+            pub privacy_discard_pending: bool,
+            #[serde(default)]
+            pub near_call_prompts: u8,
+            #[serde(default)]
+            pub near_call_tries: Vec<lamp_near_call::Try>,
+            #[serde(default)]
+            pub sentence_prompts: u8,
+            #[serde(default)]
+            pub giving_way_tries: u8,
+        }
+    }
+
+    fn kept(outcome: Outcome, offered_at_unix_s: Option<u64>, later_offers: u8) -> Kept {
+        Kept {
+            outcome,
+            at_unix_s: 1_700,
+            framing: None,
+            offered_at_unix_s,
+            later_offers,
+        }
+    }
+
+    /// The reviewer's P2 (the update path): a file this build writes with
+    /// `later` steps is read by a build from before `later`, each as the
+    /// outcome that build gave it (privacy `skipped`, the rest `failed`), so
+    /// a lamp put back goes on with onboarding; and it reads back here as
+    /// it was, `later`, count and date with it.
+    #[test]
+    fn a_file_with_later_steps_is_read_by_a_build_from_before_later() {
+        let mut progress = Progress::default();
+        for step in [
+            Step::WhoYouAre,
+            Step::HowYouSound,
+            Step::Touch,
+            Step::GivingWay,
+            Step::Preferences,
+        ] {
+            progress
+                .steps
+                .insert(step.name().into(), kept(Outcome::Later, None, 0));
+        }
+        progress
+            .steps
+            .insert("privacy".into(), kept(Outcome::Later, Some(1_800), 1));
+        progress.steps.insert(
+            "where_you_sit".into(),
+            Kept {
+                framing: Some(NEAR_MIDDLE),
+                ..kept(Outcome::Done, None, 0)
+            },
+        );
+        progress.steps.insert(
+            "room_sounds".into(),
+            kept(Outcome::NotAvailable, Some(1_900), 0),
+        );
+        progress.tried = vec!["face_expressions".into()];
+        let written = serde_json::to_vec(&progress).unwrap();
+        let text = String::from_utf8(written.clone()).unwrap();
+        assert!(
+            !text.contains("\"later\"") || text.contains("\"later\":true"),
+            "{text}"
+        );
+        assert!(!text.contains("\"outcome\":\"later\""), "{text}");
+        let old: before_later::Progress = serde_json::from_slice(&written).unwrap();
+        use before_later::Outcome as Old;
+        let outcome = |name: &str| &old.steps[name].outcome;
+        for name in [
+            "who_you_are",
+            "how_you_sound",
+            "touch",
+            "giving_way",
+            "preferences",
+        ] {
+            assert_eq!(outcome(name), &Old::Failed, "{name}");
+        }
+        assert_eq!(outcome("privacy"), &Old::Skipped);
+        assert_eq!(outcome("where_you_sit"), &Old::Done);
+        assert_eq!(old.steps["where_you_sit"].framing, Some(NEAR_MIDDLE));
+        assert_eq!(outcome("room_sounds"), &Old::NotAvailable);
+        assert_eq!(old.steps["room_sounds"].offered_at_unix_s, Some(1_900));
+        assert_eq!(old.steps["privacy"].at_unix_s, 1_700);
+        // Read back here, it is as it was written.
+        let back: Progress = serde_json::from_slice(&written).unwrap();
+        assert_eq!(back, progress);
+        assert!(back.check().is_ok());
+    }
+
+    /// A file a build from before `later` wrote still loads here, each
+    /// outcome as it was, none read as `later`, and with no count.
+    #[test]
+    fn a_file_from_before_later_still_loads() {
+        let today = r#"{"steps":{
+            "who_you_are":{"outcome":"done","at_unix_s":10},
+            "touch":{"outcome":"failed","at_unix_s":11},
+            "privacy":{"outcome":"skipped","at_unix_s":12},
+            "room_sounds":{"outcome":"not_available","at_unix_s":13,"offered_at_unix_s":14},
+            "where_you_sit":{"outcome":"done","at_unix_s":15,"framing":{"size":0.2,"x":0.05,"y":-0.1}}
+            },"privacy_invitation_tries":2,"privacy_discard_pending":false}"#;
+        let read: Progress = serde_json::from_str(today).unwrap();
+        assert!(read.check().is_ok());
+        let outcome = |name: &str| read.steps[name].outcome;
+        assert_eq!(outcome("who_you_are"), Outcome::Done);
+        assert_eq!(outcome("touch"), Outcome::Failed);
+        assert_eq!(outcome("privacy"), Outcome::Skipped);
+        assert_eq!(outcome("room_sounds"), Outcome::NotAvailable);
+        assert_eq!(read.steps["room_sounds"].offered_at_unix_s, Some(14));
+        assert_eq!(read.steps["where_you_sit"].framing, Some(NEAR_MIDDLE));
+        assert!(read.steps.values().all(|kept| kept.later_offers == 0));
+        assert!(read.tried.is_empty());
+        // `later: true` beside an outcome a `later` step is never written as
+        // is that outcome still.
+        let odd = r#"{"steps":{"where_you_sit":{"outcome":"done","at_unix_s":1,"later":true}}}"#;
+        let read: Progress = serde_json::from_str(odd).unwrap();
+        assert_eq!(read.steps["where_you_sit"].outcome, Outcome::Done);
+    }
+
     fn file(name: &str) -> PathBuf {
         let directory = std::env::temp_dir().join(format!(
             "onboarding-{name}-{}-{:?}",
@@ -3278,6 +3686,7 @@ mod tests {
                     at_unix_s: now,
                     framing: None,
                     offered_at_unix_s: Some(now),
+                    later_offers: 0,
                 },
             );
         }
@@ -4722,12 +5131,15 @@ mod tests {
         room.still = true;
         assert_eq!(room.walk.kept().steps["where_you_sit"].framing, Some(far));
         assert_eq!(room.wait(4 * S, Some(far)), [WHO_NOTE]);
-        // Never reported: asked twice more once its conversation is over
-        // (#3754), then failed after ninety seconds and a quiet room.
+        // Never answered: asked twice more once its conversation is over
+        // (#3754), then, nothing heard, left for later (#3996).
         assert_eq!(room.wait(95 * S, Some(far)), [WHO_NOTE]);
         assert_eq!(room.wait(95 * S, Some(far)), [WHO_NOTE]);
-        assert_eq!(room.wait(95 * S, Some(far)), [PREFERENCES_NOTE]);
-        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Failed));
+        assert_eq!(
+            room.wait(95 * S, Some(far)),
+            [crate::onboarding::skill::LATER, PREFERENCES_NOTE]
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Later));
     }
 
     #[test]
@@ -4956,14 +5368,186 @@ mod tests {
     }
 
     #[test]
-    fn no_touch_is_reminded_once_then_failed() {
+    fn no_touch_is_reminded_once_then_left_for_later() {
         let (mut room, _says, root) = at_touch("untouched");
+        // No tap felt is no attempt: later, said so (#3996).
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
-            [TOUCH_REMIND, TOUCH_FAILED, PREFERENCES_NOTE]
+            [
+                TOUCH_REMIND,
+                crate::onboarding::skill::LATER,
+                PREFERENCES_NOTE
+            ]
         );
-        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Later));
         assert_eq!(room.walk.take_gesture(), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Back-dates the walk's kept times by `by` seconds, as the clock
+    /// moving on would.
+    fn back_date(room: &mut Room, by: u64) {
+        for kept in room.walk.desired.steps.values_mut() {
+            kept.at_unix_s -= by;
+            if let Some(at) = kept.offered_at_unix_s.as_mut() {
+                *at -= by;
+            }
+        }
+    }
+
+    /// #3996: a step nobody tried is offered again after the walk, at
+    /// `later_after_s` and then once after `reoffer_after_s`, twice at most;
+    /// a tap during a re-offer does it.
+    #[test]
+    fn a_step_left_for_later_is_offered_again_after_the_walk_twice_at_most() {
+        let later = crate::onboarding::skill::LATER;
+        let (mut room, _says, root) = at_touch("later");
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, later, PREFERENCES_NOTE]
+        );
+        report(&room.walk, "preferences", "done");
+        // The walk is over: nothing before `later_after_s`.
+        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        let again = room.walk.definition.note(Step::Touch, true).to_owned();
+        let named = room
+            .walk
+            .definition
+            .later_reoffer(Step::Touch)
+            .unwrap()
+            .to_owned();
+        // 30 minutes on: offered again, its line naming the step first, then
+        // the step's own re-offer words (the first builder's P2 on #4012).
+        back_date(&mut room, 1_801);
+        assert_eq!(
+            room.wait(4 * S, Some(NEAR_MIDDLE)),
+            [named.clone(), again.clone()]
+        );
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        // Silent again: later, its count kept, not offered again this sitting.
+        assert_eq!(room.wait(61 * S, Some(NEAR_MIDDLE)), [TOUCH_REMIND, later]);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Later));
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        // The next day: once more, and then never again.
+        back_date(&mut room, 86_401);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [named, again]);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 2);
+        assert_eq!(room.wait(61 * S, Some(NEAR_MIDDLE)), [TOUCH_REMIND, later]);
+        back_date(&mut room, 2 * 86_401);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Later));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// The Reviewer-lead's P3s on #4012: an offer that ends unsaid keeps
+    /// the count, so the cap holds; and an attempt seen before a restart is
+    /// kept, so the step then ends `failed`, never `later`.
+    #[test]
+    fn the_later_count_outlasts_an_unsaid_offer_and_an_attempt_a_restart() {
+        let later = crate::onboarding::skill::LATER;
+        let (mut room, _says, root) = at_touch("later-kept");
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, later, PREFERENCES_NOTE]
+        );
+        room.walk
+            .desired
+            .steps
+            .get_mut("touch")
+            .unwrap()
+            .later_offers = 1;
+        room.walk
+            .finish(Step::Touch, Outcome::NotAvailable, None, room.at);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        room.walk.finish(Step::Touch, Outcome::Later, None, room.at);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        // An attempt is kept in the progress file and read back.
+        room.walk.mark_tried(Step::Preferences);
+        assert!(room.walk.was_tried(Step::Preferences));
+        report(&room.walk, "preferences", "done");
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(!room.walk.was_tried(Step::Preferences), "ended: forgotten");
+        let mut redone = Room::new("later-kept-file");
+        redone.walk.mark_tried(Step::GivingWay);
+        redone.walk.drain_storage_for_test(redone.at);
+        assert!(redone.walk.kept().tried.contains(&"giving_way".to_owned()));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// The first builder's P2 on #4012: offers left unsaid count, so a step
+    /// that came from `later` is offered twice in all, then never again.
+    #[test]
+    fn unsaid_offers_of_a_later_step_count_and_then_it_is_never_asked_again() {
+        let later = crate::onboarding::skill::LATER;
+        let (mut room, _says, root) = at_touch("later-unsaid");
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, later, PREFERENCES_NOTE]
+        );
+        report(&room.walk, "preferences", "done");
+        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        // Its first offer left unsaid: `not_available`, the count kept.
+        back_date(&mut room, 1_801);
+        assert!(!room.wait(4 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        room.walk
+            .finish(Step::Touch, Outcome::NotAvailable, None, room.at);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        // A day on, offered as `not_available` is, and counted: the second.
+        back_date(&mut room, 86_401);
+        let said = room.wait(12 * S, Some(NEAR_MIDDLE));
+        assert!(!said.is_empty(), "{:?}", room.walk.desired.steps["touch"]);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 2);
+        room.walk
+            .finish(Step::Touch, Outcome::NotAvailable, None, room.at);
+        // Then never again, however long.
+        back_date(&mut room, 3 * 86_401);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_tap_in_a_later_steps_offer_does_it() {
+        let later = crate::onboarding::skill::LATER;
+        let (mut room, mut says, root) = at_touch("later-tap");
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, later, PREFERENCES_NOTE]
+        );
+        report(&room.walk, "preferences", "done");
+        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        back_date(&mut room, 1_801);
+        let again = room.walk.definition.note(Step::Touch, true).to_owned();
+        let named = room
+            .walk
+            .definition
+            .later_reoffer(Step::Touch)
+            .unwrap()
+            .to_owned();
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [named, again]);
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        // The step already has its `later`: ticked until the tap is taken.
+        let since = std::time::Instant::now();
+        while room.outcome(Step::Touch) != Some(Outcome::Done)
+            && since.elapsed() < std::time::Duration::from_secs(2)
+        {
+            room.walk.drain_storage_for_test(room.at);
+            room.walk.tick(
+                room.at,
+                room.at - room.said,
+                true,
+                false,
+                Some(NEAR_MIDDLE),
+                true,
+            );
+            room.walk.drain_storage_for_test(room.at);
+        }
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
         std::fs::remove_dir_all(root).unwrap();
     }
 
