@@ -85,7 +85,7 @@ fn the_stable_notes_read_only_fields_the_receipt_has() {
     .unwrap();
     let script = include_str!("../../../scripts/lampos-stable-notes.py");
     let mut read = std::collections::BTreeSet::new();
-    for opening in ["receipt[\"", "receipt['", "receipt.get(\""] {
+    for opening in ["receipt[\"", "receipt['", "receipt.get(\"", "receipt.get('"] {
         for (at, _) in script.match_indices(opening) {
             let rest = &script[at + opening.len()..];
             let name: String = rest
