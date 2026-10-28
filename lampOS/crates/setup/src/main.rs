@@ -298,6 +298,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             let mut touch = bus.subscribe_typed(TouchEvent::TOPIC, NAME, TouchEvent::TYPE)?;
             let mut requests = shutdown_requests(&bus)?;
             let mut start = start_shutdown_asked;
+            let mut running = shutdown_running;
             let watched = lamp_setup::watch(
                 &mut touch,
                 &clock,
@@ -305,7 +306,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                 until,
                 lamp_ipc::monotonic_us,
                 |line| eprintln!("lamp-setup: {line}"),
-                shutdown_watch(&mut requests, &mut start),
+                shutdown_watch(&mut requests, &mut start, &mut running),
                 act,
             )?;
             println!(
@@ -819,6 +820,7 @@ fn watch_refused(
     let mouth = lamp_setup::wifi_change::SayService::product();
     let mut requests = shutdown_requests(&bus)?;
     let mut start = start_shutdown_asked;
+    let mut running = shutdown_running;
     let watched = lamp_setup::watch_refused(
         &mut touch,
         &clock,
@@ -826,7 +828,7 @@ fn watch_refused(
         until,
         lamp_ipc::monotonic_us,
         |line| eprintln!("lamp-setup: {line}"),
-        shutdown_watch(&mut requests, &mut start),
+        shutdown_watch(&mut requests, &mut start, &mut running),
         || mouth.say_as("reset", reset::SAY_REFUSED),
     )?;
     println!(
@@ -871,11 +873,35 @@ fn shutdown_requests(bus: &Bus) -> io::Result<lamp_bus::Subscriber> {
 fn shutdown_watch<'a>(
     requests: &'a mut lamp_bus::Subscriber,
     start: &'a mut dyn FnMut() -> io::Result<()>,
+    running: &'a mut dyn FnMut() -> bool,
 ) -> lamp_setup::Shutdown<'a> {
     Some(lamp_setup::ShutdownWatch {
         requests,
         start: lamp_msgs::shutdown_switched_on().then_some(start),
+        running,
     })
+}
+
+/// The transient unit `lamp-setup shutdown` hands the runner to.
+const SHUTDOWN_UNIT: &str = "lamp-setup-shutdown";
+
+/// Whether the runner is still at work (#3729): its unit loaded, from
+/// `systemd-run` creating it until it ends and is collected, refused or
+/// failed alike. Unreadable reads as not at work: the start is tried, and
+/// `systemd-run` itself refuses a second unit of that name.
+fn shutdown_running() -> bool {
+    let argv = [
+        "/usr/bin/systemctl",
+        "show",
+        "-p",
+        "LoadState",
+        "--value",
+        SHUTDOWN_UNIT,
+    ]
+    .map(str::to_owned);
+    System
+        .read(&argv)
+        .is_ok_and(|state| state.trim() == "loaded")
 }
 
 /// A request to turn off, accepted: `lamp-setup shutdown`, as by hand.
@@ -892,11 +918,11 @@ fn start_shutdown(dry_run: bool) -> Result<bool, Box<dyn std::error::Error>> {
         "/usr/bin/systemd-run",
         "--no-block",
         "--collect",
-        "--unit=lamp-setup-shutdown",
         "--property=Type=oneshot",
     ]
     .map(str::to_owned)
     .into();
+    argv.push(format!("--unit={SHUTDOWN_UNIT}"));
     argv.push(std::env::current_exe()?.to_string_lossy().into_owned());
     argv.push("shutdown-now".to_owned());
     if dry_run {

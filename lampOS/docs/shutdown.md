@@ -84,8 +84,12 @@ root) is the only privileged part that runs, so it is the one that listens.
   (`SHUTDOWN_REQUEST_TTL_US`). The watcher adds its own checks: its
   `LAMP_SHUTDOWN` on, and `--enable`. Off, a valid request is logged
   (`… not acted on, LAMP_SHUTDOWN is not on`) and nothing happens.
-- The first accepted request starts `lamp-setup shutdown` (the detached
-  runner above). Later ones are logged `already turning off`. A start that
+- An accepted request starts `lamp-setup shutdown` (the detached runner
+  above) unless the runner is still at work: its unit `lamp-setup-shutdown`
+  loaded (`systemctl show -p LoadState`), when it is logged `already turning
+  off`. The watcher keeps no flag of its own: a runner that refused (an update
+  installing) or ended without powering off is collected (`--collect`), so
+  the next request, a second hold, starts it again (#3729). A start that
   fails is logged, and the reset is still watched.
 
 ## The button held
