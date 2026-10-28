@@ -153,6 +153,9 @@ Environment=LAMP_REPLY_END_REACH=on
 # Its own voice heard back, a cut-in told as one, words said once, and a reply that is not for it.
 Environment=LAMP_SECOND_OWN_ECHO=on
 Environment=LAMP_CUT_IN_TOLD=on
+# A stop said over the lamp's answer ("Stop", "Stop them.", "That's enough.") is answered
+# "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985).
+Environment=LAMP_SPOKEN_STOP_ENDS=on
 Environment=LAMP_SECOND_SAID_ONCE=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on

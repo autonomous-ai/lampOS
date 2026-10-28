@@ -310,6 +310,10 @@ pub struct Files {
     /// Whether a spoken cut-in over the lamp's answer is told to the model
     /// (`--cut-in-told`, `LAMP_CUT_IN_TOLD`, [`crate::cut_in_told`], #828).
     pub cut_in_told: bool,
+    /// Whether a stop said over the lamp's answer is answered with one fixed
+    /// line, not asked of the model (`--spoken-stop-ends`,
+    /// `LAMP_SPOKEN_STOP_ENDS`, [`crate::spoken_stop`], #3985).
+    pub spoken_stop_ends: bool,
     /// Whether a misheard cut-in gets the lamp's "hm?" rather than a model
     /// turn, and the model is told with the next request (`--misheard-hum`,
     /// `LAMP_MISHEARD_HUM`, [`crate::misheard_hum`], #828).
@@ -494,6 +498,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (remarks, flags) = crate::remarks::take(flags);
     let (going_on_asks, flags) = crate::going_on_asks::take(flags);
     let (cut_in_told, flags) = crate::cut_in_told::take(flags);
+    let (spoken_stop_ends, flags) = crate::spoken_stop::take(flags);
     let (misheard_hum, flags) = crate::misheard_hum::take(flags);
     let (holding_answer, flags) = crate::holding_answer::take(flags);
     let (messages, flags) = crate::messages::take(flags);
@@ -554,6 +559,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         remarks,
         going_on_asks,
         cut_in_told,
+        spoken_stop_ends,
         misheard_hum,
         holding_answer,
         messages,
