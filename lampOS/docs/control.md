@@ -151,7 +151,10 @@ and the three of `PatternKind`: `breathe`, `candle`, `pulse`. A light never
 blinks or flashes. A test in `lamp-msgs` keeps the schema's lists in step.
 
 **State** (`get`, or the events above): presence (`count`, `near`,
-`facing`, never who), the light (the person's own and what shows), mood
+`facing`, never who), the light (the person's own, `on`, `colour` and
+`level` from `light/state`, and `shows`, what the ring draws now from
+`light/drawn`: the person's light, or one a computer or skill asked for
+over it; each left out until the lamp has said it), mood
 (`mood/state`'s energy, warmth, awake, asleep), and `lamp_state`.
 
 **Never through this door:** camera frames, audio, transcripts, face prints
