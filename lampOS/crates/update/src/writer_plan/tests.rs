@@ -1041,3 +1041,6 @@ fn signed_compact_pins_that_expand_past_the_output_cap_return_no_partial_prepara
         head,
     ));
 }
+
+#[path = "tests/saved.rs"]
+mod saved;
