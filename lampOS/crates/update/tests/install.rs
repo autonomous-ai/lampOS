@@ -1069,6 +1069,44 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
     assert!(page.contains(&format!("`{condition}`")));
 }
 
+/// #3710: each product unit that runs as root has the sandbox its work
+/// needs: a read-only system but for the exact paths it writes, no home,
+/// its own /tmp and no privileges gained. One row a unit, each line once.
+#[test]
+fn root_units_write_only_what_their_work_needs() {
+    let rows: [(&str, &[&str]); 1] = [
+        // The release socket, in its runtime directory, and the ring's
+        // device: nothing else (crates/setup/src/wake.rs).
+        ("lamp-waking.service", &[]),
+    ];
+    for (unit, writes) in rows {
+        let text = PRODUCT
+            .iter()
+            .find_map(|(name, text)| (*name == unit).then_some(*text))
+            .unwrap();
+        let service = section(text, "Service");
+        assert!(service.contains(&"User=root"), "{unit}");
+        for line in [
+            "ProtectSystem=strict",
+            "ProtectHome=yes",
+            "PrivateTmp=yes",
+            "NoNewPrivileges=yes",
+        ] {
+            assert_eq!(
+                service.iter().filter(|each| **each == line).count(),
+                1,
+                "{unit}: {line}"
+            );
+        }
+        let written: Vec<&str> = service
+            .iter()
+            .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+            .flat_map(str::split_whitespace)
+            .collect();
+        assert_eq!(written, writes, "{unit}");
+    }
+}
+
 /// #811: no battery clock. Every product part that acts on the time of day
 /// trusts the wall clock only once the kernel says a time client set it:
 /// the schedule, Expression's night and the voice's telling of the time.
