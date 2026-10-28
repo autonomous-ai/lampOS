@@ -7700,6 +7700,14 @@ impl Heeding {
             .iter()
             .map(|(at, _)| (*at as i64 - began_us as i64) / 1_000)
             .max();
+        // And where the first that counts for the line began: the one its
+        // start is judged by (`Attention::name_heard_scored`).
+        let name_first_ms = signs
+            .names
+            .iter()
+            .filter(|(at, _)| at.saturating_add(crate::attention::NAME_BEFORE_US) >= began_us)
+            .map(|(at, _)| (*at as i64 - began_us as i64) / 1_000)
+            .min();
         for (at_us, score) in signs.names {
             attention.name_heard_scored(at_us, score);
         }
@@ -7766,6 +7774,13 @@ impl Heeding {
             }
             // The name note goes with the name (`heed_signs`).
             self.noted = Some((request, None));
+        } else if let (Some(first), Some(newest)) = (name_first_ms, name_into_ms) {
+            // Every hearing weighed is dated too, not only one dropped, so
+            // `attention::NAME_AT_THE_START_US` can be set from both (#4226).
+            eprintln!(
+                "lamp-voice second: request {request}: lamp-name's hearing began {first} ms into the line (the newest {newest} ms); the line's start is up to {} ms",
+                crate::attention::NAME_AT_THE_START_US / 1_000
+            );
         }
         let turned = signs.turned.filter(|_| self.strict);
         // `LAMP_SAME_SPEAKER_CARRIES`: a print come after its line's verdict

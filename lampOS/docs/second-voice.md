@@ -3252,7 +3252,12 @@ after a take-over, but now for every turn:
   begins a few words in ("Yes, the lamp looked at me…", about 1.55 s;
   #829 scene 2's three). The journal's drop line says where the hearing
   began ("began N ms into the line"), which is what the bound is set
-  from. The first builder at 03:54 on #1722:
+  from. A hearing weighed and not dropped says it too (#4226): "lamp-name's
+  hearing began N ms into the line (the newest M ms)", N the first that
+  counts for the line, so both sides of the bound are read. On lamp-c0a4
+  on 29 Oct, "Lamp, I want to cook something new this weekend." played
+  1.5 s after desk talk was dropped 5 times in 20 at 1686 to 1822 ms (and
+  once at 5554 ms), on 8327 and 8389 alike. The first builder at 03:54 on #1722:
   lamp-4ace's played tests b0333 and b0413 each lost their first four day
   lines, "Hey Lamp, good morning!" heard at 1.000 (`began_ms_ago=480`) with
   its words written "Mainland. Good morning.". The 18:20 shape's words were
