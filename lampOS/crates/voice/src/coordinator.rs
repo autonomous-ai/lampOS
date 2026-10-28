@@ -5314,20 +5314,24 @@ fn near_text_call(
     onboarding.and_then(|walk| walk.near_text_call(began_us, ended_us))
 }
 
-/// A call's line whose words came back as more than the name, or ended with
-/// none (#3923): its try waits no longer for them.
-fn near_call_words_back(onboarding: Option<&mut crate::onboarding::Onboarding>) {
+/// The step's call lines kept at once: the words of a line begun before the
+/// one before it had its words back still find their line.
+const STEP_CALL_LINES: usize = 4;
+
+/// A call's line begun at `began_us`, whose turn ended with its words more
+/// than the name, or none (#3923): its try waits no longer for them.
+fn near_call_words_back(onboarding: Option<&mut crate::onboarding::Onboarding>, began_us: u64) {
     #[cfg(test)]
     if TEST_NEAR.with(|near| {
         near.borrow_mut()
             .as_mut()
-            .map(crate::onboarding::near::NearFlow::call_words_back)
+            .map(|flow| flow.call_words_back(began_us))
             .is_some()
     }) {
         return;
     }
     if let Some(walk) = onboarding {
-        walk.near_call_words_back();
+        walk.near_call_words_back(began_us);
     }
 }
 
@@ -5691,11 +5695,12 @@ fn conversation_with_gate_inner(
     // count-only to the provider, its words are counted for onboarding and
     // kept nowhere, and its answer is neither played, published nor kept.
     let mut sentence_turn: Option<u64> = None;
-    // The turn told the second route as onboarding's call (`StepCall`,
-    // #3504), and, once its line ended, when its speech began and ended
+    // The turns told the second route as onboarding's call (`StepCall`,
+    // #3504), and, once each line ended, when its speech began and ended
     // (#3923): what the step takes if its words come back as the lamp's
-    // name alone.
-    let mut step_call_line: Option<(u64, Option<(u64, u64)>)> = None;
+    // name alone. A few, newest last: a line begun before an earlier one's
+    // words are back leaves that one's place to it (c0a4, 28 Oct).
+    let mut step_call_lines: VecDeque<(u64, Option<(u64, u64)>)> = VecDeque::new();
     // Its words as they come, in memory only, until the last piece: on
     // Live they come in pieces, all of which are counted.
     let mut sentence_heard: Option<String> = None;
@@ -7329,11 +7334,13 @@ fn conversation_with_gate_inner(
             // step's try waits for nothing more. Only its own turn's end: a
             // finished transcript names no line, and an earlier line's late
             // words would empty this one's slot (the Reviewer-lead on #4006).
-            if let Some((turn, Some(_))) = step_call_line
-                && matches!(&event, ProviderOutput::TurnComplete { request, .. } if *request == turn)
+            if let ProviderOutput::TurnComplete { request, .. } = &event
+                && let Some(at) = step_call_lines
+                    .iter()
+                    .position(|(turn, spoken)| turn == request && spoken.is_some())
+                && let Some((_, Some((began, _)))) = step_call_lines.remove(at)
             {
-                step_call_line = None;
-                near_call_words_back(onboarding.as_mut());
+                near_call_words_back(onboarding.as_mut(), began);
             }
             match event {
                 ProviderOutput::ReminderDeferred {
@@ -7595,12 +7602,11 @@ fn conversation_with_gate_inner(
                 // (#3923): its speech's start goes to the step, which counts
                 // it only while its name part listens for a call.
                 ProviderOutput::StepCallHeard { request } => {
-                    // Only this line's: a late one for another leaves the
-                    // slot to the line in it.
-                    let line = step_call_line.filter(|(turn, _)| *turn == request);
-                    if line.is_some() {
-                        step_call_line = None;
-                    }
+                    // Only this line's, wherever it is among them.
+                    let line = step_call_lines
+                        .iter()
+                        .position(|(turn, _)| *turn == request)
+                        .and_then(|at| step_call_lines.remove(at));
                     let taken = line
                         .and_then(|(_, spoken)| spoken)
                         .and_then(|spoken| near_text_call(onboarding.as_mut(), spoken));
@@ -8610,8 +8616,37 @@ fn conversation_with_gate_inner(
             // requests 3 and 5), and its kept sound was carried into the
             // next line, which then was no bare name and was answered
             // (request 7, "Hey Lamp"). On Live the hold stands.
-            if near_call_turn.is_some()
-                && near_call_turn == step_call_line.map(|(turn, _)| turn)
+            // A line still going on, never told as the step's call because
+            // the step did not wait for one as it began (its Start came
+            // before the prompt's playback was known whole, or the walk was
+            // between ticks): told now, before its End, once the step waits
+            // (c0a4, 28 Oct: "Hey Lamp." answered as a turn). The route
+            // reads the mark only once the line's words are in.
+            if matches!(step, AdmissionStep::Audio(_) | AdmissionStep::End(_))
+                && let Some(current) = reply.as_ref()
+                && !current.local_input_ended
+                && sentence_turn != Some(current.owner.turn())
+                && !step_call_lines
+                    .iter()
+                    .any(|(turn, _)| *turn == current.owner.turn())
+                && step_call(onboarding.as_ref())
+            {
+                let turn = current.owner.turn();
+                provider_queue.push_back(ProviderInput::StepCall {
+                    request: turn,
+                    privacy_generation: snapshot.microphone_generation(),
+                });
+                step_call_lines.push_back((turn, None));
+                if step_call_lines.len() > STEP_CALL_LINES {
+                    step_call_lines.pop_front();
+                }
+                record(
+                    trace,
+                    json!({"kind":"onboarding_step_call","turn":turn,"late":true,"at_us":monotonic_us()}),
+                )?;
+            }
+            if near_call_turn
+                .is_some_and(|held| step_call_lines.iter().any(|(turn, _)| *turn == held))
                 && (rig.provider.role == "second"
                     || rig
                         .second
@@ -9390,7 +9425,10 @@ fn conversation_with_gate_inner(
                             request: current.owner.turn(),
                             privacy_generation: snapshot.microphone_generation(),
                         });
-                        step_call_line = Some((current.owner.turn(), None));
+                        step_call_lines.push_back((current.owner.turn(), None));
+                        if step_call_lines.len() > STEP_CALL_LINES {
+                            step_call_lines.pop_front();
+                        }
                         record(
                             trace,
                             json!({"kind":"onboarding_step_call","turn":current.owner.turn(),"at_us":monotonic_us()}),
@@ -9722,8 +9760,9 @@ fn conversation_with_gate_inner(
                     let input_end_us = audio.captured_at_us;
                     // A call's line ending (#3923): when its speech began,
                     // for its words, and the step waits a moment for them.
-                    if let Some((turn, spoken)) = step_call_line.as_mut()
-                        && *turn == current.owner.turn()
+                    if let Some((_, spoken)) = step_call_lines
+                        .iter_mut()
+                        .find(|(turn, _)| *turn == current.owner.turn())
                         && let (Some((began, _)), Some((ended, _))) =
                             (speech_levels.front(), speech_levels.back())
                     {

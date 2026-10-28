@@ -696,8 +696,17 @@ something of it, so it was held and dropped at its End: the route logged
 no words for it ("speech to text kept ready" and nothing at the line's
 end); a "Hey Lamp" after such a line (request 7) was answered, likely with
 the held line's kept sound going on into it. On Gemini Live the hold
-stands. Test:
-`coordinator::tests::second_route::a_call_begun_after_the_prompt_and_heard_by_the_detector_still_reaches_the_step_by_text`.
+stands. A line whose Start came before the step waited for a call is told
+as its call once the step does, before its End (record `onboarding_step_call`
+with `late`; c0a4, 28 October, "Hey Lamp." answered as a turn), and the step
+counts a try's evidence and calls while its prompt is claimed or its try is
+open, whatever the walk's lead says between ticks. The coordinator keeps the
+last four call lines, each in its own place, so a call whose words come back
+after the next line began still reaches the step (c0a4, "Hey, Lamp." left
+to the step with `said: []`). Tests:
+`a_line_begun_before_the_step_waits_is_told_as_its_call_once_it_does`,
+`a_call_whose_words_come_back_after_the_next_line_began_still_reaches_the_step`,
+`a_call_begun_after_the_prompt_and_heard_by_the_detector_still_reaches_the_step_by_text`.
 Outside the window, and with no near-call try open, nothing changes;
 Stop, mute and physical privacy are not touched. Tests:
 `coordinator::tests::second_route::a_call_in_the_near_call_window_is_not_answered_on_either_route`,

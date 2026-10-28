@@ -352,10 +352,16 @@ impl NearFlow {
         Some(began_ms)
     }
 
-    /// The words of the call's line came back as more than the name, or it
-    /// ended with none (#3923): the try waits for nothing more.
-    pub(crate) fn call_words_back(&mut self) {
-        self.awaited = None;
+    /// The call's line begun at `began_us` ended its turn with words more
+    /// than the name, or none (#3923): the try waits for it no more. Another
+    /// line's wait is left as it is.
+    pub(crate) fn call_words_back(&mut self, began_us: u64) {
+        if self
+            .call_unix_ms(began_us)
+            .is_some_and(|(began_ms, _)| self.awaited == Some(began_ms))
+        {
+            self.awaited = None;
+        }
     }
 
     /// A call's line begun at `began_us` ended: begun in the window, its
@@ -556,10 +562,15 @@ impl Onboarding {
         self.near.available
     }
 
+    /// While this step is led, or while a prompt of its own is claimed or
+    /// its try is open: a try in flight keeps its evidence and its call
+    /// whatever the walk's lead says between ticks (#3923).
     fn collecting(&self) -> bool {
         self.led
             .as_ref()
             .is_some_and(|led| led.step == Step::HowYouSound)
+            || self.near.offer.as_ref().is_some_and(|offer| offer.claimed)
+            || self.near.listening.is_some()
     }
 
     /// Bounded evidence, kept only while this step is led. Restart and
@@ -863,8 +874,8 @@ impl Onboarding {
     }
 
     /// [`NearFlow::call_words_back`].
-    pub(crate) fn near_call_words_back(&mut self) {
-        self.near.call_words_back();
+    pub(crate) fn near_call_words_back(&mut self, began_us: u64) {
+        self.near.call_words_back(began_us);
     }
 
     /// [`NearFlow::call_line_ended`], while this step is led.
