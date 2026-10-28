@@ -1042,6 +1042,134 @@ async fn skill_requests_to_the_helper_are_one_at_a_time_and_rated() {
     assert_eq!(helper.lock().unwrap().asked.len(), 6);
 }
 
+/// Reviewer-two's and harness-reviewer's P3s on #3910: with the helper
+/// stalled, four computers' requests are with it and a fifth's is `busy`
+/// before anything is asked, and `stop` is still answered at once.
+#[tokio::test]
+async fn a_stalled_helper_takes_four_requests_and_stop_still_answers() {
+    let lamp = lamp_built("push-cap", Box::new(session::Unrouted), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let helper = manage_helper(
+        &lamp.dir.join("manage.sock"),
+        &lamp.dir,
+        Duration::from_secs(3),
+    );
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    // Five computers, all from this one address.
+    lamp.shared.set_limits(server::Limits {
+        per_peer: 8,
+        ..server::Limits::default()
+    });
+    let mut sockets = Vec::new();
+    for seed in 50..55 {
+        if seed > 50 {
+            // One pairing try a second.
+            tokio::time::sleep(Duration::from_millis(1_100)).await;
+        }
+        sockets.push(paired(&lamp, json!(["skills"]), seed).await);
+    }
+    for socket in &mut sockets[..4] {
+        socket
+            .send(Message::text(
+                json!({"id": 2, "op": "skill.list"}).to_string(),
+            ))
+            .await
+            .unwrap();
+    }
+    for _ in 0..100 {
+        if helper.lock().unwrap().asked.len() == 4 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let fifth = &mut sockets[4];
+    let busy = send(fifth, json!({"id": 2, "op": "skill.list"})).await;
+    assert_eq!(busy["error"]["code"], "busy", "{busy}");
+    assert_eq!(
+        busy["error"]["why"], "the lamp's skill helper is busy: try again",
+        "{busy}"
+    );
+    let asked = std::time::Instant::now();
+    let stopped = send(fifth, json!({"id": 3, "op": "stop"})).await;
+    assert_eq!(stopped, json!({"re": 3, "ok": true}));
+    assert!(
+        asked.elapsed() < Duration::from_millis(500),
+        "{:?}",
+        asked.elapsed()
+    );
+    assert_eq!(helper.lock().unwrap().asked.len(), 4);
+    // Each of the four is answered once the helper is.
+    for socket in &mut sockets[..4] {
+        let listed = next(socket).await;
+        assert_eq!(listed["ok"], true, "{listed}");
+    }
+}
+
+/// Fourteen's P3 on #3910: a change the helper gives no answer to is asked
+/// again (after `RETRY_AFTER`), so a revoke's `off_pushed_by` isn't lost to
+/// one dropped connection.
+#[tokio::test]
+async fn a_change_the_helper_does_not_answer_is_asked_again() {
+    use std::io::{BufRead as _, Write as _};
+    let lamp = lamp_built("push-retry", Box::new(session::Unrouted), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let socket_path = lamp.dir.join("manage.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();
+    let asked = Arc::new(std::sync::Mutex::new(
+        Vec::<(std::time::Instant, Value)>::new(),
+    ));
+    let keep = asked.clone();
+    std::thread::spawn(move || {
+        for (n, stream) in listener.incoming().enumerate() {
+            let Ok(mut stream) = stream else { break };
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            keep.lock().unwrap().push((
+                std::time::Instant::now(),
+                serde_json::from_str(&line).unwrap(),
+            ));
+            // The first is dropped unanswered, as a helper that dies would.
+            if n > 0 {
+                let _ = writeln!(stream, "{}", json!({"done": {"off": []}}));
+            }
+        }
+    });
+    lamp.shared.set_manage_socket(socket_path);
+    let _socket = paired(&lamp, json!(["skills"]), 56).await;
+    let client = {
+        let clients = admin(&lamp, json!({"clients": true})).await;
+        clients["clients"][0]["id"].as_str().unwrap().to_owned()
+    };
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    for _ in 0..250 {
+        if asked.lock().unwrap().len() >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let asked = asked.lock().unwrap().clone();
+    let off = json!({"off_pushed_by": client});
+    assert_eq!(
+        asked
+            .iter()
+            .map(|(_, request)| request.clone())
+            .collect::<Vec<_>>(),
+        [off.clone(), off],
+        "{asked:?}"
+    );
+    let waited = asked[1].0 - asked[0].0;
+    assert!(waited >= server::RETRY_AFTER[0], "{waited:?}");
+}
+
 /// Without a manage socket, skill push is off on the lamp and says so.
 #[tokio::test]
 async fn skill_push_is_off_without_the_helper() {
