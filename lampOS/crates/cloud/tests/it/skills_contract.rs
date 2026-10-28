@@ -304,6 +304,40 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
     let camera = asked(&mut real, "skills.camera", &yes);
     assert_eq!(camera["status"], "success", "{camera}");
     assert_eq!(camera_of(&camera), json!(true));
+    // The reply also says what was kept for that name (#4099)...
+    assert_eq!(
+        camera["data"]["camera"],
+        json!({"name": "desk-tutor", "allowed": true})
+    );
+    // ...on the lamp or not yet: a yes before its install reads back, as
+    // does its taking back, and neither has a row on the page.
+    let ahead = json!({"name": "store-camera-skill", "allow": true});
+    let given = asked(&mut real, "skills.camera", &ahead);
+    assert_eq!(given["status"], "success", "{given}");
+    assert_eq!(
+        given["data"]["camera"],
+        json!({"name": "store-camera-skill", "allowed": true})
+    );
+    let rows = given["data"]["skills"].as_array().unwrap();
+    assert!(rows.iter().all(|row| row["name"] != "store-camera-skill"));
+    let back = json!({"name": "store-camera-skill", "allow": false});
+    let taken = asked(&mut real, "skills.camera", &back);
+    assert_eq!(
+        taken["data"]["camera"],
+        json!({"name": "store-camera-skill", "allowed": false})
+    );
+    // A refusal keeps nothing and says no `camera`: V1's failure.
+    let bad = asked(
+        &mut real,
+        "skills.camera",
+        &json!({"name": "desk-tutor", "allow": "yes"}),
+    );
+    assert_eq!(bad["status"], "failure", "{bad}");
+    assert_eq!(bad["error"], "allow must be true or false");
+    assert!(
+        bad.get("data")
+            .is_none_or(|data| data.get("camera").is_none())
+    );
 
     let removed = asked(&mut real, "skills.remove", &json!({"name": "desk-tutor"}));
     assert_eq!(

@@ -183,7 +183,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 35] = [
+pub const KINDS: [(&str, Switch); 38] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -199,6 +199,11 @@ pub const KINDS: [(&str, Switch); 35] = [
     ("reports.set", |lamp| lamp.reports().is_some()),
     ("skills.list", |lamp| lamp.skills().is_some()),
     ("skills.remove", |lamp| lamp.skills().is_some()),
+    // Off, on and the camera's yes with the page (#4099), so `can` tells an
+    // app the lamp that takes them from an older one.
+    ("skills.off", |lamp| lamp.skills().is_some()),
+    ("skills.on", |lamp| lamp.skills().is_some()),
+    ("skills.camera", |lamp| lamp.skills().is_some()),
     ("skills.install", |lamp| {
         lamp.skills().is_some_and(|places| places.store)
     }),
@@ -411,13 +416,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // A skill turned off or on on the person's tap (#2815), kept as
         // their own choice: the page as it now is.
-        "skills.off" | "skills.on" if lamp.skills().is_some() => {
+        "skills.off" | "skills.on" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::turn(&places, data, kind == "skills.off").map(Some)
         }
         // The owner's yes to a skill's camera, given or taken back
         // (#3504's piece C), kept as off and on are: the page as it now is.
-        "skills.camera" if lamp.skills().is_some() => {
+        "skills.camera" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::camera(&places, data).map(Some)
         }
@@ -944,12 +949,25 @@ pub mod tests {
             (
                 "skills page",
                 |f| f.skills = Some(places_of(false)),
-                &["skills.list", "skills.remove"],
+                &[
+                    "skills.list",
+                    "skills.remove",
+                    "skills.off",
+                    "skills.on",
+                    "skills.camera",
+                ],
             ),
             (
                 "skills store",
                 |f| f.skills = Some(places_of(true)),
-                &["skills.list", "skills.remove", "skills.install"],
+                &[
+                    "skills.list",
+                    "skills.remove",
+                    "skills.off",
+                    "skills.on",
+                    "skills.camera",
+                    "skills.install",
+                ],
             ),
             (
                 "settings",
