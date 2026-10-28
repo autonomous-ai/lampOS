@@ -155,6 +155,8 @@ pub struct Shared {
     open: Mutex<HashMap<u64, Open>>,
     next: AtomicU64,
     started: Instant,
+    /// How far tests have moved the door's clock on ([`Shared::move_clock_on`]).
+    ahead_us: AtomicU64,
     pin: String,
     limits: Mutex<Limits>,
     /// Open connections by address, handshakes included.
@@ -177,6 +179,7 @@ impl Shared {
             open: Mutex::new(HashMap::new()),
             next: AtomicU64::new(1),
             started: Instant::now(),
+            ahead_us: AtomicU64::new(0),
             pin,
             limits: Mutex::new(Limits::default()),
             peers: Mutex::new(HashMap::new()),
@@ -292,6 +295,7 @@ impl Shared {
                 open: Mutex::new(HashMap::new()),
                 next: AtomicU64::new(1),
                 started: Instant::now(),
+                ahead_us: AtomicU64::new(0),
                 pin,
                 limits: Mutex::new(Limits::default()),
                 peers: Mutex::new(HashMap::new()),
@@ -311,7 +315,18 @@ impl Shared {
     }
 
     fn now_us(&self) -> u64 {
-        u64::try_from(self.started.elapsed().as_micros()).unwrap_or(u64::MAX)
+        u64::try_from(self.started.elapsed().as_micros())
+            .unwrap_or(u64::MAX)
+            .saturating_add(self.ahead_us.load(Ordering::Relaxed))
+    }
+
+    /// For tests: the door's clock moves on by `by`, as if that long had
+    /// passed, so a test of "one pairing try a second" need not sleep it
+    /// (#1806). Every rule that reads the clock is unchanged, and it only
+    /// moves forward. Nothing in the product calls it.
+    pub fn move_clock_on(&self, by: Duration) {
+        let by = u64::try_from(by.as_micros()).unwrap_or(u64::MAX);
+        self.ahead_us.fetch_add(by, Ordering::Relaxed);
     }
 
     /// Whether a computer holds the protocol's `body` lease now: the door
