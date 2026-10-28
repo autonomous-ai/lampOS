@@ -8138,8 +8138,11 @@ impl Heeding {
             ));
         }
         // An answer let out for the name in the room's sound alone opens no
-        // conversation (#4175): the next line needs a sign of its own.
-        let opens_nothing = self.remark_about_it && name_alone && attention.played_for_its_name();
+        // conversation (#4175): the next line needs a sign of its own. A
+        // conversation already going on is renewed as before (the Tests
+        // lane's P3 on #4201).
+        let opens_nothing =
+            self.remark_about_it && name_alone && !seen.going_on && attention.played_for_its_name();
         // In a busy room, a line going on that turns to someone else ends
         // the conversation for that line (#3882): "Can you pass me the
         // charger?" to a colleague, after the lamp's answer. A reply to the
@@ -18335,6 +18338,44 @@ mod tests {
             assert_eq!(lost, None, "{on}: words lost");
             assert_eq!(heeding.called_at.is_some(), !on, "{on}: words lost");
         }
+        // A request with the lamp as its object, its call lost in the words
+        // (Fourth's and the Reviewer-three's P2 on #4201): answered, as
+        // without the switch.
+        for heard in [
+            "Turn off the lamp.",
+            "Can you dim the lamp?",
+            "Can you dim the lamp a little?",
+            "Mainland. Turn off the lamp please.",
+            "Make the lamp brighter.",
+        ] {
+            let mut heeding = room_name_heeding(true);
+            heeding.holding_remarks_about_it();
+            assert_eq!(
+                heeding.judge(
+                    915,
+                    (10_000_000, 11_500_000),
+                    heard,
+                    room_name_signs(Room::Busy, false, None, false, at_start.clone()),
+                ),
+                None,
+                "{heard}"
+            );
+        }
+        // Going on from a real call, a follow-up let out for the name in the
+        // room's sound alone renews the conversation as before: not put on
+        // the chain.
+        let mut heeding = room_name_heeding(true);
+        heeding.holding_remarks_about_it();
+        assert_eq!(
+            heeding.judge(
+                916,
+                (10_000_000, 11_500_000),
+                "and what about tomorrow",
+                room_name_signs(Room::Busy, true, None, false, at_start.clone()),
+            ),
+            None
+        );
+        assert!(!heeding.chain.contains(&916), "a follow-up going on");
         // Said to the lamp, or with a face turned to it: as without the
         // switch (the turned face's remark is held by the busy room's
         // rule, as it asks nothing).
