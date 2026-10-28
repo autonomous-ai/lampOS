@@ -65,6 +65,10 @@ const COLLECT_MS: u64 = WINDOW_MS + RISE_MS;
 /// The last level and a final `name/heard` are published a moment after the
 /// span they describe; the try is judged this long after it.
 const DELIVERY_GRACE_US: u64 = 300_000;
+/// The answer to a call try just judged (its next prompt, "Got it. Once
+/// more." or "I didn't catch that.") waits only this much quiet, not the
+/// walk's 3 s (`START_QUIET_US`): it follows the call as a reply would.
+const ANSWER_QUIET_US: u64 = 500_000;
 /// The Unix clock may drift from the monotonic one by this much over a try;
 /// more is a jump, and the try's window can't be trusted.
 pub(super) const CLOCK_SLACK_MS: u64 = 1_000;
@@ -268,6 +272,8 @@ pub(crate) struct NearFlow {
     /// A call's line ended in the try's window, its words not back yet
     /// ([`TEXT_WAIT_US`]): when it began, Unix milliseconds.
     awaited: Option<u64>,
+    /// A call try was just judged: its answer waits [`ANSWER_QUIET_US`].
+    answers: bool,
 }
 
 impl NearFlow {
@@ -687,6 +693,7 @@ impl Onboarding {
         self.near.unsaid = 0;
         self.near.last = None;
         self.near.awaited = None;
+        self.near.answers = false;
     }
 
     pub(super) fn near_pending(&self) -> Option<lamp_msgs::OnboardingInvitation> {
@@ -720,6 +727,7 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
+        self.near.answers = false;
         Some(
             match (offer.sentence, offer.prompt, self.near.short) {
                 // Each call prompt answers the last try (#3702).
@@ -1063,21 +1071,38 @@ impl Onboarding {
             self.sentence_judge(now_us);
             return;
         }
-        // A call's line still waiting for its words holds the judgement a
-        // little, never past TEXT_WAIT_US.
-        let wait = if self.near.awaited.is_some() {
-            TEXT_WAIT_US
-        } else {
-            0
-        };
+        // Judged as soon as a call is heard: once its rise window is in
+        // (a call begun over the prompt's end, from that end). With none
+        // heard, at the window's end and the rise window after it. A call's
+        // line still waiting for its words holds the judgement until they
+        // come, never past the window, the rise window and TEXT_WAIT_US.
+        let awaited = self.near.awaited.is_some();
         let due = self.near.listening.as_ref().is_some_and(|listening| {
-            now_us >= listening.ended_us + COLLECT_MS * 1_000 + DELIVERY_GRACE_US + wait
+            if awaited {
+                return now_us
+                    >= listening.ended_us + COLLECT_MS * 1_000 + DELIVERY_GRACE_US + TEXT_WAIT_US;
+            }
+            let after_ms = self
+                .near
+                .seen
+                .iter()
+                .filter_map(|seen| match seen {
+                    Seen::Hearing(hearing, heard_ms) => {
+                        call_began_ms(hearing, *heard_ms, listening.ended_ms)
+                    }
+                    _ => None,
+                })
+                .filter(|began| *began <= listening.ended_ms + WINDOW_MS)
+                .max()
+                .map_or(COLLECT_MS, |began| began - listening.ended_ms + RISE_MS);
+            now_us >= listening.ended_us + after_ms * 1_000 + DELIVERY_GRACE_US
         });
         if !due {
             return;
         }
         let listening = self.near.listening.take().expect("due");
         self.near.awaited = None;
+        self.near.answers = true;
         let from_end = |ms: u64| ms as i64 - listening.ended_ms as i64;
         // Every name heard, as (ms from the prompt's end, score), for the
         // try's record and journal line.
@@ -1255,7 +1280,12 @@ impl Onboarding {
             };
             self.near.generation = generation;
         }
-        let ready = can_speak && present && quiet_us >= START_QUIET_US;
+        let quiet = if self.near.answers {
+            ANSWER_QUIET_US
+        } else {
+            START_QUIET_US
+        };
+        let ready = can_speak && present && quiet_us >= quiet;
         if let Some(offer) = self.near.offer.as_mut() {
             if !offer.persisted {
                 let committed = if offer.sentence {
