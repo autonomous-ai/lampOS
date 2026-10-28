@@ -512,7 +512,7 @@ fn writer_refresh(options: &BTreeMap<String, String>) -> Result<(), String> {
         Path::new("/"),
         Path::new(lamp_update::install::RECORDS),
         &running,
-        lamp_update::records::unix_ms(),
+        &lamp_update::records::unix_ms,
         &mut |path: &Path| lamp_update::fixed_copy::run_probe(path),
     )?;
     // A new writer is judged by its own `back` only: a failure systemd
