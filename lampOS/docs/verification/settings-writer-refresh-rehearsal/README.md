@@ -27,6 +27,19 @@ writer is unproved.
 
   There should be no `lamp-update-back.prev` and no
   `/etc/systemd/system/lamp-update-writer.service`.
+- For #4190 (a `back` that began before the refresh is waited past), as
+  root, once the timer has run `back`:
+
+  ```sh
+  busctl get-property org.freedesktop.systemd1 \
+    /org/freedesktop/systemd1/unit/lamp_2dupdate_2dback_2eservice \
+    org.freedesktop.systemd1.Service ExecMainStartTimestamp
+  ```
+
+  It should print `t` and a number of microseconds that, divided by
+  1,000,000, is about `date +%s` at that `back`'s start. If it says nothing
+  or fails (no D-Bus daemon), #4190 counts every failure as before: post it
+  on #4190.
 - Follow a test channel signed with a throwaway key, never the production
   head or key. The product carrier's acceptance
   ([product-carrier-20261025](../product-carrier-20261025/README.md),
