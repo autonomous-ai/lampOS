@@ -1629,6 +1629,12 @@ pub fn not_the_builds_updater(
     running: Result<String, String>,
 ) -> Option<String> {
     let sequence = manifest.sequence;
+    // Before the units the build is known to carry its lamp-update; one
+    // without it has nothing to check against, so says nothing.
+    let builds = manifest
+        .files
+        .iter()
+        .find(|file| file.name == crate::own::BINARY)?;
     let running = match running {
         Ok(sha256) => sha256,
         Err(why) => {
@@ -1637,11 +1643,6 @@ pub fn not_the_builds_updater(
             ));
         }
     };
-    // Before the units the build is known to carry its lamp-update.
-    let builds = manifest
-        .files
-        .iter()
-        .find(|file| file.name == crate::own::BINARY)?;
     if builds.sha256.eq_ignore_ascii_case(&running) {
         return None;
     }

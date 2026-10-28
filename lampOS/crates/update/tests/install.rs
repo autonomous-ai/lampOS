@@ -553,6 +553,30 @@ fn an_install_that_ends_before_its_units_says_nothing_of_the_lamp_update() {
 }
 
 #[test]
+fn a_build_without_a_lamp_update_has_nothing_to_check_against() {
+    // The Reviewer-lead's P3 on #4085: an unreadable running file says
+    // nothing when the build carries no lamp-update to check it against.
+    let manifest = Manifest {
+        schema: 1,
+        channel: "lamp-voice".into(),
+        sequence: 188,
+        commit: "a".repeat(40),
+        files_url: CHANNEL.into(),
+        files: Vec::new(),
+        units: Vec::new(),
+        min_updater: None,
+        models: Vec::new(),
+        settings: Vec::new(),
+        image: Vec::new(),
+        reset_plan: None,
+    };
+    let running = Err("/proc/self/exe: Permission denied".to_owned());
+    assert_eq!(install::not_the_builds_updater(&manifest, running), None);
+    let running = Ok(sha256_hex(b"lamp-update of build 120\n"));
+    assert_eq!(install::not_the_builds_updater(&manifest, running), None);
+}
+
+#[test]
 fn a_closed_etc_lampos_is_said_and_left_as_it_is() {
     use std::os::unix::fs::PermissionsExt;
     let mut lamp = Lamp::new(188, &[]);
