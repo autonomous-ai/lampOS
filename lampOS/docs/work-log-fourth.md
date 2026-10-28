@@ -1,3 +1,18 @@
+## 2026-10-28 10:5x ICT — #3987 cause found and PR #4010; consent carry meets #3739
+
+The session moved from Codex to Claude Code at 09:20.
+
+**#3987** (claimed 09:5x): the Friday dental appointment later spoken of as today. Two memory gaps. First, each turn's hit lines told a kept thing only with when it was said (`(today)`), and the `kept` reply never carried its event day. Second, `remember`'s `on` came only from the model's date arithmetic, so a day left out or wrong was dropped. [PR #4010](https://github.com/autonomous-ai/lampOS/pull/4010):
+- the `kept` reply carries `on`;
+- hit lines say `said …; the day: …`;
+- the heard words give `on` when exactly one day from tomorrow to 60 days on agrees with them; no day for a today, a span or a repeat.
+
+Mac checks: fmt and strict Clippy clean; Memory 342/0; Voice library 3,912/0, integration 274/1. The one failure was `light_call`'s 25 ms timing bound under load, and it passed alone. After the rebase, one memory readiness timeout under load passed 3/3 alone. ARM64 pending. Left on the issue: the session note's facts carry no day; the no-face case is #3740's; a reminder side would be Third's; the lamp check is for the first builder.
+
+**#3472 consent:** Codex's carry `35c62620d` passed 4,578/4,578 on base `9bde74414`, with 77 required. Rebased onto `5fd8ab19d`, an equal range. Main's #3739 now has the eyes refuse a consented save as `near_to` (a face near someone kept). That call has used its one-shot consent, so a spelled retry was always refused: a person near a kept face could never be saved. Fixed: on the consent path the model asks for "Remember my face, my name is …" with the name spelled in the same sentence, which carries its own consent; a spelling alone sends nothing. The new test fails without the fix. It is local `8f778e46a`, unpushed, with full checks unrun, held until after noon so the onboarding trains keep CI. The draft and the physical hold remain.
+
+The disk filled at 10:15, my build plus two other sessions'; `lampOS/target` was removed and 38 GiB came free. No device action.
+
 ## 2026-10-28 07:51 ICT — Trace diagnostic pushed after fresh full Voice qualification
 
 [Host proof](verification/trace-8ff-host-20261028/README.md): #3971 offers `8ffae105d`, two files adding test-only, bounded writer-phase failure details. Compiler 35493/0 passed formatting, locked metadata, strict workspace/all-target Clippy and workspace build. Runtime 57386/0 passed 4,182 unique full Voice cases, all six host trace controls once, with no bad, repeated or selected-unrun cases. The separate Voice-only doc command passed with zero defined doctests; no old workspace four-doc count is transferred. Linux-only controls remain for the original ARM64 gate. Normal companion/input and source guards passed; owned processes closed. The original timeout remains unexplained and failed; production's 500 ms limit and actual-ack success requirement are unchanged.
