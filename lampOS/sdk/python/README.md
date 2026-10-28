@@ -204,8 +204,9 @@ lamp skill install my-skill-1.0.0.tar          # or an https:// URL, 1 MiB at mo
 ```
 
 It shows the package's name, version and signer, and what it asks in plain
-words (`light`: change the light; `camera`: see the camera's picture, which
-the lamp keeps off until the owner says yes in the app). It asks you yes once,
+words of the owner's app (`light`: "changes the light"; `camera`: "uses the
+camera when it runs", which the lamp keeps off until the owner says yes in
+the app). It asks you yes once,
 then sends it as `skill.push` with `asks` on part 0, the lamp's check that it
 was shown what it asks (`--yes` skips the question). The skill is held to
 your pairing's grants whatever it asks. Planned on the lamp (#3504): it keeps

@@ -629,9 +629,10 @@ on the lamp that run on their own".
   another scheme, 1 MiB at most, nothing run on the computer). It shows the
   name, version, "signed by key FPR16, not the Store" (never "verified"), and
   what the skill asks in the person's words, asks yes once, and pushes it
-  with `asks` on part 0: `body`, `light` and `speak` as the skill names them,
-  `look` for the presence topics or format 2's `look`, and `camera` for the
-  picture. `asks` is a check that the person was shown what the lamp will
+  with `asks` on part 0, lamp-skills' `grants_asked` in its order: `body`,
+  `light` and `speak` as the skill names them, `look` for the presence
+  topics or format 2's `look`, and `camera` for the picture. The lamp
+  compares the list in that order. `asks` is a check that the person was shown what the lamp will
   see. It lets nothing through: the skill is held to the pairing's grants,
   and a picture skill still waits for the owner's yes in the app.
 - **Consent** (decided by blue's person through the coordinator on #3504,

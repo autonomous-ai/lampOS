@@ -140,9 +140,9 @@ the Store".
 
 `lamp skill install FILE|URL` puts a shared package on your own paired lamp
 (the `skills` grant): a file, or an `https://` URL read to 1 MiB at most. It
-shows the package's name, version and signer, and what it asks in plain words
-(`camera`: see the camera's picture, which the lamp keeps off until the
-owner says yes in the app), asks you yes once (`--yes` skips it), and sends
+shows the package's name, version and signer, and what it asks in the
+owner's app's words (`camera`: "uses the camera when it runs", which the lamp
+keeps off until the owner says yes in the app), asks you yes once (`--yes` skips it), and sends
 it as `skill.push` with `asks` on part 0. In code, `lamp.installPackage(bytes)`
 and `asksOf(rules)`. The skill is held to your pairing's grants whatever it
 asks.

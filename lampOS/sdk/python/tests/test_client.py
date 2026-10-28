@@ -1014,18 +1014,21 @@ def test_a_path_lamp_skills_refuses_or_no_header_holds_is_refused_before_packing
     assert "longer than a tar header holds" in raised.value.why
 
 
-@pytest.mark.parametrize(
-    "rules, asks",
-    [
-        ('version = "0.1.0"\n[permissions]\nlight = true\nspeak = true\n', ["light", "speak"]),
-        ('version = "0.1.0"\n[permissions]\nbody = true\ntopics = ["room/stood_up"]\n', ["body", "look"]),
-        # Format 1's look is the picture; format 2's is presence alone.
-        ('version = "0.1.0"\n[permissions]\nlook = true\n', ["camera"]),
-        ('format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\n', ["look"]),
-        ('format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\ncamera = true\n', ["camera", "look"]),
-        ('version = "0.1.0"\n', []),
-    ],
-)
+# lamp-skills' own table for `grants_asked` (tests/it/pushed.rs,
+# the_asks_of_a_skill_are_grants_asked_in_the_protocols_order), row for row:
+# the lamp compares `asks` in this order, so a sorted list would differ.
+GRANTS_ASKED_ROWS = [
+    ('tool = "t"\n[permissions]\nspeak = true\n[[do]]\nsay = "Say you will."\n', ["speak"]),
+    ('tool = "t"\n[permissions]\nbody = true\nlight = true\nspeak = true\n[[do]]\nbody = { mood = "reading", for = "2m" }\nlight = { colour = "warm" }\nsay = "Say you will."\n', ["body", "light", "speak"]),
+    ('tool = "t"\n[permissions]\nlook = true\n[[do]]\nlook = true\n', ["camera"]),
+    ('format = 2\ntool = "t"\n[permissions]\nlook = true\nspeak = true\n[[do]]\nsay = "Say you will."\n', ["speak", "look"]),
+    ('[[trigger]]\ntopic = "room/stood_up"\nfield = "stood_up"\nequals = true\n[ask]\npolicy = "unprompted"\n[permissions]\ntopics = ["room/stood_up"]\nspeak = true\n[[do]]\nsay = "Say hello."\n', ["speak", "look"]),
+    ('format = 2\ntool = "t"\n[permissions]\ncamera = true\n[[do]]\nlook = true\n', ["camera"]),
+    ('format = 2\ntool = "t"\n[permissions]\nlook = true\ncamera = true\n[[do]]\nlook = true\n', ["look", "camera"]),
+]
+
+
+@pytest.mark.parametrize("rules, asks", GRANTS_ASKED_ROWS)
 def test_asks_are_the_grant_names_a_person_is_shown(rules, asks):
     from lampos.push import asks_of, tomllib
 
@@ -1116,7 +1119,7 @@ def test_lamp_skill_install_shows_the_signer_and_asks_then_asks_yes(tmp_path):
             await paired(fake, home)
             code, said = await lamp_cli(home, "skill", "install", str(package), typed="n\n")
             assert code == 1 and said.endswith("not installed"), said
-            assert said.splitlines()[:3] == ["desk-wave 0.1.0", f"  signed by key {fpr}, not the Store", "  asks to change the light (light)"]
+            assert said.splitlines()[:3] == ["desk-wave 0.1.0", f"  signed by key {fpr}, not the Store", "  it changes the light (light)"]
             assert fake.asked("skill.push") == []
             code, said = await lamp_cli(home, "skill", "install", str(package), typed="y\n")
             assert code == 0 and said.endswith("desk-wave 0.1.0 installed, on"), said

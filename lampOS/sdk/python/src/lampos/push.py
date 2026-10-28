@@ -335,20 +335,35 @@ def _rules(folder: str | Path) -> dict | None:
         return None
 
 
+# The protocol's grants a push asks, in the protocol's order, each with the
+# words the owner's app shows for it: lamp-skills' `package::grants_asked`,
+# the one definition the lamp checks `asks` against, in order (Eighth's
+# piece B, for Ten and blue on #3931).
+GRANTS_ASKED = {
+    "body": "moves the lamp's body",
+    "light": "changes the light",
+    "speak": "speaks and plays sounds",
+    "look": "knows when someone is there, never who",
+    "camera": "uses the camera when it runs",
+}
+
+
 def asks_of(rules: dict) -> list[str]:
-    """What a skill's rules ask, as the grant names a person is shown:
-    `body`, `light` and `speak`; `look` for the presence topics, or format
-    2's `look`; `camera` for the picture (`camera`, or format 1's `look`,
-    lamp-skills' `sees_picture`). Sorted, each once."""
+    """What a skill's rules ask, as `grants_asked` names them, in its order:
+    `body`, `light` and `speak` as the rules say them; `look` for the
+    presence topics, or format 2's `look`; `camera` for the picture
+    (`camera`, or format 1's `look`: lamp-skills' `sees_picture`)."""
     permissions = rules.get("permissions") if isinstance(rules.get("permissions"), dict) else {}
     format_2 = rules.get("format", 1) == 2
-    asks = {grant for key, grant in PERMISSION_GRANTS.items() if permissions.get(key) is True}
     topics = permissions.get("topics") or []
-    if any(topic in PRESENCE_TOPICS for topic in topics) or (format_2 and permissions.get("look") is True):
-        asks.add("look")
-    if permissions.get("camera") is True or (not format_2 and permissions.get("look") is True):
-        asks.add("camera")
-    return sorted(asks)
+    asked = {
+        "body": permissions.get("body") is True,
+        "light": permissions.get("light") is True,
+        "speak": permissions.get("speak") is True,
+        "look": any(topic in PRESENCE_TOPICS for topic in topics) or (format_2 and permissions.get("look") is True),
+        "camera": permissions.get("camera") is True or (not format_2 and permissions.get("look") is True),
+    }
+    return [grant for grant in GRANTS_ASKED if asked[grant]]
 
 
 def asks_beyond(folder: str | Path, grants: list[str]) -> tuple[str, str] | None:

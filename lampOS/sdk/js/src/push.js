@@ -218,18 +218,34 @@ const OUTSIDE = ['actions', 'messages', 'known_faces', 'who', 'output_limits', '
 
 const permissionsOf = (rules) => (rules.permissions && typeof rules.permissions === 'object' && !Array.isArray(rules.permissions) ? rules.permissions : {});
 
-// What a skill's rules ask, as the grant names a person is shown: body,
-// light and speak; look for the presence topics, or format 2's look; camera
-// for the picture (camera, or format 1's look: lamp-skills' sees_picture).
-// Sorted, each once.
+// The protocol's grants a push asks, in the protocol's order, each with the
+// words the owner's app shows for it: lamp-skills' `package::grants_asked`,
+// the one definition the lamp checks `asks` against, in order (Eighth's
+// piece B, for Ten and blue on #3931).
+export const GRANTS_ASKED = {
+  body: "moves the lamp's body",
+  light: 'changes the light',
+  speak: 'speaks and plays sounds',
+  look: 'knows when someone is there, never who',
+  camera: 'uses the camera when it runs',
+};
+
+// What a skill's rules ask, as grants_asked names them, in its order: body,
+// light and speak as the rules say them; look for the presence topics, or
+// format 2's look; camera for the picture (camera, or format 1's look:
+// lamp-skills' sees_picture).
 export function asksOf(rules) {
   const permissions = permissionsOf(rules);
   const format2 = (rules.format ?? 1) === 2;
-  const asks = new Set(Object.entries(PERMISSION_GRANTS).filter(([key]) => permissions[key] === true).map(([, grant]) => grant));
   const topics = Array.isArray(permissions.topics) ? permissions.topics : [];
-  if (topics.some((topic) => PRESENCE_TOPICS.includes(topic)) || (format2 && permissions.look === true)) asks.add('look');
-  if (permissions.camera === true || (!format2 && permissions.look === true)) asks.add('camera');
-  return [...asks].sort();
+  const asked = {
+    body: permissions.body === true,
+    light: permissions.light === true,
+    speak: permissions.speak === true,
+    look: topics.some((topic) => PRESENCE_TOPICS.includes(topic)) || (format2 && permissions.look === true),
+    camera: permissions.camera === true || (!format2 && permissions.look === true),
+  };
+  return Object.keys(GRANTS_ASKED).filter((grant) => asked[grant]);
 }
 
 // The code and why the lamp would refuse these rules as a push for this

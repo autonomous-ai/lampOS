@@ -698,15 +698,17 @@ test('a shared package is installed with its asks on part 0, and refused before 
     await assert.rejects(lamp.request('skill.push', { name: 'desk-wave', sha256, size: signed.length, part: 0, parts: 1, data: signed.toString('base64') }),
       (error) => error.code === 'bad_request' && /asks on part 0/.test(error.why));
   });
-  // The same table as the Python SDK's asks_of test.
+  // lamp-skills' own table for grants_asked (tests/it/pushed.rs), row for
+  // row: the lamp compares asks in this order, so a sorted list would differ.
   const { parse } = await import('smol-toml');
   for (const [rules, asks] of [
-    ['version = "0.1.0"\n[permissions]\nlight = true\nspeak = true\n', ['light', 'speak']],
-    ['version = "0.1.0"\n[permissions]\nbody = true\ntopics = ["room/stood_up"]\n', ['body', 'look']],
-    ['version = "0.1.0"\n[permissions]\nlook = true\n', ['camera']],
-    ['format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\n', ['look']],
-    ['format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\ncamera = true\n', ['camera', 'look']],
-    ['version = "0.1.0"\n', []],
+    ['tool = "t"\n[permissions]\nspeak = true\n[[do]]\nsay = "Say you will."\n', ['speak']],
+    ['tool = "t"\n[permissions]\nbody = true\nlight = true\nspeak = true\n[[do]]\nbody = { mood = "reading", for = "2m" }\nlight = { colour = "warm" }\nsay = "Say you will."\n', ['body', 'light', 'speak']],
+    ['tool = "t"\n[permissions]\nlook = true\n[[do]]\nlook = true\n', ['camera']],
+    ['format = 2\ntool = "t"\n[permissions]\nlook = true\nspeak = true\n[[do]]\nsay = "Say you will."\n', ['speak', 'look']],
+    ['[[trigger]]\ntopic = "room/stood_up"\nfield = "stood_up"\nequals = true\n[ask]\npolicy = "unprompted"\n[permissions]\ntopics = ["room/stood_up"]\nspeak = true\n[[do]]\nsay = "Say hello."\n', ['speak', 'look']],
+    ['format = 2\ntool = "t"\n[permissions]\ncamera = true\n[[do]]\nlook = true\n', ['camera']],
+    ['format = 2\ntool = "t"\n[permissions]\nlook = true\ncamera = true\n[[do]]\nlook = true\n', ['look', 'camera']],
   ]) assert.deepEqual(asksOf(parse(rules)), asks, rules);
 });
 
@@ -726,7 +728,7 @@ test('lamp skill install shows the signer and asks, then asks yes once', async (
     });
     const no = await lamp('n\n', 'skill', 'install', file);
     assert.ok(no.code === 1 && no.said.endsWith('not installed'), no.said);
-    assert.deepEqual(no.said.split('\n').slice(0, 3), ['desk-wave 0.1.0', `  signed by key ${fpr}, not the Store`, '  asks to change the light (light)']);
+    assert.deepEqual(no.said.split('\n').slice(0, 3), ['desk-wave 0.1.0', `  signed by key ${fpr}, not the Store`, '  it changes the light (light)']);
     assert.equal(fake.asked('skill.push').length, 0);
     const yes = await lamp('y\n', 'skill', 'install', file);
     assert.ok(yes.code === 0 && yes.said.endsWith('desk-wave 0.1.0 installed, on'), yes.said);

@@ -849,7 +849,7 @@
             ]
           },
           "uniqueItems": true,
-          "description": "Part 0 only: what the computer showed the person this package asks, sorted. Required when the package is signed; the lamp refuses asks_differ when its own list differs. A check for honest tools only: the skill is held to the pairing's grants whatever it says."
+          "description": "Part 0 only: what the computer showed the person this package asks, as lamp-skills' grants_asked names them and in its order: body, light, speak, look, camera. Required when the package is signed; the lamp refuses asks_differ when its own list differs. A check for honest tools only: the skill is held to the pairing's grants whatever it says."
         }
       },
       "required": [

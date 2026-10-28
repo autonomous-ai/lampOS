@@ -18,7 +18,7 @@ import { PORT } from './schema.js';
 import { fake } from './fake.js';
 import { LampError } from './errors.js';
 import { Keyring } from './keys.js';
-import { PACKAGE_MAX, asksOf, fetchPackage, fingerprint, openPackage, pack } from './push.js';
+import { GRANTS_ASKED, PACKAGE_MAX, asksOf, fetchPackage, fingerprint, openPackage, pack } from './push.js';
 import { parse as parseToml } from 'smol-toml';
 
 const { values, positionals } = parseArgs({
@@ -106,15 +106,6 @@ async function main() {
   return 0;
 }
 
-// What each ask lets a skill do, in the words a person is shown.
-const ASK_WORDS = {
-  body: 'move the lamp',
-  camera: "see the camera's picture",
-  light: 'change the light',
-  look: 'know when someone is at the lamp',
-  speak: 'speak and play sounds',
-};
-
 async function install(source, lampId) {
   let data;
   // A URL is fetched over https only; anything else is a file here.
@@ -134,7 +125,7 @@ async function install(source, lampId) {
   // Integrity, not trust: anyone can make a key (Fourteen, #3504).
   console.log(`${opened.name} ${opened.version}`);
   console.log(opened.author ? `  signed by key ${opened.author}, not the Store` : '  not signed, not the Store');
-  for (const ask of asks) console.log(`  asks to ${ASK_WORDS[ask]} (${ask})`);
+  for (const ask of asks) console.log(`  it ${GRANTS_ASKED[ask]} (${ask})`);
   if (asks.includes('camera')) console.log("  It asks for the camera's picture: the lamp keeps it off until the owner says yes in the app.");
   if (!values.yes) {
     const prompt = createInterface({ input: process.stdin, output: process.stdout });

@@ -163,18 +163,8 @@ async def _skill_push(args) -> int:
     return 0
 
 
-# What each ask lets a skill do, in the words a person is shown.
-ASK_WORDS = {
-    "body": "move the lamp",
-    "camera": "see the camera's picture",
-    "light": "change the light",
-    "look": "know when someone is at the lamp",
-    "speak": "speak and play sounds",
-}
-
-
 async def _skill_install(args) -> int:
-    from .push import asks_of, fetch, open_package, read_capped, tomllib
+    from .push import GRANTS_ASKED, asks_of, fetch, open_package, read_capped, tomllib
 
     # A URL is fetched over https only; anything else is a file here.
     if "://" in args.source:
@@ -188,7 +178,7 @@ async def _skill_install(args) -> int:
     print(f"{opened.name} {opened.version}")
     print(f"  signed by key {opened.author}, not the Store" if opened.author else "  not signed, not the Store")
     for ask in asks:
-        print(f"  asks to {ASK_WORDS[ask]} ({ask})")
+        print(f"  it {GRANTS_ASKED[ask]} ({ask})")
     if "camera" in asks:
         print("  It asks for the camera's picture: the lamp keeps it off until the owner says yes in the app.")
     if not args.yes:
