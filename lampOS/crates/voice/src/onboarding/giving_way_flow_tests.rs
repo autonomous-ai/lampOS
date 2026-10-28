@@ -701,6 +701,49 @@ fn an_invitation_cut_with_no_push_is_said_again_and_spends_no_try() {
     assert_eq!(walk.kept().giving_way_tries, 0);
 }
 
+/// Left `not_available` past the unsaid bound and offered again later in
+/// the same run, the step starts its count again: its first gap is said
+/// again, not straight back to `not_available` (Third's P3 on #4045).
+#[test]
+fn a_step_left_for_later_by_gaps_counts_its_unsaid_anew_when_offered_again() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for turn in 1..=u64::from(MOST_UNSAID) + 1 {
+        finished(&mut walk, (8 + 2 * turn) * S, turn, Delivery::Gapped);
+    }
+    walk.drain_storage_for_test(16 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::NotAvailable));
+    // The walk's other steps end, so it is offered again.
+    for step in [Step::RoomSounds, Step::FaceExpressions, Step::Preferences] {
+        walk.desired.steps.insert(
+            step.name().into(),
+            Kept {
+                outcome: Outcome::Skipped,
+                at_unix_s: 1,
+                framing: None,
+                offered_at_unix_s: None,
+            },
+        );
+    }
+    walk.save();
+    walk.drain_storage_for_test(20 * S);
+    walk.take_records();
+    // Offered again: its first gap is said again, and the offer is dated so
+    // the skill's interval holds before the next.
+    finished(&mut walk, 30 * S, 10, Delivery::Gapped);
+    assert!(
+        walk.desired.steps[Step::GivingWay.name()]
+            .offered_at_unix_s
+            .is_some()
+    );
+    let row = walk
+        .take_records()
+        .into_iter()
+        .rfind(|row| row["kind"] == "onboarding_giving_way_try")
+        .unwrap();
+    assert_eq!(row["offered_again"], true, "{row}");
+}
+
 #[test]
 fn an_invitation_the_voice_never_said_is_no_try_and_is_asked_again() {
     // lamp-29e7, 27 Oct 14:18:52: `say: dropped (no_audio_answer)` and
