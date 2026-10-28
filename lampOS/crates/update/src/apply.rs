@@ -1429,6 +1429,34 @@ mod tests {
         );
     }
 
+    /// The Skills Store's key (#3692): a round writes the build's file at
+    /// 0644, and a later build with a rotated key replaces it, first with
+    /// the new and old keys, then with the new one alone.
+    #[test]
+    fn the_stores_key_is_written_0644_and_a_rotated_one_replaces_it() {
+        let key = crate::install::STORE_KEY_SETTING;
+        let (old, new) = (
+            format!("{}=\n", "A".repeat(43)),
+            format!("{}=\n", "Q".repeat(43)),
+        );
+        let mut lamp = Lamp::new();
+        lamp.installed(&[(EXPRESSION, "expression 1")]);
+        for (sequence, text) in [(2, old.clone()), (3, format!("{new}{old}")), (4, new)] {
+            let envelope = lamp.envelope(sequence, vec![Setting::new(key, &text)]);
+            lamp.run(Op::Apply, sequence, Some(&envelope)).unwrap();
+            assert_eq!(lamp.read(key).as_deref(), Some(text.as_str()));
+            let mode = fs::metadata(on_root(&lamp.root, key))
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o777, 0o644);
+            assert_eq!(
+                lamp.state().settings[key],
+                manifest::sha256_hex(text.as_bytes())
+            );
+        }
+    }
+
     #[test]
     fn the_tmpfiles_are_created_only_when_they_are_there() {
         let mut lamp = Lamp::new();

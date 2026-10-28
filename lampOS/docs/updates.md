@@ -1420,8 +1420,15 @@ there is the Skills Store's public key (#3692):
 `/var/lib/lampOS/skills/store-key.pub` (`install::STORE_KEY_SETTING`),
 0644, beside the skills and never in a skill's folder. With settings, `lamp-update manifest`
 refuses a file that isn't one or two keys, one a line, as a lamp reads it
-(`manifest::read_public_keys`). The repository has none until the Store's
-keeper gives its key, and a build without it leaves a lamp's key as it is.
+(`manifest::read_public_keys`). The repository holds the Store's
+production key, fingerprint `8717ddcdf9ac22fb`, as the Store's keeper
+posted it (`publish::tests::the_repositorys_store_key_is_the_stores_production_key`
+pins it). To rotate, the file holds the new key and the old one, a line
+each, for a build, then the new one alone; each round writes the build's
+file over the one it wrote before
+(`apply::tests::the_stores_key_is_written_0644_and_a_rotated_one_replaces_it`).
+A build without the file carries no `removed` entry for it, so it leaves a
+lamp's key as it is.
 The path is one build 7071's fixed settings writer already takes, so a
 lamp still on that `lamp-update-back` gets it in a round
 (`publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it`
