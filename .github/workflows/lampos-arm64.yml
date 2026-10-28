@@ -72,7 +72,7 @@ name: lampOS on ARM64
 on:
   push:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py', '.github/scripts/lampos-source-times.py', '.github/scripts/lampos-publish*.py', '.github/tools/lampos-promote/**']
+    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py', '.github/scripts/lampos-source-times.py', '.github/scripts/lampos-route*.py', '.github/scripts/lampos-publish*.py', '.github/tools/lampos-promote/**']
   # A pull request that changes only docs a build never reads skips this run (the
   # project lead, 19 Oct 2026, #1711): the docs' and the role files' Markdown. The
   # docs that code or tests read are named again below, so a change to one still
@@ -102,6 +102,7 @@ on:
       - '.github/workflows/lampos-arm64.yml'
       - '.github/scripts/lampos-pr-crates.py'
       - '.github/scripts/lampos-source-times.py'
+      - '.github/scripts/lampos-route*.py'
       - '.github/scripts/lampos-publish*.py'
       - '.github/tools/lampos-promote/**'
   workflow_dispatch:
@@ -128,10 +129,62 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
 
 jobs:
+  # Which runner the ARM64 job gets: the self-hosted Mac Studio pool (org
+  # runner group lampos-studio, about 5 minutes a pull request against 13.5
+  # here) or GitHub-hosted, as before. GitHub-hosted is the default and every
+  # doubt falls back to it (.github/scripts/lampos-route.py): the switch
+  # vars.LAMPOS_STUDIO not on, the Studio's heartbeat (vars.LAMPOS_STUDIO_BEAT,
+  # written every 30 s by the Studio host) older than two minutes, a Studio job
+  # stuck, the queue there longer than GitHub-hosted would take, an API error.
+  # Only the team's pull requests and runs by hand ask: forks, lamp-voice's
+  # pushes (the signed publication build), the full run and promotions skip
+  # this job and run on GitHub-hosted. lampos-promote reads this run's ARM64
+  # job by its name, so this one has another and never fails.
+  route:
+    if: >-
+      ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      || (github.event_name == 'workflow_dispatch' && !inputs.full && !inputs.promote_sequence) }}
+    name: lampOS — choose the ARM64 runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+    outputs:
+      runner: ${{ steps.route.outputs.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: choose
+        id: route
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAMPOS_STUDIO: ${{ vars.LAMPOS_STUDIO }}
+          LAMPOS_STUDIO_BEAT: ${{ vars.LAMPOS_STUDIO_BEAT }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          FULL: ${{ inputs.full }}
+          PROMOTE: ${{ inputs.promote_sequence }}
+        run: python3 -I .github/scripts/lampos-route.py route
+      # A Studio job the Studio left queued or running too long is cancelled
+      # and its run started again, so its own route job sends it here.
+      - name: rescue stuck Studio runs
+        if: vars.LAMPOS_STUDIO == 'shadow' || vars.LAMPOS_STUDIO == 'canary' || vars.LAMPOS_STUDIO == 'on'
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/lampos-route.py sweep
+
   arm64:
-    if: ${{ !inputs.promote_sequence }}
+    needs: route
+    # Also when route was skipped (not asked) or failed: then GitHub-hosted.
+    if: ${{ !cancelled() && !inputs.promote_sequence }}
     name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
-    runs-on: ubuntu-22.04-arm
+    runs-on: ${{ fromJSON(needs.route.outputs.runner || '"ubuntu-22.04-arm"') }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -150,6 +203,8 @@ jobs:
           fetch-depth: 2
       - name: publication failure tests (offline, no signing secret)
         run: python3 -I .github/scripts/lampos-publish-test.py
+      - name: runner choice tests (offline)
+        run: python3 -I .github/scripts/lampos-route-test.py
       - name: Rust 1.96.0
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
@@ -163,8 +218,10 @@ jobs:
       - name: restore the cache
         id: cache
         # Match publish's eligibility exactly, so signing candidates build cold.
+        # Not on the Studio: its own cache disk replaces this one, and pulling
+        # lampOS/target from GitHub's cache there takes minutes.
         if: >-
-          ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
+          ${{ runner.environment == 'github-hosted' && !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
           && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
         uses: actions/cache/restore@v4
         with:
@@ -254,6 +311,8 @@ jobs:
           --out lampOS/arm64-out
       - uses: actions/upload-artifact@v4
         if: matrix.shard == 1
+        # A bad route from the Studio crawled at 9 KB/s once: fail in minutes, not at the job's 90.
+        timeout-minutes: 10
         with:
           # A pull request runs on its merge with lamp-voice; the name is its own head commit.
           name: lampos-arm64-${{ github.event.pull_request.head.sha || github.sha }}
@@ -272,6 +331,7 @@ jobs:
         if: >-
           ${{ !cancelled() && matrix.shard == 1 && (github.ref == 'refs/heads/lamp-voice'
           || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
+        timeout-minutes: 10
         uses: actions/cache/save@v4
         with:
           path: |
@@ -286,7 +346,10 @@ jobs:
     needs: arm64
     # Off until the owner explicitly activates publication. Manual runs and PRs
     # never enter this job; download-artifact defaults to this successful run.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on'
+    # The ARM64 job's own result, not the implicit success(): route is skipped
+    # on a push, and a skipped job anywhere upstream skips this one too
+    # (probed on devops007/needs-probe, run 40358296675).
+    if: ${{ !cancelled() && needs.arm64.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on' }}
     # The owner must configure branch-only lamp-voice protection before storing
     # the signing key here; naming an environment does not create its rules.
     environment: lampos-update-publish
