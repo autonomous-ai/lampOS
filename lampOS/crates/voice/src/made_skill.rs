@@ -951,6 +951,16 @@ pub fn asked(directory: &Path, key: &str, now_unix_ms: u64) -> io::Result<()> {
     }
 }
 
+/// Whether the made skill from the news `key` is on the lamp already: its
+/// news then has nothing left to ask, and isn't told again (Reviewer-three's
+/// P3 on #4240: news played through, and so told again, asked to put on a
+/// skill a yes had already put on).
+pub fn is_on(directory: &Path, key: &str) -> bool {
+    index(directory)
+        .iter()
+        .any(|entry| entry["from"] == key && entry["on"] == true)
+}
+
 /// The made skill the lamp asked about within [`PUT_ON_WITHIN`] before
 /// `now_unix_ms` and not yet on: its name and SHA-256. The newest ask
 /// alone: once it is on, or out of its time, none. lamp-skills' manage
