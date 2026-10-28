@@ -935,22 +935,34 @@ pub fn yield_notes(skills: &[Skill]) -> Vec<String> {
     notes
 }
 
+/// The most lines a say's `text` or `note` may list, one picked each run
+/// (#3997: Head pat's seven).
+pub const MOST_SAY_LINES: usize = 16;
+
 /// What a `say` asks of the voice: a note it phrases, its exact words, or
-/// what it keeps.
-fn say_step(say: toml::Value) -> Result<Call, String> {
+/// what it keeps; or one of several lines of words, picked as it runs.
+fn say_step(say: toml::Value) -> Result<Step, String> {
+    say_call(say).map(|(call, lines)| match lines {
+        Some(lines) => Step::Lines(lines),
+        None => Step::Call(call),
+    })
+}
+
+/// A say's call, and with a list of lines, each line's.
+fn say_call(say: toml::Value) -> Result<(Call, Option<Vec<Words>>), String> {
     const WHAT: &str = "say is a note in words, or { from = \"schedule\" } or { from = \"tasks\" }, \
                         or { text = ... } or { note = ... } with an optional priority and expires";
     match say {
         toml::Value::String(note) if note.trim().is_empty() => Err(WHAT.into()),
-        toml::Value::String(note) => Ok(Call::Say(note)),
+        toml::Value::String(note) => Ok((Call::Say(note), None)),
         toml::Value::Table(table) if table.contains_key("from") => {
             if table.len() != 1 {
                 return Err(format!("{WHAT}: a say table has from and nothing else"));
             }
             match table["from"].as_str() {
-                Some("schedule") => Ok(Call::SayFrom(Source::Schedule, None)),
-                Some("tasks") => Ok(Call::SayFrom(Source::Tasks, None)),
-                Some("onboarding") => Ok(Call::SayFrom(Source::Onboarding, None)),
+                Some("schedule") => Ok((Call::SayFrom(Source::Schedule, None), None)),
+                Some("tasks") => Ok((Call::SayFrom(Source::Tasks, None), None)),
+                Some("onboarding") => Ok((Call::SayFrom(Source::Onboarding, None), None)),
                 Some(other) => Err(format!(
                     "say.from is \"schedule\" or \"tasks\", not {other:?}"
                 )),
@@ -969,17 +981,37 @@ fn say_step(say: toml::Value) -> Result<Call, String> {
                 (None, Some(note)) => (note, false),
                 _ => return Err(format!("{WHAT}: one of text or note")),
             };
-            let words = words
-                .as_str()
-                .filter(|words| {
-                    !words.trim().is_empty()
-                        && words.len() <= MOST_WORDS_BYTES
-                        && !words.chars().any(char::is_control)
-                })
-                .ok_or(format!(
-                    "say's text or note is words, 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
-                ))?
-                .to_owned();
+            let line = |words: &toml::Value| {
+                words
+                    .as_str()
+                    .filter(|words| {
+                        !words.trim().is_empty()
+                            && words.len() <= MOST_WORDS_BYTES
+                            && !words.chars().any(char::is_control)
+                    })
+                    .map(str::to_owned)
+                    .ok_or(format!(
+                        "say's text or note is words, 1 to {MOST_WORDS_BYTES} bytes, with no control characters, \
+                         or a list of 2 to {MOST_SAY_LINES} different lines of them, one said each run"
+                    ))
+            };
+            // A list: one of its lines each run (#3997), so its words stay
+            // in the skill's file, never in code.
+            let lines = match words {
+                toml::Value::Array(lines) => {
+                    let lines = lines.iter().map(line).collect::<Result<Vec<_>, _>>()?;
+                    let different: BTreeSet<&String> = lines.iter().collect();
+                    if !(2..=MOST_SAY_LINES).contains(&lines.len())
+                        || different.len() != lines.len()
+                    {
+                        return Err(format!(
+                            "say's list of lines has 2 to {MOST_SAY_LINES} different lines"
+                        ));
+                    }
+                    lines
+                }
+                one => vec![line(one)?],
+            };
             let priority = match table.get("priority") {
                 None => SAY_PRIORITY,
                 Some(priority) => priority
@@ -1003,12 +1035,22 @@ fn say_step(say: toml::Value) -> Result<Call, String> {
             if !(1_000..=MOST_SAY_EXPIRES_MS).contains(&expires_ms) {
                 return Err("say.expires is 1s to 1h".into());
             }
-            Ok(Call::Words(Words {
-                words,
-                exact,
-                priority,
-                expires_ms,
-            }))
+            let mut lines: Vec<Words> = lines
+                .into_iter()
+                .map(|words| Words {
+                    words,
+                    exact,
+                    priority,
+                    expires_ms,
+                })
+                .collect();
+            let first = Call::Words(lines[0].clone());
+            Ok(if lines.len() == 1 {
+                (first, None)
+            } else {
+                lines.shrink_to_fit();
+                (first, Some(lines))
+            })
         }
         _ => Err(WHAT.into()),
     }
@@ -1954,6 +1996,8 @@ enum Step {
         by: Vec<(String, Vec<String>)>,
         again: bool,
     },
+    /// One of a say's lines, picked as the run is made (#3997).
+    Lines(Vec<Words>),
 }
 
 /// What a message must show for a trigger or a condition to hold.
@@ -3845,7 +3889,12 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             steps.push(Step::Call(Call::Show { name: show, frames }));
         }
         if let Some(say) = step.say {
-            let call = say_step(say)?;
+            let step = say_step(say)?;
+            let call = match &step {
+                Step::Lines(lines) => Call::Words(lines[0].clone()),
+                Step::Call(call) => call.clone(),
+                Step::Gesture { .. } => unreachable!("a say is never a gesture"),
+            };
             if matches!(call, Call::SayFrom(Source::Onboarding, _)) {
                 let canonical = file.permissions.grants("onboarding")
                     && conditions.is_empty()
@@ -3877,7 +3926,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 );
             }
             said = true;
-            steps.push(Step::Call(call));
+            steps.push(step);
         }
         if let Some(name) = step.sound {
             // A tool is called while the voice answers: a sound would always
@@ -3973,7 +4022,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                             | Call::SayFrom(..)
                             | Call::Sound { .. }
                             | Call::Cue
-                    )
+                    ) | Step::Lines(_)
                 ) && match on {
                     None => true,
                     Some(Only::Trigger(on)) => Some(on) == name,
@@ -4296,6 +4345,8 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         let call = match step {
             Step::Call(call) => call.clone(),
             Step::Gesture { .. } => Call::Gesture(String::new()),
+            // Each line asks the same of the voice.
+            Step::Lines(lines) => Call::Words(lines[0].clone()),
         };
         if let Some(why) = skill.permissions.refuses(&call) {
             return Err(format!("not permitted: {why}"));
@@ -7519,6 +7570,7 @@ fn calls(
                 vec![Call::SayFrom(*source, task)]
             }
             Step::Call(other) => vec![other.clone()],
+            Step::Lines(lines) => vec![Call::Words(lines[pick(now_us, lines.len())].clone())],
             Step::Gesture { by, again } => {
                 let names: Vec<&String> =
                     match by.iter().find(|(value, _)| Some(value.as_str()) == chosen) {

@@ -676,6 +676,7 @@ const BUS_TOPICS: &[&str] = &[
     "chat/in",
     "chat/out",
     "controls/gesture",
+    "controls/pet",
     "controls/state",
     "controls/touch",
     "controls/touch_state",

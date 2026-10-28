@@ -15,13 +15,20 @@
 //! contact the body felt as a push on the head asks nothing more from then on.
 //! The qualification, the shortest tap and the gap are settings
 //! ([`HeadTiming`]), to be sized from a recording of the lamp's own pads.
+//!
+//! With `LAMP_HEAD_PET` on ([`TouchEngine::set_head_pet`], #3997, Part of
+//! #4133), a hand petting the head, its pads taking turns alone, is told
+//! apart and said on `controls/pet` ([`HeadPet`]), never as a gesture of
+//! `controls/touch`. That contact asks no sleep and holds nothing from then
+//! on ([`HoldSleeps`]). Off, nothing here changes.
 use crate::{
     base::strip::{StripDirection, StripEffectKind, StripError, StripRecognizer, StripTiming},
     input::{InputError, Level, check_name},
 };
 use lamp_msgs::{
-    ClockStamp, ControlFault, TOUCH_INPUT_TTL_US, TouchEvent, TouchGesture, TouchIntent,
-    TouchSource, TouchSourceState, TouchState,
+    ClockStamp, ControlFault, HEAD_PET_MOST_PER_SECOND, HEAD_PET_SWAPS, HEAD_PET_WITHIN_US,
+    HeadPet, TOUCH_INPUT_TTL_US, TouchEvent, TouchGesture, TouchIntent, TouchSource,
+    TouchSourceState, TouchState,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -50,6 +57,39 @@ pub const PULSE_MIN_US: u64 = 20_000;
 /// (`docs/controls.md`). A single change with none after it, as lamp-cb94's
 /// and lamp-c0a4's lines made at rest (#1764), is never a touch.
 pub const PULSE_GAP_US: u64 = 250_000;
+
+/// A head pad touched alone counts towards a pet once it has been alone
+/// this long: a still hand shifting shows 10-20 ms of one pad, a pet's turns
+/// on lamp-06c1 were 90 ms and longer (#3997).
+pub const PET_ALONE_MIN_US: u64 = 40_000;
+/// A pet's hand is resting once no swap has come for this long: a sliding
+/// hand on lamp-06c1 swapped every 0.1-0.3 s.
+pub const PET_RESTING_US: u64 = 400_000;
+/// While a pet lasts, it is said again at most this often (ten a second).
+pub const PET_EVERY_US: u64 = 100_000;
+
+/// What a head hand kept [`HEAD_SLEEP_US`] asks with `LAMP_HEAD_PET` on
+/// (#3997, #4133).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HoldSleeps {
+    /// Sleep, as today, unless the contact was told apart as a pet.
+    PetOnly,
+    /// No head contact asks sleep: #4133's design, once its owners say yes.
+    Never,
+}
+
+/// The head's sleep with `LAMP_HEAD_PET` on: one line to change when
+/// #4133's design is agreed on a lamp.
+pub const HEAD_PET_HOLD: HoldSleeps = HoldSleeps::PetOnly;
+
+/// The switch, read by Controls when it serves the head (#3997).
+pub const HEAD_PET_ENV: &str = "LAMP_HEAD_PET";
+
+/// What `LAMP_HEAD_PET` asks: [`HEAD_PET_HOLD`] when it is exactly `on`,
+/// and nothing otherwise, unset as on every lamp today.
+pub fn head_pet(value: Option<&str>) -> Option<HoldSleeps> {
+    (value == Some("on")).then_some(HEAD_PET_HOLD)
+}
 
 /// The head's timing, from the touch pins file (`head_qualify_ms`,
 /// `head_tap_min_ms`, `head_gap_ms`), each defaulting to the constants above.
@@ -235,6 +275,10 @@ pub struct StripSample {
 pub struct TouchOutput {
     pub events: Vec<TouchEvent>,
     pub state: TouchState,
+    /// `controls/pet`, only with `LAMP_HEAD_PET` on: left out when empty, so
+    /// a replay's frames are as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pets: Vec<HeadPet>,
 }
 
 fn error(fault: ControlFault, message: &'static str) -> InputError {
@@ -526,6 +570,39 @@ struct Head {
     /// This contact overlapped a push: it asks nothing more.
     spoiled: bool,
     timing: HeadTiming,
+    /// `LAMP_HEAD_PET`: none when off ([`TouchEngine::set_head_pet`]).
+    pet: Option<HoldSleeps>,
+    /// This contact's pet, as [`Pet`] counts it.
+    petting: Pet,
+    /// What the pet says from the last acquisition, for the engine to take.
+    pet_due: Option<PetNote>,
+}
+
+/// One contact's pads taking turns (#3997).
+#[derive(Clone, Copy, Default)]
+struct Pet {
+    /// The pad touched alone now, and since when.
+    alone: Option<(u16, u64)>,
+    /// The last pad counted alone.
+    last_alone: Option<u16>,
+    swaps: u32,
+    /// The last [`HEAD_PET_SWAPS`] swaps' times, the oldest first.
+    recent: [u64; HEAD_PET_SWAPS as usize],
+    /// When it was told apart as a pet, and when last said.
+    petted: Option<u64>,
+    said: u64,
+}
+
+/// What the pet says of one acquisition.
+#[derive(Clone, Copy)]
+struct PetNote {
+    contact: Contact,
+    petted: u64,
+    observed: u64,
+    swaps: u32,
+    per_second: f32,
+    resting: bool,
+    ended: bool,
 }
 
 /// What one head acquisition produced, and the release it confirmed, if any.
@@ -538,8 +615,75 @@ impl Head {
             pushed: self.pushed,
             timing: self.timing,
             all: self.all,
+            pet: self.pet,
             ..Self::default()
         };
+    }
+    /// Whether a hand kept [`HEAD_SLEEP_US`] asks sleep: always with the pet
+    /// off, as before.
+    fn hold_sleeps(&self) -> bool {
+        match self.pet {
+            None => true,
+            Some(HoldSleeps::PetOnly) => self.petting.petted.is_none(),
+            Some(HoldSleeps::Never) => false,
+        }
+    }
+    /// Counts the pads taking turns alone in this contact, once a pad has
+    /// been alone [`PET_ALONE_MIN_US`]; released and both-pad acquisitions
+    /// between them do not break a turn (A, both, B is one swap). A pet is
+    /// [`HEAD_PET_SWAPS`] of them within [`HEAD_PET_WITHIN_US`] of a contact
+    /// whose touch counted.
+    fn count_turns(&mut self, mask: u16, at: u64) {
+        let pet = &mut self.petting;
+        match (mask.is_power_of_two().then_some(mask), pet.alone) {
+            (Some(bit), Some((alone, _))) if alone == bit => {}
+            (Some(bit), _) => pet.alone = Some((bit, at)),
+            (None, _) => pet.alone = None,
+        }
+        let Some((bit, since)) = pet.alone else {
+            return;
+        };
+        if at - since < PET_ALONE_MIN_US || pet.last_alone == Some(bit) {
+            return;
+        }
+        let swapped = pet.last_alone.is_some();
+        pet.last_alone = Some(bit);
+        if !swapped {
+            return;
+        }
+        pet.swaps = pet.swaps.saturating_add(1);
+        pet.recent.rotate_left(1);
+        pet.recent[pet.recent.len() - 1] = at;
+        if pet.petted.is_none()
+            && self.touch_sent
+            && pet.swaps >= HEAD_PET_SWAPS
+            && at - pet.recent[0] <= HEAD_PET_WITHIN_US
+        {
+            pet.petted = Some(at);
+        }
+    }
+    /// What the pet says at `at`: when it is told apart, at most every
+    /// [`PET_EVERY_US`] while it lasts, and `ended` once let go.
+    fn say_pet(&mut self, contact: Contact, at: u64, ended: bool) {
+        let pet = &mut self.petting;
+        let Some(petted) = pet.petted else {
+            return;
+        };
+        if !ended && petted != at && at - pet.said < PET_EVERY_US {
+            return;
+        }
+        pet.said = at;
+        let last = pet.recent[pet.recent.len() - 1];
+        let seconds = (at - contact.began) as f32 / 1e6;
+        self.pet_due = Some(PetNote {
+            contact,
+            petted,
+            observed: at,
+            swaps: pet.swaps,
+            per_second: (pet.swaps as f32 / seconds).min(HEAD_PET_MOST_PER_SECOND),
+            resting: ended || at - last >= PET_RESTING_US,
+            ended,
+        });
     }
     fn end(&mut self) {
         self.contact = None;
@@ -571,6 +715,7 @@ impl Head {
                 began: at,
             });
             (self.touch_sent, self.stroke_sent, self.hold_sent) = (false, false, false);
+            self.petting = Pet::default();
             self.spoiled = self.pushed;
             self.run_began = Some(at);
             self.last_active = at;
@@ -581,13 +726,17 @@ impl Head {
             self.run_began = None;
             let released = *self.released.get_or_insert(at);
             if at - self.last_active < self.timing.gap_us {
+                self.say_pet(contact, at, false);
                 return Ok(Vec::new());
             }
-            // Let go: only a short, qualified, unspoiled contact was a tap.
+            // Let go: only a short, qualified, unspoiled contact was a tap,
+            // and never a pet, however quick.
             let tap = self.touch_sent
                 && !self.stroke_sent
                 && !self.spoiled
+                && self.petting.petted.is_none()
                 && (self.timing.tap_min_us..HEAD_TAP_US).contains(&(released - contact.began));
+            self.say_pet(contact, at, true);
             self.end();
             return Ok(if tap {
                 vec![(contact, TouchGesture::Tap, Some(released))]
@@ -606,22 +755,29 @@ impl Head {
             self.touch_sent = true;
             effects.push((contact, TouchGesture::Touch, None));
         }
+        if self.pet.is_some() {
+            self.count_turns(mask, at);
+            self.say_pet(contact, at, false);
+        }
         let held = at - contact.began;
         if self.touch_sent && !self.stroke_sent && held >= HEAD_STROKE_US {
             self.stroke_sent = true;
             effects.push((contact, TouchGesture::Stroke, None));
         }
-        if self.touch_sent && !self.hold_sent && held >= HEAD_SLEEP_US {
+        if self.touch_sent && !self.hold_sent && held >= HEAD_SLEEP_US && self.hold_sleeps() {
             self.hold_sent = true;
             effects.push((contact, TouchGesture::Hold, None));
         }
         Ok(effects)
     }
     /// How long the hand has been there, through short gaps; none for a
-    /// contact a push spoiled, which counts towards nothing.
+    /// contact a push spoiled, which counts towards nothing, nor once it is
+    /// a pet, which counts towards no sleep (#3997: no countdown, no sleep
+    /// breath).
     fn held(&self, observed: u64) -> Option<u64> {
         let contact = self.contact?;
-        (!self.spoiled && self.touch_sent).then(|| observed - contact.began)
+        (!self.spoiled && self.touch_sent && self.petting.petted.is_none())
+            .then(|| observed - contact.began)
     }
 }
 
@@ -672,8 +828,10 @@ pub struct TouchEngine {
     /// The unmasked, successful twelve-bit acquisition, not inferred levels.
     strip_mask: u16,
     pending: Vec<TouchEvent>,
+    pending_pets: Vec<HeadPet>,
     latest: Vec<TouchEvent>,
     event_sequence: u64,
+    pet_sequence: u64,
     state_sequence: u64,
     rejected_inputs: u64,
 }
@@ -731,8 +889,10 @@ impl TouchEngine {
             strip_selected_mask,
             strip_mask: 0,
             pending: Vec::new(),
+            pending_pets: Vec::new(),
             latest: Vec::new(),
             event_sequence: 0,
+            pet_sequence: 0,
             state_sequence: 0,
             rejected_inputs: 0,
         })
@@ -741,6 +901,12 @@ impl TouchEngine {
     /// contact that overlaps a push asks for nothing more (#711).
     pub fn set_head_pushed(&mut self, pushed: bool) {
         self.head.pushed = pushed;
+    }
+    /// `LAMP_HEAD_PET` (#3997): with `Some`, a hand petting the head is said
+    /// on `controls/pet`, and a kept hand's sleep is as `hold` says. With
+    /// `None`, the default, the head is exactly as before.
+    pub fn set_head_pet(&mut self, hold: Option<HoldSleeps>) {
+        self.head.pet = hold;
     }
     /// Whether the reset line read pressed through all of its first second,
     /// so never arms until Controls starts again: a line that rests pressed
@@ -758,6 +924,7 @@ impl TouchEngine {
         self.reset.reset();
         self.head.reset();
         self.pulse_pads.iter_mut().for_each(PulsePad::reset);
+        self.pending_pets.clear();
         self.pending
             .retain(|event| event.source == TouchSource::Strip);
         self.latest
@@ -943,7 +1110,41 @@ impl TouchEngine {
                 event.when_asleep = asleep;
                 self.emit(event)?;
             }
+            if let Some(note) = self.head.pet_due.take() {
+                self.emit_pet(note, now)?;
+            }
         }
+        Ok(())
+    }
+    fn emit_pet(&mut self, note: PetNote, now: u64) -> Result<(), InputError> {
+        if self.pending_pets.len() == MAX_PENDING_EVENTS {
+            return Err(error(ControlFault::Overflow, "head pet queue is full"));
+        }
+        self.pet_sequence = self
+            .pet_sequence
+            .checked_add(1)
+            .ok_or_else(|| error(ControlFault::Overflow, "head pet identity exhausted"))?;
+        let pet = HeadPet {
+            stamp: ClockStamp {
+                clock_id: self.clock_id.clone(),
+                at_us: now,
+                sequence: self.pet_sequence,
+            },
+            session_id: self.session_id.clone(),
+            reader_session_id: self.gpio.session.clone().expect("accepted reader"),
+            enabled: self.config.enabled,
+            contact_id: note.contact.id,
+            began_us: note.contact.began,
+            petted_us: note.petted,
+            observed_us: note.observed,
+            swaps: note.swaps,
+            swaps_per_second: note.per_second,
+            resting: note.resting,
+            ended: note.ended,
+        };
+        pet.check()
+            .map_err(|_| error(ControlFault::Invalid, "recognizer produced an invalid pet"))?;
+        self.pending_pets.push(pet);
         Ok(())
     }
     pub fn ingest_strip(&mut self, now_us: u64, sample: StripSample) -> Result<(), InputError> {
@@ -1234,6 +1435,7 @@ impl TouchEngine {
         TouchOutput {
             events: std::mem::take(&mut self.pending),
             state,
+            pets: std::mem::take(&mut self.pending_pets),
         }
     }
 }

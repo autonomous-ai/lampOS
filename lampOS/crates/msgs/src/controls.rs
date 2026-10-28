@@ -804,10 +804,86 @@ fn touch_geometry(
     Ok(())
 }
 
+/// The pads must take turns at least this often for a pet (#3997).
+pub const HEAD_PET_SWAPS: u32 = 3;
+/// Within this, from the first counted swap to the [`HEAD_PET_SWAPS`]th.
+pub const HEAD_PET_WITHIN_US: u64 = 1_200_000;
+/// The most swaps a second a pet says: a hand can't slide faster than the
+/// pads' 40 ms alone phases let it count.
+pub const HEAD_PET_MOST_PER_SECOND: f32 = 25.0;
+
+/// A hand petting the head, the pads taking turns alone (#3997, Part of
+/// #4133): its own type on its own topic, `controls/pet`, so no reader of
+/// `controls/touch` or `controls/touch_state` sees a new meaning. Said when
+/// the pet is told apart, again while it lasts (at most ten a second) with
+/// its intensity, and once more, `ended`, when the contact is let go. Only
+/// with `LAMP_HEAD_PET` on in Controls; off, nothing is said here.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HeadPet {
+    pub stamp: ClockStamp,
+    pub session_id: String,
+    pub reader_session_id: String,
+    pub enabled: bool,
+    /// The head contact, as `controls/touch` names it.
+    pub contact_id: u64,
+    pub began_us: u64,
+    /// When the pet was told apart: its [`HEAD_PET_SWAPS`]th swap.
+    pub petted_us: u64,
+    /// The acquisition this message says.
+    pub observed_us: u64,
+    /// The swaps counted in the contact so far.
+    pub swaps: u32,
+    /// Swaps a second over the contact so far: how lively the pet is, for a
+    /// light or a purr to follow.
+    pub swaps_per_second: f32,
+    /// The hand is still between swaps: none for a while, or let go.
+    pub resting: bool,
+    /// The contact ended: the last message of this pet.
+    pub ended: bool,
+}
+
+impl HeadPet {
+    pub const TYPE: &str = "lamp_msgs/HeadPet";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "controls/pet";
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+            .lasting(Duration::from_micros(TOUCH_EVENT_TTL_US))
+    }
+    pub fn check(&self) -> Result<(), Invalid> {
+        self.stamp.check()?;
+        for name in [&self.session_id, &self.reader_session_id] {
+            control_name(name)?;
+        }
+        if self.stamp.sequence == 0
+            || self.contact_id == 0
+            || self.began_us > self.petted_us
+            || self.petted_us > self.observed_us
+            || self.observed_us > self.stamp.at_us
+            || self.swaps < HEAD_PET_SWAPS
+            || !(0.0..=HEAD_PET_MOST_PER_SECOND).contains(&self.swaps_per_second)
+            || (self.ended && !self.resting)
+        {
+            return Err(Invalid(
+                "head pet identity, times, swaps or intensity are invalid".into(),
+            ));
+        }
+        Ok(())
+    }
+    pub fn fresh_at(&self, clock_id: &str, now_us: u64) -> bool {
+        self.check().is_ok()
+            && self.enabled
+            && self.stamp.clock_id == clock_id
+            && self.stamp.at_us <= now_us
+            && now_us - self.stamp.at_us < TOUCH_EVENT_TTL_US
+    }
+}
+
 /// Explicit opt-in inventory; the shipped v1 controls topic list is unchanged.
 pub fn touch_topics() -> Vec<(&'static str, Declaration)> {
     vec![
         (TouchEvent::TOPIC, TouchEvent::declaration()),
         (TouchState::TOPIC, TouchState::declaration()),
+        (HeadPet::TOPIC, HeadPet::declaration()),
     ]
 }

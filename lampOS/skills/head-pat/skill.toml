@@ -1,0 +1,75 @@
+# Head pat (#3997, Part of #4133): a hand petting the lamp's head, its pads
+# taking turns alone, gets a short response, at most once a minute. Controls
+# tells the pet apart and says it on `controls/pet` only with LAMP_HEAD_PET=on
+# (docs/controls.md); without it nothing here ever runs. Written to
+# lamp-skills' schema (docs/skills.md, "The schema, as lamp-skills reads it").
+needs = ["voice"]
+# Its owner puts it on, and only after its lamp check: held out of the
+# product's install by install::NOT_PRODUCT_SKILLS.
+kind = "installable"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the pet, the voice's state,
+# whether the lamp sleeps, whether setup is under way, and one line.
+[permissions]
+topics = ["controls/pet", "voice/state", "expression/state", "onboarding/pending"]
+speak = true
+
+[trigger]
+topic = "controls/pet"
+field = "ended"
+equals = false            # a pet going on: Controls says it about ten times a second until it ends
+rearm = "ends"            # once a pet; a chance held back (talking, asleep, setup) is spent, never said late
+cooldown = "1m"           # at most once a minute
+
+[[while]]                 # not while it listens, thinks or speaks, nor within 10 s of it: a pet that cut its words gets nothing
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "10s"
+
+[[while]]                 # never while asleep, nor for a pet that woke it (the kept hand's wake at 1 s comes before the pet)
+topic = "expression/state"
+field = "asleep"
+not_equals = true         # awake, or Expression planning no idle layer this step
+for = "5s"
+
+[[while]]                 # never during setup: an onboarding invitation pending
+topic = "onboarding/pending"
+field = "invitations"
+equals = []
+unknown = "holds"         # a lamp with onboarding off never says the topic
+
+[quiet]                   # quiet hours: silent from 22:00 to 07:00, and when the time is not known
+from = "22:00"
+to = "07:00"
+
+[ask]
+policy = "nudge"
+
+# The response: the design owner's and the growth lead's choice (#4133),
+# made here and not in code. Keep exactly one of the three.
+#
+# A spoken line, one of these at random, said as written (the default). Add,
+# remove or reword lines freely: 2 to 16 different ones.
+[[do]]
+say = { text = [
+  "Mm, that's nice.",
+  "Oh, I like that.",
+  "Hehe, that tickles.",
+  "Aw, thank you.",
+  "That feels good.",
+  "Mmm. More of that, please.",
+  "Oh, hello to you too.",
+], priority = 8, expires = "3s" }   # a reaction: said at the first second's quiet or not at all, never late (the 30 s default would let it come long after the hand, #4155; lamp-voice's say test a_pets_line_is_said_at_once_or_dropped_never_late)
+
+# A non-word giggle: put a sound at sounds/giggle.wav (24 kHz mono, at most
+# 3 s, quiet: the voice's own check), then use this step in place of the say.
+# [[do]]
+# sound = "giggle"
+
+# A purr with light: add `light = true` to [permissions], then use this step
+# in place of the say.
+# [[do]]
+# cue = "hum"
+# light = { colour = "warm", level = 3, for = "4s", pattern = { kind = "breathe", period = "4s" } }

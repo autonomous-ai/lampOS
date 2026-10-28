@@ -1,0 +1,3 @@
+# The voice speaking from 15 s to 30 s, a pet at 20 s: nothing, and not later.
+clock = "10:00"
+none = true

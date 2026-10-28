@@ -2655,6 +2655,50 @@ mod tests {
         assert_eq!(says.quiet_needed_us(), None);
     }
 
+    /// #3997: Head pat's line, as its skill asks it (priority 8 and
+    /// `expires = "3s"`), is a reaction: said at the first second's quiet,
+    /// or answered `expired` and never said late (the 30 s default would
+    /// let it come long after the hand, #4155). The skill's own file is read,
+    /// so a change there that drops its short `expires` fails here.
+    #[test]
+    fn a_pets_line_is_said_at_once_or_dropped_never_late() {
+        let toml = include_str!("../../../skills/head-pat/skill.toml");
+        assert!(toml.contains("priority = 8, expires = \"3s\""), "{toml}");
+        let line =
+            r#"{"skill":"head-pat","text":"Mm, that's nice.","priority":8,"expires_in_ms":3000}"#;
+        let request = parse(line).unwrap();
+        let ask_at = |read_at_us: u64| {
+            let (answer, answered) = mpsc::channel();
+            let asked = Asked {
+                expires_at_us: request.expires_at_us(read_at_us),
+                request: request.clone(),
+                answer,
+                read_at_us,
+                guard: None,
+            };
+            (asked, answered)
+        };
+        let (mut says, ask) = Says::by_hand();
+        // The lamp busy past the line's 3 s: expired, never taken after.
+        let (late, late_answer) = ask_at(1_000_000);
+        ask.send(late).unwrap();
+        says.poll(1_000_000);
+        assert_eq!(says.quiet_needed_us(), Some(URGENT_QUIET_US));
+        says.poll(3_999_999);
+        assert_eq!(late_answer.try_recv(), Err(mpsc::TryRecvError::Empty));
+        says.poll(4_000_000);
+        assert_eq!(late_answer.try_recv(), Ok(Answer::Done(Outcome::Expired)));
+        assert!(says.take(4_000_000).is_none());
+        assert!(says.take(30_000_000).is_none());
+        // A pause within it: taken, as written.
+        let (prompt, _) = ask_at(10_000_000);
+        ask.send(prompt).unwrap();
+        says.poll(10_000_000);
+        let (turn, priority, ticket, _) = says.take(11_000_000).unwrap();
+        assert_eq!((ticket.skill(), priority), ("head-pat", 8));
+        assert!(turn.contains("Mm, that's nice."), "{turn}");
+    }
+
     /// #3697: the skill `shutdown` is root's only; its say is taken before
     /// any other, whatever their priority.
     #[test]

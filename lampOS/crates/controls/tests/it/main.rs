@@ -5,6 +5,7 @@
 mod base;
 mod engine;
 mod head_discovery;
+mod head_pet;
 mod head_rest;
 mod head_sleep;
 mod hold_clear;

@@ -115,7 +115,13 @@ fn touch_topics_are_explicit_and_leave_v1_inventory_unchanged() {
             .collect::<Vec<_>>(),
         ["controls/gesture", "controls/state"]
     );
-    assert_eq!(touch_topics().len(), 2);
+    assert_eq!(
+        touch_topics()
+            .iter()
+            .map(|(topic, _)| *topic)
+            .collect::<Vec<_>>(),
+        ["controls/touch", "controls/touch_state", "controls/pet"]
+    );
     for (topic, declaration) in touch_topics() {
         assert_eq!(declaration_of(topic), Some(declaration));
         assert!(!first_topics().iter().any(|(name, _)| *name == topic));
@@ -125,6 +131,9 @@ fn touch_topics_are_explicit_and_leave_v1_inventory_unchanged() {
     assert_eq!(TouchState::declaration().kind, Kind::Latest);
     assert_eq!(TouchState::declaration().period_ms, Some(100));
     assert_eq!(TouchState::declaration().lifespan_ms, Some(300));
+    assert_eq!(HeadPet::declaration().kind, Kind::Event);
+    assert_eq!(HeadPet::declaration().lifespan_ms, Some(500));
+    assert_eq!(HeadPet::declaration().type_name, "lamp_msgs/HeadPet");
 }
 #[test]
 fn additive_fields_on_events_preserve_requests_without_granting_permission() {
@@ -591,4 +600,80 @@ fn primary_and_reset_keep_their_exact_one_way_intent_while_asleep() {
         e.when_asleep = Some(TouchIntent::Wake);
         assert!(e.check().is_err());
     }
+}
+
+fn pet() -> HeadPet {
+    HeadPet {
+        stamp: ClockStamp {
+            clock_id: "boot".into(),
+            at_us: 2_300_000,
+            sequence: 1,
+        },
+        session_id: "controls".into(),
+        reader_session_id: "gpio".into(),
+        enabled: true,
+        contact_id: 1,
+        began_us: 1_000_000,
+        petted_us: 2_190_000,
+        observed_us: 2_290_000,
+        swaps: 3,
+        swaps_per_second: 2.3,
+        resting: false,
+        ended: false,
+    }
+}
+
+/// #3997: `lamp_msgs/HeadPet` on `controls/pet` writes and reads back, a
+/// newer writer's extra field is passed over, and a missing one refuses.
+#[test]
+fn a_head_pet_round_trips_ignores_an_extra_field_and_refuses_a_missing_one() {
+    let pet = pet();
+    assert!(pet.check().is_ok());
+    let wire = serde_json::to_value(&pet).unwrap();
+    assert_eq!(
+        serde_json::from_value::<HeadPet>(wire.clone()).unwrap(),
+        pet
+    );
+    let mut newer = wire.clone();
+    newer["warmth"] = json!(0.5);
+    assert_eq!(serde_json::from_value::<HeadPet>(newer).unwrap(), pet);
+    for field in [
+        "contact_id",
+        "petted_us",
+        "swaps",
+        "swaps_per_second",
+        "resting",
+        "ended",
+    ] {
+        let mut older = wire.clone();
+        older.as_object_mut().unwrap().remove(field);
+        assert!(serde_json::from_value::<HeadPet>(older).is_err(), "{field}");
+    }
+    assert!(pet.fresh_at("boot", 2_300_000));
+    assert!(!pet.fresh_at("boot", 2_800_000));
+    assert!(!pet.fresh_at("other", 2_300_000));
+}
+
+#[test]
+fn a_head_pet_is_checked_for_its_times_swaps_and_intensity() {
+    let refused = |change: fn(&mut HeadPet)| {
+        let mut pet = pet();
+        change(&mut pet);
+        pet.check().is_err()
+    };
+    assert!(refused(|pet| pet.contact_id = 0));
+    assert!(refused(|pet| pet.stamp.sequence = 0));
+    assert!(refused(|pet| pet.swaps = 2));
+    assert!(refused(|pet| pet.petted_us = 900_000));
+    assert!(refused(|pet| pet.observed_us = 2_100_000));
+    assert!(refused(|pet| pet.observed_us = 2_400_000));
+    assert!(refused(|pet| pet.swaps_per_second = f32::NAN));
+    assert!(refused(|pet| pet.swaps_per_second = -1.0));
+    assert!(refused(|pet| pet.swaps_per_second = 26.0));
+    // Ended is let go, so resting.
+    assert!(refused(|pet| pet.ended = true));
+    assert!(!refused(|pet| (pet.ended, pet.resting) = (true, true)));
+    let mut off = pet();
+    off.enabled = false;
+    assert!(off.check().is_ok() && !off.fresh_at("boot", 2_300_000));
 }

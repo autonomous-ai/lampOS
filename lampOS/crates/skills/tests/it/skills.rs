@@ -323,6 +323,115 @@ fn repo_skill_with(dir: &Path, name: &str, from: &str, to: &str) -> PathBuf {
     skill
 }
 
+/// Head pat's response is chosen in its `skill.toml` (#3997, #4133): its
+/// seven lines, one picked each run, said as written; or, by editing that
+/// file alone, a purr with light. A list of lines is 2 to 16 different ones.
+#[test]
+fn head_pats_response_is_chosen_in_its_file() {
+    let lines = [
+        "Mm, that's nice.",
+        "Oh, I like that.",
+        "Hehe, that tickles.",
+        "Aw, thank you.",
+        "That feels good.",
+        "Mmm. More of that, please.",
+        "Oh, hello to you too.",
+    ];
+    let toml = fs::read_to_string(skills_root().join("head-pat/skill.toml")).unwrap();
+    assert_eq!(
+        load(&skills_root().join("head-pat")).unwrap().kind,
+        SkillKind::Installable
+    );
+    let say = &toml[toml.find("[[do]]\nsay").unwrap()..toml.find("# A non-word").unwrap()];
+    // Its own steps in a skill that runs at each pet, with no gate.
+    let runs_of = |permissions: &str, steps: &str| {
+        let dir = tempfile::tempdir().unwrap();
+        let skill = dir.path().join("head-pat");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: head-pat\ndescription: A pet.\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            skill.join("skill.toml"),
+            format!(
+                "[permissions]\ntopics = [\"controls/pet\"]\n{permissions}\n\
+                 [trigger]\ntopic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"\n\
+                 [ask]\npolicy = \"nudge\"\n{steps}"
+            ),
+        )
+        .unwrap();
+        let mut engine = Engine::new(vec![load(&skill).unwrap()], true);
+        let mut runs = Vec::new();
+        for pet in 0..200u64 {
+            let at = 1_000_000 + pet * 1_234_567;
+            for (ended, at) in [(false, at), (true, at + 500_000)] {
+                let payload = format!("{{\"ended\":{ended}}}");
+                runs.extend(engine.observe("controls/pet", at, payload.as_bytes(), Some(500)));
+            }
+        }
+        runs
+    };
+    let runs = runs_of("speak = true", say);
+    assert_eq!(runs.len(), 200);
+    let mut said = std::collections::BTreeSet::new();
+    for run in &runs {
+        let [Call::Words(words)] = run.calls.as_slice() else {
+            panic!("{:?}", run.calls);
+        };
+        assert!(words.exact && words.priority == 8 && words.expires_ms == 3_000);
+        assert!(lines.contains(&words.words.as_str()), "{words:?}");
+        said.insert(words.words.clone());
+    }
+    assert_eq!(said.len(), lines.len());
+    // The purr with light, from the file's own commented step.
+    let purr = &toml[toml.find("# [[do]]\n# cue").unwrap()..];
+    let purr: String = purr
+        .lines()
+        .map(|line| line.trim_start_matches("# "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let runs = runs_of("speak = true\nlight = true", &purr);
+    assert!(runs[0].calls.iter().any(|call| matches!(call, Call::Cue)));
+    assert!(
+        runs[0]
+            .calls
+            .iter()
+            .any(|call| matches!(call, Call::Light { .. }))
+    );
+    // A list is 2 to 16 different lines.
+    let dir = tempfile::tempdir().unwrap();
+    let from = &toml[toml.find("text = [").unwrap()..=toml.find("], priority").unwrap()];
+    let many: Vec<String> = (0..17).map(|n| format!("\"Line {n}.\"")).collect();
+    for (case, to, why) in [
+        (
+            "one",
+            "text = [\"Mm.\"]".to_owned(),
+            "2 to 16 different lines",
+        ),
+        (
+            "same",
+            "text = [\"Mm.\", \"Mm.\"]".to_owned(),
+            "2 to 16 different lines",
+        ),
+        (
+            "empty",
+            "text = [\"Mm.\", \" \"]".to_owned(),
+            "1 to 900 bytes",
+        ),
+        (
+            "many",
+            format!("text = [{}]", many.join(", ")),
+            "2 to 16 different lines",
+        ),
+    ] {
+        let skill = repo_skill_with(&dir.path().join(case), "head-pat", from, &to);
+        let error = load(&skill).unwrap_err();
+        assert!(error.contains(why), "{case}: {error}");
+    }
+}
+
 /// The owner, 19 Oct: core skills are always on the lamp, as a phone's own
 /// apps; the rest are installed. Desk tutor and its marks wait for the full
 /// look in the product. The four wellbeing nudges are core since 25 Oct
@@ -378,6 +487,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "desk-tutor",
             "desk-tutor-marks",
             "guard-mode",
+            "head-pat",
             "look-for-things",
             "meal-check",
             "sit-back",

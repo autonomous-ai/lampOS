@@ -632,7 +632,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `presence` | notices whether someone is at the desk, with the camera | the privacy switch stops it | `room/presence`, `room/activity` |
   | `hearing` | hears what is said to it | the privacy switch stops it | `voice/heard`, `name/heard` |
   | `room_sound` | hears how loud the room is | the privacy switch stops it | `ears/level`, `ears/sudden` |
-  | `touch` | feels a touch on the lamp | — | `controls/touch`, `controls/gesture` |
+  | `touch` | feels a touch on the lamp | — | `controls/touch`, `controls/gesture`, `controls/pet` |
   | `air` | reads the air sensor | — | `air/state` |
   | `reminders` | knows when a reminder is due | — | `schedule/due` |
   | `tasks` | knows how the work you handed over is going | — | `tasks/status` |
