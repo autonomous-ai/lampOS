@@ -2056,11 +2056,6 @@ impl Run<'_, '_> {
                 if let Err(why) = self.ask_apply(apply::Op::Back, sequence) {
                     troubles.push(format!("the settings cannot be put back: {why}"));
                 }
-                // Undone by the writer that made the apply; only then is a
-                // new writer whose first apply failed put back itself.
-                if self.apply_failed && crate::writer_swap::unproven(&self.config.root, &records) {
-                    self.writer_op(crate::writer_swap::Op::PutBack, "its first apply failed");
-                }
             } else {
                 // No back.json of this build: lamp-update-apply wrote
                 // nothing (it never ran, or failed before its first write),
@@ -2073,6 +2068,12 @@ impl Run<'_, '_> {
                 if let Err(error) = apply::finish(&records) {
                     troubles.push(format!("the settings' request cannot be removed: {error}"));
                 }
+            }
+            // Undone above by the writer that made the apply, if it wrote
+            // at all; only then is a new writer whose first apply failed
+            // put back itself, whether or not it wrote before failing.
+            if self.apply_failed && crate::writer_swap::unproven(&self.config.root, &records) {
+                self.writer_op(crate::writer_swap::Op::PutBack, "its first apply failed");
             }
         }
         if troubles.is_empty() {
