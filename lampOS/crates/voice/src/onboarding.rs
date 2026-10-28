@@ -557,6 +557,10 @@ pub struct Onboarding {
     gesture: Option<&'static str>,
     /// [`NUDGE_ENVIRONMENT`].
     nudge: bool,
+    /// Whether the voice can save a face (`remember_my_face`, the eyes' who
+    /// socket set): "who you are" then asks for the face, and is done when it
+    /// is saved, not on a name and a yes (#3883's follow-up).
+    face_kept: bool,
     /// Whether no hand was on the lamp at the body's last reading.
     released: bool,
     /// Since when a face at least [`NEAR`] has been seen without a break.
@@ -645,6 +649,8 @@ impl Onboarding {
         let mut walk = Self::with_definition(file, client, definition);
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
+        walk.face_kept =
+            std::env::var(crate::known_faces::ENVIRONMENT).is_ok_and(|socket| !socket.is_empty());
         // The head pads' touches, from `--touch` Controls, only with the
         // voice's bus on.
         if std::env::var(crate::bus_out::ENVIRONMENT).ok().as_deref() == Some("on") {
@@ -715,6 +721,7 @@ impl Onboarding {
             goals: None,
             body_heard: false,
             nudge: false,
+            face_kept: false,
             released: true,
             near_since: None,
             touches: None,
@@ -1670,6 +1677,7 @@ impl Onboarding {
     /// never both end it (the first builder on #2526).
     pub fn heard(&mut self, text: &str, now_us: u64) {
         let nudge = self.nudge;
+        let face_kept = self.face_kept;
         let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) else {
             return;
         };
@@ -1677,12 +1685,22 @@ impl Onboarding {
         let done = match led.step {
             Step::WhoYouAre if nudge => false,
             Step::WhoYouAre => {
+                // With a face to keep, the yes after a name is most often the
+                // yes to "May I remember your face?": the step ends when the
+                // face is saved (`face_saved`), or by the model's report, not
+                // here. On lamp-29e7 (28 Oct, 8001) a name and a yes ended it
+                // at 08:50:29 and no face was kept.
                 if led.heard.name && agrees(&words) {
-                    true
+                    !face_kept
                 } else if names_someone(text, &words) {
                     if !led.heard.name {
                         eprintln!(
-                            "lamp-voice: onboarding: who_you_are heard a name; a yes ends it"
+                            "lamp-voice: onboarding: who_you_are heard a name; {}",
+                            if face_kept {
+                                "the face saved ends it"
+                            } else {
+                                "a yes ends it"
+                            }
                         );
                     }
                     led.heard.name = true;
@@ -3898,6 +3916,24 @@ mod tests {
             assert!(refuses(&words(no)), "{no}");
         }
         assert_eq!(yes_or_no("of course not"), Some(false));
+    }
+
+    /// With a face to keep (the eyes' who socket), a name and a yes leave
+    /// "who you are" open: the yes is the face question's, and the face
+    /// saved ends it (lamp-29e7, 28 Oct: ended on the yes, no face kept).
+    #[test]
+    fn with_a_face_to_keep_a_name_and_a_yes_wait_for_the_face() {
+        let mut room = Room::new("face-kept");
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.walk.heard("Yes, of course.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        face_saved(&room.walk.file);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
     /// The first builder on #2526: with the nudge on, both of the
