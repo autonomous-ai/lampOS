@@ -75,6 +75,9 @@ const REPLACE_MARGIN_PERCENT: u8 = 15;
 pub const ACTIVITY_BLOCKS: u8 = 50;
 /// The most [`EchoEvidence::render_quiet_blocks`] reports: 640 ms or longer.
 pub const QUIET_BLOCKS_CEILING: u8 = 64;
+/// Blocks over which [`EchoMatch::render_drop`] takes the render's peak:
+/// 150 ms.
+const RENDER_PEAK_BLOCKS: usize = 15;
 
 /// RMS level in tenths of a decibel relative to full scale, measured in the
 /// analysis band (below about 2 kHz) over the last 120 ms and about the mean.
@@ -93,10 +96,14 @@ impl Level {
     }
     /// From the energy of one analysis window about its mean.
     fn of(energy: f64) -> Self {
+        Self::of_samples(energy, WINDOW)
+    }
+    /// From the energy of `samples` analysis samples.
+    fn of_samples(energy: f64, samples: usize) -> Self {
         if energy <= 0.0 {
             return Self::FLOOR;
         }
-        let db = 10.0 * (energy / WINDOW as f64 / (32_768.0 * 32_768.0)).log10();
+        let db = 10.0 * (energy / samples as f64 / (32_768.0 * 32_768.0)).log10();
         Self(((db * 10.0).round() as i16).max(Self::FLOOR.0))
     }
 }
@@ -125,6 +132,15 @@ pub struct EchoMatch {
     /// Capture blocks since this alignment last explained at least
     /// [`MATCH_PERCENT`] of the capture. Zero means this block.
     pub alignment_age_blocks: u16,
+    /// Level of the render at the matched alignment over the newest capture
+    /// block alone (10 ms), where `render_level` covers 120 ms.
+    // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+    pub render_block_level: Level,
+    /// How far `render_block_level` is under its own peak over the last
+    /// 150 ms at the alignment held, in tenths of a decibel: high on the
+    /// tail of a word the lamp just stopped, near zero while it holds.
+    // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+    pub render_drop: u16,
 }
 
 /// Measurements for one capture block. See the module text for what they do
@@ -266,6 +282,10 @@ pub struct EchoObserver {
     /// The held alignment's age when the render at it is silent this block
     /// ([`EchoEvidence::silent_at_echo`]).
     silent_at: Option<u16>,
+    /// The render's level at the held alignment over the last
+    /// [`RENDER_PEAK_BLOCKS`] capture blocks, oldest first, for
+    /// [`EchoMatch::render_drop`].
+    render_blocks: [Level; RENDER_PEAK_BLOCKS],
 }
 impl Default for EchoObserver {
     fn default() -> Self {
@@ -328,6 +348,7 @@ impl EchoObserver {
             counts: Skipped::default(),
             latest: None,
             silent_at: None,
+            render_blocks: [Level::FLOOR; RENDER_PEAK_BLOCKS],
         }
     }
     /// Forget everything but [`Self::skip_while_render_silent`] and the
@@ -410,6 +431,23 @@ impl EchoObserver {
         self.blocks = self.blocks.saturating_add(1);
         let (raw_energy, clean_energy) = (self.raw.energy(), self.clean.energy());
         let echo = self.matched(raw_energy);
+        // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+        let block = self.alignment.as_ref().map_or(Level::FLOOR, |alignment| {
+            self.render_block(alignment.offset)
+        });
+        self.render_blocks.copy_within(1.., 0);
+        self.render_blocks[RENDER_PEAK_BLOCKS - 1] = block;
+        let peak = self
+            .render_blocks
+            .iter()
+            .max()
+            .copied()
+            .unwrap_or(Level::FLOOR);
+        let echo = echo.map(|echo| EchoMatch {
+            render_block_level: block,
+            render_drop: (peak.0 - block.0).unsigned_abs(),
+            ..echo
+        });
         let evidence = EchoEvidence {
             blocks: self.blocks,
             render_active_blocks: (self.activity & ((1 << ACTIVITY_BLOCKS) - 1)).count_ones() as u8,
@@ -421,6 +459,20 @@ impl EchoObserver {
         };
         self.latest = Some(evidence);
         evidence
+    }
+
+    /// The render's level over the newest capture block at `offset`, or
+    /// [`Level::FLOOR`] where that render is no longer, or not yet, held.
+    fn render_block(&self, offset: i64) -> Level {
+        let start = self.captured as i64 - BLOCK as i64 + offset;
+        let oldest = self.render.total as i64 - HISTORY as i64;
+        if start < oldest.max(0) || start + BLOCK as i64 > self.render.total as i64 {
+            return Level::FLOOR;
+        }
+        let energy: i64 = (start..start + BLOCK as i64)
+            .map(|index| self.render.at(index as u64).pow(2))
+            .sum();
+        Level::of_samples(energy as f64, BLOCK)
     }
 
     /// Offsets at which the whole capture window has render to compare with:
@@ -773,6 +825,9 @@ impl EchoObserver {
             residual_explained,
             residual_playback_floor,
             alignment_age_blocks: age_blocks,
+            // Filled in by `capture`, which keeps the render's recent peak.
+            render_block_level: Level::FLOOR,
+            render_drop: 0,
         })
     }
 }
@@ -797,6 +852,54 @@ mod tests {
         }
         let index = (seconds * 4_000.0) as u64;
         8_000.0 * noise(1, index) * (0.4 + 0.6 * (seconds * 19.0).sin().abs())
+    }
+
+    /// A render held at one level for a second, then stopped at once, with
+    /// its echo 50 ms late (five blocks). While it holds, the render at the
+    /// alignment is about its own recent peak; once the alignment reaches the
+    /// stop, every block still matched is 6 dB or more under it: the tail a
+    /// word leaves in the room (#4035).
+    #[test]
+    fn a_render_that_stops_abruptly_drops_and_a_held_one_does_not() {
+        let mut observer = EchoObserver::new();
+        let stop = 100u64;
+        let (mut held, mut tail) = (Vec::new(), Vec::new());
+        for block in 0..stop + 30 {
+            let render: RenderBlock = std::array::from_fn(|index| {
+                let sample = block * RENDER_SAMPLES as u64 + index as u64;
+                if block < stop {
+                    (8_000.0 * noise(1, sample / 6)) as i16
+                } else {
+                    0
+                }
+            });
+            let capture: CaptureBlock = std::array::from_fn(|index| {
+                let sample = block * CAPTURE_SAMPLES as u64 + index as u64;
+                let echo = if (5..stop + 5).contains(&block) {
+                    -0.5 * 8_000.0 * noise(1, (sample - 5 * CAPTURE_SAMPLES as u64) / 4)
+                } else {
+                    0.0
+                };
+                (echo + 4.0 * noise(2, sample)).round() as i16
+            });
+            observer.render(&render);
+            let Some(echo) = observer.capture(&capture, &capture).echo else {
+                continue;
+            };
+            if (50..stop).contains(&block) {
+                held.push(echo.render_drop);
+            } else if block >= stop + 5 {
+                tail.push(echo.render_drop);
+            }
+        }
+        assert!(held.len() >= 40, "held matched {} blocks", held.len());
+        // A 10 ms block of noise wanders a few dB about its level; all of
+        // it stays under the 6 dB a tail is taken at, most of it near zero.
+        assert!(held.iter().all(|&drop| drop < 50), "held {held:?}");
+        let mean = held.iter().map(|&drop| u32::from(drop)).sum::<u32>() / held.len() as u32;
+        assert!(mean <= 20, "held {held:?}");
+        assert!(tail.len() >= 3, "tail matched {} blocks", tail.len());
+        assert!(tail.iter().all(|&drop| drop >= 60), "tail {tail:?}");
     }
 
     /// The same scene through an observer that skips and one that does not:
