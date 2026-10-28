@@ -36,6 +36,17 @@ export const LAMP_CONTROL_REFUSES = Object.freeze({
   play: 'not routed yet: waits for client packages',
   sound: 'not routed yet: waits for client packages',
 });
+// A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
+// LightPattern::check, with the breath's low at 1): the least level each is
+// seen at, and the words it refuses with.
+export const PATTERN_LEAST_LEVEL = Object.freeze({
+  breathe: [2, "a breath's low is from 1 to under the light's level"],
+  candle: [3, 'a candle flickers at level 3 and up'],
+  pulse: [2, 'a pulse is seen at level 2 and up'],
+});
+// The ring plays one pulse a minute for one asker, and drops a second without a
+// word to the computer (lamp_msgs' PULSE_GAP_US): the door has answered by then.
+export const PULSE_GAP_MS = 60_000;
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const LEASE_OPS = new Set(['look', 'move', 'play', 'joints']);
 
@@ -76,6 +87,11 @@ export class FakeLamp {
     // The newest light a computer asked for, and until when (the fake's
     // `clock`, ms): what the ring shows while it lasts (`lightState`).
     this.shown = null;
+    // Each pulse the ring would play, and each it would drop as a second within
+    // a minute from the same computer: { client, request }.
+    this.pulsesPlayed = [];
+    this.pulsesDropped = [];
+    this.pulsed = new Map();
     this.clock = () => Date.now();
   }
 
@@ -246,9 +262,6 @@ export class FakeLamp {
         // `lamp.changed`'s `lamp_state`) (harness-reviewer's lamp run on 75c9, 28 Oct).
         return this.ok(ws, id, { state: Object.fromEntries(request.state.map((k) => [k, k === 'light' ? this.lightState() : this.state[k] ?? null])) });
       }
-      case 'light':
-        this.show(request);
-        return this.ok(ws, id);
       case 'lease.take': {
         const taken = [...this.leases.values()].some((h) => h.parts.some((p) => request.parts.includes(p)));
         if (taken) return this.refuse(ws, id, 'busy', 'another client holds it');
@@ -262,6 +275,29 @@ export class FakeLamp {
       case 'lease.release':
         this.leases.delete(request.lease);
         return this.ok(ws, id);
+      case 'light': {
+        // As lamp-control's parts.rs: the pattern checked first, then to the
+        // ring, which keeps its own one-pulse-a-minute (not said back).
+        const [least, why] = PATTERN_LEAST_LEVEL[request.pattern] ?? [1, ''];
+        if (request.level < least) {
+          this.requests.pop();
+          return this.refuse(ws, id, 'refused', why);
+        }
+        if (request.pattern === 'pulse') {
+          const now = this.clock();
+          if (now - (this.pulsed.get(client) ?? -PULSE_GAP_MS) < PULSE_GAP_MS) {
+            // The ring shows it without its pulse (ring_light.rs's start_moving
+            // starts it "as already played"): its colour and level steady, the
+            // old light replaced.
+            this.pulsesDropped.push({ client, request });
+          } else {
+            this.pulsed.set(client, now);
+            this.pulsesPlayed.push({ client, request });
+          }
+        }
+        this.show(request);
+        return this.ok(ws, id, { to: 'ring' });
+      }
       case 'express': {
         // As lamp-control's feelings.rs: the feelings skill's three, its
         // move to the body (smaller below strength 0.5) and its light; no

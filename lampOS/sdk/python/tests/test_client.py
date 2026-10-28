@@ -820,3 +820,51 @@ def test_the_fake_checks_the_lease_before_the_routing_refusal(tmp_path):
                     assert raised.value.why.startswith("not routed yet")
 
     run(go())
+
+
+def test_the_fakes_light_keeps_lamp_controls_pattern_levels_and_the_rings_pulse_gap(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for pattern, level, why in [
+                    ("breathe", 1, "a breath's low is from 1 to under the light's level"),
+                    ("candle", 2, "a candle flickers at level 3 and up"),
+                    ("pulse", 1, "a pulse is seen at level 2 and up"),
+                ]:
+                    with pytest.raises(errors.BY_CODE["refused"], match=why):
+                        await lamp.light("warm", level, 5_000, pattern=pattern)
+                assert fake.asked("light") == []
+                assert (await lamp.light("warm", 1, 5_000))["to"] == "ring"
+                assert (await lamp.light("green", 2, 5_000, pattern="breathe"))["to"] == "ring"
+                now = [1000.0]
+                fake.clock = lambda: now[0]
+                await lamp.light("red", 3, 5_000, pattern="pulse")
+                now[0] += 59
+                await lamp.light("red", 3, 5_000, pattern="pulse")  # answered, but the ring drops it
+                now[0] += 2
+                await lamp.light("red", 3, 5_000, pattern="pulse")
+                assert [r["colour"] for _, r in fake.pulses_played] == ["red", "red"]
+                assert len(fake.pulses_dropped) == 1
+                assert len(fake.asked("light")) == 5
+
+    run(go())
+
+
+def test_a_second_pulse_within_a_minute_shows_without_its_pulse_and_a_refused_light_never(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                now = [100.0]
+                fake.clock = lambda: now[0]
+                await lamp.light("red", 3, 30_000, pattern="pulse")
+                now[0] += 10
+                await lamp.light("blue", 2, 30_000, pattern="pulse")  # within a minute: shown, no pulse
+                assert (await lamp.get("light"))["light"]["shows"] == {"on": True, "colour": "blue", "level": 2}
+                assert len(fake.pulses_played) == 1 and len(fake.pulses_dropped) == 1
+                with pytest.raises(errors.BY_CODE["refused"]):
+                    await lamp.light("green", 1, 30_000, pattern="breathe")  # refused: never shown
+                assert (await lamp.get("light"))["light"]["shows"]["colour"] == "blue"
+
+    run(go())

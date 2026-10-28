@@ -565,3 +565,42 @@ test('the fake checks the lease before the routing refusal', async () => {
     });
   });
 });
+
+test('the fake light keeps lamp-control\'s pattern levels and the ring\'s pulse gap', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    for (const [pattern, level, why] of [
+      ['breathe', 1, "a breath's low is from 1 to under the light's level"],
+      ['candle', 2, 'a candle flickers at level 3 and up'],
+      ['pulse', 1, 'a pulse is seen at level 2 and up'],
+    ]) {
+      await assert.rejects(lamp.light('warm', level, 5000, pattern), (error) => error instanceof byCode.refused && error.message.includes(why));
+    }
+    assert.deepEqual(fake.asked('light'), []);
+    assert.equal((await lamp.light('warm', 1, 5000)).to, 'ring');
+    assert.equal((await lamp.light('green', 2, 5000, 'breathe')).to, 'ring');
+    let now = 1_000_000;
+    fake.clock = () => now;
+    await lamp.light('red', 3, 5000, 'pulse');
+    now += 59_000;
+    await lamp.light('red', 3, 5000, 'pulse'); // answered, but the ring drops it
+    now += 2_000;
+    await lamp.light('red', 3, 5000, 'pulse');
+    assert.equal(fake.pulsesPlayed.length, 2);
+    assert.equal(fake.pulsesDropped.length, 1);
+    assert.equal(fake.asked('light').length, 5);
+  });
+});
+
+test('a second pulse within a minute shows without its pulse, and a refused light never', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    await lamp.light('red', 3, 30000, 'pulse');
+    now += 10_000;
+    await lamp.light('blue', 2, 30000, 'pulse'); // within a minute: shown, no pulse
+    assert.deepEqual((await lamp.get('light')).light.shows, { on: true, colour: 'blue', level: 2 });
+    assert.deepEqual([fake.pulsesPlayed.length, fake.pulsesDropped.length], [1, 1]);
+    await assert.rejects(lamp.light('green', 1, 30000, 'breathe'), byCode.refused); // refused: never shown
+    assert.equal((await lamp.get('light')).light.shows.colour, 'blue');
+  });
+});
