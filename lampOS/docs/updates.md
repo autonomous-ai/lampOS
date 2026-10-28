@@ -1079,9 +1079,11 @@ build could carry it units or settings.
    `self.json` goes. A binary that cannot reach the channel or refuses the
    manifest waits and tries again every 30 s, and doesn't confirm.
 3. **Back.** `lamp-update-back` is a copy of the installed build's
-   `lamp-update` at `/usr/local/lib/lampos/lamp-update-back`. Only `install`
-   writes it, and it is outside `lamp-update.service`'s `ReadWritePaths`, so
-   no round can change it. `lamp-update-back.service` runs it as
+   `lamp-update` at `/usr/local/lib/lampos/lamp-update-back`. It is outside
+   `lamp-update.service`'s `ReadWritePaths`, so no round writes it itself.
+   `install` writes it, and so does the writer's one-shot unit, which a round
+   starts to refresh it from a confirmed lamp-update ("The settings writer
+   refreshed", #4178). `lamp-update-back.service` runs it as
    `lamp-update-back back`. It is started by `lamp-update.service`'s
    `OnFailure=` and every 2 min by `lamp-update-back.timer`. When
    `self.json` is there and lamp-update is not `active`/`running`, or 10 min

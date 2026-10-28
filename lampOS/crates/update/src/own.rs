@@ -8,8 +8,10 @@
 //! 2. The new binary confirms itself only when it has read the channel's
 //!    manifest and checked its signature, a dry round: then `self.json`
 //!    goes. Until then no round acts.
-//! 3. `lamp-update-back`, at a fixed path that only `install` writes and no
-//!    round can, puts the link back when `self.json` is still there and
+//! 3. `lamp-update-back`, at a fixed path no round writes itself (`install`
+//!    does, and the writer's one-shot unit refreshes it from a confirmed
+//!    lamp-update, crate::writer_swap), puts the link back when `self.json`
+//!    is still there and
 //!    lamp-update has failed (`OnFailure=`) or [`DEADLINE`] has passed (its
 //!    timer). The binary is refused from then on, and lamp-update started
 //!    again.

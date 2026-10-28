@@ -883,8 +883,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    any `current` link move, each replaced whole by a new link renamed over
    it. Then it copies the build's `lamp-update` to
    `/usr/local/lib/lampos/lamp-update-back` (0755) if that file isn't already
-   the same: lamp-update's fallback, which only install writes and no round
-   can (updates.md, "lamp-update switching itself", #1680).
+   the same: lamp-update's fallback, which no round writes itself
+   (updates.md, "lamp-update switching itself", #1680). After install, only
+   the writer's one-shot unit replaces it, from a confirmed lamp-update
+   (updates.md, "The settings writer refreshed", #4178).
 5. Writes each product unit, its reserved exit-note drop-in and
    `lampos.conf`, each only if it is not already exactly that. The drop-ins are
    `/etc/systemd/system/UNIT.d/exit-note.conf`, for exactly Cloud's fixed
