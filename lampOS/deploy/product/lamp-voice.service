@@ -156,6 +156,9 @@ Environment=LAMP_CUT_IN_TOLD=on
 Environment=LAMP_SECOND_SAID_ONCE=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
+# A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by
+# LAMP_SECOND_SPEECH_MODEL's eleven_v4_turbo (#2901): the owner's pick at lamp-52e6 on 28 Oct, first sound unchanged.
+Environment=LAMP_SECOND_SPEECH_TAGS=on
 # The weather for any place and day. LAMP_SECOND_FACE_NAME and LAMP_SECOND_MEMORY_HITS, on in the A/B, stay off
 # until a request is bound to the person seen speaking it (reviewer-two on #3371): a silent face in view would
 # otherwise give its name and kept notes to an off-camera caller's answer.
