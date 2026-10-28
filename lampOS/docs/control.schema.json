@@ -473,7 +473,7 @@
       "pattern": "^l_[0-9]{1,20}$"
     },
     "express": {
-      "description": "A feeling in body and light, as the lamp shows its own (the feelings skill, #3691). Its names are that skill's; until it lands, the lamp answers bad_request for any.",
+      "description": "A feeling in body and light, as the lamp shows its own (the feelings skill, #3691): its move and its light. Its names are that skill's, glad, lively and low today; any other is bad_request. strength from 0.5 up plays the skill's whole move, below it a three-quarter, half or quarter step of it, never bigger.",
       "type": "object",
       "properties": {
         "id": {

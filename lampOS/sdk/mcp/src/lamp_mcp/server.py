@@ -307,7 +307,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_express(feeling: str, strength: float = 0.5) -> str:
-            """Show a feeling in the body and the light (glad, lively, low, …), `strength` 0 to 1."""
+            """Show a feeling in the body and the light, as the lamp shows its own: glad, lively or low. `strength` 0 to 1: from 0.5 up the lamp's whole move, a smaller step of it below."""
             await act("express", feeling=feeling, strength=strength)
             return f"expressing {feeling}"
 

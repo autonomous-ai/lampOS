@@ -14,7 +14,7 @@ SDKs generate from.
 - **piece 1** (#3715): the protocol's messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the rates (`rate.rs`), with their tests;
 - **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
 - **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Its actions were refused until piece 4.
-- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, and `say` goes to the voice's say socket with its outcome as a `done` event. Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` and `joints` (the body's lease socket), `express`, `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
+- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event, and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` and `joints` (the body's lease socket), `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
 - **piece 5**: the bus as events, lease signals and state (`watch.rs`, with `--bus-root`). Events go out by edge, never per message: someone arrived or left, turned to or from the lamp, or stood up; the lamp's name heard; a sound class past its bar (never `speech`); a touch or the button; the lamp talking, paused, private or asleep. Each goes only to a connection subscribed to it that holds its grant. Words heard are matched on the lamp against each connection's own phrases, and only the phrase leaves it. Talking suspends every lease and resting holds them again; a hand on the body, a stop, a pause, privacy or sleep loses them. `get` answers presence (counts, never who), the light, the inner state and the lamp's own.
 - **piece 6**: the body's lease (`body_lease.rs`): with `--lease-socket`, a computer's `body` lease holds lamp-body's own, so the lamp's own life stands back, and the body's end of it is the computer's (`slumped` added to the whys).
 - **piece 7**: skills pushed from a computer (`push.rs`, with `--manage-socket`): the `skills` grant, `skill.push` in parts, `skill.list` and `skill.remove`, each asked of root's manage helper off the door's lock, and a revoke turning the computer's pushed skills off. The helper's side is lamp-skills' (Eighth's piece B); until it is in, the helper refuses what it doesn't know.
@@ -86,7 +86,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 
 | op | args | carried out by | grant | lease |
 |---|---|---|---|---|
-| `express` | `feeling`, `strength` 0–1 (0.5) | the `feelings` skill (#3691), so one set of feelings | `body`, `light` | no |
+| `express` | `feeling`, `strength` 0–1 (0.5) | the `feelings` skill's (#3691) move on `mood.sock` `{move}` and its light as a `light/request`, so one set of feelings (below) | `body`, `light` | no |
 | `gesture` | `name`, one of 19 built-in clips (below) | `mood.sock` `{gesture}` | `body` | no |
 | `look` | `at`: `face`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive) | `gaze.sock`, body goals, within the gaze reach | `body` (and `look` for `face`) | body |
 | `move` | `step_ms` 20–1,000, `frames` (2–500) of 5 joints in counts, first and last all 0 | `mood.sock` `{move}`, through `moves.rs`'s check | `body` | body |
@@ -105,6 +105,43 @@ These are the body's own clips (`crates/body/src/clips/data.rs`) but two:
 `idle` is the lamp's own life, and `scanning` looks like a camera sweeping a
 room, which CLAUDE.md's rule 8 keeps for when a person asks for it. A test in
 `lamp-body` keeps this list and the schema's in step with the clips.
+
+**Feelings** (`express`, `crates/control/src/feelings.rs`): the `feelings`
+skill's three, each its `[[do]]` (`skills/feelings/skill.toml`). `glad` is
+the `glad-lift` move, and the light breathing every 6 s for 12 s; `lively` is
+`perk`, breathing every 4 s for 8 s; `low` is `low-droop`, steady for 20 s.
+- **The move** is compiled in from `skills/feelings/moves` (lamp-control's
+  unit reads no skills folder) and sent whole on `mood.sock` as `move` is, at
+  `skill` priority, so the body plays or drops it by the same rules. From
+  `strength` 0.5 up it is the skill's own move. Below, it is the nearest of
+  three smaller ones, three quarters, a half and a quarter of each count,
+  each with its own fixed name (`glad-lift-75`, `-50`, `-25`), because the body
+  keeps a sent move by name and allows only 64 changes of one a run
+  (`MOST_REPLACED`). Each still passes `moves.rs`'s check. Under 0.0625 no move
+  is sent, but the light shows and the ask counts against the rate. Nothing
+  is ever bigger than the skill's, and a move's way back past rest (`low`'s
+  lift back) stays the skill's own, so a weak droop still comes up. `low`
+  goes no smaller than three quarters, so that lift back keeps the lead a
+  head needs to come up (about 47 counts on lamp-06c1).
+- **The light** is one step warmer (white to warm) and one level dimmer than
+  the person's own, as `lamp_skills::glow::relative` makes the skill's: a
+  breath from their level down one and back, or steady one down. It lapses at
+  the skill's `for`, and `stop` gives it back. It takes the place of a light
+  this computer asked for, so when the feeling lapses the ring goes back to
+  the person's own light, not to that one: a client re-sends its light if it
+  wants it back. With the light off, not known or at level 1, the move goes
+  alone.
+- **Not carried:** the skill's triggers, waits, caps and quiet hours, which are
+  the lamp's unprompted life. Nor whether the owner turned the skill off: the
+  owner's say here is the `body` and `light` grants. A computer asking is held to `express`'s rate,
+  1 a minute.
+- **The answer** is `{"to":"body","move":"glad-lift","light":true}`, with
+  `move` the one sent (`glad-lift-50` at 0.25, null under 0.0625) and `light`
+  the reason when none was shown. No `done` follows, as with `gesture`.
+
+Tests keep the compiled moves equal to the skill's files, the table equal to
+its `[[do]]`, and the light equal to lamp-skills' for every light a person may
+have on.
 
 **Colours and patterns:** the ten of `lamp_msgs::Light::COLOURS` (`yellow`,
 `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`),
@@ -607,7 +644,8 @@ Nine's, for the first builder (#3504, 12:24):
    control"? Or must pairing stay on the LAN, which needs the app to reach
    the lamp locally?
 2. Port 7731 and the name `lamp-control`.
-3. Should `express` wait for the `feelings` skill (#3691) to fix its names?
-   Until then the schema takes any short lowercase name, and the lamp answers
-   `bad_request`.
+3. ~~Should `express` wait for the `feelings` skill (#3691) to fix its
+   names?~~ It carries that skill's three, `glad`, `lively` and `low`; the
+   schema still takes any short lowercase name, so a lamp with more is no
+   SDK change.
 4. The script runtime of phase 3: WASM or QuickJS.
