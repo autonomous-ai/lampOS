@@ -1589,6 +1589,18 @@
               },
               "why": {
                 "type": "string"
+              },
+              "yaw": {
+                "description": "A look's done: the yaw the head reached, degrees, right positive.",
+                "type": "number"
+              },
+              "pitch": {
+                "description": "A look's done: the pitch the head reached, degrees, up positive.",
+                "type": "number"
+              },
+              "clamped": {
+                "description": "A look's done: the body held it inside its reach or pitch window, so yaw and pitch are not what was asked.",
+                "type": "boolean"
               }
             },
             "required": [

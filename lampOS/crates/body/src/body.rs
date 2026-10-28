@@ -534,6 +534,11 @@ pub struct Asked {
     /// a standing lamp stays up while it lasts, as with someone in front of
     /// it. It never stands a folded lamp up by itself.
     pub held: bool,
+    /// Where the lease's holder asks the head to look (`lamp_body::lease`,
+    /// `{"look":…}`): yaw and pitch, in counts from the pose's own
+    /// direction, as the gaze's own look is, already inside the reach the
+    /// holder was given. Taken only while `held`, in place of the gaze's.
+    pub aim: Option<[f32; 2]>,
 }
 
 impl Asked {
@@ -554,6 +559,7 @@ impl Asked {
         unplug: false,
         held_by_test: false,
         held: false,
+        aim: None,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -574,6 +580,7 @@ impl Asked {
         unplug: false,
         held_by_test: false,
         held: false,
+        aim: None,
     };
 }
 
@@ -1065,6 +1072,11 @@ pub struct Glimpse {
     /// Where the eyes have it look: yaw and pitch, in counts from the
     /// pose's own direction.
     pub look: [f32; 2],
+    /// While held, the holder's look as the body applied it, after the
+    /// joints' own bounds (the pitch window, the base's reach): yaw and
+    /// pitch, in counts from the pose's own direction. None otherwise. What
+    /// the door says the head reached (`lease::Looking`, `there`).
+    pub look_aimed: Option<[f32; 2]>,
     /// A face the eyes reported on this step: across, down and size.
     pub face: Option<[f32; 3]>,
     /// The gesture it is making.
@@ -2878,6 +2890,7 @@ fn glimpse_of(template: Glimpse, step: u64, now: &[Sample; 5], goals: [u16; 3]) 
         arm_loads: ARM.map(|joint| now[joint.index()].load),
         arm_temperatures: ARM.map(|joint| now[joint.index()].temperature),
         look: [0.0; 2],
+        look_aimed: None,
         face: None,
         gesture: None,
         gesture_fates: Fates::default(),
@@ -3674,6 +3687,7 @@ pub(crate) fn run_looking(
         unplug: false,
         held_by_test: false,
         held: false,
+        aim: None,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -4817,6 +4831,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // many steps no joint has been asked to move.
     let mut gaze = looking.map(Gaze::new);
     let mut look = [0.0f32; 2];
+    // The lease holder's look as last taken, to wake the head only when it
+    // changes (the Reviewer-lead's P2 on #4023).
+    let mut aim_was: Option<[f32; 2]> = None;
     let mut still_steps = 0u32;
     // The gesture being made and one waiting to be, each with when; the
     // offsets it has the five joints at; and steps left of the allowance a
@@ -5868,6 +5885,28 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 now.as_micros().try_into().unwrap_or(u64::MAX),
             );
         }
+        // Held by lamp-control's lease, its holder's look in place of the
+        // gaze's, inside the same bounds every pose keeps (#3504's `look`).
+        let aim = asked_now.aim.filter(|_| asked_now.held);
+        match aim {
+            Some(aim) => look = aim,
+            // Let go, with no gaze of its own to say otherwise: back to the
+            // pose's own direction, moved to as the look was.
+            None if gaze.is_none() => look = [0.0; 2],
+            None => {}
+        }
+        // A new look, or its end, is the head's to make, as a gesture is:
+        // nothing of it rests, relaxed or asleep. Once there it may arrive
+        // and stop being pushed at, as any pose does, until the look changes.
+        if aim != aim_was {
+            aim_was = aim;
+            resting_steps = 0;
+            relaxed = false;
+            asleep = [false; 3];
+        }
+        // The holder's look as it is applied: what each joint's own bounds
+        // cut of it comes off below.
+        let mut aimed = aim.map(|_| look);
         // Each axis of a pose is a share of its reach, and where the eyes
         // have it look is added to that, inside the same reach. The head's
         // tilt has the reach of a lamp that has stood up, as far as it has.
@@ -6002,7 +6041,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
                 None => {
                     commanded[index] += carried[index];
-                    (home_now[index] + kept[index] + offset).clamp(low[index], high[index])
+                    let unbounded = home_now[index] + kept[index] + offset;
+                    let wanted = unbounded.clamp(low[index], high[index]);
+                    // The base's yaw and the head's pitch carry the holder's
+                    // look: what the bounds cut is cut from the look.
+                    if let Some(aimed) = aimed.as_mut() {
+                        match index {
+                            0 => aimed[1] -= unbounded - wanted,
+                            2 => aimed[0] -= unbounded - wanted,
+                            _ => {}
+                        }
+                    }
+                    wanted
                 }
             };
             wanted_of[index] = wanted;
@@ -6402,6 +6452,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             arm_loads: ARM.map(|joint| samples[joint.index()].load),
             arm_temperatures: ARM.map(|joint| samples[joint.index()].temperature),
             look,
+            look_aimed: aimed,
             face,
             gesture: playing.map(|(clip, _)| clip.name),
             kept_where_put: report.kept_where_put,
