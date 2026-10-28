@@ -136,6 +136,7 @@ fn submission_checks_names_person_shape_and_finished_same_person_sources() {
         submit("too_many", &(1..=65).collect::<Vec<_>>()),
         submit("zero", &[0]),
         submit("integer_range", &[u64::MAX]),
+        submit("missing", &[9_999]),
         submit("future", &[future]),
         submit("not_exchange", &[kept]),
     ];
@@ -150,10 +151,15 @@ fn submission_checks_names_person_shape_and_finished_same_person_sources() {
         assert_eq!(answer["ok"], false, "{request}: {answer}");
         assert_eq!(answer["error"], "bad_request", "{request}: {answer}");
     }
-    // An id no scope has is taken as forgotten since: with none left the
-    // end closes with nothing to observe and no job (N12), never refused.
+    // An id the person was given and no longer has was forgotten since:
+    // with none left the end closes with nothing to observe and no job
+    // (N12), never refused. One never given (`missing`) is refused above.
+    let gone = store
+        .append(&person, NOW, "Soon forgotten.", "Yes.", &[])
+        .unwrap();
+    store.forget(&person, gone).unwrap();
     assert_eq!(
-        ask(&mut store, submit("missing", &[9_999])),
+        ask(&mut store, submit("forgotten", &[gone])),
         json!({"ok":true,"submitted":false,"reason":"forgotten"})
     );
     for person in [Value::Null, json!("Not_a_person")] {

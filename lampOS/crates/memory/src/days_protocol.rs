@@ -1110,33 +1110,46 @@ mod tests {
     /// #2176 row 13 (the first builder, 18:20): a conversation's end that
     /// names an exchange this store no longer has (a forget since) goes on
     /// with the rest, prepared or submitted, rather than being refused; one
-    /// with nothing left it has closes with nothing to observe (N12).
+    /// with nothing left it has closes with nothing to observe (N12). An id
+    /// never given is still refused.
     #[test]
     fn a_conversation_end_passes_over_sources_it_no_longer_has() {
         let (_scratch, mut store) = Scratch::new("end-unknown");
-        for heard in ["one", "two"] {
+        for heard in ["one", "two", "three", "four"] {
             let line = json!({"op":"append","at_unix_ms":NOW,"heard":heard}).to_string();
             assert!(answer(&mut store, line.as_bytes(), NOW).wrote);
+        }
+        for id in [3, 4] {
+            let line = json!({"op":"forget","id":id}).to_string();
+            let forgot = answer(&mut store, line.as_bytes(), NOW).line;
+            assert_eq!(forgot, r#"{"ok":true,"removed":1}"#);
         }
         let ended = |store: &mut Days, request: Value| -> Value {
             serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
         };
         let prepared = ended(
             &mut store,
-            json!({"op":"conversation_end","conversation":"talk","source_ids":[1,999,2]}),
+            json!({"op":"conversation_end","conversation":"talk","source_ids":[1,3,2]}),
         );
         assert_eq!(prepared["ok"], true, "{prepared}");
         assert_eq!(prepared["input"]["source_ids"], json!([1, 2]));
         let submitted = ended(
             &mut store,
-            json!({"op":"conversation_end","conversation":"later","source_ids":[999,2],"submit":true}),
+            json!({"op":"conversation_end","conversation":"later","source_ids":[4,2],"submit":true}),
         );
         assert_eq!(submitted["ok"], true, "{submitted}");
         let nothing = ended(
             &mut store,
-            json!({"op":"conversation_end","conversation":"gone","source_ids":[998,999]}),
+            json!({"op":"conversation_end","conversation":"gone","source_ids":[3,4]}),
         );
         assert_eq!(nothing, json!({"ok":true,"reason":"forgotten"}));
+        // An id this scope was never given is the caller's mistake, never a
+        // forget.
+        let never = ended(
+            &mut store,
+            json!({"op":"conversation_end","conversation":"never","source_ids":[1,999]}),
+        );
+        assert_eq!(never["error"], "bad_request", "{never}");
         // No sources at all is still the caller's mistake.
         let none = ended(
             &mut store,
@@ -1145,22 +1158,101 @@ mod tests {
         assert_eq!(none["ok"], false, "{none}");
         // Another person's exchange is refused as before, never passed over
         // as if it were forgotten (the reviewer-lead's P3 on #2226). Each
-        // person's records are numbered apart: their third is an id the
-        // room's scope never had.
+        // person's records are numbered apart: their fifth is an id the
+        // room's scope was never given.
         let mut theirs = Value::Null;
-        for heard in ["a", "b", "c"] {
+        for heard in ["a", "b", "c", "d", "e"] {
             let line =
                 json!({"op":"append","person":"p-0123456789abcdef","at_unix_ms":NOW,"heard":heard});
             theirs =
                 serde_json::from_str(&answer(&mut store, line.to_string().as_bytes(), NOW).line)
                     .unwrap();
         }
-        assert_eq!(theirs["id"], 3, "{theirs}");
+        assert_eq!(theirs["id"], 5, "{theirs}");
         let foreign = ended(
             &mut store,
-            json!({"op":"conversation_end","conversation":"foreign","source_ids":[1, 3]}),
+            json!({"op":"conversation_end","conversation":"foreign","source_ids":[1, 5]}),
         );
         assert_eq!(foreign["ok"], false, "{foreign}");
+    }
+
+    /// The N12 follow-up (lamp-06c1, 28 Oct: `conversation_end ... refused
+    /// error=bad_request` 2 ms after a `forget_everything`): ids are numbered
+    /// per person, so the room's own ids, the same numbers, never make a
+    /// person's forgotten exchange look known. Two scopes with overlapping
+    /// ids: one of the person's three forgotten, the end observes the other
+    /// two; everything of theirs forgotten, the end closes with nothing to
+    /// observe; an id never given them is still refused.
+    #[test]
+    fn a_conversation_end_asks_only_the_persons_own_ids() {
+        const MAI: &str = "p-0123456789abcdef";
+        let (_scratch, mut store) = Scratch::new("end-per-person");
+        let ask = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        // The room has ids 1..=8, more than the person will ever be given.
+        for n in 0..8 {
+            let line = ask(
+                &mut store,
+                json!({"op":"append","at_unix_ms":NOW,"heard":format!("room {n}")}),
+            );
+            assert_eq!(line["id"], n + 1, "{line}");
+        }
+        let mut ids = vec![];
+        for heard in ["one", "two", "three"] {
+            let line = ask(
+                &mut store,
+                json!({"op":"append","person":MAI,"at_unix_ms":NOW,"heard":heard}),
+            );
+            ids.push(line["id"].as_u64().unwrap());
+        }
+        assert_eq!(ids, [1, 2, 3], "the person's numbering is their own");
+        let forgot = ask(&mut store, json!({"op":"forget","person":MAI,"id":ids[1]}));
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        let prepared = ask(
+            &mut store,
+            json!({"op":"conversation_end","person":MAI,"conversation":"talk","source_ids":ids}),
+        );
+        assert_eq!(prepared["ok"], true, "{prepared}");
+        assert_eq!(prepared["input"]["source_ids"], json!([ids[0], ids[2]]));
+
+        let mut later = vec![];
+        for heard in ["four", "five"] {
+            let line = ask(
+                &mut store,
+                json!({"op":"append","person":MAI,"at_unix_ms":NOW,"heard":heard}),
+            );
+            later.push(line["id"].as_u64().unwrap());
+        }
+        let emptied = ask(&mut store, json!({"op":"forget_all","person":MAI}));
+        assert_eq!(emptied["ok"], true, "{emptied}");
+        for (conversation, submit, reply) in [
+            ("later", false, json!({"ok":true,"reason":"forgotten"})),
+            (
+                "later2",
+                true,
+                json!({"ok":true,"submitted":false,"reason":"forgotten"}),
+            ),
+        ] {
+            let closed = ask(
+                &mut store,
+                json!({"op":"conversation_end","person":MAI,"conversation":conversation,
+                    "source_ids":later,"submit":submit}),
+            );
+            assert_eq!(closed, reply);
+        }
+        // Never given this person, though the room has an id 7: refused.
+        let never = ask(
+            &mut store,
+            json!({"op":"conversation_end","person":MAI,"conversation":"never","source_ids":[7]}),
+        );
+        assert_eq!(never["error"], "bad_request", "{never}");
+        // The room's own end is untouched by the person's wipe.
+        let room = ask(
+            &mut store,
+            json!({"op":"conversation_end","conversation":"room","source_ids":[4, 5]}),
+        );
+        assert_eq!(room["input"]["source_ids"], json!([4, 5]), "{room}");
     }
 
     /// Friday's N12 on #3504: a forget, or a forget_everything, in an open

@@ -1631,28 +1631,43 @@ impl Days {
     }
 
     /// A conversation end's sources as this store has them, and how many it
-    /// named that it no longer has at all (#2176 row 13): a voice can name
-    /// exchanges a forget has since removed, and the end goes on with the
-    /// rest rather than being refused, or with none left closes with nothing
-    /// to observe (Friday's N12 on #3504). An id another person's scope still has
-    /// is kept, for the checks after to refuse as before (the reviewer-lead's
-    /// P3 on #2226): a wrong person's ids never look like a forget. Duplicates
-    /// and bad numbers are kept for those checks too.
-    pub(crate) fn known_sources(&self, _person: &Person, ids: &[u64]) -> Result<(Vec<u64>, usize)> {
+    /// named that this person's scope no longer has (#2176 row 13): a voice
+    /// can name exchanges a forget has since removed, and the end goes on
+    /// with the rest rather than being refused, or with none left closes
+    /// with nothing to observe (Friday's N12 on #3504). Ids are numbered
+    /// per person (`UNIQUE(person,id)`), so only the person's own scope is
+    /// asked: the room's id 5 says nothing of the person's 5 (the N12
+    /// follow-up, lamp-06c1 28 Oct: the room's ids made every id of a
+    /// wiped person look known, and the end was refused). An id the person
+    /// was given (below their `next_id`, which a forget never lowers) and no
+    /// longer has was forgotten; one never given them, another person's
+    /// included, is kept for the checks after to refuse as before (the
+    /// reviewer-lead's P3 on #2226). Duplicates and bad numbers are kept for
+    /// those checks too.
+    pub(crate) fn known_sources(&self, person: &Person, ids: &[u64]) -> Result<(Vec<u64>, usize)> {
+        let issued: u64 = self
+            .db
+            .query_row(
+                "SELECT next_id FROM people WHERE person=?",
+                [person.as_str()],
+                |r| r.get(0),
+            )
+            .optional()?
+            .unwrap_or(1);
         let mut known = Vec::with_capacity(ids.len());
         let mut unknown = 0;
         for id in ids {
-            let exists = *id == 0
-                || *id > i64::MAX as u64
-                || self.db.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM entries WHERE id=?)",
-                    params![id],
-                    |r| r.get(0),
+            let forgotten = *id != 0
+                && *id < issued
+                && !self.db.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM entries WHERE person=?1 AND id=?2)",
+                    params![person.as_str(), id],
+                    |r| r.get::<_, bool>(0),
                 )?;
-            if exists {
-                known.push(*id);
-            } else {
+            if forgotten {
                 unknown += 1;
+            } else {
+                known.push(*id);
             }
         }
         Ok((known, unknown))

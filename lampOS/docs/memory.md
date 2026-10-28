@@ -1375,7 +1375,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     and since Friday's N12 on #3504 (lamp-06c1, 27 Oct: refused right after
     a `forget_everything`) one whose every exchange was forgotten closes
     with nothing to observe, `{ok:true,reason:"forgotten"}`, never
-    `bad_request`.
+    `bad_request`. Only the person's own ids are asked: ids are numbered
+    per person, and on lamp-06c1 (28 Oct) the room's ids, the same
+    numbers, had made a wiped person's exchanges look known.
 
 - **An exchange linked to what its turn used** (#2176 finding 14,
   `LAMP_MEMORY_LINK_USED=on`, with the Days client only; off unless set;
