@@ -2916,6 +2916,19 @@ pub fn serve(
                 heeding.attention.ask_a_second_sign_of_the_name(true);
             }
         }
+        // A hearing at the line's start is no second sign of its own on a
+        // line said to a person ("Ma'am, …"), and a conversation going on
+        // is one (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
+        if std::env::var(crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: with a second sign of the lamp's name asked, a hearing at the line's start counts for nothing alone when the line's first word, set off, is said to a person, and a conversation going on counts as one (LAMP_NAME_SAID_TO_A_PERSON)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.hold_a_start_said_to_a_person(true);
+            }
+        }
         // A hearing of the name inside one line's sound counts for that line
         // only (`LAMP_NAME_STAYS_IN_ITS_LINE=on`).
         if std::env::var(crate::second_provider::NAME_STAYS_ENVIRONMENT)
@@ -7632,11 +7645,19 @@ impl Heeding {
         // `LAMP_NAME_SECOND_SIGN=on`: the name heard only in the room's
         // sound needs a second sign; the eyes are read for it whatever the
         // rule's form.
-        if self.attention.weigh_the_name(signs.turned) {
-            eprintln!(
-                "lamp-voice second: request {request}: its name, heard only in the room's sound, counts for nothing alone: nobody turned to the lamp, not said close to it, its words not calling it, its hearing not at the line's start (began {} ms into the line); the model is not told it was heard (LAMP_NAME_SECOND_SIGN)",
-                name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
-            );
+        let said_to_a_person = self.attention.start_said_to_a_person();
+        if self.attention.weigh_the_name(signs.turned, signs.going_on) {
+            if let Some(word) = said_to_a_person {
+                eprintln!(
+                    "lamp-voice second: request {request}: lamp-name heard the name at the line's start (began {} ms into the line), but its first word, set off, is said to a person (\"{word}\"), and nothing else shows it was called: not counted; the model is not told it was heard (LAMP_NAME_SAID_TO_A_PERSON)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            } else {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound, counts for nothing alone: nobody turned to the lamp, not said close to it, its words not calling it, its hearing not at the line's start (began {} ms into the line); the model is not told it was heard (LAMP_NAME_SECOND_SIGN)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            }
             // The name note goes with the name (`heed_signs`).
             self.noted = Some((request, None));
         }
@@ -18514,6 +18535,57 @@ mod tests {
             assert_eq!(verdict.is_some(), held, "{into}");
         }
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #3945, `LAMP_NAME_SAID_TO_A_PERSON=on` beside
+    /// `LAMP_NAME_SECOND_SIGN=on`: "Ma'am, could you pass me the salt
+    /// please?", said to a person and heard as the lamp's name at 0.996 at
+    /// the line's start, nobody turned and nothing going on, is held, in a
+    /// quiet room and a busy one, as "Sir, …" and "Honey, …" are. A face
+    /// turned to the lamp, a conversation going on, or the switch off let
+    /// it out; #3923's lines, a start hearing on any other first word, and
+    /// "Man, …" (its words call the lamp) are still answered.
+    #[test]
+    fn with_said_to_a_person_a_start_hearing_on_maam_is_held() {
+        use crate::room_told::Room;
+        let line = (10_000_000, 12_500_000);
+        let start = vec![(line.0 + 200_000, 0.996)];
+        let judged = |on: bool, room: Room, going_on: bool, turned: Option<bool>, text: &str| {
+            let mut heeding = room_name_heeding(true);
+            heeding.attention.hold_a_start_said_to_a_person(on);
+            heeding
+                .judge(
+                    896,
+                    line,
+                    text,
+                    room_name_signs(room, going_on, turned, false, start.clone()),
+                )
+                .is_some()
+        };
+        let maam = "Ma'am, could you pass me the salt please?";
+        for room in [Room::Quiet, Room::Busy] {
+            for text in [
+                maam,
+                "Sir, could you pass me the salt please?",
+                "Honey, could you pass me the salt please?",
+            ] {
+                assert!(judged(true, room, false, None, text), "{room:?}: {text}");
+            }
+            assert!(!judged(false, room, false, None, maam), "{room:?}: off");
+            assert!(!judged(true, room, true, None, maam), "{room:?}: going on");
+            for text in [
+                "Lamp, what time is it in London?",
+                "1. How are you today?",
+                "Blake, what time is it in London?",
+                "Man, what time is it in London?",
+            ] {
+                assert!(!judged(true, room, false, None, text), "{room:?}: {text}");
+            }
+        }
+        assert!(
+            !judged(true, Room::Quiet, false, Some(true), maam),
+            "turned"
+        );
     }
 
     /// The rule with `--spoken-to`, strict, and the eyes and the voice's

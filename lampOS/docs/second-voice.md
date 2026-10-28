@@ -3261,6 +3261,28 @@ after a take-over, but now for every turn:
   is heard as the name counts as the second sign, as the rule's `TURNED`
   does today; the lamp run includes someone facing the lamp and not
   speaking. Not yet: the Live route and a bare call.
+  - **A line said to a person is no call by its start**
+    (`LAMP_NAME_SAID_TO_A_PERSON=on`, off unless set, #3945). On c0a4
+    "Ma'am, could you pass me the salt please?", said to a person, was
+    heard at 0.95 to 0.99 at the line's start and answered, the start
+    being its own second sign. With the switch, `weigh_the_name` does not
+    count the start when the line's first word, set off
+    (`first_word_set_off`), is on `attention::SAID_TO_A_PERSON` (ma'am,
+    madam, sir, mum, dad, honey, sweetie, babe, dude, bro, buddy, guys;
+    lower case, apostrophe kept, a curly one as straight), and counts a
+    conversation with the lamp going on (`Signs::going_on`) as a second
+    sign; a face turned to the lamp, closeness and its words calling it
+    count as before. The journal says `is said to a person ("ma'am"), and
+    nothing else shows it was called: not counted
+    (LAMP_NAME_SAID_TO_A_PERSON)`, counts and the list's word only. Never
+    on the list: the lamp's name, "lamb", `STAND_INS`, `STAND_ALONE_INS`,
+    `HEARD_FOR_THE_NAME`, `NAMES_OF_ITS_SHAPE`, a word that isn't
+    alphabetic. Known costs: "man" and "mom" stay stand-ins (the text
+    calls them before the hearing matters), and a "Lamp, …" written
+    "Ma'am, …" (#3923) needs a face, a conversation or closeness. Lamp
+    check on c0a4 (28 Oct): a person's "Ma'am, …" heard as the name at
+    1.00 was held, two "Lamp, …" calls were answered
+    ([attention.md](attention.md)).
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard

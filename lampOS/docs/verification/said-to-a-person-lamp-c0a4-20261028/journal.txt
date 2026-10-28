@@ -1,0 +1,109 @@
+2026-10-28T15:58:42.375335+0700 lamp-c0a4 lamp-voice second: the lamp's name heard only in the room's sound counts only with a second sign: a face turned to it, said close to it, or its words calling it (LAMP_NAME_SECOND_SIGN)
+2026-10-28T15:58:42.375335+0700 lamp-c0a4 lamp-voice second: with a second sign of the lamp's name asked, a hearing at the line's start counts for nothing alone when the line's first word, set off, is said to a person, and a conversation going on counts as one (LAMP_NAME_SAID_TO_A_PERSON)
+2026-10-28T15:58:42.375467+0700 lamp-c0a4 lamp-voice second: a hearing of the lamp's name inside one line's sound counts for that line only, never for the line begun after it (LAMP_NAME_STAYS_IN_ITS_LINE)
+2026-10-28T15:58:42.376138+0700 lamp-c0a4 lamp-voice second: a line's first word, set off and sounding like the lamp's name, is the name when lamp-name heard it near (0.5 or more) within 1.3 s of the line's start (LAMP_NAME_NEAR)
+2026-10-28T15:58:42.525878+0700 lamp-c0a4 {"seconds":null,"status":"listening_ready"}
+2026-10-28T15:58:48.597340+0700 lamp-c0a4 lamp-voice second: request 1: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T15:58:53.497174+0700 lamp-c0a4 lamp-voice second: request 1 at the line's end: settled=false, speech_final=false, finals cover none of 1240 ms sent, pending=none, last final none, finalize answered in 4259 ms to 1200 ms, results 0 with words, 2 without, words from=close_stream
+2026-10-28T15:58:53.497174+0700 lamp-c0a4 lamp-voice second: request 1 heard 0 words, the last 4260 ms after the line ended
+2026-10-28T15:59:02.202524+0700 lamp-c0a4 lamp-voice: microphones closed until the switch can be read: privacy switch unreadable: service privacy freshness lost before next observation
+2026-10-28T15:59:02.277701+0700 lamp-c0a4 lamp-voice second: the lamp's name heard only in the room's sound counts only with a second sign: a face turned to it, said close to it, or its words calling it (LAMP_NAME_SECOND_SIGN)
+2026-10-28T15:59:02.277701+0700 lamp-c0a4 lamp-voice second: with a second sign of the lamp's name asked, a hearing at the line's start counts for nothing alone when the line's first word, set off, is said to a person, and a conversation going on counts as one (LAMP_NAME_SAID_TO_A_PERSON)
+2026-10-28T15:59:02.277701+0700 lamp-c0a4 lamp-voice second: a hearing of the lamp's name inside one line's sound counts for that line only, never for the line begun after it (LAMP_NAME_STAYS_IN_ITS_LINE)
+2026-10-28T15:59:02.277701+0700 lamp-c0a4 lamp-voice second: a line's first word, set off and sounding like the lamp's name, is the name when lamp-name heard it near (0.5 or more) within 1.3 s of the line's start (LAMP_NAME_NEAR)
+2026-10-28T15:59:02.416639+0700 lamp-c0a4 {"seconds":null,"status":"listening_ready"}
+2026-10-28T15:59:09.991916+0700 lamp-c0a4 lamp-voice: microphones closed until the switch can be read: privacy switch unreadable: service privacy freshness lost before next observation
+2026-10-28T15:59:10.062235+0700 lamp-c0a4 lamp-voice second: the lamp's name heard only in the room's sound counts only with a second sign: a face turned to it, said close to it, or its words calling it (LAMP_NAME_SECOND_SIGN)
+2026-10-28T15:59:10.064332+0700 lamp-c0a4 lamp-voice second: with a second sign of the lamp's name asked, a hearing at the line's start counts for nothing alone when the line's first word, set off, is said to a person, and a conversation going on counts as one (LAMP_NAME_SAID_TO_A_PERSON)
+2026-10-28T15:59:10.064332+0700 lamp-c0a4 lamp-voice second: a hearing of the lamp's name inside one line's sound counts for that line only, never for the line begun after it (LAMP_NAME_STAYS_IN_ITS_LINE)
+2026-10-28T15:59:10.064332+0700 lamp-c0a4 lamp-voice second: a line's first word, set off and sounding like the lamp's name, is the name when lamp-name heard it near (0.5 or more) within 1.3 s of the line's start (LAMP_NAME_NEAR)
+2026-10-28T15:59:10.253830+0700 lamp-c0a4 {"seconds":null,"status":"listening_ready"}
+2026-10-28T16:01:19.125772+0700 lamp-c0a4 lamp-voice second: request 1: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:01:23.016498+0700 lamp-c0a4 lamp-voice second: request 1 at the line's end: settled=false, speech_final=true, finals cover 3440 of 4060 ms sent, pending=none, last final 82 ms before End, finalize answered in 431 ms to 4050 ms, results 3 with words, 1 without, words from=finalize
+2026-10-28T16:01:23.016498+0700 lamp-c0a4 lamp-voice second: request 1 heard 8 words, the last 432 ms after the line ended
+2026-10-28T16:01:23.017271+0700 lamp-c0a4 lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+2026-10-28T16:01:23.017442+0700 lamp-c0a4 lamp-voice second: request 1: its answer is played: someone is turned to the lamp
+2026-10-28T16:01:24.414997+0700 lamp-c0a4 lamp-voice second: request 1 chat round 1 first event in 1397 ms
+2026-10-28T16:01:24.414997+0700 lamp-c0a4 lamp-voice second: request 1 chat round 1 called not_for_me
+2026-10-28T16:01:37.577525+0700 lamp-c0a4 lamp-voice second: request 2: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:01:38.480561+0700 lamp-c0a4 lamp-voice second: request 2 at the line's end: settled=false, speech_final=false, finals cover none of 1220 ms sent, pending=speech_started 440 ms after the last final, last final none, finalize answered in 282 ms to 1220 ms, results 0 with words, 2 without, words from=finalize
+2026-10-28T16:01:38.480561+0700 lamp-c0a4 lamp-voice second: request 2 heard 0 words, the last 283 ms after the line ended
+2026-10-28T16:01:42.700030+0700 lamp-c0a4 lamp-voice second: request 3: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:01:46.706184+0700 lamp-c0a4 lamp-voice second: request 3 at the line's end: settled=false, speech_final=true, finals cover 3470 of 4120 ms sent, pending=none, last final 10 ms before End, finalize answered in 488 ms to 4120 ms, results 4 with words, 1 without, words from=finalize
+2026-10-28T16:01:46.706184+0700 lamp-c0a4 lamp-voice second: request 3 heard 8 words, the last 488 ms after the line ended
+2026-10-28T16:01:46.706986+0700 lamp-c0a4 lamp-voice second: request 3: no conversation going on: it was never heard saying words, to their end,, it was last called 23 s ago, 0 lines left alone since it last spoke
+2026-10-28T16:01:46.706986+0700 lamp-c0a4 lamp-voice second: request 3: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+2026-10-28T16:02:06.333681+0700 lamp-c0a4 lamp-voice second: request 4: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:02:09.961405+0700 lamp-c0a4 lamp-voice second: request 4 at the line's end: settled=false, speech_final=true, finals cover 3430 of 3820 ms sent, pending=none, last final 14 ms before End, finalize answered in 407 ms to 3820 ms, results 3 with words, 1 without, words from=finalize
+2026-10-28T16:02:09.961405+0700 lamp-c0a4 lamp-voice second: request 4 heard 8 words, the last 408 ms after the line ended
+2026-10-28T16:02:09.962129+0700 lamp-c0a4 lamp-voice second: request 4: no conversation going on: it was never heard saying words, to their end,, it was last called 46 s ago, 0 lines left alone since it last spoke
+2026-10-28T16:02:09.962129+0700 lamp-c0a4 lamp-voice second: request 4: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+2026-10-28T16:02:30.009766+0700 lamp-c0a4 lamp-voice second: request 5: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:02:32.981063+0700 lamp-c0a4 lamp-voice second: request 5 at the line's end: settled=false, speech_final=true, finals cover 2420 of 3060 ms sent, pending=none, last final 259 ms before End, finalize answered in 513 ms to 3060 ms, results 3 with words, 1 without, words from=finalize
+2026-10-28T16:02:32.981063+0700 lamp-c0a4 lamp-voice second: request 5 heard 5 words, the last 514 ms after the line ended
+2026-10-28T16:02:32.982729+0700 lamp-c0a4 lamp-voice second: request 5: no conversation going on: it was never heard saying words, to their end,, it was last called 69 s ago, 0 lines left alone since it last spoke
+2026-10-28T16:02:32.982729+0700 lamp-c0a4 lamp-voice second: request 5: its answer is held back: said to someone it calls by name, not to the lamp
+2026-10-28T16:03:18.839211+0700 lamp-c0a4 lamp-voice second: request 6: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:03:21.769939+0700 lamp-c0a4 lamp-voice second: request 6 at the line's end: settled=false, speech_final=false, finals cover none of 3000 ms sent, pending=interim 2200 ms after the last final, last final none, finalize answered in 527 ms to 3000 ms, results 4 with words, 1 without, words from=finalize
+2026-10-28T16:03:21.769939+0700 lamp-c0a4 lamp-voice second: request 6 heard 7 words, the last 529 ms after the line ended
+2026-10-28T16:03:21.775041+0700 lamp-c0a4 lamp-voice second: request 6: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN): told and kept as the room's
+2026-10-28T16:03:21.775041+0700 lamp-c0a4 lamp-voice second: request 6: no conversation going on: it was never heard saying words, to their end,, it was last called 118 s ago, 0 lines left alone since it last spoke
+2026-10-28T16:03:21.775041+0700 lamp-c0a4 lamp-voice second: request 6: its answer is played: its name was heard in the room's sound
+2026-10-28T16:03:21.775041+0700 lamp-c0a4 lamp-voice second: request 6: the model is told the lamp's name was heard
+2026-10-28T16:03:23.274268+0700 lamp-c0a4 lamp-voice second: request 6 made a sound while its chat had not begun in 1501 ms
+2026-10-28T16:03:23.438778+0700 lamp-c0a4 lamp-voice second: request 6 chat round 1 first event in 1666 ms
+2026-10-28T16:03:23.438778+0700 lamp-c0a4 lamp-voice second: request 6 chat round 1 called the_time
+2026-10-28T16:03:24.653400+0700 lamp-c0a4 lamp-voice second: request 6 chat round 2 first event in 2880 ms
+2026-10-28T16:03:24.770655+0700 lamp-c0a4 lamp-voice second: request 6 first piece to the voice 2998 ms after the words were heard, 4 words
+2026-10-28T16:03:24.974016+0700 lamp-c0a4 lamp-voice second: request 6 speech tags: 0 given to the voice, 0 dropped (LAMP_SECOND_SPEECH_TAGS)
+2026-10-28T16:03:25.277795+0700 lamp-c0a4 lamp-voice second: request 6 ElevenLabs piece 1: 16 chars, sent 2998 ms after the words were heard on a reused connection; its first audio byte 506 ms after it went
+2026-10-28T16:03:25.277795+0700 lamp-c0a4 lamp-voice second: request 6 first answer audio 3504 ms after the words were heard
+2026-10-28T16:03:26.061494+0700 lamp-c0a4 lamp-voice second: request 6 ElevenLabs piece 2: 54 chars, sent 3199 ms after the words were heard on a new connection; its first audio byte 1089 ms after it went
+2026-10-28T16:03:26.063339+0700 lamp-c0a4 lamp-voice second: request 6 ElevenLabs piece 3: 48 chars, sent 3201 ms after the words were heard on a new connection; its first audio byte 1087 ms after it went
+2026-10-28T16:03:27.055057+0700 lamp-c0a4 lamp-voice second: request 6 ElevenLabs: 3 of 3 pieces began, 1 on a reused connection, 118 chars; the first piece's first audio byte 506 ms after it went, the slowest 1089 ms
+2026-10-28T16:03:38.943692+0700 lamp-c0a4 lamp-voice second: request 7: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:03:43.180694+0700 lamp-c0a4 lamp-voice second: request 7 at the line's end: settled=false, speech_final=false, finals cover none of 3460 ms sent, pending=interim 1230 ms after the last final, last final none, finalize answered in 1377 ms to 3150 ms, results 3 with words, 2 without, words from=close_stream
+2026-10-28T16:03:43.180694+0700 lamp-c0a4 lamp-voice second: request 7 heard 5 words, the last 1377 ms after the line ended
+2026-10-28T16:03:43.182129+0700 lamp-c0a4 lamp-voice second: request 7: of its 5 words, 0 in the lamp's answer to request 6 so far
+2026-10-28T16:03:43.182129+0700 lamp-c0a4 lamp-voice second: request 7: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN): told and kept as the room's
+2026-10-28T16:03:43.182129+0700 lamp-c0a4 lamp-voice second: request 7: its answer is played: its name was heard in the room's sound
+2026-10-28T16:03:43.182129+0700 lamp-c0a4 lamp-voice second: request 7: the model is told the lamp's name was heard
+2026-10-28T16:03:44.249381+0700 lamp-c0a4 lamp-voice second: request 7 chat round 1 first event in 1067 ms
+2026-10-28T16:03:44.365405+0700 lamp-c0a4 lamp-voice second: request 7 first piece to the voice 1183 ms after the words were heard, 4 words
+2026-10-28T16:03:44.489683+0700 lamp-c0a4 lamp-voice second: request 7 speech tags: 0 given to the voice, 0 dropped (LAMP_SECOND_SPEECH_TAGS)
+2026-10-28T16:03:44.914732+0700 lamp-c0a4 lamp-voice second: request 7 ElevenLabs piece 1: 21 chars, sent 1183 ms after the words were heard on a reused connection; its first audio byte 549 ms after it went
+2026-10-28T16:03:44.914732+0700 lamp-c0a4 lamp-voice second: request 7 first answer audio 1732 ms after the words were heard
+2026-10-28T16:03:44.916754+0700 lamp-c0a4 lamp-voice second: request 7 ElevenLabs piece 2: 37 chars, sent 1308 ms after the words were heard on a reused connection; its first audio byte 424 ms after it went
+2026-10-28T16:03:45.702957+0700 lamp-c0a4 lamp-voice second: request 7 ElevenLabs: 2 of 2 pieces began, 2 on a reused connection, 58 chars; the first piece's first audio byte 549 ms after it went, the slowest 549 ms
+2026-10-28T16:04:55.247545+0700 lamp-c0a4 lamp-voice second: request 8: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:04:57.919161+0700 lamp-c0a4 lamp-voice second: request 8 at the line's end: settled=false, speech_final=false, finals cover none of 2960 ms sent, pending=interim 2170 ms after the last final, last final none, finalize answered in 312 ms to 2960 ms, results 3 with words, 0 without, words from=finalize
+2026-10-28T16:04:57.920535+0700 lamp-c0a4 lamp-voice second: request 8 heard 8 words, the last 313 ms after the line ended
+2026-10-28T16:04:57.920535+0700 lamp-c0a4 lamp-voice second: request 8: of its 8 words, 0 in the lamp's answer to request 7 so far
+2026-10-28T16:04:57.920535+0700 lamp-c0a4 lamp-voice second: request 8: no conversation going on: it was last heard saying words, to their end, 67 s ago, it was last called 74 s ago, 0 lines left alone since it last spoke
+2026-10-28T16:04:57.920535+0700 lamp-c0a4 lamp-voice second: request 8: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+2026-10-28T16:05:22.204368+0700 lamp-c0a4 lamp-voice second: request 9: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:05:25.637184+0700 lamp-c0a4 lamp-voice second: request 9 at the line's end: settled=false, speech_final=true, finals cover 3300 of 3690 ms sent, pending=none, last final 16 ms before End, finalize answered in 343 ms to 3690 ms, results 3 with words, 1 without, words from=finalize
+2026-10-28T16:05:25.637184+0700 lamp-c0a4 lamp-voice second: request 9 heard 8 words, the last 344 ms after the line ended
+2026-10-28T16:05:25.637184+0700 lamp-c0a4 lamp-voice second: request 9: of its 8 words, 0 in the lamp's answer to request 7 so far
+2026-10-28T16:05:25.641508+0700 lamp-c0a4 lamp-voice second: request 9: lamp-name heard the name near, at 1.00, by the line's start, but its first word, set off, doesn't sound like it: not the name (LAMP_NAME_NEAR)
+2026-10-28T16:05:25.641508+0700 lamp-c0a4 lamp-voice second: request 9: no conversation going on: it was last heard saying words, to their end, 95 s ago, it was last called 102 s ago, 0 lines left alone since it last spoke
+2026-10-28T16:05:25.641508+0700 lamp-c0a4 lamp-voice second: request 9: lamp-name heard the name at the line's start (began 902 ms into the line), but its first word, set off, is said to a person ("ma'am"), and nothing else shows it was called: not counted; the model is not told it was heard (LAMP_NAME_SAID_TO_A_PERSON)
+2026-10-28T16:05:25.641508+0700 lamp-c0a4 lamp-voice second: request 9: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+2026-10-28T16:05:46.657990+0700 lamp-c0a4 lamp-voice second: request 10: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:05:47.582350+0700 lamp-c0a4 lamp-voice second: request 10 at the line's end: settled=false, speech_final=false, finals cover none of 1310 ms sent, pending=none, last final none, finalize answered in 214 ms to 1300 ms, results 0 with words, 2 without, words from=finalize
+2026-10-28T16:05:47.582350+0700 lamp-c0a4 lamp-voice second: request 10 heard 0 words, the last 215 ms after the line ended
+2026-10-28T16:05:52.428468+0700 lamp-c0a4 lamp-voice second: request 11: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:05:53.418858+0700 lamp-c0a4 lamp-voice second: request 11 at the line's end: settled=false, speech_final=false, finals cover none of 1280 ms sent, pending=none, last final none, finalize answered in 306 ms to 1260 ms, results 2 with words, 0 without, words from=finalize
+2026-10-28T16:05:53.418858+0700 lamp-c0a4 lamp-voice second: request 11 heard 1 words, the last 307 ms after the line ended
+2026-10-28T16:05:53.418858+0700 lamp-c0a4 lamp-voice second: request 11: of its 1 words, 0 in the lamp's answer to request 7 so far
+2026-10-28T16:05:53.420275+0700 lamp-c0a4 lamp-voice second: request 11: its answer is held back: a short sound, and nothing shows it was said to the lamp: not heard as a short word (this route has no ears or eyes)
+2026-10-28T16:05:53.427593+0700 lamp-c0a4 lamp-voice second: request 12 goes on from request 11: its 1280 ms of sound go first
+2026-10-28T16:05:53.428324+0700 lamp-c0a4 lamp-voice second: request 12: speech to text kept ready in 0 ms, 80 ms of the line's sound waiting
+2026-10-28T16:05:56.074059+0700 lamp-c0a4 lamp-voice second: request 12 at the line's end: settled=false, speech_final=false, finals cover none of 3110 ms sent, pending=interim 1280 ms after the last final, last final none, finalize answered in 261 ms to 2160 ms, results 3 with words, 0 without, words from=close_stream
+2026-10-28T16:05:56.074059+0700 lamp-c0a4 lamp-voice second: request 12 heard 7 words, the last 1136 ms after the line ended
+2026-10-28T16:05:56.076483+0700 lamp-c0a4 lamp-voice second: request 12: of its 7 words, 0 in the lamp's answer to request 7 so far
+2026-10-28T16:05:56.076483+0700 lamp-c0a4 lamp-voice second: request 12: no conversation going on: it was last heard saying words, to their end, 125 s ago, it was last called 132 s ago, 0 lines left alone since it last spoke
+2026-10-28T16:05:56.076483+0700 lamp-c0a4 lamp-voice second: request 12: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+2026-10-28T16:06:20.674286+0700 lamp-c0a4 lamp-voice second: request 13: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+2026-10-28T16:06:22.152942+0700 lamp-c0a4 lamp-voice second: request 13 at the line's end: settled=false, speech_final=false, finals cover none of 1690 ms sent, pending=speech_started 240 ms after the last final, last final none, finalize answered in 390 ms to 1680 ms, results 0 with words, 3 without, words from=finalize
+2026-10-28T16:06:22.152942+0700 lamp-c0a4 lamp-voice second: request 13 heard 0 words, the last 391 ms after the line ended
