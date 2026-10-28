@@ -1275,6 +1275,47 @@ it does not know).
 - **`asked`** is the manage helper ("The manage helper", below): one
   request read from the standard input, its answer on the standard output.
 
+**Skills pushed from a computer** (#3869, [control.md](control.md),
+"Skills pushed from a computer"). A paired computer with the `skills`
+grant puts a skill of its own on its own lamp, with no Store. The running
+program loads them from a developer folder of their own,
+`/var/lib/lampOS/skills-dev` (the product unit's
+`LAMP_SKILLS_DEV_DIR`, or `--dev-dir`, which wins; an `Environment=` line,
+as an older `lamp-skills` would end at an unknown flag, #2157), after the
+skills folder, looked at every 2 s with it (`lamp_skills::load_all_with`):
+- **Never in another's place.** A pushed folder with the name of a skill in
+  the skills folder isn't loaded ("a skill of that name is already on the
+  lamp: a pushed skill never takes its place"), and a pushed skill claims
+  its tool's name only after every skill there has, core first, so a
+  pushed skill never takes a core or Store skill's function, whatever the
+  folders' order. Nor does it join a `[budget]` group a skill there uses,
+  or share a `[stop]` with one, so it can never spend a group's hour (the
+  Reviewer-lead's P2 on #3879: a pushed member of `wellbeing` would have
+  quieted A sip of water).
+- **Held to the protocol's grants** (`lamp_skills::pushed_refuses`),
+  whatever wrote the folder:
+  - installable only, never `core` or `addon`;
+  - none of `actions`, `messages`, `known_faces`, `who`,
+    `output_limits`, `propose`, `say` or `core`;
+  - topics from `lamp_skills::PUSHED_TOPICS` alone: presence
+    (`humans/faces/tracked`, `room/stood_up`) and those the protocol's
+    events take with no grant (`clock/local`, `voice/state`,
+    `lamp/pause`, `controls/touch`). Not `voice/heard`, `name/heard` or
+    `ears/classes`, which give a skill every phrase or class heard until
+    format 2 lists them (Fourteen on #3869).
+- **The picture held for the owner's yes.** One that sees the picture
+  (`Permissions::sees_picture`: `camera = true`, or format 1's
+  `look = true`) loads off, unless the owner said yes in the app, kept as
+  its name in `--state-dir`'s `on`.
+- **Said as pushed.** Each is said as pushed by the computer its folder's
+  `.pushed.json` names (`{"computer": NAME}`, at most 1 KiB, never through
+  a link), "a computer" without one.
+
+The manage helper writes the folder (`{"install_pushed": SHA256}`,
+`{"off_pushed_by": CLIENT}`) once `lamp-control` serves the ops; until
+then the folder is empty and nothing changes. Tests
+(`crates/skills/tests/it/pushed.rs`): `a_pushed_skill_*`.
+
 **The manage helper** (#1722, the first builder's 18:33). The one way a
 part that is not root changes the skills folder. `lamp-cloud`'s
 `skills.remove` and `skills.install`, for the app's skills page
