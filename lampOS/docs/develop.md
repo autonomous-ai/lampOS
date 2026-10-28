@@ -23,13 +23,15 @@ lamp.
 | The owner's "Add a developer computer" screen in the app | pending: a later piece of #3504 |
 | `lamp skill check` reading format 2 as the lamp does | merged: #3979 |
 | `skill.push` on the lamp: the door and the `skills` grant | merged: #3910 |
-| Loading pushed skills, and checking signed ones | pending: #3879, then Eighth's piece B (`eighth/skills-dev-p3`) |
+| Loading pushed skills, and checking signed ones | not in this release: #3879 and Eighth's piece B (`eighth/skills-dev-p3`) are parked |
 | `lamp skill keygen`, `pack --sign`, `push`, `install`, `list`, `remove` | pending: blue's `blue/sdk-skill-sign`, not yet a PR |
 | Packing and checking an author's signature on the lamp (`lamp-skills pack --author`) | merged: #3931, #3938 |
 
 ## 1. Install the SDK, and try it with no lamp (2 minutes)
 
-From a checkout of this repository:
+From a checkout of this repository. On Debian or Ubuntu, run
+`sudo apt install python3-venv` first: without it, Python 3.12's `venv`
+fails.
 
 ```sh
 python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
@@ -48,7 +50,8 @@ LAMPOS_HOME=/tmp/lampos-try lamp fake
 ```
 
 It answers as a lamp does today. `gesture`, `move` and `express` are taken
-(`{"to": "body"}`). `play`, `sound`, `look` and `joints` are refused, in
+(`{"to": "body"}`, and `express` says its move and that it showed the
+light: `{"to": "body", "move": "glad-lift", "light": true}`). `play`, `sound`, `look` and `joints` are refused, in
 lamp-control's own words ("not routed yet: waits for …").
 `--everything` answers every op instead.
 
@@ -226,6 +229,9 @@ pip install ./lampOS/sdk/python ./lampOS/sdk/mcp
 claude mcp add lamp -- lamp-mcp        # or any MCP client; --lamp ID picks one of several
 ```
 
+Install the two in one `pip` command: the SDK (`lampos`) isn't on PyPI, so
+`sdk/mcp` installed alone looks for it there and fails.
+
 The tools are `lamp_state`, `lamp_wait_for`, `lamp_gesture`, `lamp_light`,
 `lamp_say`, `lamp_look`, `lamp_move`, `lamp_express` and `lamp_stop`. Each
 is offered only with the grant it needs, takes its own short body lease,
@@ -301,11 +307,12 @@ moves and the sounds, and refuses any script. It says
 format 2 that is presence (someone there, how near), never the picture.
 `lamp-skills install` says the same: "It may use: light, body, look".
 
-## 6. Push it, sign it, share it (pending)
+## 6. Push it, sign it, share it (not in this release)
 
-These steps wait on #3879 and Eighth's piece B on the lamp, and on
-blue's `blue/sdk-skill-sign` in the SDK. Against that branch's fake lamp
-they run as shown.
+Pushing a skill from a computer is parked for this release (#3879 and
+Eighth's piece B on the lamp), and signing waits on blue's
+`blue/sdk-skill-sign` in the SDK. Against that branch's fake lamp these
+steps run as shown.
 
 **Push** it to your own lamp. It needs the `skills` grant, and lands in
 your computer's own folder there:
