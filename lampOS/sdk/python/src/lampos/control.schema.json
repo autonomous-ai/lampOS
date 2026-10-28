@@ -188,6 +188,15 @@
         },
         {
           "$ref": "#/$defs/stop"
+        },
+        {
+          "$ref": "#/$defs/skill.push"
+        },
+        {
+          "$ref": "#/$defs/skill.list"
+        },
+        {
+          "$ref": "#/$defs/skill.remove"
         }
       ]
     },
@@ -783,6 +792,101 @@
       "required": [
         "id",
         "op"
+      ],
+      "additionalProperties": false
+    },
+    "skill.push": {
+      "description": "One part of a skill package (lamp-skills pack's shape: ustar, lamp-skill.json first, then NAME/path), sent in order from 0; the last part's answer comes once the lamp has checked and installed it. Needs the skills grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "skill.push"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$",
+          "description": "A skill's name: 1 to 64 of a-z, 0-9 and -."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "description": "The whole package's SHA-256."
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576,
+          "description": "The whole package's bytes."
+        },
+        "part": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 31
+        },
+        "parts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 49152,
+          "description": "This part's bytes, base64 (36 KiB of the package at most)."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name",
+        "sha256",
+        "size",
+        "part",
+        "parts",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "skill.list": {
+      "description": "This client's own pushed skills. Needs the skills grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "skill.list"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "skill.remove": {
+      "description": "One of this client's own pushed skills, taken off. Needs the skills grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "skill.remove"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$",
+          "description": "A skill's name: 1 to 64 of a-z, 0-9 and -."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name"
       ],
       "additionalProperties": false
     },

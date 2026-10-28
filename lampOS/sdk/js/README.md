@@ -37,7 +37,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
 example runs this way: `greet.js`, `follow.js`, `phrase.js`, `pomodoro.js`,
-`ci-light.js`.
+`ci-light.js`, and `push-skill.js ../../examples/relaxing-music` (a pairing with `skills`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light,
@@ -116,3 +116,15 @@ with no lock file, as a library's are: the application that uses it locks
 them.
 
 Tests: `npm test`.
+
+## Push a skill to your own lamp
+
+With the `skills` grant, which the owner ticks at pairing, a computer can put
+a skill of its own on its own lamp, with no Store
+([control.md](../../docs/control.md), "Skills pushed from a computer"):
+`await lamp.pushSkill(folder)` packs the folder and sends it in parts, and
+resolves with the lamp's answer (on, or held for the owner's yes);
+`await lamp.skills()` and `await lamp.removeSkill(name)`; on the command line,
+`lamp skill push FOLDER`, `lamp skill list` and `lamp skill remove NAME`. It refuses a
+folder without a `version`, or a `core` or add-on skill. The fuller check is
+the Python SDK's `lamp skill check`, and the lamp checks everything again.
