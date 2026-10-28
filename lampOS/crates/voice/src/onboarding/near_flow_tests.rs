@@ -485,8 +485,9 @@ fn a_call_begun_late_has_its_words_waited_for_a_moment() {
 }
 
 /// A hearing under 0.95 is no call alone, so a try judged as soon as it is
-/// heard would refuse a call whose words are on their way: while its line's
-/// words are pending the try waits for them, or for the wait's end.
+/// heard would refuse a call whose words are on their way: a weak hearing
+/// is judged at the window's end as before, and while its line's words are
+/// pending the try waits for them, or for the wait's end.
 #[test]
 fn a_weak_hearing_with_words_pending_waits_for_them() {
     let store = Store::new(None);
@@ -497,8 +498,9 @@ fn a_weak_hearing_with_words_pending_waits_for_them() {
     walk.near_call_line_ended(prompt.ended_us + 1_000_000);
     assert_eq!(tick_at(&mut walk, &prompt, 2_300_000, 500_000), None);
     by_text(&mut walk, &prompt, 1_000);
+    assert_eq!(tick_at(&mut walk, &prompt, 7_299_999, 500_000), None);
     let judged =
-        tick_at(&mut walk, &prompt, 2_400_000, 500_000).expect("judged once its words are in");
+        tick_at(&mut walk, &prompt, 7_300_000, 500_000).expect("judged at the window's end");
     assert_eq!(judged["accepted"], true, "{judged}");
     assert_eq!(judged["heard_by"], "text");
     // Words that never come: judged at the wait's end, the hearing refused.
@@ -513,6 +515,30 @@ fn a_weak_hearing_with_words_pending_waits_for_them() {
         judged["why"].as_str().unwrap().contains("under 0.95"),
         "{judged}"
     );
+}
+
+/// Thirteen's finding on #4014: a line's End, which says its words are on
+/// their way, comes 0.4 to 1.5 s after its speech, so a weak hearing judged
+/// once its rise window is in could be refused before the End came. A 0.92
+/// hearing begun about 0.5 s in (0.6 s, clear of the prompt's echo guard),
+/// its line's End at 2.4 s and its words at 2.7 s, counts by text.
+#[test]
+fn a_weak_hearing_whose_line_ends_late_counts_by_text() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 900, 22.0);
+    name(&mut walk, &prompt, 600, 0.92);
+    // Its rise window and the delivery grace are in at 1.9 s: not judged.
+    assert_eq!(tick_at(&mut walk, &prompt, 1_900_000, 500_000), None);
+    assert_eq!(tick_at(&mut walk, &prompt, 2_399_999, 500_000), None);
+    walk.near_call_line_ended(prompt.ended_us + 600_000);
+    assert_eq!(tick_at(&mut walk, &prompt, 2_400_000, 500_000), None);
+    by_text(&mut walk, &prompt, 600);
+    assert_eq!(tick_at(&mut walk, &prompt, 2_700_000, 500_000), None);
+    let judged = tick_at(&mut walk, &prompt, 7_300_000, 500_000).expect("judged");
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["heard_by"], "text");
 }
 
 /// Three calls heard only by text make this home's bar.

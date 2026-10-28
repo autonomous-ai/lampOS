@@ -670,21 +670,25 @@ for a Unix time. Evidence comes from the bus, dated by its headers:
 end (the 6 s window plus the 1 s rise of a hearing begun at its very end),
 keeping 1.5 s of earlier history so the half second of the lamp's own speech
 before a hearing is known; the try is judged 0.3 s after that for delivery.
-That 7.3 s is only for a try where nothing is heard. A call heard (any
-`name/heard` begun in the window, or over the prompt's last word) is judged as
-soon as its own second of rise is in, 1.3 s after it began, about 0.7 s after
-its final hearing; and the next prompt, its answer ("Got it. Once more." or
+That 7.3 s is only for a try where no sure call is heard. A sure call (a
+`name/heard` at 0.95 or more begun in the window, or over the prompt's last
+word) is judged as soon as its own second of rise is in, 1.3 s after it began,
+about 0.7 s after its final hearing; and the next prompt, its answer ("Got it. Once more." or
 "I didn't catch that. …"), waits only 0.5 s of quiet (`ANSWER_QUIET_US`),
 not the walk's 3 s, so it follows the call as a reply would (the
 Reviewer-lead's P3 on #4001: a call 1 s into the window was answered about
-6 s later). A call's line whose words are still pending (`TEXT_WAIT_US`,
-below) holds that early judgement until they come or the wait ends, so a
-hearing under 0.95 is not refused before its words can count it. The rules
-are the same; only a second name heard after the verdict is past the try,
-not a `TwoHearings` refusal. Tests:
+6 s later). A hearing under 0.95 is no call alone and
+may still count by its words, so it is judged at 7.3 s as before, and its
+line's words still pending then (`TEXT_WAIT_US`, below) hold the judgement
+until they come or the wait ends. It is never judged early: its line's End,
+which says the words are on their way, comes 0.4 to 1.5 s after its speech,
+after its second of rise (Thirteen's finding on #4014). The rules are the
+same; only a second name heard after the verdict is past the try, not a
+`TwoHearings` refusal. Tests:
 `a_heard_call_is_answered_at_once_not_after_seven_seconds`,
 `with_nothing_heard_the_try_is_judged_at_seven_seconds`,
-`a_weak_hearing_with_words_pending_waits_for_them`.
+`a_weak_hearing_with_words_pending_waits_for_them`,
+`a_weak_hearing_whose_line_ends_late_counts_by_text`.
 `lamp_near_call::near_try` judges it: one hearing in the 6 s at 0.95 or more,
 mic1's largest rise over its quiet in the second after it began, and the lamp
 not speaking from 0.5 s before the hearing to 1 s after (speech elsewhere in
