@@ -115,7 +115,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime and zone |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`, `system.reboot`, `system.shutdown`), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -138,6 +138,7 @@ lamp says so.
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
 | `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms"} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything. Without the switch, V1's "not on this lamp" |
+| `update.check` (`{}`) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
@@ -478,7 +479,7 @@ words then pass through the broker to the app, where before they left the
 lamp only to the voice's model. Tests: `app_contract.rs`'s
 `schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without`.
 
-## The lamp's software update (#2194, `update.status`)
+## The lamp's software update (#2194, `update.status`, `update.check`)
 
 Off unless `LAMP_APP_UPDATE=on` in lamp-cloud's unit. lamp-update says on
 the bus, as a kept value, `update/status` (`lamp_msgs::UpdateStatus`,
@@ -499,6 +500,40 @@ true when lamp-update stopped saying it (it died mid-round), and its `now` is
 then not to be believed. Tests: `app_contract.rs`'s
 `the_software_update_is_answered_from_lamp_updates_status`, and
 `lamp-update`'s `status` tests and `a_round_with_nothing_to_change_only_checks`.
+
+### Check for update (#4153, `update.check`)
+
+With the same switch, the app's Check for update asks `lamp-update serve`
+for its next round now instead of after its wait (`--every-s`, 15 minutes).
+lamp-cloud only asks: it says one `update/check` (`lamp_msgs::UpdateCheck`,
+empty, a stream nothing keeps), and `serve` reads it between rounds, looking
+once a second. The round is the same round: the same lock, a quiet moment
+before any switch (nobody heard or answered for 45 s, or the lamp asleep or
+muted), and `--apply` as set, so a tap never installs in the middle of a
+conversation. The reply is `update.status`'s object with
+`"check": "started"`; the app then follows the round on `update.status`.
+
+It is refused, in V1's failure shape with the reason the app shows:
+
+- `a round is running`: `update/status`'s `now` is not `idle` or
+  `unknown`. A stale value counts as it reads.
+- `asked less than a minute ago`: lamp-cloud took one within the last
+  60 s (`UpdateCheck::AGAIN_AFTER`). A refused ask does not count.
+- `lamp-update is not listening for a check`: nothing running reads
+  `update/check`, so nothing would happen. That is an older lamp-update (one
+  build apart, it never subscribes), a dry `serve` (without `--apply on`,
+  which also says no `update/status`), or none running.
+
+On `serve`'s side too a check that came while a round ran is dropped,
+never kept for after it, and at most one a minute starts a round.
+`started` means a running lamp-update has the check in its socket, not
+that a round has begun: a lamp-update stopped between that and its next
+look starts none, and the app sees it on `update.status` (`now` stays
+`idle`, then reads `stale`). Tests: `answer.rs`'s
+`the_app_asks_for_a_round_now_between_rounds_and_once_a_minute`,
+`update.rs`'s tests, `app_contract.rs`'s
+`the_software_update_is_answered_from_lamp_updates_status`, and
+`lamp-update`'s `app_check` tests.
 
 ## A skill typed in the app (#2813, `skills.make`, `skills.made`)
 

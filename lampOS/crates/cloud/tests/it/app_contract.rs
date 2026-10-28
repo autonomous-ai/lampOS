@@ -168,6 +168,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         faces: None,
         schedule: None,
         update_page: false,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,
@@ -274,6 +275,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         }),
         schedule: None,
         update_page: false,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,
@@ -426,6 +428,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         faces: None,
         schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
         update_page: false,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,
@@ -517,6 +520,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         faces: None,
         schedule: None,
         update_page: true,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,
@@ -586,9 +590,56 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
     assert_eq!(data["now"], "fetching");
     assert_eq!(data["running"]["sequence"], 3309);
 
-    // Without the switch the kind is not here.
+    // #4153: the app's Check for update, in the reply the app reads. While
+    // the round runs it is refused with the reason the app shows.
+    let asked = |real: &mut Real| -> Value {
+        let result = answer(real, "update.check", &json!({}));
+        let sent = me
+            .data("2026-10-20T17:00:00Z", "update.check", &result)
+            .to_string();
+        serde_json::from_str(&sent).unwrap()
+    };
+    let running = asked(&mut real);
+    assert_eq!(running["status"], "failure", "{running}");
+    assert_eq!(running["error"], lamp_cloud::update::RUNNING);
+    let idle = lamp_msgs::UpdateStatus {
+        running: None,
+        now: "idle".into(),
+        last: None,
+    };
+    says.publish_json(0, &idle).unwrap();
+    // Between rounds with no lamp-update reading checks: said, not counted.
+    let nobody = asked(&mut real);
+    assert_eq!(
+        nobody["error"],
+        lamp_cloud::update::NOT_LISTENING,
+        "{nobody}"
+    );
+    let mut serve = update
+        .subscribe_typed(
+            lamp_msgs::UpdateCheck::TOPIC,
+            "update",
+            lamp_msgs::UpdateCheck::TYPE,
+        )
+        .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    let started = asked(&mut real);
+    assert_eq!(started["status"], "success", "{started}");
+    assert_eq!(started["data"]["check"], "started");
+    assert_eq!(started["data"]["now"], "idle");
+    assert!(
+        serve
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .is_some()
+    );
+    let again = asked(&mut real);
+    assert_eq!(again["error"], lamp_cloud::update::TOO_SOON, "{again}");
+
+    // Without the switch neither kind is here.
     real.update_page = false;
     assert!(answer(&mut real, "update.status", &json!({})).is_err());
+    assert!(answer(&mut real, "update.check", &json!({})).is_err());
     let _ = std::fs::remove_dir_all(root);
 }
 
@@ -648,6 +699,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         faces: None,
         schedule: None,
         update_page: false,
+        update_checks: Default::default(),
         restart: Some(socket),
         guard: None,
         make_skill: None,
@@ -716,6 +768,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         faces: None,
         schedule: None,
         update_page: false,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,

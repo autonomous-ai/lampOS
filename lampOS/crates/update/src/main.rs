@@ -43,7 +43,8 @@ once    one round: with --apply on, fetches what changed, installs it beside the
         build, switches at a quiet moment (nobody heard or answered for 45 s, or the
         lamp asleep or muted), watches each part for --watch-s (60) and puts the
         previous build back if one is not well. Without --apply on (the default) it is check.
-serve   a round every --every-s (900), until stopped.
+serve   a round every --every-s (900), until stopped; with --apply on, the app's
+        Check for update (update/check) starts the next one sooner.
 install lampOS on a blank lamp (docs/install.md): the newest build's binary of every
         product part, in its folder with its current link; the product units, tmpfiles,
         users and zone; enables the lamp and starts nothing. Run again, it changes
@@ -832,6 +833,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     let mut telling = config
         .apply
         .then(|| lamp_update::status::Telling::start(&bus_root, &records, &mut say));
+    // The app's Check for update (#4153): read between rounds only by a
+    // `serve` that acts, the one that says `update/status`.
+    let mut app_check = (config.apply && command == "serve")
+        .then(|| lamp_update::app_check::AppCheck::new(&bus_root, &mut say));
     loop {
         let outcome = {
             let mut phase = |now: &'static str| {
@@ -886,8 +891,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             last = text;
         }
         // Between rounds the bus is still read, so that what the voice said
-        // meanwhile does not wait in the sockets.
-        let _ = ears.listen(every);
+        // meanwhile does not wait in the sockets. A check from the app ends
+        // the wait (#4153); one that came during the round is dropped.
+        match &mut app_check {
+            Some(app_check) => {
+                app_check.forget();
+                if app_check.wait(ears.as_mut(), every) {
+                    eprintln!("lamp-update: the app asked for a check: a round now");
+                }
+            }
+            None => {
+                let _ = ears.listen(every);
+            }
+        }
     }
 }
 

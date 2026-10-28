@@ -195,6 +195,7 @@ fn main() -> ExitCode {
         schedule: lamp_cloud::schedule::from_environment(),
         // The lamp's software update for the app (#2194): only with LAMP_APP_UPDATE=on.
         update_page: lamp_cloud::update::from_environment(),
+        update_checks: Default::default(),
         // A restart from the app, asked of setup's change helper (#2193): only with LAMP_APP_RESTART=on.
         restart: (std::env::var(lamp_cloud::lamp::RESTART_ENVIRONMENT)
             .ok()
@@ -237,6 +238,7 @@ fn main() -> ExitCode {
         faces: None,
         schedule: None,
         update_page: false,
+        update_checks: Default::default(),
         restart: None,
         guard: None,
         make_skill: None,

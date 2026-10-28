@@ -12,6 +12,7 @@
 //! written by `lamp-update-apply`; [`switches`] the product's switches,
 //! and a kept file that turns one off.
 pub mod added;
+pub mod app_check;
 pub mod apply;
 pub mod check_units;
 pub mod companion;
