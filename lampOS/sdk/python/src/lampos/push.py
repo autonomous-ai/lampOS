@@ -319,16 +319,41 @@ def pack(folder: str | Path, author: Ed25519PrivateKey | None = None) -> Package
     return Package(folder.name, version, data)
 
 
+def _rules(folder: str | Path) -> dict | None:
+    try:
+        return tomllib.loads((Path(folder) / "skill.toml").read_text("utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return None
+
+
+def asks_of(rules: dict) -> list[str]:
+    """What a skill's rules ask, as the grant names a person is shown:
+    `body`, `light` and `speak`; `look` for the presence topics, or format
+    2's `look`; `camera` for the picture (`camera`, or format 1's `look`,
+    lamp-skills' `sees_picture`). Sorted, each once."""
+    permissions = rules.get("permissions") if isinstance(rules.get("permissions"), dict) else {}
+    format_2 = rules.get("format", 1) == 2
+    asks = {grant for key, grant in PERMISSION_GRANTS.items() if permissions.get(key) is True}
+    topics = permissions.get("topics") or []
+    if any(topic in PRESENCE_TOPICS for topic in topics) or (format_2 and permissions.get("look") is True):
+        asks.add("look")
+    if permissions.get("camera") is True or (not format_2 and permissions.get("look") is True):
+        asks.add("camera")
+    return sorted(asks)
+
+
 def asks_beyond(folder: str | Path, grants: list[str]) -> tuple[str, str] | None:
     """The code and why the lamp would refuse this skill as a push for this
     pairing's grants (docs/control.md, "Skills pushed from a computer"), or
     None: `no_grant` for a grant the pairing lacks, `refused` for what no
     grant allows. The lamp checks it all again; a skill that sees the picture isn't refused
     here, the lamp holds it off for the owner's yes."""
-    try:
-        rules = tomllib.loads((Path(folder) / "skill.toml").read_text("utf-8"))
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
-        return None
+    rules = _rules(folder)
+    return None if rules is None else rules_beyond(rules, grants)
+
+
+def rules_beyond(rules: dict, grants: list[str]) -> tuple[str, str] | None:
+    """`asks_beyond` for rules already read, as a package's skill.toml."""
     kind = rules.get("kind", "installable")
     if kind != "installable":
         return "refused", f'kind = "{kind}": a pushed skill is installable'

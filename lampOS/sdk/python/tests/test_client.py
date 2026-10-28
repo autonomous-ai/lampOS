@@ -1012,3 +1012,21 @@ def test_a_path_lamp_skills_refuses_or_no_header_holds_is_refused_before_packing
     with pytest.raises(LampError) as raised:
         pack(folder("desk-over", "a" * 100 + "/" + "b" * 100 + "/c.json"))
     assert "longer than a tar header holds" in raised.value.why
+
+
+@pytest.mark.parametrize(
+    "rules, asks",
+    [
+        ('version = "0.1.0"\n[permissions]\nlight = true\nspeak = true\n', ["light", "speak"]),
+        ('version = "0.1.0"\n[permissions]\nbody = true\ntopics = ["room/stood_up"]\n', ["body", "look"]),
+        # Format 1's look is the picture; format 2's is presence alone.
+        ('version = "0.1.0"\n[permissions]\nlook = true\n', ["camera"]),
+        ('format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\n', ["look"]),
+        ('format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\ncamera = true\n', ["camera", "look"]),
+        ('version = "0.1.0"\n', []),
+    ],
+)
+def test_asks_are_the_grant_names_a_person_is_shown(rules, asks):
+    from lampos.push import asks_of, tomllib
+
+    assert asks_of(tomllib.loads(rules)) == asks
