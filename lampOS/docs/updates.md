@@ -106,6 +106,15 @@ runs cannot. [Actions string comparisons ignore case](https://docs.github.com/en
 so `ON` can enter the cold-build and protected publication job paths, but
 the helper rejects it before executing an artifact binary.
 
+**Where the artifact is built.** With repository variable `LAMPOS_STUDIO` set
+to `on`, lamp-voice's `arm64` job may run on the internal Mac Studio's trusted
+runner (`studio-trusted`) instead of GitHub-hosted: one VM, fresh for each
+job and deleted after it, with no cache mounted, that takes only `lamp-voice`
+and `main`. `.github/scripts/lampos-route.py` chooses, and falls back to
+GitHub-hosted on any doubt. The build is cold either way. `publish` and
+`promote-stable` always run on GitHub-hosted, so the signing key never
+reaches the Studio; publish checks the artifact's SHA-256 before signing.
+
 ### Selecting a published build for the stable feed
 
 The same ARM64 workflow accepts an optional `promote_sequence` manual input.

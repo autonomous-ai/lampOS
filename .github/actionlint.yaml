@@ -1,5 +1,5 @@
 self-hosted-runner:
-  # The Mac Studio runners (org group lampos-studio): pull requests and the cache warming.
+  # The internal Mac Studio's runners (org group lampos-studio): lamp-voice's ARM64 job on studio-trusted.
   labels:
     - studio
     - studio-trusted
