@@ -1,3 +1,18 @@
+## 29 October 2026, 02:05 +07 — plan A landed; its follow-up in reads, its rehearsal NEXT TRAIN
+
+Ready for lamp-voice: yes, NEXT TRAIN: #4181 (the rehearsal, Reviewer-three's READ-OK on its head). No: #4199 waits on two reads.
+
+Landed: #4171 and #4172 in train 324. #4178 (#3689 item 1, plan A, the settings writer refresh) in train 325, as lamp-voice `2694140d9`, on Reviewer-two's and Reviewer-three's re-reads of the P2 fix.
+
+#4199 replaces #4190, rebased after #4178 landed. It's El's P3 on #4178: a `back` from the old copy, running when the refresh lands, can fail after the unit's `reset-failed`. That failure no longer puts the new writer back or bars its build. A `failed` counts only when the back unit's `ExecMainStartTimestamp` is after the refresh.
+- **The read:** `systemctl show --timestamp=unix` isn't confirmed on systemd 252, so the start is read with `busctl get-property` in microseconds. It asks the system bus, then systemd's own socket, since the lamp's Wi-Fi is wpa_supplicant and it may run no D-Bus daemon (Reviewer-two's P3). It asks only when the back failed.
+- **The time:** the refresh is timed after the copy is in place, not when asked, since the place takes up to the probe's 20 s (Reviewer-three's P3).
+- Each piece has a test that fails without it. Mac gate: 711 passed, 0 failed.
+
+The rehearsal: Tests runs it on lamp-52e6, and has asked Fifth for 09:30–11:30 on 29 Oct. Three P3s are taken: BAD 3 (a refresh after a put-back), the `busctl` step for #4199, and the carrier's whole backup taken and restored. B1, the throwaway build whose `back` fails, is on `second/rehearsal-b1-2694`, never merged.
+
+Reads given: #3843 (carried and re-gated) and #4186 (lamp-update's half). #3689 item 2c waits on the first builder.
+
 ## 29 October 2026, 00:25 +07 — #2810 landed, plan A on HOLD and being fixed, three PRs on NEXT TRAIN
 
 Ready for lamp-voice: yes, on NEXT TRAIN: #4171 (the fixed copy, two READ-OKs carried), #4172 (`UPDATER` is 8 in `updates.md`, three READ-OKs) and #4181 (plan A's rehearsal, Tests' READ-OK; BAD 3 added since). No: #4178 (plan A), which is stacked on #4171 and on HOLD.
