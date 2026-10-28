@@ -7,8 +7,10 @@
 //! `/etc/systemd/system` and its records. So at the switch it stages a
 //! request and the build's signed envelope in its records, and starts
 //! `lamp-update-apply.service`: a one-shot that runs `lamp-update-back
-//! apply`, the copy only `install` writes, never one from `update/current`,
-//! which a round can write. It checks the envelope's signature again with
+//! apply`, the copy no round writes itself (`install` does, and the writer's
+//! one-shot unit refreshes it from a confirmed lamp-update,
+//! crate::writer_swap), never one from `update/current`, which a round can
+//! write. It checks the envelope's signature again with
 //! the lamp's own key, and writes nothing a build's settings may not name
 //! (`manifest::is_setting_path`).
 //!
