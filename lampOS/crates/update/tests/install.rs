@@ -568,7 +568,12 @@ fn a_run_handed_over_to_already_hands_over_no_further() {
         "{:?}",
         lamp.said
     );
-    assert_eq!(updater_said(&lamp).len(), 1, "{:?}", lamp.said);
+    // Then #4085's warning, once.
+    let warned = updater_said(&lamp)
+        .into_iter()
+        .filter(|line| line.starts_with("this lamp-update (sha256 "))
+        .count();
+    assert_eq!(warned, 1, "{:?}", lamp.said);
 }
 
 #[test]
