@@ -71,6 +71,10 @@ pub(crate) struct Words {
     pub(crate) privacy_done_camera: String,
     pub(crate) privacy_failed: String,
     pub(crate) near_again: String,
+    /// #3702's line after a call not caught; optional for the same reason
+    /// as #3769's. Without it, `near_again` is said.
+    #[serde(default)]
+    pub(crate) near_missed: Option<String>,
     pub(crate) near_done: String,
     pub(crate) near_failed: String,
     pub(crate) sentence_first: String,
@@ -191,6 +195,7 @@ impl Definition {
             ("touch_done", &self.words.touch_done),
             ("touch_failed", &self.words.touch_failed),
             ("give_again", &self.words.give_again),
+            ("near_missed", &self.words.near_missed),
         ] {
             if let Some(line) = line {
                 checked_words("onboarding words", &[(name, line, &[])])?;

@@ -106,6 +106,7 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
         definition.words.near_again.as_bytes(),
         NEAR_AGAIN.as_bytes()
     );
+    assert_eq!(definition.words.near_missed.as_deref(), Some(NEAR_MISSED));
     assert_eq!(definition.words.near_done.as_bytes(), NEAR_DONE.as_bytes());
     assert_eq!(
         definition.words.near_failed.as_bytes(),
@@ -237,6 +238,7 @@ fn a_file_without_the_3769_lines_still_loads() {
                 "touch_done = ",
                 "touch_failed = ",
                 "give_again = ",
+                "near_missed = ",
                 "skipped = ",
             ]
             .iter()
@@ -253,6 +255,7 @@ fn a_file_without_the_3769_lines_still_loads() {
         assert_eq!(definition.words.touch_done, None, "{what}");
         assert_eq!(definition.words.touch_failed, None, "{what}");
         assert_eq!(definition.words.give_again, None, "{what}");
+        assert_eq!(definition.words.near_missed, None, "{what}");
     }
 }
 
