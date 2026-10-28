@@ -26,7 +26,8 @@ on that commit. Nothing here was run on a lamp.
    (`/generate_204`, `/hotspot-detect.html`, …) get 204, so no sign-in sheet
    pops up; the person opens a browser.
 4. **The wizard** shows one step in normal use: pick the home network, type
-   its password, press Setup. The page's admin password defaults to the
+   its password, say whether to send health and crash reports (a box left
+   unticked, #2862), press Setup. The page's admin password defaults to the
    sticker suffix. The AI, channel, language and voice steps appear only with
    `?debug=true`.
 5. **"Your device is joining Wi-Fi…"** The light blinks blue. About 2 s after

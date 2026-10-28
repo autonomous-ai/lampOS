@@ -1095,7 +1095,9 @@ a week.
 - **At setup**, `"share_reports": true` in the setup request; only the
   JSON `true` is a yes. Setup keeps the answer, a no included, in
   `/etc/lampOS/setup/reports.json` ([setup.md](setup.md)), which
-  `lamp-cloud` reads where it is. A lamp set up on its own page is off.
+  `lamp-cloud` reads where it is. The lamp's own setup page asks too
+  (#2862): "Send health and crash reports", a box left unticked, which
+  sends `share_reports` only as the box is. Unticked, it is off.
 - **Later, in the app:** `reports.get` and `reports.set` (the device API
   above), the only way to turn reports on after setup: it is the person's
   own tap, from their account. `lamp-cloud` keeps that choice in
