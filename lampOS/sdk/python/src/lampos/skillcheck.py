@@ -23,6 +23,8 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from .moves import MOVE_FARTHEST, MOVE_FASTEST, MOVE_LASTS_MS, MOVE_STEP_MS
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:  # pragma: no cover - Python 3.10
@@ -39,12 +41,6 @@ SOUND_RATE = 24_000
 # A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs).
 MOVE_MOST_BYTES = 256 * 1024
 MOVE_NAME = re.compile(r"^[a-z0-9_-]{1,32}$")
-MOVE_STEP_MS = (40, 1_000)
-MOVE_LASTS_MS = (1_500, 10_000)
-# Head pitch, head roll, base yaw, shoulder, elbow: counts from rest, and
-# counts a second.
-MOVE_FARTHEST = (200, 200, 150, 350, 350)
-MOVE_FASTEST = (900.0, 1_300.0, 1_000.0, 800.0, 800.0)
 # The body's own clips besides the protocol's gestures (clips.rs, idle.rs).
 BODY_OWN = ("idle", "scanning", "called", "dip", "look_up", "tilt_left", "tilt_right", "two")
 

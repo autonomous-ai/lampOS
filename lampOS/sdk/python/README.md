@@ -130,6 +130,9 @@ asyncio.run(main())
   (a `breathe` at level 1 is refused) and answers `{"to": "ring"}`.
   `pulses_dropped` lists a second pulse within a minute, which the ring shows
   steady, without its pulse (and says nothing).
+  A `move` it takes is one lamp-control takes: steps of 40 to 1,000 ms, 1.5 to
+  10 s in all, from home and back, each joint within the body's reach and speed
+  (`lampos.moves.move_refusal`, its words).
 
 **When the lamp restarts** (every update), the connection closes and
 `wait_closed()` returns: a long-running program connects again, for example

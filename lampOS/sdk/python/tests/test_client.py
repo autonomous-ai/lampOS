@@ -18,6 +18,11 @@ from lampos.testing import FakeLamp
 REPO_SCHEMA = Path(__file__).resolve().parents[3] / "docs" / "control.schema.json"
 
 
+# A move the body plays (and lamp-control takes): 4 frames of 500 ms, 1.5 s in
+# all, from rest and back, well inside each joint's reach and speed.
+PLAYABLE = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+
+
 def run(coroutine):
     return asyncio.run(asyncio.wait_for(coroutine, timeout=20))
 
@@ -377,7 +382,7 @@ def test_a_lease_the_lamp_takes_back_is_lost_with_its_why(tmp_path):
                         await asyncio.sleep(0.01)
                     assert lease.lost_why == "hand"
                     with pytest.raises(errors.BY_CODE["no_lease"]):
-                        await lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 40)
+                        await lamp.move(PLAYABLE, 500)
                 assert fake.asked("lease.release") == []
 
     run(go())
@@ -503,6 +508,109 @@ def test_the_readme_reference_names_every_public_call_command_and_option():
         assert f"| `{state}`" in readable, state
     assert "### Never readable" in readable
 
+
+# Moves the body would drop, and its words for each (lamp_body::moves::check;
+# the JS SDK's test has the same list).
+UNPLAYABLE = [
+    ([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, "frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000"),
+    ([[0, 0, 0, 0, 0], [0, 0, 151, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 151 counts, farther than 150"),
+    ([[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, None),  # 2 s: one the body plays
+    ([[0, 0, 0, 0, 0]] * 7 + [[0, 0, 0, 0, 300]] * 8 + [[0, 0, 0, 0, 0]], 100, "frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800"),
+    ([[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, "frames: start and end at home, all five 0"),
+]
+
+
+
+def test_the_move_rules_are_the_bodys_and_lamp_controls_own():
+    """lampos.moves holds the numbers lamp-body's moves.rs and lamp-control's
+    protocol.rs hold: read from the Rust, so a change there fails here."""
+    import re
+
+    from lampos import moves
+
+    crates = Path(__file__).resolve().parents[3] / "crates"
+    body, door = crates / "body" / "src" / "moves.rs", crates / "control" / "src" / "protocol.rs"
+    if not (body.exists() and door.exists()):
+        pytest.skip("the Rust crates are not beside this copy")
+    body, door = body.read_text(), door.read_text()
+
+    def numbers(text):
+        return [float(n.replace("_", "")) for n in re.findall(r"[0-9][0-9_]*(?:\.[0-9]+)?", text)]
+
+    farthest = re.search(r"pub const FARTHEST: \[i16; 5\] = \[([^\]]*)\]", body).group(1)
+    fastest = re.search(r"pub const FASTEST: \[f32; 5\] = \[([^\]]*)\]", body).group(1)
+    assert numbers(farthest) == list(moves.MOVE_FARTHEST)
+    assert numbers(fastest) == list(moves.MOVE_FASTEST)
+    shortest = numbers(re.search(r"const SHORTEST_US: u64 = ([0-9_]+);", body).group(1))[0]
+    longest = numbers(re.search(r"const LONGEST_US: u64 = ([0-9_]+);", body).group(1))[0]
+    assert (shortest / 1000, longest / 1000) == moves.MOVE_LASTS_MS
+    body_step = numbers(re.search(r"if !\(([0-9_]+)\.\.=([0-9_]+)\)\.contains\(&file\.step_ms\)", body).group(0))[:2]
+    door_step = numbers(re.search(r"pub const STEP_MS: [^=]*= ([0-9_]+)\.\.=([0-9_]+);", door).group(0))[-2:]
+    frames = numbers(re.search(r"pub const FRAMES: [^=]*= ([0-9_]+)\.\.=([0-9_]+);", door).group(0))[-2:]
+    assert body_step == door_step == list(moves.MOVE_STEP_MS)
+    assert frames == list(moves.MOVE_FRAMES)
+
+@pytest.mark.parametrize("schema_check", [True, False])
+def test_the_fake_refuses_a_move_whose_frames_lamp_control_cannot_parse_and_keeps_the_connection(tmp_path, monkeypatch, schema_check):
+    import lampos.client
+    import lampos.testing
+
+    # Sent past the client's own check, as another computer's code might; and
+    # with or without the fake's schema check (jsonschema may not be installed).
+    monkeypatch.setattr(lampos.client, "_check", lambda op, fields: None)
+
+    async def go():
+        async with FakeLamp() as fake:
+            if not schema_check:
+                fake._validator = None
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000):
+                    for middle in ([1, 2], None, [0, 0, "a", 0, 0], [0, 0, 1.5, 0, 0], [0, 0, True, 0, 0]):
+                        frames = [[0, 0, 0, 0, 0], middle, [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+                        with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                            await lamp.request("move", step_ms=500, frames=frames)
+                        if not schema_check:
+                            assert raised.value.why == "frames: each frame is five whole counts"
+                    for step_ms in (1.5, "500"):
+                        with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                            await lamp.request("move", step_ms=step_ms, frames=PLAYABLE)
+                        if not schema_check:
+                            assert raised.value.why == "step_ms: a whole number of ms"
+                    await lamp.move(PLAYABLE, 500)
+                assert len(fake.asked("move")) == 1
+
+    run(go())
+
+
+def test_the_fake_refuses_a_move_the_body_would_drop_with_its_words_before_the_lease(tmp_path):
+    from lampos.moves import move_refusal
+
+    assert move_refusal(500, PLAYABLE) is None
+    for frames, step_ms, refusal in UNPLAYABLE:
+        assert move_refusal(step_ms, frames) == refusal, (frames, step_ms)
+    assert move_refusal(20, PLAYABLE) == "step_ms: from 40 to 1000"
+    assert move_refusal(500, [[0, 0, 0, 0, 0]]) == "frames: from 2 to 500"
+
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                # Refused before the lease is asked for, as lamp-control's protocol.rs checks it.
+                with pytest.raises(errors.BY_CODE["bad_request"], match="a move this body cannot play: it lasts 600 ms"):
+                    await lamp.move(UNPLAYABLE[0][0], 200)
+                async with lamp.lease("body", for_ms=5000):
+                    for frames, step_ms, refusal in UNPLAYABLE:
+                        if refusal is None:
+                            await lamp.move(frames, step_ms)
+                            continue
+                        with pytest.raises(errors.BY_CODE["bad_request"]) as raised:
+                            await lamp.move(frames, step_ms)
+                        assert raised.value.why == refusal
+                    await lamp.move(PLAYABLE, 500)
+                assert len(fake.asked("move")) == 2
+
+    run(go())
 
 def test_off_takes_a_handler_off_and_unsubscribes_the_last(tmp_path):
     async def go():
@@ -734,7 +842,7 @@ def test_a_waiting_gesture_or_move_returns_at_the_bodys_answer(tmp_path):
             async with await Lamp.connect(keyring=ring) as lamp:
                 async with lamp.lease("body", for_ms=5000):
                     nod = await asyncio.wait_for(lamp.gesture("nod", wait=True), timeout=2)
-                    move = await asyncio.wait_for(lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0]], 40, wait=True), timeout=2)
+                    move = await asyncio.wait_for(lamp.move(PLAYABLE, 500, wait=True), timeout=2)
                 assert (nod["ok"], nod["to"]) == (True, "body")
                 assert (move["ok"], move["to"]) == (True, "body")
                 assert lamp._done == {}

@@ -36,6 +36,7 @@ from websockets.asyncio.server import ServerConnection, serve
 
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
+from .moves import move_refusal
 
 try:
     import jsonschema
@@ -110,9 +111,21 @@ PATTERN_LEAST_LEVEL = {
     "candle": (3, "a candle flickers at level 3 and up"),
     "pulse": (2, "a pulse is seen at level 2 and up"),
 }
-# The ring plays one pulse a minute for one asker, and drops a second without a
-# word to the computer (lamp_msgs' PULSE_GAP_US): the door has answered by then.
+# The ring plays one pulse a minute for one asker, and shows a second steady,
+# without its pulse (lamp_msgs' PULSE_GAP_US): the door has answered by then.
 PULSE_GAP_S = 60.0
+
+
+def _whole(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _frames(frames: Any) -> bool:
+    """Whether a move's frames are what lamp-control parses (`Vec<[i32; 5]>`),
+    so its check can read them."""
+    return isinstance(frames, list) and all(
+        isinstance(frame, list) and len(frame) == 5 and all(_whole(count) for count in frame) for frame in frames
+    )
 
 
 def _now() -> str:
@@ -285,11 +298,31 @@ class FakeLamp:
                     continue
                 self.received.append(request)
                 id_ = request.get("id") if isinstance(request.get("id"), int) else None
+                # As lamp-control's protocol.rs, once a move has parsed (an id,
+                # and frames of five whole counts) and before grants or leases:
+                # one it won't take, or the body would drop, is refused in its
+                # words (#4217). Anything else is the schema's to refuse.
+                if (
+                    request.get("op") == "move"
+                    and id_ is not None
+                    and _whole(request.get("step_ms"))
+                    and _frames(request.get("frames"))
+                ):
+                    refusal = move_refusal(request["step_ms"], request["frames"])
+                    if refusal is not None:
+                        await self._refuse(ws, id_, "bad_request", refusal)
+                        continue
                 if self._validator is not None:
                     errors = list(self._validator.iter_errors(request))
                     if errors:
                         await self._refuse(ws, id_, "bad_request", errors[0].message)
                         continue
+                if request.get("op") == "move" and not _whole(request.get("step_ms")):
+                    await self._refuse(ws, id_, "bad_request", "step_ms: a whole number of ms")
+                    continue
+                if request.get("op") == "move" and not _frames(request.get("frames")):
+                    await self._refuse(ws, id_, "bad_request", "frames: each frame is five whole counts")
+                    continue
                 op = request.get("op")
                 if op == "pair":
                     await self._pair(ws, request, nonce)
