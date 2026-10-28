@@ -22,7 +22,7 @@ name: lampOS on ARM64
 #
 #            | runners | profile   | tests at once | realtime | crates tested
 # pull req.  | 1       | `pr`      | one per core  | skipped  | its own, their users, three readers (below)
-# lamp-voice | 1       | `pr`      | one per core  | skipped  | all (binaries for updates.md)
+# lamp-voice | 1       | `pr`      | one per core  | skipped  | all (binaries for updates.md; on the Studio when route says so)
 # full       | 4       | `default` | one           | run      | all
 #
 # A pull request tests only the crates its diff changes, every crate that
@@ -129,21 +129,24 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
 
 jobs:
-  # Which runner the ARM64 job gets: the self-hosted Mac Studio pool (org
-  # runner group lampos-studio, about 5 minutes a pull request against 13.5
-  # here) or GitHub-hosted, as before. GitHub-hosted is the default and every
-  # doubt falls back to it (.github/scripts/lampos-route.py): the switch
-  # vars.LAMPOS_STUDIO not on, the Studio's heartbeat (vars.LAMPOS_STUDIO_BEAT,
-  # written every 30 s by the Studio host) older than two minutes, a Studio job
-  # stuck, the queue there longer than GitHub-hosted would take, an API error.
-  # Only the team's pull requests and runs by hand ask: forks, lamp-voice's
-  # pushes (the signed publication build), the full run and promotions skip
-  # this job and run on GitHub-hosted. lampos-promote reads this run's ARM64
-  # job by its name, so this one has another and never fails.
+  # Which runner lamp-voice's ARM64 job gets: the internal Mac Studio's
+  # trusted slot (org runner group lampos-studio, label studio-trusted: one
+  # 20-vCPU VM, fresh for each job, no cache, only lamp-voice and main) or
+  # GitHub-hosted, as before. lamp-voice's push is the publication build,
+  # about 25 minutes here; signing and publishing stay on GitHub-hosted, so the
+  # key never reaches the Studio. GitHub-hosted is the default and every doubt
+  # falls back to it (.github/scripts/lampos-route.py): the switch
+  # vars.LAMPOS_STUDIO not on (canary: runs by hand on lamp-voice only), the
+  # Studio's heartbeat (vars.LAMPOS_STUDIO_BEAT, written every 30 s by the
+  # Studio host) older than two minutes, a Studio job stuck, the queue there
+  # longer than GitHub-hosted would take, an API error. Pull requests, other
+  # branches, the full run and promotions skip this job and run on
+  # GitHub-hosted. lampos-promote reads this run's ARM64 job by its name, so
+  # this one has another and never fails.
   route:
     if: >-
-      ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-      || (github.event_name == 'workflow_dispatch' && !inputs.full && !inputs.promote_sequence) }}
+      ${{ github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS'
+      && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.full && !inputs.promote_sequence)) }}
     name: lampOS — choose the ARM64 runner
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -152,6 +155,7 @@ jobs:
       contents: read
     outputs:
       runner: ${{ steps.route.outputs.runner }}
+      studio: ${{ steps.route.outputs.studio }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -164,8 +168,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LAMPOS_STUDIO: ${{ vars.LAMPOS_STUDIO }}
           LAMPOS_STUDIO_BEAT: ${{ vars.LAMPOS_STUDIO_BEAT }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
           FULL: ${{ inputs.full }}
           PROMOTE: ${{ inputs.promote_sequence }}
         run: python3 -I .github/scripts/lampos-route.py route
@@ -219,8 +221,8 @@ jobs:
       - name: restore the cache
         id: cache
         # Match publish's eligibility exactly, so signing candidates build cold.
-        # Not on the Studio: its own cache disk replaces this one, and pulling
-        # lampOS/target from GitHub's cache there takes minutes.
+        # Not on the Studio: it builds lamp-voice cold, and the cache job below
+        # renews this one for pull requests.
         if: >-
           ${{ runner.environment == 'github-hosted' && !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
           && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
@@ -343,6 +345,66 @@ jobs:
             lampOS/target
           # A cold publication build skipped restore, so it has no cache outputs.
           key: ${{ steps.cache.outputs.cache-primary-key || format('lampos-arm64-u2204-{0}-{1}', hashFiles('lampOS/Cargo.lock'), github.sha) }}
+
+  # Pull requests restore lamp-voice's newest build (see the top), which
+  # lamp-voice's own run saves. When that run is on the Studio, which saves
+  # nothing, this job builds the same targets here instead, from the last
+  # cache, and saves them under the same key. Nothing waits on it: publish
+  # needs only the ARM64 job.
+  cache:
+    needs: route
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.route.outputs.studio == 'true' }}
+    name: lampOS — renew the pull requests' ARM64 cache
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 60
+    steps:
+      - name: system packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
+      - uses: actions/checkout@v4
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: restore the cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
+      - name: unchanged source files get the cached build's times back
+        run: python3 -I .github/scripts/lampos-source-times.py
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      # The ARM64 job's own builds, so a pull request finds every target fresh.
+      - name: build (release, the lamps' binaries)
+        working-directory: lampOS
+        run: cargo build --locked --release --workspace --bins --examples
+      - name: build the test binaries (listed, not run)
+        working-directory: lampOS
+        # The two own-harness tests cannot be listed; the ARM64 job leaves them out the same way.
+        run: >-
+          cargo nextest list --locked --release --workspace --profile pr
+          -E 'not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))' > /dev/null
+      - name: save the cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        timeout-minutes: 10
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: ${{ steps.cache.outputs.cache-primary-key }}
 
   publish:
     name: lampOS — sign and publish the tested lamp-voice artifact

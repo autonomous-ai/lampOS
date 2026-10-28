@@ -1,8 +1,8 @@
 name: lampOS Studio watchdog
 
-# Rescues lampOS ARM64 runs the Mac Studio runners left stuck: a Studio job
-# queued over 8 minutes or running over 25 (they take 5 to 7) is cancelled
-# and its whole run started again, so its route job sends it to
+# Rescues lampOS ARM64 runs the Mac Studio runner left stuck: a Studio job
+# queued over 15 minutes or running over 20 (lamp-voice's take about 9) is
+# cancelled and its whole run started again, so its route job sends it to
 # GitHub-hosted (.github/scripts/lampos-route.py sweep). Each route job
 # sweeps too; this catches a stuck job when no new run comes along.
 #

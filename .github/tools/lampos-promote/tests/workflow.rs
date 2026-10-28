@@ -22,6 +22,8 @@ fn promotion_is_manual_separate_and_branch_protected() {
         .next()
         .unwrap();
     assert!(publish.contains("if: ${{ !cancelled() && needs.arm64.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'"));
+    // The Studio may build lamp-voice's artifact; the signing key stays on GitHub-hosted.
+    assert!(publish.contains("    runs-on: ubuntu-22.04-arm\n"));
     let promotion = workflow
         .split("  promote-stable:\n")
         .nth(1)
