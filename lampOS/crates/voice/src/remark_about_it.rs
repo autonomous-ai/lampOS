@@ -55,8 +55,48 @@ pub fn talked_about(heard: &str) -> bool {
     let asked = heard
         .split_inclusive(['.', '!', '?', ';', ','])
         .filter(|clause| named(clause))
-        .any(crate::remarks::asks_in);
+        .any(|clause| crate::remarks::asks_in(clause) || moves_or_needs(clause));
     !asked && only_about(heard)
+}
+
+/// Words that ask the lamp to move when a clause begins with them ("Tilt
+/// the lamp up.", "Point the lamp at my desk."): its head's own moves, which
+/// [`crate::remarks::asks_in`]'s doing words leave out (Reviewer-three's
+/// narrower P2 on #4201).
+const MOVES: &[&str] = &[
+    "lower", "raise", "lift", "tilt", "point", "aim", "move", "face", "nod", "lean", "angle",
+    "bend", "swing", "rotate", "bring", "shine", "light",
+];
+
+/// Words that state a need of the lamp's light or place anywhere in a
+/// clause ("The lamp is too bright.", "I need the lamp brighter."): a
+/// missed request costs more in a busy room than a reply to a remark.
+const NEEDS: &[&str] = &[
+    "too", "need", "needs", "want", "wants", "brighter", "dimmer", "darker", "lighter", "warmer",
+    "cooler", "higher",
+];
+
+/// Whether a clause naming the lamp asks it to move, or states a need of
+/// its light or place.
+fn moves_or_needs(clause: &str) -> bool {
+    let mut words = clause
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .skip_while(|word| {
+            matches!(
+                word.as_str(),
+                "and" | "so" | "but" | "then" | "okay" | "ok" | "now" | "um"
+            )
+        })
+        .peekable();
+    if words
+        .peek()
+        .is_some_and(|first| MOVES.contains(&first.as_str()))
+    {
+        return true;
+    }
+    words.any(|word| NEEDS.contains(&word.as_str()))
 }
 
 /// Whether a clause says "lamp" or "lamb" (one or many, or its own).
@@ -132,6 +172,14 @@ mod tests {
             "Make the lamp brighter.",
             "Dim the lamp, please.",
             "Is the lamp on?",
+            // Its moves and a stated need (Reviewer-three's narrower P2 on
+            // #4201).
+            "Lower the lamp.",
+            "Raise the lamp a bit.",
+            "Point the lamp at my desk.",
+            "Tilt the lamp up.",
+            "The lamp is too bright.",
+            "I need the lamp brighter.",
             "Do you want confidence? Going downstairs.",
             "Yes, please. A latte. No sugar.",
             "",
