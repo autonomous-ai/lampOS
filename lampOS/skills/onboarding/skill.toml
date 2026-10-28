@@ -30,7 +30,7 @@ order = ["where_you_sit", "who_you_are", "how_you_sound", "touch", "privacy", "g
 reoffer_after_s = 86400
 
 [onboarding.steps.where_you_sit]
-first = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Sit where you usually sit and look at me. I'll tell you when I see you.\")"
+first = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Let's get set up first. It takes a few minutes. Just do what I ask, and you can ask me anything once we're done. Sit where you usually sit and look at me. I'll tell you when I see you.\")"
 reoffer = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet you. Sit where you usually sit and look at me. I'll tell you when I see you.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip where you sit for now.\")"
 
@@ -47,8 +47,8 @@ reoffer = "(Say only this, nothing before or after it: \"Now I'll learn how you 
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip how you call me for now.\")"
 
 [onboarding.steps.touch]
-first = "(Say only this, nothing before or after it: \"Tap the top of my head once, then let go.\")"
-reoffer = "(Say only this, nothing before or after it: \"One more thing: tap the top of my head once, then let go.\")"
+first = "(Say only this, nothing before or after it: \"Next, let's check my touch. Tap the top of my head once with your finger, then let go.\")"
+reoffer = "(Say only this, nothing before or after it: \"One more thing: let's check my touch. Tap the top of my head once with your finger, then let go.\")"
 skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip the touch for now.\")"
 
 [onboarding.steps.privacy]
@@ -92,9 +92,9 @@ privacy_done_camera = "(Say only this, nothing before or after it: \"Got it, the
 privacy_failed = "(Say only this, nothing before or after it: \"The switch check didn't finish. You can try it again later by redoing the setup. Just ask me to redo the setup.\")"
 near_again = "(Say only this, nothing before or after it: \"Got it. Say 'Hey Lamp' once more.\")"
 near_missed = "(Say only this, nothing before or after it: \"I didn't catch that. Say 'Hey Lamp' again, from your seat.\")"
-near_done = "(Say only this, nothing before or after it: \"Got it, I know how you call me from there.\")"
+near_done = "(Say only this, nothing before or after it: \"Got it, that's three.\")"
 near_failed = "(Say only this, nothing before or after it: \"I couldn't learn how you call me this time. That's fine, you can redo the setup later. Just ask me to redo the setup.\")"
-sentence_first = "(Say only this, nothing before or after it: \"Now say a sentence to me from your seat, anything at all, so I get used to your voice.\")"
+sentence_first = "(Say only this, nothing before or after it: \"Now say any sentence to me, the way you'd talk to me.\")"
 sentence_louder = "(Say only this, nothing before or after it: \"Say another sentence from your seat, a little louder.\")"
 sentence_closer = "(Say only this, nothing before or after it: \"Come a little closer and say another sentence.\")"
 sentence_again = "(Say only this, nothing before or after it: \"Say another sentence from your seat.\")"
