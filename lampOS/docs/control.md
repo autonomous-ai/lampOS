@@ -82,6 +82,8 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `time` | the client's own schedule | the lamp's clock and zone | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
 
+lamp-control reads each topic on its own thread. A state topic's message that says nothing new for these, the same privacy, pause, sleep, talking, light or mood as the last one, is passed over on that thread and never handed to the door. `voice/privacy` alone comes a hundred times a second (its lease, renewed every 10 ms), and handing each one on was lamp-control's idle CPU: 2% of a core on lamp-75c9.
+
 **Actions:**
 
 | op | args | carried out by | grant | lease |

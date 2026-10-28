@@ -698,12 +698,23 @@ pub fn watch_bus(
         let mut subscriber = bus.subscribe(topic, "control")?;
         let sent = sent.clone();
         std::thread::spawn(move || {
+            // What `watch` last read from this topic: a state message that
+            // says the same is passed over here, not handed on (lamp-75c9's
+            // idle CPU was `voice/privacy`'s hundred a second).
+            let mut kept: Option<Value> = None;
             loop {
                 match subscriber.recv(Duration::from_secs(1)) {
                     Ok(Some(message)) => {
-                        if let Ok(payload) = message.json()
-                            && sent.send((topic.to_owned(), payload)).is_err()
-                        {
+                        let Ok(payload) = message.json() else {
+                            continue;
+                        };
+                        if let Some(now) = Watch::kept_of(topic, &payload) {
+                            if kept.as_ref() == Some(&now) {
+                                continue;
+                            }
+                            kept = Some(now);
+                        }
+                        if sent.send((topic.to_owned(), payload)).is_err() {
                             return;
                         }
                     }

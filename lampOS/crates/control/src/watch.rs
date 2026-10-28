@@ -67,6 +67,36 @@ impl Watch {
         Self::default()
     }
 
+    /// What [`Watch::take`] reads from a state topic's message, for the bus
+    /// thread to pass over one that says nothing new: `voice/privacy` comes
+    /// a hundred times a second (its lease, `.every(10 ms)`), and each one
+    /// parsed and handed to the runtime was lamp-control's idle CPU on
+    /// lamp-75c9 (2% of a core). None for a topic whose every message is
+    /// news (an event, or the faces, whose leaving is timed).
+    pub fn kept_of(topic: &str, payload: &Value) -> Option<Value> {
+        match topic {
+            "voice/privacy" => Some(json!(
+                payload["permitted"] == false || payload["physical_muted"] == true
+            )),
+            "lamp/pause" => Some(json!(payload["paused"] == true)),
+            "voice/mute" => Some(json!(
+                payload["muted"] == true && payload["reason"] == "sleep"
+            )),
+            "voice/state" => Some(json!(
+                payload["state"]
+                    .as_str()
+                    .is_some_and(|state| state != "resting")
+            )),
+            "light/state" => Some(
+                json!({"on": payload["on"], "colour": payload["colour"], "level": payload["level"]}),
+            ),
+            "mood/state" => Some(
+                json!({"energy": payload["energy"], "warmth": payload["warmth"], "awake": payload["awake"], "asleep": payload["asleep"]}),
+            ),
+            _ => None,
+        }
+    }
+
     /// One message on `topic`, its JSON payload, at `now_us`.
     pub fn take(&mut self, topic: &str, payload: &Value, now_us: u64) -> Vec<Out> {
         match topic {
@@ -114,9 +144,7 @@ impl Watch {
                 vec![Out::Lose(Some(Part::Body), LeaseWhy::Hand)]
             }
             "voice/state" => {
-                let talking = payload["state"]
-                    .as_str()
-                    .is_some_and(|state| state != "resting");
+                let talking = Self::kept_of(topic, payload) == Some(json!(true));
                 if talking == self.talking {
                     return Vec::new();
                 }
@@ -129,24 +157,24 @@ impl Watch {
                 vec![signal, self.lamp_changed()]
             }
             "lamp/pause" => self.flag(
-                payload["paused"] == true,
+                Self::kept_of(topic, payload) == Some(json!(true)),
                 |watch| &mut watch.paused,
                 LeaseWhy::Paused,
             ),
             "voice/mute" => {
-                let asleep = payload["muted"] == true && payload["reason"] == "sleep";
+                let asleep = Self::kept_of(topic, payload) == Some(json!(true));
                 self.flag(asleep, |watch| &mut watch.asleep, LeaseWhy::Asleep)
             }
             "voice/privacy" => {
-                let private = payload["permitted"] == false || payload["physical_muted"] == true;
+                let private = Self::kept_of(topic, payload) == Some(json!(true));
                 self.flag(private, |watch| &mut watch.private, LeaseWhy::Private)
             }
             "light/state" => {
-                self.light = json!({"on": payload["on"], "colour": payload["colour"], "level": payload["level"]});
+                self.light = Self::kept_of(topic, payload).unwrap_or_default();
                 Vec::new()
             }
             "mood/state" => {
-                self.mood = json!({"energy": payload["energy"], "warmth": payload["warmth"], "awake": payload["awake"], "asleep": payload["asleep"]});
+                self.mood = Self::kept_of(topic, payload).unwrap_or_default();
                 Vec::new()
             }
             _ => Vec::new(),
@@ -298,6 +326,90 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// A state topic's message whose [`Watch::kept_of`] is the last one's
+    /// changes nothing in [`Watch::take`], so the bus thread may pass it
+    /// over; one whose key differs is news. Event topics have no key.
+    #[test]
+    fn a_state_message_with_the_same_key_changes_nothing() {
+        let pairs = [
+            (
+                "voice/privacy",
+                json!({"permitted": true, "physical_muted": false, "stamp": {"sequence": 1}}),
+                json!({"permitted": true, "physical_muted": false, "stamp": {"sequence": 2}}),
+                json!({"permitted": false, "stamp": {"sequence": 3}}),
+            ),
+            (
+                "lamp/pause",
+                json!({"paused": false, "at": 1}),
+                json!({"paused": false, "at": 2}),
+                json!({"paused": true}),
+            ),
+            (
+                "voice/mute",
+                json!({"muted": true, "reason": "button"}),
+                json!({"muted": false, "reason": "sleep"}),
+                json!({"muted": true, "reason": "sleep"}),
+            ),
+            (
+                "voice/state",
+                json!({"state": "listening"}),
+                json!({"state": "speaking"}),
+                json!({"state": "resting"}),
+            ),
+            (
+                "light/state",
+                json!({"on": true, "colour": "warm", "level": 3, "at": 1}),
+                json!({"on": true, "colour": "warm", "level": 3, "at": 2}),
+                json!({"on": true, "colour": "warm", "level": 2}),
+            ),
+            (
+                "mood/state",
+                json!({"energy": 0.5, "warmth": 0.4, "awake": true, "asleep": false, "at": 1}),
+                json!({"energy": 0.5, "warmth": 0.4, "awake": true, "asleep": false, "at": 2}),
+                json!({"energy": 0.6, "warmth": 0.4, "awake": true, "asleep": false}),
+            ),
+        ];
+        for (topic, first, same, other) in pairs {
+            let mut watch = Watch::new();
+            watch.take(topic, &first, S);
+            assert_eq!(
+                Watch::kept_of(topic, &first),
+                Watch::kept_of(topic, &same),
+                "{topic}"
+            );
+            let state = |watch: &Watch| {
+                (
+                    watch.private,
+                    watch.paused,
+                    watch.asleep,
+                    watch.talking,
+                    watch.light.clone(),
+                    watch.mood.clone(),
+                )
+            };
+            let before = state(&watch);
+            assert!(watch.take(topic, &same, 2 * S).is_empty(), "{topic}");
+            assert_eq!(state(&watch), before, "{topic}");
+            assert_ne!(
+                Watch::kept_of(topic, &first),
+                Watch::kept_of(topic, &other),
+                "{topic}"
+            );
+        }
+        for topic in [
+            "humans/faces/tracked",
+            "voice/heard",
+            "ears/classes",
+            "body/hand",
+            "controls/gesture",
+            "name/heard",
+            "room/stood_up",
+            "controls/touch",
+        ] {
+            assert_eq!(Watch::kept_of(topic, &json!({})), None, "{topic}");
+        }
     }
 
     #[test]
