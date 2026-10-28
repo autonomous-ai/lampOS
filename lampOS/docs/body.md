@@ -3190,7 +3190,10 @@ under its 220; from where each hold began it never moved 15 counts, and
 `pushed` was never said. A head or base joint the stall rule tells to
 stop pushing (`--give-way`: over 100 for 1.5 s without moving, its goal
 then where it is) is said as a push too, for half a second
-(`STALL_HAND_STEPS`), unless it is a rest found at the same place again:
+(`STALL_HAND_STEPS`), when it was carried more than 6 counts away from
+its goal while pressed (from where the press began): a joint stuck short
+of its goal under its own weight or against a shelf, never moved, is not,
+nor is a rest found at the same place again:
 a gentle hand turning the head is followed by that rule alone, under the
 load that eases it (lamp-29e7 on 8080: the roll put 34 counts over a
 minute at 100 to 144, its bound 150, and `pushed` was never said, so
