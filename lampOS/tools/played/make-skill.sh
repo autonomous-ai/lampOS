@@ -55,6 +55,15 @@ QUIET_GATE=${QUIET_GATE:-./quiet_gate.sh}
 SAY=${SAY:-say}
 AFPLAY=${AFPLAY:-afplay}
 RATE=${LAMP_SAY_RATE:-185}
+# Seconds between reads of the lamp while a check waits (MAKE_POLL). Each read is an ssh and a sudo, and each leaves
+# lines in the lamp's journal: read every 1 to 2 s, an arm's long waits (40 to 120 s) pushed its own lamp-voice lines
+# out of lamp-06c1's 5 MB journal in about 6 minutes (jarvis on #2811, j0239). A wait reads at its start, every POLL,
+# and once more at its deadline.
+POLL=${MAKE_POLL:-5}
+# The wait for the lamp's answer to play to its end reads every ANSWER_POLL seconds (MAKE_ANSWER_POLL): a spoken yes
+# follows it, and the voice's follow-up window is 8 s (FOLLOW_UP_FOR, crates/voice/src/name_or_follow_up.rs). It
+# runs only while the lamp speaks.
+ANSWER_POLL=${MAKE_ANSWER_POLL:-1}
 OUT="$PLAYED_OUT/scenarios/make-skill-$L.txt"
 REMOTE=/usr/local/lib/played-stand-in   # /run may be noexec; this folder is removed when the run ends
 SKILLS=/opt/lampOS/skills/current/lamp-skills
@@ -343,38 +352,39 @@ said() {  # what the lamp said in its newest session, one line
   lamp 'sudo -n sh -c '"'"'d=/var/lib/lampOS/voice/sessions; s=$(ls -t $d | head -n 1); grep -h "\"kind\":\"transcript\"" $d/$s/metadata/events-*.jsonl'"'" 2>/dev/null \
     | grep -v '"role":"input"' | sed -n 's/.*"text":"\([^"]*\)".*/\1/p' | tr '\n' ' '
 }
+nap() {  # UNTIL EVERY: sleep EVERY seconds, or what is left until UNTIL; fails once UNTIL has passed
+  local left=$(( $1 - $(date +%s) ))
+  [ "$left" -gt 0 ] || return 1
+  sleep $(( left < $2 ? left : $2 ))
+}
 wait_for() {  # SINCE PATTERN SECONDS: until the journal since SINCE matches PATTERN; print the line
   local until=$(( $(date +%s) + $3 )) hit
-  while [ "$(date +%s)" -lt "$until" ]; do
+  while :; do
     hit=$(journal "$1" | grep -E -- "$2" | tail -n 1)
     [ -n "$hit" ] && { printf '%s\n' "$hit"; return 0; }
-    sleep 1
+    nap "$until" "$POLL" || return 1
   done
-  return 1
 }
 wait_answered() {  # COUNT SECONDS: until more than COUNT of the lamp's answers have played to their end
   local until=$(( $(date +%s) + $2 ))
-  while [ "$(date +%s)" -lt "$until" ]; do
+  while :; do
     [ "$(answered)" -gt "$1" ] && { echo "the lamp's answer played to its end"; return 0; }
-    sleep 1
+    nap "$until" "$ANSWER_POLL" || return 1
   done
-  return 1
 }
 wait_called() {  # OPERATION COUNT SECONDS: until the stand-in was called with OPERATION more than COUNT times
   local until=$(( $(date +%s) + $3 ))
-  while [ "$(date +%s)" -lt "$until" ]; do
+  while :; do
     [ "$(called "$1")" -gt "$2" ] && { echo "the stand-in's $1 was called"; return 0; }
-    sleep 2
+    nap "$until" "$POLL" || return 1
   done
-  return 1
 }
 wait_said() {  # COUNT PATTERN SECONDS: until the lamp's words match PATTERN more than COUNT times
   local until=$(( $(date +%s) + $3 ))
-  while [ "$(date +%s)" -lt "$until" ]; do
+  while :; do
     [ "$(said | grep -oE -- "$2" | wc -l)" -gt "$1" ] && { echo "the lamp said it"; return 0; }
-    sleep 1
+    nap "$until" "$POLL" || return 1
   done
-  return 1
 }
 FAILS=0
 CHECKS=0
@@ -408,6 +418,10 @@ for arm in $ARMS; do
   # The made skills as saved: an ask an earlier arm left waiting is not this arm's to answer.
   voice_state reset || { echo "make-skill.sh: the voice's made skills could not be put back before the $arm arm" | tee -a "$OUT"; FAILS=$((FAILS + 1)); break; }
   START=$(lamp 'date +%s')
+  # How many of the lamp's answers had played to their end before the line whose answer comes next. Each is taken
+  # before that answer can begin, never after a wait on POLL (Third's P2 on #4194): a short answer can play to its
+  # end inside one poll, and a count taken after it would wait for an answer that never comes.
+  replied=""
   news=$(called new); shows=$(called show)
   asks=$(said | grep -oE 'Shall I put it on the lamp' | wc -l)
   before=$(listed)
@@ -427,20 +441,24 @@ for arm in $ARMS; do
   else
     confirm=$(wait_answered "$heard" 40)
     check "asked to confirm" "$confirm"
-    [ -n "$confirm" ] && { sleep 1; line Samantha "Yes, please."; }
+    [ -n "$confirm" ] && { sleep 1; heard=$(answered); line Samantha "Yes, please."; }
     offered=$(wait_for "$START" 'asked for make_skill' 40)
   fi
   check "offered" "$offered"
   # Its read-back ends with its question: the yes once it has played to its end.
+  # (`heard` was taken before the request, or before the yes to the lamp's own confirm: the read-back is next.)
   if [ -n "$offered" ]; then
-    heard=$(answered)
     wait_answered "$heard" 40 >/dev/null
     sleep 1
+    replied=$(answered)
     line Samantha "Yes, please."
   fi
   fi
   check "handed over" "$(wait_called new "$news" 40)"
   check "the answer read" "$(wait_called show "$shows" 90)"
+  # The lamp's answer to the hand-over's yes has played by now; the next one is its ask to put the skill on.
+  [ -n "$replied" ] && wait_answered "$replied" 40 >/dev/null
+  heard=$(answered)
   kept=$(wait_for "$START" 'a skill made by voice is (kept|not kept)' 120)
   case $kept in *"is kept"*) check "made" "$kept" ;; *) check "made" ""; [ -n "$kept" ] && echo "  $kept" | tee -a "$OUT"; continue ;; esac
   sha=$(printf '%s' "$kept" | sed -n 's/.*sha256 \([0-9a-f]\{64\}\).*/\1/p')
@@ -455,10 +473,10 @@ for arm in $ARMS; do
     heard=$(answered)
     line Samantha "Hey Lamp, I'm back at my desk."
     wait_answered "$heard" 40 >/dev/null
+    heard=$(answered)
   fi
   check "asked to put it on" "$(wait_said "$asks" 'Shall I put it on the lamp' 120)"
-  heard=$(answered)
-  wait_answered "$heard" 30 >/dev/null
+  wait_answered "$heard" 30 >/dev/null || echo "  the ask's end wasn't seen within 30 s: the answer comes late" | tee -a "$OUT"
   ASKED=$(lamp 'date +%s')
   early=$(journal "$START" | grep -E 'a made skill is on the lamp' | tail -n 1)
   # One put on before the answer is taken off on exit, whatever comes after (the Reviewer-lead on #2745).
