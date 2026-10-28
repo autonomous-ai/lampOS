@@ -3,13 +3,15 @@
 Off by default. What would let someone pair or say hello as this computer, or
 read the lamp's pin, never reaches the log: `proof`, `sig`, `key`, `nonce`,
 `pin` and `fp` are replaced, and so is a pair request's `code`, the owner's
-one-time code (a reply's `code` is a refusal's, and is kept); a say's `text` is given only as its length and the
-start of its SHA-256, and a pushed skill part's `data` only as its length.
+one-time code (a reply's `code` is a refusal's, and is kept). A say's `text` is
+given only as its length and a tag keyed for this run (an HMAC), and a pushed
+skill part's `data` only as its length.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import sys
@@ -17,6 +19,26 @@ from typing import Any
 
 # Fields replaced wherever they appear in a frame.
 SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp"})
+# Fields given only as a summary: a said text, a pushed skill part's bytes.
+SUMMARISED = frozenset({"text", "data"})
+# Every other field the protocol has, printed as it is. A test fails on any
+# field of control.schema.json in none of these, so a new one is decided here,
+# not found later in a log. Shown as they are, so on a terminal or in the logs
+# an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
+# phrase, events' fields, and a refusal's `why`.
+SHOWN = frozenset({
+    "asleep", "at", "class", "client", "code", "colour", "count", "elbow", "error", "ev", "events",
+    "express", "facing", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
+    "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
+    "mood", "most", "motion", "name", "near", "ok", "op", "parts", "pattern", "paused", "phrase",
+    "phrases", "pitch", "presence", "press", "private", "push", "quiet_hours", "re", "refused",
+    "retry_ms", "roll", "say", "say_max_chars", "score", "shoulder", "side", "skill", "skills",
+    "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "until", "v", "where",
+    "why", "within_ms", "yaw"
+})
+# A said text's tag is keyed with this process's own random key: the same text
+# gives the same tag within a run, and nobody holding the log can test a guess.
+_TAG_KEY = os.urandom(16)
 
 
 def on() -> bool:
@@ -29,8 +51,8 @@ def redact(value: Any, key: str | None = None) -> Any:
     if key in SECRET and value is not None:
         return "<redacted>"
     if key == "text" and isinstance(value, str):
-        digest = hashlib.sha256(value.encode()).hexdigest()[:8]
-        return f"<{len(value)} chars, sha256 {digest}>"
+        tag = hmac.new(_TAG_KEY, value.encode(), hashlib.sha256).hexdigest()[:8]
+        return f"<{len(value)} chars, tag {tag}>"
     if key == "data" and isinstance(value, str):
         return f"<{len(value)} chars>"
     if isinstance(value, dict):
