@@ -46,7 +46,8 @@ Read on 2026-10-15 at `lamp-voice` `462d04cee`.
   `/opt/lampOS/<folder>/<sha256>/` and switches a part by writing the new
   hash into its unit (`crates/update/src/unit.rs`, `with_build`). It knows a
   part only by a unit in `/etc/systemd/system` whose `ExecStart=` names such
-  a folder, never adds a part, never enables a unit, and carries files
+  a folder, adds a part only as `install` would and only from level 8
+  (updates.md, "A part added over the air"), and carries files
   beside a binary from the old folder to the new (the controls' settings).
   Taken: the signed manifest, the install beside, the quiet moment, the
   watch and the way back, all as they are. To change: what a switch writes

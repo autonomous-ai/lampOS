@@ -11,6 +11,7 @@
 //! models a build carries; [`apply`] the settings and tmpfiles it carries,
 //! written by `lamp-update-apply`; [`switches`] the product's switches,
 //! and a kept file that turns one off.
+pub mod added;
 pub mod apply;
 pub mod check_units;
 pub mod companion;

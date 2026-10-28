@@ -195,9 +195,14 @@ pub fn make_with(
                 .max(manifest::PRODUCT_UNITS_UPDATER),
         );
     }
+    // Every build with the product's units may add one a lamp lacks.
+    if units.iter().any(|unit| unit.lamp == manifest::PRODUCT_LAMP) {
+        min_updater = Some(min_updater.unwrap_or(1).max(manifest::ADDS_UPDATER));
+    }
+    // A template by its name on the lamp (`manifest::lamp_name`).
     if units
         .iter()
-        .any(|unit| companion::kind(&unit.unit).is_some())
+        .any(|unit| companion::kind(&unit.on_lamp()).is_some())
     {
         min_updater = Some(min_updater.unwrap_or(1).max(manifest::COMPANIONS_UPDATER));
     }
@@ -240,7 +245,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn product_services_and_linked_lamp_overrides_are_carried_with_level_six() {
+    fn product_services_and_linked_lamp_overrides_are_carried_with_the_level_that_adds() {
         let folder = tempfile::tempdir().unwrap();
         let out = folder.path().join("out");
         let deploy = folder.path().join("deploy");
@@ -289,7 +294,7 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        assert_eq!(made.min_updater, Some(manifest::PRODUCT_UNITS_UPDATER));
+        assert_eq!(made.min_updater, Some(manifest::ADDS_UPDATER));
         assert_eq!(made.units.len(), 3);
         let product_voice = made
             .units
@@ -334,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn a_parts_templates_sockets_and_timers_are_carried_with_level_seven() {
+    fn a_parts_templates_sockets_and_timers_are_carried_with_the_level_that_adds() {
         let folder = tempfile::tempdir().unwrap();
         let out = folder.path().join("out");
         let deploy = folder.path().join("deploy");
@@ -387,7 +392,7 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        assert_eq!(made.min_updater, Some(manifest::COMPANIONS_UPDATER));
+        assert_eq!(made.min_updater, Some(manifest::ADDS_UPDATER));
         let units: Vec<String> = made.units.iter().map(Unit::file_name).collect();
         assert_eq!(
             units,

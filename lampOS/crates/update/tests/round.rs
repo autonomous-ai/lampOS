@@ -47,6 +47,8 @@ mod head_touch;
 #[path = "round/asleep_quiet.rs"]
 mod asleep_quiet;
 
+#[path = "round/product_adds.rs"]
+mod product_adds;
 #[path = "round/product_carrier.rs"]
 mod product_carrier;
 #[path = "round/product_companions.rs"]
@@ -348,6 +350,12 @@ impl Systemd for FakeSystemd {
         self.unreachable |= self.unreachable_after_restart;
         self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
+        Ok(())
+    }
+
+    fn stop(&mut self, unit: &str) -> Result<(), String> {
+        self.calls.borrow_mut().push(format!("stop {unit}"));
+        self.units.remove(unit);
         Ok(())
     }
 

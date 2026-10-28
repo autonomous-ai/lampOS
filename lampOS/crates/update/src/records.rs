@@ -114,6 +114,24 @@ pub struct Switching {
     /// it named before the switch, to name again on the way back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<LinkBack>,
+    /// A unit the switch adds (#3689): on the way back it is stopped and
+    /// removed, with what it added. Absent from a journal written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added: Option<Added>,
+}
+
+/// What a switch adds with a unit the lamp did not have, as the lamp names
+/// each: all of it removed on the way back.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Added {
+    /// The links that enable it, as `systemctl enable` writes them:
+    /// `/etc/systemd/system/lampos.target.wants/lamp-x.service`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wants: Vec<String>,
+    /// The `current` link made for a part new to the lamp:
+    /// `/opt/lampOS/x/current`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
 }
 
 /// A `current` link as it was before a switch.
@@ -586,6 +604,7 @@ mod tests {
                     unit: "lamp-voice.service".into(),
                     was_active: true,
                     link: None,
+                    added: None,
                 },
                 Switching {
                     unit: "lamp-body.service".into(),
@@ -594,6 +613,7 @@ mod tests {
                         path: "/opt/lampOS/body/current".into(),
                         build: "b".repeat(64),
                     }),
+                    added: None,
                 },
             ],
             skills: vec![SkillBack {
@@ -742,6 +762,7 @@ mod tests {
                     path: "/opt/lampOS/voice/current".into(),
                     build: "f".repeat(64),
                 }),
+                added: None,
             }],
             models: vec![ModelBack {
                 path: "/opt/lampOS/eyes/models/face.onnx".into(),

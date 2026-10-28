@@ -28,7 +28,7 @@
 //! Without `apply` it stops after step 5 and says what it would do, having
 //! written nothing.
 use crate::{
-    apply, companion,
+    added, apply, companion,
     fetch::{Channel, Fetch},
     image,
     judge::{Before, UnitState, Watch, part_of},
@@ -39,8 +39,8 @@ use crate::{
     quiet::{BETWEEN_TURNS, QUIET, Quiet},
     records,
     records::{
-        Build, Journal, LinkBack, Records, SkillBack, State, Switching, replace_link, sync_folder,
-        sync_parent, write_whole,
+        Added, Build, Journal, LinkBack, Records, SkillBack, State, Switching, replace_link,
+        sync_folder, sync_parent, write_whole,
     },
     unit::{self, Program},
     world::{Clock, Disk, Ears, Systemd},
@@ -353,6 +353,29 @@ struct Change {
     /// One of a part's templates, sockets or timers (crate::companion),
     /// not its service: its folder is its part's, and it moves nothing.
     kind: Option<companion::Kind>,
+    /// A unit the lamp lacks, which the switch adds (crate::added).
+    added: Option<Adding>,
+}
+
+/// What adding a unit the lamp lacks takes (crate::added).
+#[derive(Clone, Debug)]
+struct Adding {
+    /// The links that enable it, as the lamp names them.
+    wants: Vec<String>,
+    /// For a part new to the lamp: its `current` link, made to name this
+    /// build.
+    link: Option<(String, String)>,
+    /// Started with the switch: what enables it runs now.
+    start: bool,
+}
+
+impl Adding {
+    fn added(&self) -> Added {
+        Added {
+            wants: self.wants.clone(),
+            link: self.link.as_ref().map(|(path, _)| path.clone()),
+        }
+    }
 }
 
 /// A `current` link a switch moves.
@@ -525,6 +548,11 @@ struct Back {
     before: Before,
     /// The `current` link, and the build it named before the switch.
     link: Option<LinkBack>,
+    /// A unit the switch added: on the way back it is stopped and removed,
+    /// with what it added, never written back.
+    added: Option<Added>,
+    /// Added and started with the switch.
+    start: bool,
 }
 
 impl Run<'_, '_> {
@@ -626,6 +654,32 @@ impl Run<'_, '_> {
                 }
             }
             Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
+        }
+        // An added unit is started with the switch when what enables it
+        // runs now (lampos.target only once setup is done); else it waits
+        // for that to start.
+        let targets: BTreeSet<String> = changes
+            .iter()
+            .filter_map(|change| change.added.as_ref())
+            .flat_map(|adding| adding.wants.iter().filter_map(|link| added::target(link)))
+            .map(str::to_owned)
+            .collect();
+        if !targets.is_empty() {
+            let targets: Vec<String> = targets.into_iter().collect();
+            let running = match self.world.systemd.states(&targets) {
+                Ok(states) => states,
+                Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
+            };
+            for adding in changes
+                .iter_mut()
+                .filter_map(|change| change.added.as_mut())
+            {
+                adding.start = adding.wants.iter().any(|link| {
+                    running.iter().any(|state| {
+                        Some(state.unit.as_str()) == added::target(link) && state.running()
+                    })
+                });
+            }
         }
         (self.world.phase)("fetching");
         if let Err(outcome) = self.install(&mut state, &manifest, &changes) {
@@ -764,6 +818,7 @@ impl Run<'_, '_> {
         let companions = installed_companions(self.config)
             .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
         let carried = self.carried_units(&manifest, &installed, &companions)?;
+        let adding = self.adding_units(&manifest, &installed, &companions)?;
         let taken = self.models_of(&manifest, state, &installed)?;
         let future_units: BTreeMap<String, String> = carried
             .iter()
@@ -808,6 +863,7 @@ impl Run<'_, '_> {
             &installed,
             &companions,
             &carried,
+            &adding,
             &taken,
             &touched,
             &forced,
@@ -1021,6 +1077,12 @@ impl Run<'_, '_> {
         {
             return false;
         }
+        self.managed_updater()
+    }
+
+    /// This lamp-update's own unit is a regular file that starts it through
+    /// `update/current`: an updater install manages.
+    fn managed_updater(&self) -> bool {
         let path = self.config.on(&self.config.units).join(OWN_UNIT);
         if !fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.file_type().is_file()) {
             return false;
@@ -1029,6 +1091,59 @@ impl Run<'_, '_> {
             .ok()
             .and_then(|text| unit::linked_program(&text, &self.config.root))
             .is_some_and(|program| program.builds == own::FOLDER && program.binary == "lamp-update")
+    }
+
+    /// The product's units this lamp lacks, which the build asks a round to
+    /// add (crate::added): those `install` puts on a lamp, fetched and
+    /// checked. Only on a lamp installed as the product, every part of it
+    /// started through its `current` link by a managed updater, and only
+    /// from a build of [`manifest::ADDS_UPDATER`]: a lamp of its own units
+    /// (lamp-4ace's) is never given the product's. One that runs as a user
+    /// or a group the lamp lacks is not added, and that is said.
+    fn adding_units(
+        &mut self,
+        manifest: &Manifest,
+        installed: &[Installed],
+        companions: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>, Outcome> {
+        let mut adding = BTreeMap::new();
+        if manifest.min_updater.unwrap_or(1) < manifest::ADDS_UPDATER
+            || installed.is_empty()
+            || !installed.iter().all(|part| part.program.linked)
+            || !self.managed_updater()
+        {
+            return Ok(adding);
+        }
+        for unit in &manifest.units {
+            let name = unit.on_lamp();
+            if unit.lamp != manifest::PRODUCT_LAMP
+                || name == OWN_UNIT
+                || !crate::install::PRODUCT
+                    .iter()
+                    .any(|(product, _)| *product == name)
+                || installed.iter().any(|part| part.unit == name)
+                || companions.contains_key(&name)
+            {
+                continue;
+            }
+            // Not there at all: a link (a masked unit) or anything else
+            // there is the lamp's, and left.
+            match fs::symlink_metadata(self.config.on(&self.config.units).join(&name)) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                _ => continue,
+            }
+            let text = self.fetch_unit(manifest, unit)?;
+            let missing = added::missing(&self.config.root, &text);
+            if !missing.is_empty() {
+                self.say(&format!(
+                    "{name} is not added: it runs as {}, which this lamp lacks; lamp-update install makes them",
+                    missing.join(", ")
+                ));
+                continue;
+            }
+            adding.insert(name, text);
+        }
+        Ok(adding)
     }
 
     /// The settings the build writes on this lamp ([`Run::setting_writes`]):
@@ -1292,8 +1407,12 @@ impl Run<'_, '_> {
             // A template is named without its `@` in a manifest.
             let name = unit.on_lamp();
             if companion::kind(&name).is_some() {
-                // Only the product's (crate::manifest), and only where the
-                // lamp has it, belonging to a part it has.
+                // Only the product's (crate::manifest refuses any other's
+                // too), and only where the lamp has it, belonging to a part
+                // it has.
+                if unit.lamp != manifest::PRODUCT_LAMP {
+                    continue;
+                }
                 let Some(ours) = owner(installed, companions, &name) else {
                     continue;
                 };
@@ -1501,6 +1620,14 @@ impl Run<'_, '_> {
         if folder.exists() {
             // Left by a run that stopped: this program's, by its name.
             fs::remove_dir_all(folder).map_err(failed)?;
+        }
+        // A part new to the lamp has no folder of its builds yet.
+        if let Some(builds) = folder.parent() {
+            fs::DirBuilder::new()
+                .mode(0o755)
+                .recursive(true)
+                .create(builds)
+                .map_err(failed)?;
         }
         fs::DirBuilder::new()
             .mode(0o755)
@@ -1813,9 +1940,13 @@ impl Run<'_, '_> {
     /// not stop the others: each is tried, and what failed is said.
     fn put_units_and_links_back(&mut self, backs: &[Back]) -> Result<(), String> {
         let mut troubles = Vec::new();
+        // An added unit is stopped and removed before the reload, so systemd
+        // forgets it with the rest put back.
+        self.remove_added(backs, &mut troubles);
         if let Err(why) = self.write_units(
             backs
                 .iter()
+                .filter(|back| back.added.is_none())
                 .map(|back| (back.unit.as_str(), back.text.as_str())),
         ) {
             troubles.push(why);
@@ -1872,19 +2003,79 @@ impl Run<'_, '_> {
     }
 
     fn write_changes(&mut self, changes: &[Change]) -> Result<(), String> {
-        self.write_units(
-            changes
-                .iter()
-                .filter(|change| change.link.is_none() || change.after != change.before)
-                .map(|change| (change.unit.as_str(), change.after.as_str())),
-        )
-        .and_then(|()| {
-            self.set_links(changes.iter().filter_map(|change| {
-                let link = change.link.as_ref()?;
-                Some((link.path.as_str(), link.new.as_str()))
-            }))
-        })
-        .and_then(|()| self.switch_models())
+        // An added unit's enabling links, before the reload reads them.
+        self.enable_added(changes)
+            .and_then(|()| {
+                self.write_units(
+                    changes
+                        .iter()
+                        .filter(|change| change.link.is_none() || change.after != change.before)
+                        .map(|change| (change.unit.as_str(), change.after.as_str())),
+                )
+            })
+            .and_then(|()| {
+                self.set_links(changes.iter().filter_map(|change| {
+                    let link = change.link.as_ref()?;
+                    Some((link.path.as_str(), link.new.as_str()))
+                }))
+            })
+            .and_then(|()| {
+                // A part new to the lamp: its `current` link, made.
+                self.set_links(changes.iter().filter_map(|change| {
+                    let (path, build) = change.added.as_ref()?.link.as_ref()?;
+                    Some((path.as_str(), build.as_str()))
+                }))
+            })
+            .and_then(|()| self.switch_models())
+    }
+
+    /// Each added unit's links, as `systemctl enable` writes them: to the
+    /// unit's own file, in a folder made if it is not there.
+    fn enable_added(&mut self, changes: &[Change]) -> Result<(), String> {
+        for change in changes {
+            for link in change.added.iter().flat_map(|adding| &adding.wants) {
+                let path = self.config.on(link);
+                let to = Path::new(added::UNITS).join(&change.unit);
+                let made = path
+                    .parent()
+                    .map_or(Ok(()), fs::create_dir_all)
+                    .and_then(|()| match fs::read_link(&path) {
+                        Ok(now) if now == to => Ok(()),
+                        _ => replace_link(&path, &to.to_string_lossy()),
+                    });
+                made.map_err(|error| format!("{link} cannot be made: {error}"))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Each added unit stopped, then its links, its file and the `current`
+    /// link it made removed. One that fails does not stop the others.
+    fn remove_added(&mut self, backs: &[Back], troubles: &mut Vec<String>) {
+        for back in backs.iter().rev() {
+            let Some(added) = &back.added else {
+                continue;
+            };
+            if let Err(why) = self.world.systemd.stop(&back.unit) {
+                troubles.push(format!("{} cannot be stopped: {why}", back.unit));
+            }
+            let unit = format!("{}/{}", added::UNITS, back.unit);
+            for path in added.wants.iter().chain([&unit]).chain(added.link.as_ref()) {
+                match fs::remove_file(self.config.on(path)) {
+                    Err(error) if error.kind() != io::ErrorKind::NotFound => {
+                        troubles.push(format!("{path} cannot be removed: {error}"));
+                    }
+                    _ => {}
+                }
+            }
+            // A `.wants` folder left empty goes too, as `systemctl disable`
+            // leaves none behind; one with other links stays.
+            for link in &added.wants {
+                if let Some(folder) = self.config.on(link).parent() {
+                    let _ = fs::remove_dir(folder);
+                }
+            }
+        }
     }
 
     /// Steps 7 and 8.
@@ -1927,6 +2118,8 @@ impl Run<'_, '_> {
                     path: link.path.clone(),
                     build: link.old.clone(),
                 }),
+                added: change.added.as_ref().map(Adding::added),
+                start: change.added.as_ref().is_some_and(|adding| adding.start),
             })
             .collect();
         // The second route's services, when the build's voice unit names
@@ -1940,8 +2133,10 @@ impl Run<'_, '_> {
         }
         // The units as they were, and each moved link with the build it
         // named: the way back by hand (docs/updates.md).
+        // An added unit was not there: it has no text to go back to.
         let mut previous: Vec<(String, String)> = backs
             .iter()
+            .filter(|back| back.added.is_none())
             .map(|back| (back.unit.clone(), back.text.clone()))
             .collect();
         previous.extend(backs.iter().filter_map(|back| {
@@ -1965,6 +2160,7 @@ impl Run<'_, '_> {
                     unit: back.unit.clone(),
                     was_active: back.was_active,
                     link: back.link.clone(),
+                    added: back.added.clone(),
                 })
                 .collect(),
             models: self.model_backs.clone(),
@@ -2056,7 +2252,8 @@ impl Run<'_, '_> {
         self.say(&format!("switching to build {}", build.sequence));
         let mut watches = Vec::new();
         for at in 0..backs.len() {
-            if !backs[at].was_active || unrestarted.contains(&backs[at].unit) {
+            // An added unit is started only when what enables it runs.
+            if !(backs[at].was_active || backs[at].start) || unrestarted.contains(&backs[at].unit) {
                 continue;
             }
             let back = &backs[at];
@@ -2336,7 +2533,7 @@ impl Run<'_, '_> {
                 .filter_map(|name| {
                     backs
                         .iter()
-                        .find(|back| back.restarted && back.unit == *name)
+                        .find(|back| back.restarted && back.added.is_none() && back.unit == *name)
                 })
                 .collect());
         }
@@ -2380,6 +2577,28 @@ impl Run<'_, '_> {
         self.applying = journal.settings.then_some(journal.build.sequence);
         let mut backs = Vec::new();
         for switching in &journal.units {
+            // A unit the switch added is put back by removing it, with what
+            // it added; one none of which is there was never added.
+            if let Some(added) = &switching.added {
+                let unit = format!("{}/{}", added::UNITS, switching.unit);
+                let there = |path: &String| fs::symlink_metadata(self.config.on(path)).is_ok();
+                if !(there(&unit) || added.wants.iter().any(there) || added.link.iter().any(there))
+                {
+                    continue;
+                }
+                backs.push(Back {
+                    unit: switching.unit.clone(),
+                    part: String::new(),
+                    text: String::new(),
+                    was_active: false,
+                    restarted: false,
+                    before: Before::default(),
+                    link: None,
+                    added: Some(added.clone()),
+                    start: false,
+                });
+                continue;
+            }
             let text = match self.records.previous(&switching.unit) {
                 Ok(text) => text,
                 Err(error) => {
@@ -2425,6 +2644,8 @@ impl Run<'_, '_> {
                 restarted: switching.was_active,
                 before: Before::default(),
                 link: switching.link.clone(),
+                added: None,
+                start: false,
             });
         }
         self.skills_back = journal.skills;
@@ -2732,6 +2953,29 @@ fn describe(
             })
             .map(|want| want.size)
             .sum();
+        if let Some(adding) = &change.added {
+            let by: Vec<&str> = adding
+                .wants
+                .iter()
+                .filter_map(|link| added::target(link))
+                .collect();
+            let enabled = if by.is_empty() {
+                "not enabled".to_owned()
+            } else {
+                format!("enabled by {}", by.join(", "))
+            };
+            let made = match (&adding.link, &change.make) {
+                (Some(_), Some(_)) => format!(
+                    ", {} made (fetch {:.1} MB)",
+                    change.new_folder,
+                    size as f64 / 1e6
+                ),
+                (Some(_), None) => format!(", {} (already there)", change.new_folder),
+                _ => String::new(),
+            };
+            lines.push(format!("{}: added, {enabled}{made}", change.unit));
+            continue;
+        }
         let folder = if change.old_folder == change.new_folder {
             "same folder, the unit changes".to_owned()
         } else if change.make.is_some() {
@@ -2979,6 +3223,7 @@ fn plan(
     installed: &[Installed],
     companions: &BTreeMap<String, String>,
     carried: &BTreeMap<String, String>,
+    adding: &BTreeMap<String, String>,
     models: &[Model],
     touched: &[String],
     forced: &[String],
@@ -3081,6 +3326,7 @@ fn plan(
             was_active: false,
             link,
             kind: None,
+            added: None,
         });
     }
     // A part's templates, sockets and timers the build changes, written
@@ -3105,8 +3351,19 @@ fn plan(
             was_active: false,
             link: None,
             kind: companion::kind(name),
+            added: None,
         });
     }
+    add_units(
+        config,
+        installed,
+        companions,
+        carried,
+        adding,
+        &files,
+        models,
+        &mut changes,
+    )?;
     // Refuse a graph with no safe order before installing or switching
     // anything. The old graph must also be usable if this build is put back.
     let mut texts: BTreeMap<&str, &str> = installed
@@ -3123,9 +3380,17 @@ fn plan(
         .map_err(|why| format!("the rollback unit order is refused: {why}"))?;
     // Project only after ordering the full old graph: unchanged nodes can
     // connect two changed units. Inactive members stay for crash recovery.
+    // An added unit is not in the old graph: it is named last, and on the
+    // way back stopped and removed, never started again.
     let rollback_order = rollback_order
         .into_iter()
         .filter(|name| changes.iter().any(|change| change.unit == *name))
+        .chain(
+            changes
+                .iter()
+                .filter(|change| change.added.is_some())
+                .map(|change| change.unit.clone()),
+        )
         .collect();
     for change in &changes {
         texts.insert(&change.unit, &change.after);
@@ -3138,6 +3403,167 @@ fn plan(
         .collect();
     changes.sort_by_key(|change| positions[change.unit.as_str()]);
     Ok((changes, rollback_order))
+}
+
+/// The product's units the lamp lacks (`adding`, crate::added), as changes
+/// that add them: a part's own service first, so that its other units find
+/// it. A part already installed here keeps its folder and link; one new to
+/// the lamp is installed afresh in the folder of its binary's SHA-256, its
+/// `current` link made to name it. An added unit whose part is neither
+/// installed nor added, or whose part's binary the build lacks, is not
+/// added. Each is enabled as `install` enables it, and only then.
+#[allow(clippy::too_many_arguments)]
+fn add_units(
+    config: &Config,
+    installed: &[Installed],
+    companions: &BTreeMap<String, String>,
+    carried: &BTreeMap<String, String>,
+    adding: &BTreeMap<String, String>,
+    files: &BTreeMap<&str, &manifest::File>,
+    models: &[Model],
+    changes: &mut Vec<Change>,
+) -> Result<(), String> {
+    let enabled = crate::install::enabled();
+    let wants = |name: &str, text: &str| -> Result<Vec<String>, String> {
+        if enabled.iter().any(|unit| unit == name) {
+            added::wants(name, text)
+        } else {
+            Ok(Vec::new())
+        }
+    };
+    let services = adding
+        .iter()
+        .filter(|(name, _)| companion::kind(name).is_none());
+    for (name, text) in services {
+        let Some((builds, binary)) = unit::linked(text) else {
+            continue;
+        };
+        let Some(file) = files.get(binary.as_str()) else {
+            continue;
+        };
+        let wants = wants(name, text)?;
+        let installed_part = installed.iter().find(|part| {
+            part.program.linked && part.program.builds == builds && part.program.binary == binary
+        });
+        let link_path = unit::current(&builds);
+        let added_part = changes.iter().find(|change| {
+            change
+                .added
+                .as_ref()
+                .and_then(|adding| adding.link.as_ref())
+                .is_some_and(|(path, _)| *path == link_path)
+        });
+        let (folder, make, link) = match (installed_part, added_part) {
+            (Some(part), _) => (part.program.folder(), None, None),
+            (None, Some(other)) => (other.new_folder.clone(), None, None),
+            (None, None) => {
+                if fs::symlink_metadata(config.on(&link_path)).is_ok() {
+                    return Err(format!(
+                        "{link_path} is there, and no unit of this lamp starts through it"
+                    ));
+                }
+                let program = Program {
+                    builds: builds.clone(),
+                    build: file.sha256.clone(),
+                    binary: binary.clone(),
+                    linked: true,
+                };
+                let ours: BTreeMap<&str, &Model> = models
+                    .iter()
+                    .filter_map(|model| Some((models::name_in(model, &builds)?, model)))
+                    .collect();
+                let wants = wants_of(config, files, &ours, &program)?;
+                let folder = program.folder();
+                let there = config.on(&folder);
+                if there.exists() && !holds(&there, &wants) {
+                    return Err(format!(
+                        "{} holds other files than the build's",
+                        there.display()
+                    ));
+                }
+                let make = (!there.exists()).then_some(wants);
+                (folder, make, Some((link_path, file.sha256.clone())))
+            }
+        };
+        changes.push(Change {
+            unit: name.clone(),
+            part: part_of(&binary).to_owned(),
+            before: String::new(),
+            after: text.clone(),
+            old_folder: folder.clone(),
+            new_folder: folder,
+            make,
+            was_active: false,
+            link: None,
+            kind: None,
+            added: Some(Adding {
+                wants,
+                link,
+                start: false,
+            }),
+        });
+    }
+    let others = adding
+        .iter()
+        .filter(|(name, _)| companion::kind(name).is_some());
+    for (name, text) in others {
+        // The unit it starts: added too, carried, or the lamp's own.
+        let lookup = |unit: &str| {
+            adding
+                .get(unit)
+                .or_else(|| carried.get(unit))
+                .or_else(|| companions.get(unit))
+                .map(String::as_str)
+                .or_else(|| {
+                    installed
+                        .iter()
+                        .find(|part| part.unit == unit)
+                        .map(|part| part.text.as_str())
+                })
+        };
+        let Some((builds, binary)) = companion::part(name, text, lookup) else {
+            continue;
+        };
+        let folder = installed
+            .iter()
+            .find(|part| {
+                part.program.linked
+                    && part.program.builds == builds
+                    && part.program.binary == binary
+            })
+            .map(|part| part.program.folder())
+            .or_else(|| {
+                changes
+                    .iter()
+                    .find(|change| {
+                        change.added.is_some()
+                            && change.kind.is_none()
+                            && unit::linked(&change.after) == Some((builds.clone(), binary.clone()))
+                    })
+                    .map(|change| change.new_folder.clone())
+            });
+        let Some(folder) = folder else {
+            continue;
+        };
+        changes.push(Change {
+            unit: name.clone(),
+            part: part_of(&binary).to_owned(),
+            before: String::new(),
+            after: text.clone(),
+            old_folder: folder.clone(),
+            new_folder: folder,
+            make: None,
+            was_active: false,
+            link: None,
+            kind: companion::kind(name),
+            added: Some(Adding {
+                wants: wants(name, text)?,
+                link: None,
+                start: false,
+            }),
+        });
+    }
+    Ok(())
 }
 
 /// The skills part, and its binary.

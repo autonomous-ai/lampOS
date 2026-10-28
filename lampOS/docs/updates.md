@@ -398,8 +398,9 @@ replacement or guaranteed recovery from a lost runner. The old bytes are
 retained and no automatic deletion follows.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 7 (2 reads models, 3 settings, 4 image, 5 reset plans,
-6 product service units, 7 a part's templates, sockets and timers). With its product deploy tree, this workflow now
+`manifest::UPDATER` is 8 (2 reads models, 3 settings, 4 image, 5 reset plans,
+6 product service units, 7 a part's templates, sockets and timers, 8 a
+product unit the lamp lacks added). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -816,9 +817,12 @@ an older updater climbs to first): the new text of each `lamp-<name>.service`
 already installed and started through its `current` link, so a switch in a
 product unit comes over the air. At updater level 7 it carries a part's
 templates, sockets and timers too, where the lamp has them (below, "A
-part's templates, sockets and timers"). It never carries the updater's own
-unit or the fixed helper units, and it never adds or enables a part. Those
-still come only with `lamp-update install` run again (#3689). A round writes the product's settings and tmpfiles the build
+part's templates, sockets and timers"). At level 8 it adds the product units
+`install` puts on a lamp that the lamp lacks, a part new to it among them,
+enabled as `install` enables them (below, "A part added over the air"). It
+never carries the updater's own unit or the fixed helper units, and never
+makes a user or a group. Those still come only with `lamp-update install`
+run again (#3689). A round writes the product's settings and tmpfiles the build
 carries (below, "Settings and tmpfiles") with `LAMP_UPDATE_APPLY=on` on any
 install, or with no apply choice at all on a managed, self-updating product
 install. With an apply choice of off or an invalid one, or with no choice on
@@ -964,8 +968,9 @@ build could carry it units or settings.
    `systemctl reset-failed` and `restart --no-block lamp-update`. Otherwise it
    ends, having changed nothing. The unit has
    `ConditionPathExists=/usr/local/lib/lampos/lamp-update-back`: on a lamp
-   not installed since #1680 (a round never adds a unit: it changes only
-   units already on the lamp, and never `lamp-update.service`), the timer
+   not installed since #1680 (a round adds only the product units of
+   `install`'s list, never this helper, and never changes
+   `lamp-update.service`), the timer
    and `OnFailure=` find the condition unmet and systemd skips the start,
    which is not a failure. lamp-health reads parts' reports on the bus, not
    systemd's unit states, so a skipped or failed lamp-update-back is no part
@@ -1330,8 +1335,8 @@ A generic entry applies only to an already installed service started
 through its `current` link, with the same part folder and binary. An exact
 `deploy/<lamp>/` entry takes precedence regardless of manifest order.
 Pinned installations keep their lamp-specific unit handling. A product
-entry never adds or enables a missing part and never rewrites local
-drop-ins. Unit text, binary links and settings use the existing quiet
+entry of level 6 never adds or enables a missing part (level 8 does, below,
+"A part added over the air") and never rewrites local drop-ins. Unit text, binary links and settings use the existing quiet
 switch, journal, health check and fallback; a failure restores the exact
 previous unit and link before restarting the old part.
 
@@ -1381,16 +1386,16 @@ can't hold `@`. So a manifest names a template `lamp-<x>.template.service`
 (`manifest::manifest_name`), and a round gives it back its `@` on the lamp
 (`Unit::on_lamp`). No part's service has a `.` in its name, so the two forms
 never meet, and a manifest that names a unit with an `@` is refused. Such a
-build has
-`min_updater` 7, so an updater of level 6 (7071's, after its climb) climbs
-again first, and the manifest's other readers, `lamp-update-apply` among
-them, never read these names.
+build has `min_updater` 7 at least (8 from "A part added over the air"), so
+an updater of level 6 (7071's, after its climb) climbs again first, and the
+manifest's other readers, `lamp-update-apply` among them, never read these
+names.
 
 A round takes one only where the lamp already has that file, a regular one,
 belonging to a part installed here through its `current` link. The build's
 must start the same unit, of the same part. One that would start another
 part or another unit is refused before anything is written. One the lamp
-lacks is neither fetched nor added (2b, adding a part, is still to come).
+lacks is not carried as a change: at level 8 it is added instead (next).
 Each that changes is written with its part's switch, in the same journal and
 under the same quiet checks. A template is reloaded and never restarted: an
 instance a socket starts after the reload runs it, and one already running
@@ -1402,6 +1407,49 @@ start, writes each back as it was, with the rest.
 Not shown: a real systemd restarting a socket while an instance of its
 template runs, and a carried template on a 7071 lamp. The tests use the
 round's fake systemd.
+
+### A part added over the air (#3689)
+
+From updater level 8 (`manifest::ADDS_UPDATER`) a round adds a product unit
+the lamp lacks (`crate::added`). Every build with the product's units asks
+for level 8, so an updater of level 7 climbs first. It adds only:
+
+- **On a lamp installed as the product:** a managed updater (its own unit
+  starts `update/current/lamp-update`), and every part started through its
+  `current` link. A lamp of its own pinned units, as lamp-4ace is, is never
+  given the product's.
+- **What `install` puts on a lamp** (`install::PRODUCT`) and the build
+  carries under `product`. So the keeper's helper and the own keys' helper,
+  which `install` leaves out until their lamp checks, are not added either.
+  A unit the lamp has as a link (a masked one) or anything but nothing is
+  left as it is.
+- **A unit whose users the lamp has:** its `User=`, `Group=` and
+  `SupplementaryGroups=` (root needs none). A round can't write
+  `/etc/passwd`, so one that runs as a user or a group the lamp lacks is not
+  added, and that is said. `lamp-update install` makes them.
+
+A service of a part already installed here is added beside it, through the
+same link. A part new to the lamp is installed afresh in the folder of its
+binary's SHA-256, as a switch installs a build, and its `current` link is
+made to name it. A part's template, socket or timer is added when its part
+is here or added with it. Each is enabled only if `install` enables it
+(`install::enabled`), and then as `systemctl enable` would: the links its
+`[Install]` asks for (`WantedBy=` in `<target>.wants/`, `RequiredBy=` in
+`<target>.requires/`) are written beside it before the reload. An
+`[Install]` with anything else (`Alias=`, `Also=`), or a template's, is
+refused. An added unit that is enabled is started with the switch when what
+enables it runs now, so a part of `lampos.target` only once setup is done.
+It is watched as a part is.
+
+All of it rides the switch's journal (`Switching::added`). A build put
+back, or a switch cut short and recovered at the next start, stops each
+added unit and removes its file, its links, an emptied `.wants` folder and
+the `current` link it made. A new part's folder goes when nothing names it.
+The empty folder of a part's builds (`/opt/lampOS/<part>/`) stays.
+
+Not shown: any of it on a real systemd or a 7071 lamp. A lamp imaged with
+7071 lacks no product unit of today's `install` list, so the first build
+that adds would add nothing there. The tests use the round's fake systemd.
 
 ### Settings and tmpfiles (`LAMP_UPDATE_APPLY`)
 
@@ -1587,7 +1635,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 7. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 8. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,

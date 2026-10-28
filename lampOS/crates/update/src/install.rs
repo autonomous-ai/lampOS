@@ -866,7 +866,7 @@ const TIMED: &[&str] = &[
 const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT];
 
 /// The units enabled: the target, and what starts outside it.
-fn enabled() -> Vec<String> {
+pub(crate) fn enabled() -> Vec<String> {
     PRODUCT
         .iter()
         .map(|(name, _)| *name)
