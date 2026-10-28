@@ -1106,7 +1106,11 @@ fn sign_in_operation(
                 eprintln!("tasks: sign-in {}: {said}", session.id());
             }
             session.code_given();
-            Ok(session.view(now))
+            let view = session.view(now);
+            if let Some(line) = code_handed(&view) {
+                eprintln!("tasks: sign-in {}: {line}", session.id());
+            }
+            Ok(view)
         }
         Request::SignInState {} => {
             let mut view = sign_in
@@ -1122,7 +1126,11 @@ fn sign_in_operation(
             for said in session.tend(now) {
                 eprintln!("tasks: sign-in {}: {said}", session.id());
             }
-            Ok(session.take_code(*id, now))
+            let claim = session.take_code(*id, now);
+            if let Some(line) = code_handed(&claim) {
+                eprintln!("tasks: sign-in {}: {line}", session.id());
+            }
+            Ok(claim)
         }
         Request::SignInAsked { id, request } => {
             let session = sign_in.as_mut().ok_or(EngineError {
@@ -1850,6 +1858,21 @@ fn wait_ready(stream: &UnixStream, events: PollFlags, deadline: Instant) -> io::
     }
 }
 
+/// The journal's line when an answer hands the voice the code to tell, never
+/// its digits, so a lamp's journal counts the tellings (#2839): a start's
+/// answer with the code (the first, or one asked for again), or a granted
+/// claim. Every other answer hands nothing.
+fn code_handed(answer: &Value) -> Option<&'static str> {
+    if answer["sign_in"] != "code" || answer["code"].as_str().is_none() {
+        return None;
+    }
+    match answer["claim"].as_str() {
+        None => Some("code handed to a start"),
+        Some("granted") => Some("code claimed"),
+        Some(_) => None,
+    }
+}
+
 fn read_line(stream: &mut UnixStream, bound: usize, deadline: Instant) -> io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     let mut buffer = [0u8; 1024];
@@ -2427,6 +2450,31 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
 
 #[cfg(test)]
 mod tests {
+    use super::code_handed;
+
+    #[test]
+    fn a_code_handed_to_the_voice_is_one_line_without_its_digits() {
+        let start = serde_json::json!({"sign_in": "code", "id": 3, "code": "12345678", "expires_in": 119, "code_told": true});
+        let granted = serde_json::json!({"claim": "granted", "sign_in": "code", "id": 3, "code": "12345678", "expires_in": 119, "code_told": true});
+        assert_eq!(code_handed(&start), Some("code handed to a start"));
+        assert_eq!(code_handed(&granted), Some("code claimed"));
+        for line in [code_handed(&start), code_handed(&granted)]
+            .into_iter()
+            .flatten()
+        {
+            assert!(!line.chars().any(|c| c.is_ascii_digit()), "{line}");
+        }
+        for nothing in [
+            serde_json::json!({"sign_in": "starting", "id": 3}),
+            serde_json::json!({"claim": "waiting", "id": 3}),
+            serde_json::json!({"claim": "already_given", "id": 3}),
+            serde_json::json!({"claim": "not_available", "id": 3}),
+            serde_json::json!({"sign_in": "asking", "id": 3}),
+        ] {
+            assert_eq!(code_handed(&nothing), None, "{nothing}");
+        }
+    }
+
     use super::*;
     use std::os::unix::fs::symlink;
 
