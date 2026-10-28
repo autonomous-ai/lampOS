@@ -19,8 +19,8 @@ lamp.
 | The fake lamp, pairing, the SDKs, `lamp-mcp`, `lamp skill check` | merged |
 | lamp-control as a product part, off by default | pending: #3876 |
 | The owner's "Add a developer computer" screen in the app | pending: a later piece of #3504 |
-| `lamp skill check` reading format 2 as the lamp does | pending: #3979 |
-| `skill.push` on the lamp: the door and the `skills` grant | pending: #3910 |
+| `lamp skill check` reading format 2 as the lamp does | merged: #3979 |
+| `skill.push` on the lamp: the door and the `skills` grant | merged: #3910 |
 | Loading pushed skills, and checking signed ones | pending: #3879, then Eighth's piece B (`eighth/skills-dev-p3`) |
 | `lamp skill keygen`, `pack --sign`, `push`, `install`, `list`, `remove` | pending: blue's `blue/sdk-skill-sign`, not yet a PR |
 | Packing and checking an author's signature on the lamp (`lamp-skills pack --author`) | merged: #3931, #3938 |
@@ -293,15 +293,14 @@ lamp skill check desk-hello
 ```
 
 It checks the front matter, the shape against the format's schema, the
-moves and the sounds, and refuses any script.
-- **Pending (#3979):** until it reads format 2, today's checker warns that
-  `look = true` is the picture, as format 1 reads it. On the lamp, format
-  2 reads it as presence: `lamp-skills install` says "It may use: light,
-  body, look".
+moves and the sounds, and refuses any script. It says
+`desk-hello: ok, format 2`, and reads `look = true` as the lamp does: in
+format 2 that is presence (someone there, how near), never the picture.
+`lamp-skills install` says the same: "It may use: light, body, look".
 
 ## 6. Push it, sign it, share it (pending)
 
-These steps wait on #3910, #3879 and Eighth's piece B on the lamp, and on
+These steps wait on #3879 and Eighth's piece B on the lamp, and on
 blue's `blue/sdk-skill-sign` in the SDK. Against that branch's fake lamp
 they run as shown.
 
