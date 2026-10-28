@@ -585,6 +585,9 @@ workflow change.
    `voice/mute`, and a muted voice there still cannot be judged. A
    voice that says nothing on the bus cannot be judged and is not switched;
    a voice whose unit is not running hears nobody and is no reason to wait.
+   The wait says "waiting for a quiet moment: <why>" once, after its first
+   one-second look at the bus, so the reason is what the voice said and
+   not the empty gate's "says nothing" (each round's gate starts empty).
    No quiet moment within `--quiet-wait-s` (3600): the new folders stay
    installed beside, nothing is switched, status 4, and the next round tries
    again.

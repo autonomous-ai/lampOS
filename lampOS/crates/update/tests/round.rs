@@ -1285,6 +1285,15 @@ fn the_voice_is_not_switched_while_someone_talks_to_the_lamp() {
         matches!(&outcome, Outcome::NotQuiet(why) if why.contains("someone was heard")),
         "{outcome:?}"
     );
+    // The wait's line gives the reason after a look at the bus, never the
+    // empty gate's "says nothing" for a voice that says its state.
+    let waiting: Vec<&String> = lamp
+        .said
+        .iter()
+        .filter(|line| line.starts_with("waiting for a quiet moment"))
+        .collect();
+    assert_eq!(waiting.len(), 1, "{:?}", lamp.said);
+    assert!(!waiting[0].contains("says nothing"), "{waiting:?}");
     assert!(lamp.calls().is_empty());
     let new = sha("voice 2");
     assert_eq!(
