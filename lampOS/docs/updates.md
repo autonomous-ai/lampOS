@@ -2412,3 +2412,15 @@ accepted; units, models, image/reset/tmpfiles/skills effects remain refused.
 The borrowed-context in-memory result is neither durable nor an apply grant.
 There is no State/live-file reader, runtime caller, capability bump, privileged
 writer, publication or restoration path.
+
+### When the writer may be refreshed (#3689)
+
+The refresh copies the running lamp-update to the writer's fixed path. That
+copy, `lamp-update-back`, is also what puts an unconfirmed lamp-update back.
+So it may be replaced only once lamp-update's own switch is settled.
+`writer_ready::ready` says yes only when no `self.json` is in the records (one
+that can't be read counts as not settled), `update/current` names a build (a
+bare 64-hex name, not a path), and that build's `lamp-update` is a regular
+file holding exactly the bytes of the lamp-update that runs. A lamp-update
+put back while still running, a build changed under its name, or a link to
+anything else is refused, with why. **Unwired:** no command calls it yet.
