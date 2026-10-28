@@ -109,6 +109,8 @@ pub trait Remote {
     -> Result<()>;
     fn upload(&mut self, tag: &str, name: &str, bytes: &[u8]) -> Result<()>;
     fn rename(&mut self, id: u64, name: &str) -> Result<Asset>;
+    /// Deletes one release asset by its id; never asked again.
+    fn delete(&mut self, id: u64) -> Result<()>;
 }
 #[derive(Clone)]
 pub struct Context {
@@ -453,6 +455,62 @@ fn restore(
     }
     Ok(())
 }
+/// How many backups the stable release keeps, as the channel's publisher
+/// does (#4161): GitHub allows at most 1000 assets on one release.
+pub const KEEP_BACKUPS: usize = 20;
+/// The most backups and stages one promotion deletes, oldest first.
+pub const MOST_PRUNED: usize = 250;
+/// The sequence in a backup's name, `lampos-manifest-previous-<seq>-<id>.json`,
+/// or a stage's, `lampos-manifest-staged-<seq>-<run>-<attempt>.json`.
+fn named_sequence(name: &str, prefix: &str, parts: usize) -> Option<u64> {
+    let numbers: Vec<&str> = name
+        .strip_prefix(prefix)?
+        .strip_suffix(".json")?
+        .split('-')
+        .collect();
+    (numbers.len() == parts
+        && numbers
+            .iter()
+            .all(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()) && !n.starts_with('0')))
+    .then(|| numbers[0].parse().ok())
+    .flatten()
+}
+/// After a verified promotion to `sequence`: the backups beyond the newest
+/// [`KEEP_BACKUPS`] (this promotion's own, and any of a later sequence,
+/// always kept) and the stages of older sequences are deleted, oldest first
+/// and [`MOST_PRUNED`] at most. The head is never among them. How many went.
+fn prune(remote: &mut impl Remote, release: u64, sequence: u64) -> Result<usize> {
+    let inventory = assets(remote, release)?;
+    let mut older: Vec<(u64, u64)> = inventory
+        .values()
+        .filter_map(|a| {
+            named_sequence(&a.name, "lampos-manifest-previous-", 2)
+                .filter(|seq| *seq < sequence)
+                .map(|seq| (seq, a.id))
+        })
+        .collect();
+    older.sort_unstable();
+    older.truncate(older.len().saturating_sub(KEEP_BACKUPS - 1));
+    let mut doomed: Vec<(u64, u64)> = inventory
+        .values()
+        .filter_map(|a| {
+            named_sequence(&a.name, "lampos-manifest-staged-", 3)
+                .filter(|seq| *seq < sequence)
+                .map(|seq| (seq, a.id))
+        })
+        .chain(older)
+        .collect();
+    doomed.sort_unstable();
+    doomed.truncate(MOST_PRUNED);
+    for (_, id) in &doomed {
+        require(
+            inventory.get(manifest::ENVELOPE).map(|a| a.id) != Some(*id),
+            "the head is never pruned",
+        )?;
+        remote.delete(*id)?;
+    }
+    Ok(doomed.len())
+}
 /// No mutation occurs until the source, all payload bytes and existing head are verified.
 pub fn promote(remote: &mut impl Remote, context: &Context) -> Result<Receipt> {
     let repo = remote.repository()?;
@@ -584,6 +642,14 @@ pub fn promote(remote: &mut impl Remote, context: &Context) -> Result<Receipt> {
         return Err(format!(
             "promotion failed ({error}); previous canonical restored, or initial head left absent"
         ));
+    }
+    // The promotion stands whatever the cleanup does (#4161).
+    match prune(remote, release.id, context.sequence) {
+        Ok(0) => {}
+        Ok(pruned) => eprintln!("lampos-promote: {pruned} old backups and stages deleted"),
+        Err(why) => {
+            eprintln!("lampos-promote: stable cleanup stopped, the promotion stands: {why}")
+        }
     }
     Ok(receipt("promoted", staged.id))
 }

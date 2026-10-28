@@ -48,6 +48,8 @@ struct Fake {
     upload_fail: Option<bool>,
     changed_head_during_upload: bool,
     foreign_canonical_on_failure: bool,
+    deleted: Vec<String>,
+    delete_fails: bool,
 }
 impl Fake {
     fn new(previous: Option<u64>) -> Self {
@@ -107,6 +109,8 @@ impl Fake {
             upload_fail: None,
             changed_head_during_upload: false,
             foreign_canonical_on_failure: false,
+            deleted: Vec::new(),
+            delete_fails: false,
         };
         fake.source_payload(payload(sequence));
         if let Some(previous) = previous {
@@ -269,6 +273,19 @@ impl Remote for Fake {
                 .name = "externally-replaced-envelope.json".into();
             self.add(release, manifest::ENVELOPE, envelope(&payload(11)));
         }
+        Ok(())
+    }
+    fn delete(&mut self, id: u64) -> Result<()> {
+        if self.delete_fails {
+            return Err("delete refused".into());
+        }
+        let list = self
+            .assets
+            .values_mut()
+            .find(|items| items.iter().any(|(a, _)| a.id == id))
+            .ok_or("asset absent")?;
+        let at = list.iter().position(|(a, _)| a.id == id).unwrap();
+        self.deleted.push(list.remove(at).0.name);
         Ok(())
     }
     fn rename(&mut self, id: u64, name: &str) -> Result<Asset> {
@@ -666,4 +683,72 @@ fn signature_valid_future_updater_requirement_refuses_before_writes() {
     let error = promote(&mut fake, &context(10)).unwrap_err();
     assert!(error.contains("updater"), "{error}");
     assert_eq!(fake.writes, 0);
+}
+
+/// Older promotions' backups on stable, and stages left by runs: names as
+/// `promote` writes them, sequences below the promotion's 10 (#4161).
+fn with_old_backups(fake: &mut Fake, count: u64, staged: &[u64]) {
+    for n in 0..count {
+        let id = 5_000 + n;
+        fake.add(
+            2,
+            &format!("lampos-manifest-previous-{}-{id}.json", 1 + n % 9),
+            b"old".to_vec(),
+        );
+    }
+    for seq in staged {
+        fake.add(
+            2,
+            &format!("lampos-manifest-staged-{seq}-7-1.json"),
+            b"left".to_vec(),
+        );
+    }
+}
+fn stable_names(fake: &Fake) -> Vec<String> {
+    fake.assets[&2]
+        .iter()
+        .map(|(a, _)| a.name.clone())
+        .collect()
+}
+#[test]
+fn a_promotion_keeps_the_newest_backups_and_deletes_the_rest() {
+    let mut fake = Fake::new(Some(9));
+    with_old_backups(&mut fake, 30, &[3, 12]);
+    let source = fake.source_bytes();
+    let receipt = promote(&mut fake, &context(10)).unwrap();
+    assert_eq!(receipt.outcome, "promoted");
+    assert_eq!(fake.current().unwrap().1, source);
+    let names = stable_names(&fake);
+    let backups: Vec<&String> = names
+        .iter()
+        .filter(|n| n.starts_with("lampos-manifest-previous-"))
+        .collect();
+    assert_eq!(backups.len(), lampos_promote::KEEP_BACKUPS);
+    assert!(
+        backups
+            .iter()
+            .any(|n| n.starts_with("lampos-manifest-previous-10-")),
+        "this promotion's own backup is kept: {backups:?}"
+    );
+    assert!(names.contains(&"lampos-manifest-staged-12-7-1.json".to_owned()));
+    assert!(!names.contains(&"lampos-manifest-staged-3-7-1.json".to_owned()));
+    assert_eq!(fake.deleted.len(), 30 - 19 + 1);
+}
+#[test]
+fn a_cleanup_that_fails_leaves_the_promotion_standing() {
+    let mut fake = Fake::new(Some(9));
+    with_old_backups(&mut fake, 30, &[]);
+    fake.delete_fails = true;
+    let source = fake.source_bytes();
+    let receipt = promote(&mut fake, &context(10)).unwrap();
+    assert_eq!(receipt.outcome, "promoted");
+    assert_eq!(fake.current().unwrap().1, source);
+}
+#[test]
+fn a_failed_promotion_deletes_nothing() {
+    let mut fake = Fake::new(Some(9));
+    with_old_backups(&mut fake, 30, &[3]);
+    fake.fail = Some((2, false));
+    assert!(promote(&mut fake, &context(10)).is_err());
+    assert!(fake.deleted.is_empty());
 }
