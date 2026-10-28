@@ -21,15 +21,20 @@
 #      event to fill in. Until they do, `lamp-skills test` fails the case, so it can't pass unread.
 # A folder that is there already is kept (exit 3), unless it is one of the placeholders (an expect.toml marked
 # PLACEHOLDER and no .jsonl), whose event lines are carried into the new expect.toml, or --force is given.
-# Ctrl-C, or any failure, stops the recording and removes the lamp's temp folder; nothing is written then. A Mac that
-# drops off mid-run leaves the recording to end by itself (AIR_CAP_S, 1 hour) and its folder removed 15 minutes later.
+# Ctrl-C, or any failure before the recording is stopped, stops it and removes the lamp's temp folder; nothing is
+# written then. Once it is stopped, the recording is copied to the Mac ($PLAYED_OUT/air-trace/EVENT-<time>.raw/), and
+# that copy and the lamp's are removed only after the case folder is written and read back the same. A failure from
+# there on (a file not read back, a case not written) keeps both, says where they are, and exits nonzero (6 or 7); the
+# lamp removes its copy AIR_LINGER_S after the recording ended. A Mac that drops off mid-run leaves the recording to
+# end by itself (AIR_CAP_S, 1 hour) and its folder removed 15 minutes later.
 # --dry-run says what it would run and write, and runs and writes nothing.
 # Plays no sound, so the office's quiet hours do not apply; the person's events do make smoke and steam.
 # Settings, from the environment:
 #   LAMP_HOST       the lamp (required, as for the played kit: lampOS/tools/played/README.md)
-#   LAMP_SSH        runs one command on the lamp, ssh-style (default: played/lamp_ssh, which is BatchMode). For a lamp
-#                   that takes a password, point it at a two-line wrapper:
-#                   exec sshpass -p "$PASS" ssh -o ControlPath=none "$LAMP_HOST" "$@"
+#   LAMP_SSH        runs one command on the lamp, ssh-style (default: played/lamp_ssh: BatchMode, by key only, with
+#                   LAMP_USER and LAMP_SSH_KEY as in played/README.md). A lamp that still takes only a password gets
+#                   your key once, by the person at the Mac: `ssh-copy-id orangepi@<lamp>.local` (lampOS/docs/joining.md,
+#                   "SSH by key only"); no password is ever typed into this tool.
 #   LAMP_BUS        lamp-bus on the lamp (/usr/local/bin/lamp-bus)
 #   AIR_PRE_S, AIR_POST_S, AIR_CAP_S, AIR_FIRST_S   120, 300, 3600, 15
 #   AIR_REMOTE_TMP  where the lamp's temp folder goes (/tmp); AIR_LINGER_S, how long after its end it removes it if the Mac never does (900)
@@ -105,9 +110,13 @@ fi
 
 PLAYED_OUT=${PLAYED_OUT:-$HOME/lamp-played}
 mkdir -p "$PLAYED_OUT/air-trace" || exit 9
-LOG=$PLAYED_OUT/air-trace/$EVENT-$(date +%Y%m%d-%H%M%S).log
+STAMP=$(date +%Y%m%d-%H%M%S)
+LOG=$PLAYED_OUT/air-trace/$EVENT-$STAMP.log
 say() { echo "$*"; echo "$(date +%H:%M:%S) $*" >>"$LOG"; }
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/air-trace.XXXXXX") || exit 9
+# The recording as copied back, kept until the case is written and read back the same.
+RAW=$PLAYED_OUT/air-trace/$EVENT-$STAMP.raw
+mkdir "$RAW" || exit 9
+LINGER=${AIR_LINGER_S:-900}
 
 # The lamp's side, sent on stdin each time (POSIX sh). `start` prints the temp folder; the others take it back and
 # refuse any other path.
@@ -140,16 +149,21 @@ EOF
 }
 
 D=
+KEEP=no   # yes from the recording's stop until its case is written and read back
 cleanup() {
+  if [ "$KEEP" = yes ]; then
+    say "air-trace.sh: the case is not written; the raw recording is kept: on this Mac in $RAW, and on the lamp in $LAMP_HOST:$D until ${LINGER} s after the recording ended"
+    return
+  fi
   if [ -n "$D" ]; then
     lamp stop "$D" >/dev/null 2>&1
     lamp clean "$D" >/dev/null 2>&1 && say "the lamp's temp folder $D is removed"
     D=
   fi
-  rm -rf "$WORK"
+  rm -rf "$RAW"
 }
 trap 'cleanup' EXIT
-trap 'say "stopped by Ctrl-C: nothing written"; exit 5' INT TERM
+trap 'say "stopped by Ctrl-C"; exit 5' INT TERM
 
 say "air-trace: $EVENT for $SKILL on $LAMP_HOST ($TOPICS); log $LOG"
 t0=$(date +%s)
@@ -158,7 +172,7 @@ t1=$(date +%s)
 OFFSET=$((remote_now - (t0 + t1) / 2))   # the lamp's clock less the Mac's, in seconds
 [ "$OFFSET" -ge -2 ] && [ "$OFFSET" -le 2 ] || say "note: the lamp's clock is ${OFFSET} s from the Mac's; the marks allow for it"
 # shellcheck disable=SC2086 # the topics are words
-D=$(lamp start "$CAP" "${AIR_LINGER_S:-900}" $TOPICS) && [ -n "$D" ] || { D=; say "air-trace.sh: the recording did not start"; exit 6; }
+D=$(lamp start "$CAP" "$LINGER" $TOPICS) && [ -n "$D" ] || { D=; say "air-trace.sh: the recording did not start"; exit 6; }
 STARTED=$(date +%s)
 say "recording into $LAMP_HOST:$D"
 n=0
@@ -197,14 +211,13 @@ while :; do
 done
 printf '\n'
 lamp stop "$D" 2>>"$LOG"
+KEEP=yes
 for t in $TOPICS; do
   f=$(echo "$t" | tr / _).jsonl
-  lamp fetch "$D" "$f" >"$WORK/$f" || { say "air-trace.sh: could not read $f back; the lamp's folder is $D"; exit 6; }
+  lamp fetch "$D" "$f" >"$RAW/$f" || { say "air-trace.sh: could not read $f back"; exit 6; }
 done
-lamp clean "$D" && say "the lamp's temp folder is removed"
-D=
 
-python3 -I - "$WORK" "$CASE" "$SKILL" "$LAMP_HOST" "$(( (MARK_START + OFFSET) * 1000 ))" "$(( (MARK_END + OFFSET) * 1000 ))" \
+python3 -I - "$RAW" "$CASE" "$SKILL" "$LAMP_HOST" "$(( (MARK_START + OFFSET) * 1000 ))" "$(( (MARK_END + OFFSET) * 1000 ))" \
   "$PRE" "$POST" "$NOTE" "$PLACEHOLDER" $TOPICS <<'PY' 2>&1 | tee -a "$LOG"
 import base64, json, os, shutil, sys, time
 work, case, skill, host, start_ms, end_ms, pre, post, note, placeholder = sys.argv[1:11]
@@ -274,19 +287,47 @@ out = [
 ]
 for call, args in say:
     out += ["# [[expect]]", '# at = "%ds"' % rel(start_ms), '# within = "120s"', '# call = "%s"' % call, "# args = %s" % args, "#"]
-part = case + ".part"
-shutil.rmtree(part, ignore_errors=True)
-os.makedirs(part)
-for name, lines in kept.items():
-    with open(os.path.join(part, name), "w", encoding="utf-8") as f:
-        f.write("".join(text + "\n" for text in lines))
-with open(os.path.join(part, "expect.toml"), "w", encoding="utf-8") as f:
-    f.write("\n".join(out).rstrip("#\n") + "\n")
-if os.path.exists(case):
-    shutil.rmtree(case)
-os.rename(part, case)
+# Written beside the case as CASE.part, read back, then swapped in; an old folder is kept as CASE.old until then.
+want = {name: "".join(text + "\n" for text in lines) for name, lines in kept.items()}
+want["expect.toml"] = "\n".join(out).rstrip("#\n") + "\n"
+def same(folder):
+    if sorted(os.listdir(folder)) != sorted(want):
+        return False
+    for name, text in want.items():
+        with open(os.path.join(folder, name), encoding="utf-8") as f:
+            if f.read() != text:
+                return False
+    return True
+part, old = case + ".part", case + ".old"
+swapped = False
+try:
+    shutil.rmtree(part, ignore_errors=True)
+    os.makedirs(part)
+    for name, text in want.items():
+        with open(os.path.join(part, name), "w", encoding="utf-8") as f:
+            f.write(text)
+    if not same(part):
+        raise OSError("%s does not read back as written" % part)
+    if os.path.exists(case):
+        shutil.rmtree(old, ignore_errors=True)
+        os.rename(case, old)
+        swapped = True
+    os.rename(part, case)
+    if not same(case):
+        raise OSError("%s does not read back as written" % case)
+    shutil.rmtree(old, ignore_errors=True)
+except Exception as e:
+    shutil.rmtree(part, ignore_errors=True)
+    if swapped:  # the folder that was there before goes back
+        shutil.rmtree(case, ignore_errors=True)
+        os.rename(old, case)
+    sys.exit("air-trace.sh: could not write the case: %s" % e)
 print("written: %s (%d air/state readings, %d s); fill in its verdict in expect.toml" % (
     case, sum(1 for h, _ in messages if h["topic"] == "air/state"), rel(last)))
 PY
 status=${PIPESTATUS[0]}
-[ "$status" -eq 0 ] || exit 7
+[ "$status" -eq 0 ] || exit 7   # the cleanup keeps the raw recording and says where
+KEEP=no
+lamp clean "$D" && say "the lamp's temp folder is removed"
+D=
+rm -rf "$RAW"
