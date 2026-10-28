@@ -79,3 +79,10 @@ sát và không giữ job nào: `{ok:true,reason:"forgotten"}`, hoặc với `su
 là `{ok:true,submitted:false,reason:"forgotten"}`; voice ghi
 `memory conversation end had nothing left to observe` (N12 của Friday, #3504).
 Một lệnh kết thúc không nêu nguồn nào vẫn bị từ chối như trước.
+Id được đánh số riêng cho từng người, nên memory chỉ hỏi phạm vi của chính người
+đó, không bao giờ hỏi những số trùng của phòng (phần tiếp theo của N12,
+lamp-06c1 ngày 28/10: các id của phòng làm những lượt đã xóa của một người trông
+như vẫn còn, và lệnh kết thúc bị từ chối). Một id người đó đã được cấp (nhỏ hơn
+`next_id` của họ, lệnh quên không bao giờ hạ nó) mà nay không còn là đã bị quên;
+một id chưa từng được cấp cho họ, kể cả id của người khác, vẫn bị từ chối
+(`bad_request`).
