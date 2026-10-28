@@ -599,13 +599,15 @@ impl Run<'_, '_> {
             // after the unit's `reset-failed`: waited past, to the next
             // `back`, never put back for. Not known, it counts (El's P3 on
             // #4178).
-            let before_refresh = done.as_ref().is_some_and(|done| {
-                self.world
-                    .systemd
-                    .back_began_unix_ms()
-                    .is_some_and(|began| began <= done.at_unix_ms)
-            });
-            if failed && before_refresh {
+            // Asked only of a `failed` one.
+            let before_refresh = failed
+                && done.as_ref().is_some_and(|done| {
+                    self.world
+                        .systemd
+                        .back_began_unix_ms()
+                        .is_some_and(|began| began <= done.at_unix_ms)
+                });
+            if before_refresh {
                 self.say(
                     "the settings writer's back failed in a run that began before it was refreshed: the next back judges it",
                 );

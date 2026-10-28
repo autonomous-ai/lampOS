@@ -380,6 +380,7 @@ impl Systemd for FakeSystemd {
     }
 
     fn back_began_unix_ms(&mut self) -> Option<u64> {
+        self.calls.borrow_mut().push("back began".into());
         self.back_began
     }
 

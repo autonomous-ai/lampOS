@@ -2808,6 +2808,9 @@ bound. Until the refreshed writer is proved:
   and fail after the unit's `reset-failed`. So a `failed` counts only when
   the back unit's `ExecMainStartTimestamp`, read from the bus (`busctl
   get-property`, in microseconds), is after the refresh's `at_unix_ms`.
+  It is asked of the system bus, then of systemd's own socket
+  (`/run/systemd/private`, as `systemctl` uses as root), since a lamp may
+  run no D-Bus daemon. It is asked only of a `failed` unit.
   One in the refresh's own millisecond or before is waited past, to the
   next `back`, and said (`… back failed in a
   run that began before it was refreshed: the next back judges it`). When
