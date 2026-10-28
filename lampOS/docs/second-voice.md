@@ -3652,8 +3652,13 @@ after a take-over, but now for every turn:
   the room's, its reply told their name`. On lamp-3e83 (stable 8163, 28 Oct
   16:30) the owner alone at the lamp had about half their lines read with no
   face speaking, and the lamp lost their name. Else: `request
-  N: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN): told and kept as
-  the room's`. A face seen speaking it gets one line too, by passing id
+  N: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN) [L looks, O with
+  one face; the known face in K, read speaking in Y, still in S, unread in U]:
+  told and kept as the room's`, the counts saying why (lamp-29e7, 28 Oct:
+  18 of 20 lines so, with nothing to say why; `SpeakingFaces::sight_told`).
+  A face seen speaking that is the known face itself, kept as the room's,
+  says the eyes' known file named someone else when read (29e7's request 35,
+  just after the file changed), or that no known face was read for this boot. A face seen speaking it gets one line too, by passing id
   only, never a name or the words (`speaking_faces::seen_speaking_note`):
   `request N: seen speaking it: the known person's face (id K): told and
   kept as theirs`, `request N: seen speaking it: a face not the known
