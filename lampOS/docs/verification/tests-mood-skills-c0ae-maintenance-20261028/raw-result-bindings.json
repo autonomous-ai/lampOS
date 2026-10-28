@@ -1,0 +1,78 @@
+{
+  "Mood-fmt": {
+    "command_receipt": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-fmt.json",
+      "bytes": 2032,
+      "sha256": "f333ed35a55f656cd2fe413e39478099660665fd1b8e51cf1295164446e63118"
+    },
+    "stdout": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-fmt.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-fmt.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "direct_exit": 0,
+    "owned_group_closed": true
+  },
+  "Mood-metadata": {
+    "command_receipt": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-metadata.json",
+      "bytes": 2089,
+      "sha256": "f17b4b5a9ec09506f5c7a3bdf245752a332aebe1f6ebb0c9ba7699bd06ca771c"
+    },
+    "stdout": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-metadata.stdout.txt",
+      "bytes": 2386664,
+      "sha256": "9559ad3f7e25c2da825b9229c3289151e97ad544f22bba7f2e095aa3e13e64b3"
+    },
+    "stderr": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-metadata.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "direct_exit": 0,
+    "owned_group_closed": true
+  },
+  "Skills-fmt": {
+    "command_receipt": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-fmt.json",
+      "bytes": 2048,
+      "sha256": "975e8ac6c78166dee35aca00dc5ba3dffe7e5dd0a44141c37aae89e20e8a23e3"
+    },
+    "stdout": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-fmt.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-fmt.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "direct_exit": 0,
+    "owned_group_closed": true
+  },
+  "Skills-metadata": {
+    "command_receipt": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-metadata.json",
+      "bytes": 2105,
+      "sha256": "0090242198a0828e75c5571da5e58df6e263bd96bd7850ef10024884ddb49d17"
+    },
+    "stdout": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-metadata.stdout.txt",
+      "bytes": 2398404,
+      "sha256": "5151b8b55a5dbe26e3934e9b7b68007e52c68c8a885e087f6f60a7b310725884"
+    },
+    "stderr": {
+      "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-metadata.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "direct_exit": 0,
+    "owned_group_closed": true
+  }
+}

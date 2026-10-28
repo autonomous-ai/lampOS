@@ -1,0 +1,671 @@
+{
+  "subject": "Skills",
+  "API_head": "913b4222c563ba478ad3965680aec91d6fe78139",
+  "authored_parent": [
+    "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7"
+  ],
+  "authored_tree": "5af0b4993f1da81715a33ebe89660a3b69e1b261",
+  "qualification_scope": "PASS exact913 original native selected scope at recorded actual checkout; current557 host and source-specific native scopes remain distinct from old7929",
+  "original_runs": {
+    "ARM64": {
+      "id": 40602565025,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602565025",
+      "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T23:30:17Z",
+      "updated_at": "2026-10-27T23:36:26Z"
+    },
+    "Linux-clippy": {
+      "id": 40602565034,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602565034",
+      "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T23:30:17Z",
+      "updated_at": "2026-10-27T23:34:25Z"
+    }
+  },
+  "Reader_actual_source_ordinary": 14,
+  "Reader_all_PASS_once": true,
+  "Trace_actual_source_ordinary": 7,
+  "Trace_all_PASS_once": true,
+  "ignored_DAC_no_runtime_credit": true,
+  "auxiliary_separate_totals": {
+    "promoter": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_docs": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "summary_groups": 47
+    },
+    "process": {
+      "line": 9427,
+      "passed": 13,
+      "failed": 0
+    },
+    "relay_ok_line": 9409,
+    "offline_Python": [
+      {
+        "line": 347,
+        "count": 49
+      },
+      {
+        "line": 417,
+        "count": 12
+      },
+      {
+        "line": 789,
+        "count": 7
+      }
+    ],
+    "added_to_nextest": false
+  },
+  "artifact_metadata_only": [
+    {
+      "id": 12779780458,
+      "name": "lampos-arm64-913b4222c563ba478ad3965680aec91d6fe78139",
+      "size_in_bytes": 118788709,
+      "digest": "sha256:070cb92077ddb171e099f4a36e102fc1c1b06e5484cf0f78adaa63873fe3e53f",
+      "expired": false,
+      "workflow_run": {
+        "id": 40602565025,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "tests/1806-addon-journal-e1",
+        "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139"
+      },
+      "API_digest_in_upload_log": true,
+      "API_size_and_id_in_upload_log": true,
+      "archive_downloaded": false,
+      "individual_payload_or_checksum_downloaded": false,
+      "API_digest_independently_rehashed": false
+    }
+  ],
+  "export_metadata": {
+    "binaries": 48,
+    "examples": 2,
+    "files_uploaded": 51
+  },
+  "native_release_and_Mac_debug_profiles_distinct": true,
+  "exact_API_head_checks": [
+    {
+      "id": 122536419409,
+      "name": "report-full-run-failure",
+      "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602565025/job/122536419409"
+    },
+    {
+      "id": 122536419077,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602565025/job/122536419077"
+    },
+    {
+      "id": 122534085219,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602565025/job/122534085219"
+    },
+    {
+      "id": 122534082962,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602565025/job/122534082962"
+    },
+    {
+      "id": 122534082908,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "head_sha": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40602565034/job/122534082908"
+    }
+  ],
+  "branch_protection_requirements_audited": false,
+  "actual_checkout": {
+    "ARM64": {
+      "actual_preview": "62c00d5c5ead298423e1dca974b62890b7e8447d",
+      "ordered_parents": [
+        "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+        "913b4222c563ba478ad3965680aec91d6fe78139"
+      ],
+      "actual_tree": "b649baa79c46710e486b061761a7efbd88e0f813",
+      "authored_tree": "5af0b4993f1da81715a33ebe89660a3b69e1b261",
+      "whole_tree_equal_authored": false,
+      "full_tree_delta_entries": 4,
+      "both_complete_owned_blobs_equal": true,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "authored": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "authored": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "actual": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "equal": true
+        }
+      ]
+    },
+    "Linux-clippy": {
+      "actual_preview": "62c00d5c5ead298423e1dca974b62890b7e8447d",
+      "ordered_parents": [
+        "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+        "913b4222c563ba478ad3965680aec91d6fe78139"
+      ],
+      "actual_tree": "b649baa79c46710e486b061761a7efbd88e0f813",
+      "authored_tree": "5af0b4993f1da81715a33ebe89660a3b69e1b261",
+      "whole_tree_equal_authored": false,
+      "full_tree_delta_entries": 4,
+      "both_complete_owned_blobs_equal": true,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "authored": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "authored": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "actual": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "equal": true
+        }
+      ]
+    }
+  },
+  "full_tree_deltas": {
+    "ARM64": {
+      "changes": [
+        {
+          "path": ".github/workflows/lampos-sdk.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1e3055cdb3d8d34452fa1462cd35152b3d61133e",
+            "size": 3250,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1e3055cdb3d8d34452fa1462cd35152b3d61133e"
+          }
+        },
+        {
+          "path": "lampOS/sdk/python/README.md",
+          "authored": {
+            "path": "lampOS/sdk/python/README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "94bf89336182207a64e7bc8afa2a8ad20a4fcd0f",
+            "size": 6334,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/94bf89336182207a64e7bc8afa2a8ad20a4fcd0f"
+          },
+          "actual": {
+            "path": "lampOS/sdk/python/README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6c5b9f08085aa0e1f01212db439b87f5a22a0a53",
+            "size": 6393,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6c5b9f08085aa0e1f01212db439b87f5a22a0a53"
+          }
+        },
+        {
+          "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+          "authored": {
+            "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "09b5e75aac5f1018e56e2ce54eb78a9b54e838c2",
+            "size": 13660,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/09b5e75aac5f1018e56e2ce54eb78a9b54e838c2"
+          },
+          "actual": {
+            "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "388cd9f8ecd62179bfcdfce3f9f730b2c1703475",
+            "size": 13966,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/388cd9f8ecd62179bfcdfce3f9f730b2c1703475"
+          }
+        },
+        {
+          "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+          "authored": {
+            "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15f8e63fb7d36dafdd05effb2929b988316aff4a",
+            "size": 10539,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/15f8e63fb7d36dafdd05effb2929b988316aff4a"
+          },
+          "actual": {
+            "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1b7a14d37937a0cc5a7ade532caf2eb689c0456",
+            "size": 11386,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1b7a14d37937a0cc5a7ade532caf2eb689c0456"
+          }
+        }
+      ],
+      "count": 4,
+      "actual_preview": "62c00d5c5ead298423e1dca974b62890b7e8447d",
+      "authored_head": "913b4222c563ba478ad3965680aec91d6fe78139"
+    },
+    "Linux-clippy": {
+      "changes": [
+        {
+          "path": ".github/workflows/lampos-sdk.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1e3055cdb3d8d34452fa1462cd35152b3d61133e",
+            "size": 3250,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1e3055cdb3d8d34452fa1462cd35152b3d61133e"
+          }
+        },
+        {
+          "path": "lampOS/sdk/python/README.md",
+          "authored": {
+            "path": "lampOS/sdk/python/README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "94bf89336182207a64e7bc8afa2a8ad20a4fcd0f",
+            "size": 6334,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/94bf89336182207a64e7bc8afa2a8ad20a4fcd0f"
+          },
+          "actual": {
+            "path": "lampOS/sdk/python/README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6c5b9f08085aa0e1f01212db439b87f5a22a0a53",
+            "size": 6393,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6c5b9f08085aa0e1f01212db439b87f5a22a0a53"
+          }
+        },
+        {
+          "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+          "authored": {
+            "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "09b5e75aac5f1018e56e2ce54eb78a9b54e838c2",
+            "size": 13660,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/09b5e75aac5f1018e56e2ce54eb78a9b54e838c2"
+          },
+          "actual": {
+            "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "388cd9f8ecd62179bfcdfce3f9f730b2c1703475",
+            "size": 13966,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/388cd9f8ecd62179bfcdfce3f9f730b2c1703475"
+          }
+        },
+        {
+          "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+          "authored": {
+            "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15f8e63fb7d36dafdd05effb2929b988316aff4a",
+            "size": 10539,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/15f8e63fb7d36dafdd05effb2929b988316aff4a"
+          },
+          "actual": {
+            "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1b7a14d37937a0cc5a7ade532caf2eb689c0456",
+            "size": 11386,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1b7a14d37937a0cc5a7ade532caf2eb689c0456"
+          }
+        }
+      ],
+      "count": 4,
+      "actual_preview": "62c00d5c5ead298423e1dca974b62890b7e8447d",
+      "authored_head": "913b4222c563ba478ad3965680aec91d6fe78139"
+    }
+  },
+  "all_CI_input_metadata": {
+    "counts": {
+      "ARM64": 94,
+      "Linux-clippy": 94
+    },
+    "source": {
+      "receipt": "skills-913-original-native-20261028/all-tracked-CI-input-bindings.json",
+      "bytes": 158128,
+      "sha256": "6466940db0940b3e3704260f1177b1b37b4f372d8b1b323f3abcb24c14c9aa89"
+    },
+    "different_rows": {
+      "ARM64": [
+        {
+          "path": ".github/workflows/lampos-sdk.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1e3055cdb3d8d34452fa1462cd35152b3d61133e",
+            "size": 3250,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1e3055cdb3d8d34452fa1462cd35152b3d61133e"
+          },
+          "equal": false
+        }
+      ],
+      "Linux-clippy": [
+        {
+          "path": ".github/workflows/lampos-sdk.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1e3055cdb3d8d34452fa1462cd35152b3d61133e",
+            "size": 3250,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1e3055cdb3d8d34452fa1462cd35152b3d61133e"
+          },
+          "equal": false
+        }
+      ]
+    }
+  },
+  "execution_window": {
+    "starting_line": 836,
+    "summary_line": 8694,
+    "following_group_line": 9111,
+    "start_raw": "2026-10-27T23:33:14.1214570Z     Starting 7856 tests across 70 binaries (54 tests and 120 binaries skipped)",
+    "summary_raw": "2026-10-27T23:36:02.5661744Z      Summary [ 168.444s] 7856 tests run: 7856 passed, 54 skipped",
+    "selected": 7856,
+    "binaries": 70,
+    "aggregate_skips": 54,
+    "skipped_binaries": 120,
+    "execution_records": 7856,
+    "unique_identities": 7856,
+    "unique_ordinals": 7856,
+    "outcomes": {
+      "PASS": 7856
+    },
+    "unobserved_selected": 0,
+    "duplicate_execution_identities": [],
+    "post_summary_reprints": 34,
+    "outside_records": [],
+    "retry_flaky_records": [],
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "picked_raw": [
+      809,
+      "2026-10-27T23:32:58.3794523Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+    ]
+  },
+  "Skills_counts": {
+    "PASS": 560
+  },
+  "Mac_counts_at913": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "required3": [
+    {
+      "binary": "lamp-skills::it",
+      "identity": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+      "execution_records": [
+        {
+          "line": 2945,
+          "timestamp": "2026-10-27T23:33:56.7410659Z",
+          "status": "PASS",
+          "seconds": 3.181,
+          "ordinal": 2109,
+          "total": 7856,
+          "binary": "lamp-skills::it",
+          "test": "addon::says_the_judge_dropped_do_not_spend_the_hour"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "binary": "lamp-skills",
+      "identity": "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+      "execution_records": [
+        {
+          "line": 2789,
+          "timestamp": "2026-10-27T23:33:52.9017529Z",
+          "status": "PASS",
+          "seconds": 0.009,
+          "ordinal": 1953,
+          "total": 7856,
+          "binary": "lamp-skills",
+          "test": "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "binary": "lamp-skills",
+      "identity": "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline",
+      "execution_records": [
+        {
+          "line": 2891,
+          "timestamp": "2026-10-27T23:33:54.3652266Z",
+          "status": "PASS",
+          "seconds": 1.457,
+          "ordinal": 2055,
+          "total": 7856,
+          "binary": "lamp-skills",
+          "test": "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline"
+        }
+      ],
+      "PASS_once": true
+    }
+  ],
+  "source_platform_additions": [
+    {
+      "identity": "tests::a_broken_socket_still_lets_a_wake_end_the_wait",
+      "path": "lampOS/crates/skills/src/main.rs",
+      "line": 4428,
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]",
+      "basis": "Current actual checkout Linux cfg(test) declaration"
+    },
+    {
+      "identity": "tests::a_broken_socket_still_lets_another_topics_message_end_the_wait",
+      "path": "lampOS/crates/skills/src/main.rs",
+      "line": 4450,
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]",
+      "basis": "Current actual checkout Linux cfg(test) declaration"
+    },
+    {
+      "identity": "tests::a_late_hang_up_waits_out_only_the_rest_of_the_wait",
+      "path": "lampOS/crates/skills/src/main.rs",
+      "line": 4477,
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]",
+      "basis": "Current actual checkout Linux cfg(test) declaration"
+    },
+    {
+      "identity": "shared::an_authors_package_carries_their_key_and_names_them",
+      "path": "lampOS/crates/skills/tests/it/shared.rs",
+      "line": 104,
+      "attributes": "#[test]",
+      "basis": "Shared-package test in actual immutable source; counted as an addition only if absent from current compiled Mac inventory"
+    },
+    {
+      "identity": "shared::unsigned_store_signed_changed_or_misnamed_packages_are_refused",
+      "path": "lampOS/crates/skills/tests/it/shared.rs",
+      "line": 146,
+      "attributes": "#[test]",
+      "basis": "Shared-package test in actual immutable source; counted as an addition only if absent from current compiled Mac inventory"
+    }
+  ],
+  "ignored9_ordinary_unrun": true,
+  "one_addon_identity_two_internal_checks": {
+    "single_Rust_identity": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "source_path": "lampOS/crates/skills/tests/it/addon.rs",
+    "source_sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+    "line": 818,
+    "internal_helper_variants": [
+      true,
+      false
+    ],
+    "Rust_test_rows_added_for_variants": 0
+  },
+  "source_receipt_manifest": {
+    "receipt": "skills-913-original-native-20261028/collection-manifest.json",
+    "bytes": 18227,
+    "sha256": "9a577e7a06747140edbdc21afdaaea033a77682942822f6231db4c10ee7ddcda"
+  },
+  "postclose_verification": {
+    "entries_checked": 113,
+    "all_bytes_SHA256_match": true,
+    "manifest_sha256": "9a577e7a06747140edbdc21afdaaea033a77682942822f6231db4c10ee7ddcda",
+    "mismatches": [],
+    "unlisted_nonexcluded": [],
+    "all_collectors_closed_before_final_capture": true
+  },
+  "whole_tree_bridge_to_later_authored4be": {
+    "status": "WHOLE_TREE_EQUAL_ADDITIONAL_SOURCE_PROVENANCE_ONLY",
+    "new_authored_head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+    "new_authored_parent": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+    "new_authored_tree": "b649baa79c46710e486b061761a7efbd88e0f813",
+    "original_API_head": "913b4222c563ba478ad3965680aec91d6fe78139",
+    "actual_original_native_preview": "62c00d5c5ead298423e1dca974b62890b7e8447d",
+    "ordered_parents": [
+      "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+      "913b4222c563ba478ad3965680aec91d6fe78139"
+    ],
+    "both_original_platform_actual_trees_equal_new_tree": true,
+    "native_audit": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-913-original-native-20261028/audit.json",
+      "sha256": "46c89564982d48e01779737f86ce01f647559d8e0ad1a84662ac4c64d977a0d5",
+      "bytes": 60397
+    },
+    "no_API_head_relabel_or_new_runtime_execution": true,
+    "latest_checks_reads_HOLD_still_separate": true
+  },
+  "source_profiles_do_not_relabel_execution_heads": true,
+  "archives_or_payload_downloaded": false,
+  "initial_discovery": {
+    "ARM64": "in_progress",
+    "Linux-clippy": "completed success"
+  },
+  "initial_discovery_receipt": {
+    "receipt": "skills-913-original-native-20261028/discovery-summary.json",
+    "bytes": 2460,
+    "sha256": "cfe2960a40813afc401064ce79592a04298608784bc32b02cbc365406278fab3"
+  }
+}

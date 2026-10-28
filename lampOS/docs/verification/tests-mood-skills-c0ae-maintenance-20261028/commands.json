@@ -1,0 +1,234 @@
+{
+  "commands": {
+    "Mood": {
+      "fmt": {
+        "command": [
+          "/Users/autonomous/.cargo/bin/cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "cwd": "/private/tmp/tests-sleep-mood-clock-20261027/lampOS",
+        "started_at": "2026-10-27T23:42:51.053823+00:00",
+        "timeout_seconds": 120,
+        "stdout": "cmd-fmt.stdout.txt",
+        "stderr": "cmd-fmt.stderr.txt",
+        "timeout_cleanup": [
+          {
+            "action": "leader exited unreaped; no other owned group members",
+            "members": [
+              {
+                "pid": 82175,
+                "state": "Z"
+              }
+            ]
+          }
+        ],
+        "timed_out": false,
+        "disk_reserve_breached": false,
+        "stop_reason": null,
+        "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+        "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+        "launch_state": "Popen_recorded",
+        "disk_reserve_bytes": 2214592512,
+        "disk_sample_interval_seconds": 1,
+        "disk_paths": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata"
+        ],
+        "disk_samples": 13,
+        "disk_last_available_bytes": 15838638080,
+        "disk_minimum_available_bytes": 15833935872,
+        "available_bytes_before_Cargo": 15834300416,
+        "owned_pid": 82175,
+        "owned_process_group": 82175,
+        "direct_wait_status": 0,
+        "exit_code": 0,
+        "owned_group_absent_after_cleanup": true,
+        "unexpected_owned_descendants": false,
+        "unresolved_owned_pids": [],
+        "compiler_lease_held": false,
+        "wall_seconds": 12.653388,
+        "finished_at": "2026-10-27T23:43:03.707172+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "metadata": {
+        "command": [
+          "/Users/autonomous/.cargo/bin/cargo",
+          "+1.96.0",
+          "metadata",
+          "--offline",
+          "--locked",
+          "--format-version",
+          "1"
+        ],
+        "cwd": "/private/tmp/tests-sleep-mood-clock-20261027/lampOS",
+        "started_at": "2026-10-27T23:43:06.874400+00:00",
+        "timeout_seconds": 120,
+        "stdout": "cmd-metadata.stdout.txt",
+        "stderr": "cmd-metadata.stderr.txt",
+        "timeout_cleanup": [
+          {
+            "action": "leader exited unreaped; no other owned group members",
+            "members": [
+              {
+                "pid": 85355,
+                "state": "Z"
+              }
+            ]
+          }
+        ],
+        "timed_out": false,
+        "disk_reserve_breached": false,
+        "stop_reason": null,
+        "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+        "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+        "launch_state": "Popen_recorded",
+        "disk_reserve_bytes": 2214592512,
+        "disk_sample_interval_seconds": 1,
+        "disk_paths": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata"
+        ],
+        "disk_samples": 1,
+        "disk_last_available_bytes": 15838605312,
+        "disk_minimum_available_bytes": 15838605312,
+        "available_bytes_before_Cargo": 15838605312,
+        "owned_pid": 85355,
+        "owned_process_group": 85355,
+        "direct_wait_status": 0,
+        "exit_code": 0,
+        "owned_group_absent_after_cleanup": true,
+        "unexpected_owned_descendants": false,
+        "unresolved_owned_pids": [],
+        "compiler_lease_held": false,
+        "wall_seconds": 0.480997,
+        "finished_at": "2026-10-27T23:43:07.355510+00:00",
+        "stdout_sha256": "9559ad3f7e25c2da825b9229c3289151e97ad544f22bba7f2e095aa3e13e64b3",
+        "stdout_bytes": 2386664,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    },
+    "Skills": {
+      "fmt": {
+        "command": [
+          "/Users/autonomous/.cargo/bin/cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "cwd": "/private/tmp/tests-skills-addon-journal-current-20261026/lampOS",
+        "started_at": "2026-10-27T23:45:29.638417+00:00",
+        "timeout_seconds": 120,
+        "stdout": "cmd-fmt.stdout.txt",
+        "stderr": "cmd-fmt.stderr.txt",
+        "timeout_cleanup": [
+          {
+            "action": "leader exited unreaped; no other owned group members",
+            "members": [
+              {
+                "pid": 91785,
+                "state": "Z"
+              }
+            ]
+          }
+        ],
+        "timed_out": false,
+        "disk_reserve_breached": false,
+        "stop_reason": null,
+        "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+        "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+        "launch_state": "Popen_recorded",
+        "disk_reserve_bytes": 2214592512,
+        "disk_sample_interval_seconds": 1,
+        "disk_paths": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata"
+        ],
+        "disk_samples": 13,
+        "disk_last_available_bytes": 15832563712,
+        "disk_minimum_available_bytes": 15832563712,
+        "available_bytes_before_Cargo": 15832621056,
+        "owned_pid": 91785,
+        "owned_process_group": 91785,
+        "direct_wait_status": 0,
+        "exit_code": 0,
+        "owned_group_absent_after_cleanup": true,
+        "unexpected_owned_descendants": false,
+        "unresolved_owned_pids": [],
+        "compiler_lease_held": false,
+        "wall_seconds": 12.723398,
+        "finished_at": "2026-10-27T23:45:42.362346+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "metadata": {
+        "command": [
+          "/Users/autonomous/.cargo/bin/cargo",
+          "+1.96.0",
+          "metadata",
+          "--offline",
+          "--locked",
+          "--format-version",
+          "1"
+        ],
+        "cwd": "/private/tmp/tests-skills-addon-journal-current-20261026/lampOS",
+        "started_at": "2026-10-27T23:45:45.408184+00:00",
+        "timeout_seconds": 120,
+        "stdout": "cmd-metadata.stdout.txt",
+        "stderr": "cmd-metadata.stderr.txt",
+        "timeout_cleanup": [
+          {
+            "action": "leader exited unreaped; no other owned group members",
+            "members": [
+              {
+                "pid": 92079,
+                "state": "Z"
+              }
+            ]
+          }
+        ],
+        "timed_out": false,
+        "disk_reserve_breached": false,
+        "stop_reason": null,
+        "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+        "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+        "launch_state": "Popen_recorded",
+        "disk_reserve_bytes": 2214592512,
+        "disk_sample_interval_seconds": 1,
+        "disk_paths": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata"
+        ],
+        "disk_samples": 1,
+        "disk_last_available_bytes": 15832625152,
+        "disk_minimum_available_bytes": 15832625152,
+        "available_bytes_before_Cargo": 15832625152,
+        "owned_pid": 92079,
+        "owned_process_group": 92079,
+        "direct_wait_status": 0,
+        "exit_code": 0,
+        "owned_group_absent_after_cleanup": true,
+        "unexpected_owned_descendants": false,
+        "unresolved_owned_pids": [],
+        "compiler_lease_held": false,
+        "wall_seconds": 0.488864,
+        "finished_at": "2026-10-27T23:45:45.897168+00:00",
+        "stdout_sha256": "5151b8b55a5dbe26e3934e9b7b68007e52c68c8a885e087f6f60a7b310725884",
+        "stdout_bytes": 2398404,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    }
+  },
+  "commands_run_only_on_official_worktrees": true,
+  "no_build_test_clippy_or_current_target_access": true
+}

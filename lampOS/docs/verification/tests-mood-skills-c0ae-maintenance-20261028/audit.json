@@ -1,0 +1,525 @@
+{
+  "status": "PROPORTIONAL_MAINTENANCE_PASSED_AND_EXACT_LEASE_PUSHED_NO_NEW_FUNCTIONAL_RUN",
+  "frozen_base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+  "subjects": [
+    {
+      "subject": "Mood",
+      "published_head": "6a40ceed7c8d38f80eaab65ca56f297bf9496c39",
+      "base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+      "previous_offered_head": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+      "clean_owned_branch": "tests/1806-sleep-mood-clock",
+      "owned_complete_blob_bindings": [
+        {
+          "path": "lampOS/crates/expression/tests/runtime.rs",
+          "sha256": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752",
+          "bytes": 53262,
+          "mode": 420,
+          "kind": "file",
+          "source_url": "https://github.com/autonomous-ai/lampOS/blob/6a40ceed7c8d38f80eaab65ca56f297bf9496c39/lampOS/crates/expression/tests/runtime.rs"
+        },
+        {
+          "path": "lampOS/docs/expression.md",
+          "sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c",
+          "bytes": 81109,
+          "mode": 420,
+          "kind": "file",
+          "source_url": "https://github.com/autonomous-ai/lampOS/blob/6a40ceed7c8d38f80eaab65ca56f297bf9496c39/lampOS/docs/expression.md"
+        }
+      ],
+      "one_equal_range_diff": {
+        "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/range-diff.txt",
+        "bytes": 90,
+        "sha256": "ca084300f2a9ceb05fca264e752b76c463a85fc63de8d688ce08a6862acfa8f1"
+      },
+      "literal_patch_before": {
+        "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/before-owned.patch",
+        "bytes": 7830,
+        "sha256": "0f6e2eac8712d23bb3f057a34db4b03424d194b5aff0a9511e8c0e163c32f889"
+      },
+      "literal_patch_after": {
+        "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/after-owned.patch",
+        "bytes": 7830,
+        "sha256": "0f6e2eac8712d23bb3f057a34db4b03424d194b5aff0a9511e8c0e163c32f889"
+      },
+      "two_full_blobs_modes_and_literal_patch_equal": true,
+      "qualified_reference_delta": {
+        "reference": "mood-29f-original-native-20261028/ARM64-actual-tree.json",
+        "count": 4,
+        "changes": [
+          {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "1e3055cdb3d8d34452fa1462cd35152b3d61133e"
+            }
+          },
+          {
+            "path": "lampOS/sdk/python/README.md",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "94bf89336182207a64e7bc8afa2a8ad20a4fcd0f"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "6c5b9f08085aa0e1f01212db439b87f5a22a0a53"
+            }
+          },
+          {
+            "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "09b5e75aac5f1018e56e2ce54eb78a9b54e838c2"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "388cd9f8ecd62179bfcdfce3f9f730b2c1703475"
+            }
+          },
+          {
+            "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "15f8e63fb7d36dafdd05effb2929b988316aff4a"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "c1b7a14d37937a0cc5a7ade532caf2eb689c0456"
+            }
+          }
+        ],
+        "SDK_workflow_delta_explicit": true,
+        "no_all94_CI_inputs_equal_claim": true
+      },
+      "actual_maintenance": {
+        "subject": "Mood",
+        "head": "6a40ceed7c8d38f80eaab65ca56f297bf9496c39",
+        "base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+        "status": "PROPORTIONAL_MAINTENANCE_PASS_PENDING_ROOT_REVIEW",
+        "fmt_metadata_direct0_closed": [
+          {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-fmt.json",
+            "sha256": "f333ed35a55f656cd2fe413e39478099660665fd1b8e51cf1295164446e63118",
+            "bytes": 2032
+          },
+          {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-metadata.json",
+            "sha256": "f17b4b5a9ec09506f5c7a3bdf245752a332aebe1f6ebb0c9ba7699bd06ca771c",
+            "bytes": 2089
+          }
+        ],
+        "new_runtime_count": 0,
+        "new_compiler_or_clippy_count": 0,
+        "historical_functional_counts_not_relabelled": true,
+        "source_owner_semantic_physical_index_unchanged": true,
+        "virtual_Cargo_target_not_created": true,
+        "external_copy_count": 8,
+        "external_copies_SHA_stat_pass": true,
+        "direct_depinfo_count": 2,
+        "historical_profile_inventory_environment_bound": true,
+        "local_Mac_Rust_compile_input_differences": [],
+        "Reader_strict_unit_source_identity_not_proven_fresh_clippy_required": false,
+        "schema_only_completion_from_already_executed_commands": true,
+        "no_push_Ready_GH_L_or_current_Body_Warm_access": true,
+        "completed_utc": "2026-10-27T23:45:23.761749+00:00"
+      },
+      "metadata_normalized_comparison": {
+        "current_metadata": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/cmd-metadata.stdout.txt",
+          "sha256": "9559ad3f7e25c2da825b9229c3289151e97ad544f22bba7f2e095aa3e13e64b3",
+          "bytes": 2386664
+        },
+        "prior_metadata": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-29f-unstarted-no-run-capacity-v3-20261028/metadata-response.json",
+          "sha256": "91a8d44b0666f024078aa8408896e97726987a0e61ddf0e5239d8e9adc464dcd",
+          "bytes": 3874604
+        },
+        "only_path_normalization": [
+          "workspace_root and its local package paths",
+          "metadata target_directory; no directory created"
+        ],
+        "all_other_metadata_exact": true,
+        "no_transitive_freshness_or_registry_byte_claim": true
+      },
+      "profile_inventory_environment_reference_hashes": {
+        "profiles": {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/external-executable-profile-bindings.json",
+          "bytes": 14358,
+          "sha256": "20b9f7127b394a09b455c5c61685ff75d0bd7740c9e97e814ec006947eed9347"
+        },
+        "direct_depinfo": {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/compiled-unit-depinfo-input-comparison.json",
+          "bytes": 551,
+          "sha256": "9268fb71a104454e5ac2ea9c22d47a671e8734744b4a67a74ec1f0d5fe1ce8e0"
+        },
+        "environment": {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood/format-metadata/maintenance-environment-binding.json",
+          "bytes": 6783,
+          "sha256": "fa7d83bd51e9f79ca3096f4b3686b295f5e9e707b47f28990019d1f2700fc3d5"
+        }
+      },
+      "exact_lease_push": {
+        "subject": "Mood",
+        "head": "6a40ceed7c8d38f80eaab65ca56f297bf9496c39",
+        "base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+        "expected_old": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+        "exact_lease_push_exit": 0,
+        "live_Main_at_push": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+        "new_runtime_count": 0,
+        "historical_counts_not_relabelled": true,
+        "new_originals_required": true,
+        "at_utc": "2026-10-27T23:50:26.566854+00:00"
+      }
+    },
+    {
+      "subject": "Skills",
+      "published_head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+      "base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+      "previous_offered_head": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "clean_owned_branch": "tests/1806-addon-journal-e1",
+      "owned_complete_blob_bindings": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+          "bytes": 31421,
+          "mode": 420,
+          "kind": "file",
+          "source_url": "https://github.com/autonomous-ai/lampOS/blob/4be3182e2a0ee84cffca8aca1b445fb70b90852e/lampOS/crates/skills/tests/it/addon.rs"
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d",
+          "bytes": 216663,
+          "mode": 420,
+          "kind": "file",
+          "source_url": "https://github.com/autonomous-ai/lampOS/blob/4be3182e2a0ee84cffca8aca1b445fb70b90852e/lampOS/docs/skills.md"
+        }
+      ],
+      "one_equal_range_diff": {
+        "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/range-diff.txt",
+        "bytes": 94,
+        "sha256": "862ef1cb63dc5ef00025b0ccb89522b4bafed4c96bcad5c4b710ab8d945f29b8"
+      },
+      "literal_patch_before": {
+        "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/before-owned.patch",
+        "bytes": 7914,
+        "sha256": "111d2bbb64ad0389e6a411a5db53f594dee249ad5af750ca731bc62953e22e8b"
+      },
+      "literal_patch_after": {
+        "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/after-owned.patch",
+        "bytes": 7914,
+        "sha256": "111d2bbb64ad0389e6a411a5db53f594dee249ad5af750ca731bc62953e22e8b"
+      },
+      "two_full_blobs_modes_and_literal_patch_equal": true,
+      "qualified_reference_delta": {
+        "reference": "913b4222c563ba478ad3965680aec91d6fe78139",
+        "count": 4,
+        "changes": [
+          {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "1e3055cdb3d8d34452fa1462cd35152b3d61133e"
+            }
+          },
+          {
+            "path": "lampOS/sdk/python/README.md",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "94bf89336182207a64e7bc8afa2a8ad20a4fcd0f"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "6c5b9f08085aa0e1f01212db439b87f5a22a0a53"
+            }
+          },
+          {
+            "path": "lampOS/sdk/python/src/lampos/skillcheck.py",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "09b5e75aac5f1018e56e2ce54eb78a9b54e838c2"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "388cd9f8ecd62179bfcdfce3f9f730b2c1703475"
+            }
+          },
+          {
+            "path": "lampOS/sdk/python/tests/test_skillcheck.py",
+            "before": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "15f8e63fb7d36dafdd05effb2929b988316aff4a"
+            },
+            "after": {
+              "mode": "100644",
+              "type": "blob",
+              "sha": "c1b7a14d37937a0cc5a7ade532caf2eb689c0456"
+            }
+          }
+        ],
+        "SDK_workflow_delta_explicit": true,
+        "no_all94_CI_inputs_equal_claim": true
+      },
+      "actual_maintenance": {
+        "subject": "Skills",
+        "head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+        "base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+        "status": "PROPORTIONAL_MAINTENANCE_PASS_PENDING_ROOT_REVIEW",
+        "fmt_metadata_direct0_closed": [
+          {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-fmt.json",
+            "sha256": "975e8ac6c78166dee35aca00dc5ba3dffe7e5dd0a44141c37aae89e20e8a23e3",
+            "bytes": 2048
+          },
+          {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-metadata.json",
+            "sha256": "0090242198a0828e75c5571da5e58df6e263bd96bd7850ef10024884ddb49d17",
+            "bytes": 2105
+          }
+        ],
+        "new_runtime_count": 0,
+        "new_compiler_or_clippy_count": 0,
+        "historical_functional_counts_not_relabelled": true,
+        "source_owner_semantic_physical_index_unchanged": true,
+        "virtual_Cargo_target_not_created": true,
+        "external_copy_count": 7,
+        "external_copies_SHA_stat_pass": true,
+        "direct_depinfo_count": 21,
+        "historical_profile_inventory_environment_bound": true,
+        "local_Mac_Rust_compile_input_differences": [],
+        "Reader_strict_unit_source_identity_not_proven_fresh_clippy_required": false,
+        "no_push_Ready_GH_L_or_current_Body_Warm_access": true,
+        "completed_utc": "2026-10-27T23:45:49.313756+00:00"
+      },
+      "metadata_normalized_comparison": {
+        "current_metadata": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/cmd-metadata.stdout.txt",
+          "sha256": "5151b8b55a5dbe26e3934e9b7b68007e52c68c8a885e087f6f60a7b310725884",
+          "bytes": 2398404
+        },
+        "prior_metadata": {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills913-unstarted-inventory-continuation-20261028/actual-metadata.json",
+          "sha256": "91a8d44b0666f024078aa8408896e97726987a0e61ddf0e5239d8e9adc464dcd",
+          "bytes": 3874604
+        },
+        "only_path_normalization": [
+          "workspace_root and its local package paths",
+          "metadata target_directory; no directory created"
+        ],
+        "all_other_metadata_exact": true,
+        "no_transitive_freshness_or_registry_byte_claim": true
+      },
+      "profile_inventory_environment_reference_hashes": {
+        "profiles": {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/external-executable-profile-bindings.json",
+          "bytes": 12911,
+          "sha256": "57644ffff673fafc42fc8c69dca638560b2841a507dbdc0c10e88d008f62a091"
+        },
+        "direct_depinfo": {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/compiled-unit-depinfo-input-comparison.json",
+          "bytes": 537,
+          "sha256": "8b34162e3a19cbd074fcffa6a69df91b1c89a721b67ac03ef59f1f6927b3fc01"
+        },
+        "environment": {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills/format-metadata/maintenance-environment-binding.json",
+          "bytes": 6790,
+          "sha256": "fc27cf31646b80a9ce53cfa33770645ee5c6820ade4578481663ca74543e32e2"
+        }
+      },
+      "exact_lease_push": {
+        "subject": "Skills",
+        "head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+        "base": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+        "expected_old": "913b4222c563ba478ad3965680aec91d6fe78139",
+        "exact_lease_push_exit": 0,
+        "live_Main_at_push": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+        "new_runtime_count": 0,
+        "historical_counts_not_relabelled": true,
+        "new_originals_required": true,
+        "at_utc": "2026-10-27T23:50:33.138493+00:00"
+      }
+    }
+  ],
+  "four_actual_commands_direct0_closed_once": true,
+  "runtime_build_clippy_inventory_replays": 0,
+  "new_originals_pending_at_publication_preparation": true,
+  "later_Main_at_push": "9f32ec194015b422562c2e8f757dc4c6e53e2415",
+  "later_Main_equivalence_claim": false,
+  "Skills_whole_tree_bridge_to_original913": {
+    "status": "WHOLE_TREE_EQUAL_ADDITIONAL_SOURCE_PROVENANCE_ONLY",
+    "new_authored_head": "4be3182e2a0ee84cffca8aca1b445fb70b90852e",
+    "new_authored_parent": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+    "new_authored_tree": "b649baa79c46710e486b061761a7efbd88e0f813",
+    "original_API_head": "913b4222c563ba478ad3965680aec91d6fe78139",
+    "actual_original_native_preview": "62c00d5c5ead298423e1dca974b62890b7e8447d",
+    "ordered_parents": [
+      "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+      "913b4222c563ba478ad3965680aec91d6fe78139"
+    ],
+    "both_original_platform_actual_trees_equal_new_tree": true,
+    "native_audit": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-913-original-native-20261028/audit.json",
+      "sha256": "46c89564982d48e01779737f86ce01f647559d8e0ad1a84662ac4c64d977a0d5",
+      "bytes": 60397
+    },
+    "no_API_head_relabel_or_new_runtime_execution": true,
+    "latest_checks_reads_HOLD_still_separate": true
+  },
+  "SDK_workflow_is_explicit_changed_input_not_all94_CI_equal": true,
+  "schema_only_private_comparison_stop": {
+    "actual_native": 41500,
+    "exit_code": 1,
+    "stage": "Mood post-format/metadata semantic-source comparison",
+    "error": "AssertionError comparing flat physical+semantic source row to semantic-only row",
+    "completed_commands": [
+      "Reader fmt0",
+      "Reader metadata0",
+      "Mood fmt0",
+      "Mood metadata0"
+    ],
+    "Rust_test_or_compiler_attempts": 0,
+    "Skills_commands_yet_unattempted": true,
+    "correction": "Compare sha256/bytes/mode/kind only for effective compile-source equality, retaining separate exact physical source/index guards."
+  },
+  "schema_correction_no_completed_command_reexecution": {
+    "old_flat_keys": [
+      "sha256",
+      "bytes",
+      "mode",
+      "kind",
+      "mtime_ns",
+      "device",
+      "inode"
+    ],
+    "compile_semantic_comparison_keys": [
+      "sha256",
+      "bytes",
+      "mode",
+      "kind"
+    ],
+    "fullphysical_guards_retained": true,
+    "actual_semantic_delta": [
+      ".github/workflows/lampos-sdk.yml",
+      "lampOS/sdk/python/README.md",
+      "lampOS/sdk/python/src/lampos/skillcheck.py",
+      "lampOS/sdk/python/tests/test_skillcheck.py",
+      "lampOS/tools/played/README.md",
+      "lampOS/tools/played/make-skill-test.sh",
+      "lampOS/tools/played/make-skill.sh",
+      "lampOS/tools/played/stand-in.sh"
+    ],
+    "Rust_Cargo_config_source_deltas": [],
+    "completed_commands_not_rerun": true,
+    "original_stop_preserved": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/three-owned-c0ae-proportional-maintenance-20261028/format-metadata-schema-stop.json"
+  },
+  "Reader_not_qualified_here_fresh_strict_deferred": true,
+  "old_runtime_scopes": {
+    "Mood": {
+      "head": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+      "base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+      "full_Expression": [
+        341,
+        0,
+        0
+      ],
+      "Doc3_install1_ci_paths2": true
+    },
+    "Skills": {
+      "head": "913b4222c563ba478ad3965680aec91d6fe78139",
+      "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+      "full_Skills": [
+        557,
+        0,
+        9
+      ],
+      "required3_once": true
+    }
+  },
+  "private_postclose_verification": {
+    "three-owned-c0ae-proportional-maintenance-20261028": {
+      "original_manifest": {
+        "receipt": "three-owned-c0ae-proportional-maintenance-20261028/manifest.json",
+        "bytes": 14343,
+        "sha256": "3d6ee39e01818747c057a719a0e56a4467f05993b39429b2d43811c8dfb86252"
+      },
+      "entries_verified": 91,
+      "mismatches": [],
+      "explicit_later_Root_push_files": [
+        {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood-push.stderr",
+          "bytes": 162,
+          "sha256": "ebc8610c479785e026536ec057cef1e62564f0c6fb452fd4e984990e17935a6d"
+        },
+        {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood-push.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Mood-qualified-push-result.json",
+          "bytes": 443,
+          "sha256": "490af69931e6cba6566528f68804ff945da3265d2f91a4ab96d8aebd743959e4"
+        },
+        {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Root-reviewed-Mood-Skills-maintenance.json",
+          "bytes": 434,
+          "sha256": "c1dfe32ec9e71f258fb30b40e09229f26151950bc7d6ea417f28f5981493dec5"
+        },
+        {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills-push.stderr",
+          "bytes": 160,
+          "sha256": "0e3161f02c73858993bce422f1c49ef1b0d1ce8c5e1d3f31af30b74c15e1bc6e"
+        },
+        {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills-push.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "receipt": "three-owned-c0ae-proportional-maintenance-20261028/Skills-qualified-push-result.json",
+          "bytes": 445,
+          "sha256": "1cfb594bb7d0bf9cfddea2f7d909d42a0269858a1577183615c97c88a1bb35ee"
+        }
+      ]
+    },
+    "skills-913-original-native-20261028": {
+      "original_manifest": {
+        "receipt": "skills-913-original-native-20261028/collection-manifest.json",
+        "bytes": 18227,
+        "sha256": "9a577e7a06747140edbdc21afdaaea033a77682942822f6231db4c10ee7ddcda"
+      },
+      "entries_verified": 113,
+      "mismatches": [],
+      "explicit_later_Root_push_files": []
+    }
+  },
+  "source_reads_and_final_train_gate_required": true,
+  "current_train_rule": {
+    "comment": "https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6456076191",
+    "base_only_HOLD_replaced_by_READ_OK": true,
+    "final_base_check": "actual train merged-tree ARM64 run",
+    "no_further_manual_base_carries": true
+  }
+}

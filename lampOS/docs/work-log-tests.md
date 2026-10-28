@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 07:02 — c0ae Mood/Skills maintenance and Skills 913 native proof
+
+Ready for lamp-voice: no for the new Mood6a40/Skills4be heads pending their own original gates and carried reads. Reader3543 publishedfcf2 is ready with Reviewer-two's exact-head READ-OK. Under [First's current rule](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6456076191), the train's own merged-tree ARM64 run is the final base check; base-only HOLDs become READ-OKs. Further manual base carries are parked. Earlier entries retain their capture-time conditions.
+
+[Mood6a40 and Skills4be source maintenance](verification/tests-mood-skills-c0ae-maintenance-20261028/) passed fresh format/metadata with unchanged Rust inputs, exact owned blobs/modes/patch and documented four-path SDK differences; no functional/build/Clippy replay or old count relabelling. Both exact-lease pushes completed. The new own-head originals are watched separately.
+
+[Skills913 originals](verification/tests-skills-913-native-20261028/) both succeeded: **7,856 unique passes, zero bad or selected unrun, 54 skips**; Skills560 (Mac557 plus3Linux), required3 once and9declared ignores unrun. Actual62c00d5c5 [c0ae,913], treeb649baa79, exactly equals the later4be authored tree; this is provenance, not a new4be execution. The SDK workflow delta among94CI records is explicit. Configured34 reprints and auxiliary checks remain separate. Historical failures remain failed. No device or ARM build on Mac.
+
 ## 2026-10-28 06:36 — Skills 913 current host qualification
 
 Ready for lamp-voice: no (new original native checks, current reads and latest-base/train-member disposition remain).
