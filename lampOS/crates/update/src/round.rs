@@ -1708,6 +1708,12 @@ impl Run<'_, '_> {
     ) -> Result<(), String> {
         let until = self.world.clock.now_ms() + within.as_millis() as u64;
         let mut told = false;
+        // Whether the bus has been listened to in this wait. Before the
+        // first listen a round's gate has heard nothing, so its reason is
+        // always that the voice says nothing: that line is said only after
+        // a look, with the real reason (lamp-3e83 on 2026-10-28 logged
+        // "says nothing" for 22 minutes of someone talking to the lamp).
+        let mut looked = false;
         loop {
             if !self.voice_running() {
                 return Ok(());
@@ -1723,11 +1729,12 @@ impl Run<'_, '_> {
             if now >= until {
                 return Err(format!("no quiet moment in {} s: {why}", within.as_secs()));
             }
-            if !told {
+            if looked && !told {
                 self.say(&format!("waiting for a quiet moment: {why}"));
                 told = true;
             }
             self.listen(LOOK_EVERY);
+            looked = true;
         }
     }
 
