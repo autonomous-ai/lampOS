@@ -109,11 +109,16 @@ the helper rejects it before executing an artifact binary.
 **Where the artifact is built.** With repository variable `LAMPOS_STUDIO` set
 to `on`, lamp-voice's `arm64` job may run on the internal Mac Studio's trusted
 runner (`studio-trusted`) instead of GitHub-hosted: one VM, fresh for each
-job and deleted after it, with no cache mounted, that takes only `lamp-voice`
-and `main`. `.github/scripts/lampos-route.py` chooses, and falls back to
-GitHub-hosted on any doubt. The build is cold either way. `publish` and
+job and deleted after it, with no cache mounted, that takes only `lamp-voice`.
+`.github/scripts/lampos-route.py` chooses, and falls back to GitHub-hosted on
+any doubt and on every re-run. The build is cold either way. `publish` and
 `promote-stable` always run on GitHub-hosted, so the signing key never
-reaches the Studio; publish checks the artifact's SHA-256 before signing.
+reaches the Studio. The key staying away does not keep the Studio out of the
+release's trust: `publish` signs the bytes the Studio built, and its SHA-256
+check covers only their transfer, not the build. So with `on`, the Studio
+host, its hypervisor and its VM image are part of what the signature vouches
+for, alongside GitHub; the team's devops administers them. The Studio's
+pull-request pool is retired: no pull request runs on that host.
 
 ### Selecting a published build for the stable feed
 

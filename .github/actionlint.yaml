@@ -1,5 +1,4 @@
 self-hosted-runner:
   # The internal Mac Studio's runners (org group lampos-studio): lamp-voice's ARM64 job on studio-trusted.
   labels:
-    - studio
     - studio-trusted
