@@ -19,6 +19,7 @@ import asyncio
 import datetime
 import ipaddress
 import json
+import math
 import os
 import ssl
 import tempfile
@@ -68,10 +69,29 @@ def _certificate() -> tuple[bytes, bytes]:
 LAMP_CONTROL_REFUSES = {
     "look": "not routed yet: waits for the body's lease socket",
     "joints": "not routed yet: waits for the body's lease socket",
-    "express": "not routed yet: waits for the feelings skill",
     "play": "not routed yet: waits for client packages",
     "sound": "not routed yet: waits for client packages",
 }
+
+
+# `express`'s feelings and their moves, as lamp-control's feelings.rs.
+FEELING_MOVES = {"glad": "glad-lift", "lively": "perk", "low": "low-droop"}
+
+
+# `low` goes no smaller than three quarters (feelings.rs `least_step`).
+FEELING_LEAST_STEP = {"glad": 1, "lively": 1, "low": 3}
+
+
+def _feeling_move(request: dict) -> str | None:
+    """The move lamp-control sends for this strength: the skill's own from
+    0.5 up, below it a quarter step of it, by its own name; none under 0.0625.
+    Halves round up, as Rust's and JS's do (jarvis's P3 on #4020)."""
+    step = math.floor(min(max(request.get("strength", 0.5) / 0.5, 0.0), 1.0) * 4 + 0.5)
+    if step == 0:
+        return None
+    step = max(step, FEELING_LEAST_STEP[request["feeling"]])
+    name = FEELING_MOVES[request["feeling"]]
+    return name if step == 4 else f"{name}-{step * 25}"
 
 
 def _now() -> str:
@@ -339,6 +359,14 @@ class FakeLamp:
             # As lamp-control routes them: the body takes them, and no
             # `done` follows.
             await self._ok(ws, id_, to="body")
+        elif op == "express":
+            # As lamp-control's feelings.rs: the feelings skill's three, its
+            # move to the body (smaller below strength 0.5) and its light; no
+            # `done` follows. The fake always shows the light.
+            if request["feeling"] not in FEELING_MOVES:
+                await self._refuse(ws, id_, "bad_request", "feeling: one of glad, lively, low")
+                return
+            await self._ok(ws, id_, to="body", move=_feeling_move(request), light=True)
         elif op == "say":
             # As lamp-control: the voice takes it, and its `done` follows.
             await self._ok(ws, id_, to="voice")

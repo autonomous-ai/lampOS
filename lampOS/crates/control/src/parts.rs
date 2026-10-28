@@ -11,15 +11,18 @@
 //! - `say` → the voice's say socket as written words (`text`), through its
 //!   quiet, privacy, pause and busy gates. Its outcome comes later as a
 //!   `done` event: spoken, dropped, expired or refused, with why.
+//! - `express` → the `feelings` skill's own move for it, sent whole on the
+//!   mood socket as `move` is, and its light as `light` is
+//!   (`crate::feelings`). With no light to show (off, not known or at its
+//!   dimmest) the move goes alone, and the answer says why.
 //!
 //! The priority is this part's, never the caller's: a client cannot claim
 //! more than `skill`. With the parts' own caller check (#3720, Ten's caps)
 //! the body and the ring hold `lamp-control` to `skill` as well.
 //!
 //! Not routed yet, each refused with what it waits for: `look` and `joints`
-//! (the body's lease socket, Ten's piece 4), `express` (Jarvis's `feelings`
-//! skill), `play` and `sound` (a client's package, with the Store's
-//! packaging). State and events from the bus come in their own piece.
+//! (the body's lease socket, Ten's piece 4), `play` and `sound` (a client's
+//! package, with the Store's packaging). State and events from the bus come in their own piece.
 
 use std::collections::HashMap;
 use std::io::{BufReader, Write as _};
@@ -31,6 +34,7 @@ use std::time::Duration;
 use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority};
 use serde_json::{Value, json};
 
+use crate::feelings;
 use crate::protocol::{Error, ErrorCode, Op, Pattern, StateKind};
 use crate::session::Parts;
 
@@ -169,6 +173,37 @@ impl Lamp {
         Ok(json!({"to": "ring"}))
     }
 
+    fn express(&mut self, client: &str, feeling: &str, strength: f32) -> Result<Value, Error> {
+        let feeling =
+            feelings::named(feeling).map_err(|why| Error::new(ErrorCode::BadRequest, why))?;
+        let mut answer = json!({"to": "body"});
+        match feeling
+            .scaled(strength)
+            .map_err(|why| Error::new(ErrorCode::Refused, why))?
+        {
+            Some(scaled) => {
+                answer["move"] = json!(scaled.name);
+                self.to_body(json!({"move": scaled}), client)?;
+            }
+            None => answer["move"] = Value::Null,
+        }
+        let now = self.state(StateKind::Light);
+        match feeling.light(&now) {
+            Ok((light, pattern)) => {
+                let until_us = (self.clock)() + u64::from(feeling.lasting_ms) * 1_000;
+                match self.ask_ring(client, light.clone(), pattern, until_us) {
+                    Ok(()) => {
+                        self.lights.insert(client.to_owned(), (light, until_us));
+                        answer["light"] = json!(true);
+                    }
+                    Err(error) => answer["light"] = json!(error.why),
+                }
+            }
+            Err(why) => answer["light"] = json!(why),
+        }
+        Ok(answer)
+    }
+
     fn ask_ring(
         &mut self,
         client: &str,
@@ -298,7 +333,7 @@ impl Parts for Lamp {
             } => self.light(client, colour, *level, *pattern, *for_ms),
             Op::Say { text } => self.say(client, re, text),
             Op::Look { .. } | Op::Joints { .. } => Err(waits_for("the body's lease socket")),
-            Op::Express { .. } => Err(waits_for("the feelings skill")),
+            Op::Express { feeling, strength } => self.express(client, feeling, *strength),
             Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
@@ -373,6 +408,112 @@ mod tests {
         let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
         assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));
         assert_eq!(sent["priority"], "skill");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `express` is the feelings skill's own move on the mood socket and
+    /// its light on the ring: glad's lift, breathing from the person's warm
+    /// 3 down to 2 for 12 s; smaller below strength 0.5; with no light
+    /// known, the move alone, said.
+    #[test]
+    fn express_is_the_feelings_skills_move_and_light() {
+        let dir = dir("express");
+        let path = dir.join("mood.sock");
+        let body = UnixDatagram::bind(&path).unwrap();
+        let ring = Ring::default();
+        let watch = Arc::new(Mutex::new(crate::watch::Watch::new()));
+        let mut lamp = Lamp::new(
+            Some(path),
+            Some(Box::new(ring.clone())),
+            None,
+            "boot".into(),
+            quiet(),
+        )
+        .with_clock(booted_61s_ago)
+        .watching(watch.clone());
+        let glad = r#"{"id":1,"op":"express","feeling":"glad"}"#;
+        // No light state yet: the move goes alone, and the answer says why.
+        assert_eq!(
+            lamp.act("c_1", 1, &op(glad), 0).unwrap(),
+            json!({"to": "body", "move": "glad-lift", "light": "the light shown is not known"})
+        );
+        let mut buffer = [0u8; 16 * 1024];
+        let length = body.recv(&mut buffer).unwrap();
+        let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+        assert_eq!(
+            sent["move"],
+            json!(crate::feelings::named("glad").unwrap().written())
+        );
+        assert_eq!(
+            (&sent["source"], &sent["priority"]),
+            (&json!("control:c_1"), &json!("skill"))
+        );
+        assert!(ring.0.lock().unwrap().is_empty());
+        watch.lock().unwrap().take(
+            "light/state",
+            &json!({"on": true, "colour": "warm", "level": 3}),
+            0,
+        );
+        assert_eq!(
+            lamp.act(
+                "c_1",
+                2,
+                &op(r#"{"id":2,"op":"express","feeling":"glad","strength":0.25}"#),
+                0
+            )
+            .unwrap(),
+            json!({"to": "body", "move": "glad-lift-50", "light": true})
+        );
+        let length = body.recv(&mut buffer).unwrap();
+        let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+        let written = crate::feelings::named("glad").unwrap().written();
+        let peak = |frames: &Value| {
+            frames
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|frame| {
+                    frame
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|count| count.as_i64().unwrap().abs())
+                })
+                .max()
+                .unwrap()
+        };
+        assert!(peak(&sent["move"]["frames"]) < peak(&json!(written.frames)));
+        let asked = ring.0.lock().unwrap();
+        assert_eq!(asked[0].claim.until_us, 61_000_000 + 12_000_000);
+        assert_eq!(
+            asked[0].light,
+            Light {
+                on: true,
+                colour: "warm".into(),
+                level: 3
+            }
+        );
+        assert_eq!(
+            asked[0].pattern,
+            Some(LightPattern {
+                kind: PatternKind::Breathe,
+                period_ms: 6_000,
+                low: 2
+            })
+        );
+        drop(asked);
+        // A feeling the skill doesn't have.
+        assert_eq!(
+            lamp.act(
+                "c_1",
+                3,
+                &op(r#"{"id":3,"op":"express","feeling":"cross"}"#),
+                0
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::BadRequest
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -485,7 +626,6 @@ mod tests {
         let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
         for (frame, waits) in [
             (r#"{"id":1,"op":"look","at":"ahead"}"#, "lease socket"),
-            (r#"{"id":1,"op":"express","feeling":"glad"}"#, "feelings"),
             (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
         ] {
             let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();

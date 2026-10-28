@@ -22,6 +22,9 @@ lamp-bus = { path = "../bus" }
 lamp-ipc = { path = "../ipc" }
 # The quiet hours, one definition with lamp-skills (#3924).
 lamp-local-time = { path = "../local-time" }
+# `express`: the feelings skill's moves held to the body's own check
+# (`lamp_body::moves`), as lamp-skills holds a skill's.
+lamp-body = { path = "../body" }
 serde.workspace = true
 serde_json.workspace = true
 # Pairing's proof (HMAC-SHA256), hello's signature (Ed25519) and the nonces,
@@ -42,6 +45,10 @@ rcgen = { version = "0.14", default-features = false, features = ["ring", "crypt
 [dev-dependencies]
 # The end-to-end test's client: TLS pinned to the lamp's certificate.
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
+# `express`'s table checked against the feelings skill's own `[[do]]` and
+# lamp-skills' light rule (`glow::relative`), so the two can't drift.
+lamp-skills = { path = "../skills" }
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [lints]
 workspace = true
