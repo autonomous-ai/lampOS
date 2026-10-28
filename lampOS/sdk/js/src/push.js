@@ -205,6 +205,52 @@ export async function fetchPackage(url, { redirects = 5 } = {}) {
   }
 }
 
+// The skill format's [permissions] a push may carry, onto the pairing's
+// grants, as the Python SDK's push.py has them (docs/control.md).
+const PERMISSION_GRANTS = { body: 'body', light: 'light', speak: 'speak' };
+const PRESENCE_TOPICS = ['humans/faces/tracked', 'room/stood_up'];
+const HEARD_TOPICS = ['voice/heard', 'name/heard', 'ears/classes'];
+const OUTSIDE = ['actions', 'messages', 'known_faces', 'who', 'output_limits', 'propose', 'core'];
+
+const permissionsOf = (rules) => (rules.permissions && typeof rules.permissions === 'object' && !Array.isArray(rules.permissions) ? rules.permissions : {});
+
+// What a skill's rules ask, as the grant names a person is shown: body,
+// light and speak; look for the presence topics, or format 2's look; camera
+// for the picture (camera, or format 1's look: lamp-skills' sees_picture).
+// Sorted, each once.
+export function asksOf(rules) {
+  const permissions = permissionsOf(rules);
+  const format2 = (rules.format ?? 1) === 2;
+  const asks = new Set(Object.entries(PERMISSION_GRANTS).filter(([key]) => permissions[key] === true).map(([, grant]) => grant));
+  const topics = Array.isArray(permissions.topics) ? permissions.topics : [];
+  if (topics.some((topic) => PRESENCE_TOPICS.includes(topic)) || (format2 && permissions.look === true)) asks.add('look');
+  if (permissions.camera === true || (!format2 && permissions.look === true)) asks.add('camera');
+  return [...asks].sort();
+}
+
+// The code and why the lamp would refuse these rules as a push for this
+// pairing's grants, or null: no_grant for a grant it lacks, refused for what
+// no grant allows. The lamp checks it all again; a picture skill isn't
+// refused here, the lamp holds it for the owner's yes.
+export function rulesBeyond(rules, grants) {
+  const kind = rules.kind ?? 'installable';
+  if (kind !== 'installable') return ['refused', `kind = "${kind}": a pushed skill is installable`];
+  const permissions = permissionsOf(rules);
+  for (const key of OUTSIDE) {
+    const given = permissions[key];
+    if (given && !(Array.isArray(given) && given.length === 0)) return ['refused', `[permissions] ${key} is outside the protocol's grants: a push refuses it`];
+  }
+  for (const topic of Array.isArray(permissions.topics) ? permissions.topics : []) {
+    if (HEARD_TOPICS.includes(topic)) return ['refused', `topic ${topic}: hear and sound wait for format 2's phrase and class lists`];
+    if (!PRESENCE_TOPICS.includes(topic)) return ['refused', `topic ${topic}: a raw topic is outside the protocol's grants`];
+    if (!grants.includes('look')) return ['no_grant', `topic ${topic} needs the look grant, which this computer doesn't hold`];
+  }
+  for (const [key, grant] of Object.entries(PERMISSION_GRANTS)) {
+    if (permissions[key] && !grants.includes(grant)) return ['no_grant', `[permissions] ${key} needs the ${grant} grant, which this computer doesn't hold`];
+  }
+  return null;
+}
+
 // A top-level string key of skill.toml (before its first table), basic or
 // literal (`"1.0.0"` or `'1.0.0'`), or undefined.
 function topLevel(toml, key) {

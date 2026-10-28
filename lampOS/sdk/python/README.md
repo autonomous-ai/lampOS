@@ -195,6 +195,18 @@ The package is the shape `lamp-skills pack --key-file` makes. Its
 SHA-256), carries the public key, and signs `lamp-skill.json`'s exact bytes.
 A changed file or a changed manifest fails the check. A signature says the
 bytes are that key's, not who is behind the key: `check` says "signed by key
-FPR16, not the Store", never "verified". Installing someone
-else's package on your lamp is planned (#3504): the lamp will keep a
-skill's author and refuse an update by another key.
+FPR16, not the Store", never "verified".
+
+To put a shared package on your own paired lamp (the `skills` grant):
+
+```sh
+lamp skill install my-skill-1.0.0.tar          # or an https:// URL, 1 MiB at most
+```
+
+It shows the package's name, version and signer, and what it asks in plain
+words (`light`: change the light; `camera`: see the camera's picture, which
+the lamp keeps off until the owner says yes in the app). It asks you yes once,
+then sends it as `skill.push` with `asks` on part 0, the lamp's check that it
+was shown what it asks (`--yes` skips the question). The skill is held to
+your pairing's grants whatever it asks. Planned on the lamp (#3504): it keeps
+a signed skill's author, and refuses an update by another key.

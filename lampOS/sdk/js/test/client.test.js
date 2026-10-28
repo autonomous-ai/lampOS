@@ -661,3 +661,55 @@ test('a package path outside its folder is refused before anything is written', 
   }
   assert.ok(pathOk('moves/wave.json'));
 });
+
+test('a shared package is installed with its asks on part 0, and refused before a byte past the pairing', async () => {
+  const { asksOf, pack } = await import('../src/push.js');
+  const author = new Keyring(folder()).authorKey({ make: true });
+  const signed = pack(skillFolder('desk-wave', 'version = "0.2.0"\n[permissions]\nlight = true\nspeak = true\n'), { author }).data;
+  await withLamp({ grants: ['light', 'speak', 'skills'] }, async (lamp, fake) => {
+    const skill = await lamp.installPackage(signed);
+    assert.deepEqual([skill.name, skill.version, skill.on], ['desk-wave', '0.2.0', true]);
+    const pushes = fake.asked('skill.push');
+    assert.deepEqual(pushes[0].asks, ['light', 'speak']);
+    assert.ok(pushes.slice(1).every((later) => !('asks' in later)));
+    const body = pack(skillFolder('desk-lift', 'version = "0.1.0"\n[permissions]\nbody = true\n'), { author }).data;
+    await assert.rejects(lamp.installPackage(body), byCode.no_grant);
+    await assert.rejects(lamp.installPackage(Buffer.from(signed.toString('latin1').replace('speak = true', 'speak = TRUE'), 'latin1')), (error) => /does not match lamp-skill.json/.test(error.why));
+    assert.equal(fake.asked('skill.push').length, pushes.length);
+  });
+  // The same table as the Python SDK's asks_of test.
+  const { parse } = await import('smol-toml');
+  for (const [rules, asks] of [
+    ['version = "0.1.0"\n[permissions]\nlight = true\nspeak = true\n', ['light', 'speak']],
+    ['version = "0.1.0"\n[permissions]\nbody = true\ntopics = ["room/stood_up"]\n', ['body', 'look']],
+    ['version = "0.1.0"\n[permissions]\nlook = true\n', ['camera']],
+    ['format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\n', ['look']],
+    ['format = 2\nversion = "0.1.0"\n[permissions]\nlook = true\ncamera = true\n', ['camera', 'look']],
+    ['version = "0.1.0"\n', []],
+  ]) assert.deepEqual(asksOf(parse(rules)), asks, rules);
+});
+
+test('lamp skill install shows the signer and asks, then asks yes once', async () => {
+  const { openPackage, pack } = await import('../src/push.js');
+  const fake = await FakeLamp.start({ grants: ['light', 'skills'] });
+  const home = folder();
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
+    const file = join(folder(), 'desk-wave-0.1.0.tar');
+    writeFileSync(file, pack(skillFolder('desk-wave'), { author: new Keyring(folder()).authorKey({ make: true }) }).data);
+    const fpr = openPackage(readFileSync(file)).author;
+    const lamp = (typed, ...args) => new Promise((done) => {
+      const child = execFile(process.execPath, [new URL('../src/cli.js', import.meta.url).pathname, ...args], { env: { ...process.env, LAMPOS_HOME: home } },
+        (error, stdout, stderr) => done({ code: error?.code ?? 0, said: `${stdout}${stderr}`.trim() }));
+      child.stdin.end(typed);
+    });
+    const no = await lamp('n\n', 'skill', 'install', file);
+    assert.ok(no.code === 1 && no.said.endsWith('not installed'), no.said);
+    assert.deepEqual(no.said.split('\n').slice(0, 3), ['desk-wave 0.1.0', `  signed by key ${fpr}, not the Store`, '  asks to change the light (light)']);
+    assert.equal(fake.asked('skill.push').length, 0);
+    const yes = await lamp('y\n', 'skill', 'install', file);
+    assert.ok(yes.code === 0 && yes.said.endsWith('desk-wave 0.1.0 installed, on'), yes.said);
+    const http = await lamp('', 'skill', 'install', 'http://example.com/desk-wave.tar', '--yes');
+    assert.ok(http.code === 1 && /https only/.test(http.said), http.said);
+  } finally { await fake.stop(); }
+});

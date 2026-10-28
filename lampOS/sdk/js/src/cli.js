@@ -5,10 +5,12 @@
 //   lamp hello [LAMP_ID]
 //   lamp fake [--every 10] [--cycles N]
 //   lamp skill push FOLDER [LAMP_ID] | lamp skill list [LAMP_ID] | lamp skill remove NAME [LAMP_ID]
+//   lamp skill install FILE|URL [LAMP_ID] [--yes]
 //   lamp skill keygen | lamp skill pack FOLDER [--sign] [--out DIR] | lamp skill check PACKAGE.tar
 import { createPublicKey } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { Lamp } from './client.js';
 import { find } from './discovery.js';
@@ -16,11 +18,12 @@ import { PORT } from './schema.js';
 import { fake } from './fake.js';
 import { LampError } from './errors.js';
 import { Keyring } from './keys.js';
-import { fingerprint, openPackage, pack } from './push.js';
+import { PACKAGE_MAX, asksOf, fetchPackage, fingerprint, openPackage, pack } from './push.js';
+import { parse as parseToml } from 'smol-toml';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, sign: { type: 'boolean' }, out: { type: 'string' } },
+  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, sign: { type: 'boolean' }, out: { type: 'string' }, yes: { type: 'boolean' } },
 });
 const [command, arg, third, fourth] = positionals;
 
@@ -60,6 +63,8 @@ async function main() {
     } finally {
       await lamp.close();
     }
+  } else if (command === 'skill' && arg === 'install' && third) {
+    return install(third, fourth);
   } else if (command === 'skill' && arg === 'keygen') {
     const ring = new Keyring();
     const made = !ring.authorKey();
@@ -95,8 +100,57 @@ async function main() {
     console.log(`${lamp.info.id}: grants ${lamp.grants.join(', ')}`);
     await lamp.close();
   } else {
-    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] | lamp skill push FOLDER | list | remove NAME [LAMP_ID]');
+    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] | lamp skill push FOLDER | list | remove NAME [LAMP_ID] | lamp skill install FILE|URL [LAMP_ID] [--yes] | lamp skill keygen | pack FOLDER [--sign] [--out DIR] | check PACKAGE.tar');
     return 2;
+  }
+  return 0;
+}
+
+// What each ask lets a skill do, in the words a person is shown.
+const ASK_WORDS = {
+  body: 'move the lamp',
+  camera: "see the camera's picture",
+  light: 'change the light',
+  look: 'know when someone is at the lamp',
+  speak: 'speak and play sounds',
+};
+
+async function install(source, lampId) {
+  let data;
+  // A URL is fetched over https only; anything else is a file here.
+  if (source.includes('://')) {
+    data = await fetchPackage(source);
+  } else {
+    if (statSync(source).size > PACKAGE_MAX) throw new LampError(`${source}: a shared skill is 1 MiB at most`, { code: 'bad_request' });
+    data = readFileSync(source);
+  }
+  const opened = openPackage(data);
+  let asks = [];
+  try {
+    asks = asksOf(parseToml((opened.files.get('skill.toml') ?? Buffer.alloc(0)).toString('utf8')));
+  } catch {
+    // The lamp says what's wrong with it; installPackage refuses it first.
+  }
+  // Integrity, not trust: anyone can make a key (Fourteen, #3504).
+  console.log(`${opened.name} ${opened.version}`);
+  console.log(opened.author ? `  signed by key ${opened.author}, not the Store` : '  not signed, not the Store');
+  for (const ask of asks) console.log(`  asks to ${ASK_WORDS[ask]} (${ask})`);
+  if (asks.includes('camera')) console.log("  It asks for the camera's picture: the lamp keeps it off until the owner says yes in the app.");
+  if (!values.yes) {
+    const prompt = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = (await prompt.question(`Put ${opened.name} on your lamp? [y/N] `)).trim().toLowerCase();
+    prompt.close();
+    if (answer !== 'y' && answer !== 'yes') {
+      console.log('not installed');
+      return 1;
+    }
+  }
+  const lamp = await Lamp.connect(lampId);
+  try {
+    const skill = await lamp.installPackage(data);
+    console.log(`${skill.name} ${skill.version} installed, ${skill.on ? 'on' : 'off'}${skill.held ? `, held: ${skill.held}` : ''}`);
+  } finally {
+    await lamp.close();
   }
   return 0;
 }

@@ -5,6 +5,7 @@
 //
 // Every message is docs/control.schema.json's. Names the schema enumerates are
 // checked before sending, and a refusal rejects with its typed error.
+import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import WebSocket from 'ws';
 import * as schema from './schema.js';
@@ -376,11 +377,43 @@ export class Lamp {
   async pushSkill(folder) {
     if (!this.grants.includes('skills')) throw new byCode.no_grant('not granted: skills');
     const { pack } = await import('./push.js');
-    const pkg = pack(folder);
+    return this.#sendPackage(pack(folder));
+  }
+
+  // Put a shared package (`lamp skill pack`'s, signed or not) on the paired
+  // lamp, as `skill.push` with `asks` on part 0: the package and its
+  // signature checked first, then what its rules ask against this pairing.
+  // Returns the lamp's `skill`. Show the person the package's signer and
+  // `asksOf` first: the lamp holds a picture skill for the owner's yes in the
+  // app whatever is said here.
+  async installPackage(data) {
+    const { PART_BYTES, asksOf, openPackage, rulesBeyond } = await import('./push.js');
+    data = Buffer.from(data);
+    const { parse } = await import('smol-toml');
+    const opened = openPackage(data);
+    const toml = opened.files.get('skill.toml');
+    if (!toml) throw new LampError(`${opened.name}: no skill.toml`, { code: 'bad_request' });
+    let rules;
+    try {
+      rules = parse(toml.toString('utf8'));
+    } catch (error) {
+      throw new LampError(`${opened.name}: skill.toml: ${error.message}`, { code: 'bad_request' });
+    }
+    if (!this.grants.includes('skills')) throw new byCode.no_grant('not granted: skills');
+    const beyond = rulesBeyond(rules, this.grants);
+    if (beyond) throw new byCode[beyond[0]](beyond[1]);
+    const parts = [];
+    for (let at = 0; at < data.length; at += PART_BYTES) parts.push(data.subarray(at, at + PART_BYTES).toString('base64'));
+    const sha256 = createHash('sha256').update(data).digest('hex');
+    return this.#sendPackage({ name: opened.name, sha256, data, parts }, asksOf(rules));
+  }
+
+  async #sendPackage(pkg, asks) {
     let reply = {};
     for (const [part, data] of pkg.parts.entries()) {
       reply = await this.request('skill.push', {
         name: pkg.name, sha256: pkg.sha256, size: pkg.data.length, part, parts: pkg.parts.length, data,
+        ...(part === 0 && asks ? { asks } : {}),
       });
     }
     return reply.skill ?? {};

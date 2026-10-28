@@ -7,11 +7,12 @@
   "engines": { "node": ">=20.11" },
   "exports": {
     ".": "./src/index.js",
+    "./push": "./src/push.js",
     "./testing": "./src/testing.js"
   },
   "bin": { "lamp": "./src/cli.js", "lampos": "./src/cli.js" },
   "files": ["src"],
-  "dependencies": { "ws": "^8.18.3" },
+  "dependencies": { "smol-toml": "1.9.0", "ws": "^8.18.3" },
   "optionalDependencies": { "bonjour-service": "^1.2.1" },
   "scripts": { "test": "node --test --test-timeout=20000 test/*.test.js" }
 }
