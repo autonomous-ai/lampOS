@@ -26,9 +26,11 @@ What it says and when:
 - Three times a day at most, once an hour at most, never at night
   (22:00 to 08:00), and at most one of the wellbeing nudges an hour
   between them. The warm word after it is not counted.
+- No warm word for coming back after a break: only for sitting back.
+- Two words in a row you didn't notice and it rests until the next morning.
 - "Not today" or "stop the sit-back reminders" to the lamp snoozes it until
   tomorrow morning or turns it off until you ask for it again. The
-  wellbeing nudges share that one function.
+  wellbeing nudges share that one function, which stops the last of them.
 
 It keeps nothing about you: only, in memory, how many times it went today;
 off is one line with its name.
