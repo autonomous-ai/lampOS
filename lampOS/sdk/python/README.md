@@ -177,3 +177,134 @@ the only picture, so a `look = true` step there needs `camera = true`; a
 format other than 1 or 2 is refused. The rules between keys, such as permissions
 covering every read, are the lamp's own load check: a folder that passes
 here can still be refused there, with its reason.
+
+## Everything you can read
+
+What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
+[control.md](../../docs/control.md) and the schema. Every event comes **by
+edge**: when something changes, never once per sensor reading. Each event
+carries `at`, a UTC time ending `Z`, besides the fields below. Subscribe with
+`on(event, …)`. An event your pairing lacks the grant for is refused at
+subscribe.
+
+### Events
+
+| event | fields | example | fires when | grant |
+|---|---|---|---|---|
+| `person.arrived` | `count`: faces in view now. `near`: the nearest face's height, as a share of the picture (0–1, 2 places) | `{"ev":"person.arrived","count":1,"near":0.31}` | a face is seen while the lamp had nobody: at its start, or after `person.left` (nobody for 5 s). A face gone for less than that fires nothing | `look` |
+| `person.left` | `count`: 0 | `{"ev":"person.left","count":0}` | nobody has been in view for 5 s, after someone was | `look` |
+| `person.facing` | `facing`: true or false | `{"ev":"person.facing","facing":true}` | someone turns to the lamp, or the last one turns away | `look` |
+| `person.stood_up` | `side`: `left`, `right` or `ahead`, when the room's watcher says | `{"ev":"person.stood_up","side":"left"}` | someone in view stands up | `look` |
+| `phrase.heard` | `phrase`: one of the phrases you registered | `{"ev":"phrase.heard","phrase":"good night lamp"}` | a finished line the lamp heard holds your phrase as whole words, ignoring case and punctuation. Only the phrase leaves the lamp | `hear` |
+| `name.heard` | none | `{"ev":"name.heard"}` | someone says the lamp's name | `hear` |
+| `sound.heard` | `class`: `music`, `laughter`, `door` or `footsteps`. `score`: 0.5–1, 2 places | `{"ev":"sound.heard","class":"door","score":0.72}` | a class's score rises past 0.5 (again only after it falls under). Never speech | `sound` |
+| `touch` | `kind`: `tap` (two or more taps are one tap) or `pet`. The schema also has `hold` and `where`, not sent yet | `{"ev":"touch","kind":"pet"}` | a tap or a pet on the lamp | none |
+| `button` | `press`: `long_press`. The schema also has `press`, not sent yet | `{"ev":"button","press":"long_press"}` | the button is held | none |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false). `quiet_hours` is planned, not sent yet | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
+| `time` | your schedule | | accepted in a subscription, not produced yet | none |
+| `hand` | `seen`. When seen: `x`, `y` (the palm's centre, 0–1 from the picture's left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. All to 2 places, never the tracker's clock | `{"ev":"hand","seen":true,"x":0.42,"y":0.55,"size":0.12,"open":true,"confidence":0.91}` and `{"ev":"hand","seen":false}` | a hand is first seen, moves or grows by 0.05, opens or closes, at most 4 a second (the newest kept). `seen: false` once, 1 s after the last. Under 0.5 confidence is no hand | `look` |
+
+And two that come by themselves, with no subscription:
+
+| event | fields | example | fires when |
+|---|---|---|---|
+| `lease` | `lease`, `state` (`held`, `suspended`, `lost`), `why` (`conversation`, `hand`, `stop_heard`, `private`, `paused`, `asleep`, `expired`, `taken_by_owner_app`, `revoked`, `released`, `slumped`) | `{"ev":"lease","lease":"l_3","state":"suspended","why":"conversation"}` | one of your leases changes: talking suspends it and resting holds it again; a hand on the body, a stop, a pause, privacy or sleep loses it |
+| `done` | `re` (your request's id), `how` (`finished`, `cut_short`, `dropped`), `why` | `{"ev":"done","re":14,"how":"finished"}` | an action that ends later has ended. Today that's `say` |
+
+### States, with `get`
+
+| state | fields | example | grant |
+|---|---|---|---|
+| `presence` | `count`, `near` (0–1), `facing`. Counts and how near, never who | `{"count":1,"near":0.31,"facing":true}` | `look` |
+| `light` | the person's own light: `on`, `colour`, `level`. Also `shows`: what the ring draws now, `{on, colour, level}`. `null` until the lamp has said either | `{"on":true,"colour":"warm","level":3,"shows":{"on":true,"colour":"green","level":2}}` | none |
+| `mood` | `energy`, `warmth`, `awake`, `asleep`, the lamp's inner state. `null` until known | `{"energy":0.6,"warmth":0.7,"awake":true,"asleep":false}` | none |
+| `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
+| `air` | the room's air (particles, humidity, temperature, CO2), from the lamp's air part | planned: not a state `get` answers yet | |
+
+### Never readable
+
+Through this door, by any grant: camera frames or pictures, audio, transcripts
+or the words around a phrase, face prints, and anyone's name. A hand's or a
+face's place in the picture is a share of it, never the picture.
+
+## Reference
+
+Every public call and `lamp` command, with what the lamp takes. The ranges are
+what lamp-control and the ring refuse past, read from
+[control.md](../../docs/control.md) and their code. The SDK checks names
+against the schema before sending, and the lamp checks the rest. A test keeps
+every public method named here.
+
+**Today a lamp refuses** `look` (but at `hand`, on a lamp with the body's lease
+socket), `joints`, `play` and `sound` with `refused`, "not routed yet: waits for
+…" (`lampos.testing.LAMP_CONTROL_REFUSES`), and `say` and `sound` in its quiet
+hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
+`lamp.limits["quiet_hours"]`), or while its time isn't known, with `quiet_hours`.
+
+### Connecting
+
+| call | parameters | returns |
+|---|---|---|
+| `await Lamp.pair(code, host, *, pin, port=7731, name=None, keyring=None)` | `code`: the owner's 8-digit pairing code. `host`: the lamp's address. `pin`: the certificate's SHA-256 the app shows, 64 hex. `port`: 7731. `name`: this computer's name in the app, 1–64 characters, default the host name. `keyring`: where the key and pairings are kept, default `Keyring()` (`LAMPOS_HOME`, else `~/.config/lampos`) | a `Pairing` (`lamp`, `client`, `grants`, …) |
+| `await Lamp.connect(lamp=None, *, host=None, keyring=None)` | `lamp`: a paired lamp's id, or the only one paired. `host`: an address to use instead of the kept one | a `Lamp`, after hello. Also `async with await Lamp.connect() as lamp:` |
+| `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: each rate as `{most, within_ms}` windows (`joints`, `motion`, `light`, `say`, `express`, …), `hold_max_ms`, `take_max_ms`, `say_max_chars` and `quiet_hours` (`{from, to}` or `off`). The fake lamp sends only `joints_hz` |
+| `await lamp.close()` | | lets go of every lease, then closes |
+| `await lamp.wait_closed()` | | returns when the connection ends, and raises a subscription's refusal nobody awaited |
+| `await find(seconds=3.0)` (`lampos.discovery`) | `seconds`: how long to listen for mDNS | the lamps on this network (`id`, `name`, `host`, `port`, `fp`). Needs `pip install 'lampos[find]'` |
+
+### Events and state
+
+| call | parameters | grant |
+|---|---|---|
+| `lamp.on(event, handler, *, phrases=None)` | `event`: one of the schema's events (below), or `lease` or `done`. `handler(event)`: a function or coroutine. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Returns a `Subscription`: `await` it to get the lamp's refusal |
+| `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
+| `await lamp.subscribe(events, phrases=None)`, `await lamp.unsubscribe(events)` | a list of events | each event's |
+| `await lamp.get(*states)` | `presence` (needs `look`), `light`, `mood`, `lamp` | the states asked, by those names |
+
+Every event and state, with its fields, an example and when it fires, is
+"Everything you can read" above.
+
+### Leases
+
+| call | parameters | |
+|---|---|---|
+| `lamp.lease(*parts, for_ms=30_000, why=None)` | `parts`: `body` (grant `body`), `light` (`light`), `voice` (`speak`). `for_ms`: 1–30,000. `why`: up to 200 characters, shown to the owner | a `Lease`. `async with lamp.lease("body") as lease:` takes it, renews it at half its time, and lets go at the end |
+| `await lease.take()`, `await lease.release()` | | `lease.id`, `lease.state` (`held`, `suspended`, `lost`, `released`), `lease.held`, `lease.lost_why` |
+
+### Actions
+
+Each returns the lamp's answer when the action is taken. `wait=True` returns
+its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
+
+| call | parameters | grant | lease | rate |
+|---|---|---|---|---|
+| `await lamp.express(feeling, strength=None)` | `feeling`: `glad`, `lively` or `low`. `strength`: 0–1, default 0.5. Under 0.5 a smaller move; under 0.0625 no move, only the light | `body` and `light` | no | 1 a minute |
+| `await lamp.gesture(name, *, wait=False)` | `name`: `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (never `idle` or `scanning`) | `body` | no | motion: 1 every 2 s |
+| `await lamp.look(at=None, *, yaw=None, pitch=None)` | `at`: `face` (needs `look` too), `hand` (needs `look` too: the body follows the hand in view until another look, a `stop` or the lease ends; answered `{"to":"body","follow":"hand"}`, no `done`; needs the body's lease socket on the lamp), `name` or `ahead`. Or `yaw` −180 to 180 and `pitch` −90 to 90 in degrees, right and up positive, kept in the body's reach | `body` | `body` | motion |
+| `await lamp.move(frames, step_ms, *, wait=False)` | `frames`: 2–500 frames of 5 joints (pitch, roll, yaw, shoulder, elbow) in counts from home, the first and last all 0. `step_ms`: 40–1,000, and 1.5 to 10 s in all. Each joint within the body's reach and speed, else `bad_request` in the body's words | `body` | `body` | motion |
+| `await lamp.play(name, *, wait=False)` | `name`: a move of your installed package | `body` | `body` | motion |
+| `await lamp.joints(lease, within_ms, **targets)` | `lease`: your held `body` lease. `within_ms`: up to 5,000. `targets`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow` in degrees, −180 to 180, at least one | `body` | `body` (named) | 20 a second |
+| `await lamp.light(colour, level, for_ms, pattern=None)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `for_ms`: 1–30,000. `pattern`: none (steady), `breathe` (level 2 or up), `candle` (3 or up) or `pulse` (2 or up). Under its level a pattern is `refused`. The ring plays one `pulse` a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no | 5 a second |
+| `await lamp.say(text)` | `text`: words, up to 300 characters | `speak` | no | 6 a minute, 60 an hour; refused in quiet hours |
+| `await lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no | as `say` |
+| `await lamp.stop()` | | none | no | |
+| `await lamp.request(op, **fields)` | any op of the schema, checked against it first | the op's | | |
+
+**Refusals** raise `lampos.errors.BY_CODE[code]`, a `LampError` with `code`,
+`why` and, for `rate`, `retry_ms`: `unpaired`, `no_hello`, `no_grant`,
+`no_lease`, `lease_lost`, `busy`, `refused`, `quiet_hours`, `private`,
+`paused`, `asleep`, `rate`, `bad_request`, `off`.
+
+### The `lamp` command
+
+| command | options |
+|---|---|
+| `lamp find` | none: lamps on this network by mDNS (needs `lampos[find]`) |
+| `lamp pair CODE --pin PIN [--host HOST] [--port 7731] [--name NAME]` | `CODE`: the 8-digit code. `--pin`: the 64-hex pin the app shows (required). `--host`: the address, found by mDNS without it. `--port`: 7731. `--name`: this computer's name in the app |
+| `lamp hello [LAMP_ID]` | a paired lamp's id, or the only one: connects and shows its grants |
+| `lamp fake [--every 10] [--cycles N] [--everything]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet |
+| `lamp skill check FOLDER...` | each a skill folder (`SKILL.md` and `skill.toml`), checked against the skill format |
+
+`LAMPOS_HOME` sets where the key and pairings are kept, for every command.
+`LAMPOS_LOG=debug` prints every frame to and from the lamp on stderr, secrets
+redacted ("Seeing every frame" above).
