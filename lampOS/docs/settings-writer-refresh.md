@@ -3,6 +3,13 @@
 Design and record/admission foundation for
 [#3689](https://github.com/autonomous-ai/lampOS/issues/3689), 27 October 2026.
 **The foundation is unwired; the privileged refresh remains a plan.**
+
+**What shipped instead (#4178, 28 October):** a round refreshes the writer
+from the lamp-update that runs, through the writer's one-shot unit. It
+keeps the copy before as `.prev`, proves the new writer by its own `back`,
+or puts the copy before back. It is described in
+[updates.md, "The settings writer refreshed"](updates.md#the-settings-writer-refreshed-3689).
+The guard and records below are not what it uses.
 The settings writer comes first; adding parts and carrying
 templates, sockets and timers follows separately. Store key delivery is
 Seventh's #3692. Harness installation is #3693.
