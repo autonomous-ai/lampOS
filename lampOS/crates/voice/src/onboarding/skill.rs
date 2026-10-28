@@ -24,6 +24,11 @@ const ROOM_SOUNDS_CONSENT: &str = "done only after a clear yes";
 pub struct Definition {
     pub(crate) order: Vec<Step>,
     pub(crate) reoffer_after_s: u64,
+    /// A step left `later` (nobody tried it) is offered again this long
+    /// after the walk ends, the same sitting, then once more after
+    /// `reoffer_after_s` (#3996). Optional, as #3781's lines are.
+    #[serde(default = "later_after_s")]
+    pub(crate) later_after_s: u64,
     pub(crate) steps: BTreeMap<Step, StepWords>,
     pub(crate) words: Words,
 }
@@ -39,6 +44,11 @@ pub(crate) struct StepWords {
     /// none, and then the skip is said by nobody.
     #[serde(default)]
     pub(crate) skipped: Option<String>,
+    /// Said first when a `later` step is offered again, naming it, so a
+    /// person half an hour on knows why the lamp asks (#3996, the first
+    /// builder's P2 on #4012). Optional: without one, only `reoffer`.
+    #[serde(default)]
+    pub(crate) later_reoffer: Option<String>,
     pub(crate) nudge: Option<Nudge>,
 }
 
@@ -95,12 +105,29 @@ pub(crate) struct Words {
     /// Said each time a push is let go before the head moved enough.
     #[serde(default)]
     pub(crate) give_more: Option<String>,
+    /// Said when a step ends with no attempt (`later`, #3996).
+    #[serde(default)]
+    pub(crate) later: Option<String>,
     pub(crate) give_done: String,
     pub(crate) give_failed: String,
     pub(crate) who_confirm: String,
 }
 
+/// [`Definition::later_after_s`] without one in the file: 30 minutes.
+fn later_after_s() -> u64 {
+    1_800
+}
+
+/// What a step that ends with no attempt says without a line in the file.
+pub(crate) const LATER: &str =
+    "(Say only this, nothing before or after it: \"No problem, we'll try that one later.\")";
+
 impl Definition {
+    /// The line said when a step ends `later` (#3996).
+    pub(crate) fn later_line(&self) -> String {
+        self.words.later.clone().unwrap_or_else(|| LATER.to_owned())
+    }
+
     /// Exactly the nine mechanisms, in the skill's order. Data cannot add an
     /// actuator, relax a physical check, or remove the privacy flow's priority.
     pub fn checked(self) -> Result<Self, String> {
@@ -116,6 +143,9 @@ impl Definition {
         }
         if !(1..=31_536_000).contains(&self.reoffer_after_s) {
             return Err("[onboarding] reoffer_after_s is 1 to 31536000".into());
+        }
+        if !(1..=31_536_000).contains(&self.later_after_s) {
+            return Err("[onboarding] later_after_s is 1 to 31536000".into());
         }
         for (step, words) in &self.steps {
             let slots: &[&str] = if *step == Step::Privacy {
@@ -158,6 +188,9 @@ impl Definition {
                     "[onboarding] only where_you_sit, how_you_sound, touch and giving_way may have a skipped line"
                         .into(),
                 );
+            }
+            if let Some(line) = &words.later_reoffer {
+                checked_words("onboarding step", &[("later_reoffer", line, &[])])?;
             }
             if let Some(skipped) = &words.skipped {
                 checked_words("onboarding step", &[("skipped", skipped, &[])])?;
@@ -209,6 +242,7 @@ impl Definition {
             ("give_prompt", &self.words.give_prompt),
             ("give_more", &self.words.give_more),
             ("near_missed", &self.words.near_missed),
+            ("later", &self.words.later),
         ] {
             if let Some(line) = line {
                 checked_words("onboarding words", &[(name, line, &[])])?;
@@ -220,6 +254,10 @@ impl Definition {
     pub(crate) fn note(&self, step: Step, again: bool) -> &str {
         let words = &self.steps[&step];
         if again { &words.reoffer } else { &words.first }
+    }
+
+    pub(crate) fn later_reoffer(&self, step: Step) -> Option<&str> {
+        self.steps[&step].later_reoffer.as_deref()
     }
 
     pub(crate) fn skipped(&self, step: Step) -> Option<&str> {
