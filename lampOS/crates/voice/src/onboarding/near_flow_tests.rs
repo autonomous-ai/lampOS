@@ -1284,8 +1284,9 @@ fn too_few_calls_or_too_far_apart_keep_no_file_and_the_default() {
     for (turn, rise) in [(1, 18.0), (2, 28.1), (3, 20.0)] {
         assert_eq!(call(&mut walk, turn * 20 * S, rise, turn)["accepted"], true);
     }
-    // Calls were tried and refused: the name part's failure is said.
-    assert_eq!(settle(&mut walk, 80 * S), [NEAR_FAILED]);
+    // Calls were tried and refused: the name part's failure waits for the
+    // step's end (the Reviewer-lead's P2 on #4269).
+    assert!(settle(&mut walk, 80 * S).is_empty());
     assert_eq!(named(&walk), Some(Outcome::Failed));
     assert!(!store.near_file().exists());
 }
@@ -1665,8 +1666,7 @@ fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
         let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
         judge(&mut walk, &prompt);
     }
-    // No call was tried, so the name part says nothing (Seventh's P3 2 on
-    // #4192).
+    // The name part says nothing mid-step (Seventh's P3 2 on #4192).
     assert!(settle(&mut walk, 70 * S).is_empty());
     assert_eq!(named(&walk), Some(Outcome::Failed));
     ask(&mut walk, 80 * S, 4);
@@ -1678,7 +1678,9 @@ fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
         sentence(&mut walk, 110 * S, 2_000, 20.0, Some(5))["accepted"],
         true
     );
-    settle(&mut walk, 130 * S);
+    // Done by its sentence, the step still says the call wasn't learned
+    // (the Reviewer-lead's P2 on #4269).
+    assert_eq!(settle(&mut walk, 130 * S), [SENTENCE_DONE, NEAR_FAILED]);
     assert_eq!(outcome(&walk), Some(Outcome::Done));
     assert!(!store.near_file().exists());
     // A kept "done" needs its sentence asked.
@@ -1745,7 +1747,7 @@ fn calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_p
         let judged = judge(&mut walk, &prompt);
         assert_eq!(judged["why"], "the name wasn't heard");
         assert_eq!(walk.kept().near_call_prompts, 3);
-        assert_eq!(settle(&mut walk, 110 * S), [NEAR_FAILED]);
+        assert!(settle(&mut walk, 110 * S).is_empty());
         assert!(!store.near_file().exists());
         ask(&mut walk, 120 * S, 6);
         // "Okay": a line whose words came back none does not close the try.
@@ -1770,7 +1772,7 @@ fn calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_p
         assert_eq!(judged["accepted"], accepted, "{judged}");
         assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, 6.0);
         if accepted {
-            assert_eq!(settle(&mut walk, 130 * S), [SENTENCE_DONE]);
+            assert_eq!(settle(&mut walk, 130 * S), [SENTENCE_DONE, NEAR_FAILED]);
             assert_eq!(outcome(&walk), Some(Outcome::Done));
         } else {
             assert_eq!(judged["short"], "level");
@@ -1941,12 +1943,13 @@ fn a_refused_call_heard_only_as_text_then_silence_ends_failed() {
     }
     let mut said = settle(&mut walk, 70 * S);
     said.extend(settle(&mut walk, 71 * S));
-    assert_eq!(said, [NEAR_FAILED]);
+    assert!(said.is_empty(), "{said:?}");
     assert_eq!(named(&walk), Some(Outcome::Failed));
     for (at, turn) in [(80 * S, 4), (110 * S, 5)] {
         ask(&mut walk, at, turn);
         sentence_none(&mut walk, at);
     }
-    assert_eq!(settle(&mut walk, 140 * S), [SENTENCE_FAILED]);
+    // At the step's end: the sentence's line, then the call's.
+    assert_eq!(settle(&mut walk, 140 * S), [SENTENCE_FAILED, NEAR_FAILED]);
     assert_eq!(outcome(&walk), Some(Outcome::Failed));
 }
