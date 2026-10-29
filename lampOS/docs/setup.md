@@ -320,7 +320,10 @@ returns, so nothing of it is kept. `wpa_cli status` prints the joined network's
 name with C escapes ("Nhà Lan" as `Nh\xc3\xa0 Lan`); it is decoded before it is
 compared with the name asked for. V1's eight failure cases, from its
 own captured wpa_supplicant lines, are tests here (`crates/setup/tests/it/wifi.rs`),
-with the join's timing against a fake lamp.
+with the join's timing against a fake lamp. One rejected key is not the early
+stop, since a router can refuse a right password's first handshake: the join
+keeps waiting, a join at 20 s is kept, and one that never joins gets the whole
+minute, then `wrong_password` (#4348).
 
 **The TLS reach.** A TCP connection alone is not the Internet: anything that
 accepts and stays silent, or answers in plain text, would pass. So, as V1, the
@@ -778,7 +781,8 @@ Tests (`crates/setup/tests/it/wifi_change.rs`, with a fake network manager): a
 network that joins and reaches the broker kept, and the old file gone; the old
 file kept while waiting; a wrong password, a network out of range, one with no
 address and one without the broker each back on the old network, never the
-hotspot; an old network that does not come back kept, within 2 min; no Wi-Fi
+hotspot; one rejected key kept waiting, then joined and kept, or the whole
+bound and back with the wrong password (#4351); an old network that does not come back kept, within 2 min; no Wi-Fi
 file refused; the request's checks in setup's words; the password and the names
 in no reply or journal line, for every outcome; the switch off, the radio
 untouched; the three lines, and the lost line at most once a minute and given
