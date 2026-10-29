@@ -534,6 +534,15 @@ voice fallback when the skill is absent. Stale, skipped, redone or restarted
 attempts cannot borrow another invitation. This bridge adds no model tool and
 grants no microphone, camera or body authority.
 
+`onboarding/pending` also says `walk` (#4367): true while the walk is under
+way (`Onboarding::under_way`: from its start to every step's outcome, the
+gaps between steps and a redo included, and while its progress is not yet
+read), whether or not an invitation is pending. The steps the model leads
+by talk (where you sit, who you are, touch, room sounds, face expressions,
+preferences) hold no invitation, so a skill that keeps out of setup, as Head
+pat and Head pat wiggle do, gates on `walk` as well as on `invitations`.
+An older voice leaves it out, read as false.
+
 Privacy is led first, before step 1, whenever it is available, though its
 record keeps the table's place. It is available only with a verified switch
 location (below) and Controls' privacy receipts, `LAMP_PRIVACY_CONTROLS=on`

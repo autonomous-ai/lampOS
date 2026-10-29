@@ -120,7 +120,7 @@ since that mute wakes as sleep does. A pad that drifts high on a level read
 (#1764), or something resting on the head, now wakes a sleeping lamp after a
 second. Before, a drift held 3 s would have put an awake one to sleep.
 
-### A pet (#3997, `LAMP_HEAD_PET=on`, off unless on)
+### A pet (#3997, `LAMP_HEAD_PET=on`, on in the product)
 
 A pet is a hand sliding left and right across the head, so the head pads are
 touched by turns. A tap and a still hand never do that: on lamp-06c1 (28 Oct,
@@ -171,13 +171,14 @@ still does, as today) or `HoldSleeps::Never` (no head contact asks sleep,
 the ring's countdown and the voice's sleep breath would play toward a sleep
 that never comes. The voice must change before it is used.
 
-With the switch off (unset, as on every lamp), `controls/pet` is not even
+With the switch off (unset), `controls/pet` is not even
 declared, `TouchOutput` carries no `pets` (a replay's frames are byte for
 byte as before) and every head gesture and `held_us` is as before; the test
 `head_pet::the_switch_off_is_identical_to_today` replays lamp-06c1's whole
-timeline through both. The response to a pet is the installable skills
+timeline through both. The product's lamp-controls turns it on (29 Oct,
+#4133's design owner's yes). The response to a pet is the core skills
 `head-pat` (`skills/head-pat`, a line) and `head-pat-wiggle`
-(`skills/head-pat-wiggle`, a wiggle of the base a second after the hand lifts), never
+(`skills/head-pat-wiggle`, a wiggle of the base 2 s after the hand lifts), never
 Controls'. Tests:
 `crates/controls/tests/it/head_pet.rs`.
 
@@ -837,7 +838,7 @@ establish listening readiness. Any brain notification must remain limited to
 one at a time by its consumer (head-pat: at most one response in 10 s, its
 `cooldown`, shortened from V1's 60 s after the lamp check, #4133; and
 head-pat-wiggle: a small wiggle of the base once the head's pads have
-stayed free 1 s after the pet's `ended`, by `controls/state`'s
+stayed free 2 s after the pet's `ended`, by `controls/state`'s
 `head_active`, at most one in 4 s, #4324); the Pet
 event is not permission to speak.
 

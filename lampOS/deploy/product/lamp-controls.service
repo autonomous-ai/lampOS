@@ -31,9 +31,9 @@ CPUSchedulingPriority=30
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
 # Voice and Ears together (the lead on #1711, 20 Oct 09:33: the lamps have the switch; the first builder at 09:51).
 Environment=LAMP_PRIVACY_CONTROLS=on
-# A pet on the head (#3997, Part of #4133): said on controls/pet, and a petted contact asks no sleep. Off until the
-# design owner and the growth lead try it on a lamp with the head-pat skill (switches.md).
-# Environment=LAMP_HEAD_PET=on
+# A pet on the head (#3997, Part of #4133): said on controls/pet, and a petted contact asks no sleep. On in the
+# product since #4133's design owner's yes (29 Oct), with the head-pat and head-pat-wiggle skills (switches.md).
+Environment=LAMP_HEAD_PET=on
 ExecStart=/opt/lampOS/controls/current/lamp-controls serve --touch --config /etc/lampOS/controls/controls.json --pins /etc/lampOS/controls/controls-pins.json --bus-root /run/lampos-bus --enable
 Restart=on-failure
 RestartSec=5s

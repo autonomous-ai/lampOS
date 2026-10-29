@@ -1,14 +1,13 @@
 # Head pat (#3997, Part of #4133): a hand petting the lamp's head, its pads
 # taking turns alone, gets a short response, at most once in 10 s. The happy
-# wiggle of the base a second after the hand lifts is Head pat wiggle's (its own skill,
+# wiggle of the base 2 s after the hand lifts is Head pat wiggle's (its own skill,
 # since its gates differ: it may move while the voice speaks). Controls
 # tells the pet apart and says it on `controls/pet` only with LAMP_HEAD_PET=on
-# (docs/controls.md); without it nothing here ever runs. Written to
+# (docs/controls.md), on in the product's lamp-controls. Written to
 # lamp-skills' schema (docs/skills.md, "The schema, as lamp-skills reads it").
 needs = ["voice"]
-# Its owner puts it on, and only after its lamp check: held out of the
-# product's install by install::NOT_PRODUCT_SKILLS.
-kind = "installable"
+# In the product since #4133's design owner's yes (29 Oct): every lamp has it.
+kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: the pet, the voice's state,
@@ -22,7 +21,7 @@ topic = "controls/pet"
 field = "ended"
 equals = false            # a pet going on: Controls says it about ten times a second until it ends
 rearm = "ends"            # once a pet; a chance held back (talking, asleep, setup) is spent, never said late
-cooldown = "10s"          # at most once in 10 s: a second pet soon after still gets one (the lamp check, #4133)
+cooldown = "10s"          # at most once in 10 s: a second pet soon after still gets one (the design owner's choice at the lamp, #4133)
 
 [[while]]                 # not while it listens, thinks or speaks, nor within 3 s of it: a pet that cut its words gets nothing, and lines come about every 10 s (the cooldown), not 13-14 s (the lamp check, #4133)
 topic = "voice/state"
@@ -41,6 +40,12 @@ topic = "onboarding/pending"
 field = "invitations"
 equals = []
 unknown = "holds"         # a lamp with onboarding off never says the topic
+
+[[while]]                 # never during the setup walk, its steps led by talk included (#4367)
+topic = "onboarding/pending"
+field = "walk"
+equals = false
+unknown = "holds"         # a lamp with onboarding off never says the topic, and an older voice no walk
 
 [quiet]                   # quiet hours: silent from 22:00 to 07:00, and when the time is not known
 from = "22:00"

@@ -1303,7 +1303,10 @@ impl Onboarding {
             })
             .into_iter()
             .collect();
-        lamp_msgs::OnboardingPending { invitations }
+        lamp_msgs::OnboardingPending {
+            invitations,
+            walk: false,
+        }
     }
 
     /// Only the core skill's exact current eligible token obtains words. The
@@ -1820,14 +1823,19 @@ impl Onboarding {
         );
     }
 
-    /// The one pending invitation, of whichever measured step is led.
+    /// The one pending invitation, of whichever measured step is led, and
+    /// whether the walk is under way (#4367). Before its progress is read,
+    /// the walk counts as under way: a pet then waits, the cautious way.
     pub(crate) fn pending(&self) -> lamp_msgs::OnboardingPending {
-        match self.near_pending().or_else(|| self.giving_pending()) {
+        let mut pending = match self.near_pending().or_else(|| self.giving_pending()) {
             Some(offer) => lamp_msgs::OnboardingPending {
                 invitations: vec![offer],
+                walk: false,
             },
             None => self.privacy_pending(),
-        }
+        };
+        pending.walk = self.under_way().unwrap_or(true);
+        pending
     }
 
     pub(crate) fn take_invitation(&mut self, token: u64, now_us: u64) -> Option<String> {
@@ -4271,6 +4279,11 @@ mod tests {
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
         assert!(room.walk.leading());
         assert_eq!(room.walk.under_way(), Some(true));
+        // Where you sit is led by talk: no invitation is pending, but
+        // `onboarding/pending` still says the walk is under way (#4367).
+        let pending = room.walk.pending();
+        assert!(pending.invitations.is_empty());
+        assert!(pending.walk, "a step with no invitation is still the walk");
         report(&room.walk, "where_you_sit", "skipped");
         // Between two steps: the first ended (its skip said, #3769), the
         // next not yet asked.
@@ -4278,6 +4291,7 @@ mod tests {
         assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Skipped));
         assert!(!room.walk.leading());
         assert_eq!(room.walk.under_way(), Some(true), "between steps");
+        assert!(room.walk.pending().walk, "between steps");
         assert_eq!(room.wait(4 * S, Some(SIDE)), [WHO_NOTE]);
         report(&room.walk, "who_you_are", "skipped");
         assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
@@ -4286,12 +4300,17 @@ mod tests {
         assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
         assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
         assert_eq!(room.walk.under_way(), Some(false), "every step ended");
+        assert!(!room.walk.pending().walk, "every step ended");
         // Kept across a restart: still over. Before a walk has read its
         // progress, it doesn't say.
         let again = Onboarding::at(room.walk.file.clone());
         assert_eq!(again.under_way(), Some(false));
         let unread = Onboarding::with_storage(room.walk.file.clone(), again.storage.clone());
         assert_eq!(unread.under_way(), None);
+        assert!(
+            unread.pending().walk,
+            "unread progress waits, the cautious way"
+        );
         let redo = ToolCall {
             id: "c".into(),
             name: REDO.into(),
@@ -4300,6 +4319,7 @@ mod tests {
         assert!(run(&room.walk.file, &redo).1);
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
         assert_eq!(room.walk.under_way(), Some(true), "redone");
+        assert!(room.walk.pending().walk, "redone");
     }
 
     #[test]

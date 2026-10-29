@@ -1,9 +1,9 @@
 # Quick pets, 1 s each, one every 1.5 s from 20 s to 35 s, ending 21 s to 36 s, the pads free 0.3 s between:
-# never under the hand coming back (#4324), one wiggle a second after the last ends, at 37 s.
+# never under the hand coming back (#4324), one wiggle 2 s after the last ends, at 38 s.
 clock = "10:00"
 
 [[expect]]
-at = "37s"
+at = "38s"
 within = "1s"
 call = "body.move"
 args = { move = "pat-wiggle" }

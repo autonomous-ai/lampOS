@@ -1,8 +1,8 @@
-# One pet going on from 20 s to 90 s: no motion under the hand, one wiggle a second after it lifts, at 91 s.
+# One pet going on from 20 s to 90 s: no motion under the hand, one wiggle 2 s after it lifts, at 92 s.
 clock = "10:00"
 
 [[expect]]
-at = "91s"
+at = "92s"
 within = "1s"
 call = "body.move"
 args = { move = "pat-wiggle" }

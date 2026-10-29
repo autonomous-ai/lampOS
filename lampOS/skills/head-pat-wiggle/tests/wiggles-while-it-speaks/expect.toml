@@ -1,8 +1,8 @@
-# The voice speaking from 15 s to 30 s, a pet from 20 s: a wiggle all the same at 23 s (a body move does not wait for the voice, as Head pat's line does).
+# The voice speaking from 15 s to 30 s, a pet from 20 s: a wiggle all the same at 24 s (a body move does not wait for the voice, as Head pat's line does).
 clock = "10:00"
 
 [[expect]]
-at = "23s"
+at = "24s"
 within = "1s"
 call = "body.move"
 args = { move = "pat-wiggle" }

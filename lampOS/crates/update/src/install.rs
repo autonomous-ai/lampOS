@@ -292,8 +292,8 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Eighteen keep their folders'
-/// own default: seventeen enabled, and Bedtime and Morning disabled by its own
+/// `tests/install.rs` holds the two lists equal). Twenty keep their folders'
+/// own default: nineteen enabled, and Bedtime and Morning disabled by its own
 /// `enabled = false` until its lamp comparison (#1672); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
@@ -335,6 +335,12 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "rest-your-eyes",
     "stand-up",
     "wind-down",
+    // A pet on the head (#3997, Part of #4133): Head pat's line, now and
+    // then, and its wiggle at every pet, on `controls/pet`, which the
+    // product's lamp-controls says (`LAMP_HEAD_PET=on`); the design owner's
+    // yes after the lamp check on lamp-06c1 (29 Oct).
+    "head-pat",
+    "head-pat-wiggle",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "light-out",
     "light-scenes",
@@ -435,18 +441,6 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
          (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_MESSAGES=on` in \
          `lamp-cloud`, which carries `messages/out` up as unasked news",
-    ),
-    (
-        "head-pat",
-        "an installable skill, not yet tried on a lamp (#3997, Part of #4133): it answers a pet \
-         Controls says only with `LAMP_HEAD_PET=on`, off on every lamp until the design owner \
-         and the growth lead try it",
-    ),
-    (
-        "head-pat-wiggle",
-        "an installable skill, not yet tried on a lamp (#3997, Part of #4133): Head pat's \
-         wiggle of the base as a pet ends, on `controls/pet` with `LAMP_HEAD_PET=on`; tried \
-         with Head pat",
     ),
     (
         "laugh-glance",
@@ -569,6 +563,13 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("stand-up", "SKILL.md"),
     skill_file!("wind-down", "skill.toml"),
     skill_file!("wind-down", "SKILL.md"),
+    skill_file!("head-pat", "skill.toml"),
+    skill_file!("head-pat", "SKILL.md"),
+    skill_file!("head-pat", "README.md"),
+    skill_file!("head-pat-wiggle", "skill.toml"),
+    skill_file!("head-pat-wiggle", "SKILL.md"),
+    skill_file!("head-pat-wiggle", "README.md"),
+    skill_file!("head-pat-wiggle", "moves/pat-wiggle.json"),
     skill_file!("music-sway", "skill.toml"),
     skill_file!("music-sway", "SKILL.md"),
     skill_file!("music-sway", "moves/sway.json"),
