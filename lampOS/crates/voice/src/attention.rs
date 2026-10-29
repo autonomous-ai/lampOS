@@ -616,6 +616,25 @@ pub(crate) fn said_to_a_person(heard: &str) -> Option<&'static str> {
     SAID_TO_A_PERSON.iter().copied().find(|said| *said == word)
 }
 
+/// [`said_to_a_person`] for a line cut short, whose words speech to text
+/// may not have set off yet: one of two words or fewer also opens with the
+/// word bare ("Ma'am could", #3945's request 12 on c0a4). A whole line
+/// still needs it set off ("Honey could you …").
+fn said_to_a_person_in_a_cut_line(heard: &str) -> Option<&'static str> {
+    said_to_a_person(heard).or_else(|| {
+        let heard = heard.replace('\u{2019}', "'");
+        let mut words = heard.split_whitespace();
+        let first = words.next()?;
+        if words.count() > 1 {
+            return None;
+        }
+        let word = first
+            .trim_end_matches(|c: char| !c.is_alphanumeric())
+            .to_lowercase();
+        SAID_TO_A_PERSON.iter().copied().find(|said| *said == word)
+    })
+}
+
 /// [`STAND_ALONE_INS`] when they count, else none.
 fn stand_alone(counted: bool) -> &'static [&'static str] {
     if counted { STAND_ALONE_INS } else { &[] }
@@ -1174,6 +1193,12 @@ pub struct Attention {
     /// a person ([`SAID_TO_A_PERSON`], `LAMP_NAME_SAID_TO_A_PERSON=on`,
     /// [`Self::hold_a_start_said_to_a_person`]).
     name_said_to_a_person: bool,
+    /// With `name_said_to_a_person`, the word said to a person that the
+    /// line before opened with, when the hearing at its start is the one at
+    /// the start of the request in hand: the line before was cut short and
+    /// its words not joined with these ([`Self::start_said_to_a_person`],
+    /// #3945).
+    cut_said_to_a_person: Option<&'static str>,
     /// A face turned to the lamp lets no line out alone in a busy room
     /// (`LAMP_NAME_OR_FOLLOW_UP=on`, [`Self::face_shows`]), and the room the
     /// request in hand was judged in, for [`Self::sign`].
@@ -1228,7 +1253,7 @@ impl Attention {
         if !(self.name_second_sign && self.name_said_to_a_person && self.named_at_start) {
             return None;
         }
-        said_to_a_person(&self.heard)
+        said_to_a_person(&self.heard).or(self.cut_said_to_a_person)
     }
 
     /// A hearing of the name that began inside the sound of the line before
@@ -1579,6 +1604,20 @@ impl Attention {
             self.named_sure_us = None;
         }
         let counts = move |named: u64| named.saturating_add(NAME_BEFORE_US) >= now_us;
+        // The line before's word said to a person, if a hearing at its
+        // start goes on to this line's start (#3945): that line was cut
+        // short within `NAME_BEFORE_US` of it, and the hearing is its own.
+        let cut_said_to_a_person = self
+            .name_said_to_a_person
+            .then(|| {
+                let start = self.start_in_hand()?;
+                let word =
+                    said_to_a_person_in_a_cut_line(&self.heard).or(self.cut_said_to_a_person)?;
+                self.named_us
+                    .is_some_and(|named| named <= start.saturating_add(NAME_AT_THE_START_US))
+                    .then_some(word)
+            })
+            .flatten();
         self.began(request, session);
         self.after_another = after_another;
         self.after_question = after_question;
@@ -1592,6 +1631,7 @@ impl Attention {
             && self
                 .named_us
                 .is_some_and(|named| named <= start.saturating_add(NAME_AT_THE_START_US));
+        self.cut_said_to_a_person = cut_said_to_a_person.filter(|_| self.named_at_start);
         self.tapped = self.tapped_us.is_some_and(|tapped| {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
         });
@@ -1659,6 +1699,9 @@ impl Attention {
         self.began_at_led(request, session, now_us, lead_us);
         if continuing {
             (self.named_us, self.named_sure_us) = hearings;
+            // Its words are joined with the first part's, which say for
+            // themselves whether they open with a word said to a person.
+            self.cut_said_to_a_person = None;
         }
         if let Some((
             (named, named_at_start),
@@ -5274,6 +5317,123 @@ mod tests {
         // Said to a person only set off: "Dad's car" is no call to a person.
         assert_eq!(said_to_a_person("Dad's car is outside."), None);
         assert_eq!(said_to_a_person("Sir Paul sang it."), None);
+    }
+
+    /// #3945, `LAMP_NAME_SAID_TO_A_PERSON=on`: "Ma'am, could you pass me the
+    /// salt, please? Sir, what time is this?" came as two lines, the first
+    /// "Ma'am, could", cut short, the second begun inside its sound with
+    /// only the rest of the words. The hearing at the first line's start
+    /// (407 ms before it, on "Ma'am") is within [`NAME_BEFORE_US`] of the
+    /// second's start, so it counts for that line too, at its start; but the
+    /// second line's own words do not open with "Ma'am,", and the start was
+    /// counted as its second sign (request 13 on the lamp run, "counts by:
+    /// its hearing at the line's start"). A hearing whose line opened with a
+    /// word said to a person is no second sign for the line after it either,
+    /// with the name kept in its line or not.
+    #[test]
+    fn with_said_to_a_person_a_start_hearing_on_maam_held_in_a_cut_line_is_no_second_sign_for_the_line_after_it()
+     {
+        let began = 10_000_000;
+        for stays in [false, true] {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.hold_a_start_said_to_a_person(true);
+            attention.keep_the_name_in_its_line(stays);
+            // Request 12: "Ma'am, could", its name heard 407 ms before it.
+            attention.began_at(12, 1, began);
+            attention.name_heard_scored(began - 407_000, 0.97);
+            attention.heard("Ma'am, could");
+            attention.ended(12, began + 900_000);
+            assert_eq!(attention.start_said_to_a_person(), Some("ma'am"));
+            assert!(attention.weigh_the_name(None, false), "{stays}");
+            // Request 13, begun inside its sound, not joined with it: only
+            // its own words, and no new hearing.
+            attention.began_at(13, 1, began + 700_000);
+            attention.heard("could you pass me the salt, please? Sir, what time is this?");
+            attention.ended(13, began + 4_500_000);
+            assert_eq!(attention.start_said_to_a_person(), Some("ma'am"));
+            assert!(
+                attention.weigh_the_name(None, false),
+                "stays {stays}: the start of a line said to a person counted for the line after it: {:?}",
+                attention.second_signs()
+            );
+        }
+    }
+
+    /// The cut line and the line after it, as in
+    /// [`with_said_to_a_person_a_start_hearing_on_maam_held_in_a_cut_line_is_no_second_sign_for_the_line_after_it`]:
+    /// whether the line after's start hearing was dropped, and the word that
+    /// held it.
+    fn after_a_cut_line(cut: &str, on: bool) -> (bool, Option<&'static str>) {
+        let began = 10_000_000;
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.hold_a_start_said_to_a_person(on);
+        attention.began_at(12, 1, began);
+        attention.name_heard_scored(began - 407_000, 0.97);
+        attention.heard(cut);
+        attention.ended(12, began + 900_000);
+        attention.weigh_the_name(None, false);
+        attention.began_at(13, 1, began + 700_000);
+        attention.heard("could you pass me the salt, please? Sir, what time is this?");
+        attention.ended(13, began + 4_500_000);
+        let held = attention.start_said_to_a_person();
+        (attention.weigh_the_name(None, false), held)
+    }
+
+    /// #3945, `LAMP_NAME_SAID_TO_A_PERSON=on`: the cut line's two words
+    /// came as speech to text's first try, "Ma'am could", with no comma
+    /// (request 12 on the lamp run was let out too). A cut line of two words
+    /// or fewer opens with a word said to a person bare; one of three or more
+    /// needs it set off, as a whole line does.
+    #[test]
+    fn with_said_to_a_person_a_cut_line_of_two_words_holds_its_bare_first_word_for_the_line_after_it()
+     {
+        assert_eq!(after_a_cut_line("Ma'am could", true), (true, Some("ma'am")));
+        assert_eq!(
+            after_a_cut_line("Ma\u{2019}am could", true),
+            (true, Some("ma'am"))
+        );
+        assert_eq!(after_a_cut_line("Sir", true), (true, Some("sir")));
+        assert_eq!(
+            after_a_cut_line("Ma'am, could", true),
+            (true, Some("ma'am"))
+        );
+        assert_eq!(after_a_cut_line("Ma'am could you", true), (false, None));
+        assert_eq!(said_to_a_person_in_a_cut_line("Honey could you"), None);
+        assert_eq!(said_to_a_person_in_a_cut_line("Honey could"), Some("honey"));
+        assert_eq!(said_to_a_person_in_a_cut_line("Could you"), None);
+        // A whole line still needs it set off.
+        assert_eq!(said_to_a_person("Ma'am could"), None);
+    }
+
+    /// #3945: with `LAMP_NAME_SAID_TO_A_PERSON` off nothing changes: the
+    /// start hearing a cut "Ma'am, could" line held goes on to count for the
+    /// line after it. A real call cut short ("Lamp, what") still counts
+    /// for the line after it with the switch on.
+    #[test]
+    fn a_start_hearing_from_a_cut_line_counts_for_the_line_after_it_with_the_switch_off_or_on_a_call()
+     {
+        for cut in ["Ma'am, could", "Ma'am could"] {
+            assert_eq!(after_a_cut_line(cut, false), (false, None), "{cut}");
+        }
+        for cut in ["Lamp, what", "Lamp what", "Hey Lamp"] {
+            assert_eq!(after_a_cut_line(cut, true), (false, None), "{cut}");
+        }
+        // A line joined with the one it cut short is judged on the joined
+        // words: "Ma'am could you pass me the salt" sets nothing off.
+        let began = 10_000_000;
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.hold_a_start_said_to_a_person(true);
+        attention.began_at(12, 1, began);
+        attention.name_heard_scored(began - 407_000, 0.97);
+        attention.heard("Ma'am could");
+        attention.ended(12, began + 900_000);
+        attention.continued_at(13, 1, began + 700_000);
+        attention.heard(" you pass me the salt, please?");
+        assert_eq!(attention.start_said_to_a_person(), None);
+        assert!(!attention.weigh_the_name(None, false));
     }
 
     /// A line for [`judged_at_the_desk`].

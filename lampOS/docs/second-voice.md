@@ -3351,7 +3351,12 @@ after a take-over, but now for every turn:
     "Ma'am, …" (#3923) needs a face, a conversation or closeness. Lamp
     check on c0a4 (28 Oct): a person's "Ma'am, …" heard as the name at
     1.00 was held, two "Lamp, …" calls were answered
-    ([attention.md](attention.md)). Whatever the switch, a hearing that
+    ([attention.md](attention.md)). A line cut short is read too
+    (request 13 on a lamp run): when the line after it, not joined with
+    it, keeps its start hearing, that start is held on the cut line's
+    first word as well, and a cut line of two words or fewer needs no
+    comma ("Ma'am could"); a whole line still does. With `LAMP_NAME_SECOND_SIGN=on`, with
+    or without this switch, a hearing that
     does count says which second sign let it (#3945: on 28 Oct a "Ma'am,
     …" line from the Mac was answered for its name and the journal could
     not say why): `its name, heard in the room's sound, counts by: <signs>
