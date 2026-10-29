@@ -521,6 +521,9 @@ struct Tally {
 
 pub struct Tts {
     client: reqwest::Client,
+    /// A client keeping no idle connection, for a piece asked again after it
+    /// failed to start ([`Tts::speak_fresh`], #4338).
+    fresh: reqwest::Client,
     provider: TtsProvider,
     base_url: String,
     key: String,
@@ -614,6 +617,7 @@ impl Tts {
     ) -> Result<Self> {
         Ok(Self {
             client: http_client()?,
+            fresh: super::fresh_client()?,
             provider,
             base_url: base_url.to_owned(),
             key: key.to_owned(),
@@ -988,6 +992,15 @@ impl Tts {
         self.speak_in(text, Some(turn)).await
     }
 
+    /// As [`Tts::speak_for`], asked again after the piece failed to start
+    /// (#4338, lamp-3e83 on 29 Oct: ElevenLabs' first sound timed out and
+    /// the sentence was never said): over HTTP on a connection of its own,
+    /// never the speech socket or a pooled connection that may have held the
+    /// first try. In the turn's model, so the answer keeps one voice.
+    pub async fn speak_fresh(&self, text: &str, turn: Turn) -> Result<TtsStream> {
+        self.speak_http(&self.fresh, text, Some(turn)).await
+    }
+
     async fn speak_in(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
         if let Some(turn) = turn
             && let Some(spoken) = self.on_socket(text, turn).await
@@ -1014,6 +1027,17 @@ impl Tts {
                 }
             }
         }
+        self.speak_http(&self.client, text, turn).await
+    }
+
+    /// `text` over HTTP on `client`: [`Tts::speak_in`]'s path when the
+    /// piece has no speech socket, and [`Tts::speak_fresh`]'s.
+    async fn speak_http(
+        &self,
+        client: &reqwest::Client,
+        text: &str,
+        turn: Option<Turn>,
+    ) -> Result<TtsStream> {
         let Some(request) = request(
             self.provider,
             &self.base_url,
@@ -1031,7 +1055,7 @@ impl Tts {
         }
         let index = turn.map(|turn| self.asked(turn.request));
         let response = post(
-            &self.client,
+            client,
             &request.url,
             (request.header, &request.value),
             &request.body,
