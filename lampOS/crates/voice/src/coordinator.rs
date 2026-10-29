@@ -11645,7 +11645,8 @@ fn conversation_with_gate_inner(
                 last_publish = monotonic_us();
                 lamp_began = reply.as_ref().map(|current| current.owner.turn());
                 // "Where you sit"'s intro is reported as an invitation is,
-                // so it is kept as said only when it was heard.
+                // so it is kept as said only when it was heard; so is an owed
+                // line, said again when none of it played.
                 if let Some(current) = reply.as_ref() {
                     let bound = (current.owner.boot(), current.owner.turn());
                     if walk.bind_opener(bound.0, bound.1) {

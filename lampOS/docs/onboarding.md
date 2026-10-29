@@ -104,17 +104,37 @@ the `later` line; the last one's silent end says instead "That's fine, you can
 redo the setup later. Just ask me to redo the setup." (`skill::LAST_LATER`, in
 code: a new key would be refused by an older build reading the file), since
 it promises no later. A re-offer dropped by the keeper's pause or by nobody
-there for 30 s, with nothing tried in it, is given back
+there for 30 s **before it was asked** (only its naming line out, or not
+even that), with nothing tried in it, is given back
 (`Onboarding::drop_led`, Seventh's P3 4 on #4192): its count goes back to
 what it was, and its date stays the drop's, so it comes back at its usual
 spacing from then (`later_after_s` for the first, `reoffer_after_s` for the
-second), never at once and never spent on an offer nobody had. After two
+second), never at once and never spent on an offer nobody had. Once asked
+it stays spent: walking away from an ask is an answer, and giving that back
+would re-ask every `later_after_s` with no cap (the Reviewer-lead's P2 on
+#4311). After two
 re-offers it stays `later` for good, so it never nags. "Redo the setup"
 still redoes everything. **A `later` step counts as not done** in #3530's rows
 and the onboarding quality row. Nobody in front of the lamp for 30 s: the step being led is dropped and
 asked again when someone is back. The keeper's pause
 ([keeper.md](keeper.md)) stops it the same way: nothing is begun while
 paused, and the step being led is asked again afterwards.
+
+**An owed line whose turn played none of it is said again.** Every line the
+walk owes (how a step ended: the `later` line, the last offer's line,
+`touch_done`, `sit_done`/`sit_failed`, the call's and the sentence's ends,
+privacy's and giving way's results; a re-offer's `later_reoffer` and
+`reoffer`) is bound to its turn as the intro is (`Onboarding::bind_opener`),
+and its delivery comes back through `invitation_finished`. Ended with none
+of it played (`Unsaid`: never said, or a sound took the turn before its
+audio began; on lamp-52e6 on 29 October a room sound took a re-offer's
+`later` line 0.46 s in, and the walk said no closing line), it is owed
+again and said once the room has been quiet `START_QUIET_US` (3 s), at most
+`MOST_UNSAID` (2) times in a row (`onboarding_note_unsaid` record,
+`said_again`). Not when any of it played (cut or whole), not over a newer
+owed line, and not once the walk has moved on: a step's own line only while
+that step is still led as it was, a line between asks only while nothing
+has been asked since (`Onboarding::still_owed`).
 
 ## Installed walk data
 
