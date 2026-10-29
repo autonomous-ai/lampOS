@@ -14,12 +14,17 @@ judgement and against a label, line by line. The jev-verifier keeps it.
   talk (and checks `room/state` reads busy before the busy block), plays it, then pulls that window's
   decisions and the voice's verdicts into `OUT`. Run it only in a booked slot, under the lock:
 
-      tools/lamp-lock.sh lamp-52e6 run jev-verifier <session> "jev-verify set" -- tools/jev-verify/replay.sh OUT
+      tools/lamp-lock.sh lamp-52e6 run jev-verifier <session> "jev-verify set" -- tools/jev-verify/replay.sh run OUT
 
-  `OUT` holds what the lamp heard: it stays on the Mac.
+  `replay.sh preflight OUT` runs every check, the wake (which must produce a policy decision that did
+  not fail) and a busy probe (two exchanges, no labelled line: does `room/state` read busy?), then
+  stops. `OUT` holds what the lamp heard: it stays on the Mac, and is refused inside a git work tree.
 - `score.sh OUT`: the scored table (per class and room, Jev vs the voice vs the label), the totals on
-  the held lines, the false answers to desk talk, and the decision latency. It prints ids and
-  classes, never the words. `score-test.sh` tests it with no lamp.
+  the held lines, the false answers to desk talk, and the decision latency. Each (pass, id) is one
+  trial; it says which ids flipped across passes. A trial is clean unless the lamp was in conversation
+  (spoke within 20 s) or the room it saw is not the label's; totals show all and clean trials, and
+  "Decision inputs" gives the held clean rates with 95% Wilson intervals, the margin and the verdict.
+  It prints ids and classes, never the words. `score-test.sh` tests it with no lamp.
 
 Jev takes the turn with `answer` or `look_up`; the voice takes it when its answer is played.
 

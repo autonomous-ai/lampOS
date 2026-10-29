@@ -24,10 +24,10 @@ b05|held|busy|bare_name|lamp|Daniel|Lamp.
 # desk talk between people
 q09|tune|quiet|desk_talk|not|Samantha|Did you send the invoice to the client yet?
 q10|held|quiet|desk_talk|not|Karen|Not yet, I'm waiting for the purchase order number.
-q11|tune|quiet|desk_talk|not|Daniel|What time is the meeting with the design team?
+q11|tune|quiet|desk_talk|not|Karen|What time is our meeting with the design team again?
 q12|held|quiet|desk_talk|not|Karen|I think it's at three, but check the calendar.
 q13|held|quiet|desk_talk|not|Samantha|Do you want to get lunch at the noodle place?
-b06|tune|busy|desk_talk|not|Daniel|Can you print the slides for tomorrow?
+b06|tune|busy|desk_talk|not|Karen|Can you print my slides for the client review tomorrow?
 b07|held|busy|desk_talk|not|Karen|What's the weather going to be like for the trip?
 b08|held|busy|desk_talk|not|Samantha|Who told the client the deadline moved?
 # two people, by name, with a question a lamp could answer

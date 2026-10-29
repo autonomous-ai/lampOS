@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# replay-test.sh: runs replay.sh in DRY mode against a stub ssh (canned lamp answers, no lamp, no sound,
+# no real sleep): the all-ok preflight and a one-pass run, then one failing case per check, each of
+# which must ABORT with its reason and "nothing ran". Prints PASS and exits 0, or FAIL lines and exits 1.
+set -u
+HERE=$(cd "$(dirname "$0")" && pwd) || exit 1
+T=$(mktemp -d) || exit 1; trap 'rm -rf "$T"' EXIT
+cat > "$T/ssh" <<'EOF'
+#!/usr/bin/env bash
+# Stub ssh: answers by what the command asks; FAIL names the one check to fail. Reads stdin unless -n.
+a="$*"; [ "$1" = -n ] || in=$(cat); a="$a ${in:-}"
+f=${FAIL:-}
+case $a in
+  *"bash -s -- status"*) [ "$f" = lock ] && h=someone-else || h=jev-verifier
+    printf 'holder: %s\nsession: s1\nmachine: mac\n' "$h"; exit 10 ;;
+  *"date +%s%3N"*) echo 1761700000123 ;;
+  *"is-active lamp-voice"*) echo active; echo active; echo active; echo active ;;
+  *"ls -d /run/systemd"*) [ "$f" = dropin ] && echo /run/systemd/system/lamp-voice.service.d/x.conf; true ;;
+  *"muted by the restart guard"*) [ "$f" = muted ] && echo 1 || echo 0 ;;
+  *"voice/mute/latest"*) echo '{"muted":false}' ;;
+  *"/cmdline"*) [ "$f" = act ] && echo "/opt/lamp-policy --shadow --act hello" || echo "/opt/lamp-policy --shadow" ;;
+  *"ls -l /var/lib/lampos-policy"*) echo "-rw-r----- 1 lamp lamp 812 Oct 29 06:00 decisions-2026-10-29.jsonl"; echo READABLE ;;
+  *"for b in lamp-bus"*) [ "$f" = bus ] && exit 1; echo lamp-bus ;;
+  *"latest room/state"*) # busy right after the colleagues' talk (the last clip played is t02)
+    [ "$f" != roomnotbusy ] && tail -1 "$DRY_PLAYLOG" 2>/dev/null | grep -q t02 && echo '"busy"' || echo '"quiet"' ;;
+  *"heard [1-9]"*) echo 0 ;;
+  *"a face in"*) case $f in face) echo 2 ;; noeyes) ;; *) echo 0 ;; esac ;;
+  *"sget Speaker"*) echo "  Front Left: Playback 26 [52%] [on]" ;;
+  *"sset Speaker"*) echo "$a" >> "$STUBLOG" ;;
+  *"sh -s -- 'lamp-voice'"*) echo 1 ;;              # jwait: reached
+  *"voice/state"*) echo 3 ;;                       # speech_done: spoke 3 s
+  *"grep -cE"*) echo 0 ;;                          # nv
+  *"grep -oE 'request"*) echo "request 7: its answer is played" ;;
+  *"stand [0-9.]"*) echo "stand 0.82" ;;
+  *"decisions-"*"sort -u"*) [ "$f" = policyfailed ] && fl=',"failed":"timed_out"'
+    echo "{\"at_unix_ms\":1761700000000,\"about\":\"attention\",\"request\":7${fl:-}}" ;;
+  *"short-unix"*) echo "1761700001.0 request 7: its answer is played" ;;
+  *) echo "STUB-UNKNOWN $a" >&2; exit 99 ;;
+esac
+EOF
+chmod +x "$T/ssh"
+fails=0
+r() { rm -f "$T/plays.log"; DRY_PLAYLOG=$T/plays.log STUBLOG=$T/stub.log DRY=1 DRY_SSH=$T/ssh LAMP=lamp-test "$HERE/replay.sh" "$@" 2>&1; }
+want() { local name=$1 pat=$2 out=$3; printf '%s\n' "$out" | grep -qE -- "$pat" || { echo "FAIL $name: no /$pat/"; printf '%s\n' "$out" | tail -5; fails=$((fails+1)); }; }
+
+o=$(export FAIL=; r preflight "$T/p"); want preflight-ok 'preflight done' "$o"
+want preflight-noplay '^ok woken' "$o"; printf '%s\n' "$o" | grep -qE 'afplay clips/[qb][0-9]' && { echo "FAIL preflight played a labelled line"; fails=$((fails+1)); }
+[ -e "$T/p/aborted" ] && { echo "FAIL preflight wrote aborted"; fails=$((fails+1)); }
+want busy-probe '^busy probe: room/state=busy' "$o"
+for c in clips lock units "no /run drop-in" "not muted" shadow "policy log" room/state "room quiet" "no face" Speaker "Mac volume" "policy decided"; do
+  want "check $c" "^ok .*$c" "$o"; done
+grep -qE 'sset Speaker 26( |$)' "$T/stub.log" || { echo "FAIL Speaker not put back"; fails=$((fails+1)); }
+
+o=$(export FAIL=; PASSES=1 r run "$T/r"); want run-ok 'pulled: 37 lines played' "$o"
+[ "$(head -1 "$T/r/plays.tsv")" = "$(printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol')" ] || { echo "FAIL plays.tsv header"; fails=$((fails+1)); }
+[ "$(awk -F'\t' 'NR>1 && $1==1 && $5=="played" && $6==45' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 37 ] || { echo "FAIL plays.tsv rows"; fails=$((fails+1)); }
+o2=$(export FAIL=; PASSES=1 r run "$T/r2"); cmp -s <(cut -f2 "$T/r/plays.tsv") <(cut -f2 "$T/r2/plays.tsv") || { echo "FAIL order not repeatable"; fails=$((fails+1)); }
+o3=$(export FAIL=; PASSES=2 ONLY='^q0[1-4]$' r run "$T/r3")
+[ "$(awk -F'\t' '$1==1{printf "%s ",$2}' "$T/r3/plays.tsv")" != "$(awk -F'\t' '$1==2{printf "%s ",$2}' "$T/r3/plays.tsv")" ] || { echo "FAIL passes share an order"; fails=$((fails+1)); }
+
+o=$(export FAIL=roomnotbusy; PASSES=1 r run "$T/rb"); want busy-abort 'ABORT busy block \(pass 1\)' "$o"
+[ "$(awk -F'\t' 'NR>1' "$T/rb/plays.tsv" | wc -l | tr -d ' ')" = 24 ] || { echo "FAIL busy abort kept quiet results"; fails=$((fails+1)); }
+
+for c in "muted:muted by the restart guard" "act:runs with --act" "face:saw a face" "lock:not held by jev-verifier" \
+         "bus:no lamp-bus answers" "dropin:foreign /run drop-in" "noeyes:no report in 15 s" \
+         "policyfailed:decision on the wake failed .timed_out."; do
+  o=$(export FAIL=${c%%:*}; r preflight "$T/f-${c%%:*}")
+  want "fail-${c%%:*}" "^ABORT .*${c#*:}.*; nothing ran\$" "$o"
+  grep -q "${c#*:}" "$T/f-${c%%:*}/aborted" 2>/dev/null || { echo "FAIL fail-${c%%:*}: OUT/aborted"; fails=$((fails+1)); }
+done
+[ $fails = 0 ] && echo PASS || { echo "FAIL ($fails)"; exit 1; }
