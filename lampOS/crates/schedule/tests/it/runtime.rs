@@ -103,6 +103,7 @@ impl Running {
             // A report every 50 ms, not the lamp's second, so a test that
             // reads it waits a fraction of a second (#1806).
             report_every: Duration::from_millis(50),
+            request_deadline: lamp_schedule::runtime::REQUEST_DEADLINE,
         };
         let clock = Injected(Arc::new(Mutex::new(sample(0))));
         let stop = Arc::new(AtomicBool::new(false));
@@ -229,6 +230,7 @@ fn disabled_service_never_reads_clock_or_creates_any_path() {
         utc_offset_minutes: None,
         run_for: None,
         report_every: Duration::from_millis(50),
+        request_deadline: lamp_schedule::runtime::REQUEST_DEADLINE,
     };
     serve(config, Unreadable, Arc::new(AtomicBool::new(false))).unwrap();
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
