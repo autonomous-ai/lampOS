@@ -78,6 +78,11 @@ const STEP_GIVE_UP_US: u64 = 90_000_000;
 /// sooner than this after the nudge, so an answer on the face can come.
 const ASK_BACK_AFTER_US: u64 = 10_000_000;
 const TIMED_OUT_QUIET_US: u64 = 20_000_000;
+/// "Preferences"' hello question waits for the model's answer to the quiet
+/// hours to be said first, and no longer than this after the line was heard
+/// when the model says nothing: the hello is to come within 8 s of the
+/// person's line (the lead, lamp-52e6 on 29 Oct: ~15 s).
+const HELLO_WAIT_US: u64 = 5_000_000;
 /// Nobody in front of the lamp this long: the step being led is dropped and
 /// asked again when someone is back.
 const GONE_US: u64 = 30_000_000;
@@ -730,6 +735,12 @@ pub struct Onboarding {
     finished_recorded: bool,
     /// The owed line last handed out and how its turn went ([`OwedNote`]).
     owed_note: OwedNote,
+    /// When "preferences"' quiet hours were heard, its hello question not
+    /// yet owed ([`Self::tick`]).
+    hello_after_us: Option<u64>,
+    /// The lamp spoke after the person's last line heard: a line it owes
+    /// then follows its own words, with no wait for the room's quiet.
+    lamp_spoke_last: bool,
     records: Vec<Value>,
     eyes: Option<lamp_bus::Bus>,
     looked: Option<(u64, Option<Framing>)>,
@@ -931,6 +942,8 @@ impl Onboarding {
             read_us: None,
             finished_recorded: false,
             owed_note: OwedNote::default(),
+            hello_after_us: None,
+            lamp_spoke_last: false,
             records: Vec::new(),
             eyes: None,
             available: Step::available,
@@ -2022,12 +2035,16 @@ impl Onboarding {
     /// never both end it (the first builder on #2526).
     pub fn heard(&mut self, text: &str, now_us: u64) {
         self.heard_words(text);
+        if text.chars().any(char::is_alphanumeric) {
+            self.lamp_spoke_last = false;
+        }
         let nudge = self.nudge;
         let face_kept = self.face_kept;
         let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) else {
             return;
         };
         let words = words_of(text);
+        let mut ask_hello = false;
         let done = match led.step {
             Step::WhoYouAre if nudge => false,
             Step::WhoYouAre => {
@@ -2111,12 +2128,21 @@ impl Onboarding {
                 if about_hello || (heard.quiet_hours && (yes || refuses(&words))) {
                     heard.hello = true;
                 } else if quiet_hours(&words) {
+                    // The hello question is the walk's own, said once the
+                    // model's answer to the quiet hours is over, once: on
+                    // lamp-29e7 (29 Oct, 8545) it answered "Already set"
+                    // and asked nothing more, and the step waited in silence
+                    // for the person's next line.
+                    ask_hello = !heard.quiet_hours && !heard.hello;
                     heard.quiet_hours = true;
                 }
                 heard.quiet_hours && heard.hello
             }
             _ => false,
         };
+        if ask_hello {
+            self.hello_after_us = Some(now_us);
+        }
         if done {
             let step = led.step;
             self.records
@@ -2247,6 +2273,7 @@ impl Onboarding {
     /// The lamp's own words, as they come: after a step's ask, its
     /// question has been spoken.
     pub fn lamp_said(&mut self) {
+        self.lamp_spoke_last = true;
         if let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) {
             led.spoke = true;
         }
@@ -2282,9 +2309,28 @@ impl Onboarding {
         face: Option<Framing>,
         still: bool,
     ) -> Option<String> {
-        // A line owed again ([`OwedNote`]) waits for the room to be quiet.
+        // "Preferences"' hello: once the model has answered the quiet hours
+        // (its words came), or [`HELLO_WAIT_US`] after them if it says
+        // nothing, owed while that step is still led.
+        if let Some(at) = self.hello_after_us
+            && self.owed.is_none()
+            && (self.lamp_spoke_last || now_us.saturating_sub(at) >= HELLO_WAIT_US)
+        {
+            self.hello_after_us = None;
+            if self.led.as_ref().is_some_and(|led| {
+                led.step == Step::Preferences && led.asked_us.is_some() && !led.heard.hello
+            }) {
+                self.owed = Some(skill::PREFERENCES_HELLO.to_owned());
+            }
+        }
+        // A line owed again ([`OwedNote`]) waits for the room to be quiet,
+        // unless the lamp itself was the last to speak: its own words are
+        // no one to wait for.
         let can_speak = can_speak
-            && !(self.owed_note.again && self.owed.is_some() && quiet_us < START_QUIET_US);
+            && !(self.owed_note.again
+                && self.owed.is_some()
+                && !self.lamp_spoke_last
+                && quiet_us < START_QUIET_US);
         self.owed_note.bindable = false;
         let owed = self.owed.clone();
         let note = self.tick_led(now_us, quiet_us, can_speak, paused, face, still)?;
@@ -2968,6 +3014,12 @@ impl Onboarding {
         // step that may move the body. Other success is spoken, never a nod.
         if outcome == Outcome::Done && step == Step::GivingWay {
             self.gesture = Some(step.gesture());
+        }
+        // "Preferences" done, by its answers heard or by the model's report:
+        // the walk says its done line as soon as the lamp may speak, never
+        // waiting for the person's next line (lamp-29e7, 29 Oct, 8545).
+        if outcome == Outcome::Done && step == Step::Preferences {
+            self.owed = Some(skill::PREFERENCES_DONE.to_owned());
         }
         if self.led.as_ref().is_some_and(|led| led.step == step) {
             self.led = None;
@@ -4223,7 +4275,10 @@ mod tests {
             assert_eq!(room.outcome(step), Some(Outcome::NotAvailable));
         }
         report(&room.walk, "preferences", "done");
-        assert_eq!(room.wait(120 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            room.wait(120 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
         assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
         // Kept across a restart: nothing is asked again.
@@ -4566,7 +4621,10 @@ mod tests {
             .offered_at_unix_s = Some(unix_ms() / 1_000 - OFFER_EVERY_S);
         assert_eq!(later.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         report(&later.walk, "preferences", "done");
-        assert_eq!(later.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            later.wait(60 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
         assert_eq!(later.outcome(Step::Preferences), Some(Outcome::Done));
         assert_eq!(later.walk.take_gesture(), None);
     }
@@ -5612,6 +5670,122 @@ mod tests {
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
     }
 
+    /// lamp-29e7's 8545 re-test (29 Oct): the quiet hours met a rule
+    /// already kept, the model said "Already set" and asked nothing more,
+    /// and the lamp was silent until the person spoke again. The walk asks
+    /// the hello itself, and says the done line itself, each as soon as the
+    /// lamp may speak, with nothing more said to it.
+    #[test]
+    fn preferences_ask_the_hello_and_close_by_the_walks_own_lines() {
+        let mut room = Room::new("preferences-own-lines");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Quiet from 10PM, please.", room.at);
+        // The model's "Already set" answer is its own turn; the hello is
+        // asked once it is over, and only once.
+        room.walk.lamp_said();
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+        assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.outcome(Step::Preferences), None);
+        // Answered: the done line follows at once, by the walk.
+        room.walk.heard("Yes, that's fine.", room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+        assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
+    }
+
+    /// The lead's bound on #4326 (lamp-52e6, 29 Oct: the hello ~15 s after
+    /// the quiet hours were heard): the hello follows the end of the model's
+    /// reply turn within 1 s, with no wait for the room's quiet, even when
+    /// its first hand-out played none; with no reply at all it comes
+    /// [`HELLO_WAIT_US`] after the line.
+    #[test]
+    fn the_hello_follows_the_models_reply_within_a_second() {
+        let mut room = Room::new("hello-after-reply");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Quiet after ten at night.", room.at);
+        // The model's reply, still playing: the lamp may not speak.
+        room.walk.lamp_said();
+        for _ in 0..8 {
+            room.at += S / 4;
+            room.walk.drain_storage_for_test(room.at);
+            let note = room
+                .walk
+                .tick(room.at, 0, false, false, Some(NEAR_MIDDLE), true);
+            assert_eq!(note, None);
+        }
+        // Its turn over, the room quiet for no time at all: the hello now.
+        let ended = room.at;
+        let mut handed = None;
+        while handed.is_none() && room.at < ended + S {
+            room.at += S / 4;
+            room.walk.drain_storage_for_test(room.at);
+            handed = room.walk.tick(
+                room.at,
+                room.at - ended,
+                true,
+                false,
+                Some(NEAR_MIDDLE),
+                true,
+            );
+        }
+        assert_eq!(handed.as_deref(), Some(skill::PREFERENCES_HELLO));
+        // Its turn played none of it: said again at once, the lamp having
+        // been the last to speak.
+        let (boot, turn) = (BootId::new([3; 16]).unwrap(), room.at + 1);
+        assert!(room.walk.bind_opener(boot, turn));
+        room.walk
+            .invitation_finished(boot, turn, Delivery::Unsaid, room.at);
+        room.at += S / 4;
+        room.walk.drain_storage_for_test(room.at);
+        let again = room
+            .walk
+            .tick(room.at, 0, true, false, Some(NEAR_MIDDLE), true);
+        assert_eq!(again.as_deref(), Some(skill::PREFERENCES_HELLO));
+
+        // No reply at all: the hello [`HELLO_WAIT_US`] after the line.
+        let mut room = Room::new("hello-no-reply");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Quiet after ten at night.", room.at);
+        assert!(room.wait(4 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(
+            room.wait(2 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_HELLO]
+        );
+    }
+
+    /// The model's own report ends the step with the same done line, and a
+    /// line that answers the hello first is not asked it again.
+    #[test]
+    fn preferences_reported_done_say_the_walks_done_line() {
+        let mut room = Room::new("preferences-reported");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Yes, say hello when I come in.", room.at);
+        room.walk.heard("No quiet hours.", room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+
+        let mut room = Room::new("preferences-reported-call");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        report(&room.walk, "preferences", "done");
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+    }
+
     /// The hello answered before the quiet hours: a line about hello with
     /// a yes or a no is the answer, whichever order they come in.
     #[test]
@@ -5708,7 +5882,10 @@ mod tests {
         room.walk
             .heard("Please stay quiet after ten at night.", room.at);
         // Nothing more: the conversation ends, the step's time runs out.
-        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(
+            room.wait(95 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_HELLO, PREFERENCES_NOTE]
+        );
         assert_eq!(room.outcome(Step::Preferences), None, "not failed");
         assert!(
             room.walk
@@ -6124,7 +6301,10 @@ mod tests {
         );
         report(&room.walk, "preferences", "done");
         // The walk is over: nothing before `later_after_s`.
-        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
         let again = room.walk.definition.note(Step::Touch, true).to_owned();
         let named = room
             .walk
@@ -6174,7 +6354,10 @@ mod tests {
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
         );
         report(&room.walk, "preferences", "done");
-        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
         let named = room
             .walk
             .definition
@@ -6261,7 +6444,10 @@ mod tests {
         room.walk.mark_tried(Step::Preferences);
         assert!(room.walk.was_tried(Step::Preferences));
         report(&room.walk, "preferences", "done");
-        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            room.wait(10 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
         assert!(!room.walk.was_tried(Step::Preferences), "ended: forgotten");
         let mut redone = Room::new("later-kept-file");
         redone.walk.mark_tried(Step::GivingWay);
@@ -6281,7 +6467,10 @@ mod tests {
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
         );
         report(&room.walk, "preferences", "done");
-        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
         // Its first offer left unsaid: `not_available`, the count kept.
         back_date(&mut room, 1_801);
         assert!(!room.wait(4 * S, Some(NEAR_MIDDLE)).is_empty());
@@ -6312,7 +6501,10 @@ mod tests {
             [TOUCH_REMIND, later, PREFERENCES_NOTE]
         );
         report(&room.walk, "preferences", "done");
-        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
         back_date(&mut room, 1_801);
         let again = room.walk.definition.note(Step::Touch, true).to_owned();
         let named = room
