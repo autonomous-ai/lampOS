@@ -174,6 +174,21 @@ becomes a fresh header with the developers part, ready for the notes in
 plain words. A build's own release body is never touched: the promote tool
 reads its one line as provenance.
 
+The step after it (`lampos-promote`'s `lampos-notes` binary,
+`.github/tools/lampos-promote/src/notes.rs`, never a gate either) writes
+the `### Built but not on yet` part. It lists each `switches.md` row counted
+`until` or `now` whose switch no product file turns on, read from the
+units themselves (`Environment=` lines, `ExecStart` flags and the settings'
+`.env` files in `deploy/product`), not from the row's "Product unit" cell.
+Each row gets its words to the end of their first sentence (140
+characters at most). It says how many, then gives the list folded and grouped
+by the page's four tables. The part goes between the notes in plain words and
+`### For developers`, or replaces itself, and it is written only when the
+body is already this build's. The same notes are kept on the build's own
+release as an asset, `NOTES.md`, which no promotion reads (it checks only
+the signed manifest's files). A release that can't take it says so in the
+step, and the promotion stands.
+
 The stable feed is
 `https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/lampos-manifest.json`.
 Its envelope is an exact copy of the selected release's signed bytes. The
