@@ -60,7 +60,10 @@ impl Drop for Listening {
 /// the channel. It listens until the [`Listening`] is dropped: with the
 /// whole crate's tests running, the rig took over 5 s to reach its call,
 /// and a stand-in that left after 5 s of nothing had its ask reach no one
-/// (#1569 row 66).
+/// (#1569 row 66). Like `lamp-cloud`, it says its state again while it
+/// listens: said once, `reports/state` means nothing after its 15 s
+/// (`ReportsState::declaration`), and a rig that slow read `before` as no
+/// state and answered `NOT_SENDING` (the held_consent flake, 29 Oct).
 fn cloud(
     bus: &std::path::Path,
     first: ReportsState,
@@ -79,7 +82,13 @@ fn cloud(
     let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let listening = Listening(done.clone());
     std::thread::spawn(move || {
+        let mut current = first;
+        let mut said = std::time::Instant::now();
         while !done.load(std::sync::atomic::Ordering::Relaxed) {
+            if said.elapsed() >= Duration::from_secs(1) {
+                let _ = state.publish_json(lamp_ipc::monotonic_us(), &current);
+                said = std::time::Instant::now();
+            }
             let Ok(taken) = taking.recv(Duration::from_millis(100)) else {
                 return;
             };
@@ -87,16 +96,15 @@ fn cloud(
                 continue;
             };
             let ask = message.parse::<ReportsRequest>().unwrap();
-            let _ = state.publish_json(
-                lamp_ipc::monotonic_us(),
-                &ReportsState {
-                    share: ask.share,
-                    queued: 0,
-                    by: Some(ReportsBy::Voice),
-                    held: ask.held,
-                    at_s: Some(wall_s()),
-                },
-            );
+            current = ReportsState {
+                share: ask.share,
+                queued: 0,
+                by: Some(ReportsBy::Voice),
+                held: ask.held,
+                at_s: Some(wall_s()),
+            };
+            let _ = state.publish_json(lamp_ipc::monotonic_us(), &current);
+            said = std::time::Instant::now();
             if told.send(ask).is_err() {
                 return;
             }
