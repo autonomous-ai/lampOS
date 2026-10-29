@@ -445,6 +445,15 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   privacy freshness lost …`) is the same kind only if it came before the
   microphone was allowed; its journal does not say.
 
+- **The speaker underrunning at start.** On lamp-52e6 at 09:18:44 on
+  2026-10-29, 0.39 s into a plain `systemctl restart lamp-voice`, the
+  speaker's `snd_pcm_avail_delay` failed with "Broken pipe (32)", the
+  speaker worker exited 1 and the restart guard muted the next start
+  (#3697). An underrun with only zeros queued now stops the device, keeps
+  the guard and primes again, saying `lamp-voice speaker: it underran while
+  held up with only zeros queued; priming again`; more than 3 in 10 s, or one
+  with speech under way, still ends the worker (`audio-device-seam.md`).
+
 Not found yet: the power cut's first exit (exit 1 at 19.8 s, with no message
 of its own) and the provider's "Connection refused" at 24.7 s; that boot's
 journal is gone, and both need a second power cut with this build to see.

@@ -157,6 +157,45 @@ the loop the session ends in an error).
 queued on the device, and the prime again after it, are shown on a lamp
 only.
 
+**The speaker underrunning** (#3697). On lamp-52e6 at 09:18:44 on 29
+October, 0.39 s into a plain start, as the models loaded, ALSA's
+`snd_pcm_avail_delay` failed with "Broken pipe (32)": the speaker worker was
+held up past its 40 ms queue. Outside a declared drain every EPIPE was a
+fault (`pcm.rs`, `discontinuity`), so the worker exited 1, the voice with it
+("verified cleanup failed: speaker worker exited abnormally"), and the
+restart guard muted its next start. Now an EPIPE with only zeros queued (no
+speech in the ledger, no retiring tail, no unreported discard) is stopped and
+prepared as by `stop`, the guard kept, and returned as `pcm::Underrun`. The
+worker (`audio_workers.rs`, `underrun`) reports the reset as after any
+discard and primes the clock again through the barrier, with one journal
+line: "it underran while held up with only zeros queued; priming again".
+Nothing said is lost, because nothing said was queued. Still faults, as
+before:
+- an underrun with speech queued, or with an answer under way (its speech
+  begun, or a chunk part-written), since its gap would cut it mid-word;
+- `ENODEV`, `EBADFD` and `ESTRPIPE`: a disconnect, a bad state or a
+  suspend;
+- more than `MAX_UNDERRUNS` (3) within `UNDERRUN_WINDOW_US` (10 s), in
+  `crates/audio/src/underrun.rs`: a speaker that keeps underrunning is
+  failing, not held up, and the restart guard should see it.
+
+Tests:
+- `underrun::tests` (any host): three in the window are recovered and a
+  fourth refused, underruns spaced wider than the window are recovered each
+  time, and a refused one is not counted.
+- `pcm::underrun_tests` (Linux only, so the ARM64 run), with ALSA's errno
+  injected on the `null` device:
+  - an EPIPE with only zeros queued stops, counts a discard, keeps the guard
+    and primes and starts again;
+  - the fourth within the window closes the guard;
+  - `ENODEV`, `EBADFD` and `ESTRPIPE` close it;
+  - an EPIPE with speech queued closes it.
+
+The worker's own branch has no test: `null` never underruns, and the worker
+loop's one test (`tests/speaker_lapse_worker.rs`) cannot inject an errno.
+An underrun mid-answer stays a fault; recovering it needs a discard reason
+the coordinator cuts an answer on, as it does for a lapse.
+
 **A speaker held up, with recovery off** (#1178, lamp-cb94 at 04:53:53 UTC
 on 17 October, 4 h 34 min into Thirteen's soak). The journal had a bare
 "Connection refused (os error 111)", then `reference ReferenceLate`, then
