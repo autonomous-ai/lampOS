@@ -5365,7 +5365,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             let tired = tired_until.is_some_and(|until| now < until);
             let awake = awake_until.is_some_and(|until| now < until);
             let wanted = if leaving.is_none() && awake && !tired && !unplug_latched {
-                asked_now.stand_share.unwrap_or(up.share)
+                asked_now
+                    .stand_share
+                    .map_or(up.share, |asked| asked.min(up.share))
             } else {
                 0.0
             };
@@ -5441,7 +5443,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let upright = leaving.is_none()
             && !blind
             && standing.is_some_and(|up| {
-                asked_now.stand_share.unwrap_or(up.share) >= 1.0
+                asked_now
+                    .stand_share
+                    .map_or(up.share, |asked| asked.min(up.share))
+                    >= 1.0
                     && stand >= 1.0
                     && stand_velocity == 0.0
             });
