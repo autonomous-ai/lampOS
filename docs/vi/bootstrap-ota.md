@@ -240,8 +240,11 @@ Script chạy **1 lần duy nhất** trên Pi mới. Thực thi tuần tự theo
 
 **Cài nhanh từ CDN:**
 ```bash
-curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo bash
+curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo DEVICE_TYPE=lamp bash
 ```
+
+`DEVICE_TYPE` là bắt buộc. Thay `lamp` bằng loại thiết bị đích và đặt biến
+sau `sudo` để truyền vào trình cài đặt thay vì lệnh tải xuống.
 
 ### Tổng quan stages
 
