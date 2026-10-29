@@ -820,3 +820,30 @@ def test_the_fake_checks_the_lease_before_the_routing_refusal(tmp_path):
                     assert raised.value.why.startswith("not routed yet")
 
     run(go())
+
+
+def test_every_sdk_part_says_the_same_version():
+    """The Python SDK's, the JS SDK's and lamp-mcp's six copies of the version
+    agree, and lamp-mcp asks for at least this lampos, so a bump can't miss one
+    (harness-reviewer's P3 on #4303)."""
+    import re
+
+    import lampos
+
+    sdk = Path(__file__).resolve().parents[2]
+    files = {
+        "python/pyproject.toml": r'^version = "([0-9.]+)"',
+        "python/src/lampos/__init__.py": r'^__version__ = "([0-9.]+)"',
+        "js/package.json": r'^  "version": "([0-9.]+)",',
+        "mcp/pyproject.toml": r'^version = "([0-9.]+)"',
+        "mcp/src/lamp_mcp/__init__.py": r'^__version__ = "([0-9.]+)"',
+        "mcp/src/lamp_mcp/server.py": r'^        return "([0-9.]+)"$',
+    }
+    if not all((sdk / path).exists() for path in files):
+        pytest.skip("the other SDKs are not beside this copy")
+    found = {path: re.findall(pattern, (sdk / path).read_text(), re.M) for path, pattern in files.items()}
+    assert all(len(versions) == 1 for versions in found.values()), found
+    versions = {path: versions[0] for path, versions in found.items()}
+    assert set(versions.values()) == {lampos.__version__}, versions
+    major_minor = ".".join(lampos.__version__.split(".")[:2])
+    assert f'"lampos>={major_minor}"' in (sdk / "mcp/pyproject.toml").read_text()
