@@ -1,4 +1,4 @@
-# Onboarding says nothing pending: a line at 20 s.
+# Setup done: nothing pending and the walk over (`walk` false), a line at 20 s.
 clock = "10:00"
 
 [[expect]]

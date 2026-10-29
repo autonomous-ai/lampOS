@@ -585,10 +585,12 @@ mod tests {
         };
         watcher.onboarding(&OnboardingPending {
             invitations: vec![invitation],
+            walk: true,
         });
         assert!(watcher.situation(0).onboarding);
         watcher.onboarding(&OnboardingPending {
             invitations: Vec::new(),
+            walk: false,
         });
         assert!(!watcher.situation(0).onboarding);
     }

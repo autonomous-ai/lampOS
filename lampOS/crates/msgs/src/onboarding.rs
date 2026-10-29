@@ -36,6 +36,13 @@ pub struct OnboardingInvitation {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OnboardingPending {
     pub invitations: Vec<OnboardingInvitation>,
+    /// The setup walk is under way (#4367): from its start to its last
+    /// step's outcome, the gaps between steps and a redo included, whether
+    /// or not an invitation is pending. Skills that keep out of setup gate
+    /// on it, since `invitations` is empty through the steps the model
+    /// leads by talk. Absent from an older voice: false.
+    #[serde(default)]
+    pub walk: bool,
 }
 
 impl OnboardingPending {

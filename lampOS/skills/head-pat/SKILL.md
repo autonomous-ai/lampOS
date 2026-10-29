@@ -1,6 +1,6 @@
 ---
 name: head-pat
-description: When someone pets the lamp's head, a hand sliding left and right across it, the lamp answers with a short response, at most once in 10 seconds, and its base gives a small happy wiggle a second after the hand lifts (Head pat wiggle). Silent while asleep, during setup, in quiet hours and while it listens, thinks or speaks.
+description: When someone pets the lamp's head, a hand sliding left and right across it, the lamp answers with a short response, at most once in 10 seconds, and its base gives a small happy wiggle two seconds after the hand lifts (Head pat wiggle). Silent while asleep, through the whole setup walk, in quiet hours and while it listens, thinks or speaks.
 ---
 
 # Head pat
@@ -24,9 +24,9 @@ of light. Changing it needs no pull request, only that file.
 It answers once a pet and at most once in 10 seconds, so a second pet
 soon after a line still gets one, and never says the same line twice in a
 row. It stays silent while the
-lamp sleeps (and for the pet that woke it), while an onboarding step is
-pending, in quiet hours (22:00 to 07:00, or when the time is not known),
-and while the lamp listens, thinks or speaks, or within 10 seconds of it,
+lamp sleeps (and for the pet that woke it), through the whole setup walk
+(a step pending or not), in quiet hours (22:00 to 07:00, or when the time is not known),
+and while the lamp listens, thinks or speaks, or within 3 seconds of it,
 so a pet that stopped its words gets nothing. A pet held back is let go,
 never answered late.
 

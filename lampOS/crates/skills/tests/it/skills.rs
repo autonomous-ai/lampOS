@@ -331,7 +331,7 @@ fn repo_skill_with(dir: &Path, name: &str, from: &str, to: &str) -> PathBuf {
 fn head_pat_wiggle_is_small_quick_and_the_bases_alone() {
     use lamp_body::moves::{FARTHEST, FASTEST, check, read};
     let skill = skills_root().join("head-pat-wiggle");
-    assert_eq!(load(&skill).unwrap().kind, SkillKind::Installable);
+    assert_eq!(load(&skill).unwrap().kind, SkillKind::Core);
     let wiggle = read(&skill.join("moves/pat-wiggle.json")).unwrap();
     // The body's own check, as lamp-skills makes it at load and the body
     // again on the mood socket.
@@ -387,7 +387,7 @@ fn head_pats_response_is_chosen_in_its_file() {
     let toml = fs::read_to_string(skills_root().join("head-pat/skill.toml")).unwrap();
     assert_eq!(
         load(&skills_root().join("head-pat")).unwrap().kind,
-        SkillKind::Installable
+        SkillKind::Core
     );
     let say = &toml[toml.find("[[do]]\nsay").unwrap()..toml.find("# A non-word").unwrap()];
     // Its own steps in a skill that runs at each pet, with no gate.
@@ -503,6 +503,8 @@ fn every_skill_folder_says_its_kind_and_version() {
             "dance",
             "dusty-air",
             "feelings",
+            "head-pat",
+            "head-pat-wiggle",
             "laugh-glance",
             "light-out",
             "light-scenes",
@@ -534,8 +536,6 @@ fn every_skill_folder_says_its_kind_and_version() {
             "desk-tutor",
             "desk-tutor-marks",
             "guard-mode",
-            "head-pat",
-            "head-pat-wiggle",
             "look-for-things",
             "meal-check",
             "sit-back",
