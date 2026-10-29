@@ -2634,6 +2634,7 @@ fn gesture_run(
                 called: false,
                 still: false,
                 paused: false,
+                stand_share: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -2708,6 +2709,7 @@ fn expression_run_with(
             called: false,
             still: false,
             paused: false,
+            stand_share: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -2872,6 +2874,7 @@ fn speaking_run_with(
             called: false,
             still: false,
             paused: false,
+            stand_share: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -3579,6 +3582,7 @@ fn rest_glances_watched(
             called: false,
             still: false,
             paused: false,
+            stand_share: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -3997,6 +4001,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             called: false,
             still: false,
             paused: false,
+            stand_share: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -4062,6 +4067,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             called: false,
             still: false,
             paused: false,
+            stand_share: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -4145,6 +4151,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 called: false,
                 still: false,
                 paused: false,
+                stand_share: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -4567,6 +4574,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     called: false,
                     still: false,
                     paused: false,
+                    stand_share: None,
                     unplug: false,
                     held_by_test: false,
                     held: false,
@@ -4645,6 +4653,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 called: false,
                 still: false,
                 paused: false,
+                stand_share: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -4728,6 +4737,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 called: false,
                 still: false,
                 paused: false,
+                stand_share: None,
                 asleep: false,
                 woken: false,
                 unplug: false,
@@ -7565,6 +7575,7 @@ fn called_run(
                 called,
                 still: false,
                 paused: false,
+                stand_share: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -13553,6 +13564,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                     held: false,
                     aim: None,
                     paused: paused && at >= Duration::from_secs(16),
+                    stand_share: None,
                     ..Asked::default()
                 }
             },
@@ -14834,4 +14846,53 @@ fn a_stall_is_carried_only_away_from_where_the_joint_last_rested() {
         }
     }
     assert!(carried, "{stall:?}");
+}
+
+/// #4135: a person asks the lamp lower by voice (`body/stand_asked`, kept).
+/// The arm goes to that share of its own stand at the stand's own pace and
+/// stays there, then back to the stand as made when the ask is gone. Every
+/// share lies on the way the lamp rises, so nothing new is asked of the
+/// tipping guard.
+#[test]
+fn a_stand_asked_lower_is_kept_and_back_as_made_when_it_is_gone() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(32));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen: Vec<(Duration, [u16; 2])> = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        gesture_limits(),
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || {
+            let at = time.get();
+            Asked {
+                stand_share: (at >= Duration::from_secs(10) && at < Duration::from_secs(20))
+                    .then_some(0.6),
+                ..Asked::default()
+            }
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.arm_goals)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |secs: u64| {
+        seen.iter()
+            .rfind(|step| step.0 < Duration::from_secs(secs))
+            .unwrap()
+            .1
+    };
+    // As made, it stands and leans in as it speaks (`LEAN`).
+    let as_made = at(9);
+    assert!(as_made[0] > 2_600 && as_made[1] > 2_530, "{as_made:?}");
+    // smooth(0.6) of the way from the fold ([2_050, 2_047]) to the stand.
+    let lowered = at(19);
+    assert!(lowered[0].abs_diff(2_439) <= 2, "{lowered:?}");
+    assert!(lowered[1].abs_diff(2_405) <= 2, "{lowered:?}");
+    assert_eq!(at(18), lowered, "kept, not drifting");
+    assert_eq!(at(31), as_made);
 }
