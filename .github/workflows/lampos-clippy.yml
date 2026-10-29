@@ -41,6 +41,10 @@ on:
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/switches.md'
       - '.github/workflows/lampos-clippy.yml'
+      # The ARM64 workflow too: a pull request (or a train) of that file alone
+      # otherwise starts ARM64 and no clippy, and the train bot waits for one
+      # (trains 350 and 351, #4296, 29 Oct).
+      - '.github/workflows/lampos-arm64.yml'
       - '.github/scripts/lampos-source-times.py'
       - '.github/tools/lampos-promote/**'
   workflow_dispatch:
