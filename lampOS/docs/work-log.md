@@ -1,3 +1,21 @@
+## 29 October 2026, 20:05 +07 — the update half of the OTA alerts, a failed self-switch made visible, and a round's end made durable
+
+Item 1's rehearsal still waits on a 52e6 slot. 2c follows it.
+
+**The OTA alerts (#1683, approved by the first builder at 17:26, Backend2's lamp half #4370):**
+- **My read of #4370:** one P2. A lamp whose next build keeps refusing would send `refused` every 15 minutes, because every round's end is a new key. Backend2 fixed it as once per `(stage, to, code)`. Plus a P3: a self-switch's confirmation never reached `update/status`.
+- **#4376, landed in train 366:** `update/status`'s `last` gains `reason`, a fixed name for where a round stopped (its last phase, or `models`), and `started_at_unix_ms`.
+  - I kept it out of the ~45 refusal and failure sites in ship week.
+  - Both fields are optional and safe both ways across a round.
+  - `self-confirmed` is now a round's end. Mobile's app v3 reads it as "Installed".
+- **#4382, landed in train 367:** a self-switch put back by `lamp-update-back` is a round's end, `self-put-back`. Before, `update/status` kept saying the switch that didn't take. Mobile reads it as "Rolled back".
+- **#4389, READ-OKs from Tests and Third, waiting on ARM64:** the readers' P3s, plus `log_round` synced with its folder. The root is mounted `commit=600` (El), so an unplug within 10 minutes could lose a round's end. I found that from Tests' durability audit, which had found the build switch durable.
+- **#4393, docs:** the put-back's line comes after `self.json` goes, so a cut between leaves no line (Fourth's P3).
+
+Also landed: #4363 (setup.md's test lists, train 363). Reads: #4356 carried to its new head (setup's parts), and READ-OK on Tests' #4387 (setup's Wi-Fi removal synced).
+
+A correction of my own: I told Backend2 that `update.check` wasn't on lamp-voice, because my grep searched the wrong path. It is (#4153). I withdrew it within 10 minutes.
+
 ## 29 October 2026, 17:00 +07 — the round's mute written down; setup's join pinned at one rejected key; 0c89's wrong-password time in the check
 
 Item 1's rehearsal still waits on a 52e6 slot. Tests (15:20) found 52e6 on 8545, five commits past the builds' base, none in update, setup or the product units, so #4316–4318 stand. 2c follows it.
