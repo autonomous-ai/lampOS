@@ -2267,7 +2267,7 @@ pub fn serve(
                     let faces = bus
                         .as_ref()
                         .and_then(|_| crate::known_faces::most_faces_lately());
-                    let known_now = who.as_deref().and_then(crate::known_faces::known_now);
+                    let known_now = who.as_deref().and_then(crate::known_faces::known_lately);
                     let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
                     match crate::person::someone_else_now(name, faces, known_now.as_deref(), another)
                     {
