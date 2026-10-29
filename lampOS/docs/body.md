@@ -925,7 +925,7 @@ With `LAMP_BODY_POSE_ASK=on`, a person can ask the lamp lower ("get lower",
 the lamp's own stand on `body/stand_asked` (`lamp_msgs::StandAsked`, kept
 like `lamp/pause` until the next ask or until the bus is made again at power-up).
 lamp-body reads it at most once a second (`stand_in.rs`) and takes it in place
-of `--stand-share` for as long as it is kept. The core skill Pose
+of `--stand-share` for as long as it is kept, never above it: a lamp brought up with `--stand-share 30` stands at most at 30 % whatever is asked (the Reviewer-lead's P2 on #4278), and a bus read that fails keeps the last share read. Anyone the lamp hears may ask, a TV included; an ask only ever lowers the lamp within its own stand, and stays until the next one or power-up. The core skill Pose
 (`skills/pose`, its tool `set_pose`) publishes it through lamp-skills' `stand`
 step: 100 for normal, 60 for lower, 30 for sit, only with
 `LAMP_BODY_POSE_ASK=on` in lamp-skills' environment too ([skills.md](skills.md),
