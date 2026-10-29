@@ -1131,8 +1131,12 @@ build could carry it units or settings.
    round's end, `self-put-back`, and runs `systemctl reset-failed` and
    `restart --no-block lamp-update`. Otherwise it ends, having changed
    nothing. So the old updater's `update/status` says `self-put-back` as the
-   last result when it starts again (#1683's update alerts). An unreadable
-   `self.json` it puts back logs the same. A helper copied from a build
+   last result when it starts again (#1683's update alerts). The line comes
+   after `self.json` is removed, so a cut between the two leaves the
+   put-back done with no line, and `update/status` says the end before it.
+   Logging first would log it twice when `back` runs again. The window is a
+   few calls either way. An unreadable `self.json` it puts back logs the
+   same. A helper copied from a build
    before this says it only in its journal, until a confirmed lamp-update
    refreshes it. The unit has
    `ConditionPathExists=/usr/local/lib/lampos/lamp-update-back`: on a lamp
