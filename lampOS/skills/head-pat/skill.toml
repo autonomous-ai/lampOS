@@ -1,5 +1,7 @@
 # Head pat (#3997, Part of #4133): a hand petting the lamp's head, its pads
-# taking turns alone, gets a short response, at most once a minute. Controls
+# taking turns alone, gets a short response, at most once in 10 s. The happy
+# wiggle of the base a second after the hand lifts is Head pat wiggle's (its own skill,
+# since its gates differ: it may move while the voice speaks). Controls
 # tells the pet apart and says it on `controls/pet` only with LAMP_HEAD_PET=on
 # (docs/controls.md); without it nothing here ever runs. Written to
 # lamp-skills' schema (docs/skills.md, "The schema, as lamp-skills reads it").
@@ -20,13 +22,13 @@ topic = "controls/pet"
 field = "ended"
 equals = false            # a pet going on: Controls says it about ten times a second until it ends
 rearm = "ends"            # once a pet; a chance held back (talking, asleep, setup) is spent, never said late
-cooldown = "1m"           # at most once a minute
+cooldown = "10s"          # at most once in 10 s: a second pet soon after still gets one (the lamp check, #4133)
 
-[[while]]                 # not while it listens, thinks or speaks, nor within 10 s of it: a pet that cut its words gets nothing
+[[while]]                 # not while it listens, thinks or speaks, nor within 3 s of it: a pet that cut its words gets nothing, and lines come about every 10 s (the cooldown), not 13-14 s (the lamp check, #4133)
 topic = "voice/state"
 field = "state"
 equals = "resting"
-for = "10s"
+for = "3s"
 
 [[while]]                 # never while asleep, nor for a pet that woke it (the kept hand's wake at 1 s comes before the pet)
 topic = "expression/state"

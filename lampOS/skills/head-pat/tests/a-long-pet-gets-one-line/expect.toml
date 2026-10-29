@@ -1,4 +1,4 @@
-# One pet going on for 70 s: one line, at its start, not again at a minute (rearm).
+# One pet going on for 70 s: one line, at its start, never again while it lasts (rearm), past its 10 s.
 clock = "10:00"
 
 [[expect]]

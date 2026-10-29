@@ -1,0 +1,9 @@
+# A pet ends at 22 s and the next touches the pads at 22.5 s (told apart at 23.7 s, ending 25.7 s): none for the first,
+# so the base never turns under the hand back for the next (#4324); one a second after the second ends, at 26.7 s.
+clock = "10:00"
+
+[[expect]]
+at = "26700ms"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
