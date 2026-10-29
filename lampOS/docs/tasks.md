@@ -1765,6 +1765,53 @@ an ask over (the owner, 19 Oct 07:1x, "via hand-overs").
 Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named`,
 `agent_tasks::tests::the_accounts_switch_is_on_only_with_asked_and_taken_after_it`.
 
+### A question for one of the staff is theirs (off unless `LAMP_TASKS_QUESTIONS=on`)
+
+Only with `LAMP_TASKS_ASKED=on` (the voice's `--tasks-questions`, taken last,
+after `--tasks-correct`). The person's rule (28 Oct, 18:1x): "just spawn a
+new agent of type <...> to ask". A question about or for a named agent
+("what did Devin build last week?", "ask Hermes what it's working on") is
+handed over as a question task. The lamp never answers it itself, never
+says it doesn't know, and never asks what to do.
+
+- **The session note** (`agent_tasks::session_note`) says such a question
+  goes to the agent at once with `start_agent_task`. The task is written as
+  `agent_tasks::QUESTION`, "Answer this question; don't change any code or
+  open any PR:", followed by the person's question in their own words. The
+  agent's target is the one its engine has in the tasks part's targets,
+  as for any hand-over: `devin` → Devin Cloud on a lamp that has it. With
+  `LAMP_TASKS_NAMED_ONLY=on`, the agent must still be named.
+- **Past work:** an agent keeps no memory between sessions, so the voice
+  adds one line to every question task, whatever the engine (Claude Code,
+  Codex, Devin on the computer or in the cloud, OpenCode, Hermes):
+  `agent_tasks::PAST_WORK`, "For anything about past work, check your own
+  session history and this folder's git log first." Each engine knows its own
+  history command, so the lamp names none (the person, 29 Oct 16:37: "just
+  one line for all type of coding engine"). A Devin Cloud session has no
+  folder: it reads its sessions alone. Nothing is added to other work.
+- **What the person hears:**
+  - After their yes, the model is told `agent_tasks::asked_next`: say it has
+    asked Devin, that it may take a few minutes, and that it will tell them
+    what Devin says. It must never guess or give the answer itself.
+  - When the answer comes, Task news tells it with the skill's `answered`
+    words (or `answered_cut` for a long one): "Devin says…", then the
+    answer in plain words.
+  - The news quotes the person's own question (`agent_tasks::question_of`),
+    without the opening or the past-work line.
+  - A Task news `skill.toml` written before these words still passes, with
+    the built-in ones.
+- **Unchanged:** the read-back and the person's spoken yes come first, as
+  for any hand-over. The functions' descriptions are untouched, since their
+  1,024 bytes are spent; this is wording in the note only.
+- **Not yet shown:** a played check on lamp-a0ae once its voice is unmuted.
+
+Tests: `agent_tasks::tests::with_questions_a_question_for_the_staff_is_handed_over_as_a_question_task`,
+`agent_tasks::tests::the_questions_switch_is_on_only_with_asked_and_taken_last`,
+`agent_tasks::tests::a_question_for_devin_says_where_its_past_work_is_written`,
+`agent_tasks::tests::a_question_tasks_own_question_is_what_the_news_tells`,
+`task_news::tests::a_finished_question_task_is_told_as_its_answer`,
+`skill_words::tests::a_task_news_without_the_folder_words_passes_with_the_built_in_ones`.
+
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 
 A lamp has no screen for Harness's QR code. Harness 0.4.23 signs a device in

@@ -156,6 +156,35 @@ pub const NAMED_ASK_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ASK";
 /// `on`, and nothing else. Needs `lamp-tasks serve --sign-in-by-code`.
 pub const SIGN_IN_ENVIRONMENT: &str = "LAMP_TASKS_SIGN_IN";
 pub const SIGN_IN_FLAG: &str = "--tasks-sign-in";
+/// Where it reads whether a question about or for one of the staff is
+/// handed to them as a question task, never answered by the lamp. `on`
+/// only, and only with [`ASKED_ENVIRONMENT`], whose note says it.
+pub const QUESTIONS_ENVIRONMENT: &str = "LAMP_TASKS_QUESTIONS";
+pub const QUESTIONS_FLAG: &str = "--tasks-questions";
+/// How a question task begins, with [`QUESTIONS_FLAG`]: the agent answers
+/// and changes nothing. The person's question follows it, in their words.
+pub const QUESTION: &str = "Answer this question; don't change any code or open any PR:";
+/// Added to every question task, whatever the engine (Claude Code, Codex,
+/// Devin, OpenCode, Hermes): an agent keeps no memory between sessions, and
+/// each knows its own history command, so the lamp names none (the person,
+/// 29 Oct 16:37: "just one line for all type of coding engine").
+pub const PAST_WORK: &str =
+    "For anything about past work, check your own session history and this folder's git log first.";
+
+/// The person's question in a question task, as the news tells it: without
+/// the opening that tells the agent to change nothing, and without
+/// [`PAST_WORK`]. `None` for any other task.
+pub fn question_of(task: &str) -> Option<&str> {
+    if !is_question(task) {
+        return None;
+    }
+    let (_, question) = task.split_once(':')?;
+    let question = question
+        .trim_end()
+        .strip_suffix(PAST_WORK)
+        .unwrap_or(question);
+    Some(question.trim()).filter(|question| !question.is_empty())
+}
 pub const DEFAULT_TARGET: &str = "office";
 /// The model's two functions.
 pub const START: &str = "start_agent_task";
@@ -776,6 +805,21 @@ pub fn handing_over_next(lead_in: bool, who: &str) -> String {
     }
 }
 
+/// What the model is told after `confirm_agent_task` handed a question task
+/// over ([`QUESTIONS_FLAG`]): that it asked, that the answer takes a few
+/// minutes, and that it is told when it comes, never guessed now.
+pub fn asked_next(lead_in: bool, who: &str) -> String {
+    if lead_in {
+        format!(
+            "They have heard you say you are giving it to {who}. Add only, in a few words, that it may take a few minutes and you will tell them what {who} says, unless you said that already. {who} has not answered yet: never guess or give the answer yourself."
+        )
+    } else {
+        format!(
+            "Tell them in a few natural words that you have asked {who}, that it may take a few minutes, and that you will tell them what {who} says (\"Okay, I've asked {who}. It may take a few minutes; I'll tell you what it says.\"). {who} has not answered yet: never guess or give the answer yourself."
+        )
+    }
+}
+
 /// Where the work is done: the person's computer, called the office's
 /// without [`ACCOUNTS_FLAG`] (a home has no office, #1676).
 fn computer(place: &Place) -> &'static str {
@@ -830,6 +874,15 @@ fn examples_of(name: &str) -> String {
     format!("\"ask {name} to …\", \"get {name} to …\", \"have {name} …\"")
 }
 
+/// Whether `task` is a question task: it begins as [`QUESTION`] does,
+/// whatever its case.
+fn is_question(task: &str) -> bool {
+    let opening = "answer this question";
+    task.trim_start()
+        .get(..opening.len())
+        .is_some_and(|start| start.eq_ignore_ascii_case(opening))
+}
+
 /// What a new session is told after the persona with [`ASKED_FLAG`]: the
 /// persona asks for stories to be told gladly, and a story asked of one of
 /// the staff is theirs, but one asked of the lamp is its own (#854). `None`
@@ -861,13 +914,31 @@ pub fn session_note(place: &Place) -> Option<String> {
     } else {
         String::new()
     };
+    let questions = if place.questions {
+        let (first, last) = staff
+            .first()
+            .zip(staff.last())
+            .filter(|_| choosing(place, &staff))
+            .map_or((whom.as_str(), whom.as_str()), |(first, last)| {
+                (first.kind.name, last.kind.name)
+            });
+        format!(
+            " A question about {whom} or for them is theirs to answer too, not yours (\"what did \
+             {first} do last week?\", \"ask {last} what it's working on\"): never answer it \
+             yourself, never say you don't know and never ask what to do; hand it to them at \
+             once with start_agent_task, the task written as \"{QUESTION} \" and then their \
+             question in their own words, and say it back and start it on their yes as any task."
+        )
+    } else {
+        String::new()
+    };
     Some(format!(
         "\nWhen the person asks to have {whom} do something, it is theirs to do, not yours: \
          hand it over with start_agent_task every time, whatever it is, a story or a poem as \
          much as code, even one you could tell yourself, and even in the middle of a story you \
          are telling. Never do it yourself instead. A name that comes to you garbled, such as \
          \"Claude Co\" for Claude Code, still names them. Work on their {computer} is \
-         theirs too, named or not.{accounts} But a story, a poem or anything else they ask of you that \
+         theirs too, named or not.{accounts}{questions} But a story, a poem or anything else they ask of you that \
          names neither {whom} nor work on their {computer}, however long, is yours: tell \
          it yourself, gladly, and never offer it to {whom} or ask whether {whom} should, even \
          after you handed something over earlier in this conversation."
@@ -878,8 +949,29 @@ pub fn session_note(place: &Place) -> Option<String> {
 /// [`session_note`] added when the switch is on.
 pub fn noted(told: Option<String>, place: Option<&Place>) -> Option<String> {
     match place.and_then(session_note) {
-        Some(note) => Some(told.unwrap_or_default() + &note),
+        Some(note) => {
+            if place.is_some_and(|place| place.questions) {
+                journal_note(&note);
+            }
+            Some(told.unwrap_or_default() + &note)
+        }
         None => told,
+    }
+}
+
+/// The session note as the model is told it, journalled with
+/// [`QUESTIONS_FLAG`] whenever its words change (the staff read, a switch):
+/// so what a lamp's live context says can be read, not only the code. The
+/// note is the voice's own words and the staff's names, nothing a person
+/// said.
+fn journal_note(note: &str) {
+    static LAST: Mutex<Option<String>> = Mutex::new(None);
+    let Ok(mut last) = LAST.lock() else {
+        return;
+    };
+    if last.as_deref() != Some(note) {
+        eprintln!("lamp-voice: tasks: session note: {}", note.trim());
+        *last = Some(note.to_owned());
     }
 }
 
@@ -1401,6 +1493,9 @@ pub struct Place {
     /// The person may sign the lamp's Harness in by voice
     /// ([`SIGN_IN_FLAG`], `crate::sign_in`).
     pub sign_in: bool,
+    /// A question about or for one of the staff is handed to them as a
+    /// question task ([`QUESTIONS_FLAG`], [`QUESTION`]).
+    pub questions: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -1431,7 +1526,19 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         arguments.push(CORRECT_FLAG.to_owned());
     }
+    if questions(
+        &arguments,
+        std::env::var(QUESTIONS_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(QUESTIONS_FLAG.to_owned());
+    }
     arguments
+}
+
+/// Whether [`QUESTIONS_FLAG`] goes after `arguments`: `on`, and only with
+/// [`ASKED_FLAG`], whose session note carries what it says.
+fn questions(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && arguments.iter().any(|flag| flag == ASKED_FLAG)
 }
 
 /// Whether [`CORRECT_FLAG`] goes after `arguments`: `on`, and only with the
@@ -1507,7 +1614,7 @@ fn alias(text: &str) -> bool {
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
 /// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
 /// [--tasks-needs PATH] [--tasks-make-skill] [--tasks-sign-in] [--tasks-named-only]
-/// [--tasks-correct]` off the flags.
+/// [--tasks-correct] [--tasks-questions]` off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
         return Ok((None, flags));
@@ -1580,6 +1687,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == CORRECT_FLAG => (true, rest),
         _ => (false, rest),
     };
+    let (questions, rest) = match rest {
+        [flag, rest @ ..] if flag == QUESTIONS_FLAG && asked => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1595,6 +1706,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             named_only,
             correct,
             sign_in,
+            questions,
         }),
         rest,
     ))
@@ -1798,6 +1910,19 @@ fn run_for(
             let (target, who) = member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
                 (member.alias.as_str(), member.kind.name)
             });
+            let recorded;
+            let task = if place.questions && !making && is_question(task) {
+                recorded = format!("{task} {PAST_WORK}");
+                if recorded.len() > MOST_TASK_BYTES || !task_fits(&recorded) {
+                    return (
+                        json!({"error": "That task is too long to send as it is: say it more shortly."}),
+                        true,
+                    );
+                }
+                recorded.as_str()
+            } else {
+                task
+            };
             let Some(status) = ask(
                 &place.directory.join("request.sock"),
                 &json!({"op":"status"}),
@@ -2006,11 +2131,16 @@ fn run_for(
                         crate::task_news::keep_typed(store, pending.id);
                     }
                     let who = pending.who;
+                    let next = if place.questions && is_question(&pending.text) {
+                        asked_next(place.lead_in, who)
+                    } else {
+                        handing_over_next(place.lead_in, who)
+                    };
                     (
                         json!({
                             "handing_over": true,
                             "who": who,
-                            "next": handing_over_next(place.lead_in, who)
+                            "next": next
                         }),
                         true,
                     )
@@ -2281,6 +2411,7 @@ pub fn hand_over(
             make_skill: true,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         match missing_target(&place, 0, target, "claude", left()) {
@@ -2523,6 +2654,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let told = |place: &Place, name: &str, args: Value| {
@@ -2761,6 +2893,7 @@ pub(crate) mod tests {
                 make_skill: false,
                 named_only: false,
                 correct: false,
+                questions: false,
                 sign_in: false,
             })
         );
@@ -3175,6 +3308,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
@@ -3704,6 +3838,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -3786,6 +3921,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -3876,6 +4012,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -3931,6 +4068,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let call = |task: &str| ToolCall {
@@ -3988,6 +4126,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let task = json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
@@ -4067,6 +4206,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let seen = tasks_part(
@@ -4551,6 +4691,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         }
     }
@@ -5073,6 +5214,206 @@ pub(crate) mod tests {
         let (place, rest) = take(&given).unwrap();
         assert!(!place.unwrap().accounts);
         assert_eq!(rest, &given[2..]);
+    }
+
+    /// With `--tasks-questions`, a question about or for one of the staff
+    /// ("what did Devin build last week?", "ask Hermes what it's working
+    /// on") is theirs: the note says never to answer it, say it doesn't
+    /// know or ask what to do, and to hand it over at once, written as a
+    /// question task, with the read-back and the yes as for any task.
+    /// Without it, the note is as before.
+    #[test]
+    fn with_questions_a_question_for_the_staff_is_handed_over_as_a_question_task() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for staff in [Vec::new(), two()] {
+            keep_staff(staff.clone());
+            let mut before = place(Path::new("/run/t"), !staff.is_empty());
+            before.asked = true;
+            let mut after = before.clone();
+            after.questions = true;
+            let plain = super::session_note(&before).unwrap();
+            assert!(!plain.contains(QUESTION), "{plain}");
+            let note = super::session_note(&after).unwrap();
+            for said in [
+                "A question about",
+                "never answer it yourself",
+                "never say you don't know",
+                "never ask what to do",
+                "at once with start_agent_task",
+                "\"Answer this question; don't change any code or open any PR: \"",
+                "say it back and start it on their yes as any task",
+            ] {
+                assert!(note.contains(said), "{said}: {note}");
+            }
+            if staff.is_empty() {
+                assert!(
+                    note.contains("what did Claude Code do last week?"),
+                    "{note}"
+                );
+            } else {
+                assert!(
+                    note.contains("what did Claude Code do last week?"),
+                    "{note}"
+                );
+                assert!(note.contains("ask Codex what it's working on"), "{note}");
+            }
+            // Only the question's sentence is new.
+            let (head, tail) = plain.split_once(" But a story").unwrap();
+            assert!(note.starts_with(head) && note.ends_with(tail), "{note}");
+            // The functions' descriptions are untouched: the 1,024 bytes
+            // they have are spent.
+            for (tool, was) in super::declared(&after, &staff)
+                .into_iter()
+                .zip(super::declared(&before, &staff))
+            {
+                assert_eq!(tool.description, was.description);
+            }
+        }
+        keep_staff(Vec::new());
+    }
+
+    /// `--tasks-questions` comes only with `LAMP_TASKS_ASKED=on`, whose note
+    /// says it, and is taken last, after `--tasks-correct`.
+    #[test]
+    fn the_questions_switch_is_on_only_with_asked_and_taken_last() {
+        let flags =
+            |list: &[&str]| -> Vec<String> { list.iter().map(|flag| (*flag).to_owned()).collect() };
+        let asked = flags(&[FLAG, "/run/t", ASKED_FLAG]);
+        assert!(questions(&asked, Some("on")));
+        for value in [None, Some("off"), Some("ON"), Some("1")] {
+            assert!(!questions(&asked, value), "{value:?}");
+        }
+        assert!(!questions(&flags(&[FLAG, "/run/t"]), Some("on")));
+        assert!(!questions(&[], Some("on")));
+        let given = flags(&[
+            FLAG,
+            "/run/t",
+            ASKED_FLAG,
+            CORRECT_FLAG,
+            QUESTIONS_FLAG,
+            "--next",
+        ]);
+        let (place, rest) = take(&given).unwrap();
+        let place = place.unwrap();
+        assert!(place.questions && place.correct && place.asked);
+        assert_eq!(rest, ["--next"]);
+        // Without asked, the flag is not this module's and is left.
+        let given = flags(&[FLAG, "/run/t", QUESTIONS_FLAG]);
+        let (place, rest) = take(&given).unwrap();
+        assert!(!place.unwrap().questions);
+        assert_eq!(rest, [QUESTIONS_FLAG]);
+    }
+
+    /// A question task for Devin is sent with where its past work is
+    /// written, since Devin keeps no memory between sessions; the same
+    /// question for Claude Code, other work for Devin, or the switch off
+    /// send the task as it was said. The read-back and the yes are as for
+    /// any task: prepared, then started on the confirmation.
+    #[test]
+    fn a_question_for_devin_says_where_its_past_work_is_written() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let cloud = [
+            member("office-claude", "claude"),
+            member("devin", "devin-cloud"),
+        ];
+        let local = [
+            member("office-claude", "claude"),
+            member("office-devin", "devin"),
+        ];
+        let question = format!("{QUESTION} what did Devin build last week?");
+        let sent_to = |staff: &[Member], tag: &str, on: bool, task: &str, who: &str| {
+            let (sent, told) = handed_over_with(
+                tag,
+                |place| {
+                    place.who = true;
+                    place.asked = true;
+                    place.questions = on;
+                },
+                Some(staff),
+                json!({"task": task, "who": who}),
+            );
+            assert_eq!(sent[1]["op"], "prepare", "{tag}");
+            assert_eq!(sent[3]["op"], "confirm", "{tag}: started on the yes");
+            assert!(told[0].get("error").is_none(), "{tag}: {}", told[0]);
+            // Once started, a question is said to be asked, its answer to
+            // come; other work is handed over as ever.
+            let asked = on && is_question(task);
+            let who = told[1]["who"].as_str().unwrap();
+            assert_eq!(
+                told[1]["next"],
+                if asked {
+                    asked_next(false, who)
+                } else {
+                    handing_over_next(false, who)
+                },
+                "{tag}"
+            );
+            (
+                sent[1]["text"].as_str().unwrap().to_owned(),
+                sent[1]["target"].as_str().unwrap().to_owned(),
+            )
+        };
+        let sent_text =
+            |tag: &str, on: bool, task: &str, who: &str| sent_to(&cloud, tag, on, task, who);
+        // One line for every engine: the lamp names no history command.
+        let past = format!("{question} {PAST_WORK}");
+        let (text, target) = sent_text("q-devin", true, &question, "Devin");
+        assert_eq!(target, "devin");
+        assert_eq!(text, past);
+        let lower = question.to_lowercase();
+        let (text, _) = sent_text("q-devin-case", true, &lower, "Devin");
+        assert_eq!(text, format!("{lower} {PAST_WORK}"));
+        let (text, target) = sent_text("q-claude", true, &question, "Claude Code");
+        assert_eq!(
+            (text.as_str(), target.as_str()),
+            (past.as_str(), "office-claude")
+        );
+        let work = "Reply in the Slack thread about the release";
+        let (text, _) = sent_text("q-work", true, work, "Devin");
+        assert_eq!(text, work);
+        let (text, _) = sent_text("q-off", false, &question, "Devin");
+        assert_eq!(text, question);
+        // Devin on the person's computer gets the same one line.
+        let (text, target) = sent_to(&local, "q-local", true, &question, "Devin");
+        assert_eq!(target, "office-devin");
+        assert_eq!(text, past);
+        assert!(!text.contains("devin list"), "{text}");
+        let (text, _) = sent_to(&local, "q-local-work", true, work, "Devin");
+        assert_eq!(text, work);
+    }
+
+    /// The news tells the person's question, without the opening that tells
+    /// the agent to change nothing or where a Devin keeps its past work.
+    #[test]
+    fn a_question_tasks_own_question_is_what_the_news_tells() {
+        let bare = "what did Devin build last week?";
+        let question = format!("{QUESTION} {bare}");
+        assert_eq!(question_of(&question), Some(bare));
+        assert_eq!(question_of(&format!("{question} {PAST_WORK}")), Some(bare));
+        assert_eq!(
+            question_of("answer this question; change nothing: is it done?"),
+            Some("is it done?")
+        );
+        for other in [
+            "Reply in the Slack thread about the release",
+            "Answer the email from the landlord",
+            "Answer this question:",
+            "",
+        ] {
+            assert_eq!(question_of(other), None, "{other}");
+        }
+        for lead_in in [false, true] {
+            let next = asked_next(lead_in, "Devin");
+            assert!(next.contains("a few minutes"), "{next}");
+            assert!(
+                next.contains("never guess or give the answer yourself"),
+                "{next}"
+            );
+        }
     }
 
     /// #799: one description the service would refuse leaves a session
@@ -5619,6 +5960,7 @@ pub(crate) mod tests {
                 make_skill: false,
                 named_only: false,
                 correct: false,
+                questions: false,
                 sign_in: false,
             })
         );
@@ -6164,6 +6506,7 @@ pub(crate) mod tests {
             make_skill: false,
             named_only: false,
             correct,
+            questions: false,
             sign_in: false,
         }
     }
