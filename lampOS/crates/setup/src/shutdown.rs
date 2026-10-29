@@ -421,6 +421,29 @@ fn still(first: &[f64], now: &[f64]) -> bool {
 /// Refused while another holder has it, and when it cannot be checked.
 pub use lamp_keeper::restart::update_lock;
 
+/// How long the runner waits for the update's lock before it refuses: the
+/// change helper that started it lets go of the lock as it exits, so the
+/// runner may ask a moment before that (the Reviewer-lead's P3 on #3735).
+pub const LOCK_WAIT: Duration = Duration::from_secs(5);
+
+/// [`update_lock`], asked again every [`LOOK_EVERY`] for up to `within`
+/// while another holder has it. An update that holds it longer still
+/// refuses the shutdown; a lock that can't be checked refuses at once.
+pub fn update_lock_within(
+    records: &lamp_update::records::Records,
+    within: Duration,
+) -> Result<lamp_update::records::Lock, String> {
+    let deadline = Instant::now() + within;
+    loop {
+        match update_lock(records) {
+            Err(why) if why == lamp_keeper::restart::INSTALLING && Instant::now() < deadline => {
+                std::thread::sleep(LOOK_EVERY)
+            }
+            taken => return taken,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -865,6 +888,38 @@ mod tests {
         // Held by the shutdown: an update that starts meanwhile can't have it.
         assert!(records.lock().is_err());
         drop(lock);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The change helper lets go of the lock as it exits, just after it
+    /// starts the runner: the runner waits for it, rather than refusing a
+    /// lock its own helper still held (the Reviewer-lead's P3 on #3735).
+    /// One an update holds past the wait still refuses.
+    #[test]
+    fn the_runner_waits_for_a_lock_let_go_soon_and_refuses_one_held_on() {
+        let folder = std::env::temp_dir().join(format!("lsw-{}", std::process::id()));
+        let records = lamp_update::records::Records::new(folder.clone());
+        let held = records.lock().unwrap();
+        let letting_go = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            drop(held);
+        });
+        let started = Instant::now();
+        let lock = update_lock_within(&records, Duration::from_secs(5)).unwrap();
+        assert!(started.elapsed() >= Duration::from_millis(300));
+        letting_go.join().unwrap();
+        drop(lock);
+
+        let held = records.lock().unwrap();
+        let started = Instant::now();
+        assert_eq!(
+            update_lock_within(&records, Duration::from_millis(300))
+                .err()
+                .as_deref(),
+            Some(lamp_keeper::restart::INSTALLING)
+        );
+        assert!(started.elapsed() >= Duration::from_millis(300));
+        drop(held);
         let _ = std::fs::remove_dir_all(folder);
     }
 

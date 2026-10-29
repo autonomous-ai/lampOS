@@ -143,7 +143,7 @@ lamp says so.
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
 | `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. `data` is not read. Without the switch, V1's "not on this lamp" |
-| `system.shutdown` | with `LAMP_SHUTDOWN=on` (#3697, "The lamp turned off from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"shutting_down": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). `data` is not read. Once taken, asked again it is answered the same `success` and the helper is not asked again. Without the switch, V1's "not on this lamp" |
+| `system.shutdown` | with `LAMP_SHUTDOWN=on` (#3697, "The lamp turned off from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"shutting_down": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). `data` is not read. Once taken, asked again within 60 s (`lamp::YES_KEPT`) it is answered the same `success` and the helper is not asked again; after that the helper is asked again. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
@@ -282,12 +282,15 @@ the lock go, answers `{"done":{"shutting_down":true}}` and starts
 `lamp-setup shutdown`, which says it is going to sleep, rests the lamp,
 stops its parts, lets the body go, lights the ring and powers off
 ([shutdown.md](shutdown.md)). That runner takes the update's lock again
-itself: an update that took it in the moment between is not cut, the
-runner refuses and its journal says so (`lamp-setup: shutdown: refused:
-…`), and the app has already heard `success`. `lamp-cloud` keeps the
-helper's yes: an app that asks again before the lamp is down gets the same
-`success`, and the helper is asked once. A refusal is not kept, so the app
-may ask again once the update is done.
+itself, waiting up to 5 s (`shutdown::LOCK_WAIT`) for the helper, which
+lets go of it as it exits. An update that holds it past that is not cut:
+the runner refuses and its journal says so (`lamp-setup: shutdown:
+refused: …`), and the app has already heard `success`. `lamp-cloud` keeps
+the helper's yes for 60 s (`lamp::YES_KEPT`): an app that asks again before
+the lamp is down gets the same `success`, and the helper is asked once. A
+lamp still on after that wasn't turned off, so the helper is asked again
+and the app hears why. A refusal is not kept, so the app may ask again once
+the update is done.
 
 `system.info`'s `can` lists `system.reboot` and `system.shutdown` only while
 their switches are on in `lamp-cloud`'s unit. The helper is not probed: it

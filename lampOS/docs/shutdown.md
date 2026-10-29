@@ -72,10 +72,12 @@ one of those, or by hand.
    done"). Otherwise it lets the lock go, answers
    `{"done":{"shutting_down":true}}`, so the app hears `success` before the
    lamp goes down, and starts `lamp-setup shutdown` (the runner above, which
-   takes the lock again itself and refuses, logged, if an update took it in
-   between). `lamp-cloud` keeps the yes: an app that asks again is answered
-   the same and the helper is asked once (cloud.md, "The lamp turned off from
-   the app"). No keeper is needed: a product lamp has none.
+   takes the lock again itself, waiting up to 5 s for the helper to let it
+   go, `shutdown::LOCK_WAIT`, and refuses, logged, if an update holds it past
+   that). `lamp-cloud` keeps the yes for 60 s: an app that asks again within
+   it is answered the same and the helper is asked once; after it, a lamp
+   still on is asked again (cloud.md, "The lamp turned off from the app").
+   No keeper is needed: a product lamp has none.
 
 Still to come:
 

@@ -876,7 +876,9 @@ fn start_shutdown(dry_run: bool) -> Result<bool, Box<dyn std::error::Error>> {
 fn shutdown_now(dry_run: bool) -> Result<bool, Box<dyn std::error::Error>> {
     use lamp_setup::shutdown;
     let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
-    let _lock = match shutdown::update_lock(&records) {
+    // Waited for a moment: the change helper that started this runner lets
+    // go of the lock as it exits.
+    let _lock = match shutdown::update_lock_within(&records, shutdown::LOCK_WAIT) {
         Ok(lock) => lock,
         Err(why) => {
             eprintln!("lamp-setup: shutdown: refused: {why}");
