@@ -2345,12 +2345,15 @@ impl Onboarding {
             }
         }
         // A line owed again ([`OwedNote`]) waits for the room to be quiet,
-        // unless the lamp itself was the last to speak: its own words are
-        // no one to wait for.
+        // unless it is "preferences"' hello and the lamp itself was the last
+        // to speak: its own words are no one to wait for (the Reviewer-lead's
+        // P3 on #4346 keeps the skip to the hello).
+        let hello_after_lamp =
+            self.lamp_spoke_last && self.owed.as_deref() == Some(skill::PREFERENCES_HELLO);
         let can_speak = can_speak
             && !(self.owed_note.again
                 && self.owed.is_some()
-                && !self.lamp_spoke_last
+                && !hello_after_lamp
                 && quiet_us < START_QUIET_US);
         self.owed_note.bindable = false;
         let owed = self.owed.clone();
@@ -5797,6 +5800,24 @@ mod tests {
         room.walk.heard("Yes.", room.at);
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+    }
+
+    /// The Reviewer-lead's P2 on #4346: an unclear first line ("Hmm.") is
+    /// the quiet hours' answer; the hello follows the model's few words, and
+    /// nothing else is asked.
+    #[test]
+    fn an_unclear_first_line_gets_the_hello_and_nothing_else() {
+        let mut room = Room::new("unclear-first");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Hmm.", room.at);
+        room.walk.lamp_said();
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+        assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.outcome(Step::Preferences), None);
+        assert!(!PREFERENCES_NOTE.contains("again"));
     }
 
     /// Reviewer-two's P3 on #4346: asking to hear the question again, its

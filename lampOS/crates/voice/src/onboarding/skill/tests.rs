@@ -539,7 +539,8 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
         (
             Step::Preferences,
             "Are there hours when I should keep quiet?",
-            "Sorry, could you say that again?",
+            // No re-ask: any first answer is the quiet hours' (#4346).
+            "",
             // Its hello question and done line are the walk's own words.
             "",
         ),
