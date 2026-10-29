@@ -111,7 +111,9 @@ to `on`, lamp-voice's `arm64` job may run on the internal Mac Studio's trusted
 runner (`studio-trusted`) instead of GitHub-hosted: one VM, fresh for each
 job and deleted after it, with no cache mounted, that takes only `lamp-voice`.
 `.github/scripts/lampos-route.py` chooses, and falls back to GitHub-hosted on
-any doubt and on every re-run. The build is cold either way. `publish` and
+any doubt and on every re-run: any attempt after the first runs the `arm64`
+job on GitHub-hosted, whether it is "Re-run all jobs" or "Re-run failed
+jobs" (which reuses `route`'s first answer). The build is cold either way. `publish` and
 `promote-stable` always run on GitHub-hosted, so the signing key never
 reaches the Studio. The key staying away does not keep the Studio out of the
 release's trust: `publish` signs the bytes the Studio built, and its SHA-256
