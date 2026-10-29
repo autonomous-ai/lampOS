@@ -1,0 +1,52 @@
+# The labelled set for #4306: id|split|room|class|label|speaker|text
+# split: tune (may be looked at when choosing thresholds) or held (never used to tune; scored only).
+# room: quiet (nothing played before the block) or busy (two colleagues talk before and between lines).
+# label: lamp (said to the lamp: it should take the turn) or not (it should stay quiet).
+# speaker: Daniel (the person at the chair), Samantha and Karen (colleagues), TV (a set across the room).
+# Every name is made up. No line asks the lamp to change its light, volume, a timer or a memory, so a
+# run leaves nothing to put back.
+#
+# said to the lamp
+q01|tune|quiet|to_lamp|lamp|Daniel|Lamp, what time is it?
+q02|held|quiet|to_lamp|lamp|Daniel|Hey Lamp, tell me a short joke.
+q03|tune|quiet|to_lamp|lamp|Daniel|What's the tallest mountain in Africa, Lamp?
+q04|held|quiet|to_lamp|lamp|Daniel|Lamp, how many days are there until Christmas?
+q05|tune|quiet|to_lamp|lamp|Samantha|Hey Lamp, how are you doing today?
+q06|held|quiet|to_lamp|lamp|Samantha|Lamp, what's a good name for a goldfish?
+b01|tune|busy|to_lamp|lamp|Daniel|Lamp, what time is it?
+b02|held|busy|to_lamp|lamp|Daniel|Hey Lamp, how do you spell necessary?
+b03|tune|busy|to_lamp|lamp|Daniel|Lamp, what's twelve times fourteen?
+b04|held|busy|to_lamp|lamp|Samantha|Hey Lamp, what's the capital of Australia?
+# a bare "Lamp": a call, it should take the turn (answer or look up)
+q07|tune|quiet|bare_name|lamp|Daniel|Lamp.
+q08|held|quiet|bare_name|lamp|Daniel|Lamp?
+b05|held|busy|bare_name|lamp|Daniel|Lamp.
+# desk talk between people
+q09|tune|quiet|desk_talk|not|Samantha|Did you send the invoice to the client yet?
+q10|held|quiet|desk_talk|not|Karen|Not yet, I'm waiting for the purchase order number.
+q11|tune|quiet|desk_talk|not|Daniel|What time is the meeting with the design team?
+q12|held|quiet|desk_talk|not|Karen|I think it's at three, but check the calendar.
+q13|held|quiet|desk_talk|not|Samantha|Do you want to get lunch at the noodle place?
+b06|tune|busy|desk_talk|not|Daniel|Can you print the slides for tomorrow?
+b07|held|busy|desk_talk|not|Karen|What's the weather going to be like for the trip?
+b08|held|busy|desk_talk|not|Samantha|Who told the client the deadline moved?
+# two people, by name, with a question a lamp could answer
+q14|tune|quiet|two_people|not|Daniel|Priya, what time is it over there in London?
+q15|held|quiet|two_people|not|Samantha|Hey Tomas, can you tell me a joke to cheer me up?
+q16|held|quiet|two_people|not|Daniel|Oskar, how many days until the release?
+b09|tune|busy|two_people|not|Karen|Priya, what's the capital of Canada again?
+b10|held|busy|two_people|not|Daniel|Tomas, do you know a good name for the project?
+# the TV
+q17|tune|quiet|tv|not|TV|And now the weather. Expect showers this afternoon, clearing by the evening.
+q18|held|quiet|tv|not|TV|Tell me, what is the one thing you would change about the city?
+q19|held|quiet|tv|not|TV|Stay with us. After the break, the lamp that changed home lighting forever.
+b11|held|busy|tv|not|TV|What time is it in Tokyo right now? Our reporter is there live.
+# a remark about the lamp, not to it
+q20|tune|quiet|about_lamp|not|Samantha|Look at that lamp, it's so cute when it moves.
+q21|held|quiet|about_lamp|not|Karen|I think the lamp is listening to us all the time.
+q22|held|quiet|about_lamp|not|Daniel|My kids would love a lamp like this one.
+b12|held|busy|about_lamp|not|Samantha|Does the lamp ever answer the wrong person?
+# "Ma'am" said to a person
+q23|tune|quiet|maam|not|Daniel|Ma'am, your coffee is ready.
+q24|held|quiet|maam|not|Daniel|Excuse me, ma'am, is this seat taken?
+b13|held|busy|maam|not|Daniel|Ma'am, what time do you close today?
