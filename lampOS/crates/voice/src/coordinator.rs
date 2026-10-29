@@ -7400,7 +7400,14 @@ fn conversation_with_gate_inner(
             observe_provider_output(&mut cloud, reply, &event)?;
             key_refusals.observe(&event, monotonic_us());
             // Answered again: the next refusal is a new outage, its line owed.
-            if refused_hold && model_refusing.observe(&event, monotonic_us()) {
+            // An onboarding line's own words, said on a failed chat (#4263),
+            // are no answer of the model's.
+            let fixed_line = matches!(
+                &event,
+                ProviderOutput::GenerationComplete { request }
+                    if onboarding_invitation_turn.is_some_and(|(_, turn)| turn == *request)
+            );
+            if refused_hold && model_refusing.observe(&event, monotonic_us(), fixed_line) {
                 outage = Outage::default();
             }
             if words_heard(&event) {
