@@ -57,6 +57,13 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
     for (step, first, reoffer) in expected {
         assert_eq!(definition.note(step, false).as_bytes(), first.as_bytes());
         assert_eq!(definition.note(step, true).as_bytes(), reoffer.as_bytes());
+        // Only where you sit opens a later visit's re-offer otherwise.
+        let visit = if step == Step::WhereYouSit {
+            SIT_VISIT_OFFER
+        } else {
+            reoffer
+        };
+        assert_eq!(definition.visit_reoffer(step).as_bytes(), visit.as_bytes());
     }
     assert_eq!(definition.nudge(Step::WhoYouAre), Some((WHO_NUDGE, 1)));
     assert_eq!(
