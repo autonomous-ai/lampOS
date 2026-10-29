@@ -262,3 +262,11 @@ Ready for lamp-voice: yes (#4417, behind `LAMP_DECLINE_SILENT`, off; Part of #39
 - c0a4, 17:20–17:40Z, Mac-played, the switch off and on: two declines silent with "no conversation going on from it". Words before a call, and a decline carrying a line, weren't reached on the lamp; the unit tests cover them. Restored after, lock released, Twelve told (its #4175 drop-in saved, with the local manager's yes).
 - Gate on 2c28a0f974: voice lib 4144/1, the one being the timed `CarryDesk` test, 3 of 3 alone; before the rebase 4142/0 and 1, 275, 4, 6.
 - #4385: HOLD then READ-OK on 9ff9b3929b.
+
+### #4417's P3s, the decline's carry window (#4429)
+
+Ready for lamp-voice: yes (#4429, behind `LAMP_DECLINE_SILENT`, off; Part of #3945)
+
+- #4417 merged in train 381.
+- The live carry window's `held`/`remember` writes after a let-out now reach the decline's snapshot (Sixth's and Reviewer-three's P3s). The new test fails without the `colleague_held` mirror.
+- Gate: voice lib 4150/0, the other targets 1, 275, 4, 6; clippy, fmt, workspace build clean.
