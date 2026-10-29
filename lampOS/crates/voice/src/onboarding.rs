@@ -537,6 +537,31 @@ impl Progress {
     }
 }
 
+/// An owed line ([`Onboarding::owed`]: how a step ended, a re-offer's
+/// lines) handed out by [`Onboarding::tick`] and bound to its turn
+/// ([`Onboarding::bind_opener`]). A turn that played none of it, taken by a
+/// sound before its audio began (lamp-52e6, 29 Oct: a re-offer's `later`
+/// line, its turn taken 0.46 s in), owes it again ([`MOST_UNSAID`] times in
+/// a row at most), said once the room is quiet; any of it played, never.
+/// The step being led and when it was asked ([`Onboarding::asking`]).
+type Asking = Option<(Step, Option<u64>)>;
+
+#[derive(Default)]
+struct OwedNote {
+    /// The line and what was being asked when it was handed out
+    /// ([`Onboarding::asking`]).
+    line: Option<(String, Asking)>,
+    /// Handed out this loop, not yet bound to a turn.
+    bindable: bool,
+    turn: Option<(BootId, u64)>,
+    /// The line [`Self::unsaid`] counts for, and its turns in a row that
+    /// played none of it.
+    counted: Option<String>,
+    unsaid: u8,
+    /// [`Onboarding::owed`] is this line owed again: said once it is quiet.
+    again: bool,
+}
+
 #[derive(Default)]
 struct Led {
     step: Step,
@@ -703,6 +728,8 @@ pub struct Onboarding {
     seen_us: Option<u64>,
     read_us: Option<u64>,
     finished_recorded: bool,
+    /// The owed line last handed out and how its turn went ([`OwedNote`]).
+    owed_note: OwedNote,
     records: Vec<Value>,
     eyes: Option<lamp_bus::Bus>,
     looked: Option<(u64, Option<Framing>)>,
@@ -903,6 +930,7 @@ impl Onboarding {
             seen_us: None,
             read_us: None,
             finished_recorded: false,
+            owed_note: OwedNote::default(),
             records: Vec::new(),
             eyes: None,
             available: Step::available,
@@ -1823,11 +1851,18 @@ impl Onboarding {
             .or_else(|| self.giving_binding())
             .or_else(|| self.privacy_invitation_binding())
             .or(self.opener_turn)
+            .or(self.owed_note.turn)
     }
 
     /// Binds "where you sit"'s intro, handed out by this loop's tick, to the
     /// turn it is said in; false for any other note.
+    /// An owed line handed out by this loop's tick is bound the same way
+    /// ([`OwedNote`]).
     pub(crate) fn bind_opener(&mut self, voice_boot: BootId, turn: u64) -> bool {
+        if std::mem::take(&mut self.owed_note.bindable) && turn != 0 {
+            self.owed_note.turn = Some((voice_boot, turn));
+            return true;
+        }
         if !std::mem::take(&mut self.opener_said) || turn == 0 {
             return false;
         }
@@ -1891,6 +1926,49 @@ impl Onboarding {
         self.giving_invitation_finished(voice_boot, turn, delivery, now_us);
         self.privacy_invitation_finished(voice_boot, turn, delivery, now_us);
         self.opener_finished(voice_boot, turn, delivery, now_us);
+        self.owed_finished(voice_boot, turn, delivery, now_us);
+    }
+
+    /// The step being led and when it was asked.
+    fn asking(&self) -> Asking {
+        self.led.as_ref().map(|led| (led.step, led.asked_us))
+    }
+
+    /// Whether a line handed out while [`Self::asking`] was `then` still
+    /// stands: a step's own line while that step is led as it was; a line
+    /// said between asks (how a step ended) while nothing has been asked
+    /// since.
+    fn still_owed(&self, then: Asking) -> bool {
+        self.asking() == then
+            || (then.is_none_or(|(_, asked)| asked.is_none())
+                && self.led.as_ref().is_none_or(|led| led.asked_us.is_none()))
+    }
+
+    /// An owed line's turn ended ([`OwedNote`]): with none of it played,
+    /// owed again, unless another line is owed, the walk has moved on
+    /// ([`Self::still_owed`]), or it went unsaid [`MOST_UNSAID`] times in a
+    /// row already.
+    fn owed_finished(&mut self, voice_boot: BootId, turn: u64, delivery: Delivery, now_us: u64) {
+        if self.owed_note.turn != Some((voice_boot, turn)) {
+            return;
+        }
+        self.owed_note.turn = None;
+        let Some((line, then)) = self.owed_note.line.take() else {
+            return;
+        };
+        if delivery != Delivery::Unsaid {
+            self.owed_note.unsaid = 0;
+            return;
+        }
+        let again =
+            self.owed.is_none() && self.still_owed(then) && self.owed_note.unsaid < MOST_UNSAID;
+        self.records.push(json!({"kind":"onboarding_note_unsaid",
+            "said_again":again,"at_us":now_us}));
+        if again {
+            self.owed_note.unsaid += 1;
+            self.owed_note.again = true;
+            self.owed = Some(line);
+        }
     }
 
     pub fn kept(&self) -> &Progress {
@@ -2196,6 +2274,34 @@ impl Onboarding {
     /// on the lamp ([`Self::still_now`]). A note returned is a turn the
     /// caller begins now as a written request.
     pub fn tick(
+        &mut self,
+        now_us: u64,
+        quiet_us: u64,
+        can_speak: bool,
+        paused: bool,
+        face: Option<Framing>,
+        still: bool,
+    ) -> Option<String> {
+        // A line owed again ([`OwedNote`]) waits for the room to be quiet.
+        let can_speak = can_speak
+            && !(self.owed_note.again && self.owed.is_some() && quiet_us < START_QUIET_US);
+        self.owed_note.bindable = false;
+        let owed = self.owed.clone();
+        let note = self.tick_led(now_us, quiet_us, can_speak, paused, face, still)?;
+        self.owed_note.again = false;
+        if owed.as_ref() == Some(&note) {
+            if self.owed_note.counted.as_ref() != Some(&note) {
+                self.owed_note.counted = Some(note.clone());
+                self.owed_note.unsaid = 0;
+            }
+            self.owed_note.line = Some((note.clone(), self.asking()));
+            self.owed_note.bindable = true;
+            self.owed_note.turn = None;
+        }
+        Some(note)
+    }
+
+    fn tick_led(
         &mut self,
         now_us: u64,
         quiet_us: u64,
@@ -2752,13 +2858,17 @@ impl Onboarding {
     }
 
     /// The step being led, dropped by the keeper's pause or by nobody
-    /// there. A `later` re-offer with nothing tried in it is given back:
-    /// its count as before, so the cap is not spent on an offer nobody had,
-    /// and its date kept, so it comes back at its usual spacing from now,
-    /// never at once (Seventh's P3 4 on #4192).
+    /// there. A `later` re-offer dropped before it was asked (only its
+    /// naming line out, or not even that) is given back: its count as
+    /// before, so the cap is not spent on an offer nobody had, and its date
+    /// kept, so it comes back at its usual spacing from now, never at once
+    /// (Seventh's P3 4 on #4192). Once asked it stays spent: walking away
+    /// from an ask is an answer, and giving that back would re-ask every
+    /// `later_after_s` with no cap (the Reviewer-lead's P2 on #4311).
     fn drop_led(&mut self) -> Option<Led> {
         let led = self.led.take()?;
         if let Some(count) = led.counted_from
+            && led.asked_us.is_none()
             && !self.was_tried(led.step)
             && let Some(kept) = self.desired.steps.get_mut(led.step.name())
         {
@@ -6050,11 +6160,13 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    /// Seventh's P3 4 on #4192: a `later` re-offer dropped by the keeper's
-    /// pause or by nobody there, with nothing tried, is given back: not
-    /// counted, and offered again at its usual spacing from the drop.
+    /// Seventh's P3 4 on #4192: a `later` re-offer dropped before it was
+    /// asked is given back, not counted, and offered again at its usual
+    /// spacing from the drop. One dropped after its ask stays spent (the
+    /// Reviewer-lead's P2 on #4311): the cap holds, and the last offer's
+    /// silent end says the setup can be redone.
     #[test]
-    fn a_later_offer_dropped_by_the_pause_or_nobody_there_is_given_back() {
+    fn a_later_offer_dropped_before_its_ask_is_given_back_and_after_it_spent() {
         let later = crate::onboarding::skill::LATER;
         let (mut room, _says, root) = at_touch("later-back");
         assert_eq!(
@@ -6063,10 +6175,16 @@ mod tests {
         );
         report(&room.walk, "preferences", "done");
         assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        let named = room
+            .walk
+            .definition
+            .later_reoffer(Step::Touch)
+            .unwrap()
+            .to_owned();
         back_date(&mut room, 1_801);
-        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)).len(), 2);
+        // Only its naming line out, then the keeper's pause: given back.
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [named]);
         assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
-        // The keeper's pause mid-offer: given back.
         room.walk
             .tick(room.at, 0, true, true, Some(NEAR_MIDDLE), room.still);
         assert_eq!(room.walk.desired.steps["touch"].later_offers, 0);
@@ -6075,11 +6193,45 @@ mod tests {
         back_date(&mut room, 1_801);
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)).len(), 2);
         assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
-        // Nobody there mid-offer: given back too, the step still `later`.
+        // Asked, then nobody there: spent, the step still `later`, and not
+        // offered again before `reoffer_after_s`.
         room.wait(31 * S, None);
-        assert_eq!(room.walk.desired.steps["touch"].later_offers, 0);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Later));
+        back_date(&mut room, 1_801);
         assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        // A day on, the last offer: its silent end says the setup can be
+        // redone, and then it is never offered again.
+        back_date(&mut room, 86_401);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)).len(), 2);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 2);
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, crate::onboarding::skill::LAST_LATER]
+        );
+        back_date(&mut room, 3 * 86_401);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// An owed line whose turn played none of it (on lamp-52e6 a sound took
+    /// a re-offer's `later` line 0.46 s in, before its audio) is said again
+    /// once the room is quiet, [`MOST_UNSAID`] times in a row at most; one
+    /// partly played is never said again.
+    #[test]
+    fn an_owed_line_whose_turn_played_none_of_it_is_said_again() {
+        let later = crate::onboarding::skill::LATER;
+        let (mut room, _says, root) = at_touch("owed-unsaid");
+        assert_eq!(
+            room.wait_played(90 * S, Some(NEAR_MIDDLE), Delivery::Unsaid),
+            [TOUCH_REMIND, later, later, later, PREFERENCES_NOTE]
+        );
+        std::fs::remove_dir_all(root).unwrap();
+        let (mut room, _says, root) = at_touch("owed-cut");
+        assert_eq!(
+            room.wait_played(70 * S, Some(NEAR_MIDDLE), Delivery::Cut),
+            [TOUCH_REMIND, later, PREFERENCES_NOTE]
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
