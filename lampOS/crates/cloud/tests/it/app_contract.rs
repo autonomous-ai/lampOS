@@ -7,7 +7,7 @@
 //! through JSON as the broker carries it.
 use lamp_bus::Bus;
 use lamp_cloud::answer::answer;
-use lamp_cloud::lamp::{Places, Real, Ring, Shutdown, Texts, Wifi};
+use lamp_cloud::lamp::{Places, Real, Ring, Shutdown, Texts, Wifi, YES_KEPT};
 use lamp_cloud::wire::Identity;
 use lamp_msgs::{Light, LightRequest};
 use serde_json::{Value, json};
@@ -752,7 +752,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
     let root = PathBuf::from(format!("/tmp/lcr-shutdown-{}", std::process::id()));
     let places = lamp(&root);
     let socket = root.join("change.sock");
-    let serving = helper(&root, &socket, vec![true, false]);
+    let serving = helper(&root, &socket, vec![true, false, true]);
     let mut real = Real {
         places,
         bus: None,
@@ -811,9 +811,23 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
     for data in [Value::Null, json!({"now": "please"}), json!("junk")] {
         assert_eq!(said(&mut real, &data)["data"], reply["data"], "{data}");
     }
+    // A lamp still on once the yes is older than YES_KEPT wasn't turned off:
+    // the runner refused, as an update took the lock first. The helper is
+    // asked again, and the app hears why, not the old `success` (the
+    // Reviewer-lead's P3 on #3735).
+    let kept = &mut real.shutdown.as_mut().unwrap().accepted.as_mut().unwrap().1;
+    *kept = std::time::Instant::now()
+        .checked_sub(YES_KEPT + std::time::Duration::from_secs(1))
+        .unwrap();
+    let reply = said(&mut real, &Value::Null);
+    assert_eq!(reply["status"], "failure", "{reply}");
+    assert!(
+        reply.to_string().contains(lamp_keeper::restart::INSTALLING),
+        "{reply}"
+    );
     assert_eq!(
         serving.join().unwrap(),
-        [lamp_keeper::restart::SHUTDOWN_REQUEST; 2]
+        [lamp_keeper::restart::SHUTDOWN_REQUEST; 3]
     );
     let _ = std::fs::remove_dir_all(root);
 }
