@@ -918,6 +918,36 @@ shoulder at 2,658 and the elbow at 2,650, so it has stood there; nothing
 else about the pose has been checked on this unit, and the old runtime
 reached it by moving all five joints together over five seconds.
 
+### A stand asked by voice
+
+With `LAMP_BODY_POSE_ASK=on`, a person can ask the lamp lower ("get lower",
+"sit down") and back ("back to normal") (#4135). The ask arrives as a share of
+the lamp's own stand on `body/stand_asked` (`lamp_msgs::StandAsked`, kept
+like `lamp/pause` until the next ask or until the bus is made again at power-up).
+lamp-body reads it at most once a second (`stand_in.rs`) and takes it in place
+of `--stand-share` for as long as it is kept, never above it: a lamp brought up with `--stand-share 30` stands at most at 30 % whatever is asked (the Reviewer-lead's P2 on #4278), and a bus read that fails keeps the last share read. Anyone the lamp hears may ask, a TV included; an ask only ever lowers the lamp within its own stand, and stays until the next one or power-up. The core skill Pose
+(`skills/pose`, its tool `set_pose`) publishes it through lamp-skills' `stand`
+step: 100 for normal, 60 for lower, 30 for sit, only with
+`LAMP_BODY_POSE_ASK=on` in lamp-skills' environment too ([skills.md](skills.md),
+`do.stand`). Asked taller than its usual height, the lamp says so in words and
+calls nothing:
+
+- The arm goes there at the stand's own pace (the same spring as rising),
+  and stays there through moods and conversations. The head follows its
+  usual share of the way (`head_share`), so at 30 % the head is still beside
+  its folded pose.
+- Every share lies on the way the lamp already rises, from `--folded-arm` to
+  `--stand`, so the tipping guard (`cog`, 16 mm held and 22 mm moving)
+  bounds it as it bounds rising. No new pose needs its own proof, and none
+  goes past the stand as made: "taller" than 100 % is never asked.
+- A share is 1 to 100. Never 0: a lamp that folds is resting, and a lamp
+  asked low is still awake and still looks at people. Anything else kept on
+  the topic, or nothing, is the stand as made.
+- A lamp below its full stand makes no gesture. Gestures are made for a lamp
+  upright at its full height, as before; the gesture is dropped and said.
+- Rest, sleep, a pause and leaving fold it as before. When it stands again,
+  it goes back to the share still kept.
+
 ## Looking at a face
 
 Not yet run on a lamp. This is what the code does against simulated servos

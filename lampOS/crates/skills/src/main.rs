@@ -6,7 +6,7 @@ use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
     BodyGesture, Decision, GestureState, Hand, Light, LightOutranked, LightReached, LightRequest,
     MessageOut, Pause, RequestedAudioContext, RequestedAudioOperation, SkillEvent, SkillStage,
-    Speech, Voice, VoiceState,
+    Speech, StandAsked, Voice, VoiceState,
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
 use lamp_skills::requested_audio::{self, Authority};
@@ -2770,10 +2770,12 @@ fn tool_call(
         if !made.iter().any(|call| matches!(call, Call::Mood { .. })) {
             end_hold(&run.skill);
         }
-        for call in made
-            .iter()
-            .filter(|call| matches!(call, Call::Mood { .. } | Call::Light { keep: true, .. }))
-        {
+        for call in made.iter().filter(|call| {
+            matches!(
+                call,
+                Call::Mood { .. } | Call::Light { keep: true, .. } | Call::Stand(_)
+            )
+        }) {
             if sockets.may.refuses(call).is_none() {
                 make(call, &sockets, &runner.bus, None);
             }
@@ -4358,6 +4360,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             });
             format!("{first}, held {} s", lasting_us / 1_000_000)
         }
+        Call::Stand(share) => stand(*share, bus),
         Call::Show { name, .. } => format!("show {name}: made by its own step"),
         Call::Say(_) | Call::Words(_) | Call::SayFrom(..) => "say: made by its own step".into(),
         Call::Sound { .. } => "sound: made by its own step".into(),
@@ -4369,6 +4372,22 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Text(_) => "text: a watch's, sent by the watch".into(),
         Call::Propose(_) => "propose: written by the run on addon/proposal".into(),
         Call::Ends => "its trigger ended".into(),
+    }
+}
+
+/// The stand a person asked for (#4135): one `body/stand_asked`, kept by
+/// the bus, published only with the body's own switch on here too.
+fn stand(share: u8, bus: &Bus) -> String {
+    use lamp_body::stand_in::ENVIRONMENT;
+    if !std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on") {
+        return format!("stand {share}%: not acted on, {ENVIRONMENT} is not on");
+    }
+    let published = bus
+        .publisher_declared(StandAsked::TOPIC, &StandAsked::declaration(), "skills")
+        .and_then(|mut out| out.publish_json(clock::now_us(), &StandAsked { share }));
+    match published {
+        Ok(_) => format!("stand {share}%: asked of the body"),
+        Err(error) => format!("stand {share}%: not published ({error})"),
     }
 }
 
