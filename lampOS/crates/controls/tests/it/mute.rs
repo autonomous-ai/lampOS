@@ -127,6 +127,9 @@ fn exposed_or_symlink_state_and_nonprivate_directory_are_refused() {
     assert!(record.save(&root.file()).is_err());
 }
 
+/// A writer's `.pending` is never overwritten by a save. A start that finds
+/// one not the record's own reads as muted, sets it aside as evidence and
+/// lets saves run again (#4332).
 #[test]
 fn an_incomplete_other_write_is_not_overwritten() {
     let root = Root::new();
@@ -135,27 +138,44 @@ fn an_incomplete_other_write_is_not_overwritten() {
     let mut record = MuteRecord::new("boot").unwrap();
     record.request_mute(100);
     assert!(record.save(&root.file()).is_err());
-    assert!(MuteRecord::load(&root.file(), "boot", 100).is_err());
     assert!(record.muted);
     assert_eq!(
         fs::read_to_string(root.0.join(".mute.json.pending")).unwrap(),
         "incomplete"
     );
+    let (loaded, note) = MuteRecord::load_noting(&root.file(), "boot", 100).unwrap();
+    assert!(loaded.muted);
+    assert!(note.is_some());
+    assert_eq!(
+        fs::read_to_string(root.0.join(".mute.json.pending.recovered")).unwrap(),
+        "incomplete"
+    );
+    record.save(&root.file()).unwrap();
 }
 
+/// An orphan `.replacement`, with no `.pending` and no record, is never
+/// overwritten in place: the start reads as muted and keeps it aside.
 #[test]
-fn orphan_replacement_is_refused_even_without_a_pending_marker_or_main_file() {
+fn orphan_replacement_reads_as_muted_and_is_kept_aside() {
     let root = Root::new();
     let replacement = root.0.join(".mute.json.replacement");
     fs::write(&replacement, "do not overwrite").unwrap();
     let record = MuteRecord::new("boot").unwrap();
-    assert!(MuteRecord::load(&root.file(), "boot", 100).is_err());
     assert!(record.save(&root.file()).is_err());
     assert_eq!(
         fs::read_to_string(&replacement).unwrap(),
         "do not overwrite"
     );
     assert!(!root.file().exists());
+    let (loaded, note) = MuteRecord::load_noting(&root.file(), "boot", 100).unwrap();
+    assert!(loaded.muted);
+    assert!(note.is_some());
+    assert!(!replacement.exists());
+    assert_eq!(
+        fs::read_to_string(root.0.join(".mute.json.replacement.recovered")).unwrap(),
+        "do not overwrite"
+    );
+    loaded.save(&root.file()).unwrap();
 }
 
 #[test]

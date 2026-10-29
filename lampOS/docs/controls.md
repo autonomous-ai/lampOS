@@ -1628,10 +1628,19 @@ switch, stays until their hold. With `LAMP_RING_ASLEEP=on` (#1025) the
 wait shows the asleep face, not a dark ring.
 
 Saves retain a private `.pending` inode while linking/renaming the replacement
-and syncing file and directory; `.replacement` and `.pending` evidence both
-refuse later startup. Removing the pending marker is the final operation.
-A crash may leave or resurrect a marker after an otherwise successful write,
-requiring explicit operator recovery. No arbitrary storage/power-failure
+and syncing file and directory. Removing the pending marker is the final
+operation, and it is not synced, so a crash or a power cut a few seconds after
+a save can leave or resurrect a marker after an otherwise successful write
+(lamp-06c1, 29 Oct). The voice recovers at its next start on its own (#4332).
+A `.pending` (with or without `.replacement`) that is the record's own inode,
+the same `dev` and `ino`, is that finished write: the markers are removed and
+the record is read as it is. Any other marker, or a marker with no record,
+means the write may not have finished: the start reads as muted, says so once
+in the journal, and moves the markers aside to `.<name>.pending.recovered` and
+`.<name>.replacement.recovered` (the latest kept as evidence), so the next save,
+the hold that clears the mute among them, works. Before #4332 such a marker
+refused every start: the voice never came back, and a person's only way out
+was the 5 s RESET pinhole, a factory reset. No arbitrary storage/power-failure
 guarantee is claimed. Clear saves its proposed unmuted record before changing
 the live latch, then normal startup writes the active guard again. Disk sync
 has no hard userspace bound and happens only outside the urgent audio loop.

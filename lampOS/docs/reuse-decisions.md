@@ -1242,8 +1242,9 @@ coordinator. Before audio, a durable muted recovery record guards against a
 crash before a later hand request can be saved. Clean verified shutdown can
 store the actual preference; a fault restart conservatively stays muted. The
 mute value survives machine reboot while boot-relative timestamps are rebased.
-Retained pending/replacement markers make interrupted commits explicit, at the
-cost of possible operator recovery. No uncontrolled async clear write can
+Retained pending/replacement markers make interrupted commits explicit; since
+#4332 a start reads one that is not the record's own inode as muted and sets it
+aside, rather than needing operator recovery. No uncontrolled async clear write can
 overtake a newer mute.
 
 First's probe and 20-second watch showed only resting GPIO levels. In

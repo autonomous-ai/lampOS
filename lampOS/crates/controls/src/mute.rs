@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::Path,
 };
 
@@ -148,17 +148,10 @@ impl MuteRecord {
         clock_id: &str,
         now_us: u64,
     ) -> io::Result<(Self, Option<String>)> {
-        if let (Some(parent), Some(name)) = (path.parent(), path.file_name()) {
-            for suffix in ["pending", "replacement"] {
-                let marker = parent.join(format!(".{}.{suffix}", name.to_string_lossy()));
-                match fs::symlink_metadata(marker) {
-                    Ok(_) => {
-                        return Err(invalid("an interrupted mute write requires owner recovery"));
-                    }
-                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                    Err(error) => return Err(error),
-                }
-            }
+        if let Some(note) = Self::recover_markers(path)? {
+            let mut muted = Self::new(clock_id)?;
+            muted.muted = true;
+            return Ok((muted, Some(note)));
         }
         match fs::symlink_metadata(path) {
             Ok(metadata) => {
@@ -213,6 +206,76 @@ impl MuteRecord {
             return Err(invalid("mute state watermark is in the future"));
         }
         Ok((state, None))
+    }
+
+    /// Settle the `.pending` and `.replacement` markers a save leaves while it
+    /// runs, before the record is read. None: no marker, or a finished write.
+    /// Some(note): an unfinished one, which the caller reads as muted.
+    ///
+    /// A marker sharing the record's own inode (`dev` and `ino`) is a
+    /// finished write: the record is the save's synced new file, and only the
+    /// last, unsynced unlink was lost, as a power cut a few seconds after a
+    /// save does (lamp-06c1, 29 Oct). The markers are removed and the record
+    /// read as usual.
+    ///
+    /// Any other marker means the write may not have finished, and which
+    /// state won is unknown, so the record reads as muted, said once. It used
+    /// to refuse the start until an operator came; a voice that never starts
+    /// again after an unplug is worse than a mute a hold clears (#4332). The
+    /// markers are moved aside to `.recovered` names, the latest kept as
+    /// evidence, so the next save, the person's hold that clears the mute
+    /// among them, can claim its fixed sibling names again.
+    fn recover_markers(path: &Path) -> io::Result<Option<String>> {
+        let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+            return Ok(None);
+        };
+        let name = name.to_string_lossy();
+        let mut markers = Vec::new();
+        for suffix in ["pending", "replacement"] {
+            let marker = parent.join(format!(".{name}.{suffix}"));
+            match fs::symlink_metadata(&marker) {
+                Ok(metadata) => markers.push((marker, metadata)),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+        if markers.is_empty() {
+            return Ok(None);
+        }
+        let record = match fs::symlink_metadata(path) {
+            Ok(metadata) => Some(metadata),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error),
+        };
+        let finished = record.as_ref().is_some_and(|record| {
+            record.is_file()
+                && markers
+                    .iter()
+                    .all(|(_, marker)| marker.dev() == record.dev() && marker.ino() == record.ino())
+        });
+        let directory = File::open(parent)?;
+        if finished {
+            for (marker, _) in &markers {
+                fs::remove_file(marker)?;
+            }
+            directory.sync_all()?;
+            return Ok(None);
+        }
+        let mut kept = Vec::new();
+        for (marker, _) in &markers {
+            let aside = marker.with_file_name(format!(
+                "{}.recovered",
+                marker.file_name().unwrap().to_string_lossy()
+            ));
+            fs::rename(marker, &aside)?;
+            kept.push(aside.display().to_string());
+        }
+        directory.sync_all()?;
+        Ok(Some(format!(
+            "the mute record at {} had an unfinished write: read as muted, until a fresh hold of the button or the base clears it (kept as {})",
+            path.display(),
+            kept.join(", ")
+        )))
     }
 
     /// Commit a private replacement while retaining a recovery marker until
@@ -333,8 +396,13 @@ mod tests {
         assert!(read.muted);
     }
 
+    /// A clear cut at each point of its save: the next load never fails, and
+    /// a save after it works, so the voice starts and a person's hold can
+    /// still clear the mute. Cut before the rename, the old muted record
+    /// stands and the start is muted; cut after it, the record is the
+    /// finished clear and the markers are its own inode (#4332, lamp-06c1).
     #[test]
-    fn failure_before_or_after_replacement_keeps_recovery_evidence() {
+    fn a_save_cut_at_any_point_never_stops_the_next_start() {
         for point in [
             SavePoint::PendingWritten,
             SavePoint::ReplacementLinked,
@@ -359,16 +427,61 @@ mod tests {
                     .is_err()
             );
             assert!(root.0.join(".mute.json.pending").exists());
-            assert!(MuteRecord::load(&path, "boot", 30).is_err());
-            assert!(record.save(&path).is_err());
-            let visible: MuteRecord = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            let finished = matches!(point, SavePoint::TargetRenamed | SavePoint::TargetSynced);
+            let (mut loaded, note) = MuteRecord::load_noting(&path, "boot", 30).unwrap();
+            assert_eq!(loaded.muted, !finished);
+            assert_eq!(note.is_some(), !finished);
+            assert!(!root.0.join(".mute.json.pending").exists());
+            assert!(!root.0.join(".mute.json.replacement").exists());
             assert_eq!(
-                visible.muted,
-                matches!(
-                    point,
-                    SavePoint::PendingWritten | SavePoint::ReplacementLinked
-                )
+                root.0.join(".mute.json.pending.recovered").exists(),
+                !finished
             );
+            loaded.save(&path).unwrap();
+            loaded.clear_after_explicit_user_request(40).unwrap();
+            loaded.save(&path).unwrap();
+            assert!(!MuteRecord::load(&path, "boot", 50).unwrap().muted);
         }
+    }
+
+    /// The lamp-06c1 files of 29 Oct: the record and `.pending` one inode,
+    /// with `.replacement` too on another cut, read as the record they are.
+    #[test]
+    fn a_finished_write_with_its_marker_left_reads_as_the_record() {
+        for with_replacement in [false, true] {
+            let root = Root::new();
+            let path = root.0.join("mute.json");
+            let mut record = MuteRecord::new("boot").unwrap();
+            record.request_mute(10);
+            record.save(&path).unwrap();
+            fs::hard_link(&path, root.0.join(".mute.json.pending")).unwrap();
+            if with_replacement {
+                fs::hard_link(&path, root.0.join(".mute.json.replacement")).unwrap();
+            }
+            let (loaded, note) = MuteRecord::load_noting(&path, "boot", 30).unwrap();
+            assert_eq!(loaded, record);
+            assert!(note.is_none());
+            for leftover in [".mute.json.pending", ".mute.json.replacement"] {
+                assert!(!root.0.join(leftover).exists());
+                assert!(!root.0.join(format!("{leftover}.recovered")).exists());
+            }
+            record.clear_after_explicit_user_request(20).unwrap();
+            record.save(&path).unwrap();
+        }
+    }
+
+    /// The first save cut before its rename: a `.pending` and no record yet.
+    /// Which state it was writing is unknown, so the start is muted, never
+    /// the first use's unmuted default.
+    #[test]
+    fn a_pending_marker_with_no_record_reads_as_muted() {
+        let root = Root::new();
+        let path = root.0.join("mute.json");
+        fs::write(root.0.join(".mute.json.pending"), "cut").unwrap();
+        let (loaded, note) = MuteRecord::load_noting(&path, "boot", 30).unwrap();
+        assert!(loaded.muted);
+        assert!(note.unwrap().contains("unfinished write"));
+        loaded.save(&path).unwrap();
+        assert!(MuteRecord::load(&path, "boot", 40).unwrap().muted);
     }
 }
