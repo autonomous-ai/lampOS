@@ -229,3 +229,15 @@ Ready for lamp-voice: yes (#4238, journal only, Part of #4226)
 - Gate: voice lib 4049/0, the other targets 275/0, 1/0, 4/0, 6/0; clippy and fmt clean.
 - Restored after, lock released, Twelve told. c0a4's chat provider answers HTTP 402.
 - Next: (b) the spread with this journal, (c) the bound or a first-word line start.
+
+- #4226 handed over to Twelve on 29 Oct at 07:1x (the first builder's move). Step (c), the carried-sound start fix, landed as Twelve's #4258.
+
+### #3945, which second sign let a named line out
+
+Ready for lamp-voice: yes (#4295, journal only, Part of #3945)
+
+- Mac-played run on lamp-c0a4, 02:49–02:55Z, the switch on through an env drop-in, each line at clip gain 1.0 and 0.35. None of the 18 "Ma'am/Sir" lines was answered. The one hearing at the line's start was held by the switch.
+- #4295 journals the second signs that let a hearing count (`Attention::second_signs`), never the words.
+- c0a4 check, 03:24–03:27Z: a "Ma'am" line soon after a call counted by "a conversation going on". One counted by "its words calling it, its hearing at the line's start" (probably a stand-in first word).
+- Gate: voice lib 4062/0, the other targets 1/0, 275/0, 4/0, 6/0; clippy and fmt clean.
+- Restored after, lock released, Twelve told.
