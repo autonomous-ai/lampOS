@@ -1661,16 +1661,22 @@ wait shows the asleep face, not a dark ring.
 
 Saves retain a private `.pending` inode while linking/renaming the replacement
 and syncing file and directory. Removing the pending marker is the final
-operation, and it is not synced, so a crash or a power cut a few seconds after
-a save can leave or resurrect a marker after an otherwise successful write
-(lamp-06c1, 29 Oct). The voice recovers at its next start on its own (#4332).
+operation. Its directory sync is best effort (an error is ignored), because the
+lamp images mount the root ext4 with `commit=600`: an unsynced unlink can stay
+unjournaled for up to ten minutes, and lamp-06c1's unplug about 4 minutes after
+a quiet save brought the marker back after an otherwise successful write
+(29 Oct). The voice recovers at its next start on its own (#4332).
 A `.pending` (with or without `.replacement`) that is the record's own inode,
 the same `dev` and `ino`, is that finished write: the markers are removed and
 the record is read as it is. Any other marker, or a marker with no record,
 means the write may not have finished: the start reads as muted, says so once
 in the journal, and moves the markers aside to `.<name>.pending.recovered` and
-`.<name>.replacement.recovered` (the latest kept as evidence), so the next save,
-the hold that clears the mute among them, works. Before #4332 such a marker
+`.<name>.replacement.recovered`, so the next save, the hold that clears the
+mute among them, works. Before the markers move, the muted record is written to
+`.<name>.recovering`, synced and renamed over the record, so a second cut before
+the voice's own save still reads muted. Only the latest marker pair is kept on
+purpose: a second cut's markers overwrite the first's evidence. Loading writes,
+so only the record's one owner (the voice, at its start) loads it. Before #4332 such a marker
 refused every start: the voice never came back, and a person's only way out
 was the 5 s RESET pinhole, a factory reset. No arbitrary storage/power-failure
 guarantee is claimed. Clear saves its proposed unmuted record before changing
