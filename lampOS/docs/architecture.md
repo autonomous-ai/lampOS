@@ -14,7 +14,8 @@ speech gaps; earlier cohorts did. The conservative turn-taking baseline suppress
 overlapping input. Natural interruption and social admission remain unqualified.
 
 Continuous `serve` and the independent motor worker are integrated. Motor output
-is inactive. Camera startup/teardown corrections passed a native 31-frame check;
+was inactive on 11 Oct; the product moves the body through `lamp-expression` and
+`lamp-body` ("The product today"). Camera startup/teardown corrections passed a native 31-frame check;
 a later conversation queued a fresh camera frame for each of three replies.
 This does not independently verify the model's visual descriptions. Optional
 ring startup and runtime failures now disable presentation while retaining
@@ -37,6 +38,33 @@ physical acceptance tests. V1 source remains a reference for useful safeguards.
 Source home: [top-level lampOS/](../README.md). Suggested human ownership, based
 on V1 history, is in [team ownership](team-ownership.md).
 
+## The product today (29 Oct)
+
+Most of this page is the 11 Oct V2 design and its evidence. The product's
+units (`deploy/product/`) run the core loop like this; where a section below
+says otherwise, this is what runs.
+
+- **The voice's route is the second one** (`lamp-voice.service`,
+  `LAMP_VOICE_ROUTE=second`): `lamp-voice serve` starts `lamp-voice worker
+  second`, which hears with Deepgram, replies with DeepSeek through the
+  relay (a person's own key only with `LAMP_OWN_KEYS`, off in the product,
+  [own-keys.md](own-keys.md)) and speaks with
+  ElevenLabs `eleven_v4_turbo`. Gemini Live is the other route
+  (`LAMP_VOICE_ROUTE=gemini`), not the product's.
+- **Wake is its own unit:** `lamp-name` (`--microphone mic2`) listens to
+  `mic2/audio` and says `name/rising` and `name/heard` on the bus; the voice
+  waits for a call with `--call-wait-ms 2000` ([bus.md](bus.md), "On the
+  lamp").
+- **End of turn is confirmed by `lamp-turn-end`:** the voice runs it with
+  `--endpoint smart-turn-fast`, and the silence window stays the fallback
+  ([endpoint-pilot.md](endpoint-pilot.md)).
+- **Motion is outside the core:** `lamp-expression serve --enable` is its own
+  unit and says `expression/body`; `lamp-body` runs `--idle on --look-at-name
+  on` with `LAMP_EXPRESSION_BODY=on`, so the body moves on Expression's word,
+  turns to its name and has its own idle ([body.md](body.md),
+  [expression.md](expression.md)).
+- Memory is `lamp-memory`, as below.
+
 ## Product boundary
 
 **Chat with a physical robot.** Lamp sits in a fixed position on the left or
@@ -58,7 +86,7 @@ The first version includes:
 
 | Experience | Required behavior |
 |---|---|
-| Conversation | Gemini Live handles short and extended chat, follow-ups, short answers to Lamp's questions, corrections, hesitant speech and topic changes. Keep the current conversation and explicit interaction settings available. |
+| Conversation | The voice route (the product's second route, "The product today" above; Gemini Live on the other) handles short and extended chat, follow-ups, short answers to Lamp's questions, corrections, hesitant speech and topic changes. Keep the current conversation and explicit interaction settings available. |
 | Interruption | The person can start a new addressed question during an answer. Retain the opening words, yield speech promptly and follow the new meaning. Measure and distinguish a listener's brief acknowledgment from an interruption. |
 | Expression | One choreographer coordinates the voice, head, body and ring using actual input/playback events. Use small purposeful gestures with cancellation and repetition limits; no gesture is required on every turn. |
 | Vision | Use fresh camera evidence for desk presence, permitted gaze adjustment and objects the person shows. Admit relevant frames to the live conversation. Report uncertainty and camera unavailability honestly. |
@@ -72,7 +100,7 @@ research and Hindsight are deferred. Memory across days is `lamp-memory`
 ([memory.md](memory.md)), off the live audio path.
 Local camera/sensor reads and bounded light, volume or posture controls are part
 of the interaction itself. The model must not claim to have run an excluded task.
-No autonomous room search, stock spoken waiting fillers or random idle movements.
+No autonomous room search or stock spoken waiting fillers. The body's own small idle (`lamp-body --idle on` in the product, [body.md](body.md)) is not a gesture of the conversation.
 
 ## Rust and reuse
 
@@ -126,7 +154,8 @@ running as separate processes with their own lifetime and resource bounds.
 
 The core is the coordination point. Each named worker below is a separate
 process; the supervisor, interaction controller and choreographer are modules
-inside the one core process. Owners shown are proposed human assignments.
+inside the one core process. (In the product, the head's and body's
+choreography is `lamp-expression`, its own unit: "The product today".) Owners shown are proposed human assignments.
 
 ```text
                         +---------------------+
@@ -162,7 +191,7 @@ INPUT WORKERS           ONE CORE PROCESS          OUTPUT WORKERS
 
 The left-to-right arrows show observations entering the core and commands leaving
 it. Workers return progress, rejection, completion and failure messages to the
-core. The Gemini worker alone owns this diagram's cloud connection. The core
+core. On the Gemini route, the Gemini worker alone owns this diagram's cloud connection; on the product's second route, `lamp-voice worker second` owns its three (speech-to-text, chat, speech). The core
 owns turn admission, cancellation and permissions; the choreographer converts
 that shared state and observed playback progress into purposeful presentation.
 
@@ -183,13 +212,14 @@ contracts, not a claim of zero latency or hard real-time Linux scheduling.
 
 `*` The motor worker is connected through an opt-in live supervision path.
 The gesture producer and physical motion qualification are still pending;
-ordinary conversation does not dispatch a motor segment. This map does not
+ordinary conversation does not dispatch a motor segment from the core. In the product, `lamp-expression` moves the body on the bus instead. This map does not
 claim every component is deployed.
 
 ```text
 ADDITIONAL WORKERS                PROPOSED OWNER       STATUS
 Perception / gaze                loclt1011            Candidate: face bearing only, eyes.md
-End-of-turn inference            ndtran11-png          Candidate
+End-of-turn inference            ndtran11-png          In the product: lamp-turn-end, --endpoint smart-turn-fast
+Wake (the lamp's name)           -                    In the product: lamp-name, mic2/audio to name/rising
 Buttons / touch                  Kyle                 Pending
 Environment sensors              Kyle                 Later priority
 
@@ -215,7 +245,10 @@ reviewer. Tony and Kyle share the setup handoff, not one hardware writer.
 
 The diagram is the V2 responsibility map, not a claim that every worker is
 already deployed. `process` means an independent OS lifetime; the choreographer
-is policy inside the core, not another authority or actuator writer. Capture and
+is policy inside the core, not another authority or actuator writer (in the
+product, the head's and body's choreography is `lamp-expression`, its own unit:
+it says `expression/body` (and its state and light) on the bus and writes no
+servo itself; `lamp-body` acts on it). Capture and
 speaker are separate processes even though they share the audio crate. Perception,
 end-of-turn inference and motor gestures still require their own
 integration/qualification gates. The current physical privacy process does not
