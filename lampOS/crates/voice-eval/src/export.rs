@@ -670,6 +670,7 @@ const BUS_TOPICS: &[&str] = &[
     "body/gesture",
     "body/hand",
     "body/joint_states",
+    "body/stand_asked",
     "body/unplug_request",
     "body/unplug_state",
     "camera/image",

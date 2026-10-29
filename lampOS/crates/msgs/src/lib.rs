@@ -1160,6 +1160,39 @@ impl Pause {
     }
 }
 
+/// The stand a person asked for by voice (`body/stand_asked`, #4135): a
+/// share of the lamp's own factory stand in percent, 1 to 100 (the stand as
+/// made), as lamp-body's `--stand-share`. Never 0: a lamp that folds is
+/// resting, not standing low. Kept until the next one, or until the bus is made
+/// again at power-up, as [`Pause`]; lamp-body takes it in place of its
+/// `--stand-share`. Published by `lamp-skills` for the pose skill.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StandAsked {
+    pub share: u8,
+}
+
+impl StandAsked {
+    pub const TYPE: &str = "lamp_msgs/StandAsked";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "body/stand_asked";
+    /// The most a share may be: the stand as made.
+    pub const MOST: u8 = 100;
+    /// The least: a stand, not a fold.
+    pub const LEAST: u8 = 1;
+
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+    }
+
+    /// A share outside [`Self::LEAST`]..=[`Self::MOST`] is no stand asked.
+    pub fn check(&self) -> Result<(), &'static str> {
+        if !(Self::LEAST..=Self::MOST).contains(&self.share) {
+            return Err("share not 1 to 100");
+        }
+        Ok(())
+    }
+}
+
 /// What lamp-update is doing and last did (`update/status`, #2194), for the
 /// app's Lamp 2 page through lamp-cloud. Read from lamp-update's own records
 /// and where its round is, never kept anywhere else: `running` is the build
@@ -1432,6 +1465,7 @@ pub fn body_topics() -> Vec<(&'static str, Declaration)> {
     vec![
         (Hand::TOPIC, Hand::declaration()),
         (BodyGesture::TOPIC, BodyGesture::declaration()),
+        (StandAsked::TOPIC, StandAsked::declaration()),
     ]
 }
 

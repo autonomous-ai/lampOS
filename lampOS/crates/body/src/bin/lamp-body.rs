@@ -1423,6 +1423,12 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         .ok()
         .map(lamp_body::pause_in::PauseIn::on);
     let paused = std::cell::Cell::new(false);
+    // The stand a person asked for by voice (`body/stand_asked`, #4135),
+    // in place of `--stand-share`. Only with `LAMP_BODY_POSE_ASK=on`.
+    let mut stand_asked = (std::env::var(lamp_body::stand_in::ENVIRONMENT).as_deref() == Ok("on"))
+        .then(|| lamp_bus::Bus::from_environment().ok())
+        .flatten()
+        .map(lamp_body::stand_in::StandIn::on);
     // Put to sleep by a hand on its head (`voice/mute`, #1362): it folds
     // now and takes nothing new until woken. Only with `LAMP_HEAD_TOUCH=on`;
     // looked at with the moods.
@@ -2037,6 +2043,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                     .as_ref()
                     .is_some_and(|asked| asked.holding(now_us)),
                 paused: false,
+                stand_share: stand_asked.as_mut().and_then(|stand| stand.share()),
                 asleep: false,
                 woken: woken.take(),
                 // Taken only while the pose is reading (`body.rs`).
