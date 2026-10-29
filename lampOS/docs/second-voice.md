@@ -3750,9 +3750,8 @@ are". It now tells the model to say the name when asked who they are, what
 their name is, or whether the lamp knows or remembers it, and a reply told
 it says so in the journal, without the name ("the owner is named by default
 to this reply"). The eyes' list is asked with up to 3 s to answer, off any
-reply's path, and eyes that don't answer in time take nothing back: the
-mark stands. Without a name, or off:
-nothing. `the owner is not named by default: WHY` in the journal when a
+reply's path; eyes reached but slow to answer take nothing back (the mark
+stands), and eyes that can't be reached at all name nobody, as before. Without a name, or off: nothing. `the owner is not named by default: WHY` in the journal when a
   sign holds.
 - **A line is a known person's only when their own face was seen speaking
   it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,
