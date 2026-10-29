@@ -2932,6 +2932,18 @@ pub fn serve(
         );
     }
     engine = engine.declining_in_words(declines_in_words);
+    // A line the model declines is never said and carries no conversation
+    // (`LAMP_DECLINE_SILENT=on`, #3945).
+    let declines_silent = std::env::var(crate::second_provider::DECLINE_SILENT_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if declines_silent {
+        eprintln!(
+            "lamp-voice second: a line the model declines says nothing and carries no conversation; a spoken line not said by name holds its first round's words to the round's end (LAMP_DECLINE_SILENT)"
+        );
+    }
+    engine = engine.declining_silently(declines_silent);
     if let Some(voiced) = speech_tags {
         eprintln!(
             "lamp-voice second: the chat is told a few speech tags; the voice is given {} (LAMP_SECOND_SPEECH_TAGS)",
@@ -3324,6 +3336,11 @@ pub fn serve(
                 // it is another person's; the same reader as above.
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
+        }
+        // A line the model declines carries no conversation
+        // (`LAMP_DECLINE_SILENT=on`, read above).
+        if declines_silent && let Ok(mut heeding) = heeding.lock() {
+            heeding.declining_silently();
         }
         // A line that cuts the one before it short is asked with that one's
         // words when one person said both (`LAMP_JOIN_CUT_WORDS`): by the
@@ -5115,6 +5132,28 @@ pub(crate) struct Heeding {
     /// With it, when the lamp's own answers played lately, so the ears'
     /// stream is read outside them too ([`Self::played_over`]).
     played: std::collections::VecDeque<(u64, u64)>,
+    /// `LAMP_DECLINE_SILENT=on` ([`Self::declining_silently`], #3945), and
+    /// what the newest line let out changed, to be undone if the model
+    /// declines it.
+    decline_silent: bool,
+    before_let_out: Option<BeforeLetOut>,
+}
+
+/// What a line let out changes of the conversation going on, as it was
+/// before it, by its request: a line the model then declines
+/// ([`crate::second_provider::Did::Declined`]) is no conversation with the
+/// lamp, so it began none (#3945). Its own words told
+/// ([`crate::second_provider::Did::Said`]) are left out of the times kept
+/// here; another request's still count.
+struct BeforeLetOut {
+    request: u64,
+    called_at: Option<Instant>,
+    caller_faces: crate::speaking_faces::Speakers,
+    chain: Vec<u64>,
+    said_until_us: Option<u64>,
+    said_until_free_us: Option<u64>,
+    carrying: bool,
+    carry_window: carry_window::CarryWindow,
 }
 
 /// How the room was as a line was judged, for a join on no sign of a
@@ -5856,7 +5895,18 @@ impl Heeding {
             held_since_start: false,
             said: std::collections::VecDeque::new(),
             played: std::collections::VecDeque::new(),
+            decline_silent: false,
+            before_let_out: None,
         }
+    }
+
+    /// `LAMP_DECLINE_SILENT=on` (#3945): a line the model declines is no
+    /// conversation with the lamp. What its let-out began (its call's
+    /// [`CALL_CARRIES_FOR`], the chain of `LAMP_GOING_ON_NOT_OWN` ended, the
+    /// carry of `LAMP_SAME_SPEAKER_CARRIES`) is undone, and any words of its
+    /// answer told keep nothing going ([`Self::lamp_did`]).
+    pub(crate) fn declining_silently(&mut self) {
+        self.decline_silent = true;
     }
 
     /// `LAMP_JOIN_CUT_WORDS`: how the room was as each line was judged is
@@ -7180,6 +7230,38 @@ impl Heeding {
                 if !self.chain.contains(&request) {
                     self.said_until_free_us = self.said_until_free_us.max(Some(until_us));
                 }
+                // Another answer's words count whatever becomes of the line
+                // let out last.
+                if let Some(before) = self
+                    .before_let_out
+                    .as_mut()
+                    .filter(|before| before.request != request)
+                {
+                    before.said_until_us = before.said_until_us.max(Some(until_us));
+                    if !before.chain.contains(&request) {
+                        before.said_until_free_us = before.said_until_free_us.max(Some(until_us));
+                    }
+                }
+            }
+            // `LAMP_DECLINE_SILENT`: the line let out last, declined, is no
+            // conversation with the lamp (#3945). An older one, with a newer
+            // let out since, is left as it stands.
+            crate::second_provider::Did::Declined(request) => {
+                if let Some(before) = self
+                    .before_let_out
+                    .take_if(|before| self.decline_silent && before.request == request)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request}: declined by the model: no conversation going on from it (LAMP_DECLINE_SILENT)"
+                    );
+                    self.called_at = before.called_at;
+                    self.caller_faces = before.caller_faces;
+                    self.chain = before.chain;
+                    self.said_until_us = before.said_until_us;
+                    self.said_until_free_us = before.said_until_free_us;
+                    self.carrying = before.carrying;
+                    self.carry_window = before.carry_window;
+                }
             }
             // `LAMP_SAME_SPEAKER_CARRIES`: a stop ends the conversation
             // carried.
@@ -8446,6 +8528,20 @@ impl Heeding {
             ));
         }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
+        // `LAMP_DECLINE_SILENT`: as things stand before this line is let
+        // out, for its decline.
+        if self.decline_silent && played {
+            self.before_let_out = Some(BeforeLetOut {
+                request,
+                called_at: self.called_at,
+                caller_faces: self.caller_faces.clone(),
+                chain: self.chain.clone(),
+                said_until_us: self.said_until_us,
+                said_until_free_us: self.said_until_free_us,
+                carrying: self.carrying,
+                carry_window: self.carry_window.clone(),
+            });
+        }
         // `LAMP_SAME_SPEAKER_CARRIES`: the lamp answers someone, whose
         // conversation may carry on ([`Self::carrying_the_same_speaker`]).
         // A face alone is no call with `LAMP_NAME_OR_FOLLOW_UP`.
@@ -22049,6 +22145,68 @@ mod tests {
             heeding.conversation_note_for(13),
             Some(super::CONVERSATION_ALONE)
         );
+    }
+
+    /// #3945: a line let out as a call, which the model then declines,
+    /// leaves no conversation going on for the next line with
+    /// `LAMP_DECLINE_SILENT`: its call carries nothing ([`super::CALL_CARRIES_FOR`]),
+    /// the chain it ended (`LAMP_GOING_ON_NOT_OWN`) stands again, and any
+    /// words of its answer told before the decline keep nothing going,
+    /// while an earlier answer's words still told count. Off, as before.
+    #[test]
+    fn a_declined_line_leaves_no_conversation_going_on_for_the_next_line() {
+        use crate::second_provider::Did;
+        let signs = super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        for on in [false, true] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.not_counting_own_answers();
+            if on {
+                heeding.declining_silently();
+            }
+            heeding.chain = vec![7];
+            heeding.lamp_did(Did::Said(6, 900_000_000));
+            assert_eq!(
+                heeding.judge(9, line, "Lamp, what time is it?", signs.clone()),
+                None,
+                "{on}"
+            );
+            assert!(heeding.called_at.is_some(), "{on}: a call let out");
+            assert!(
+                heeding.chain.is_empty(),
+                "{on}: an answer to a call ends it"
+            );
+            // The earlier answer's last packet, told after the let-out, and
+            // the declined line's own words.
+            heeding.lamp_did(Did::Said(6, 950_000_000));
+            heeding.lamp_did(Did::Said(9, 1_005_000_000));
+            heeding.lamp_did(Did::Declined(9));
+            assert_eq!(heeding.called_at.is_some(), !on, "{on}");
+            assert_eq!(
+                heeding.said_until_us,
+                Some(if on { 950_000_000 } else { 1_005_000_000 }),
+                "{on}"
+            );
+            assert_eq!(heeding.chain, if on { vec![7] } else { Vec::new() }, "{on}");
+            // A decline of an older line, after a newer one was let out,
+            // undoes nothing of the newer one's.
+            assert_eq!(
+                heeding.judge(10, line, "Lamp, and tomorrow?", signs.clone()),
+                None
+            );
+            heeding.lamp_did(Did::Declined(9));
+            assert!(heeding.called_at.is_some(), "{on}: request 10's call");
+        }
     }
 
     /// lamp-52e6, 24 Oct 15:33: over the lamp's story, "Sorry, can you say

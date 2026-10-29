@@ -1543,6 +1543,13 @@ the battery's counters read both routes alike.
   before a held call; the turn ends here, and nothing more is said`. If
   the battery shows such words on held turns, the fix is to hold the
   words back only once a call the Policy holds is in the round.
+- **A line the model declines, with `LAMP_DECLINE_SILENT=on`** (#3945):
+  on a spoken line not said by name, round 1's words wait for the round's
+  end, so words written before `not_for_me` are never said, and the rule
+  undoes what letting the line out began (its call's 15 s, the
+  `LAMP_GOING_ON_NOT_OWN` chain, the same-speaker carry): a declined line
+  starts no conversation going on for the next. A line said by name waits
+  for nothing. See [second-voice.md](second-voice.md).
 - **What the wait costs.** It is measured from the model's call to its run
   on the route's harness (`second_provider::tests::policy::measure_the_wait_from_the_call_to_its_run`,
   run with `--ignored`; Mac, debug build, the decision on a real bus):

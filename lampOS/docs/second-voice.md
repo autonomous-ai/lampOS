@@ -2859,6 +2859,59 @@ after a take-over, but now for every turn:
   lamp." and "Not for me either.", and 160 ms for "Not for me to say, but
   it's lovely." and "Not for me to answer, but I think it's lovely.", each
   held to the word that decides it.
+- **A decline says nothing and starts no conversation, with
+  `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
+  Words the model streams before its `not_for_me` call ("Sure, I'll stay
+  out of it.") were said up to the first clause or four words
+  (`LAMP_SECOND_FIRST_WORDS`) before the call, known only at the round's
+  end, ended the turn: the piece's transcript went out as soon as the
+  stream paused between chunks, so the thread kept it as the lamp's words
+  (a conversation going on for 45 s) whether or not its audio began before
+  the call cancelled the saying half; and "not for me" written as the reply was taken as
+  the decline only on a line told `CONVERSATION_ALONE`
+  (`LAMP_NOT_FOR_ME_WORDS`), never on the other lines told `DECLINE_NOTE`
+  (a face turned to the lamp, a line begun over its answer, one asking for
+  its work). With the switch, on a spoken line told `DECLINE_NOTE` or
+  `CONVERSATION_ALONE`, round 1's words, and its announcement, are held to
+  the round's end (`Engine::declining_silently`). Beside a `not_for_me`
+  call none is said, whether the decline is taken or, said by name to a
+  face (`LAMP_NAMED_ALWAYS`), the model is asked once more; a reply that
+  is "not for me" (`not_speech::opens_not_for_me`, whole) is the decline
+  (`Stop::Declined`); anything else goes on as one piece, cut into
+  sentences as streamed words are. The journal says `its words before
+  not_for_me are not said (LAMP_DECLINE_SILENT)` or `its reply is "not for
+  me" on a line that may not be for the lamp: taken as not_for_me, nothing
+  said (LAMP_DECLINE_SILENT)`. Nothing waits on a line said by name
+  (`BY_NAME_NOTE`), a written turn, or any round after one that called
+  something. What waits: the first audio of round 1 on a line that may be
+  declined, for the rest of that round's reply; measured on the test clock
+  with a word every 40 ms and four first words
+  (`the_hold_costs_the_first_audio_only_on_lines_that_may_be_declined`),
+  a line said by name 80 ms either way; a line that may be declined
+  80 ms off and 360 ms on for "Sure, it was a gift from a friend." (eight
+  pieces), 480 ms on for an eleven-piece reply: the whole of round 1's
+  reply, which the first clause no longer cuts short. A reply with no
+  words before its call costs nothing, and the wait ends at the round's
+  end however long the reply. On a lamp the wait is the model's time to
+  write the rest of round 1's reply, unmeasured there. A decline, unless a tool ran for the line first, is told
+  to the rule (`Did::Declined`, `Heeding::declining_silently`): what the
+  line's let-out began is undone, so the next line finds no conversation
+  going on from it. Its call carries nothing (`called_at` and the caller's
+  faces as before it), the `LAMP_GOING_ON_NOT_OWN` chain its let-out ended
+  stands again, the `LAMP_SAME_SPEAKER_CARRIES` carry is as before it, and
+  any words of its answer told (`Did::Said`; none, with the hold, on a
+  line that may be declined) keep nothing going, while another answer's
+  words told meanwhile still count. Only the line let out last is undone:
+  one declined after a newer line was let out changes nothing. Not undone:
+  the room's count of talk past the lamp, which the call reset
+  (`RoomTold::called`), and the held colleagues of the carry. Journal:
+  `declined by the model: no conversation going on from it
+  (LAMP_DECLINE_SILENT)`. Tests: `a decline with words streamed before the
+  call says nothing`, `a not for me written on a line not let out alone
+  says nothing`, `the switch off and a line said by name keep todays
+  behaviour`, `the hold costs the first audio only on lines that may be
+  declined` (`second_provider/tests/decline_silent.rs`) and `a declined
+  line leaves no conversation going on for the next line` (worker).
 - **Said by name, or perhaps not for the lamp** (`worker::call_note`,
   `Engine::noting_whether_called`). Each spoken line gets one note beside
   its words. A line whose words or the lamp's name heard in its sound
