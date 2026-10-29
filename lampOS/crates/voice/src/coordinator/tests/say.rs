@@ -43,6 +43,11 @@ impl Test {
     /// A say taken by the voice and begun: its written turn submitted to
     /// the provider, which has started it.
     fn new() -> Self {
+        Self::writing("Remind them to call the bank.")
+    }
+
+    /// As [`Self::new`], the written turn saying `written`.
+    fn writing(written: &str) -> Self {
         let directory = SessionDirectory::create().unwrap();
         let (channels, peer) = pair(&directory, "speaker");
         let (mut provider, mut provider_peer) = pair(&directory, "provider");
@@ -66,7 +71,7 @@ impl Test {
             &mut owner,
             &mut reply,
             &mut queue,
-            "Remind them to call the bank.",
+            written,
             false,
             "skill_says",
             1,
@@ -79,7 +84,7 @@ impl Test {
         let turn = reply.as_ref().unwrap().owner;
         assert!(matches!(queue.front(), Some(ProviderInput::Written {
             request, session: 1, text, look: false, ..
-        }) if *request == turn.turn() && text == "Remind them to call the bank."));
+        }) if *request == turn.turn() && text == written));
         let mut cloud = CloudAvailability::default();
         cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
         flush_provider_input(&cloud, &mut reply, &mut queue, &mut provider.data).unwrap();
@@ -292,6 +297,80 @@ fn a_say_cut_short_is_dropped_with_why() {
         test.answered.try_recv(),
         Ok(Answer::Done(Outcome::Dropped("user_interrupted".into())))
     );
+}
+
+/// "Where you sit"'s intro through the coordinator's own path (jarvis's P3
+/// on #4120): the walk's note committed as a written turn, bound to it by
+/// `bind_opener`, and reported as the loop reports it. Played whole and
+/// settled, it keeps `opened`; a head touch that stops it after some of it
+/// played (gone unsettled, so `Cut`) leaves `opened` false.
+#[test]
+fn the_setup_intro_is_kept_as_said_only_when_its_committed_turn_was_heard_whole() {
+    use crate::onboarding::{Delivery, Framing, Onboarding};
+    let face = Framing {
+        size: 0.2,
+        x: 0.0,
+        y: 0.0,
+    };
+    for whole in [true, false] {
+        let directory =
+            std::env::temp_dir().join(format!("lv-say-opener-{}-{whole}", std::process::id()));
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir(&directory).unwrap();
+        let mut walk = Onboarding::at(directory.join("progress.json"));
+        let note = (1..20)
+            .find_map(|second| {
+                let at = second * 1_000_000;
+                walk.drain_storage_for_test(at);
+                walk.tick(at, at, true, false, Some(face), true)
+            })
+            .expect("the intro");
+        assert_eq!(note, crate::onboarding::SIT_NOTE);
+        let mut test = Test::writing(&note);
+        let bound = {
+            let owner = test.reply.as_ref().unwrap().owner;
+            (owner.boot(), owner.turn())
+        };
+        assert!(walk.bind_opener(bound.0, bound.1));
+        assert_eq!(walk.invitation_binding(), Some(bound));
+        let mut audio = false;
+        let first = test.generation(17);
+        if whole {
+            test.provider_complete();
+            test.accept(&first, 240);
+            test.retire(&first);
+            latch_invitation_sounded(&test.reply, Some(bound), &mut audio);
+            // As the loop's settled report.
+            let current = test.reply.as_mut().unwrap();
+            assert!(current.settled(&test.pending));
+            test.owner.complete_turn(now(), current.owner).unwrap();
+            test.snapshot = test.owner.snapshot(now()).unwrap();
+            let delivery = current.invitation_delivery(&test.pending, test.snapshot, audio);
+            assert_eq!(delivery, Delivery::Whole);
+            test.reply = None;
+            walk.invitation_finished(bound.0, bound.1, delivery, monotonic_us());
+        } else {
+            test.accept(&first, 120);
+            latch_invitation_sounded(&test.reply, Some(bound), &mut audio);
+            cancel_reply(
+                &mut test.owner,
+                &mut test.reply,
+                &mut test.trace,
+                "head_stop",
+            )
+            .unwrap();
+            assert!(test.reply.is_none());
+            // As the loop's "gone unsettled" report.
+            assert_eq!(walk.invitation_binding(), Some(bound));
+            let delivery = Delivery::unsettled(audio);
+            assert_eq!(delivery, Delivery::Cut);
+            walk.invitation_finished(bound.0, bound.1, delivery, monotonic_us());
+        }
+        assert_eq!(walk.invitation_binding(), None);
+        walk.drain_storage_for_test(0);
+        assert_eq!(walk.kept().opened, whole, "whole {whole}");
+        let _ = fs::remove_dir_all(&directory);
+    }
 }
 
 /// The model said nothing: the turn settles with no audio, and the say is

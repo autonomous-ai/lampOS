@@ -35,7 +35,9 @@ report. Once the walk is over, with someone there and the room quiet, a
 `later` step is offered again with its `later_reoffer` line naming it, then
 its `reoffer` note: first `later_after_s`
 after the walk ends, then once after `reoffer_after_s`, twice at most. A
-`later` step counts as not done.
+`later` step counts as not done. "Where you sit" is never `later`: its
+`reoffer` is its short line within a walk, and its `later_reoffer` is said
+in its place when it is offered again on a later visit.
 
 The runner also ends "who you are" on a name heard and a yes after it, and
 "preferences" on both answers heard; call `setup_step` all the same, as the
