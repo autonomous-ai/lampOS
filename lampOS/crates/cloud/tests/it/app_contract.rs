@@ -565,6 +565,8 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                 outcome: "up-to-date".into(),
                 sequence: Some(3309),
                 at_unix_ms: 1_760_950_000_000,
+                reason: None,
+                started_at_unix_ms: None,
             }),
         },
     )

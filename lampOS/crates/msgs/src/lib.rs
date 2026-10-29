@@ -1188,6 +1188,30 @@ pub struct UpdateResult {
     pub outcome: String,
     pub sequence: Option<u64>,
     pub at_unix_ms: u64,
+    /// For a round that did not switch, a fixed name for where it stopped,
+    /// one of [`UpdateResult::REASONS`]: never the reason's text, which may
+    /// carry paths. None for a round that switched or had nothing to do, and
+    /// for one read back from the records at start (#1683's update alerts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// When the round began, its `checking`, in Unix milliseconds. None for
+    /// one read back from the records at start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at_unix_ms: Option<u64>,
+}
+
+impl UpdateResult {
+    /// The phase of [`UpdateStatus::NOW`] the round was in when it ended,
+    /// or `models` for a build whose models differ from the lamp's while
+    /// the updater is not switched to apply models (`LAMP_UPDATE_MODELS`).
+    pub const REASONS: [&str; 6] = [
+        "checking",
+        "fetching",
+        "switching",
+        "watching",
+        "restoring",
+        "models",
+    ];
 }
 
 impl UpdateStatus {

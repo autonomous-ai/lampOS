@@ -429,10 +429,11 @@ pub fn confirm(
     };
     // Only what this updater is switched to apply counts: a build that
     // waits for the models switch was read and checked all the same.
-    match round(&dry, world) {
-        Outcome::UpToDate(_) | Outcome::Would(_) | Outcome::WaitsForModels(_) => {}
+    let checked = match round(&dry, world) {
+        Outcome::UpToDate(sequence) => Some(sequence),
+        Outcome::Would(_) | Outcome::WaitsForModels(_) => None,
         other => return Ok(Confirm::NotProven(other.to_string())),
-    }
+    };
     let records = Records::new(folder.clone());
     let _lock = match records.lock() {
         Ok(lock) => lock,
@@ -446,9 +447,13 @@ pub fn confirm(
         return Ok(Confirm::NotOwn);
     }
     end(&folder).map_err(failed)?;
-    records.log(
+    // A round's end, so `update/status` says it as the last one when this
+    // updater starts telling (#1683's update alerts): the build the dry
+    // round found the lamp on, when it named one.
+    records.log_round(
         "self-confirmed",
         &format!("lamp-update runs its build {}", &pending.new[..12]),
+        checked,
     );
     Ok(Confirm::Confirmed)
 }

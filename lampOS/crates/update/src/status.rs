@@ -41,6 +41,35 @@ pub fn result(outcome: &Outcome, at_unix_ms: u64) -> UpdateResult {
         outcome: outcome.kind().to_owned(),
         sequence: outcome.sequence(),
         at_unix_ms,
+        reason: None,
+        started_at_unix_ms: None,
+    }
+}
+
+/// [`result`], with when the round began and, for a round that did not
+/// switch, where it stopped: `phase`, the last of [`UpdateStatus::NOW`] it
+/// said, or `models`. Only a name of [`UpdateResult::REASONS`] is given.
+pub fn ended(
+    outcome: &Outcome,
+    at_unix_ms: u64,
+    phase: Option<&'static str>,
+    began_unix_ms: Option<u64>,
+) -> UpdateResult {
+    let reason = match outcome {
+        Outcome::Switched(_)
+        | Outcome::SelfSwitched { .. }
+        | Outcome::Climbs { .. }
+        | Outcome::UpToDate(_)
+        | Outcome::NothingPublished
+        | Outcome::Would(_) => None,
+        Outcome::WaitsForModels(_) => Some("models"),
+        _ => phase,
+    }
+    .filter(|name| UpdateResult::REASONS.contains(name));
+    UpdateResult {
+        reason: reason.map(str::to_owned),
+        started_at_unix_ms: began_unix_ms,
+        ..result(outcome, at_unix_ms)
     }
 }
 
@@ -51,6 +80,8 @@ pub fn last_in_records(records: &Path) -> Option<UpdateResult> {
         outcome,
         sequence,
         at_unix_ms,
+        reason: None,
+        started_at_unix_ms: None,
     })
 }
 
@@ -63,6 +94,9 @@ pub struct Telling {
     records: PathBuf,
     last: Option<UpdateResult>,
     said: Option<Arc<Mutex<(Publisher, UpdateStatus)>>>,
+    /// The round under way: the last phase it said, and when it began.
+    phase: Option<&'static str>,
+    began_unix_ms: Option<u64>,
 }
 
 impl Telling {
@@ -116,18 +150,27 @@ impl Telling {
             records: records.to_owned(),
             last,
             said,
+            phase: None,
+            began_unix_ms: None,
         }
     }
 
-    /// A phase of a round begins.
+    /// A phase of a round begins; the first is when the round began.
     pub fn phase(&mut self, now: &'static str) {
+        self.phase = Some(now);
+        self.began_unix_ms.get_or_insert_with(unix_ms);
         let status = status(&self.records, now, self.last.as_ref());
         self.tell(status);
     }
 
-    /// A round ended: `idle`, with how.
+    /// A round ended: `idle`, with how, where it stopped and when it began.
     pub fn ended(&mut self, outcome: &Outcome, at_unix_ms: u64) {
-        self.last = Some(result(outcome, at_unix_ms));
+        self.last = Some(ended(
+            outcome,
+            at_unix_ms,
+            self.phase.take(),
+            self.began_unix_ms.take(),
+        ));
         let status = status(&self.records, "idle", self.last.as_ref());
         self.tell(status);
     }
@@ -140,6 +183,12 @@ impl Telling {
             said.1 = status;
         }
     }
+}
+
+fn unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
 }
 
 #[cfg(test)]
@@ -192,6 +241,81 @@ mod tests {
         }
     }
 
+    /// #1683's update alerts: a round that did not switch says where it
+    /// stopped by a fixed name, and every end says when its round began;
+    /// a switch or nothing to do says no reason, and what the records give
+    /// back at start says neither. An older reader takes the new fields'
+    /// value, and the new one takes an older value without them.
+    #[test]
+    fn an_end_says_where_a_round_stopped_by_name_and_when_it_began() {
+        let refused = Outcome::Refused("/etc/lampOS/x cannot be read".into());
+        for (outcome, phase, reason) in [
+            (refused.clone(), Some("checking"), Some("checking")),
+            (
+                Outcome::Failed("/var/lib/x: denied".into()),
+                Some("fetching"),
+                Some("fetching"),
+            ),
+            (
+                Outcome::NotQuiet("someone spoke".into()),
+                Some("switching"),
+                Some("switching"),
+            ),
+            (
+                Outcome::WaitsForModels("models 3 to 4".into()),
+                Some("checking"),
+                Some("models"),
+            ),
+            (
+                Outcome::Unreachable("no route".into()),
+                Some("checking"),
+                Some("checking"),
+            ),
+            (Outcome::Switched(3312), Some("watching"), None),
+            (Outcome::UpToDate(3312), Some("checking"), None),
+            (refused.clone(), None, None),
+            (refused.clone(), Some("not a phase"), None),
+        ] {
+            let end = ended(&outcome, 9_000, phase, Some(1_000));
+            assert_eq!(end.reason.as_deref(), reason, "{outcome:?} in {phase:?}");
+            assert_eq!(end.started_at_unix_ms, Some(1_000));
+            assert_eq!(
+                (end.outcome.clone(), end.sequence),
+                (outcome.kind().to_owned(), outcome.sequence())
+            );
+            let text = serde_json::to_string(&end).unwrap();
+            assert!(!text.contains('/'), "no reason text: {text}");
+        }
+        for name in UpdateResult::REASONS {
+            assert!(
+                UpdateStatus::NOW.contains(&name) || name == "models",
+                "{name}"
+            );
+        }
+
+        // Absent fields are not written, and either reader takes either value.
+        let plain = result(&Outcome::Switched(3312), 9_000);
+        let text = serde_json::to_string(&plain).unwrap();
+        assert!(
+            !text.contains("reason") && !text.contains("started_at"),
+            "{text}"
+        );
+        let older: UpdateResult =
+            serde_json::from_str(r#"{"outcome":"switched","sequence":3312,"at_unix_ms":9000}"#)
+                .unwrap();
+        assert_eq!(older, plain);
+        #[derive(serde::Deserialize)]
+        struct Older {
+            outcome: String,
+        }
+        let newer =
+            serde_json::to_string(&ended(&refused, 9_000, Some("fetching"), Some(1))).unwrap();
+        assert_eq!(
+            serde_json::from_str::<Older>(&newer).unwrap().outcome,
+            "refused"
+        );
+    }
+
     /// The reviewers on #2271: the last result survives a restart (read
     /// back from the log, the self-switch's included), each round's end is
     /// said, and the value is said again while nothing changes. Read off a
@@ -233,12 +357,25 @@ mod tests {
             ("self-switched", Some(3311))
         );
 
+        assert_eq!((last.reason, last.started_at_unix_ms), (None, None));
+
+        telling.phase("checking");
         telling.phase("fetching");
         assert_eq!(kept().now, "fetching");
         telling.ended(&Outcome::Switched(3312), 7);
         let ended = kept();
         assert_eq!(ended.now, "idle");
-        assert_eq!(ended.last.unwrap().sequence, Some(3312));
+        let switched = ended.last.unwrap();
+        assert_eq!(switched.sequence, Some(3312));
+        assert_eq!(switched.reason, None);
+        let began = switched.started_at_unix_ms.expect("its checking's time");
+        // The next round has its own start, and says where it stopped.
+        telling.phase("checking");
+        telling.phase("fetching");
+        telling.ended(&Outcome::Failed("the disk is full".into()), 8);
+        let failed = kept().last.unwrap();
+        assert_eq!(failed.reason.as_deref(), Some("fetching"));
+        assert!(failed.started_at_unix_ms.unwrap() >= began);
 
         // Said again: a newer value of the same status within a few periods.
         let first = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap().header.seq;
