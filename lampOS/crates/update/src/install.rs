@@ -443,6 +443,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          and the growth lead try it",
     ),
     (
+        "head-pat-wiggle",
+        "an installable skill, not yet tried on a lamp (#3997, Part of #4133): Head pat's \
+         wiggle of the base as a pet ends, on `controls/pet` with `LAMP_HEAD_PET=on`; tried \
+         with Head pat",
+    ),
+    (
         "laugh-glance",
         "PARKED (#1669): dropped, the owner never asked to listen for other people laughing \
          (the lead, #1711, 21 Oct); kept, and off by being listed here",

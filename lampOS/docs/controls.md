@@ -175,8 +175,10 @@ With the switch off (unset, as on every lamp), `controls/pet` is not even
 declared, `TouchOutput` carries no `pets` (a replay's frames are byte for
 byte as before) and every head gesture and `held_us` is as before; the test
 `head_pet::the_switch_off_is_identical_to_today` replays lamp-06c1's whole
-timeline through both. The response to a pet is the installable skill
-`head-pat` (`skills/head-pat`), never Controls'. Tests:
+timeline through both. The response to a pet is the installable skills
+`head-pat` (`skills/head-pat`, a line) and `head-pat-wiggle`
+(`skills/head-pat-wiggle`, a wiggle of the base a second after the hand lifts), never
+Controls'. Tests:
 `crates/controls/tests/it/head_pet.rs`.
 
 **Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on).** "Lamp, go
@@ -832,7 +834,12 @@ Directional labels, early reversal classification, the first-session chirp
 and spoken phrases are not ported. State publishes
 head-active edges promptly for an optional small visual reaction; it cannot
 establish listening readiness. Any brain notification must remain limited to
-one per 60 s by its consumer, as in V1; the Pet event is not permission to speak.
+one at a time by its consumer (head-pat: at most one response in 10 s, its
+`cooldown`, shortened from V1's 60 s after the lamp check, #4133; and
+head-pat-wiggle: a small wiggle of the base once the head's pads have
+stayed free 1 s after the pet's `ended`, by `controls/state`'s
+`head_active`, at most one in 4 s, #4324); the Pet
+event is not permission to speak.
 
 ## The adapter contract
 

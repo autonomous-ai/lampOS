@@ -1,0 +1,8 @@
+# Awake, a pet from 20 s to 22 s, the pads free after: one wiggle a second after the hand lifts, at 23 s, and none while it pets.
+clock = "10:00"
+
+[[expect]]
+at = "23s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
