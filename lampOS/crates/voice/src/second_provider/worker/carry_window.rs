@@ -29,6 +29,12 @@ impl CarryWindow {
             && self.ends.is_empty()
     }
 
+    /// The request the window was begun, or last answered, for: a window
+    /// begun since for a new caller has another.
+    pub(super) fn first_request(&self) -> Option<u64> {
+        self.first_request
+    }
+
     pub(super) fn begin(&mut self, request: u64) {
         self.clear();
         self.first_request = Some(request);

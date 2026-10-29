@@ -5167,9 +5167,15 @@ impl BeforeLetOut {
 
     /// The carry's window as it would be put back, while the carry stood at
     /// the let-out: a held line or a remembered end after it counts in it
-    /// too (the Reviewers' P3s on #4417).
-    fn carry_window(&mut self) -> Option<&mut carry_window::CarryWindow> {
-        self.carrying.then_some(&mut self.carry_window)
+    /// too (the Reviewers' P3s on #4417). Only while `live` is still that
+    /// conversation's window: a new caller's let-out begins another, whose
+    /// lines stretch none before it (Reviewer-three's P3s on #4429).
+    fn carry_window(
+        &mut self,
+        live: &carry_window::CarryWindow,
+    ) -> Option<&mut carry_window::CarryWindow> {
+        (self.carrying && self.carry_window.first_request() == live.first_request())
+            .then_some(&mut self.carry_window)
     }
 }
 
@@ -6828,7 +6834,7 @@ impl Heeding {
                 if let Some(window) = self
                     .before_let_out
                     .as_mut()
-                    .and_then(BeforeLetOut::carry_window)
+                    .and_then(|before| before.carry_window(&self.carry_window))
                 {
                     window.held(late);
                 }
@@ -7164,7 +7170,7 @@ impl Heeding {
             if let Some(window) = self
                 .before_let_out
                 .as_mut()
-                .and_then(BeforeLetOut::carry_window)
+                .and_then(|before| before.carry_window(&self.carry_window))
             {
                 window.held(request);
             }
@@ -7806,7 +7812,7 @@ impl Heeding {
             if let Some(window) = self
                 .before_let_out
                 .as_mut()
-                .and_then(BeforeLetOut::carry_window)
+                .and_then(|before| before.carry_window(&self.carry_window))
             {
                 window.remember(request, ended, now);
             }
@@ -13229,6 +13235,107 @@ mod tests {
             );
             assert!(!desk.heeding.carry_window.extra_allows(began), "{end}");
         }
+    }
+
+    /// `LAMP_DECLINE_SILENT` (#3945), Reviewer-three's P3s on #4429: a
+    /// colleague's line begun after the owner's line is let out is carried,
+    /// its end remembered as it is judged, then held. The owner's line is
+    /// declined: the window put back keeps that end, as the live one did.
+    #[test]
+    fn a_line_carried_after_a_let_out_keeps_its_end_in_the_window_its_decline_puts_back() {
+        use crate::second_provider::Did;
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut desk = CarryDesk::new(true);
+        desk.heeding.declining_silently();
+        desk.answered(60);
+        let answer = desk.heeding.said_until_us.unwrap();
+        assert_eq!(
+            desk.line_at(1, "f1", "And what about tomorrow?", answer + 3_000_000),
+            None
+        );
+        let owners = desk.request;
+        let before = desk.heeding.before_let_out.as_ref().unwrap();
+        assert_eq!(before.request, owners);
+        assert!(before.carrying);
+        let colleague = (answer + 6_000_000, answer + 8_000_000);
+        desk.heeding.signs_begun(owners + 1, colleague, colleague.0);
+        assert!(desk.heeding.carried.is_some(), "carried");
+        assert!(desk.heeding.colleague_held(owners + 1));
+        desk.heeding.lamp_did(Did::Declined(owners));
+        assert!(desk.heeding.carrying);
+        // From the held line's end, to 28 s after the answer; without it,
+        // no extra time at all.
+        assert!(desk.heeding.carry_window.extra_allows(answer + 25_000_000));
+    }
+
+    /// `LAMP_DECLINE_SILENT` (#3945), Reviewer-three's P3s on #4429: a
+    /// colleague's line let out as the conversation's, its print not back
+    /// yet, is declined after the print, back at the next line, says it was
+    /// another's: the window put back holds it, from its end.
+    #[test]
+    fn a_late_print_held_after_a_let_out_stays_in_the_window_its_decline_puts_back() {
+        use crate::second_provider::Did;
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut desk = CarryDesk::new(true);
+        desk.heeding.declining_silently();
+        desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
+        desk.answered(60);
+        let answer = desk.heeding.said_until_us.unwrap();
+        desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            desk.line_at(
+                -1,
+                "",
+                "I sent the slides to the client this morning.",
+                answer + 3_000_000
+            ),
+            None
+        );
+        let colleagues = desk.request;
+        assert!(desk.heeding.before_let_out.as_ref().unwrap().carrying);
+        desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
+        desk.heeding.voice_going_on(colleagues + 1, false);
+        assert!(desk.heeding.carry_window.extra_allows(answer + 22_000_000));
+        desk.heeding.lamp_did(Did::Declined(colleagues));
+        assert!(desk.heeding.carrying);
+        assert!(desk.heeding.carry_window.extra_allows(answer + 22_000_000));
+    }
+
+    /// `LAMP_DECLINE_SILENT` (#3945), Reviewer-three's P3s on #4429: with
+    /// the carry standing, a new caller is let out and begins a window of
+    /// their own. A line carried by it and held is that conversation's:
+    /// declined, the new caller's line puts back the earlier window, which
+    /// it does not stretch.
+    #[test]
+    fn a_new_callers_held_line_does_not_stretch_the_window_its_decline_puts_back() {
+        use crate::second_provider::Did;
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut desk = CarryDesk::new(true);
+        desk.heeding.declining_silently();
+        desk.answered(60);
+        let answer = desk.heeding.said_until_us.unwrap();
+        assert_eq!(
+            desk.line_at(
+                3,
+                "f2",
+                "Lamp, what's the weather like?",
+                answer + 3_000_000
+            ),
+            None
+        );
+        let caller = desk.request;
+        let before = desk.heeding.before_let_out.as_ref().unwrap();
+        assert_eq!(before.request, caller);
+        assert!(before.carrying);
+        assert_ne!(before.carry_window.first_request(), Some(caller));
+        assert_eq!(desk.heeding.carry_window.first_request(), Some(caller));
+        let colleague = (answer + 6_000_000, answer + 8_000_000);
+        desk.heeding.signs_begun(caller + 1, colleague, colleague.0);
+        assert!(desk.heeding.carried.is_some(), "carried");
+        assert!(desk.heeding.colleague_held(caller + 1));
+        desk.heeding.lamp_did(Did::Declined(caller));
+        assert!(desk.heeding.carrying);
+        assert!(!desk.heeding.carry_window.extra_allows(answer + 25_000_000));
     }
 
     /// The owner's P1 on Queue #3126 (lamp-4ace, 23 Oct 18:51): in a busy
@@ -22388,37 +22495,6 @@ mod tests {
         heeding.carry_window.remember(7, 201 * S, 300 * S);
         heeding.carry_window.held(7);
         assert!(heeding.carry_window.extra_allows(205 * S));
-    }
-
-    #[test]
-    fn a_colleagues_line_held_after_a_let_out_stays_in_the_restored_carry_window() {
-        use crate::second_provider::Did;
-        const S: u64 = 1_000_000;
-        let (mut heeding, signs, line) = declining(false);
-        heeding.carrying_the_same_speaker();
-        heeding.carrying = true;
-        heeding.carry_window.begin(5);
-        heeding.lamp_did(Did::Said(5, 100 * S));
-        assert_eq!(
-            heeding.judge(9, line, "Lamp, what time is it?", signs),
-            None
-        );
-        // A colleague's line ending at 130 s, after the let-out, is held
-        // with the carry standing: the window keeps its end.
-        heeding.carry_window.remember(10, 130 * S, 300 * S);
-        if let Some(window) = heeding
-            .before_let_out
-            .as_mut()
-            .and_then(super::BeforeLetOut::carry_window)
-        {
-            window.remember(10, 130 * S, 300 * S);
-        }
-        assert!(heeding.colleague_held(10));
-        heeding.lamp_did(Did::Declined(9));
-        assert!(heeding.carrying);
-        // The held line's end gives the window its extra time (to 140 s, the
-        // most after the answer); without it, no extra time at all.
-        assert!(heeding.carry_window.extra_allows(135 * S));
     }
 
     /// lamp-52e6, 24 Oct 15:33: over the lamp's story, "Sorry, can you say
