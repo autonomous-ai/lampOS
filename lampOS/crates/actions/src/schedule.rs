@@ -93,12 +93,26 @@ pub fn catalog() -> Vec<Function> {
 #[derive(Clone, Debug)]
 pub struct Adapter {
     socket: PathBuf,
+    /// [`DEADLINE`] for every product path.
+    deadline: Duration,
 }
 
 impl Adapter {
     pub fn new(socket: PathBuf) -> io::Result<Self> {
         client::validate_socket(&socket).map_err(io::Error::other)?;
-        Ok(Self { socket })
+        Ok(Self {
+            socket,
+            deadline: DEADLINE,
+        })
+    }
+
+    /// The same adapter, giving one call `deadline` instead of [`DEADLINE`]:
+    /// for a host test against a real Schedule service on a loaded machine,
+    /// where one durable commit can take past 1250 ms (lamp-voice's push
+    /// runs on 29 Oct). Never used on a lamp.
+    pub fn with_deadline(mut self, deadline: Duration) -> Self {
+        self.deadline = deadline;
+        self
     }
 
     /// An absent or inexact switch does not even inspect the socket setting.
@@ -131,7 +145,7 @@ impl Adapter {
     /// Voice's separate model-result budget. Failure sentences are fixed and
     /// never contain the caller's reminder text or an owner's arbitrary error.
     pub fn call(&self, name: &str, args: &Value) -> Value {
-        let deadline = Instant::now() + DEADLINE;
+        let deadline = Instant::now() + self.deadline;
         match parse(name, args).and_then(|call| self.perform(call, deadline)) {
             Ok(result) if result.to_string().len() <= MAX_RESULT_BYTES => {
                 json!({"ok":true,"result":result})
