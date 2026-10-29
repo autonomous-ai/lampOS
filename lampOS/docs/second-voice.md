@@ -3742,7 +3742,15 @@ earlier ones. The memory note and a recall's answer are not taken from: a
 room fact naming the owner can still reach the reply. The faces are counted over the
 eyes' looks of the last 3 s (`known_faces::most_faces_lately`), not their
 newest look alone: in the same run, with two faces in 36 of 37 looks, one
-reply read a look with none and named the owner. On lamp-29e7 on 8545 (29 Oct) the owner,
+reply read a look with none and named the owner. The count is the most
+faces seen in at least two of those looks, so one look that saw a second
+face that isn't there never makes one person two (lamp-52e6, 29 Oct 16:52,
+the one screen face read as two). The face the eyes know is read from their
+known file while it is at most 8 s old (`known_faces::known_lately`): the
+eyes rewrite it at each check, every 2–3 s, and remove it as soon as the
+near face matches nobody, so the 3 s read of `known_now` took a file still
+there for nobody (16:49, "an unknown face in view" with the file present;
+#4118). On lamp-29e7 on 8545 (29 Oct) the owner,
 4.5 minutes after setup, asked "can you remember my name?" and was told
 "You haven't told me your name yet": their own answer had left the recent
 exchanges, and the note then said "not to answer" and named only "who they
