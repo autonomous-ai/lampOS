@@ -746,6 +746,13 @@ impl Voice {
             _ => self.first(text, turn).await,
         }
     }
+
+    /// Whether [`Voice::first_fresh`] asks on a connection of its own: the
+    /// configured voice for a turn's piece. Gemini, and speech with no turn,
+    /// are asked as the first time (El's P3 on #4345).
+    fn asks_fresh(&self, turn: Option<net::Turn>) -> bool {
+        matches!((self, turn), (Self::Configured(..), Some(_)))
+    }
 }
 
 /// What a piece of an answer's speech fails with when it could not be
@@ -823,15 +830,20 @@ fn in_one_voice_near(
         match tried {
             Ok(speech) => Ok(speech),
             Err(error) => {
+                let how = if voice.asks_fresh(turn) {
+                    ", on a connection of its own"
+                } else {
+                    ""
+                };
                 eprintln!(
-                    "lamp-voice second: {} failed to start a sentence ({error}); asked once more, on a connection of its own",
+                    "lamp-voice second: {} failed to start a sentence ({error}); asked once more{how}",
                     voice.name()
                 );
                 match fresh(&voice).await {
                     Ok(speech) => Ok(speech),
                     Err(again) => {
                         eprintln!(
-                            "lamp-voice second: {} failed again ({again}); the sentence is said with the next one",
+                            "lamp-voice second: {} failed again ({again}); the sentence could not be started",
                             voice.name()
                         );
                         Err(net::Error::Timeout(UNSAID))
@@ -1335,6 +1347,24 @@ pub(crate) mod tests {
         .await;
         assert_eq!(samples, [200, -200], "said on its second asking");
         assert_eq!(asked.await.unwrap(), 2);
+    }
+
+    /// The journal says "on a connection of its own" only when the second
+    /// asking takes one: the configured voice for a turn's piece, never
+    /// Gemini or speech with no turn (El's P3 on #4345).
+    #[test]
+    fn only_a_turns_piece_in_the_configured_voice_is_asked_on_its_own_connection() {
+        let turn = Some(net::Turn {
+            request: 4345,
+            heard_at: std::time::Instant::now(),
+        });
+        let tts =
+            Arc::new(Tts::with(TtsProvider::OpenAi, "http://127.0.0.1:9", "k", None).unwrap());
+        let gemini = Arc::new(GeminiTts::new("http://127.0.0.1:9", "tts", "k", "Kore").unwrap());
+        assert!(Voice::Configured(tts.clone(), "OpenAI").asks_fresh(turn));
+        assert!(!Voice::Configured(tts, "OpenAI").asks_fresh(None));
+        assert!(!Voice::Gemini(gemini.clone()).asks_fresh(turn));
+        assert!(!Voice::Gemini(gemini).asks_fresh(None));
     }
 
     /// #1844's C: a voice whose host takes the connection and never answers
