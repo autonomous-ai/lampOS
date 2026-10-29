@@ -293,8 +293,8 @@ impl Door {
         self.journal.line(client, now_us, &line);
     }
 
-    /// Every rate lifted but the refused actions' guard (`--rates off`, a
-    /// dev lamp's switch, never a product's).
+    /// Every rate lifted but the refused actions' guard and the phrase
+    /// changes (`--rates off`, a dev lamp's switch, never a product's).
     pub fn with_rates_off(mut self) -> Self {
         self.rates = Rates::off();
         self
@@ -928,8 +928,9 @@ pub const PUSH_OFF: &str = "skill push is not on this lamp";
 
 /// The rates and caps `hello` tells, so a client keeps inside them, and
 /// this lamp's quiet hours (`"off"` when none). With the rates lifted
-/// (`--rates off`) it says `"rates": "off"` and only the refused actions'
-/// window, so a client doesn't pace itself to rates the door doesn't hold.
+/// (`--rates off`) it says `"rates": "off"` and only the windows still held,
+/// the refused actions' and the phrase changes', so a client doesn't pace
+/// itself to rates the door doesn't hold.
 pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> Value {
     let class = |class: Class| -> Value {
         class
@@ -942,6 +943,7 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
         return json!({
             "rates": "off",
             "refused": class(Class::Refused),
+            "phrases": class(Class::Phrases),
             "hold_max_ms": protocol::HOLD_MAX_MS,
             "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
             "say_max_chars": protocol::SAY_MAX_CHARS,
@@ -1338,6 +1340,27 @@ mod tests {
         assert_eq!(reply(&rated)["error"]["why"], "phrases: 6 changes a minute");
     }
 
+    /// harness-reviewer's P2 on #4360: `--rates off` keeps the phrase
+    /// changes at 6 a minute, a privacy bound on `hear`, not pacing.
+    #[test]
+    fn rates_off_still_rates_phrase_changes() {
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Hear]);
+        let mut door = door.with_rates_off();
+        let subscribe = |n: usize| {
+            format!(
+                r#"{{"id":3,"op":"subscribe","events":["phrase.heard"],"phrases":["phrase number {n}"]}}"#
+            )
+        };
+        for n in 0..6 {
+            let change = door.handle(&mut session, &subscribe(n), &mut fake, 2 * S, 1);
+            assert_eq!(reply(&change)["ok"], true, "{n}: {change:?}");
+        }
+        let rated = door.handle(&mut session, &subscribe(6), &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&rated), Some("rate"));
+        assert_eq!(reply(&rated)["error"]["why"], "phrases: 6 changes a minute");
+    }
+
     #[test]
     fn a_computer_pairs_with_the_owners_code_then_says_hello_on_each_connection() {
         let computer = Computer::new(1);
@@ -1653,8 +1676,8 @@ mod tests {
         );
     }
 
-    /// `--rates off`: hello says so and holds only the refused actions'
-    /// window; each class is lifted at the door, the refused guard still
+    /// `--rates off`: hello says so and holds only the refused actions' and
+    /// the phrase changes' windows; each class is lifted at the door, the refused guard still
     /// closes a connection; the setting is read as the quiet hours' is.
     #[test]
     fn rates_off_lifts_the_doors_rates_but_not_the_refused_guard() {
@@ -1677,6 +1700,10 @@ mod tests {
             "{limits}"
         );
         assert_eq!(limits["refused"][0], json!({"most": 20, "within_ms": 1000}));
+        assert_eq!(
+            limits["phrases"][0],
+            json!({"most": 6, "within_ms": 60_000})
+        );
         // Motion, express, light and say at any pace.
         for n in 0..10 {
             for frame in [
