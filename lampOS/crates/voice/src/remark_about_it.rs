@@ -34,6 +34,15 @@ pub const ENVIRONMENT: &str = "LAMP_REMARK_ABOUT_IT";
 pub const HELD: &str =
     "a busy room: the lamp was talked about, not to (a remark about it), so it says nothing";
 
+/// Why the rule holds the line said right after a remark it held, let out
+/// only as the conversation going on, not in the conversation's own voice
+/// and answering no question of the lamp's: it carries on the talk about
+/// the lamp to someone else. On lamp-4ace on 29 Oct at 20:3x
+/// (`rUTNR-2031`), "It's from the office, they're testing it." after "That
+/// lamp is cute." was answered as a conversation with the lamp going on.
+pub const AFTER_A_REMARK: &str =
+    "said right after a remark about the lamp, to someone else, with no sign of its own";
+
 /// Whether the switch is on.
 pub fn on() -> bool {
     std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on")
