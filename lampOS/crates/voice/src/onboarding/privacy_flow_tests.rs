@@ -176,6 +176,22 @@ fn unplayed_invitation_never_arms_and_restarts_use_only_one_retry() {
     assert_eq!(third.kept().steps["privacy"].outcome, Outcome::Later);
 }
 
+/// lamp-29e7's re-test (#3702): an invitation said through with a gap was
+/// heard, so a close after it counts: its attempt stays armed.
+#[test]
+fn an_invitation_said_with_a_gap_keeps_its_attempt_armed() {
+    let (_store, mut walk) = walk();
+    let token = offer(&mut walk, T, 1);
+    let boot = BootId::new([7; 16]).unwrap();
+    walk.take_privacy_invitation(token, T).unwrap();
+    assert!(walk.bind_privacy_invitation(token, boot, 5));
+    walk.privacy_invitation_finished(boot, 5, Delivery::Gapped, T);
+    assert_eq!(
+        walk.privacy_flow.attempt.as_ref().unwrap().phase(),
+        privacy::Phase::Armed
+    );
+}
+
 #[test]
 fn cancellation_retries_once_and_model_success_is_refused() {
     let (_store, mut walk) = walk();

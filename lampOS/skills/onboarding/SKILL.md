@@ -1,7 +1,12 @@
 ---
 name: onboarding
-description: Meet the lamp through short invitations, its physical privacy switch, calling it by name from the person's usual seat, and its head giving way to a hand.
+description: Meet the lamp through short invitations, its physical privacy switch, and calling it by name from the person's usual seat.
 ---
+
+<!-- PARKED (#3702): giving way is out of the walk (the owner's call, 28 Oct), so neither
+the description nor this card offers it. To put it back with
+`onboarding::giving_way::PARKED = false` in lamp-voice, end the description again with
+", and its head giving way to a hand." and remove the "parked" sentence below. -->
 
 The core onboarding skill invites; the system runner verifies physical evidence
 and keeps progress. It never changes microphone or camera permission.
@@ -51,7 +56,8 @@ last words, so the lamp's own voice is not taken for the call. The runner, not a
 from the name heard and the room microphone's rise; it keeps only those numbers,
 never sound. At most five prompts are asked; the model can only skip the step.
 
-For giving way, the invitation asks the person to hold the lamp's base with one
+For giving way (parked, #3702: lamp-voice keeps it `not_available` and never
+tells the model of it; its words below and in `skill.toml` stay), the invitation asks the person to hold the lamp's base with one
 hand and, with the other, move its head gently, any way, just a little: any head joint counts, a nudge is
 enough, and the runner listens from the invitation's start. A felt push is
 answered at once ("That's it, now let go"), one let go too soon asks for a little more,

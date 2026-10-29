@@ -266,15 +266,16 @@ impl Outcome {
 /// How an invitation's turn ended, as the coordinator saw it (#3754).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Delivery {
-    /// Played whole and heard: only this opens a try.
+    /// Played whole and heard.
     Whole,
     /// Some of it played, then cut (someone spoke over it).
     Cut,
     /// Played to its end and complete, with nobody's turn taken over it, but
     /// with a gap in its playback: on lamp-52e6 a yield to the lamp's own
-    /// voice that resumed (#4035). Every word was said, though not as one
-    /// line: like [`Self::Unsaid`], the person was never asked as the step
-    /// asks, so it is no try of theirs.
+    /// voice that resumed (#4035). Every word was said, so the person was
+    /// asked: how they sound and privacy take what follows as after a whole
+    /// one (lamp-29e7's re-test, #3702); with nothing after it, how they
+    /// sound gives its prompt back.
     Gapped,
     /// Nothing of it played (`no_audio_answer`, a provider that never
     /// began): the person was never asked, so it is no try of theirs.
@@ -1366,9 +1367,10 @@ impl Onboarding {
     }
 
     /// Called on the existing attributable whole-turn playback result. The
-    /// attempt was armed as the turn began; an invitation not heard whole
-    /// (cut off, a playback gap, no audio) drops it and is offered again
-    /// within the two-try budget. A physical mute while it is said never
+    /// attempt was armed as the turn began; an invitation not heard through
+    /// (cut off, no audio) drops it and is offered again within the two-try
+    /// budget. One said through with a gap was heard: its attempt stays
+    /// armed, as after a whole one (lamp-29e7's re-test, #3702). A physical mute while it is said never
     /// gets here: that cycle ends with the close as its candidate.
     pub(crate) fn privacy_invitation_finished(
         &mut self,
@@ -1381,7 +1383,7 @@ impl Onboarding {
             return;
         }
         let attempt = self.privacy_flow.offer.take().map(|offer| offer.attempt);
-        if delivery != Delivery::Whole {
+        if !matches!(delivery, Delivery::Whole | Delivery::Gapped) {
             // Nothing of an armed attempt was persisted: dropping it is enough.
             if self
                 .privacy_flow
@@ -3293,21 +3295,42 @@ fn nearest(faces: &lamp_msgs::Faces) -> Option<Framing> {
 }
 
 /// The two functions the model is told of when the walk is switched on.
+/// A parked step ([`giving_way::PARKED`]) is in neither, nor in their
+/// words: the model only knows a step from them, and on lamp-29e7 (29 Oct,
+/// #3702) one it was told of was asked in its own words.
 pub fn tools() -> Vec<Tool> {
-    let names = Step::IDS;
-    let redo_names: Vec<&str> = Step::IDS.iter().copied().chain([REDO_ALL]).collect();
+    let parked = |name: &&str| giving_way::PARKED && *name == Step::GivingWay.name();
+    let names: Vec<&str> = Step::IDS
+        .iter()
+        .copied()
+        .filter(|name| !parked(name))
+        .collect();
+    let redo_names: Vec<&str> = names.iter().copied().chain([REDO_ALL]).collect();
+    let (measured, evidence) = if giving_way::PARKED {
+        (
+            "where_you_sit, how_you_sound, touch and privacy",
+            "seeing them, hearing their call, feeling their touch, the switch's receipt",
+        )
+    } else {
+        (
+            "where_you_sit, how_you_sound, touch, privacy and giving_way",
+            "seeing them, hearing their call, feeling their touch, the switch's receipt, the body \
+             giving way",
+        )
+    };
     vec![
         Tool {
             name: STEP.into(),
-            description: "Call this during your first meeting with someone, when a step you were asked \
-                          to lead has ended: done, skipped because they asked to skip it, or failed. If \
-                          they want to skip the rest, call it skipped for the step you are on. Then go on \
-                          talking as the step asked. Only for the step you are leading now; \
-                          where_you_sit, how_you_sound, touch, privacy and giving_way can only be \
-                          skipped; the runner requires physical evidence: seeing them, hearing their \
-                          call, feeling their touch, the switch's receipt, the body giving way. \
-                          room_sounds and face_expressions are done only after a clear yes."
-                .into(),
+            description: format!(
+                "Call this during your first meeting with someone, when a step you were asked \
+                 to lead has ended: done, skipped because they asked to skip it, or failed. If \
+                 they want to skip the rest, call it skipped for the step you are on. Then go on \
+                 talking as the step asked. Only for the step you are leading now; {measured} \
+                 can only be skipped; the runner requires physical evidence: {evidence}. \
+                 room_sounds and face_expressions are done only after a clear yes. The runner \
+                 asks each step in its own words and counts every try: never name, announce, \
+                 explain or ask a step yourself, and never count calls or say how many are left."
+            ),
             parameters: Some(json!({
                 "type": "object",
                 "properties": {
@@ -6165,6 +6188,41 @@ mod tests {
         assert!((framing.size - 0.2).abs() < 1e-6);
         assert!(framing.x.abs() < 1e-6 && framing.y.abs() < 1e-6);
         assert_eq!(nearest(&lamp_msgs::Faces { faces: vec![] }), None);
+    }
+
+    /// lamp-29e7's re-test, 29 Oct 09:39 (#3702): with giving way parked,
+    /// the model was still told of it (`setup_step`'s steps and "the body
+    /// giving way"), asked for it in its own words ("push gently against my
+    /// arm or head, and I'll give way") and reported it skipped. Parked, the
+    /// functions name no such step and say nothing of it, and they tell the
+    /// model never to lead or count a step itself.
+    #[test]
+    fn a_parked_step_is_never_told_to_the_model() {
+        let told = tools();
+        let text = serde_json::to_string(
+            &told
+                .iter()
+                .map(|tool| json!([tool.name, tool.description, tool.parameters]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        // Put back (PARKED false), it is told again, with nothing else changed.
+        let told_of = !giving_way::PARKED;
+        assert_eq!(text.contains("giving_way"), told_of, "{text}");
+        assert_eq!(text.contains("giving way"), told_of, "{text}");
+        for name in Step::IDS
+            .iter()
+            .filter(|name| told_of || **name != Step::GivingWay.name())
+        {
+            assert!(text.contains(name), "{name} is told");
+        }
+        assert!(
+            told[0]
+                .description
+                .contains("never name, announce, explain or ask a step yourself"),
+            "{}",
+            told[0].description
+        );
     }
 }
 
