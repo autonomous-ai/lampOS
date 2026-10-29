@@ -38,6 +38,8 @@ ACTION_LEASE_MS = 10_000
 DONE_FOLLOWS = {"look"}
 # The longest `lamp_follow_hand` follows, in one call.
 MOST_FOLLOW_S = 60
+# Said in place of a starting `lamp_follow_hand` when a stop comes meanwhile.
+STOP_ASKED = "stop asked"
 # The longest `lamp_wait_for` waits, so one call can't hold an agent's turn.
 MOST_WAIT_S = 120
 # What `lamp://events/recent` keeps.
@@ -185,10 +187,10 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # action never ended is listed only until then (the Reviewer-lead's P3
     # on #3802).
     leases: dict[str, float] = {}
-    # Each `lamp_follow_hand` running, so `lamp_stop` ends it.
-    # The one `lamp_follow_hand` running, if any (a `Following`, or True while
-    # it starts): a second is `busy`, and `lamp_follow_stop` or `lamp_stop`
-    # ends it (folded from Nine's nine/mcp-follow).
+    # The one `lamp_follow_hand` running, if any (a `Following`, True while it
+    # starts, or STOP_ASKED when a stop came while it started): a second is
+    # `busy`, and `lamp_follow_stop` or `lamp_stop` ends it (folded from
+    # Nine's nine/mcp-follow).
     follow_now: list = []
 
     def held() -> list[str]:
@@ -472,16 +474,21 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             except LampError as error:
                 lamp.off("hand", hand)
                 raise refused(error) from error
+            # A stop that came while it started ends it now, not at its time.
+            stopped = follow_now == [STOP_ASKED]
             follow_now[:] = [following]
             # Its lease is this server's while it follows (`lamp://lease`).
             leases[following.lease.id] = clock() + min(max(seconds, 0), MOST_FOLLOW_S)
             try:
-                ending = asyncio.ensure_future(following.wait())
-                done, _ = await asyncio.wait(
-                    {ending, gone}, timeout=min(max(seconds, 0), MOST_FOLLOW_S), return_when=asyncio.FIRST_COMPLETED
-                )
-                ending.cancel()
-                ended = next(iter(done)).result() if done else {"how": "finished", "why": "time up"}
+                if stopped:
+                    ended = {"how": "finished", "why": "stopped"}
+                else:
+                    ending = asyncio.ensure_future(following.wait())
+                    done, _ = await asyncio.wait(
+                        {ending, gone}, timeout=min(max(seconds, 0), MOST_FOLLOW_S), return_when=asyncio.FIRST_COMPLETED
+                    )
+                    ending.cancel()
+                    ended = next(iter(done)).result() if done else {"how": "finished", "why": "time up"}
             finally:
                 lamp.off("hand", hand)
                 leases.pop(following.lease.id, None)
@@ -501,8 +508,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             return "stopped following" if await end_follow() else "not following"
 
     async def end_follow() -> bool:
-        """End the follow running now, if any: its lease is let go of, and the lamp then stops following."""
-        running = [following for following in follow_now if following is not True]
+        """End the follow running now, if any: its lease is let go of, and the lamp then stops following.
+        One still starting ends as soon as it has started."""
+        if follow_now in ([True], [STOP_ASKED]):
+            follow_now[:] = [STOP_ASKED]
+            return True
+        running = list(follow_now)
         for following in running:
             await following.stop()
         return bool(running)

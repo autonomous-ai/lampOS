@@ -614,6 +614,28 @@ def test_a_required_argument_given_as_null_is_missing(tmp_path):
     run(go())
 
 
+def test_a_follow_stop_while_a_follow_starts_ends_it_once_started(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body", "look")) as (fake, _, session):
+            plain = fake._ok
+
+            async def slow(ws, re, **fields):
+                await asyncio.sleep(0.3)
+                await plain(ws, re, **fields)
+
+            fake._ok = slow
+            started = asyncio.get_running_loop().time()
+            call = asyncio.create_task(session.call_tool("lamp_follow_hand", {"seconds": 30}))
+            await until(lambda: fake.asked("lease.take"))
+            assert text(await session.call_tool("lamp_follow_stop", {})) == "stopped following"
+            said = json.loads(text(await call))
+            assert (said["how"], said["why"]) == ("finished", "stopped")
+            assert asyncio.get_running_loop().time() - started < 5
+            assert not fake.leases and not fake.following
+
+    run(go())
+
+
 def test_a_second_follow_is_busy_and_follow_stop_ends_the_first(tmp_path):
     async def go():
         async with connected(tmp_path, grants=("body", "look")) as (fake, _, session):

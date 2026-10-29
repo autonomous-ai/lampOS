@@ -810,12 +810,38 @@ test('followHand stops when asked, at a stop, or when the lamp takes the body ba
     following = await lamp.followHand().start();
     await lamp.stop();
     assert.equal((await following.wait()).why, 'stop');
+    // The client's stop lets go of its lease too.
+    assert.equal(fake.leases.size, 0);
+    assert.equal(following.lease.held, false);
     await following.stop();
     following = await lamp.followHand().start();
     fake.loseLease(following.lease.id, 'hand');
     assert.deepEqual(await following.wait(), { how: 'cut_short', why: 'hand' });
     await following.stop();
     assert.deepEqual(fake.asked('lease.release'), [{ lease: 'l_1' }, { lease: 'l_2' }]);
+  });
+});
+
+test('followHand keeps its lease after another look, and a new followHand lets it go', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    const first = await lamp.followHand().start();
+    await lamp.look('ahead');
+    assert.deepEqual(await first.wait(), { how: 'cut_short', why: 'another look' });
+    // The look runs under the following's lease, so it is still held.
+    assert.equal(first.lease.held, true);
+    assert.equal(fake.leases.size, 1);
+    // A new following lets go of it first, rather than being refused busy.
+    const second = await lamp.followHand().start();
+    assert.equal(second.following, true);
+    assert.equal(first.lease.held, false);
+    assert.equal(fake.leases.size, 1);
+    // And one still following ends the same way.
+    const third = await lamp.followHand().start();
+    assert.deepEqual(await second.wait(), { how: 'cut_short', why: 'another look' });
+    assert.equal(third.following, true);
+    assert.equal(fake.leases.size, 1);
+    await third.stop();
+    assert.equal(fake.leases.size, 0);
   });
 });
 

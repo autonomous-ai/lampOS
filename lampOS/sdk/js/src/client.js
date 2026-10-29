@@ -150,9 +150,12 @@ export class Lease {
 // back (a hand on the head, a conversation). lamp-control answers
 // `{"to":"body","follow":"hand"}` and says no `done`, so `ended` is told
 // here: `{ how: 'finished', why: 'stopped' }`, or `{ how: 'cut_short', why:
-// 'stop' | 'another look' | the lease's why }`. Where the hand is comes as
-// `hand` events: `seen` with `x`, `y`, `size`, `open`, `confidence`, and
-// `seen: false` once it's gone. Needs the `body` and `look` grants.
+// 'stop' | 'another look' | the lease's why }`. The client's `stop` lets go of
+// its lease too. After another look the lease stays held, since that look runs
+// under it, and the lamp's own life stands back until `stop()`; a new
+// `followHand()` lets go of it first. Where the hand is comes as `hand` events:
+// `seen` with `x`, `y`, `size`, `open`, `confidence`, and `seen: false` once
+// it's gone. Needs the `body` and `look` grants.
 export class Following {
   constructor(lamp, forMs, why) {
     this.lamp = lamp;
@@ -169,10 +172,16 @@ export class Following {
       this.result = { how, why };
       this.resolveEnded(this.result);
     }
-    if (this.lamp.following === this) this.lamp.following = null;
   }
 
   async start() {
+    // One following a connection: the one before it ends, and its lease is let
+    // go, or this one's take would be refused `busy`.
+    const before = this.lamp.following;
+    if (before) {
+      before.end('cut_short', 'another look');
+      await before.finish();
+    }
     await this.lease.take();
     this.lamp.on('lease', this.onLease);
     let reply;
@@ -188,9 +197,7 @@ export class Following {
       await this.finish();
       throw new byCode.refused("this lamp doesn't follow a hand yet");
     }
-    // Another look or a stop from this client ends it (`look`, `stop`); one
-    // following a connection.
-    this.lamp.following?.end('cut_short', 'another look');
+    // Another look or a stop from this client ends it (`look`, `stop`).
     this.lamp.following = this;
     return this;
   }
@@ -209,6 +216,9 @@ export class Following {
   }
 
   async finish() {
+    // The lamp keeps it while its lease is held, so a new following can let go
+    // of it.
+    if (this.lamp.following === this) this.lamp.following = null;
     await this.lamp.off('lease', this.onLease);
     await this.lease.release();
   }
@@ -471,7 +481,12 @@ export class Lamp {
   sound(name) { return this.act('sound', { name }); }
   async stop() {
     const reply = await this.act('stop', {});
-    this.following?.end('cut_short', 'stop');
+    const following = this.following;
+    if (following) {
+      // A stop ends what this client asked for; its lease goes too.
+      following.end('cut_short', 'stop');
+      await following.finish();
+    }
     return reply;
   }
 }
