@@ -281,12 +281,12 @@ pub fn place_told(place: Option<&str>) -> Option<String> {
         Some(place) => format!(
             " You are in {place}. When someone asks about the weather, the news or anything nearby without naming a place, they mean {place}. {AREA_ASKED}"
         ),
-        None => format!(" You don't know where you are beyond your time zone's city. {AREA_ASKED}"),
+        None => format!(" You don't know where you are beyond your time zone. {AREA_ASKED}"),
     })
 }
 
 /// [`place_told`]'s rule for the area near the person (#4337).
-pub const AREA_ASKED: &str = "You don't know which part of town they are in: when they ask for something near them, or name a place that doesn't sound real, ask which area they mean before you search, and never pick one yourself. When you looked somewhere they didn't name, say where.";
+pub const AREA_ASKED: &str = "You don't know which part of town they are in: when they ask for something near them, or name a place you aren't sure you heard right, ask which area they mean before you search, and never pick one yourself. When you looked somewhere they didn't name, say where. The weather and the time are for where you are: never ask which area for those.";
 
 /// The place the lamp's own zone names ("Ho Chi Minh"), or `None` when it
 /// names none ([`own_place`]).
@@ -965,7 +965,7 @@ mod tests {
         // the person is asked, never picked.
         assert_eq!(
             place_told(None).unwrap(),
-            format!(" You don't know where you are beyond your time zone's city. {AREA_ASKED}")
+            format!(" You don't know where you are beyond your time zone. {AREA_ASKED}")
         );
         assert_eq!(
             place_told(Some("Hanoi")).unwrap(),
@@ -974,6 +974,10 @@ mod tests {
             )
         );
         assert!(AREA_ASKED.contains("ask which area") && AREA_ASKED.contains("never pick"));
+        // Aimed at a mishearing, and never at the weather or the time (the
+        // Reviewer-lead's and Reviewer-three's P3s on #4350).
+        assert!(AREA_ASKED.contains("aren't sure you heard right"));
+        assert!(AREA_ASKED.contains("never ask which area for those"));
     }
 
     #[test]
