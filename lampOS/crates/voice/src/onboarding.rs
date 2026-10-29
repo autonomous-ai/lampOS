@@ -3415,9 +3415,11 @@ fn quiet_hours(words: &[String]) -> bool {
     const CUE_BEFORE: [&str; 10] = [
         "from", "until", "till", "til", "to", "at", "around", "by", "between", "past",
     ];
-    const CUE_AFTER: [&str; 10] = [
-        "o'clock", "am", "pm", "to", "until", "till", "at", "in", "thirty", "and",
-    ];
+    // After an hour, only what can't be a question's word: "ten to six" is
+    // counted by "to six", and "at night" or "in the morning" by
+    // `names_a_time`, while "Which two to pick?" or "the two in the middle"
+    // name none (Seventh's P3s on #4399).
+    const CUE_AFTER: [&str; 4] = ["o'clock", "am", "pm", "thirty"];
     let hour_named = words.iter().enumerate().any(|(at, word)| {
         HOUR_WORDS.contains(&word.as_str())
             && (at
@@ -5903,6 +5905,8 @@ mod tests {
             "Can you be quiet from eleven?",
             "Again, nine to six.",
             "Quiet at ten again",
+            "Hi, ten pm please.",
+            "Again, quiet until seven thirty.",
         ]
         .into_iter()
         .enumerate()
@@ -6018,6 +6022,15 @@ mod tests {
             "Which two questions?",
             "Can you repeat the two choices?",
             "What, ten?",
+            // Nor a number beside a word that also sits in questions
+            // (Seventh's P3s on #4399).
+            "Which two to pick?",
+            "What, two and three?",
+            "Can you say the two in the middle again?",
+            // A bare hour said again, or after a greeting, owes nothing:
+            // the step's re-ask asks for it again.
+            "Ten again.",
+            "Hi, ten please.",
         ]
         .into_iter()
         .enumerate()
