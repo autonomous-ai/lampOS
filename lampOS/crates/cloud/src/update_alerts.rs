@@ -8,7 +8,7 @@
 //! is what stops a stage seen before the yes being sent after it.
 //!
 //! One alert per stage of a round: `started`, `done`, `failed`, `refused`,
-//! `rolled-back`, and `self-switched` and `self-confirmed` under their own names; and `not-switched`
+//! `rolled-back`, and `self-switched`, `self-confirmed` and `self-put-back` under their own names; and `not-switched`
 //! for a round that began (its `started` was told) and ended with nothing
 //! switched, so no start is left without an end. Each is built
 //! from `update/status` (`lamp_msgs::UpdateStatus`) and a fixed template,
@@ -87,6 +87,9 @@ pub enum Stage {
     SelfSwitched,
     /// lamp-update's new self confirmed the switch it was started by.
     SelfConfirmed,
+    /// The old lamp-update was put back because the new one did not take;
+    /// it names no build, reason or start time.
+    SelfPutBack,
     /// A round whose start was told ended with nothing switched; its code
     /// is the outcome's own name from [`NOT_SWITCHED`].
     NotSwitched,
@@ -102,6 +105,7 @@ impl Stage {
             Self::RolledBack => "rolled-back",
             Self::SelfSwitched => "self-switched",
             Self::SelfConfirmed => "self-confirmed",
+            Self::SelfPutBack => "self-put-back",
             Self::NotSwitched => "not-switched",
         }
     }
@@ -115,6 +119,7 @@ fn told_as(outcome: &str) -> Option<Stage> {
         "switched" => Some(Stage::Done),
         "self-switched" => Some(Stage::SelfSwitched),
         "self-confirmed" => Some(Stage::SelfConfirmed),
+        "self-put-back" => Some(Stage::SelfPutBack),
         "refused" => Some(Stage::Refused),
         "rolled-back" => Some(Stage::RolledBack),
         "failed" => Some(Stage::Failed),
@@ -683,6 +688,7 @@ mod tests {
             ("switched", Some(Stage::Done)),
             ("self-switched", Some(Stage::SelfSwitched)),
             ("self-confirmed", Some(Stage::SelfConfirmed)),
+            ("self-put-back", Some(Stage::SelfPutBack)),
             ("refused", Some(Stage::Refused)),
             ("rolled-back", Some(Stage::RolledBack)),
             ("failed", Some(Stage::Failed)),
@@ -767,6 +773,50 @@ mod tests {
         assert_eq!(took(T0, T0), Some(0));
         assert_eq!(took(T0 + 5_000, T0), None);
         assert_eq!(took(T0, T0 + 90_000_000), None);
+    }
+
+    /// The old lamp-update put back is always told, with no build, reason
+    /// or time needed, once, and it breaks a repeating streak.
+    #[test]
+    fn a_self_put_back_is_always_told_once_and_breaks_a_streak() {
+        let mut watcher = Watcher::new(None);
+        let old = Some(("up-to-date", Some(8599), T0 - 1));
+        watcher.observe(&status("idle", 8599, old), &none(), T0);
+        watcher.observe(&status("fetching", 8599, old), &none(), T0 + 1_000);
+        let refused = Some(("refused", None, T0 + 5_000));
+        assert_eq!(
+            watcher
+                .observe(&status("idle", 8599, refused), &none(), T0 + 6_000)
+                .len(),
+            1
+        );
+        // No round began on this run (the helper acts on its own), and the
+        // value has no build.
+        let back = Some(("self-put-back", None, T0 + 100_000));
+        let told = watcher.observe(&status("idle", 8599, back), &none(), T0 + 101_000);
+        assert_eq!((told.len(), told[0].stage), (1, Stage::SelfPutBack));
+        assert_eq!(
+            (told[0].to, told[0].code, told[0].took_s),
+            (None, None, None)
+        );
+        assert_eq!(told[0].message(), "Software update lamp - self-put-back");
+        for minute in 1..4 {
+            let again = status("idle", 8599, back);
+            assert!(
+                watcher
+                    .observe(&again, &none(), T0 + 101_000 + minute * 60_000)
+                    .is_empty()
+            );
+        }
+        // The refusal after it is told again.
+        watcher.observe(&status("fetching", 8599, back), &none(), T0 + 400_000);
+        let refused = Some(("refused", None, T0 + 405_000));
+        assert_eq!(
+            watcher
+                .observe(&status("idle", 8599, refused), &none(), T0 + 406_000)
+                .len(),
+            1
+        );
     }
 
     /// The confirmation of lamp-update's own switch is its own stage, told
