@@ -1217,8 +1217,9 @@ it.
 **One alert per stage of a round,** from `update/status`: `started` (the
 first phase after `idle` that goes on to fetch; a round that only checks
 says nothing), then `done` (`switched`), `failed`, `refused`, `rolled-back`
-or `self-switched` (lamp-update switched itself; its new self confirms on
-its next round). A round whose `started` was told and that ends with
+`self-switched` (lamp-update switched itself) or `self-confirmed` (its new
+self confirmed that switch; a self-switch has this confirmation alert once
+lamp-update says it, and it breaks a repeating streak like `done`). A round whose `started` was told and that ends with
 nothing switched (`not-quiet`, `unreachable`, `would`, `up-to-date`,
 `nothing-published`) ends as `not-switched`, with `code:` the outcome's
 own name (`other` for a name not known), so no start is left without an
@@ -1233,10 +1234,12 @@ took: 95 s
 
 `from` is the build the lamp ran when the round began (digits, hex digits
 and `+`), `to` the build the round was about. A `code:` line (a fixed
-reason name) and the `took` time come from lamp-update's `last.reason` and
-`last.started_at_unix_ms` when it says them; absent, the lines are left
-out. A reason that is not on `update_alerts::REASONS` is not told, and
-that list is empty until lamp-update's names are agreed. Every value is
+reason name: the last phase the round said, or `models`) and the `took`
+time (the end's time less `last.started_at_unix_ms`, the round's
+`checking`, in whole seconds, never negative) come from lamp-update's
+`last.reason` and `last.started_at_unix_ms` when it says them; absent, the
+lines are left out. A reason that is not on `update_alerts::REASONS` is not
+told. Every value is
 typed so that no text that came in can reach an alert (the part, a build,
 a stage, a number); a canary test plants secrets in every input.
 
