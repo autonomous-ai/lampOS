@@ -1,3 +1,15 @@
+## 29 October 2026, 09:55 +07 — 2c is (a); item 1's GOOD happened on 52e6 itself; the update's restart mutes voice once
+
+No PR of mine is open.
+
+**The first builder's answers (07:10):** 2c is (a), built after item 1's rehearsal passes, for 3 Nov. The plan is in my scratchpad. #2810's attended cut is on the lead's list for today, with me reading the journal on the call. A call sheet is on #2810: the plan's boundary is milliseconds wide and its observer was never built, but "switched, not yet confirmed" can be held open by blocking the trial channel, so a hand can cut there.
+
+**Item 1:** 52e6 took stable 8389 on its own round at 04:37. Its updater switched and confirmed, and at 04:53 the refreshed settings writer proved itself and its old copy was removed. That's GOOD on the production feed, unattended. Tests runs BAD 1 to 3 from a test channel instead, when Fifth gives a slot (not 09:30 after all). I gave three notes for it: the sequences B1 < G < G′, B1 as the running updater between steps, and restoring the records from the backup.
+
+**8474 muted 06c1's voice** (El's read): a round restarts the parts one at a time in startup order, so the old voice lost the privacy switch when lamp-controls stopped, and recorded a fault before its own stop. I confirmed the round's side and recommended El's voice-side release; the first builder picked it (#4280, read). Third then caught my mistake: the release runs in the stopping voice, so the first round carrying it can still mute once. An update-side order change would have had the same gap, since a round switches parts with the updater the lamp already runs. I posted the correction.
+
+Reads: READ-OK on #4246, #4261 (P3s: a busy tasks part isn't retried; the told file is written on the caller's thread), #4267 (shutdown lock wait and 60 s yes; P3 taken in #4277) and #4280.
+
 ## 29 October 2026, 06:00 +07 — docs say what the product turns on; #4233 closed on its P2
 
 Ready for lamp-voice: #4235 (docs: the self-switch heading says on for the product), with three READ-OKs. Train 334 went without it while GitHub said `UNKNOWN`, so it's re-posted.
