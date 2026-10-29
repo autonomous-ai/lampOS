@@ -617,6 +617,9 @@ struct Answers {
     face_answered_us: Option<u64>,
     quiet_hours: bool,
     hello: bool,
+    /// "Preferences"' hello question has been handed out to be said: only
+    /// then does a plain yes or no answer it.
+    hello_asked: bool,
 }
 
 struct PrivacyContext {
@@ -2098,26 +2101,35 @@ impl Onboarding {
                     .iter()
                     .any(|word| matches!(word.as_str(), "hello" | "hellos" | "hi" | "greet"))
                     && (hello_yes(&words) || refuses(&words));
-                // Once the quiet hours are in, a yes or a no answers the hello
-                // question: "That's fine." does, "Hi, I'm fine." doesn't, since
-                // a line that greets takes only `hello_yes`'s yes.
-                let greets = words.iter().any(|word| {
-                    matches!(word.as_str(), "hello" | "hellos" | "hi" | "hey" | "greet")
-                });
-                let yes = if greets {
+                // Once the hello question was said, a yes or a no answers it:
+                // "That's fine." does, "Hi, I'm fine." doesn't, since a line
+                // that greets takes only `hello_yes`'s yes. A line naming
+                // hours never does: on lamp-52e6 (29 Oct) room speech gave
+                // the quiet hours, the person's "Please stay quiet after 10PM
+                // each day." took its "please" as the hello's yes, and the
+                // step ended with the hello never asked.
+                let greeting = greets(&words);
+                let yes = if greeting {
                     hello_yes(&words)
                 } else {
                     agrees(&words)
                 };
-                if about_hello || (heard.quiet_hours && (yes || refuses(&words))) {
+                let answer = !greeting && !text.contains('?') && !words.is_empty();
+                if about_hello
+                    || (heard.hello_asked && !names_hours(&words) && (yes || refuses(&words)))
+                {
                     heard.hello = true;
+                } else if answer && !heard.quiet_hours && !heard.hello {
+                    // The hello question is the walk's own, owed once, after
+                    // the first answer to the quiet hours, whatever its words:
+                    // the model is told never to ask it, so "Only when I'm
+                    // sleeping." left the walk silent until its give-up
+                    // (Reviewer-two's P2 on #4326). On lamp-29e7 (29 Oct,
+                    // 8545) the model answered "Already set" and asked nothing
+                    // more. That answer is the quiet hours'.
+                    ask_hello = true;
+                    heard.quiet_hours = true;
                 } else if quiet_hours(&words) {
-                    // The hello question is the walk's own, said once the
-                    // model's answer to the quiet hours is over, once: on
-                    // lamp-29e7 (29 Oct, 8545) it answered "Already set"
-                    // and asked nothing more, and the step waited in silence
-                    // for the person's next line.
-                    ask_hello = !heard.quiet_hours && !heard.hello;
                     heard.quiet_hours = true;
                 }
                 heard.quiet_hours && heard.hello
@@ -2377,6 +2389,11 @@ impl Onboarding {
         }
         if can_speak && let Some(note) = self.owed.take() {
             self.owed = self.owed_after.take();
+            if note == skill::PREFERENCES_HELLO
+                && let Some(led) = self.led.as_mut()
+            {
+                led.heard.hello_asked = true;
+            }
             return Some(note);
         }
         let Some(step) = self.next_step() else {
@@ -3316,11 +3333,26 @@ fn hello_yes(words: &[String]) -> bool {
     words.iter().any(|word| HELLO_YES.contains(&word.as_str())) && !refuses(words)
 }
 
-/// An answer about the hours to keep quiet: a time, a part of the day, or none.
-/// A part of the day right after "good" is a greeting, not an hour: "Good
-/// evening, Lamp." answers nothing (Fourteen's P2 on #3673).
+/// The parts of the day "good" makes a greeting of.
+const DAY_PARTS: [&str; 4] = ["morning", "afternoon", "evening", "night"];
+
+/// A greeting: "hello", "hi", "hey" or "greet", or a part of the day right
+/// after "good" ("Good evening, Lamp.", Fourteen's P2 on #3673).
+fn greets(words: &[String]) -> bool {
+    words.iter().enumerate().any(|(at, word)| {
+        matches!(word.as_str(), "hello" | "hellos" | "hi" | "hey" | "greet")
+            || (at > 0 && words[at - 1] == "good" && DAY_PARTS.contains(&word.as_str()))
+    })
+}
+
+/// An answer about the hours to keep quiet: hours named, or none.
 fn quiet_hours(words: &[String]) -> bool {
-    const GREETS: [&str; 4] = ["morning", "afternoon", "evening", "night"];
+    names_hours(words) || words.iter().any(|word| NO.contains(&word.as_str()))
+}
+
+/// Hours named: a time or a part of the day. A part of the day right after
+/// "good" is a greeting, not an hour: "Good evening, Lamp." names none.
+fn names_hours(words: &[String]) -> bool {
     const WHEN: [&str; 14] = [
         "quiet",
         "night",
@@ -3338,11 +3370,8 @@ fn quiet_hours(words: &[String]) -> bool {
         "before",
     ];
     words.iter().enumerate().any(|(at, word)| {
-        let greeting = at > 0 && words[at - 1] == "good" && GREETS.contains(&word.as_str());
-        !greeting
-            && (WHEN.contains(&word.as_str())
-                || NO.contains(&word.as_str())
-                || word.chars().any(|c| c.is_ascii_digit()))
+        let greeting = at > 0 && words[at - 1] == "good" && DAY_PARTS.contains(&word.as_str());
+        !greeting && (WHEN.contains(&word.as_str()) || word.chars().any(|c| c.is_ascii_digit()))
     })
 }
 
@@ -5657,6 +5686,64 @@ mod tests {
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
         assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
+    }
+
+    /// Reviewer-two's P2 on #4326: the hello is owed after the first answer
+    /// to the quiet hours, whatever its words, since the model never asks it.
+    #[test]
+    fn any_first_answer_owes_the_hello() {
+        for (n, answer) in [
+            "Only when I'm sleeping.",
+            "Weekends, please.",
+            "From ten to six.",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut room = Room::new(&format!("any-answer-{n}"));
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk.heard(answer, room.at);
+            assert_eq!(
+                room.wait(S, Some(NEAR_MIDDLE)),
+                [skill::PREFERENCES_HELLO],
+                "{answer}"
+            );
+            assert_eq!(room.outcome(Step::Preferences), None, "{answer}");
+            room.walk.heard("Yes, that's fine.", room.at);
+            assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
+            assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+        }
+    }
+
+    /// lamp-52e6 (29 Oct): room speech gave the quiet hours, then the
+    /// person's own quiet-hours line took its "please" as the hello's yes and
+    /// the step ended with the hello never asked. A line naming hours never
+    /// answers the hello, and before the hello is said only a line about
+    /// hello does.
+    #[test]
+    fn a_second_quiet_hours_line_is_no_hello_answer() {
+        let mut room = Room::new("two-quiet-lines");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk
+            .heard("After ten at night, you're falling", room.at);
+        room.walk
+            .heard("Please stay quiet after 10PM each day.", room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+        assert_eq!(room.outcome(Step::Preferences), None);
+        // Said again after the hello question: still not its answer.
+        room.walk
+            .heard("Please stay quiet after 10PM each day.", room.at);
+        assert!(room.wait(S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.outcome(Step::Preferences), None);
+        room.walk.heard("Yes.", room.at);
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
     }
 
     /// The model's own report ends the step with the same done line, and a
