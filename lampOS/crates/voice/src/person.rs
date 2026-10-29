@@ -463,17 +463,6 @@ pub fn someone_else_now(
     }
 }
 
-/// The owner's name for [`BY_DEFAULT_ENVIRONMENT`] on a lamp set up by
-/// voice, which has no typed name (lamp-29e7, 29 Oct): who_you_are keeps the
-/// name only with the face it saves, in the eyes. The one person the eyes
-/// know is the one who set the lamp up; with two or more, nobody is guessed.
-pub fn owner_of_faces(names: &[String]) -> Option<&str> {
-    match names {
-        [only] if !only.trim().is_empty() => Some(only.as_str()),
-        _ => None,
-    }
-}
-
 /// What a reply is told when the owner `name` may be named by default
 /// ([`someone_else_now`]).
 pub fn by_default(name: &str) -> String {
@@ -540,24 +529,6 @@ pub fn told_record(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// lamp-29e7 (29 Oct): with no typed name, the owner is the one person
-    /// the eyes know; none, a blank or two known is nobody.
-    #[test]
-    fn the_owner_of_faces_is_the_only_one_known() {
-        let names = |list: &[&str]| {
-            list.iter()
-                .map(|name| (*name).to_owned())
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(
-            owner_of_faces(&names(&["Example Name"])),
-            Some("Example Name")
-        );
-        assert_eq!(owner_of_faces(&names(&[])), None);
-        assert_eq!(owner_of_faces(&names(&[" "])), None);
-        assert_eq!(owner_of_faces(&names(&["Example Name", "Robin"])), None);
-    }
 
     /// #2831: the record says a who-skill's note was told, with Mood's
     /// level; any other say, or nobody at the lamp, false and null. The
