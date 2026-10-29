@@ -73,8 +73,9 @@ One datagram: a line of JSON, a line end, then the payload's bytes untouched.
     {"topic":"body/joint_states","kind":"latest","enc":"json","type":"lamp_msgs/JointState","source":"body","boot":"9f3a6c1e04b7d25a","seq":412,"at_us":98123456,"at_unix_ms":1791878400123,"expires_ms":500}
     {"name":["yaw"],"position":[0.12]}
 
-`enc` says how to read the payload: `json`, `none` (there is none), or a
-label for media such as `pcm_s16le_16000_mono`. `type` (optional) says what
+`enc` says how to read the payload: `json`, `none` (there is none), or
+`json+pcm` for sound (`lamp_msgs::Audio::ENCODING`): a JSON `Audio` header
+line, then the samples. `type` (optional) says what
 the payload is, by the name its publisher declared for the topic; a publisher
 that declared nothing leaves it out, and so does a recording made before
 there were types. `source` is the publisher's name, `boot` sixteen hex
@@ -327,11 +328,11 @@ so, the crate does not do it yet.**
 | What ROS does, and its reason | What the lamp's bus does about it | In the crate |
 |---|---|---|
 | Names are `/`-separated lower-case tokens with underscores, grouped by the part the data comes from and named for the data, never for who uses it | The same rule, and only it: `mic2/audio`, `camera/image`, `body/joint_states`. The `.` separator and `-` in a token are refused, in a publisher's or subscriber's name too | Yes |
-| One declared message type per topic, checked when a subscriber connects: both ends "must agree on the layout" | Each topic carries a declaration written by its publisher (type name, kind, how often, how long a value lasts). A subscriber names the type it expects and is refused another. The types are Rust structures in one shared crate, sent as JSON | Yes. The bus compares names and does not check a payload against its type. The types of the first topics are in `lamp-msgs` ([msgs.md](msgs.md)); no part publishes them yet |
+| One declared message type per topic, checked when a subscriber connects: both ends "must agree on the layout" | Each topic carries a declaration written by its publisher (type name, kind, how often, how long a value lasts). A subscriber names the type it expects and is refused another. The types are Rust structures in one shared crate, sent as JSON | Yes. The bus compares names and does not check a payload against its type. The types of the first topics are in `lamp-msgs` ([msgs.md](msgs.md)), and the parts publish with them: the voice's `voice/*` below, the body's, the ears', Controls' and the others' |
 | The registry only introduces; data goes straight from publisher to subscriber: "no central point of failure" | The filesystem is the registry and each message goes straight to each subscriber's socket | Yes |
 | A bounded queue per subscriber, so that one slow subscriber cannot hold the publisher or the others | Each subscriber's socket is its own queue; a full one loses that subscriber's message and is counted. ROS drops the oldest, this drops the newest; to be revisited for sound | Yes, with that difference, which is unchanged |
 | Latched topics: "new subscribers always get the latest state" | The `latest` kind: the newest value is kept and read by a late joiner. It also outlives its publisher, which ROS's does not | Yes |
-| Liveliness and deadline: a publisher must show it is alive, a topic may promise a period, and missing either raises an event | Each publisher keeps a small entry it refreshes; the subscriber's library reports "the source has gone" and "this is late". This is how a part says whether it is ready | Yes: `pubs/`, a lease of 3 s, `Notice`. A subscriber is told when it asks, not called. No publisher on the lamp calls `alive()` yet |
+| Liveliness and deadline: a publisher must show it is alive, a topic may promise a period, and missing either raises an event | Each publisher keeps a small entry it refreshes; the subscriber's library reports "the source has gone" and "this is late". This is how a part says whether it is ready | Yes: `pubs/`, a lease of 3 s, `Notice`. A subscriber is told when it asks, not called. The voice (`bus_out.rs`), the body, the ears, Controls, the air and tasks call `alive()` between messages |
 | Lifespan: a message older than its limit is dropped, not delivered | The header already carries how long a value lasts; the subscriber's library is to drop what has expired | Yes: `recv` passes an expired message over and counts it. A kept value is returned marked `expired`, not hidden, which ROS does not do |
 | The graph: any tool can list topics, their types, who publishes and who subscribes | `lamp-bus info TOPIC` and `lamp-bus hz TOPIC` beside the tools there are | Yes, and `topics` shows each type. The same from a program: `Bus::declaration`, `publishers`, `subscribers`. Nothing says when the graph changes: a tool asks again |
 | Three patterns, not one: topics for streams, services for ask-and-answer, actions for long work with progress, one result and an acknowledged cancel | Topics on the bus. A service stays a direct ask-and-answer on its own socket (the executive's is one, [tools.md](tools.md)), and publishes each call as an event so that it can be watched. A task handed to an agent takes the shape of an action: an id made by the asker, accepted or refused, progress, one result, cancel acknowledged, its status latched | Topics only |
@@ -353,7 +354,7 @@ of each, and its kind and period as a declaration, are in
 
 | Topic | What it carries | Kind | Published by | How often |
 |---|---|---|---|---|
-| `mic1/audio`, `mic2/audio` | Sound, 20 ms at a time (16 kHz, one channel) | stream | The microphone's owner | 50 a second |
+| `mic1/audio`, `mic2/audio` | Sound, 20 ms at a time (16 kHz, one channel), as `json+pcm`: what the voice hears after its echo canceller | stream | The voice, only with `LAMP_BUS=on` and `LAMP_BUS_AUDIO=on` (`bus_out.rs`, `MicOut`); the capture worker itself never touches the bus | 50 a second |
 | `camera/image` | Where the newest picture is, and when it was taken. The picture itself stays in a file | latched | Eyes | 2 to 4 a second |
 | `body/joint_states` | Each joint: where it is, how fast, how loaded (ROS's `JointState`) | latched | Body | 10 to 20 a second |
 | `humans/faces/tracked` | The faces in view: a passing id, where, and whether it is turned to the lamp | latched | Eyes | With each look |
@@ -402,9 +403,10 @@ The voice publishes `voice/state`, `voice/heard` and `voice/said` when
 its unit has `LAMP_BUS=on` (`crates/voice/src/bus_out.rs`), each declared
 with its type from `lamp-msgs`. The state comes when it changes and once a
 second (on the lamp: one a second, gaps of 1,000.9 ms on average, 0.2 ms
-old on arrival); the two streams carry the provider's text in pieces, the
-lamp's with the number of the request it answered, what was heard with the
-number of the turn whose input began last before it, and between things
+old on arrival); `voice/said` carries the lamp's words a sentence at a time, with the
+number of the request it answered; `voice/heard` carries what was heard, on
+the second route one whole, finished message per line, with the number of
+the turn whose input began last before it, and between things
 said the voice says once a second that it is alive on them. Before it did,
 their subscribers were told "no publisher is alive" before and after
 every sentence.
@@ -440,10 +442,13 @@ that owns it:
 | `expression/rest_state` | `lamp-expression`, with `LAMP_REST_REQUESTS=on` | Skills' routine manager |
 | `expression/sleep_claim` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and the `night-sleep` folder, every 60 s | Expression, with `LAMP_REST_REQUESTS=on`: fresh under 180 s, the night is the skill's (#940) |
 | `output/caps` | `lamp-actions`, with `LAMP_OUTPUT_CAPS=on` | Voice's ring worker, with `LAMP_OUTPUT_CAPS=on` |
-| `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
-| `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |
+| `policy/decisions` | the policy ([policy.md](policy.md)) | the voice (the second route's policy and its holds, task news), `lamp-skills`, the add-ons |
+| `body/joint_states` | the body ([body.md](body.md), "On the bus") | the voice (`body_motion.rs`), Expression, the eyes, `lamp-peek`; recorded to measure how the lamp moves |
 | `light/command` | the actions program ([actions.md](actions.md)); `lamp-cloud`, the app's Light row ([cloud.md](cloud.md)) | the voice's ring worker |
 | `light/state` | the voice's ring worker ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the actions program; `lamp-cloud` |
+| `name/heard`, `name/rising` | `lamp-name` (the lamp's name heard in `mic*/audio`: its final word, and the first sign while it is still being said, #782) | the voice (`name/rising` for the call's wait, `name/heard` in `body_ask.rs`), the body, Expression, `lamp-control` |
+| `stop/heard` | `lamp-name` (its `stop.onnx`, #828) | the voice (`bus_out.rs`): a "stop" yields the lamp's reply |
+| `voice/remarked` | the voice, one for each remark about the lamp it holds in a busy room (`LAMP_REMARK_ABOUT_IT`) | Expression, with `LAMP_REMARK_GLANCE=on`: one glance |
 | `light/test` | the self-test (#812) | the voice's ring worker |
 | `light/drawn` | the voice's ring worker, from its own write receipts ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the self-test |
 | `light/request` | `lamp-skills`, a skill's light, with `LAMP_LIGHT_REQUESTS=on` ([skills.md](skills.md)); `lamp-cloud`, the app's preview ([cloud.md](cloud.md)) | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` |
