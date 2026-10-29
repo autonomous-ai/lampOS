@@ -2278,7 +2278,14 @@ pub fn serve(
                             withheld = Some(name.to_owned());
                             format!("\n\n{}", crate::person::HELD_BACK_NOTE)
                         }
-                        None => format!("\n\n{}", crate::person::by_default(name)),
+                        None => {
+                            // Said without the name, so a miss shows whether
+                            // the reply was told it (lamp-29e7, 29 Oct, #4118).
+                            eprintln!(
+                                "lamp-voice second: the owner is named by default to this reply (LAMP_PERSON_NAME_BY_DEFAULT)"
+                            );
+                            format!("\n\n{}", crate::person::by_default(name))
+                        }
                     }
                 })
                 .unwrap_or_default();

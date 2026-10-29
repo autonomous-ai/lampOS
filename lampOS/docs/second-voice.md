@@ -3742,7 +3742,16 @@ earlier ones. The memory note and a recall's answer are not taken from: a
 room fact naming the owner can still reach the reply. The faces are counted over the
 eyes' looks of the last 3 s (`known_faces::most_faces_lately`), not their
 newest look alone: in the same run, with two faces in 36 of 37 looks, one
-reply read a look with none and named the owner. Without a name, or off:
+reply read a look with none and named the owner. On lamp-29e7 on 8545 (29 Oct) the owner,
+4.5 minutes after setup, asked "can you remember my name?" and was told
+"You haven't told me your name yet": their own answer had left the recent
+exchanges, and the note then said "not to answer" and named only "who they
+are". It now tells the model to say the name when asked who they are, what
+their name is, or whether the lamp knows or remembers it, and a reply told
+it says so in the journal, without the name ("the owner is named by default
+to this reply"). The eyes' list is asked with up to 3 s to answer, off any
+reply's path, and eyes that don't answer in time take nothing back: the
+mark stands. Without a name, or off:
 nothing. `the owner is not named by default: WHY` in the journal when a
   sign holds.
 - **A line is a known person's only when their own face was seen speaking
