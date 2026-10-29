@@ -108,3 +108,49 @@ fn the_stable_notes_read_only_fields_the_receipt_has() {
         );
     }
 }
+
+/// The promotion's own `cargo run … -- --sequence` names no `--bin`: with a
+/// second binary in the package (`lampos-notes`, #3976) it runs the promoter
+/// only through `default-run`. That step runs only at a promotion, so a lost
+/// `default-run` would pass every pull request's run and refuse the next
+/// promotion (Reviewer-three's read of #4400). The notes' step names its own.
+#[test]
+fn the_promotion_runs_the_promoter_and_the_notes_name_their_binary() {
+    let manifest = include_str!("../Cargo.toml");
+    assert!(
+        manifest.contains("\ndefault-run = \"lampos-promote\"\n"),
+        "Cargo.toml lost default-run"
+    );
+    let workflow = include_str!("../../../workflows/lampos-arm64.yml");
+    let promotion = workflow
+        .split("  promote-stable:\n")
+        .nth(1)
+        .unwrap()
+        .split("  report-full-run-failure:\n")
+        .next()
+        .unwrap();
+    let runs: Vec<&str> = promotion
+        .lines()
+        .filter(|line| {
+            line.contains(
+                "cargo run --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+            )
+        })
+        .collect();
+    assert_eq!(runs.len(), 2, "{runs:?}");
+    assert!(runs.iter().any(|line| !line.contains("--bin")
+        && line.contains("-- --sequence \"$PROMOTE_SEQUENCE\" | tee")));
+    assert!(
+        runs.iter()
+            .any(|line| line.contains("--bin lampos-notes -- --sequence \"$PROMOTE_SEQUENCE\""))
+    );
+    // The notes' step is never a gate on the promotion that has stood.
+    let notes = promotion
+        .split("- name: fill the stable notes' built-but-not-on part\n")
+        .nth(1)
+        .unwrap();
+    assert!(
+        notes.trim_start().starts_with("continue-on-error: true"),
+        "{notes}"
+    );
+}
