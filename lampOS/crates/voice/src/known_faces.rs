@@ -2053,12 +2053,28 @@ pub const FACES_EVERY: Duration = Duration::from_millis(100);
 /// The eyes' face counts of the last [`FACES_WITHIN`], as [`faces_in_view`]
 /// read them.
 #[derive(Debug, Default)]
-pub struct FacesLately(std::collections::VecDeque<(std::time::Instant, usize)>);
+pub struct FacesLately(
+    std::collections::VecDeque<(std::time::Instant, usize)>,
+    /// The last look counted, by its publisher's boot and `seq`.
+    Option<(String, u64)>,
+);
 
 impl FacesLately {
     pub fn seen(&mut self, at: std::time::Instant, faces: usize) {
         self.0.push_back((at, faces));
         self.forget_before(at);
+    }
+
+    /// [`Self::seen`] for one of the eyes' looks, counted once however
+    /// often it is read: the bus keeps a look as its latest value for 2 s
+    /// and [`keep_faces_counted`] reads it every [`FACES_EVERY`], so one
+    /// spurious look read three times would pass for two (the Reviewer-lead's
+    /// and Fourth's P2 on #4364).
+    pub fn look(&mut self, at: std::time::Instant, look: (String, u64), faces: usize) {
+        if self.1.as_ref() != Some(&look) {
+            self.1 = Some(look);
+            self.seen(at, faces);
+        }
     }
 
     /// The most faces seen in at least two looks within [`FACES_WITHIN`] of
@@ -2085,7 +2101,7 @@ impl FacesLately {
 }
 
 static FACES_LATELY: std::sync::Mutex<FacesLately> =
-    std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new()));
+    std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None));
 
 /// Read the eyes' newest look every [`FACES_EVERY`] into
 /// [`most_faces_lately`], on a thread of its own.
@@ -2094,11 +2110,23 @@ static FACES_LATELY: std::sync::Mutex<FacesLately> =
 pub fn keep_faces_counted(bus: lamp_bus::Bus) {
     std::thread::spawn(move || {
         loop {
-            if let Some(faces) = faces_in_view(&bus) {
+            if let Some((look, faces)) = bus
+                .latest(lamp_msgs::Faces::TOPIC)
+                .ok()
+                .flatten()
+                .filter(|message| !message.expired)
+                .and_then(|message| {
+                    let look = (message.header.boot.clone(), message.header.seq);
+                    message
+                        .parse::<lamp_msgs::Faces>()
+                        .ok()
+                        .map(|faces| (look, faces.faces.len()))
+                })
+            {
                 FACES_LATELY
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .seen(std::time::Instant::now(), faces);
+                    .look(std::time::Instant::now(), look, faces);
             }
             std::thread::sleep(FACES_EVERY);
         }
@@ -2988,6 +3016,15 @@ mod tests {
         lately.seen(at + Duration::from_millis(250), 0);
         lately.seen(at + Duration::from_millis(500), 2);
         assert_eq!(lately.most(at + Duration::from_millis(600)), Some(2));
+        // One look read three times is one look: a spurious second face
+        // in it alone is still one person.
+        let mut read = FacesLately::default();
+        read.look(at, ("b".into(), 1), 1);
+        for k in 1..4 {
+            read.look(at + Duration::from_millis(100 * k), ("b".into(), 2), 2);
+        }
+        read.look(at + Duration::from_millis(500), ("b".into(), 3), 1);
+        assert_eq!(read.most(at + Duration::from_secs(1)), Some(1));
         // One spurious second face among looks of one: one person.
         let mut one = FacesLately::default();
         for (k, faces) in [1, 1, 2, 1].into_iter().enumerate() {
