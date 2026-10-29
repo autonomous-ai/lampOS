@@ -9578,6 +9578,10 @@ fn conversation_with_gate_inner(
                         follows_on,
                         count_only,
                         not_now,
+                        // Read as the input is admitted, not as the detector
+                        // started it: still that start's, since no new start
+                        // comes while a candidate is pending (the
+                        // Reviewer-lead's P3 on #4286).
                         detector.began_ordinarily(),
                         rig.playout_start_now(),
                         trace,
