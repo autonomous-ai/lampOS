@@ -2049,19 +2049,19 @@ fn run_for(
                     .and_then(|thread| thread.heard_for(request, Instant::now()))
                     .unwrap_or_default()
             });
-            let made = std::path::Path::new(crate::made_skill::DIRECTORY);
-            let answer = crate::made_skill::put_on(
-                made,
-                std::path::Path::new(crate::made_skill::MANAGE_SOCKET),
-                said.as_deref(),
-                now_unix_ms,
-            );
-            // Its question answered: its news is told, so its harness is
-            // closed (Second's P3 on #4246).
-            if answer.get("put_on").is_some() {
-                crate::task_news::answered(&place.directory, crate::made_skill::on_keys(made));
-            }
-            (answer, true)
+            // Once on, its news is told, so its harness is closed (Second's
+            // P3 on #4246).
+            (
+                crate::made_skill::put_on_told(
+                    std::path::Path::new(crate::made_skill::DIRECTORY),
+                    std::path::Path::new(crate::made_skill::MANAGE_SOCKET),
+                    &place.directory,
+                    &crate::task_news::told_file(),
+                    said.as_deref(),
+                    now_unix_ms,
+                ),
+                true,
+            )
         }
         _ => (crate::tools::unavailable(), false),
     }

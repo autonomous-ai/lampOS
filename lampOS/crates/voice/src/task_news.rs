@@ -407,18 +407,14 @@ fn keep_asked(
 }
 
 /// The news `keys` of made skills a spoken yes has just put on: their
-/// question answered, they are kept as told in [`told_file`], and the
-/// tasks part in `directory` is told so on a thread of its own, so with
-/// `--close-told` each one's harness is closed. Otherwise news skipped once
-/// its skill is on (`made_skill::is_on`) is never told, and its harness on
-/// the person's computer stays open (Second's P3 on #4246). Never waits.
-pub fn answered(directory: &Path, keys: Vec<String>) {
-    let _ = answered_in(&told_file(), directory, keys);
-}
-
-/// [`answered`], with the told file given: only keys not kept as told
-/// already, each kept once. The thread, to join in a test.
-fn answered_in(
+/// question answered, they are kept as told in `told_file` (the voice's
+/// [`told_file`]), each once, and the tasks part in `directory` is told so
+/// on a thread of its own, so with `--close-told` each one's harness is
+/// closed. Otherwise news skipped once its skill is on
+/// (`made_skill::is_on`) is never told, and its harness on the person's
+/// computer stays open (Second's P3 on #4246). Never waits; the thread, to
+/// join in a test.
+pub fn answered(
     told_file: &Path,
     directory: &Path,
     keys: Vec<String>,
@@ -3138,13 +3134,13 @@ mod tests {
         assert_eq!(on_keys, [news[0].key.clone()]);
         let told_file = root.join("told");
         let quiet = root.join("no-tasks-part");
-        answered_in(&told_file, &quiet, on_keys.clone())
+        answered(&told_file, &quiet, on_keys.clone())
             .unwrap()
             .join()
             .unwrap();
         assert!(read_told(&told_file).contains(&news[0].key));
         assert!(
-            answered_in(&told_file, &quiet, on_keys).is_none(),
+            answered(&told_file, &quiet, on_keys).is_none(),
             "told already: nothing kept twice"
         );
         assert_eq!(

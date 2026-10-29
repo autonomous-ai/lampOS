@@ -1029,6 +1029,27 @@ pub fn put_on(directory: &Path, socket: &Path, said: Option<&str>, now_unix_ms: 
     put_on_within(directory, socket, said, now_unix_ms, PUT_ON_WAIT)
 }
 
+/// [`put_on`], and once a yes has put it on, the news of the made skills
+/// on the lamp kept as told in `told_file` and the tasks part in `tasks`
+/// told so, so their harnesses are closed (`task_news::answered`, Second's
+/// P3 on #4246). What `put_on_made_skill` does; its own paths are given, so
+/// a test can pin the whole of it (El's P3 on #4261). What the model is
+/// told.
+pub fn put_on_told(
+    directory: &Path,
+    socket: &Path,
+    tasks: &Path,
+    told_file: &Path,
+    said: Option<&str>,
+    now_unix_ms: u64,
+) -> Value {
+    let answer = put_on(directory, socket, said, now_unix_ms);
+    if answer.get("put_on").is_some() {
+        let _ = crate::task_news::answered(told_file, tasks, on_keys(directory));
+    }
+    answer
+}
+
 /// [`put_on`], waiting at most `wait` for the helper.
 pub fn put_on_within(
     directory: &Path,
@@ -1628,6 +1649,28 @@ light = { dim = 1 }
             again["error"], "no skill made here is waiting for a yes",
             "{again}"
         );
+    }
+
+    /// The whole of `put_on_made_skill` (El's P3 on #4261): a yes that puts
+    /// the skill on keeps its news as told, so its harness is closed; one
+    /// that puts nothing on keeps nothing.
+    #[test]
+    fn a_yes_that_puts_it_on_keeps_its_news_as_told() {
+        let dir = scratch("mk-told");
+        let made = dir.join("made");
+        two_kept(&made);
+        let told = dir.join("told");
+        let tasks = dir.join("no-tasks-part");
+        let socket = dir.join("manage.sock");
+        let nothing = put_on_told(&made, &socket, &tasks, &told, Some("Yes."), 1_000);
+        assert!(nothing.get("put_on").is_none(), "{nothing}");
+        assert!(!told.exists(), "no ask waiting: nothing told");
+        offered(&made, &"a".repeat(64), 1_000).unwrap();
+        let asked = helper(&socket, r#"{"done": "installed evening-dim"}"#);
+        let answer = put_on_told(&made, &socket, &tasks, &told, Some("Yes."), 2_000);
+        assert_eq!(answer["put_on"], "evening-dim", "{answer}");
+        asked.join().unwrap();
+        assert_eq!(fs::read_to_string(&told).unwrap(), "s1:7:1\n");
     }
 
     /// A yes not said out loud, or no ask waiting, asks the helper nothing;
