@@ -676,6 +676,19 @@ impl Standing {
     /// To start, each of the two must be found within this of the way
     /// between folded and stood up.
     pub const FOUND_SLACK: u16 = 80;
+    /// A sit-down for a strain whose joint is this close to where it was
+    /// when the stand began has not lifted at all (#4390): lamp-4ace's
+    /// elbow pushed to its 600 cap at 2048, one count off its fold, while
+    /// its goal rose to 2120.
+    pub const UNLIFTED_SLACK: u16 = 3;
+    /// After this many long rests begun by a stand that did not lift, it
+    /// tries no more until it is started again (#4390): an arm that cannot
+    /// lift does not strain every half hour for days.
+    pub const UNLIFTED_LONG_RESTS: u8 = 2;
+    /// After a sit-down for a strain, a folded arm is let go this long and
+    /// taken back where it lies (#4390), so it does not sit pushing into
+    /// its stop at 464 to 557 for hours.
+    pub const RELEASE: Duration = Duration::from_millis(100);
 
     /// `share` in percent, `seconds` for the whole way, `awake` in seconds.
     pub fn new(
@@ -1114,6 +1127,10 @@ pub struct Glimpse {
     /// health, so a body sat down for half an hour is seen, not only felt
     /// (lamp-4ace folded unseen from 20 to 24 Oct).
     pub resting_s: u16,
+    /// The arm joint that could not lift the lamp in
+    /// [`Standing::UNLIFTED_LONG_RESTS`] long rests' worth of tries: it stays
+    /// folded until started again (#4390). `None` while it may stand.
+    pub cannot_lift: Option<&'static str>,
     /// Under `Limits::refused_let_go`: the lamp is let go because a joint
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
@@ -1344,6 +1361,11 @@ pub struct BodyReport {
     pub torque_writes: u8,
     /// The joints found without torque that it took hold of.
     pub torque_given: Vec<&'static str>,
+    /// Times a folded arm was let go and taken back where it lay after a
+    /// sit-down for a strain (#4390).
+    pub arm_releases: u16,
+    /// The arm joint it gave up standing for (`Glimpse::cannot_lift`).
+    pub cannot_lift: Option<&'static str>,
     /// What waking did, if it had to.
     pub woke: Option<Woke>,
     /// Writes of the force limit, and the limit every joint it was written
@@ -3154,6 +3176,35 @@ fn let_go_at_end<P: PortIo, R: Runtime>(bus: &mut Bus<'_, P, R>, report: &mut Bo
     let _ = torque_off(bus, report, &mut Joint::ALL.to_vec());
 }
 
+/// A folded arm let go for [`Standing::RELEASE`] and taken back where it
+/// then lies (#4390): torque off to the shoulder and the elbow, a read, each
+/// goal set to its position, torque on. Folded, the arm is at its lowest and
+/// stays where it is let go, and a joint wedged against its stop stops
+/// pushing there. The read after, or the first failure.
+fn release_arm<P: PortIo, R: Runtime>(
+    bus: &mut Bus<'_, P, R>,
+    report: &mut BodyReport,
+) -> Result<[Sample; 5], String> {
+    let mut holding = ARM.to_vec();
+    if let Some(detail) = torque_off(bus, report, &mut holding) {
+        return Err(detail);
+    }
+    let due = bus.runtime.now() + Standing::RELEASE;
+    bus.sleep_until(due);
+    let now = bus.samples();
+    for joint in ARM {
+        // Torque comes back on whatever the read said: where it was told to
+        // go before, if the read failed.
+        if let Ok(now) = &now {
+            bus.write_goal(joint, now[joint.index()].position, true)?;
+        }
+        report.torque_writes = report.torque_writes.saturating_add(1);
+        bus.write_patiently(joint, &torque_write(joint, 1))?;
+    }
+    report.arm_releases = report.arm_releases.saturating_add(1);
+    now
+}
+
 /// What a let-go after the body stopped found and did (#3697,
 /// `lamp-body-measure let-go`): whether the lamp was down, whether every
 /// joint then read back let go, and each joint as it was read.
@@ -3930,6 +3981,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         own_ranges: None,
         torque_writes: 0,
         torque_given: Vec::new(),
+        arm_releases: 0,
+        cannot_lift: None,
         woke: None,
         force_writes: 0,
         force: None,
@@ -4825,6 +4878,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut retreats = 0u8;
     // When each retreat inside the last `Standing::RETREAT_WINDOW` was.
     let mut retreated_at: std::collections::VecDeque<Duration> = std::collections::VecDeque::new();
+    // #4390: where the arm was when the stand under way left its fold; long
+    // rests begun by a sit-down whose joint never moved off it; the joint it
+    // gave up standing for; and a sit-down whose folded arm is still to be
+    // let go once down.
+    let mut lift_from: Option<[u16; 2]> = None;
+    let mut unlifted_long_rests = 0u8;
+    let mut cannot_lift: Option<&'static str> = None;
+    let mut release_due = false;
     let mut arm_over = [0u8; 2];
     let mut arm_off = [0u8; 2];
     let mut arm_hot = [0u8; 2];
@@ -5386,11 +5447,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             let tired = tired_until.is_some_and(|until| now < until);
             let awake = awake_until.is_some_and(|until| now < until);
-            let wanted = if leaving.is_none() && awake && !tired && !unplug_latched {
-                up.share
-            } else {
-                0.0
-            };
+            let wanted =
+                if leaving.is_none() && awake && !tired && !unplug_latched && cannot_lift.is_none()
+                {
+                    up.share
+                } else {
+                    0.0
+                };
+            let was_folded = stand <= 0.0;
             awake_now = wanted > 0.0;
             if !blind {
                 let rate = 1.0 / up.seconds;
@@ -5402,6 +5466,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     stand = wanted;
                     stand_velocity = 0.0;
                 }
+            }
+            if was_folded && stand > 0.0 {
+                lift_from = report
+                    .last
+                    .map(|last| ARM.map(|joint| last[joint.index()].position));
             }
             if stand > 0.05 {
                 report.stood = true;
@@ -5420,6 +5489,27 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 && let Some(last) = report.last
             {
                 arm_rests = true;
+                // Down after a sit-down for a strain: let go a moment first,
+                // so it rests where it lies, not pushed into its stop.
+                let last = if release_due {
+                    release_due = false;
+                    match release_arm(bus, &mut report) {
+                        Ok(now) => {
+                            report.last = Some(now);
+                            arm_written = ARM.map(|joint| now[joint.index()].position);
+                            now
+                        }
+                        Err(detail) => {
+                            eprintln!(
+                                "lamp-body: step {}: letting the folded arm go after a strain failed: {detail}",
+                                report.steps
+                            );
+                            last
+                        }
+                    }
+                } else {
+                    last
+                };
                 // Its resting goal keeps torque on: where it reads, if that
                 // is within a step of the goal it had, or farther only while
                 // it pushes there (over `STALL_LOAD`) and came there without
@@ -6515,6 +6605,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
                 _ => 0,
             },
+            cannot_lift,
             waiting: None,
         };
         if !unplug_latched {
@@ -6646,6 +6737,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // goes back the way it came and rests there. Only an arm
                 // still strained or astray two seconds on ends the run.
                 let tired = tired_until.is_some_and(|until| now < until);
+                // Over its load where it was when the stand began: it never
+                // lifted (#4390).
+                let unlifted = arm_over[index] >= limits.load_steps.max(1)
+                    && lift_from.is_some_and(|from| {
+                        is.position.abs_diff(from[index]) <= Standing::UNLIFTED_SLACK
+                    });
+                if unlifted && stand > 0.0 {
+                    release_due = true;
+                }
                 if !tired && stand > 0.0 {
                     retreats = retreats.saturating_add(1);
                     retreated_at.retain(|at| now.saturating_sub(*at) < Standing::RETREAT_WINDOW);
@@ -6658,11 +6758,24 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
                 // A third retreat inside the window rests it long, and while
                 // still strained the rest is never shortened.
-                let rest = if retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED) {
+                let long = retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED);
+                let rest = if long {
                     Standing::LONG_REST
                 } else {
                     Standing::TIRED
                 };
+                // A long rest begun now, by a stand that never lifted.
+                if long && unlifted && !tired && stand > 0.0 && cannot_lift.is_none() {
+                    unlifted_long_rests = unlifted_long_rests.saturating_add(1);
+                    if unlifted_long_rests >= Standing::UNLIFTED_LONG_RESTS {
+                        cannot_lift = Some(joint.name());
+                        report.cannot_lift = cannot_lift;
+                        eprintln!(
+                            "lamp-body: step {}: {joint} pushed at its load bound without lifting, in {} long rests' tries: it stays folded until it is started again",
+                            report.steps, unlifted_long_rests
+                        );
+                    }
+                }
                 tired_until = Some(tired_until.map_or(now + rest, |until| until.max(now + rest)));
                 if arm_over[index] >= Standing::STUCK_STEPS {
                     surprise.get_or_insert(Stop::Load {
