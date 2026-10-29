@@ -19,6 +19,16 @@ impl CarryWindow {
         *self = Self::default();
     }
 
+    /// Whether nothing is kept: no conversation carried.
+    #[cfg(test)]
+    pub(super) fn is_clear(&self) -> bool {
+        self.first_request.is_none()
+            && self.answer.is_none()
+            && !self.used
+            && self.held_end.is_none()
+            && self.ends.is_empty()
+    }
+
     pub(super) fn begin(&mut self, request: u64) {
         self.clear();
         self.first_request = Some(request);

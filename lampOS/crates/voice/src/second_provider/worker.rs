@@ -5156,6 +5156,16 @@ struct BeforeLetOut {
     carry_window: carry_window::CarryWindow,
 }
 
+impl BeforeLetOut {
+    /// The carry ended after the let-out (a stop, a privacy change, a held
+    /// line's reset): a decline puts back only what its own let-out did, so
+    /// it does not bring the carry back (the Reviewer's P2 on #4417).
+    fn carry_ended(&mut self) {
+        self.carrying = false;
+        self.carry_window.clear();
+    }
+}
+
 /// How the room was as a line was judged, for a join on no sign of a
 /// second person ([`Heeding::same_speaker`], `LAMP_JOIN_CUT_WORDS`).
 #[derive(Clone, Copy, Debug)]
@@ -6815,6 +6825,9 @@ impl Heeding {
                 self.carrying = false;
                 self.carry_window.clear();
                 self.held_colleagues.clear();
+                if let Some(before) = self.before_let_out.as_mut() {
+                    before.carry_ended();
+                }
                 eprintln!(
                     "lamp-voice second: request {request}: no conversation is going on for it: request {late}'s voice, known after its answer, was another's"
                 );
@@ -6950,6 +6963,12 @@ impl Heeding {
         self.carrying = false;
         self.carry_window.clear();
         self.held_colleagues.clear();
+        // Nor brought back by a decline of a line let out before it
+        // (`LAMP_DECLINE_SILENT`).
+        if let Some(before) = self.before_let_out.as_mut() {
+            before.caller_faces.clear();
+            before.carry_ended();
+        }
         // The lines' speaking faces too, for a join (`Self::same_speaker`),
         // and how the room was.
         self.spoke.clear();
@@ -7058,6 +7077,9 @@ impl Heeding {
             self.carrying = false;
             self.carry_window.clear();
             self.held_colleagues.clear();
+            if let Some(before) = self.before_let_out.as_mut() {
+                before.carry_ended();
+            }
             eprintln!(
                 "lamp-voice second: request {request}: the one the lamp answered, turned away from it, talking to someone else ({heard}): not carried, and the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)"
             );
@@ -7134,6 +7156,9 @@ impl Heeding {
         } else {
             self.carry_window.clear();
             self.held_colleagues.clear();
+            if let Some(before) = self.before_let_out.as_mut() {
+                before.carry_ended();
+            }
             eprintln!(
                 "lamp-voice second: request {request}: {} lines in a row from someone else: the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)",
                 self.carry_others.len()
@@ -7231,12 +7256,16 @@ impl Heeding {
                     self.said_until_free_us = self.said_until_free_us.max(Some(until_us));
                 }
                 // Another answer's words count whatever becomes of the line
-                // let out last.
+                // let out last, in the carry's window too (the Reviewer's P3
+                // on #4417).
                 if let Some(before) = self
                     .before_let_out
                     .as_mut()
                     .filter(|before| before.request != request)
                 {
+                    if self.carries && before.carrying && !before.chain.contains(&request) {
+                        before.carry_window.answered(request, until_us);
+                    }
                     before.said_until_us = before.said_until_us.max(Some(until_us));
                     if !before.chain.contains(&request) {
                         before.said_until_free_us = before.said_until_free_us.max(Some(until_us));
@@ -7269,6 +7298,9 @@ impl Heeding {
                 self.carrying = false;
                 self.carry_window.clear();
                 self.held_colleagues.clear();
+                if let Some(before) = self.before_let_out.as_mut() {
+                    before.carry_ended();
+                }
             }
         }
     }
@@ -7738,6 +7770,9 @@ impl Heeding {
             self.carrying = false;
             self.carry_window.clear();
             self.held_colleagues.clear();
+            if let Some(before) = self.before_let_out.as_mut() {
+                before.carry_ended();
+            }
         }
         let carry = self.carries
             && self.carrying
@@ -8206,6 +8241,9 @@ impl Heeding {
         // turned away) keeps the caller's face for their next line.
         if !signs.going_on && !carry_stands {
             self.caller_faces.clear();
+            if let Some(before) = self.before_let_out.as_mut() {
+                before.caller_faces.clear();
+            }
         }
         // #1522 on this route (`LAMP_GOING_ON_ASKS`): what the Policy said of
         // the line is given before it is judged, and in a busy room a line
@@ -22207,6 +22245,120 @@ mod tests {
             heeding.lamp_did(Did::Declined(9));
             assert!(heeding.called_at.is_some(), "{on}: request 10's call");
         }
+    }
+
+    /// `LAMP_DECLINE_SILENT` (#3945): a line let out, then declined, puts
+    /// back only what its own let-out changed. What changed after it is
+    /// kept: a stop, a privacy change, a held line's reset, another answer's
+    /// words in the carry's window (the Reviewer's P2 and P3 on #4417).
+    fn declining(going_on: bool) -> (super::Heeding, super::Signs, (u64, u64)) {
+        let signs = super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.not_counting_own_answers();
+        heeding.declining_silently();
+        (heeding, signs, (1_000_000_000, 1_001_500_000))
+    }
+
+    #[test]
+    fn a_decline_does_not_bring_back_a_carry_stopped_after_its_let_out() {
+        use crate::second_provider::Did;
+        let (mut heeding, signs, line) = declining(false);
+        heeding.carrying_the_same_speaker();
+        heeding.carrying = true;
+        heeding.carry_window.begin(5);
+        heeding.lamp_did(Did::Said(5, 900_000_000));
+        assert_eq!(
+            heeding.judge(9, line, "Lamp, what time is it?", signs),
+            None
+        );
+        let before = heeding.before_let_out.as_ref().unwrap();
+        assert!(before.carrying && !before.carry_window.is_clear());
+        heeding.lamp_did(Did::Stopped);
+        heeding.lamp_did(Did::Declined(9));
+        assert!(!heeding.carrying, "the stop stands");
+        assert!(heeding.carry_window.is_clear(), "and its window with it");
+    }
+
+    #[test]
+    fn a_decline_does_not_bring_back_the_callers_faces_after_a_privacy_change() {
+        use crate::second_provider::Did;
+        // Let out while a conversation is going on, so the caller's faces
+        // are still there as the snapshot is taken (Reviewer-three on
+        // #4417: a line not going on clears them before it).
+        let (mut heeding, signs, line) = declining(true);
+        heeding.carrying_the_same_speaker();
+        heeding.carrying = true;
+        heeding.carry_window.begin(5);
+        heeding.lamp_did(Did::Said(5, 900_000_000));
+        heeding.caller_faces = vec!["face-1".to_owned()];
+        assert_eq!(
+            heeding.judge(9, line, "Lamp, what time is it?", signs),
+            None
+        );
+        let before = heeding.before_let_out.as_ref().unwrap();
+        assert_eq!(before.caller_faces, vec!["face-1".to_owned()]);
+        assert!(before.carrying && !before.carry_window.is_clear());
+        heeding.privacy_changed();
+        heeding.lamp_did(Did::Declined(9));
+        assert!(heeding.caller_faces.is_empty(), "no face outlives it");
+        assert!(!heeding.carrying, "no carry across it");
+        assert!(heeding.carry_window.is_clear(), "nor its window");
+    }
+
+    #[test]
+    fn a_held_lines_reset_after_a_let_out_stays_after_its_decline() {
+        use crate::second_provider::Did;
+        let (mut heeding, signs, line) = declining(false);
+        heeding.carrying_the_same_speaker();
+        heeding.carrying = true;
+        heeding.lamp_did(Did::Said(5, 900_000_000));
+        assert_eq!(
+            heeding.judge(9, line, "Lamp, what time is it?", signs),
+            None
+        );
+        assert!(heeding.before_let_out.as_ref().unwrap().carrying);
+        // Two held lines from someone else in a row end the carry; held,
+        // they take no snapshot of their own.
+        assert!(heeding.colleague_held(10));
+        assert!(!heeding.colleague_held(11));
+        assert!(!heeding.carrying);
+        heeding.lamp_did(Did::Declined(9));
+        assert!(!heeding.carrying, "the held lines' end of the carry stands");
+    }
+
+    #[test]
+    fn another_answer_while_carrying_is_kept_in_the_restored_carry_window() {
+        use crate::second_provider::Did;
+        const S: u64 = 1_000_000;
+        let (mut heeding, signs, line) = declining(false);
+        heeding.carrying_the_same_speaker();
+        heeding.carrying = true;
+        heeding.carry_window.begin(5);
+        heeding.lamp_did(Did::Said(5, 100 * S));
+        assert_eq!(
+            heeding.judge(9, line, "Lamp, what time is it?", signs),
+            None
+        );
+        assert!(heeding.before_let_out.as_ref().unwrap().carrying);
+        // An earlier request's answer ends at 200 s, after the let-out.
+        heeding.lamp_did(Did::Said(6, 200 * S));
+        heeding.lamp_did(Did::Declined(9));
+        assert!(heeding.carrying);
+        // A held line ending at 201 s extends the window from request 6's
+        // end (to 221 s); from request 5's it would end at 140 s.
+        heeding.carry_window.remember(7, 201 * S, 300 * S);
+        heeding.carry_window.held(7);
+        assert!(heeding.carry_window.extra_allows(205 * S));
     }
 
     /// lamp-52e6, 24 Oct 15:33: over the lamp's story, "Sorry, can you say
