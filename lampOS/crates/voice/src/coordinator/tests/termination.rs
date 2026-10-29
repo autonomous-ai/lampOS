@@ -1225,3 +1225,118 @@ fn a_frame_or_a_spoken_startup_marks_the_run_heard() {
     assert!(!muted(), "nothing spoke, no frame: released");
     let _ = fs::remove_dir_all(&directory);
 }
+
+/// lamp-06c1, 29 Oct, 08:33:16: an update's round stopped lamp-controls
+/// (16.238), the old voice's run closed on the switch it could no longer
+/// read (16.37), and the voice's own stop came half a second later (16.87),
+/// while it waited. The guard is released, the latch as it was, and the
+/// trace says so; the lamp no longer comes back muted with nobody told.
+#[test]
+fn an_unreadable_switch_then_the_stop_releases_the_guard() {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = std::env::temp_dir().join(format!("lv-unreadable-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let muted = || {
+        lamp_controls::mute::MuteRecord::load(&record, "test-hand-clock", monotonic_us())
+            .unwrap()
+            .muted
+    };
+    let mut controls =
+        Some(HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap());
+    controls.as_mut().unwrap().arm_active().unwrap();
+    controls.as_mut().unwrap().heard_audio();
+    assert!(muted(), "armed while the run listened");
+    // lamp-controls stops: the run closes on the switch, cleanup verified.
+    let closed: Result<()> = Err(service_privacy::unavailable("lamp-controls went away"));
+    note_unreadable_close(&closed, &mut controls);
+    assert!(muted(), "the run's close alone keeps the guard");
+    // Half a second later, while the service waits, the voice's own stop.
+    std::thread::sleep(Duration::from_millis(500));
+    let mut trace = SessionState::default();
+    released_after_unreadable_stop(Ok(()), &mut trace, Some("SIGTERM"), &mut controls).unwrap();
+    assert!(!muted(), "released: the latch as it was");
+    assert!(
+        trace
+            .iter()
+            .any(|row| row["kind"] == "guard_released_unreadable_then_stop"
+                && row["signal"] == "SIGTERM")
+    );
+    let _ = fs::remove_dir_all(&directory);
+}
+
+/// The same close keeps the guard without the stop's signal (the wait ended
+/// in a fault, or the voice exited on its own), with a press in flight or
+/// taken unsaved, after a run that ended any other way, and when the close's
+/// cleanup failed.
+#[test]
+fn an_unreadable_switch_keeps_the_guard_without_a_quiet_stop() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::atomic::Ordering;
+    let directory = std::env::temp_dir().join(format!("lv-unreadable-kept-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let muted = || {
+        lamp_controls::mute::MuteRecord::load(&record, "test-hand-clock", monotonic_us())
+            .unwrap()
+            .muted
+    };
+    let unreadable =
+        || -> Result<()> { Err(service_privacy::unavailable("lamp-controls went away")) };
+    let closed = |result: Result<()>| {
+        let mut controls = Some(
+            HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap(),
+        );
+        controls.as_mut().unwrap().arm_active().unwrap();
+        note_unreadable_close(&result, &mut controls);
+        controls
+    };
+    let stop = |controls: &mut Option<HandControls>, result: Result<()>, signal| {
+        let _ =
+            released_after_unreadable_stop(result, &mut SessionState::default(), signal, controls);
+    };
+
+    let mut controls = closed(unreadable());
+    stop(&mut controls, Ok(()), None);
+    assert!(muted(), "no signal: not the stop's");
+    stop(
+        &mut controls,
+        Err(io::Error::other("the wait failed").into()),
+        Some("SIGTERM"),
+    );
+    assert!(muted(), "the wait ended in a fault");
+
+    let mut controls = closed(unreadable());
+    controls
+        .as_ref()
+        .unwrap()
+        .queued_for_test()
+        .fetch_add(1, Ordering::AcqRel);
+    stop(&mut controls, Ok(()), Some("SIGTERM"));
+    assert!(muted(), "a press in flight keeps the guard");
+
+    let mut controls = closed(unreadable());
+    controls.as_mut().unwrap().set_dirty_for_test();
+    stop(&mut controls, Ok(()), Some("SIGTERM"));
+    assert!(muted(), "a press taken and unsaved keeps the guard");
+
+    let mut controls = closed(Err(io::Error::other("capture: a fault").into()));
+    stop(&mut controls, Ok(()), Some("SIGTERM"));
+    assert!(muted(), "another fault is not this rule's");
+
+    let mut controls = closed(service_privacy::finish(
+        unreadable(),
+        Err(io::Error::other("endpoint worker exit not confirmed")),
+    ));
+    stop(&mut controls, Ok(()), Some("SIGTERM"));
+    assert!(muted(), "a failed cleanup hides the switch's error");
+
+    // A later run that ends another way clears the close.
+    let mut controls = closed(unreadable());
+    note_unreadable_close(&Err(io::Error::other("a fault").into()), &mut controls);
+    stop(&mut controls, Ok(()), Some("SIGTERM"));
+    assert!(muted(), "the last run's close, not an earlier one's");
+    let _ = fs::remove_dir_all(&directory);
+}

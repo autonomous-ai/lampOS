@@ -418,6 +418,9 @@ pub struct HandControls {
     could_not_start: u32,
     /// The record was muted by the restart guard, not by the person.
     restored_after_fault: bool,
+    /// The last run closed, its cleanup verified, on a privacy switch that
+    /// could not be read ([`Self::closed_on_unreadable_switch`]).
+    closed_unreadable: bool,
     /// The late sleep window ([`Self::allow_late_sleep`]), given to the head
     /// pads' receiver once the first Controls state is applied.
     late_sleep: Option<LateSleep>,
@@ -901,6 +904,7 @@ impl HandControls {
             never_listened: false,
             could_not_start: 0,
             restored_after_fault: false,
+            closed_unreadable: false,
             late_sleep: None,
             sleep_asked: false,
             polled_at: None,
@@ -1484,6 +1488,27 @@ impl HandControls {
         }
         self.armed = true;
         Ok(())
+    }
+
+    /// Whether the last run closed, its cleanup verified, on a privacy switch
+    /// that could not be read, set for each run as it ends: a run that ends
+    /// any other way, or a cycle refused before its run, says false.
+    pub fn closed_on_unreadable_switch(&mut self, closed: bool) {
+        self.closed_unreadable = closed;
+    }
+
+    /// The guard released when the service stops while it waits after a run
+    /// that closed on an unreadable switch, as the latch was, only with
+    /// nothing in flight (as [`Self::release_if_still_quiet`]). An update
+    /// restarts lamp-controls before the voice, so the old voice reads the
+    /// switch as gone half a second before its own stop (lamp-06c1, 29 Oct,
+    /// 08:33:16): that is the stop's, not a crash. The switch is read again
+    /// at every start. Whether it released.
+    pub fn release_after_unreadable_stop(&mut self) -> io::Result<bool> {
+        if !self.closed_unreadable || !self.armed || self.persistence_failed {
+            return Ok(false);
+        }
+        self.release_if_still_quiet()
     }
 
     /// This run's capture has delivered audio: from now on a fault keeps the

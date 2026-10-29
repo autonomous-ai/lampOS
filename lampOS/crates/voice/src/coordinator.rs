@@ -2942,7 +2942,7 @@ fn run_source(
             ) {
                 eprintln!("{line}");
             }
-            service::supervise(
+            let supervised = service::supervise(
                 &mut trace,
                 &mut cues,
                 termination,
@@ -3014,6 +3014,12 @@ fn run_source(
                         &mut reminders.borrow_mut(),
                     )
                 },
+            );
+            released_after_unreadable_stop(
+                supervised,
+                &mut trace,
+                termination.signal_name(),
+                &mut controls.borrow_mut(),
             )
         } else {
             run_inner(
@@ -4421,7 +4427,63 @@ fn run_inner(
         controls,
         reminders,
     );
+    note_unreadable_close(&result, controls);
     released_if_never_listened(result, trace, controls)
+}
+
+/// Whether this run closed on an unreadable privacy switch, kept for the
+/// service's stop ([`released_after_unreadable_stop`]). A failed cleanup is
+/// never this: [`service_privacy::finish`] hides the switch's error.
+fn note_unreadable_close(result: &Result<()>, controls: &mut Option<HandControls>) {
+    if let Some(controls) = controls.as_mut() {
+        let unreadable = result
+            .as_ref()
+            .err()
+            .is_some_and(|error| service_privacy::is_unavailable(&**error));
+        controls.closed_on_unreadable_switch(unreadable);
+    }
+}
+
+/// The service stopped by its signal while it waited, after a run that
+/// closed on an unreadable privacy switch: the guard is released, the latch
+/// written as it was, with no control input in flight, and said once. An
+/// update's round restarts lamp-controls before the voice, so the old voice
+/// loses the switch half a second before its own stop (lamp-06c1, 29 Oct,
+/// 08:33:16.238 controls stopped, 16.37 the switch unreadable, 16.87 the
+/// voice's stop), and the lamp came back muted with nobody told. A wait that
+/// ends without a signal, or a press in flight, keeps the guard.
+fn released_after_unreadable_stop(
+    result: Result<()>,
+    trace: &mut SessionState,
+    signal: Option<&str>,
+    controls: &mut Option<HandControls>,
+) -> Result<()> {
+    if result.is_err() || signal.is_none() {
+        return result;
+    }
+    let Some(controls) = controls.as_mut() else {
+        return result;
+    };
+    match controls.release_after_unreadable_stop() {
+        Ok(true) => {
+            eprintln!(
+                "lamp-voice: the run closed on an unreadable privacy switch before {}; the mute is kept as it was, not restored muted",
+                signal.unwrap_or("the stop")
+            );
+            // The service's result is returned as it was, even if this write fails.
+            let _ = record(
+                trace,
+                json!({"kind":"guard_released_unreadable_then_stop","at_us":monotonic_us(),"signal":signal}),
+            );
+        }
+        Ok(false) => {}
+        Err(release) => {
+            eprintln!(
+                "lamp-voice: the run closed on an unreadable privacy switch, and the guard could not be released: {release}"
+            );
+        }
+    }
+    result
 }
 
 /// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, B): a run that ended in a
