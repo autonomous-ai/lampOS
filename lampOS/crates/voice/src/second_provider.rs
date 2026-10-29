@@ -3858,9 +3858,19 @@ impl Engine {
                                 0,
                             ));
                         }
-                        // The line began with the sound carried: the name
-                        // heard in it is this line's.
-                        if let Ok(mut said) = said.lock() {
+                        // The line began with the sound carried when the
+                        // name was in it: the name heard there is this
+                        // line's. Sound carried with no name heard in it
+                        // leaves the line dated from its own first sound,
+                        // or a name said at its start reads as said seconds
+                        // into it, `said_from` being when the held line
+                        // began, not its last 1.5 s (#4226). A name in that
+                        // sound still calls the lamp by the words it gives,
+                        // and its hearing, come late, counts from up to
+                        // `attention::NAME_BEFORE_US` before the line.
+                        if (name_words.is_some() || name_heard)
+                            && let Ok(mut said) = said.lock()
+                        {
                             *said = (kept.said_from, kept.said_from);
                         }
                         KeptSound {

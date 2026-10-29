@@ -7705,7 +7705,9 @@ impl Heeding {
         let name_first_ms = signs
             .names
             .iter()
-            .filter(|(at, _)| at.saturating_add(crate::attention::NAME_BEFORE_US) >= began_us)
+            .filter(|(at, _)| {
+                at.saturating_add(crate::attention::NAME_BEFORE_US) >= began_us && *at <= ended_us
+            })
             .map(|(at, _)| (*at as i64 - began_us as i64) / 1_000)
             .min();
         for (at_us, score) in signs.names {

@@ -899,3 +899,34 @@ async fn a_line_said_by_the_name_never_goes_on_from_talk_before_the_name() {
         Some(&Message::user("Lamp. what's on my calendar?"))
     );
 }
+
+/// #4226 (busy_cook's c11 on lamp-4ace, played again on lamp-c0a4 on 29
+/// Oct): a short sound held with no words, then "Lamp, I want to cook
+/// something new this weekend." 1 s after it. The held sound goes first in
+/// the line's stream, but the line is judged from its own first sound: the
+/// name said at its start is at its start, not seconds into it from when
+/// the held sound began.
+#[tokio::test(start_paused = true)]
+async fn a_sound_carried_with_no_name_leaves_the_line_dated_from_its_own_start() {
+    let played = script(&["", "Lamp, I want to cook something new this weekend."]);
+    let judged = Judged::default();
+    let (mut engine, now) = lamp(&played, true, &judged);
+    say_the_name(&mut engine, false, true);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    say_after(&mut engine, &now, Duration::from_millis(1_000)).await;
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the line after's turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request: 2, .. }) {
+            break;
+        }
+    }
+    let windows = judged.lock().unwrap().clone();
+    let (_, window, words) = windows
+        .iter()
+        .find(|(request, _, _)| *request == 2)
+        .expect("the line after is judged");
+    assert_eq!(words, "Lamp, I want to cook something new this weekend.");
+    assert_eq!(window.0, NAME_READ_US + 1_000_000, "{windows:?}");
+}
