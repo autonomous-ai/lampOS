@@ -346,12 +346,18 @@ other shipped re-offer matches its former invitation.
 With `LAMP_SECOND_REFUSED_HOLD=on`, while the model service refuses the
 lamp's turns (failure-notices.md, "The model service refusing"), the walk
 begins nothing while turns are held and the step being led is not failed.
-Once a minute the hold lifts and the walk goes on by itself: its own
-re-offer is the try, so the person is never left in silence and setup
-resumes when the service answers, nobody having to speak first. A step that
-would end `failed` or `not_available` meanwhile is kept as `later` instead,
-with one journal line; a `later` re-offer cut that way gets its count back,
-and is offered again by the `later` rules above. Off unless set.
+Once a minute the hold lifts and the walk goes on by itself. A step offered
+as an invitation (privacy, how_you_sound, where_you_sit's opener) is
+re-offered then, that invitation being the minute's try, and the model's
+answer to it ends the refusal; only a line said in its own words on a failed
+chat (#4263, `OwnWordsSaid`) does not. A step asked as a note (who_you_are,
+preferences, touch, where_you_sit's ask) is asked again only after
+`STEP_GIVE_UP_US` (90 s) and quiet, `MOST_UNSAID` (two) times at most. A step
+that would end `failed` or `not_available` meanwhile is kept as `later`
+instead, with one journal line, and offered again only after the skill's
+`later_after_s` (30 minutes): a long refusal leaves setup's steps `later`. A
+`later` re-offer cut that way gets its count back, and is offered again by
+the `later` rules above. Off unless set.
 
 ## Why a step is not_available
 

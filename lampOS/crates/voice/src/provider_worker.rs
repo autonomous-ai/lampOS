@@ -1033,6 +1033,14 @@ pub enum ProviderOutput {
     StepCallHeard {
         request: u64,
     },
+    /// An onboarding fixed line's own words were said for `request`, its
+    /// chat having failed or not begun in time (#4263): its
+    /// `GenerationComplete` is no answer of the model's, so it ends no
+    /// refusal (the Reviewer-lead's P2 on #4279). Sent before it; nothing is
+    /// asked or answered.
+    OwnWordsSaid {
+        request: u64,
+    },
     /// The second route's times for `request` (19 Oct: an A/B is scored on
     /// each request's first answer audio, never a wait cue), sent once,
     /// before its `TurnComplete` or `TurnFailed`, for every request: in
@@ -1415,6 +1423,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
+        | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };
