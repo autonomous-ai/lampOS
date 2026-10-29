@@ -3541,8 +3541,9 @@ fn service_speaker_control(
                 let current = reply.as_ref().is_some_and(|r| r.owner == old);
                 handle_playback_discard(owner, reply, trace, event)?;
                 // #1178: the current answer's speech dropped as the
-                // speaker's authority lapsed: cut by the caller.
-                if current && reason == PlaybackDiscardReason::ExpiredState {
+                // speaker's authority lapsed, or (#3697) it underran: cut by
+                // the caller.
+                if current && cuts_only_the_answer(reason) {
                     *lapsed = Some(old);
                 }
             }
@@ -15051,10 +15052,11 @@ fn handle_playback_discard(
     if queued_frames == 0 || queued_frames > lamp_audio::ownership::MAX_QUEUED_FRAMES {
         return Err(io::Error::other("invalid playback discard frame count").into());
     }
-    // #1178: the speaker's authority lapsed while it was held up, and what
-    // it had queued is gone. That costs the answer (cut by the caller if it
-    // is the current one), never the voice (the reviewer on #1214).
-    let lapsed = reason == PlaybackDiscardReason::ExpiredState;
+    // #1178: the speaker's authority lapsed while it was held up, or (#3697)
+    // it underran, and what it had queued is gone. That costs the answer (cut
+    // by the caller if it is the current one), never the voice (the reviewer
+    // on #1214).
+    let lapsed = cuts_only_the_answer(reason);
     let expected = (reason == PlaybackDiscardReason::StaleOwner || lapsed)
         && !other_owners
         && reply
@@ -15081,6 +15083,15 @@ fn handle_playback_discard(
     .into())
 }
 
+/// A speaker discard that costs the answer, never the voice: its authority
+/// lapsed while it was held up (#1178), or it underran (#3697).
+fn cuts_only_the_answer(reason: PlaybackDiscardReason) -> bool {
+    matches!(
+        reason,
+        PlaybackDiscardReason::ExpiredState | PlaybackDiscardReason::Underran
+    )
+}
+
 /// Why a reply is cut when the speaker's authority lapsed (#1178).
 const SPEAKER_LAPSED: &str = "speaker_lapsed";
 
@@ -15101,7 +15112,7 @@ fn cut_after_speaker_lapse<T>(
         return Ok(false);
     }
     eprintln!(
-        "lamp-voice: the speaker's authority lapsed while it was held up; its answer is cut, the voice goes on"
+        "lamp-voice: the speaker was held up (its authority lapsed, or it underran); its answer is cut, the voice goes on"
     );
     cancel_reply(owner, reply, trace, SPEAKER_LAPSED)?;
     provider_queue.clear();
@@ -17492,6 +17503,40 @@ mod tests {
         // The enclosing failure path cannot append a second or successful result.
         cancel_reply(&mut owner, &mut reply, &mut trace, "runtime_failed").unwrap();
         assert_eq!(trace.len(), 2);
+    }
+
+    /// #3697: the speaker underran mid-answer, held up past its 40 ms queue.
+    /// Its speech is gone, as after a lapse (#1178): the answer is cut, and
+    /// the voice goes on.
+    #[test]
+    fn an_underrun_mid_answer_cuts_the_answer_and_the_voice_goes_on() {
+        let (mut owner, current, _) = active_reply();
+        let affected = current.owner;
+        let mut reply = Some(current);
+        let mut trace = SessionState::default();
+        let event = discarded(affected, PlaybackDiscardReason::Underran, false);
+        let bytes = crate::wire::encode(&event).unwrap();
+        let event = crate::wire::decode(&bytes).unwrap();
+        handle_playback_discard(&mut owner, &mut reply, &mut trace, event).unwrap();
+        assert_eq!(trace[0]["reason"], "underran");
+        assert_eq!(trace[0]["lapsed"], true);
+        assert!(reply.is_some(), "the caller cuts it");
+        let mut provider_queue = VecDeque::from([1_u8, 2]);
+        let mut speaker_pending = None;
+        assert!(
+            cut_after_speaker_lapse(
+                affected,
+                &mut owner,
+                &mut reply,
+                &mut provider_queue,
+                &mut speaker_pending,
+                &mut trace,
+            )
+            .unwrap()
+        );
+        assert!(reply.is_none());
+        assert!(provider_queue.is_empty(), "nothing queued for it is said");
+        assert!(owner.snapshot(now()).unwrap().owner().is_none());
     }
 
     #[test]

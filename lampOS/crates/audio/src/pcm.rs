@@ -24,17 +24,27 @@ use std::{fmt, io};
 /// 40 ms maximum negotiated PCM queue plus 60 ms scheduling/device margin.
 const MAX_FINISH_US: u64 = 100_000;
 
-/// The speaker underran with only zeros queued (#3697): ALSA's EPIPE outside
-/// a declared drain, within the budget of `crate::underrun`. The device was
-/// stopped as by `stop`, its discard counted, and the guard kept, so the
-/// worker reports the reset and primes again; nothing said was queued.
+/// The speaker underran (#3697): ALSA's EPIPE outside a declared drain,
+/// within the budget of `crate::underrun`. The device was stopped as by
+/// `stop`, its discard counted, and the guard kept, so the worker reports the
+/// reset and primes again. Speech it had queued is in `take_underran`.
 #[derive(Debug)]
 pub struct Underrun;
 
 impl fmt::Display for Underrun {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("the speaker underran with only zeros queued; stopped to prime again")
+        f.write_str("the speaker underran; stopped to prime again")
     }
+}
+
+/// Speech an underrun discarded (#3697): its oldest owner, as an ownership
+/// failure names it, and the frames dropped with it. Never written again:
+/// the answer is cut, as after a lapse (#1178), and the voice goes on.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UnderranSpeech {
+    pub owner: lamp_turn_owner::TurnOwner,
+    pub queued_frames: usize,
+    pub other_owners: bool,
 }
 
 impl std::error::Error for Underrun {}
@@ -81,6 +91,7 @@ pub struct Speaker {
     clock_started: bool,
     last_discard: Option<QueuedRange>,
     underruns: UnderrunBudget,
+    underran: Option<UnderranSpeech>,
     #[cfg(test)]
     post_write_check_at: Option<MonoTime>,
     // The software null sink never underruns; tests inject ALSA's errno.
@@ -157,6 +168,7 @@ impl Speaker {
             clock_started: false,
             last_discard: None,
             underruns: UnderrunBudget::default(),
+            underran: None,
             #[cfg(test)]
             post_write_check_at: None,
             #[cfg(test)]
@@ -349,6 +361,7 @@ impl Speaker {
         if !self.clock_mode
             || self.clock_started
             || self.discarded.is_some()
+            || self.underran.is_some()
             || self.pending.pending_speech_frames() != 0
             || self.pending.pending_frames() != RENDER_SAMPLES * 2
         {
@@ -673,22 +686,34 @@ impl Speaker {
         Ok(())
     }
 
-    /// An ALSA error outside a declared drain. #3697: an underrun (EPIPE) with
-    /// only zeros queued is a held-up worker, never the voice (on lamp-52e6,
-    /// 0.39 s into a start as the models loaded): discard and prepare as
-    /// `stop` does, keep the guard, and return `Underrun` for the worker to
-    /// report and prime again. Queued speech, a retiring tail, an unreported
-    /// discard, a disconnect or suspend (ENODEV, EBADFD, ESTRPIPE), or more
-    /// underruns than `crate::underrun` allows latch the guard closed.
+    /// An ALSA error outside a declared drain. #3697: an underrun (EPIPE) is a
+    /// held-up worker, never the voice (on lamp-52e6, 0.39 s into a start as
+    /// the models loaded): discard and prepare as `stop` does, keep the guard,
+    /// and return `Underrun` for the worker to report and prime again. Speech
+    /// it had queued is kept as `take_underran`'s receipt, never written again.
+    /// A retiring tail, an unreported discard or underrun receipt, a
+    /// disconnect or suspend (ENODEV, EBADFD, ESTRPIPE), or more underruns
+    /// than `crate::underrun` allows latch the guard closed.
     fn discontinuity(&mut self, error: alsa::Error) -> Box<dyn std::error::Error + Send + Sync> {
         if error.errno() == rustix::io::Errno::PIPE.raw_os_error()
-            && self.pending.pending_speech_frames() == 0
             && !self.pending.is_retiring_tail()
             && self.discarded.is_none()
+            && self.underran.is_none()
             && self.underruns.admit(monotonic_us())
         {
+            let speech = self
+                .pending
+                .speech_owner()
+                .map(|(owner, other_owners)| UnderranSpeech {
+                    owner,
+                    queued_frames: self.pending.pending_frames(),
+                    other_owners,
+                });
             return match self.stop() {
-                Ok(()) => Underrun.into(),
+                Ok(()) => {
+                    self.underran = speech;
+                    Underrun.into()
+                }
                 Err(stop) => stop,
             };
         }
@@ -717,6 +742,15 @@ impl Speaker {
     /// the reporting channel is a worker fault, never permission to hide a loss.
     pub fn take_discard(&mut self) -> Option<OwnershipFailure> {
         self.discarded.take()
+    }
+
+    /// Speech the last underrun discarded, until reported (#3697).
+    pub fn underran(&self) -> Option<UnderranSpeech> {
+        self.underran
+    }
+
+    pub fn take_underran(&mut self) -> Option<UnderranSpeech> {
+        self.underran.take()
     }
 
     pub fn last_poll(&self) -> Option<PlaybackStatus> {
@@ -1115,8 +1149,9 @@ mod underrun_tests {
         }
     }
 
-    #[test]
-    fn an_underrun_with_speech_queued_is_still_a_fault() {
+    /// A started clock with 240 frames of `owner`'s speech queued: an answer
+    /// under way when the worker is held up.
+    fn speaking() -> (Speaker, Controller, lamp_turn_owner::TurnOwner) {
         let (mut speaker, mut controller) = started_clock();
         let owner = controller.admit(now(), AdmittedInput::NewTurn).unwrap();
         controller.input_ended(now(), owner).unwrap();
@@ -1130,6 +1165,41 @@ mod underrun_tests {
         let token = speaker.zero_authority().unwrap();
         // Inject queued ownership for the null-sink model, not real hardware PCM.
         speaker.pending.push_clock(permit, token, 240).unwrap();
+        (speaker, controller, owner)
+    }
+
+    #[test]
+    fn an_underrun_mid_answer_drops_its_speech_keeps_the_guard_and_primes_again() {
+        let (mut speaker, _controller, owner) = speaking();
+        let queued = speaker.pending.pending_frames();
+        let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
+        assert!(error.downcast_ref::<Underrun>().is_some(), "{error}");
+        assert_eq!(
+            speaker.underran(),
+            Some(UnderranSpeech {
+                owner,
+                queued_frames: queued,
+                other_owners: false,
+            })
+        );
+        // Nothing it said is left to replay, and nothing starts before the
+        // receipt is reported.
+        assert_eq!(speaker.pending.pending_speech_frames(), 0);
+        let token = speaker.zero_authority().unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        assert!(speaker.start_clock(token).is_err());
+        assert!(speaker.take_underran().is_some());
+        // The guard is kept: the same authority starts the clock again.
+        speaker.start_clock(token).unwrap();
+        assert!(speaker.clock_started());
+    }
+
+    #[test]
+    fn an_underrun_before_the_last_ones_receipt_is_reported_is_a_fault() {
+        let (mut speaker, _controller, _owner) = speaking();
+        let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
+        assert!(error.downcast_ref::<Underrun>().is_some(), "{error}");
         let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
         assert!(error.downcast_ref::<Underrun>().is_none(), "{error}");
         assert!(speaker.zero_authority().is_err(), "the guard is closed");
