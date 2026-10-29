@@ -35,6 +35,24 @@ struct Second {
     began_us: u64,
     written: u32,
     left_out: u32,
+    /// The last command's line, less its ms: the same again within the
+    /// second is counted, not written ([`Journal::command`]).
+    last: Option<String>,
+    again: u32,
+}
+
+impl Second {
+    /// "…, again N times" for the command repeated since its line, if it
+    /// was; the run is over.
+    fn repeated(&mut self) -> Option<String> {
+        let again = std::mem::take(&mut self.again);
+        let last = self.last.take()?;
+        match again {
+            0 => None,
+            1 => Some(format!("{last}, again once")),
+            again => Some(format!("{last}, again {again} times")),
+        }
+    }
 }
 
 /// Where the door's lines go: the journal, through stderr, or a test's
@@ -76,22 +94,65 @@ impl Journal {
     }
 
     /// `text` about `client` (its id, or [`NOBODY`]), within its second's
-    /// bound.
+    /// bound. A command repeated just before it is said first.
     pub fn line(&mut self, client: &str, now_us: u64, text: &str) {
-        let second = self.seconds.entry(client.to_owned()).or_default();
-        if now_us.saturating_sub(second.began_us) >= 1_000_000 {
-            let left_out = second.left_out;
-            *second = Second {
-                began_us: now_us,
-                ..Second::default()
-            };
-            if left_out > 0 {
-                (self.write)(&format!(
-                    "lamp-control: {client}: {left_out} more not logged"
-                ));
-            }
+        self.roll(client, now_us);
+        if let Some(repeated) = self.second(client).repeated() {
+            self.put(client, &repeated);
         }
-        let second = self.seconds.get_mut(client).expect("kept above");
+        self.put(client, text);
+    }
+
+    /// A command's line, `head` without its time and `ms` the time it took.
+    /// The same command with the same answer as the one just before, within
+    /// the computer's second, is counted, not written: one line says how
+    /// many when the run ends, at another line, the second's end or the
+    /// door's tick (Fourth's P3 on #4245: a dashboard polling `get` wrote
+    /// the whole 10 lines a second). Every command is still told.
+    pub fn command(&mut self, client: &str, now_us: u64, head: &str, ms: f64) {
+        self.roll(client, now_us);
+        let second = self.second(client);
+        if second.last.as_deref() == Some(head) {
+            second.again += 1;
+            return;
+        }
+        if let Some(repeated) = second.repeated() {
+            self.put(client, &repeated);
+        }
+        self.put(client, &format!("{head}, {ms:.1} ms"));
+        self.second(client).last = Some(head.to_owned());
+    }
+
+    fn second(&mut self, client: &str) -> &mut Second {
+        self.seconds.entry(client.to_owned()).or_default()
+    }
+
+    /// Ends `client`'s second if it is over: its repeats and the lines left
+    /// out are said, and the next second begins now.
+    fn roll(&mut self, client: &str, now_us: u64) {
+        let second = self.second(client);
+        if now_us.saturating_sub(second.began_us) < 1_000_000 {
+            return;
+        }
+        let repeated = second.repeated();
+        let left_out = second.left_out;
+        *second = Second {
+            began_us: now_us,
+            ..Second::default()
+        };
+        if let Some(repeated) = repeated {
+            (self.write)(&format!("lamp-control: {repeated}"));
+        }
+        if left_out > 0 {
+            (self.write)(&format!(
+                "lamp-control: {client}: {left_out} more not logged"
+            ));
+        }
+    }
+
+    /// One line, within the second's bound.
+    fn put(&mut self, client: &str, text: &str) {
+        let second = self.second(client);
         if second.written >= MOST_A_SECOND {
             second.left_out += 1;
             return;
@@ -104,13 +165,20 @@ impl Journal {
     /// out has them said now, so a burst followed by silence still says so.
     pub fn tick(&mut self, now_us: u64) {
         for (client, second) in &mut self.seconds {
-            if second.left_out > 0 && now_us.saturating_sub(second.began_us) >= 1_000_000 {
+            let over = now_us.saturating_sub(second.began_us) >= 1_000_000;
+            if !over || (second.left_out == 0 && second.again == 0) {
+                continue;
+            }
+            if let Some(repeated) = second.repeated() {
+                (self.write)(&format!("lamp-control: {repeated}"));
+            }
+            if second.left_out > 0 {
                 (self.write)(&format!(
                     "lamp-control: {client}: {} more not logged",
                     second.left_out
                 ));
-                *second = Second::default();
             }
+            *second = Second::default();
         }
     }
 
@@ -290,6 +358,76 @@ mod tests {
         assert_eq!(lines[10], "lamp-control: theirs");
         assert_eq!(lines[11], "lamp-control: c_1: 4 more not logged");
         assert_eq!(lines[12], "lamp-control: next second");
+        assert_eq!(lines.len(), 13);
+    }
+
+    /// Fourth's P3 on #4245: a computer polling `get` 20 times a second
+    /// wrote the whole 10 lines a second. The same command with the same
+    /// answer, within the second, is one line and then how many again.
+    #[test]
+    fn the_same_command_again_within_a_second_is_counted_not_written() {
+        let (mut journal, lines) = kept();
+        let get = "c_1 (lab-mac): get (presence): ok, to the door";
+        for n in 0..20 {
+            journal.command("c_1", 5_000_000 + n * 50_000, get, 0.1);
+        }
+        assert_eq!(lines.lock().unwrap().len(), 1, "the first only, so far");
+        // The second's end says the run, at the tick or the next line.
+        journal.tick(6_000_000);
+        {
+            let lines = lines.lock().unwrap();
+            assert_eq!(lines[0], format!("lamp-control: {get}, 0.1 ms"));
+            assert_eq!(lines[1], format!("lamp-control: {get}, again 19 times"));
+            assert_eq!(lines.len(), 2);
+        }
+        // Another command, or another answer, ends a run at once.
+        let refused = "c_1 (lab-mac): get (presence): refused: rate";
+        journal.command("c_1", 7_000_000, get, 0.1);
+        journal.command("c_1", 7_010_000, get, 0.1);
+        journal.command("c_1", 7_020_000, refused, 0.0);
+        journal.line("c_1", 7_030_000, "c_1 (lab-mac): event touch sent");
+        let lines = lines.lock().unwrap();
+        assert_eq!(lines[2], format!("lamp-control: {get}, 0.1 ms"));
+        assert_eq!(lines[3], format!("lamp-control: {get}, again once"));
+        assert_eq!(lines[4], format!("lamp-control: {refused}, 0.0 ms"));
+        assert_eq!(lines[5], "lamp-control: c_1 (lab-mac): event touch sent");
+        assert_eq!(lines.len(), 6);
+    }
+
+    /// Different commands are each written, within the bound as before, and
+    /// a run cut by the second's turn is said as the next second begins.
+    #[test]
+    fn different_commands_are_each_written_and_a_run_is_told_at_the_seconds_turn() {
+        let (mut journal, lines) = kept();
+        for n in 0..12 {
+            journal.command(
+                "c_1",
+                5_000_000 + n,
+                &format!("c_1: gesture (g{n}): ok"),
+                0.0,
+            );
+        }
+        assert_eq!(lines.lock().unwrap().len(), 10);
+        journal.command("c_1", 5_500_000, "c_1: stop: ok, to the door", 0.0);
+        journal.command("c_1", 5_600_000, "c_1: stop: ok, to the door", 0.0);
+        journal.command(
+            "c_1",
+            6_000_000,
+            "c_1: light (warm, level 3, steady, for_ms 10000): ok",
+            0.2,
+        );
+        let lines = lines.lock().unwrap();
+        // The stop's first line was past the bound; its repeat is told at
+        // the turn, then the lines left out.
+        assert_eq!(
+            lines[10],
+            "lamp-control: c_1: stop: ok, to the door, again once"
+        );
+        assert_eq!(lines[11], "lamp-control: c_1: 3 more not logged");
+        assert_eq!(
+            lines[12],
+            "lamp-control: c_1: light (warm, level 3, steady, for_ms 10000): ok, 0.2 ms"
+        );
         assert_eq!(lines.len(), 13);
     }
 
