@@ -211,9 +211,13 @@ class Following:
     answers `{"to": "body", "follow": "hand"}` and says no `done`, so
     `ended` is told here: `{"how": "finished", "why": "stopped"}`, or
     `{"how": "cut_short", "why": "stop" | "another look" | the lease's why}`.
-    Where the hand is comes as `hand` events (`lamp.on("hand", ...)`):
-    `seen` with `x`, `y`, `size`, `open`, `confidence`, and `seen: false`
-    once it's gone. Needs the `body` and `look` grants."""
+    The client's `stop` lets go of its lease too. After another look the
+    lease stays held, since that look runs under it, and the lamp's own life
+    stands back until `stop()` or the block ends; a new `follow_hand()` lets
+    go of it first. Where the hand is comes as `hand` events
+    (`lamp.on("hand", ...)`): `seen` with `x`, `y`, `size`, `open`,
+    `confidence`, and `seen: false` once it's gone. Needs the `body` and
+    `look` grants."""
 
     def __init__(self, lamp: "Lamp", for_ms: int, why: str | None):
         self.lamp = lamp
@@ -221,6 +225,12 @@ class Following:
         self.ended: asyncio.Future = asyncio.get_running_loop().create_future()
 
     async def start(self) -> "Following":
+        # One following a connection: the one before it ends, and its lease
+        # is let go, or this one's take would be refused `busy`.
+        before = self.lamp._following
+        if before is not None:
+            before.end("cut_short", "another look")
+            await before._end()
         await self.lease.take()
         self.lamp.on("lease", self._lease_event)
         try:
@@ -234,17 +244,13 @@ class Following:
             await self._end()
             raise errors.BY_CODE["refused"]("this lamp doesn't follow a hand yet")
         # Another look or a stop from this client ends it (`Lamp.look`,
-        # `Lamp.stop`); one following a connection.
-        if self.lamp._following is not None:
-            self.lamp._following.end("cut_short", "another look")
+        # `Lamp.stop`).
         self.lamp._following = self
         return self
 
     def end(self, how: str, why: str | None) -> None:
         if not self.ended.done():
             self.ended.set_result({"how": how, "why": why})
-        if self.lamp._following is self:
-            self.lamp._following = None
 
     def _lease_event(self, event: dict) -> None:
         if event.get("lease") == self.lease.id and event.get("state") == "lost":
@@ -267,6 +273,10 @@ class Following:
         return self.ended.result()
 
     async def _end(self) -> None:
+        # The lamp keeps it while its lease is held, so a new following can
+        # let go of it.
+        if self.lamp._following is self:
+            self.lamp._following = None
         self.lamp.off("lease", self._lease_event)
         await self.lease.release()
 
@@ -645,6 +655,9 @@ class Lamp:
     async def stop(self) -> dict:
         reply = await self._act("stop", False)
         if self._following is not None:
-            self._following.end("cut_short", "stop")
+            # A stop ends what this client asked for; its lease goes too.
+            following = self._following
+            following.end("cut_short", "stop")
+            await following._end()
         return reply
 

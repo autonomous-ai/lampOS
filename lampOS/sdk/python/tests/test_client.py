@@ -1140,6 +1140,8 @@ def test_follow_hand_stops_when_asked_at_a_stop_or_when_the_lamp_takes_the_body_
                 following = await lamp.follow_hand().start()
                 await lamp.stop()
                 assert (await following.wait())["why"] == "stop"
+                # The client's stop lets go of its lease too.
+                assert fake.leases == {} and not following.lease.held
                 await following.stop()
                 following = await lamp.follow_hand().start()
                 await fake.lose_lease(following.lease.id, "hand")
@@ -1147,6 +1149,29 @@ def test_follow_hand_stops_when_asked_at_a_stop_or_when_the_lamp_takes_the_body_
                 assert (ended["how"], ended["why"]) == ("cut_short", "hand")
                 await following.stop()
                 assert fake.asked("lease.release") == [{"lease": "l_1"}, {"lease": "l_2"}]
+
+    run(go())
+
+
+def test_follow_hand_keeps_its_lease_after_another_look_and_a_new_follow_lets_it_go(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body", "look")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                first = await lamp.follow_hand().start()
+                await lamp.look("ahead")
+                assert await first.wait() == {"how": "cut_short", "why": "another look"}
+                # The look runs under the following's lease, so it is still held.
+                assert first.lease.held and len(fake.leases) == 1
+                # A new following lets go of it first, rather than being refused busy.
+                second = await lamp.follow_hand().start()
+                assert second.following and not first.lease.held and len(fake.leases) == 1
+                # And one still following ends the same way.
+                third = await lamp.follow_hand().start()
+                assert await second.wait() == {"how": "cut_short", "why": "another look"}
+                assert third.following and not second.lease.held and len(fake.leases) == 1
+                await third.stop()
+                assert fake.leases == {}
 
     run(go())
 
