@@ -43,6 +43,14 @@ pub struct Channel {
     /// An in-order message from the peer's boot is taken however late
     /// ([`Self::taking_late`]); the run of late ones taken, and the oldest.
     take_late: bool,
+    /// Until a message is taken, the run of stale ones is dropped and said
+    /// ([`Self::dropping_stale_first`]): from the first one's stamp, the
+    /// count, the oldest and the bound.
+    drop_stale_first: bool,
+    dropped_from_us: Option<u64>,
+    dropped_run: u64,
+    dropped_oldest_us: u64,
+    dropped_bound_us: u64,
     late_run: u64,
     late_oldest_us: u64,
     /// Stale renewals passed over in the run now going on
@@ -58,7 +66,9 @@ pub struct Channel {
 /// started other workers. On lamp-4ace on 2026-10-15 a plain
 /// `systemctl restart lamp-voice` ended twice on such a message, older than
 /// the usual bound, and the lamp was deaf for 23 s. Later control messages,
-/// and every data message (sound must not arrive late), keep the bound.
+/// and every data message (sound must not arrive late), keep the bound; the
+/// microphone's stale frames at the start are dropped instead, while the
+/// first of them is at most this old ([`Channel::dropping_stale_first`]).
 pub const FIRST_CONTROL_MAX_AGE_US: u64 = 1_000_000;
 
 impl Channel {
@@ -85,6 +95,11 @@ impl Channel {
             held_up_us: 0,
             sender_held_up: false,
             take_late: false,
+            drop_stale_first: false,
+            dropped_from_us: None,
+            dropped_run: 0,
+            dropped_oldest_us: 0,
+            dropped_bound_us: 0,
             late_run: 0,
             late_oldest_us: 0,
             passed_run: 0,
@@ -124,6 +139,22 @@ impl Channel {
     /// boot, or out of order, is still refused.
     fn taking_late(mut self) -> Self {
         self.take_late = true;
+        self
+    }
+
+    /// For the microphone's frames to the voice (`capture.d.p`): the run of
+    /// frames at the start, in order from the peer's boot and stale by their
+    /// age alone, is dropped up to the first fresh one, and said once.
+    /// Capture sends a frame every 10 ms from when it is asked to, and they
+    /// wait until the voice first reads; on lamp-0c89 at build 8545 the
+    /// first waited 154 ms and ended the voice at boot (#4332). A frame is
+    /// sound now or not at all, so they are dropped, never taken late. The
+    /// run is bounded: once its first frame is over
+    /// [`FIRST_CONTROL_MAX_AGE_US`] old, a stale one ends the voice. One from
+    /// another boot, out of order or stamped after now ends it anywhere in
+    /// the run, and once a frame is taken, later ones keep the bound.
+    fn dropping_stale_first(mut self) -> Self {
+        self.drop_stale_first = true;
         self
     }
     pub fn connect(&mut self, path: &Path) -> io::Result<()> {
@@ -225,6 +256,7 @@ impl Channel {
         if received.is_err() {
             // The runs worth reading end so (the reviewer on #1660).
             self.say_run("ended by an error");
+            self.say_dropped("then ended by an error");
         }
         received
     }
@@ -289,6 +321,44 @@ impl Channel {
             } else {
                 self.max_age_us
             };
+            // The run of stale frames at the start ([`Self::dropping_stale_first`]):
+            // in order, same boot, none stamped after now, and only while the
+            // run's first frame is at most 1 s old; beyond that, fatal.
+            let bound_us = max_age_us + self.held_up_us;
+            if self.drop_stale_first
+                && self.incoming.is_in_order(&packet)
+                && packet.sent_at_us <= at_us
+                && at_us - packet.sent_at_us >= bound_us
+            {
+                let run_from_us = self.dropped_from_us.unwrap_or(packet.sent_at_us);
+                let limit_us = if at_us - run_from_us <= FIRST_CONTROL_MAX_AGE_US {
+                    u64::MAX
+                } else {
+                    bound_us
+                };
+                self.incoming
+                    .accept(&packet, at_us, limit_us)
+                    .map_err(|error| {
+                        io::Error::new(error.kind(), format!("{}: {error}", self.name))
+                    })?;
+                self.dropped_from_us = Some(run_from_us);
+                self.dropped_run += 1;
+                self.dropped_oldest_us = self.dropped_oldest_us.max(at_us - packet.sent_at_us);
+                self.dropped_bound_us = bound_us;
+                let mut data = [0; MAX_DATAGRAM_BYTES];
+                let count = match self.endpoint.try_recv(&mut data) {
+                    Ok(count) => count,
+                    // Nothing fresh yet: the next receive goes on with the run.
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                        return Ok(None);
+                    }
+                    Err(error) => return Err(error),
+                };
+                packet = decode(&data[..count])?;
+                // Again after this receive, as above.
+                at_us = now();
+                continue;
+            }
             match self.judge(&packet, at_us, max_age_us) {
                 Ok(()) => break,
                 // Stale by its age alone, a renewal, the next renewal behind.
@@ -313,6 +383,11 @@ impl Channel {
             }
         }
         self.received = true;
+        if self.drop_stale_first {
+            // Taken: the run is over, and later frames keep the bound.
+            self.drop_stale_first = false;
+            self.say_dropped("the next taken");
+        }
         #[cfg(test)]
         self.probe
             .record(probe::Direction::Receive, packet.boot, packet.sequence);
@@ -419,6 +494,19 @@ impl Channel {
         }
     }
 
+    /// The run of stale first frames dropped, said once as it ends
+    /// ([`Self::dropping_stale_first`]): its count, the oldest and the bound.
+    fn say_dropped(&mut self, how: &str) {
+        if self.dropped_run > 0 {
+            say(format!(
+                "lamp-voice: {}: {} stale first messages dropped, the oldest {} us (bound {} us), {how}: they waited for the receiver's first look",
+                self.name, self.dropped_run, self.dropped_oldest_us, self.dropped_bound_us
+            ));
+            self.dropped_run = 0;
+            self.dropped_oldest_us = 0;
+        }
+    }
+
     /// Late messages taken in the run now going on.
     #[cfg(test)]
     pub(crate) fn late_run(&self) -> u64 {
@@ -495,6 +583,10 @@ impl WorkerChannels {
             // is used, so a late one is taken (lamp-4ace, 19 Oct 05:08).
             data: if role == "provider" && worker_side {
                 data.taking_late()
+            } else if role == "capture" && !worker_side {
+                // The microphone's first frame may wait for the voice's first
+                // look; stale, it is dropped (lamp-0c89, #4332).
+                data.dropping_stale_first()
             } else {
                 data
             },
@@ -665,6 +757,169 @@ mod tests {
         assert!(capture.connect_step().unwrap());
         assert!(speaker.connect_step().unwrap());
         (capture, speaker)
+    }
+
+    fn capture_pair(dir: &Path) -> (WorkerChannels, WorkerChannels) {
+        let (parent, worker) = (new_boot().unwrap(), new_boot().unwrap());
+        let mut voice = WorkerChannels::bind(dir, "capture", parent, worker, false).unwrap();
+        let mut capture = WorkerChannels::bind(dir, "capture", parent, worker, true).unwrap();
+        voice.connect(dir, "capture", false).unwrap();
+        capture.connect(dir, "capture", true).unwrap();
+        (voice, capture)
+    }
+
+    /// Frames every 10 ms from 10 us, as capture sends them, the first `n`.
+    fn frames(capture: &mut WorkerChannels, n: u32) {
+        for k in 1..=n {
+            let stamp = 10 + u64::from(k - 1) * 10_000;
+            capture.data.send_with(k, || stamp).unwrap();
+        }
+    }
+
+    #[test]
+    fn the_microphones_stale_frames_at_the_start_are_dropped_said_once_and_the_first_fresh_taken() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut voice, mut capture) = capture_pair(&dir.path);
+        said();
+        // lamp-0c89's first look, 154 ms after the first frame (#4332), at
+        // capture's own pace: frames 1 to 6 are 100 ms old or more.
+        frames(&mut capture, 16);
+        assert_eq!(voice.data.receive_with::<u32>(|| 154_182).unwrap(), Some(7));
+        let lines = said();
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0].starts_with(
+                "lamp-voice: capture.d.p: 6 stale first messages dropped, the oldest 154172 us (bound 100000 us), the next taken"
+            ),
+            "{lines:?}"
+        );
+        for k in 8..=16 {
+            assert_eq!(voice.data.receive_with::<u32>(|| 154_182).unwrap(), Some(k));
+        }
+        assert!(said().is_empty());
+        // Once one is taken, a stale frame later ends the voice as before.
+        capture.data.send_with(17u32, || 154_200).unwrap();
+        let refused = voice.data.receive_with::<u32>(|| 1_854_200).unwrap_err();
+        assert!(
+            refused.to_string().starts_with(
+                "capture.d.p: stale, reordered or wrong-boot runtime message (sequence 17 after 16"
+            ),
+            "{refused}"
+        );
+        // Alone in the socket, the first is dropped and nothing is taken; the
+        // next receive goes on with the run, said once when a frame is taken.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut voice, mut capture) = capture_pair(&dir.path);
+        frames(&mut capture, 1);
+        assert_eq!(voice.data.receive_with::<u32>(|| 154_182).unwrap(), None);
+        frames_from(&mut capture, 2, 20_010);
+        assert_eq!(voice.data.receive_with::<u32>(|| 154_182).unwrap(), None);
+        assert!(said().is_empty());
+        frames_from(&mut capture, 3, 154_100);
+        assert_eq!(voice.data.receive_with::<u32>(|| 154_182).unwrap(), Some(3));
+        let lines = said();
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0].starts_with("lamp-voice: capture.d.p: 2 stale first messages dropped"),
+            "{lines:?}"
+        );
+    }
+
+    /// Frame `k`, stamped `stamp`.
+    fn frames_from(capture: &mut WorkerChannels, k: u32, stamp: u64) {
+        capture.data.send_with(k, || stamp).unwrap();
+    }
+
+    #[test]
+    fn a_run_of_stale_frames_beyond_its_bound_ends_the_voice() {
+        // The first frame over 1 s old.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut voice, mut capture) = capture_pair(&dir.path);
+        frames(&mut capture, 3);
+        let refused = voice.data.receive_with::<u32>(|| 1_000_011).unwrap_err();
+        assert!(
+            refused.to_string().starts_with(
+                "capture.d.p: stale, reordered or wrong-boot runtime message (sequence 1 after 0"
+            ),
+            "{refused}"
+        );
+        // A run that goes on past 1 s from its first frame, across receives.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut voice, mut capture) = capture_pair(&dir.path);
+        said();
+        frames(&mut capture, 1);
+        assert_eq!(voice.data.receive_with::<u32>(|| 154_182).unwrap(), None);
+        frames_from(&mut capture, 2, 20);
+        let refused = voice.data.receive_with::<u32>(|| 1_100_000).unwrap_err();
+        assert!(
+            refused.to_string().starts_with(
+                "capture.d.p: stale, reordered or wrong-boot runtime message (sequence 2 after 1"
+            ),
+            "{refused}"
+        );
+        // The run is still said, once.
+        let lines = said();
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0].contains("1 stale first messages dropped")
+                && lines[0].contains("then ended by an error"),
+            "{lines:?}"
+        );
+    }
+
+    #[test]
+    fn a_stale_first_frame_from_another_boot_out_of_order_or_after_now_still_ends_the_voice() {
+        for case in [
+            "wrong-boot",
+            "not-first-sequence",
+            "future",
+            "wrong-boot-in-run",
+            "out-of-order-in-run",
+            "future-in-run",
+        ] {
+            let dir = SessionDirectory::create().unwrap();
+            let (mut voice, mut capture) = capture_pair(&dir.path);
+            if case == "wrong-boot" {
+                capture.data.sender = new_boot().unwrap();
+            }
+            if case == "not-first-sequence" {
+                capture.data.send_sequence = 1;
+            }
+            let sent = if case == "future" { 200_000 } else { 10 };
+            capture.data.send_with(1u32, || sent).unwrap();
+            if case == "wrong-boot-in-run" {
+                capture.data.sender = new_boot().unwrap();
+            }
+            if case == "out-of-order-in-run" {
+                capture.data.send_sequence += 1;
+            }
+            // Fresh, so only the order guard refuses the not-first case; in
+            // the run, stale but for the case's own fault.
+            let behind = match case {
+                "future" | "future-in-run" => 200_000,
+                "wrong-boot-in-run" | "out-of-order-in-run" => 20,
+                _ => 154_150,
+            };
+            capture.data.send_with(2u32, || behind).unwrap();
+            let refused = voice.data.receive_with::<u32>(|| 154_182).unwrap_err();
+            assert_eq!(refused.kind(), io::ErrorKind::InvalidData, "{case}");
+            assert!(
+                refused.to_string().starts_with("capture.d.p: stale"),
+                "{case}: {refused}"
+            );
+        }
+    }
+
+    #[test]
+    fn other_data_channels_keep_a_stale_first_message_fatal() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut voice, mut capture) = capture_pair(&dir.path);
+        voice.data.send_with(1u32, || 10).unwrap();
+        assert!(capture.data.receive_with::<u32>(|| 154_182).is_err());
+        let dir = SessionDirectory::create().unwrap();
+        let (mut sender, mut receiver) = pair(&dir.path);
+        sender.send_with(1u32, || 10).unwrap();
+        assert!(receiver.receive_with::<u32>(|| 154_182).is_err());
     }
 
     #[test]
