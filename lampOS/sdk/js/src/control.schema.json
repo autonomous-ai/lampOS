@@ -992,7 +992,7 @@
       "type": "object",
       "properties": {
         "rates": {
-          "description": "Present only on a dev lamp run with `--rates off`: every rate lifted but `refused`, whose window is then the only one told.",
+          "description": "Present only on a dev lamp run with `--rates off`: every rate lifted but `refused` and `phrases`, whose windows are then the only ones told.",
           "const": "off"
         },
         "quiet_hours": {

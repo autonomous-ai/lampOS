@@ -83,6 +83,13 @@ impl Class {
         }
     }
 
+    /// Kept with `--rates off`: the refused actions' guard, and the
+    /// phrase-change rate, which bounds `hear` for privacy, not pace
+    /// (harness-reviewer's P2 on #4360).
+    pub fn kept_when_off(self) -> bool {
+        matches!(self, Self::Phrases | Self::Refused)
+    }
+
     fn longest(self) -> u64 {
         self.windows()
             .iter()
@@ -96,8 +103,8 @@ impl Class {
 #[derive(Debug, Default)]
 pub struct Rates {
     seen: HashMap<(String, Class), VecDeque<u64>>,
-    /// `--rates off`, a dev lamp's switch: every class lifted but
-    /// [`Class::Refused`], which still closes a connection that spins.
+    /// `--rates off`, a dev lamp's switch: every class lifted but those
+    /// [`Class::kept_when_off`].
     off: bool,
 }
 
@@ -106,7 +113,8 @@ impl Rates {
         Self::default()
     }
 
-    /// Every rate lifted but the refused actions' guard (`--rates off`).
+    /// Every rate lifted but the refused actions' guard and the phrase
+    /// changes (`--rates off`).
     pub fn off() -> Self {
         Self {
             off: true,
@@ -131,7 +139,7 @@ impl Rates {
     /// nothing: the door counts it once the part takes it, so a refused
     /// action isn't counted (harness-reviewer's P2 on #3778).
     pub fn check(&mut self, client: &str, class: Class, now_us: u64) -> Result<(), u64> {
-        if self.off && class != Class::Refused {
+        if self.off && !class.kept_when_off() {
             return Ok(());
         }
         let seen = self.seen.entry((client.to_owned(), class)).or_default();
@@ -202,9 +210,10 @@ mod tests {
     }
 
     /// `--rates off`: every class lifted, at any pace, but the refused
-    /// actions' guard, which still bites at 20 a second.
+    /// actions' guard, which still bites at 20 a second, and the phrase
+    /// changes, still 6 a minute.
     #[test]
-    fn rates_off_lifts_every_class_but_the_refused_guard() {
+    fn rates_off_lifts_every_class_but_the_refused_guard_and_phrases() {
         let mut rates = Rates::off();
         assert!(rates.lifted() && !Rates::new().lifted());
         for class in [
@@ -213,7 +222,6 @@ mod tests {
             Class::Light,
             Class::Say,
             Class::Express,
-            Class::Phrases,
             Class::Push,
             Class::Manage,
         ] {
@@ -225,6 +233,10 @@ mod tests {
             assert_eq!(rates.take("c_1", Class::Refused, n), Ok(()), "{n}");
         }
         assert!(rates.take("c_1", Class::Refused, 20).is_err());
+        for n in 0..6 {
+            assert_eq!(rates.take("c_1", Class::Phrases, n), Ok(()), "{n}");
+        }
+        assert!(rates.take("c_1", Class::Phrases, 6).is_err());
     }
 
     #[test]

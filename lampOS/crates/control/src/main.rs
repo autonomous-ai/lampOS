@@ -133,14 +133,15 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         None => eprintln!("lamp-control: quiet hours off, this lamp's setting"),
     }
     // `--rates off` (or LAMP_CONTROL_RATES=off): a dev lamp's switch, every
-    // rate lifted but the refused actions' guard. A product never passes it.
+    // rate lifted but the refused actions' guard and the phrase changes. A
+    // product never passes it.
     let rates_off = session::rates_off_of(
         option(arguments, "--rates").as_deref(),
         std::env::var("LAMP_CONTROL_RATES").ok().as_deref(),
     )?;
     if rates_off {
         eprintln!(
-            "lamp-control: rates off, a dev lamp's switch: every rate lifted but refused actions'"
+            "lamp-control: rates off, a dev lamp's switch: every rate lifted but refused actions' and phrase changes"
         );
     }
     let mut door = session::Door::new(
