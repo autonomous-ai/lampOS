@@ -1,3 +1,23 @@
+## 2026-10-29 19:0x ICT — trains 364 and 365: #4368, #4369, #4373 landed; two carries; three update reads
+
+**Landed:**
+- **#4368** (Part of #4337): #4350's P3 commit, which train 361 left out, carried unchanged. The area is asked about a place the voice may have misheard, never for the weather or the time. Train 364.
+- **#4369** (Part of #4338): El's P3s on #4345. The journal says "on a connection of its own" only when the retry takes one (`Voice::asks_fresh`). Train 364 took it before its docs commit, which is carried as **#4379** (NEXT TRAIN).
+- **#4373** (Part of #1569): the second route's two-line judging tests read a given look as gone under load, because each look lived 300 ms. Shown red with a 400 ms delay; with the fix, 197/0 with the same delay. Train 365.
+
+**#4380** (Part of #4337, NEXT TRAIN): `switches.md`'s `LAMP_PLACE` row said unset is "none". Every lamp is now told it doesn't know where it is, plus `AREA_ASKED`.
+
+**Reads:**
+- **#4370** (Backend2's OTA alerts, lamp half): a P2, a round not switched left a `started` with no end, every round. Fixed; READ-OK on `3fe00d6d01`, with a P3 that the end breaking a streak comes without its start. Two corrections posted.
+- **#4376** (Second's update half): READ-OK. For #4370, `self-confirmed` needs a stage there to be told.
+- **#4364** (Sixth, the by-default name): a P2, one look counted two or three times by the 100 ms poll. Fixed by `(boot, seq)` and landed in train 365.
+
+**Local runs:** the whole `lamp-voice --lib` on this Mac fails only `coordinator::motor::tests` (2 s owned-child deadline) under load; 36/0 alone. Noted on #1569 for Tests.
+
+**Disk:** removed `lampos-fourth-native-check` and four landed worktrees, ran fstrim in the VM, and dropped `target/debug/incremental`.
+
+No device action. lamp-0c89 (#2836) still waits for access.
+
 ## 2026-10-29 17:1x ICT — #4345 and #4350 landed; #4350's P3s carried; El's P3s; reads
 
 **#4345** (Fixes #4338): a speech piece not started within 4 s is asked once more on a connection of its own (`net::fresh_client`, `Tts::speak_fresh`). One still not started is said with the next piece, so no sentence is silently dropped. READ-OKs from Tests, Reviewer-three, the Reviewer-lead and El. Landed in train 361 (`a0a6a87fb9`, `e34eee25eb`). El's two P3s (the journal overstated the fresh connection for Gemini and turnless speech; the docs lacked the joined piece's extra start time) are a follow-up PR on `fourth/speech-piece-p3s-4338`.
