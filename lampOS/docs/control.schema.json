@@ -641,7 +641,7 @@
       "additionalProperties": false
     },
     "joints": {
-      "description": "Joint targets, at most 20 a second, each step through the body's caps.",
+      "description": "Joint targets, at most 40 a second, each step through the body's caps.",
       "type": "object",
       "properties": {
         "id": {

@@ -328,7 +328,7 @@ class FakeLamp:
             await self._refuse(ws, request["id"], "unpaired", "not paired, or a bad signature")
             await ws.close()
             return None
-        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits={"joints_hz": 20})
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits={"joints_hz": 40})
         return request["client"]
 
     # The grant each event and state needs, as lamp-control's own (#3736).
