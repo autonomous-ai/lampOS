@@ -194,6 +194,12 @@ pub fn main() -> io::Result<()> {
                 "{}",
                 json!({"id":args.get(3),"state":"idle","ask":"Earlier unrelated question","answer":"Observed answer","truncated":false,"tools":2})
             ),
+            // As openharness#2157's `reply --json` answers once the words
+            // are queued in the harness's mailbox.
+            "reply" => println!(
+                "{}",
+                json!({"ok":true,"name":"lamp-task-001","id":args.get(3),"message":"m1","state":"queued"})
+            ),
             _ => return Err(io::Error::other("fixture operation unknown")),
         }
     }

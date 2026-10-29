@@ -111,7 +111,7 @@ impl Rig {
             _turn: turn,
         };
         rig.plan(
-            json!({"machines":{"default":true},"new":{"default":true},"show":{"default":true}}),
+            json!({"machines":{"default":true},"new":{"default":true},"show":{"default":true},"reply":{"default":true}}),
         );
         rig
     }
@@ -135,7 +135,7 @@ impl Rig {
             .unwrap();
     }
     fn new_step(&self, step: Value) {
-        self.plan(json!({"machines":{"default":true},"new":step}));
+        self.plan(json!({"machines":{"default":true},"new":step,"show":{"default":true},"reply":{"default":true}}));
     }
     fn show_step(&self, step: Value) {
         self.plan(json!({"show":step}));
@@ -331,6 +331,7 @@ fn devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none() {
     assert_eq!(args[1], "devin");
     assert!(!args.iter().any(|arg| arg == "--mode"), "{args:?}");
     assert_eq!(args[7], "--json");
+    assert_eq!(args.len(), 8, "{args:?}");
     let receipt = |mode: Value, bypass: Option<Value>| {
         let mut agent = json!({"id":AGENT,"name":"lamp-task-001","engine":"devin"});
         if !mode.is_null() {
@@ -364,6 +365,176 @@ fn devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none() {
             uncertain("invalid_reply"),
             "{mode} {bypass:?}"
         );
+    }
+}
+
+/// Devin can't start with a first message (Harness 0.5.6, 29 Oct), so its
+/// task is typed in once Harness reads it idle: `new` with no `--task`,
+/// `show` until idle, then `harness reply` with the task (openharness#2157).
+#[test]
+fn devins_task_is_typed_in_with_reply_once_it_is_idle() {
+    let rig = Rig::new();
+    let mut request = launch();
+    request.target.engine = EngineKind::Devin;
+    let seen = |state: &str| {
+        step(json!({"id":AGENT,"state":state,"ask":null,"answer":"","truncated":false,"tools":0}))
+    };
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},
+        "show":{"each":[seen("starting"), seen("working"), seen("idle")]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(verbs, ["machines", "new", "show", "show", "show", "reply"]);
+    assert!(
+        !calls[1]["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|arg| arg == "--task")
+    );
+    assert_eq!(
+        calls[5]["args"],
+        json!([
+            "reply",
+            "--machine",
+            MACHINE,
+            AGENT,
+            "--json",
+            "--",
+            "Inspect the authored fixture"
+        ])
+    );
+    // Other engines still get their task with `new`, and no reply.
+    let rig = Rig::new();
+    assert!(matches!(
+        rig.cli().launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 2);
+    assert!(
+        calls[1]["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|arg| arg == "--task")
+    );
+}
+
+/// A Devin whose task couldn't be typed in was still started, so it is
+/// uncertain, never sent again, with Harness's reason.
+#[test]
+fn a_devin_whose_task_is_not_typed_in_is_uncertain_with_the_reason() {
+    let mut request = launch();
+    request.target.engine = EngineKind::Devin;
+    let refused = |code: &str| json!({"stdout":format!("{}\n", json!({"error":code,"detail":"…","code":code,"next":[]})),"exit":5});
+    for (reply, code) in [
+        (refused("REPLY_OFF"), "reply_off"),
+        (refused("NOT_RUNNING"), "reply_not_running"),
+        (
+            json!({"stdout":format!("{}\n", json!({"error":"NOT_IDLE","detail":"…"})),"exit":1}),
+            "reply_not_idle",
+        ),
+        (
+            step(json!({"ok":false,"name":"lamp-task-001","id":AGENT,"state":"failed"})),
+            "reply_failed",
+        ),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"machines":{"default":true},"new":{"default":true},"show":{"default":true},"reply":reply}));
+        assert_eq!(rig.cli().launch(&request), uncertain(code), "{code}");
+    }
+    // Stopped before it was idle: nothing is typed.
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true},
+        "show":step(json!({"id":AGENT,"state":"stopped","ask":null,"answer":"","truncated":false,"tools":0}))}));
+    assert_eq!(
+        rig.cli().launch(&request),
+        uncertain("stopped_before_message")
+    );
+    assert!(!rig.calls().iter().any(|call| call["args"][0] == "reply"));
+    // Never idle within the launch's bound: nothing is typed.
+    let mut rig = Rig::new();
+    rig.config.launch_timeout = Duration::from_millis(1500);
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true},
+        "show":step(json!({"id":AGENT,"state":"working","ask":null,"answer":"","truncated":false,"tools":0}))}));
+    assert_eq!(rig.cli().launch(&request), uncertain("never_idle"));
+    assert!(!rig.calls().iter().any(|call| call["args"][0] == "reply"));
+    // A `show` that fails to run ends it under its own code, at once.
+    let mut rig = Rig::new();
+    rig.config.read_timeout = Duration::from_millis(300);
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true},
+        "show":{"delay_ms":3000,"default":true},"reply":{"default":true}}));
+    let began = Instant::now();
+    let outcome = rig.cli().launch(&request);
+    assert!(
+        matches!(outcome, LaunchOutcome::Uncertain { ref code } if code != "never_idle"),
+        "{outcome:?}"
+    );
+    assert!(
+        began.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        began.elapsed()
+    );
+}
+
+/// A Harness before the fresh-Devin fix (0.5.6) reads a Devin that has done
+/// nothing yet as `needs-input`. Nothing is asked of it, so the reply is
+/// tried at once, and Harness's answer stands: never 60 s of looks (the
+/// Reviewer-lead's P2 on #4374). One that has asked something waits.
+#[test]
+fn a_fresh_devin_read_as_needs_input_is_replied_to_at_once() {
+    let mut request = launch();
+    request.target.engine = EngineKind::Devin;
+    let shown = |ask: Value, tools: u64| {
+        step(
+            json!({"id":AGENT,"state":"needs-input","ask":ask,"answer":"","truncated":false,"tools":tools}),
+        )
+    };
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true},"show":shown(Value::Null, 0),"reply":{"default":true}}));
+    let began = Instant::now();
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    assert!(began.elapsed() < Duration::from_secs(5));
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(verbs, ["machines", "new", "show", "reply"]);
+    // Harness refusing it as not idle ends it at once, under that code.
+    let rig = Rig::new();
+    let refused =
+        json!({"stdout":format!("{}\n", json!({"error":"NOT_IDLE","detail":"…"})),"exit":1});
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true},"show":shown(Value::Null, 0),"reply":refused}));
+    assert_eq!(rig.cli().launch(&request), uncertain("reply_not_idle"));
+    // Asked something (a question or a permission), or it has worked: it isn't fresh, and nothing is typed.
+    for (ask, tools) in [(json!("Trust this folder?"), 0), (Value::Null, 3)] {
+        let mut rig = Rig::new();
+        rig.config.launch_timeout = Duration::from_millis(1500);
+        rig.plan(json!({"machines":{"default":true},"new":{"default":true},"show":shown(ask.clone(), tools)}));
+        assert_eq!(
+            rig.cli().launch(&request),
+            uncertain("never_idle"),
+            "{ask} {tools}"
+        );
+        assert!(!rig.calls().iter().any(|call| call["args"][0] == "reply"));
     }
 }
 
