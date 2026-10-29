@@ -62,23 +62,33 @@ def main():
     if not os.path.isfile(REAL): sys.exit('cutin_scene.py: CV_SCENARIO is not scenario.py')
     name, steps, wait = split(sys.argv[1:])
     if wait is None: os.execv(sys.executable, [sys.executable, REAL, *sys.argv[1:]])
-    since = lamp('date +%s')
-    rc = subprocess.run([sys.executable, REAL, name, *steps]).returncode
-    if rc: sys.exit(rc)
-    end = time.time() + 30
-    while True:
-        got = lamp(f"journalctl -u lamp-voice --since @{since} --no-pager -o short-unix | grep 'first answer audio' | tail -n 1")
-        if got: break
-        if time.time() > end: return print(f'cutin_scene.py: {name}: no first answer audio since the scene began; no stop played', file=sys.stderr)
-        time.sleep(0.5)
-    age = float(lamp('date +%s.%N') or 0) - float(got.split()[0])
-    if age < 1.5: time.sleep(1.5 - age)
-    if not speaking():
-        print(f'cutin_scene.py: {name}: the lamp had stopped speaking before the stop was due; void, no stop played', file=sys.stderr)
-        sys.exit(7)
-    wav = f"{OUT}/prompts/generated/{hashlib.sha256(f'Daniel|{RATE}|{STOP}'.encode()).hexdigest()[:16]}.wav"
-    if not os.path.exists(wav): sys.exit(f'cutin_scene.py: {wav} missing (quality_rows.py levels it); no stop played')
-    at = lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'")
+    # Held streams, opened before the scene: a new ssh to a lamp takes 5-6 s to connect (52e6, 30 Oct), so one ssh per
+    # check let every short answer end before the stop was due (6 of 8 scenes void, 30 Oct 04:56).
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import night
+    from quality_rows import FirstAudio
+    fa, ev = FirstAudio(night.SSH), night.Events()
+    try:
+        time.sleep(6)
+        began = time.time()
+        rc = subprocess.run([sys.executable, REAL, name, *steps]).returncode
+        if rc: sys.exit(rc)
+        first = fa.after(began, 30.0)
+        if first is None: return print(f'cutin_scene.py: {name}: no first answer audio since the scene began; no stop played', file=sys.stderr)
+        if time.time() < first + 1.5: time.sleep(first + 1.5 - time.time())
+        ev.pump()
+        if not speaking(ev.rows):
+            print(f'cutin_scene.py: {name}: the lamp had stopped speaking before the stop was due; void, no stop played', file=sys.stderr)
+            sys.exit(7)
+        wav = f"{OUT}/prompts/generated/{hashlib.sha256(f'Daniel|{RATE}|{STOP}'.encode()).hexdigest()[:16]}.wav"
+        if not os.path.exists(wav): sys.exit(f'cutin_scene.py: {wav} missing (quality_rows.py levels it); no stop played')
+        # The lamp's clock at the stop: the newest event's at_us (the session's clock, as cutin.sh times the scene) plus
+        # the Mac time since it came, so no ssh is opened here.
+        last = max((r for r in ev.rows if isinstance(r.get('at_us'), int)), key=lambda r: r['_mac'], default=None)
+        at = str(last['at_us'] + int((time.time() - last['_mac']) * 1e6)) if last else ''
+        if last: print(f'cutin_scene.py: {name}: stop at lamp {at} us, from an event {time.time() - last["_mac"]:.2f} s old', file=sys.stderr)
+    finally:
+        fa.close(); ev.p.terminate()
     volume(90)
     try: subprocess.run(['/usr/bin/afplay', wav], check=True)
     finally: volume(45)
