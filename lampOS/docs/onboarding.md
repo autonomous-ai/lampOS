@@ -201,12 +201,16 @@ fixed form, `(Say only this, nothing before or after it: "…")` with nothing
 after the quote but `)` or a trailer that only forbids (` Do not …)`,
 privacy's), says the quoted words as they are through the route's own speech
 when its first round has not begun within the bound (journal: `the
-onboarding line's own words are said`; `onboarding::fixed_words`). It is an
+onboarding line's own words are said`; `onboarding::fixed_words`), or when
+that round fails before any word, whatever the error (lamp-52e6, 29 Oct
+07:35: the model service out of credit answered HTTP 402 in 0.9 s, and
+every `how_you_sound` prompt ended with nothing said; journal: `chat round 1
+failed; the onboarding line's own words are said`). It is an
 ordinary spoken reply to the coordinator, so the invitation's delivery
 (`Whole`, `Gapped`, `Cut`, `Unsaid`), the yield to a person speaking and
 the turn's bookkeeping are as for any reply. A line that asks the model to do
 more (`who_you_are`, preferences, a confirm: "Ask exactly this … When they
-have answered …") keeps the model path and ends unanswered as before; so do
+have answered …") keeps the model path and ends unanswered (or failed) as before; so do
 a person's line, a look and an add-on's quoted line.
 
 The conversational steps keep their tool calls and consent clauses, but say
@@ -514,7 +518,10 @@ invitation that ends without being heard whole (cut off, a playback gap: the
 turn's shared `heard_whole` proof) drops the armed attempt and can be retried
 once, then skipped. One of which nothing played at all (`no_audio_answer`, or
 a turn that ended unsettled before its first audio: the route failed, the
-service stopped, a privacy gap) was never said, so it is no try (#3754): it is
+service stopped, a privacy gap) was never said, so it is no try (#3754). A
+failure notice played in place of words that never came is none of the
+invitation's audio either (lamp-52e6, 29 Oct 07:35: a chat refused with HTTP
+402 played only the notice, and every prompt was taken as cut): it is
 offered again once the voice can speak, `MOST_UNSAID` (2) times at most, then
 the step is `not_available`, never `failed`, with an
 `onboarding_privacy_try` row whose `why` is `"invitation not said"`. Giving

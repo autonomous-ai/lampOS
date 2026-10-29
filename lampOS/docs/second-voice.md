@@ -371,9 +371,10 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   journal: `look round had not begun in … ms`) rather than nothing after
   "Let me look." (the first builder, 2026-10-16 21:25). A written
   onboarding line of the fixed form (`(Say only this, nothing before or
-  after it: "…")`, `onboarding::fixed_words`) not begun in time says its
-  quoted words as they are rather than nothing (journal: `the onboarding
-  line's own words are said`; lamp-52e6, 28 Oct 16:42; `docs/onboarding.md`,
+  after it: "…")`, `onboarding::fixed_words`) not begun in time, or whose
+  first round fails before any word (an HTTP 402, lamp-52e6 29 Oct 07:35),
+  says its quoted words as they are rather than nothing (journal: `the
+  onboarding line's own words are said`; lamp-52e6, 28 Oct 16:42; `docs/onboarding.md`,
   "Exact lines"). A full look
   (`LAMP_LOOK_FULL=on`) whose still never came arrives as the no-look note
   without `look`, and is a look all the same: 5 s, then the line.

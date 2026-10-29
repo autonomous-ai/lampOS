@@ -8489,6 +8489,19 @@ async fn answer(
                                 continue;
                             }
                         }
+                        // An onboarding fixed line whose chat failed before
+                        // any word (a 402 in 0.9 s, lamp-52e6 29 Oct 07:35)
+                        // is said in its own words, as one not begun in time.
+                        if first
+                            && round == 1
+                            && let Some(words) = fixed.take()
+                        {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round} failed; the onboarding line's own words are said"
+                            );
+                            queue.push(words).await?;
+                            return Ok(());
+                        }
                         // A chat that answers with a refusal before any word
                         // is as down as one that never begins: a line, not
                         // silence (#1844's B). The slow line only for one
