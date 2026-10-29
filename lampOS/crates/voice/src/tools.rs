@@ -1694,7 +1694,7 @@ fn run_call_with_scope(
                 && told.0["ok"] == true
                 && let Some(file) = onboarding
             {
-                crate::onboarding::face_saved(file);
+                crate::onboarding::face_saved(file, call.args.get("name").and_then(Value::as_str));
             }
             if call.name == crate::known_faces::FORGET
                 && told.0["ok"] == true
@@ -2162,7 +2162,9 @@ mod tests {
             .collect();
         assert_eq!(
             lines,
-            [json!({"step": "who_you_are", "outcome": "done", "by": "remember_my_face"})]
+            [
+                json!({"step": "who_you_are", "outcome": "done", "by": "remember_my_face", "name": "Sam"})
+            ]
         );
         // A face forgotten tells it too, from the person's own scope (a
         // forget is theirs only); one refused, or a name the eyes didn't

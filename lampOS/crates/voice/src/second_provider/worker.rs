@@ -2191,10 +2191,11 @@ pub fn serve(
     // voice in the conversation (the rule's own sign, below) say someone
     // else is there now.
     // The owner's name is the typed one; a lamp set up by voice has none,
-    // and keeps it only with the face who_you_are saved (lamp-29e7, 29 Oct):
-    // then it is the one person the eyes know, asked at most every
-    // `known_faces::OWNER_FROM_FACES_EVERY`, so a redo or a forget is seen.
+    // and keeps the name who_you_are saved with their face as the owner in
+    // the onboarding file (lamp-29e7, 29 Oct): named only while the eyes
+    // still know them, asked at each reply.
     let owner_faces = tools.who.clone();
+    let owner_file = tools.onboarding.clone();
     let by_default = crate::person::by_default_from_environment()
         .then(|| {
             let bus = files
@@ -2207,10 +2208,10 @@ pub fn serve(
                 if typed.is_some() {
                     "typed at setup"
                 } else {
-                    "from the one face the eyes know"
+                    "kept as the owner when who_you_are saved their face"
                 }
             );
-            (typed, bus, std::sync::Mutex::new(None::<(Instant, Option<String>)>))
+            (typed, bus)
         });
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
@@ -2240,10 +2241,15 @@ pub fn serve(
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
             let named_by_default = by_default
                 .as_ref()
-                .and_then(|(typed, bus, faces_owner)| {
+                .and_then(|(typed, bus)| {
                     let name = match typed {
                         Some(typed) => typed.clone(),
-                        None => crate::known_faces::owner_from_faces(faces_owner, owner_faces.as_deref())?,
+                        None => owner_file
+                            .as_deref()
+                            .and_then(crate::onboarding::owner_of)
+                            .filter(|owner| {
+                                crate::known_faces::still_known(owner_faces.as_deref(), owner)
+                            })?,
                     };
                     Some((name, bus))
                 })

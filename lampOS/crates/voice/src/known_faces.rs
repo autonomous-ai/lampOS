@@ -1873,28 +1873,13 @@ pub fn names_known(socket: &Path) -> Option<Vec<String>> {
 /// How long [`names_known`] waits for the eyes: a reply's context waits on it.
 pub const LIST_WITHIN: Duration = Duration::from_millis(250);
 
-/// How often a lamp with no typed name asks the eyes whom they know, for
-/// the owner named by default (#3884, lamp-29e7).
-pub const OWNER_FROM_FACES_EVERY: Duration = Duration::from_secs(30);
-
-/// The owner's name from the eyes ([`crate::person::owner_of_faces`]), kept
-/// for [`OWNER_FROM_FACES_EVERY`]: the one person they know, or none. No
-/// socket, or the eyes not answering, is none.
-pub fn owner_from_faces(
-    kept: &std::sync::Mutex<Option<(Instant, Option<String>)>>,
-    socket: Option<&Path>,
-) -> Option<String> {
-    let mut kept = kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some((at, name)) = kept.as_ref()
-        && at.elapsed() < OWNER_FROM_FACES_EVERY
-    {
-        return name.clone();
-    }
-    let name = socket
-        .and_then(crate::known_faces::names_known)
-        .and_then(|names| crate::person::owner_of_faces(&names).map(str::to_owned));
-    *kept = Some((Instant::now(), name.clone()));
-    name
+/// Whether the eyes still know `owner` ([`names_known`]): asked at each
+/// reply, so a forgotten face is never named (the Reviewer-lead's P3 on
+/// #4290). No socket, or the eyes not answering, is no.
+pub fn still_known(socket: Option<&Path>, owner: &str) -> bool {
+    socket
+        .and_then(names_known)
+        .is_some_and(|names| names.iter().any(|name| name == owner))
 }
 
 /// The file the eyes keep the known person's name in while they are at the
@@ -2729,36 +2714,22 @@ mod tests {
         }
     }
 
-    /// lamp-29e7 (29 Oct): a lamp set up by voice has no typed name, so the
-    /// owner named by default is the one person the eyes know, asked once
-    /// per [`OWNER_FROM_FACES_EVERY`]; two known, or no eyes, is nobody.
+    /// lamp-29e7 (29 Oct): the owner kept at setup is named by default only
+    /// while the eyes still know them, asked each time; no eyes is no.
     #[test]
-    fn the_owner_by_default_is_the_one_face_the_eyes_know() {
+    fn the_owner_is_named_only_while_the_eyes_still_know_them() {
         let (socket, asked) = eyes(vec![
-            serde_json::json!({"people": ["Example Name"]}),
-            serde_json::json!({"people": ["Example Name", "Robin"]}),
+            serde_json::json!({"people": ["Robin", "Example Name"]}),
+            serde_json::json!({"people": ["Robin"]}),
         ]);
-        let kept = std::sync::Mutex::new(None);
-        assert_eq!(
-            owner_from_faces(&kept, Some(&socket)).as_deref(),
-            Some("Example Name")
-        );
-        // Kept: not asked again within the time.
-        assert_eq!(
-            owner_from_faces(&kept, Some(&socket)).as_deref(),
-            Some("Example Name")
-        );
-        // Past it, asked again: two known now, so nobody is guessed.
-        if let Some((at, _)) = kept.lock().unwrap().as_mut() {
-            *at -= OWNER_FROM_FACES_EVERY;
-        }
-        assert_eq!(owner_from_faces(&kept, Some(&socket)), None);
+        assert!(still_known(Some(&socket), "Example Name"));
+        // Forgotten since: not named, at the very next ask.
+        assert!(!still_known(Some(&socket), "Example Name"));
         assert_eq!(
             asked.join().unwrap(),
             vec![serde_json::json!({"list": true}); 2]
         );
-        // No eyes to ask: nobody.
-        assert_eq!(owner_from_faces(&std::sync::Mutex::new(None), None), None);
+        assert!(!still_known(None, "Example Name"));
     }
 
     /// The eyes stand-in on a real socket: what each request sent, and the

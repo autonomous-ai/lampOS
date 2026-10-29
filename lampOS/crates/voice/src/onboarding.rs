@@ -373,6 +373,14 @@ pub struct Progress {
     /// the count: nothing of the sentence is kept.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub sentence_prompts: u8,
+    /// The name `remember_my_face` saved with the face that ended "who you
+    /// are" (#4118, lamp-29e7): the owner, named by default
+    /// (`LAMP_PERSON_NAME_BY_DEFAULT`) on a lamp set up by voice, which has no
+    /// typed name. Only that save sets it, so a guest's face never does
+    /// (the Reviewer-lead's P2s on #4290); a reset wipes it with the file.
+    /// An older voice ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
     /// Giving-way invitations committed this setup/redo, before each is
     /// published (#1800): at most two, so a rebuilt walk cannot ask again.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -733,6 +741,8 @@ pub struct Onboarding {
     /// this flag is kept, in memory, never the name; a forget, a redo of
     /// the walk or of that step clears it.
     face_saved_unasked: bool,
+    /// The name saved with that face, the owner's once it ends the step.
+    face_saved_name: Option<String>,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -891,6 +901,7 @@ impl Onboarding {
             no_slide: false,
             face_ask: false,
             face_saved_unasked: false,
+            face_saved_name: None,
             looked: None,
             felt: None,
             goals: None,
@@ -2249,6 +2260,9 @@ impl Onboarding {
                 .is_none_or(|led| led.step != step || led.asked_us.is_none())
         {
             self.face_saved_unasked = false;
+            if let Some(name) = self.face_saved_name.take() {
+                self.desired.owner = Some(name);
+            }
             self.records
                 .push(json!({"kind":"onboarding_face_saved","step":step.name(),
                 "before_asked":true,"at_us":now_us}));
@@ -2783,7 +2797,10 @@ impl Onboarding {
                 self.redo_giving();
                 self.desired.giving_way_tries = 0;
             }
-            Step::WhoYouAre => self.face_saved_unasked = false,
+            Step::WhoYouAre => {
+                self.face_saved_unasked = false;
+                self.face_saved_name = None;
+            }
             _ => {}
         }
         if self.led.as_ref().is_some_and(|led| led.step == step) {
@@ -2808,6 +2825,7 @@ impl Onboarding {
             // longer answers "who you are".
             if told.get("face_forgotten").and_then(Value::as_bool) == Some(true) {
                 self.face_saved_unasked = false;
+                self.face_saved_name = None;
                 continue;
             }
             if told.get("redo").and_then(Value::as_bool) == Some(true) {
@@ -2817,6 +2835,7 @@ impl Onboarding {
                 self.near.generation = 0;
                 self.redo_giving();
                 self.face_saved_unasked = false;
+                self.face_saved_name = None;
                 self.privacy_flow.loaded = true;
                 self.privacy_flow.maintenance_failed = false;
                 self.privacy_flow.failures = 0;
@@ -2870,12 +2889,23 @@ impl Onboarding {
             // #3746).
             let by_face =
                 told.get("by").and_then(Value::as_str) == Some(crate::known_faces::REMEMBER);
+            // The name saved with the face, the owner's if it ends "who you
+            // are" (#4118).
+            let saved_name = by_face
+                .then(|| told.get("name").and_then(Value::as_str))
+                .flatten()
+                .map(str::trim)
+                .filter(|name| !name.is_empty() && name.len() <= 64)
+                .map(str::to_owned);
             if led && step.reportable(outcome) {
                 self.nudge_record(!by_face, now_us);
                 if by_face {
                     self.records.push(
                         json!({"kind":"onboarding_face_saved","step":step.name(),"at_us":now_us}),
                     );
+                    if step == Step::WhoYouAre && outcome == Outcome::Done && saved_name.is_some() {
+                        self.desired.owner = saved_name.clone();
+                    }
                 }
                 if step == Step::Privacy {
                     self.invalidate_privacy(privacy::Invalidation::Redo);
@@ -2903,6 +2933,7 @@ impl Onboarding {
                 // asked (a tester's 7071 lamp, 27 Oct: the name told while
                 // "where you sit" was asked): kept for when it comes up.
                 self.face_saved_unasked = true;
+                self.face_saved_name = saved_name.clone();
                 eprintln!(
                     "lamp-voice: onboarding: a face saved before \"who you are\" was asked: kept for it"
                 );
@@ -3478,12 +3509,19 @@ fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
 /// leads that step, so a face saved at any other time changes nothing. On
 /// a tester's 7071 lamp on 27 Oct the chat saved the face twice and the
 /// step was never recorded.
-pub fn face_saved(file: &Path) {
+pub fn face_saved(file: &Path, name: Option<&str>) {
     let line = json!({"step": Step::WhoYouAre.name(), "outcome": "done",
-        "by": crate::known_faces::REMEMBER});
+        "by": crate::known_faces::REMEMBER, "name": name});
     if let Err(error) = post(file, &line) {
         eprintln!("lamp-voice: onboarding: a face saved, not noted for \"who you are\": {error}");
     }
+}
+
+/// The owner the onboarding file at `file` keeps ([`Progress::owner`]), as
+/// the walk last committed it; none without the file or the field.
+pub fn owner_of(file: &Path) -> Option<String> {
+    let bytes = std::fs::read(file).ok()?;
+    serde_json::from_slice::<Progress>(&bytes).ok()?.owner
 }
 
 /// A face `forget_my_face` forgot: a face saved before "who you are" was
@@ -4828,7 +4866,7 @@ mod tests {
     fn a_face_saved_with_the_nudge_on_is_no_report_of_the_models() {
         let mut room = at_who("face-saved-nudge", true);
         room.walk.take_records();
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
         let records = room.walk.take_records();
@@ -4849,6 +4887,45 @@ mod tests {
         );
     }
 
+    /// lamp-29e7 (#4118, the Reviewer-lead's P2s on #4290): the name saved
+    /// with the face that ends "who you are" is kept as the owner, led or
+    /// saved before it was asked; a face saved once the step is done, a
+    /// guest's, never changes it; a blank name sets nothing.
+    #[test]
+    fn the_face_that_ends_who_you_are_is_kept_as_the_owner_and_no_later_one() {
+        let mut room = Room::new("owner-kept");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        face_saved(&room.walk.file, Some(" "));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.walk.desired.owner, None, "a blank name sets nothing");
+        room.walk.redo_step(Step::WhoYouAre, room.at);
+        assert_eq!(
+            room.wait(20 * S, Some(NEAR_MIDDLE))
+                .first()
+                .map(String::as_str),
+            Some(WHO_NOTE)
+        );
+        face_saved(&room.walk.file, Some("Example Name"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.desired.owner.as_deref(), Some("Example Name"));
+        // A guest's face, saved later: the owner stays.
+        face_saved(&room.walk.file, Some("Robin"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.walk.desired.owner.as_deref(), Some("Example Name"));
+        // Committed to the file, where the second worker reads it.
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Example Name"));
+        // Saved before it was asked: kept for it, and the owner when it ends.
+        let mut early = Room::new("owner-early");
+        face_saved(&early.walk.file, Some("Example Name"));
+        early.wait(7 * S, Some(NEAR_MIDDLE));
+        early.wait(20 * S, Some(NEAR_MIDDLE));
+        assert_eq!(early.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(early.walk.desired.owner.as_deref(), Some("Example Name"));
+    }
+
     /// A face `remember_my_face` saved while "who you are" is led ends it
     /// (#3740, a tester's 7071 lamp).
     #[test]
@@ -4858,7 +4935,7 @@ mod tests {
         assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), None);
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
@@ -4872,7 +4949,7 @@ mod tests {
     fn a_face_saved_before_who_you_are_is_asked_ends_it_unasked_and_words_never_do() {
         let mut room = Room::new("face-saved-before");
         let mut said = room.wait(S, Some(NEAR_MIDDLE));
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         said.extend(room.wait(6 * S, Some(NEAR_MIDDLE)));
         assert_eq!(said, [SIT_NOTE, SIT_DONE]);
         let said = room.wait(20 * S, Some(NEAR_MIDDLE));
@@ -4912,7 +4989,7 @@ mod tests {
     fn a_face_saved_before_who_you_are_is_let_go_by_a_forget_or_a_redo() {
         // Forgotten before the step comes up: asked as before.
         let mut room = Room::new("face-saved-forgot");
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         face_forgotten(&room.walk.file);
         assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
         assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
@@ -4920,7 +4997,7 @@ mod tests {
 
         // The whole walk redone before it comes up: asked in the new walk.
         let mut room = Room::new("face-saved-redo");
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         room.wait(S, Some(NEAR_MIDDLE));
         let redo = ToolCall {
             id: "c".into(),
@@ -4936,7 +5013,7 @@ mod tests {
         // Done by an early save, then that step redone: asked, not done by
         // the old save.
         let mut room = Room::new("face-saved-redo-step");
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
         room.wait(20 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
@@ -5047,7 +5124,7 @@ mod tests {
             room.walk.heard(yes, room.at);
             room.wait(5 * S, Some(NEAR_MIDDLE));
             assert_eq!(room.outcome(Step::WhoYouAre), None, "{yes}");
-            face_saved(&room.walk.file);
+            face_saved(&room.walk.file, None);
             room.wait(S, Some(NEAR_MIDDLE));
             assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done), "{yes}");
         }
@@ -5113,7 +5190,7 @@ mod tests {
         room.walk.heard("Yes.", room.at);
         room.wait(5 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), None);
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
@@ -5136,7 +5213,7 @@ mod tests {
         room.walk.heard("Yes.", room.at);
         room.wait(5 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), None);
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
@@ -5156,7 +5233,7 @@ mod tests {
         room.walk.heard("Sure.", room.at);
         room.wait(12 * S - S / 4, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), None);
-        face_saved(&room.walk.file);
+        face_saved(&room.walk.file, None);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
         let records = room.walk.take_records();
