@@ -4177,20 +4177,24 @@ the configured provider's, and the chosen voice's model is
 voice fails to start (a refusal, a quota, a broken connection, an answer
 with no sound, or no first sound within 4 s, `START_WITHIN`) is asked of it
 once more, `lamp-voice second: <voice> failed to start a sentence (…);
-asked once more, on a connection of its own`. For a piece of a turn's
-answer in the configured voice, that second asking goes over HTTP on a
-connection opened for it, never the speech socket or a pooled connection
+asked once more`. For a piece of a turn's answer in the configured voice,
+the line adds `, on a connection of its own`: that second asking goes over
+HTTP on a connection opened for it, never the speech socket or a pooled connection
 that may have held the first (`net::fresh_client`, `Tts::speak_fresh`), in
 the turn's model, so the answer keeps one voice. Failing again, the piece
-fails with `services::UNSAID` (`<voice> failed again (…); the sentence is
-said with the next one`), and the answer's player says it with the next
+fails with `services::UNSAID` (`<voice> failed again (…); the sentence
+could not be started`), and the answer's player says it with the next
 piece, as one, in order (`a piece of the answer could not be started twice;
 it is said with the next piece`, then `the piece not said goes with the next
 one, as one piece (N words)`), so no sentence is silently dropped (#4338:
 on lamp-3e83 on 29 Oct ElevenLabs' first sound timed out at 14:15:13 and
 14:15:48, and one sentence of each of those answers was never said). A joined
 piece that can't be started either is carried again into the piece after
-it. Only the answer's last piece has nothing to go with: it is not said,
+it. The joined piece is asked for only when the player reaches it, after the
+two tries' up to 8 s, and the next piece's speech asked ahead is let go, so
+its first sound can come up to one more start, 4 s, after that. Speech
+outside an answer's pieces, such as the wait's sounds and the down line, has
+no next piece: a sentence not started twice is not said, as before. Only the answer's last piece has nothing to go with: it is not said,
 `the answer's last piece could not be started twice and was not said`, and
 the turn ends as ever. Its words were already given as the lamp's (the
 turn's `Transcript`, `said_piece`), so the lamp's own record holds words
