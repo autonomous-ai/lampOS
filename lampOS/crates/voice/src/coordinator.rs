@@ -1166,7 +1166,7 @@ impl Reply {
             Delivery::Whole
         } else if self.heard_through(speaker_pending, snapshot) {
             Delivery::Gapped
-        } else if !self.reached_speaker() && !sounded {
+        } else if !self.invitation_reached_speaker() && !sounded {
             Delivery::Unsaid
         } else {
             Delivery::Cut
@@ -1305,6 +1305,15 @@ impl Reply {
     /// It has reached the speaker: accepted, now or before a pause.
     fn reached_speaker(&self) -> bool {
         self.sounded || self.playback.is_some()
+    }
+
+    /// [`Self::reached_speaker`] with the turn's own output: a failure
+    /// notice played in place of words that never came (a chat refused
+    /// with HTTP 402 before any word, lamp-52e6 29 Oct 07:35) does not make
+    /// an onboarding invitation said, so it is `Unsaid`, not `Cut`.
+    fn invitation_reached_speaker(&self) -> bool {
+        self.reached_speaker()
+            && (self.had_audio || self.notice.origin() != SpeechOrigin::FailureNotice)
     }
 
     fn has_speaker_chunk(&self) -> bool {
@@ -3261,7 +3270,7 @@ fn latch_invitation_sounded(
     if let Some(current) = reply.as_ref()
         && invitation == Some((current.owner.boot(), current.owner.turn()))
     {
-        *audio |= current.reached_speaker();
+        *audio |= current.invitation_reached_speaker();
     }
 }
 
@@ -11428,7 +11437,7 @@ fn conversation_with_gate_inner(
             if let Some(current) = reply.as_ref()
                 && onboarding_invitation_turn == Some((current.owner.boot(), current.owner.turn()))
             {
-                onboarding_invitation_audio |= current.reached_speaker();
+                onboarding_invitation_audio |= current.invitation_reached_speaker();
             }
             if let Some((boot, turn)) = walk.invitation_binding()
                 && reply
@@ -16730,6 +16739,27 @@ mod tests {
         assert!(matches!(
             crate::onboarding::Delivery::unsettled(audio),
             crate::onboarding::Delivery::Cut
+        ));
+    }
+
+    /// lamp-52e6, 29 Oct 07:35: a chat refused (HTTP 402) before any word,
+    /// with only the failure notice played in its place, never said the
+    /// invitation: `Unsaid`, so it spends no try, not `Cut`.
+    #[test]
+    fn invitation_with_only_a_failure_notice_played_is_unsaid() {
+        let (_, mut current, _) = active_reply();
+        let bound = Some((current.owner.boot(), current.owner.turn()));
+        current.had_audio = false;
+        current.notice = NoticeDelivery::sound(SpeechOrigin::FailureNotice, vec![5; 480]);
+        current.playback = None;
+        current.sounded = true;
+        assert!(current.reached_speaker());
+        let mut audio = false;
+        latch_invitation_sounded(&Some(current), bound, &mut audio);
+        assert!(!audio, "a failure notice is not the invitation said");
+        assert!(matches!(
+            crate::onboarding::Delivery::unsettled(audio),
+            crate::onboarding::Delivery::Unsaid
         ));
     }
 
