@@ -11,15 +11,15 @@ use crate::protocol::Op;
 /// A kind of action, each with its own windows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Class {
-    /// `joints` goals: 20 a second.
+    /// `joints` goals: 40 a second.
     Joints,
-    /// `gesture`, `move`, `play`, `look`: one each 2 s.
+    /// `gesture`, `move`, `play`, `look`: one each second.
     Motion,
     /// `light`: 5 a second.
     Light,
     /// `say` and `sound`: 6 a minute and 60 an hour.
     Say,
-    /// `express`: one a minute.
+    /// `express`: 20 a minute.
     Express,
     /// A change of the phrases a connection listens for: 6 a minute, so a
     /// program can't swap word lists to probe the room's speech
@@ -56,11 +56,11 @@ impl Class {
     pub fn windows(self) -> &'static [(usize, u64)] {
         const S: u64 = 1_000_000;
         match self {
-            Self::Joints => &[(20, S)],
-            Self::Motion => &[(1, 2 * S)],
+            Self::Joints => &[(40, S)],
+            Self::Motion => &[(1, S)],
             Self::Light => &[(5, S)],
             Self::Say => &[(6, 60 * S), (60, 3_600 * S)],
-            Self::Express => &[(1, 60 * S)],
+            Self::Express => &[(20, 60 * S)],
             Self::Phrases => &[(6, 60 * S)],
             Self::Push => &[(1, 10 * S), (20, 3_600 * S)],
             Self::Manage => &[(6, 60 * S)],
@@ -71,11 +71,11 @@ impl Class {
     /// The class's bounds, as a refusal's why says them.
     pub fn says(self) -> &'static str {
         match self {
-            Self::Joints => "joints: 20 a second",
-            Self::Motion => "motion: 1 each 2 s",
+            Self::Joints => "joints: 40 a second",
+            Self::Motion => "motion: 1 each second",
             Self::Light => "light: 5 a second",
             Self::Say => "say: 6 a minute and 60 an hour",
-            Self::Express => "express: 1 a minute",
+            Self::Express => "express: 20 a minute",
             Self::Phrases => "phrases: 6 changes a minute",
             Self::Push => "skill.push: 1 each 10 s and 20 an hour",
             Self::Manage => "skill.list and skill.remove: 6 a minute",
@@ -162,16 +162,24 @@ mod tests {
     #[test]
     fn each_class_holds_its_windows_and_says_when_to_try_again() {
         let mut rates = Rates::new();
+        // Motion: one each second (the person's 09:43, was one each 2 s).
         assert_eq!(rates.take("c_1", Class::Motion, 0), Ok(()));
-        assert_eq!(rates.take("c_1", Class::Motion, S), Err(1_000));
-        assert_eq!(rates.take("c_1", Class::Motion, 2 * S), Ok(()));
+        assert_eq!(rates.take("c_1", Class::Motion, S / 2), Err(500));
+        assert_eq!(rates.take("c_1", Class::Motion, S), Ok(()));
         // Another client counts on its own.
-        assert_eq!(rates.take("c_2", Class::Motion, 2 * S), Ok(()));
-        for n in 0..20 {
+        assert_eq!(rates.take("c_2", Class::Motion, S), Ok(()));
+        // Joints: 40 a second (was 20).
+        for n in 0..40 {
             assert_eq!(rates.take("c_1", Class::Joints, n * 10_000), Ok(()), "{n}");
         }
         assert_eq!(rates.take("c_1", Class::Joints, 500_000), Err(500));
         assert_eq!(rates.take("c_1", Class::Joints, S), Ok(()));
+        // Express: 20 a minute (was 1).
+        for n in 0..20 {
+            assert_eq!(rates.take("c_1", Class::Express, n * S), Ok(()), "{n}");
+        }
+        assert_eq!(rates.take("c_1", Class::Express, 20 * S), Err(40_000));
+        assert_eq!(rates.take("c_1", Class::Express, 60 * S), Ok(()));
     }
 
     #[test]
