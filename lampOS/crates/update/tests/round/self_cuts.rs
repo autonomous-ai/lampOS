@@ -388,7 +388,21 @@ fn interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart() {
     );
     assert!(lamp.pending().is_none());
     assert_eq!(fs::read(&refusal_path).unwrap(), refused_bytes);
-    assert_eq!(lamp.files(), completed_files);
+    // Every file as the completed put-back left it, but the log: each
+    // put-back is a round's end of its own (#1683's update alerts), so the
+    // finished one adds its line.
+    let log = "var/lib/lampos-update/log.jsonl";
+    let without_log = |mut files: BTreeMap<String, Vec<u8>>| {
+        files.remove(log);
+        files
+    };
+    assert_eq!(
+        without_log(lamp.files()),
+        without_log(completed_files.clone())
+    );
+    assert!(lamp.files()[log].starts_with(&completed_files[log]));
+    let told = lamp_update::status::last_in_records(&lamp.records()).unwrap();
+    assert_eq!(told.outcome, "self-put-back");
     boundary(&lamp, OLD);
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
     assert_eq!(fs::read(&refusal_path).unwrap(), refused_bytes);
