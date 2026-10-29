@@ -72,6 +72,56 @@ the plain CLI on 2026-10-14 ("just use the harness cli to create a new
 claude code session"); the person's spoken yes to each exact task is still
 what lets a task start.
 
+`--route` (off unless set; the person, 29 Oct 23:46) asks Harness's
+router first, after the yes and before `new`: `harness route --machine <id>
+--json --send -- <task>`, within 20 s (`harness::ROUTE_TIMEOUT`,
+`Cli::route_first`). That time counts inside the launch's one 60 s bound:
+a `new` after it gets what is left. The router (Jev, as
+Harness's ⌘B, openharness `docs/design/2026-10-09-auto-router.md`) reads
+that computer's sessions and either picks one, typing the words into it
+when it is idle as `harness reply` does (openharness#2157, the person's
+`programs-reply` switch), or says the task is new work.
+- **A session picked and typed into** is the task's agent (`joined` in the
+  dispatch line). The watch, `wait` and the news follow it as any task's.
+  It is the person's own session, so the task is stored not closable and
+  `--close-told` never closes it; an older build reads that the same way.
+  A follow-up typed into a session an earlier task of the lamp's had
+  ("now make it rhyme", after the lamp's own poem task) takes it over once
+  that task is spent: its newest answer settled (idle with an answer,
+  stopped or failed, not waiting on the person) and no close of it under
+  way. The earlier task leaves the store, so the store keeps one task a
+  session, and the follow-up watches the session and tells its answer. An
+  earlier answer not yet told is then not told on its own. A session the
+  store still sees working, though the router saw it idle (a race: a
+  working one is `NOT_IDLE` at the router, so `agent_busy`) keeps its task
+  (a close under way holds every launch until it ends), and the words typed into it are `uncertain`
+  (`reused_remote_id`), never sent again.
+- **`new` as before:** the router says new work, is off or can't be
+  reached (`ROUTER_UNAVAILABLE`), refuses (`REPLY_OFF`, `NOT_YOURS`), or its
+  pick is no longer running or its computer refused the words (`FAILED`).
+  Nothing was
+  typed in any of these.
+- **A busy pick** (`NOT_IDLE`: working, or maybe waiting on the person)
+  ends `not_sent` with `agent_busy`, and never starts a new session for
+  the same task. Task news says so with its `failed_busy` words.
+- **A send that ended unconfirmed** (`UNCONFIRMED`, `DISCONNECTED`,
+  `INVALID_RESPONSE`, `CANCELLED`: openharness#2252 says so under `sent`
+  with `uncertain`), an answer it can't read after it may have typed, or a
+  route stopped before it answered, is `uncertain`, never sent again and
+  never new: the words may be in the session already.
+- **Not routed:** Devin Cloud, whose sessions are in Devin's cloud.
+- **Which session:** the router picks among every session on the target's
+  computer, so the read-back's agent may not be the one that takes it. It
+  goes with `LAMP_TASKS_SHORT_CONFIRM=on`, whose yes is "Should I send it
+  to your computer?" and names no agent or session.
+- **Tests:** `tests/harness.rs`
+  `with_route_the_router_is_asked_first_and_its_pick_is_the_tasks_agent`;
+  `engine::tests::a_task_that_joined_the_persons_session_is_told_and_never_closed`,
+  `engine::tests::a_follow_up_takes_over_a_spent_tasks_session_and_never_a_working_one`;
+  the voice's `skill_words` (with `failed_busy`).
+- **Not yet shown:** any run with a real `harness route`, which
+  harness-reviewer is building (29 Oct).
+
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts
 it on the bus as `tasks/status`, without the agent's words: ["Progress on

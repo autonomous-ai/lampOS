@@ -1527,6 +1527,7 @@ fn note_failed(
         Some("folder_missing") => Some(&words.failed_folder),
         Some("engine_signed_out") => Some(&words.failed_signed_out),
         Some("engine_no_prompt") => Some(&words.failed_no_prompt),
+        Some("agent_busy") => Some(&words.failed_busy),
         _ => None,
     };
     if let Some(line) = refused

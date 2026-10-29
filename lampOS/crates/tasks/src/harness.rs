@@ -178,10 +178,24 @@ pub struct Launch {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LaunchOutcome {
-    Created { agent_id: String },
-    Pending { creation_id: String },
-    NotSent { code: String },
-    Uncertain { code: String },
+    Created {
+        agent_id: String,
+    },
+    /// The task's words were typed into a session the person already had,
+    /// which Harness's router chose (`serve --route`): its agent is that
+    /// session, which the lamp never closes.
+    Joined {
+        agent_id: String,
+    },
+    Pending {
+        creation_id: String,
+    },
+    NotSent {
+        code: String,
+    },
+    Uncertain {
+        code: String,
+    },
 }
 
 /// How closing one harness this lamp started went (#1390).
@@ -238,6 +252,10 @@ pub const ENGINES_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
 /// nothing: a second hand-over within it asks nothing. A refusal is never
 /// kept: the person may sign in at once and ask again.
 pub const ENGINES_KEPT: Duration = Duration::from_secs(300);
+/// The most a route may take, of the launch's bound: Harness's router
+/// answers in 0.4 to 0.7 s and is bounded at 8 s; from a lamp, the read of
+/// that computer's sessions and the typing in come on top.
+pub const ROUTE_TIMEOUT: Duration = Duration::from_secs(20);
 /// How often a Devin just started is looked at until it is idle, for its
 /// first message ([`Cli::first_message`]).
 const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
@@ -388,6 +406,12 @@ pub struct CliConfig {
     /// so the voice can say so (`serve --engines-ready`). Off unless set:
     /// nothing is asked, and the hand-over goes as before.
     pub engines_ready: bool,
+    /// Before `new`, Harness's router is asked whether the task belongs to a
+    /// session the person already has on the target's computer, and the
+    /// words are typed into it there (`harness route --send`,
+    /// [`Cli::route_first`]). Off unless set (`serve --route`): `new`, as
+    /// before.
+    pub route: bool,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -407,6 +431,7 @@ impl CliConfig {
             as_person: false,
             folder_missing: false,
             engines_ready: false,
+            route: false,
             journal: None,
         }
     }
@@ -620,10 +645,18 @@ impl Cli {
         if !launch.target.engine.typed_after() {
             args.extend(["--task".into(), launch.prompt.clone().into()]);
         }
-        // One `launch_timeout` for the whole `new`, a retry included, and
-        // Devin's first message after it.
-        let until = Instant::now() + self.config.launch_timeout;
-        let mut reply = self.run(&args, self.config.launch_timeout);
+        // One `launch_timeout` for the whole hand-over: any route, then the
+        // `new`, a retry included, and Devin's first message after it (the
+        // Reviewer-lead's P3 on #4422: the two bounds no longer add).
+        let began = Instant::now();
+        if self.config.route
+            && !launch.target.engine.cloud()
+            && let Some(routed) = self.route_first(launch, seen)
+        {
+            return routed;
+        }
+        let until = began + self.config.launch_timeout;
+        let mut reply = self.run(&args, until.saturating_duration_since(Instant::now()));
         seen.took(&reply);
         // A bare name gets its folder, `~/harnesses/<name>`, from Harness on
         // the first `new`, and every later `new` on that name is refused
@@ -657,6 +690,67 @@ impl Cli {
             Ok(_) => uncertain("new_failed"),
             Err(error) if error.spawned => uncertain(error.code),
             Err(error) => not_sent(error.code),
+        }
+    }
+
+    /// Harness's router, asked first (`serve --route`): `harness route
+    /// --machine <id> --json --send -- <task>`. It reads that computer's
+    /// sessions and either chose one, and typed the words into it when it
+    /// is idle, or says the task is new work. `None` is "start new work as
+    /// before": the router said new, is off or unreachable
+    /// (`ROUTER_UNAVAILABLE`), refused (`REPLY_OFF`, `NOT_YOURS`), or its
+    /// pick is no longer running or its machine refused the words
+    /// (`FAILED`), and nothing was typed (openharness#2246). A busy pick is
+    /// `agent_busy`, not sent and never new, so the person isn't handed a
+    /// second session for one task. A route that may have typed the words
+    /// and gave no answer is uncertain, never sent again.
+    fn route_first(&self, launch: &Launch, seen: &mut Seen) -> Option<LaunchOutcome> {
+        let uncertain = |code: &str| Some(LaunchOutcome::Uncertain { code: code.into() });
+        let args: Vec<OsString> = vec![
+            "route".into(),
+            "--machine".into(),
+            launch.target.machine_id.clone().into(),
+            "--json".into(),
+            "--send".into(),
+            "--".into(),
+            launch.prompt.clone().into(),
+        ];
+        let began = Instant::now();
+        let reply = self.run(&args, ROUTE_TIMEOUT.min(self.config.launch_timeout));
+        seen.took(&reply);
+        let routed = match reply {
+            Ok(reply) => route_answer(&reply.stdout),
+            Err(error) if error.code == "cancelled" => return uncertain("cancelled"),
+            // Started, and stopped before it answered: it may have typed.
+            Err(error) if error.spawned => return uncertain("route_uncertain"),
+            Err(error) => Routed::New(error.code),
+        };
+        let ms = began.elapsed().as_millis();
+        match routed {
+            Routed::Sent(agent_id) => {
+                eprintln!(
+                    "tasks: {}: routed to a session already there, in {ms} ms",
+                    launch.name
+                );
+                Some(LaunchOutcome::Joined { agent_id })
+            }
+            Routed::Busy => {
+                eprintln!(
+                    "tasks: {}: the router chose a busy session, in {ms} ms: not sent",
+                    launch.name
+                );
+                Some(LaunchOutcome::NotSent {
+                    code: "agent_busy".into(),
+                })
+            }
+            Routed::New(why) => {
+                eprintln!(
+                    "tasks: {}: the router says new work ({why}), in {ms} ms",
+                    launch.name
+                );
+                None
+            }
+            Routed::Unsure => uncertain("route_uncertain"),
         }
     }
 
@@ -1671,6 +1765,7 @@ const STDERR_SAID_CHARS: usize = 160;
 fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Duration) -> String {
     let state = match outcome {
         LaunchOutcome::Created { .. } => "accepted".to_owned(),
+        LaunchOutcome::Joined { .. } => "joined".to_owned(),
         LaunchOutcome::Pending { .. } => "pending".to_owned(),
         LaunchOutcome::NotSent { code } => format!("not_sent {code}"),
         LaunchOutcome::Uncertain { code } => format!("uncertain {code}"),
@@ -1820,6 +1915,71 @@ fn name_taken(bytes: &[u8], project: &str) -> Option<String> {
 /// no tool used ([`Cli::first_message`]).
 fn fresh(observation: &Observation) -> bool {
     observation.ask.is_none() && observation.answer.is_empty() && observation.tools == 0
+}
+
+/// What `harness route --json --send` answered ([`Cli::route_first`]).
+enum Routed {
+    /// Chose this session, and its words are queued in its mailbox.
+    Sent(String),
+    /// Chose a session that is working, or may be waiting on the person.
+    Busy,
+    /// Nothing typed: start new work, for this reason.
+    New(&'static str),
+    /// Chose a session and may have typed the words: an answer it can't read.
+    Unsure,
+}
+
+fn route_answer(bytes: &[u8]) -> Routed {
+    let Ok(answer) = serde_json::from_slice::<Value>(bytes) else {
+        // No answer at all: nothing it decided can be read, so nothing is
+        // taken as typed only when it said nothing.
+        return if bytes.iter().all(u8::is_ascii_whitespace) {
+            Routed::New("no_answer")
+        } else {
+            Routed::Unsure
+        };
+    };
+    // A send that ended unconfirmed may have typed the words: uncertain,
+    // never new (openharness#2252 says so under `sent`, with `uncertain`;
+    // a `harness route` before it said the same codes as a bare error).
+    let unconfirmed = |code: Option<&str>| {
+        matches!(
+            code,
+            Some("UNCONFIRMED" | "DISCONNECTED" | "INVALID_RESPONSE" | "CANCELLED")
+        )
+    };
+    if answer["sent"]["uncertain"] == true
+        || unconfirmed(answer["sent"]["error"].as_str())
+        || unconfirmed(answer["error"].as_str())
+    {
+        return Routed::Unsure;
+    }
+    // A refusal before or after deciding: Harness's code, at the top or
+    // under `sent`. Anything else under `sent` typed nothing.
+    let refused = answer["error"]
+        .as_str()
+        .or_else(|| answer["sent"]["error"].as_str())
+        .or_else(|| answer["sent"]["code"].as_str());
+    match refused {
+        Some("NOT_IDLE") => return Routed::Busy,
+        Some("NOT_RUNNING") => return Routed::New("not_running"),
+        // Its machine's mailbox refused the words: nothing was typed.
+        Some("FAILED") => return Routed::New("send_failed"),
+        Some("ROUTER_UNAVAILABLE" | "JEV_UNAVAILABLE") => return Routed::New("router_unavailable"),
+        Some("REPLY_OFF") => return Routed::New("reply_off"),
+        Some(_) => return Routed::New("refused"),
+        None => {}
+    }
+    match answer["decided"].as_str() {
+        Some("new") => Routed::New("router"),
+        Some("session") => match (answer["id"].as_str(), answer["sent"]["state"].as_str()) {
+            (Some(id), Some("queued")) if agent_id(id) => Routed::Sent(id.to_owned()),
+            // Its machine refused the words: nothing was typed.
+            (_, Some("failed")) => Routed::New("send_failed"),
+            _ => Routed::Unsure,
+        },
+        _ => Routed::Unsure,
+    }
 }
 
 /// Whether `harness reply --json` took the words for `agent_id`: queued in

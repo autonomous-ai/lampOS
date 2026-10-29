@@ -656,6 +656,16 @@ fn spent(task: &Task) -> bool {
         _ => false,
     }
 }
+/// Whether an earlier task may give its session to a follow-up the router
+/// typed into it ([`LaunchOutcome::Joined`]): spent, and no close of it under
+/// way, which could end the session the follow-up is in.
+fn handed_on(task: &Task) -> bool {
+    spent(task)
+        && !task
+            .close
+            .as_ref()
+            .is_some_and(|close| close.state == CloseState::Attempting)
+}
 fn digest(value: &impl Serialize) -> String {
     let bytes = serde_json::to_vec(value).expect("owned serializable data");
     Sha256::digest(bytes)
@@ -1849,6 +1859,15 @@ impl<P: Persistence> Engine<P> {
                 .tasks
                 .iter()
                 .any(|task| task.dispatch.agent_id.as_ref() == Some(agent_id)),
+            // A session the router chose that an earlier task of the lamp's
+            // has: taken over once that task is spent (its answer settled)
+            // and not being closed, below. One the store still sees working
+            // is the race where the router saw it idle: uncertain, since the
+            // words were typed (the local leader's P2 on #4422).
+            LaunchOutcome::Joined { agent_id } => next
+                .tasks
+                .iter()
+                .any(|task| task.dispatch.agent_id.as_ref() == Some(agent_id) && !handed_on(task)),
             LaunchOutcome::Pending { creation_id } => next
                 .tasks
                 .iter()
@@ -1862,11 +1881,32 @@ impl<P: Persistence> Engine<P> {
         } else {
             outcome
         };
+        // A follow-up the router typed into a session an earlier, spent task
+        // of the lamp's had: that task gives the session to this one, so the
+        // store keeps one task a session and this one watches and tells it.
+        if let LaunchOutcome::Joined { agent_id: id } = &outcome {
+            let before = next.tasks.len();
+            next.tasks
+                .retain(|task| task.id == task_id || task.dispatch.agent_id.as_ref() != Some(id));
+            if next.tasks.len() < before {
+                eprintln!(
+                    "tasks: task {task_id} takes over the session of {} earlier one(s)",
+                    before - next.tasks.len()
+                );
+            }
+        }
+        let index = find(&next, task_id)?;
         let task = &mut next.tasks[index];
         match outcome {
             LaunchOutcome::Created { agent_id: id } if agent_id(&id) => {
                 task.dispatch.state = DispatchState::Accepted;
                 task.dispatch.agent_id = Some(id);
+            }
+            // The person's own session: told as any task's, never closed.
+            LaunchOutcome::Joined { agent_id: id } if agent_id(&id) => {
+                task.dispatch.state = DispatchState::Accepted;
+                task.dispatch.agent_id = Some(id);
+                task.closable = false;
             }
             LaunchOutcome::Pending { creation_id: id } if creation_id(&id) => {
                 task.dispatch.state = DispatchState::Pending;
@@ -3145,6 +3185,144 @@ mod tests {
             )
             .unwrap();
         id
+    }
+
+    /// `serve --route`: a task the router typed into a session the person
+    /// already had is accepted with that session as its agent, told as any
+    /// task, and never closed, even with `--close-told`; stored with no
+    /// `closable`, which an older build also reads as never closed.
+    #[test]
+    fn a_task_that_joined_the_persons_session_is_told_and_never_closed() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 0);
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                },
+                &clock(0),
+            )
+            .unwrap();
+        assert_eq!(
+            engine.state.tasks[0].dispatch.state,
+            DispatchState::Accepted
+        );
+        assert_eq!(
+            engine.state.tasks[0].dispatch.agent_id.as_deref(),
+            Some(AGENT)
+        );
+        assert!(!engine.state.tasks[0].closable);
+        assert!(
+            !serde_json::to_string(&stored(&memory).tasks[0])
+                .unwrap()
+                .contains("closable")
+        );
+        let job = request_read(&mut engine, id, 10);
+        let mut answer = data("Fixed the login page.");
+        answer.ask = Some("Fix the login page".into());
+        engine.finish_observation(&job, answer, &clock(10)).unwrap();
+        let observation = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        engine
+            .handle(&claim(&engine, id, observation), &clock(11), true)
+            .unwrap();
+        engine
+            .handle(&acknowledgement(&engine, id, observation), &clock(12), true)
+            .unwrap();
+        assert!(engine.begin_close(&clock(13)).unwrap().is_none());
+        assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
+    }
+
+    /// A follow-up the router typed into a session an earlier task of the
+    /// lamp's had (the local leader's P2 on #4422): that task gives the
+    /// session over once it is spent, so the follow-up watches and tells
+    /// it, and is never closed. One the store still sees working (the router
+    /// saw it idle) keeps it, and the follow-up is uncertain.
+    #[test]
+    fn a_follow_up_takes_over_a_spent_tasks_session_and_never_a_working_one() {
+        let join = |engine: &mut Engine<Memory>, at: u64| {
+            let id = queued(engine, at);
+            engine.begin_launch(&clock(at)).unwrap().unwrap();
+            engine
+                .finish_launch(
+                    id,
+                    LaunchOutcome::Joined {
+                        agent_id: AGENT.into(),
+                    },
+                    &clock(at),
+                )
+                .unwrap();
+            id
+        };
+        let dispatch = |engine: &Engine<Memory>, id: u64| {
+            engine
+                .state
+                .tasks
+                .iter()
+                .find(|task| task.id == id)
+                .map(|task| {
+                    (
+                        task.dispatch.state,
+                        task.dispatch.code.clone(),
+                        task.closable,
+                    )
+                })
+        };
+        // Spent (idle with its answer, told): the follow-up takes it over.
+        let (mut engine, memory) = opened();
+        let first = told(&mut engine, "idle", 10);
+        let second = join(&mut engine, 20);
+        assert_eq!(
+            dispatch(&engine, first),
+            None,
+            "the earlier task gave it over"
+        );
+        assert_eq!(
+            dispatch(&engine, second),
+            Some((DispatchState::Accepted, None, false))
+        );
+        assert_eq!(stored(&memory).tasks.len(), 1);
+        // The follow-up's answer is read and told as any task's, never closed.
+        let read = request_read(&mut engine, second, 30);
+        let mut answer = data("A rhyming two-line poem about coffee.");
+        answer.ask = Some("Now make it rhyme".into());
+        engine
+            .finish_observation(&read, answer, &clock(30))
+            .unwrap();
+        assert_eq!(engine.state.tasks[0].observations.len(), 1);
+        assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
+        // Still working in the store: the race; uncertain, the earlier untouched.
+        let (mut engine, _) = opened();
+        let first = accepted(&mut engine, 0);
+        let read = request_read(&mut engine, first, 5);
+        let mut working = data("");
+        working.state = "working".into();
+        engine
+            .finish_observation(&read, working, &clock(5))
+            .unwrap();
+        let second = join(&mut engine, 6);
+        assert_eq!(
+            dispatch(&engine, second),
+            Some((
+                DispatchState::Uncertain,
+                Some("reused_remote_id".into()),
+                true
+            ))
+        );
+        assert_eq!(dispatch(&engine, first).unwrap().0, DispatchState::Accepted);
+        // A close under way holds every launch until it ends (`active`), so
+        // a follow-up never lands while the earlier task is being closed.
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        engine.begin_close(&clock(13)).unwrap().unwrap();
+        queued(&mut engine, 20);
+        assert!(engine.begin_launch(&clock(20)).unwrap().is_none());
     }
 
     /// #1390: the harness this lamp started is closed once its answer is told,

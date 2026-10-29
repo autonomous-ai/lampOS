@@ -103,6 +103,7 @@ impl Rig {
             as_person: false,
             folder_missing: false,
             engines_ready: false,
+            route: false,
             journal: None,
         };
         let rig = Self {
@@ -536,6 +537,132 @@ fn a_fresh_devin_read_as_needs_input_is_replied_to_at_once() {
         );
         assert!(!rig.calls().iter().any(|call| call["args"][0] == "reply"));
     }
+}
+
+/// `serve --route`: Harness's router is asked first, with `--send`. A
+/// session it chose and typed into is the task's agent (`joined`), with no
+/// `new`; new work, or a router that can't or won't decide, is `new` as
+/// before; a busy pick is `agent_busy`, never new; an answer it can't read
+/// after it may have typed is uncertain. Off, nothing is routed.
+#[test]
+fn with_route_the_router_is_asked_first_and_its_pick_is_the_tasks_agent() {
+    let verbs = |rig: &Rig| -> Vec<String> {
+        rig.calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let routed = |answer: Value| {
+        let mut rig = Rig::new();
+        rig.config.route = true;
+        rig.plan(json!({"machines":{"default":true},"new":{"default":true},"route":answer}));
+        let outcome = rig.cli().launch(&launch());
+        (outcome, verbs(&rig), rig)
+    };
+    let sent = json!({"decided":"session","id":AGENT,"name":"Fix login","machine":"daniel-pc","confidence":0.82,"reason":"same work","sent":{"state":"queued"}});
+    let (outcome, called, rig) = routed(step(sent));
+    assert_eq!(
+        outcome,
+        LaunchOutcome::Joined {
+            agent_id: AGENT.into()
+        }
+    );
+    assert_eq!(called, ["machines", "route"]);
+    assert_eq!(
+        rig.calls()[1]["args"],
+        json!([
+            "route",
+            "--machine",
+            MACHINE,
+            "--json",
+            "--send",
+            "--",
+            "Inspect the authored fixture"
+        ])
+    );
+    // New work: `new` as before.
+    let (outcome, called, _) = routed(json!({"default":true}));
+    assert!(
+        matches!(outcome, LaunchOutcome::Created { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(called, ["machines", "route", "new"]);
+    // Busy: not sent, and no new session for it.
+    let busy =
+        json!({"decided":"session","id":AGENT,"name":"Fix login","sent":{"error":"NOT_IDLE"}});
+    let (outcome, called, _) = routed(step(busy));
+    assert_eq!(outcome, not_sent("agent_busy"));
+    assert_eq!(called, ["machines", "route"]);
+    let busy = json!({"stdout":format!("{}\n", json!({"error":"NOT_IDLE","detail":"…"})),"exit":1});
+    assert_eq!(routed(busy).0, not_sent("agent_busy"));
+    // Can't or won't decide, or its pick is gone: new work, nothing typed.
+    for (stdout, exit) in [
+        (
+            json!({"error":"ROUTER_UNAVAILABLE","detail":"Nothing was decided"}),
+            1,
+        ),
+        (
+            json!({"decided":"session","id":AGENT,"sent":{"error":"FAILED","detail":"its machine refused it"}}),
+            0,
+        ),
+        (
+            json!({"error":"REPLY_OFF","detail":"…","code":"REPLY_OFF"}),
+            5,
+        ),
+        (json!({"error":"NOT_YOURS","detail":"…"}), 5),
+        (
+            json!({"decided":"session","id":AGENT,"sent":{"error":"NOT_RUNNING"}}),
+            0,
+        ),
+        (
+            json!({"decided":"session","id":AGENT,"sent":{"state":"failed"}}),
+            1,
+        ),
+    ] {
+        let (outcome, called, _) = routed(json!({"stdout":format!("{stdout}\n"),"exit":exit}));
+        assert!(
+            matches!(outcome, LaunchOutcome::Created { .. }),
+            "{stdout}: {outcome:?}"
+        );
+        assert_eq!(called, ["machines", "route", "new"], "{stdout}");
+    }
+    // A send that ended unconfirmed (openharness#2252), or the same codes
+    // bare from a route before it: the words may be there, so uncertain.
+    for stdout in [
+        json!({"decided":"session","id":AGENT,"sent":{"error":"UNCONFIRMED","detail":"…","uncertain":true}}),
+        json!({"decided":"session","id":AGENT,"sent":{"error":"DISCONNECTED","detail":"…","uncertain":true}}),
+        json!({"error":"INVALID_RESPONSE","detail":"…"}),
+        json!({"error":"CANCELLED","detail":"…"}),
+    ] {
+        let (outcome, called, _) = routed(json!({"stdout":format!("{stdout}\n"),"exit":1}));
+        assert_eq!(outcome, uncertain("route_uncertain"), "{stdout}");
+        assert_eq!(called, ["machines", "route"], "{stdout}");
+    }
+    // Its machine's own code under `sent`, with nothing typed: new.
+    let (outcome, called, _) = routed(step(
+        json!({"decided":"session","id":AGENT,"sent":{"error":"SESSION_GONE","detail":"…"}}),
+    ));
+    assert!(
+        matches!(outcome, LaunchOutcome::Created { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(called, ["machines", "route", "new"]);
+    // A session chosen, and an answer that can't say whether it was typed.
+    for stdout in [
+        "{\"decided\":\"session\",\"id\":\"11111111-1111-4111-8111-111111111111\"}\n",
+        "not json\n",
+    ] {
+        let (outcome, called, _) = routed(json!({"stdout":stdout}));
+        assert_eq!(outcome, uncertain("route_uncertain"), "{stdout}");
+        assert_eq!(called, ["machines", "route"], "{stdout}");
+    }
+    // Off: no route.
+    let rig = Rig::new();
+    assert!(matches!(
+        rig.cli().launch(&launch()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(verbs(&rig), ["machines", "new"]);
 }
 
 /// A Devin Cloud agent's id, as Harness 0.4.27 gave one on 20 October.
