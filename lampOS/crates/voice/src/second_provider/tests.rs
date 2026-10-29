@@ -939,6 +939,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         named_only: false,
         correct: false,
         questions: false,
+        short_confirm: false,
         sign_in: false,
     };
     let settings = crate::tools::Settings {
@@ -5549,6 +5550,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         named_only: false,
         correct: false,
         questions: false,
+        short_confirm: false,
         sign_in: false,
     };
     let settings = crate::tools::Settings {
@@ -12854,6 +12856,7 @@ async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() 
                 named_only: false,
                 correct: false,
                 questions: false,
+                short_confirm: false,
                 sign_in: false,
             }),
             requested_audio: true,

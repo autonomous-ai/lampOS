@@ -105,6 +105,10 @@ With `LAMP_MESSAGES=on` (#1673, [messages.md](messages.md)), a task asked for in
 a text from the Autonomous app is confirmed the same way, by a "yes" typed in
 that same chat within the same 120 s (`agent_tasks::may_confirm`): never by a
 spoken yes, and a typed yes never confirms a spoken task.
+One kind of task needs no yes: with `LAMP_TASKS_QUESTIONS=on`, a read-only
+question for one of the staff starts as soon as it is prepared (["A question
+for one of the staff is theirs"](#a-question-for-one-of-the-staff-is-theirs-off-unless-lamp_tasks_questionson)
+below). Every task that may change something keeps its read-back and yes.
 
 ## Local state transitions
 
@@ -1826,10 +1830,37 @@ says it doesn't know, and never asks what to do.
   history command, so the lamp names none (the person, 29 Oct 16:37: "just
   one line for all type of coding engine"). A Devin Cloud session has no
   folder: it reads its sessions alone. Nothing is added to other work.
+- **Asking how work is going is no question task.** The note says that
+  asking how work already handed over is going ("how's it going?", "is it
+  done?", "what is Claude Code doing?") is answered with
+  `check_agent_task`, never with a new task and never without a call. On
+  lamp-75c9 on 30 Oct at 06:42, "How's it going?" got the question's own
+  words ("I'll ask Claude Code about that…") and no call at all.
+- **No yes for a question** (the person, 29 Oct 17:15: "no need to
+  confirmation for those cases"). A question task starts at once, in the
+  same `start_agent_task` call that prepares it, with no read-back and no
+  yes (`agent_tasks::starts_unasked`). Only when all of these hold:
+  - the task begins with `agent_tasks::QUESTION` exactly;
+  - the person's own words or text are this request: heard, or a text
+    typed in the app. A task the model starts on a turn of the lamp's own
+    (task news, an add-on's note) still needs the yes;
+  - it is the first question started so in this request: a second one
+    waits for the yes. The usual limit on tasks under way still holds.
+
+  A question task that still needs the yes is said back as the person's
+  question alone (`agent_tasks::question_of`), never with its opening or
+  the past-work line. Work that may change things keeps its read-back and
+  yes. Harness has a
+  plan mode for Claude Code and Codex (openharness `cli/src/engines/claude`
+  and `codex`), and none for OpenCode, Devin, Devin Cloud or Hermes; question
+  tasks still start in `auto`, as other work does. Starting them in plan mode needs the tasks
+  part to carry the kind of task, and isn't done yet.
 - **What the person hears:**
-  - After their yes, the model is told `agent_tasks::asked_next`: say it has
-    asked Devin, that it may take a few minutes, and that it will tell them
-    what Devin says. It must never guess or give the answer itself.
+  - As it starts, the model is told `agent_tasks::asked_next`: say in a few
+    natural words that it has asked Devin and to wait for the answer ("I'll
+    ask Devin about that, let's wait for its answer."), and that it will
+    tell them what Devin says. It must never guess or give the answer
+    itself, and never ask whether to start it.
   - When the answer comes, Task news tells it with the skill's `answered`
     words (or `answered_cut` for a long one): "Devin says…", then the
     answer in plain words.
@@ -1837,17 +1868,76 @@ says it doesn't know, and never asks what to do.
     without the opening or the past-work line.
   - A Task news `skill.toml` written before these words still passes, with
     the built-in ones.
-- **Unchanged:** the read-back and the person's spoken yes come first, as
-  for any hand-over. The functions' descriptions are untouched, since their
-  1,024 bytes are spent; this is wording in the note only.
+- **Unchanged:** the functions' descriptions, since their 1,024 bytes are
+  spent; the rest is wording in the note and the start in `start_agent_task`.
 - **Not yet shown:** a played check on lamp-a0ae once its voice is unmuted.
 
 Tests: `agent_tasks::tests::with_questions_a_question_for_the_staff_is_handed_over_as_a_question_task`,
 `agent_tasks::tests::the_questions_switch_is_on_only_with_asked_and_taken_last`,
 `agent_tasks::tests::a_question_for_devin_says_where_its_past_work_is_written`,
 `agent_tasks::tests::a_question_tasks_own_question_is_what_the_news_tells`,
+`agent_tasks::tests::only_the_persons_own_first_question_in_a_request_starts_with_no_yes`,
+`agent_tasks::tests::a_question_task_is_said_back_as_the_persons_own_question`,
 `task_news::tests::a_finished_question_task_is_told_as_its_answer`,
 `skill_words::tests::a_task_news_without_the_folder_words_passes_with_the_built_in_ones`.
+
+### A short yes (off unless `LAMP_TASKS_SHORT_CONFIRM=on`)
+
+The person (29 Oct 23:59): "when the lamp confirm, just need to talk 'should
+i send it to your computer' not really need to talk verbosely what will it
+do, or what session will it communicate with". With the voice's
+`--tasks-short-confirm`, taken last, after `--tasks-questions`:
+
+- **The yes is one short line.** After `start_agent_task` prepares a work
+  task, the model is told `agent_tasks::short_prepared_next`: ask only, in a
+  few words, "Should I send it to your computer?" ("your office computer"
+  without `LAMP_TASKS_ACCOUNTS`). It doesn't say the task back, and doesn't
+  name the agent or the session. The start function's description asks for
+  the same (`read_back`).
+- **The yes goes to `confirm_agent_task`.** The short question, the start
+  function's description and the confirm function's own (even with
+  `LAMP_TOOL_LEAD_IN`) all say that on their yes the model calls
+  `confirm_agent_task`, never `start_agent_task` again. On lamp-75c9 on
+  30 Oct at 04:03, with the read-back's words still in the confirm
+  function's description, a typed "Yes" was taken for a second
+  `start_agent_task`, so nothing started.
+- **Work for the same agent isn't prepared again while one waits.** If
+  the model calls `start_agent_task` for the same agent while a task waits
+  for a yes this request may give (`may_confirm`), whatever the words, the
+  answer is `already_prepared` with the waiting task's own words
+  (`agent_tasks::ALREADY_PREPARED_NEXT`: if they just said yes, call
+  `confirm_agent_task` now). Nothing new is prepared, so the waiting task
+  keeps its id and digest and the confirm still starts it.
+  - **Why:** on lamp-75c9 at 05:22 and 06:04, a typed "Yes" became a second
+    `start_agent_task` in that same request, reworded the second time.
+    That replaced the waiting task, and a task prepared in a request can
+    never be confirmed in it, so the confirm was refused.
+  - **With `LAMP_TASKS_CORRECT`,** other words still replace it as a
+    corrected ask.
+  - **A question is never caught:** it starts on its own path with no
+    yes, and the waiting work keeps waiting (Reviewer-three's P2 on #4421).
+  - **Other words** may be new work for the same agent. The answer then
+    names the waiting task (`agent_tasks::other_work_waiting_next`): if it
+    was a yes to sending it, call `confirm_agent_task`; if they asked for
+    something else, say in a few words that it is still waiting and ask
+    whether to send that one first. So no yes starts work the person
+    didn't hear named. The new ask isn't prepared until that one is sent
+    or refused.
+  - This takes no repeat as the yes: only `confirm_agent_task` starts
+    anything.
+- **After the yes, a word or two:** `agent_tasks::SHORT_HANDING_OVER_NEXT`,
+  "Sent.". It never says the work was taken up or what it will do.
+- **Unchanged:** the yes itself (`may_confirm`: heard, or typed in the same
+  chat, within 120 s, through `voice.sock`), a question task that starts
+  with no yes (above), and what task news says when the work is done.
+- **What it gives up:** a misheard word in the task no longer shows before
+  the yes, since the task isn't said back (#2602 finding 2, `NAMES_BACK`).
+  The person chose that.
+
+Tests: `agent_tasks::tests::the_short_confirm_switch_is_on_only_with_the_tasks_part_and_taken_last`,
+`agent_tasks::tests::with_the_short_confirm_the_yes_is_one_short_line_and_sent_a_word`,
+`agent_tasks::tests::with_the_short_yes_the_same_task_again_is_not_prepared_again`,
+and `every_description_fits_the_service_whatever_the_switches` (now with it).
 
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 

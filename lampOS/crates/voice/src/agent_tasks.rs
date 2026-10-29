@@ -161,6 +161,15 @@ pub const SIGN_IN_FLAG: &str = "--tasks-sign-in";
 /// only, and only with [`ASKED_ENVIRONMENT`], whose note says it.
 pub const QUESTIONS_ENVIRONMENT: &str = "LAMP_TASKS_QUESTIONS";
 pub const QUESTIONS_FLAG: &str = "--tasks-questions";
+/// Off unless `on`: the yes is asked in one short line ("Should I send it
+/// to your computer?"), with no read-back of the task and no agent or
+/// session named, and after it a word or two ("Sent."). The person, 29 Oct
+/// 23:59: "just need to talk 'should i send it to your computer' not
+/// really need to talk verbosely what will it do, or what session will it
+/// communicate with". Only the words change: the yes is checked as always
+/// ([`may_confirm`]). Taken last, after [`QUESTIONS_FLAG`].
+pub const SHORT_CONFIRM_ENVIRONMENT: &str = "LAMP_TASKS_SHORT_CONFIRM";
+pub const SHORT_CONFIRM_FLAG: &str = "--tasks-short-confirm";
 /// How a question task begins, with [`QUESTIONS_FLAG`]: the agent answers
 /// and changes nothing. The person's question follows it, in their words.
 pub const QUESTION: &str = "Answer this question; don't change any code or open any PR:";
@@ -571,8 +580,13 @@ fn named_not_set_up(who: &str) -> Value {
 /// come. Kept short: with work asked of the staff ([`ASKED_FLAG`]) and
 /// three of them, the description has 165 bytes left for it of the 1,024
 /// the service takes.
-fn read_back(lead_in: bool, with_who: &str) -> String {
-    if lead_in {
+fn read_back(place: &Place, with_who: &str) -> String {
+    if place.short_confirm {
+        return "Nothing starts yet: then ask only whether to send it to their computer, and on \
+                their yes call confirm_agent_task."
+            .into();
+    }
+    if place.lead_in {
         format!(
             "Say the task back in one short sentence{with_who} as a statement, then call it \
              at once; ask whether to start it only after it answers."
@@ -621,7 +635,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      ask in a few words what it should work on, and call this with their answer.",
                     computer(place),
                     asked_of(&all, &examples(staff), place.staff_note, computer(place)),
-                    read_back(place.lead_in, ", with who will do it,")
+                    read_back(place, ", with who will do it,")
                 )
             } else {
                 format!(
@@ -631,7 +645,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      You can do this: if they ask you to start one of them, open a session or \
                      give it something, without saying what it should do, never say you cannot; \
                      ask in a few words what it should work on, and call this with their answer.",
-                    read_back(place.lead_in, ", with who will do it,")
+                    read_back(place, ", with who will do it,")
                 )
             },
             json!({
@@ -674,7 +688,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                         place.staff_note,
                         computer(place)
                     ),
-                    read_back(place.lead_in, "")
+                    read_back(place, "")
                 )
             } else {
                 format!(
@@ -684,7 +698,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      You can do this: if they ask you to start {default}, open a session or \
                      give it something, without saying what it should do, never say you cannot; \
                      ask in a few words what it should work on, and call this with their answer.",
-                    read_back(place.lead_in, "")
+                    read_back(place, "")
                 )
             },
             json!({
@@ -703,7 +717,17 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
         },
         Tool {
             name: CONFIRM.into(),
-            description: if place.lead_in {
+            description: if place.short_confirm {
+                // Nothing is read back with the short yes: the yes is to
+                // sending it, and on lamp-75c9 a typed "Yes" to it was taken
+                // for a new start_agent_task (30 Oct 04:03).
+                format!(
+                    "Start the task you prepared with start_agent_task. Call it right after \
+                     the person says yes to sending it to their computer; never on your own, \
+                     and not if they said no or something else.{}",
+                    if place.correct { NOT_A_YES } else { "" }
+                )
+            } else if place.lead_in {
                 format!(
                     "Start the task you prepared with start_agent_task. Call it only right \
                      after the person has said yes to the task you read back; never on your \
@@ -792,6 +816,31 @@ pub fn prepared_next(lead_in: bool, choosing: bool, who: &str) -> String {
     }
 }
 
+/// What the model is told after `start_agent_task` prepared the work, with
+/// [`SHORT_CONFIRM_FLAG`]: only the one short question.
+pub fn short_prepared_next(computer: &str) -> String {
+    format!(
+        "Ask only, in a few words, whether to send it to their {computer} (\"Should I send it to your {computer}?\"). Don't say the task back, and don't name the agent or the session it goes to. When they say yes, call confirm_agent_task: never start_agent_task again for it."
+    )
+}
+
+/// What the model is told when, with [`SHORT_CONFIRM_FLAG`], it asks again
+/// to prepare the work already waiting for the person's yes.
+pub const ALREADY_PREPARED_NEXT: &str = "A task is already prepared and waiting for the person's yes: the one in `task`; nothing new was prepared. If they just said yes, call confirm_agent_task now. Otherwise, ask only whether to send it.";
+
+/// [`ALREADY_PREPARED_NEXT`] for a call with other words than the task
+/// waiting: they may be new work, so the person hears which task waits
+/// before any yes starts it (Reviewer-three's P2 on #4421).
+pub fn other_work_waiting_next(waiting: &str) -> String {
+    format!(
+        "Nothing new was prepared: \"{waiting}\" is still waiting for the person's yes. If what they just said was a yes to sending it, call confirm_agent_task now. If they asked for something else, say in a few words that \"{waiting}\" is still waiting, and ask whether to send that one first; don't call confirm_agent_task until they say yes to it."
+    )
+}
+
+/// What the model is told after `confirm_agent_task` handed the work over,
+/// with [`SHORT_CONFIRM_FLAG`]: a word or two.
+pub const SHORT_HANDING_OVER_NEXT: &str = "Say only that it's sent, in a word or two (\"Sent.\"). It has not been taken up yet: don't say it has, and don't say what it will do.";
+
 /// What the model is told after `confirm_agent_task` handed the work over.
 pub fn handing_over_next(lead_in: bool, who: &str) -> String {
     if lead_in {
@@ -815,7 +864,7 @@ pub fn asked_next(lead_in: bool, who: &str) -> String {
         )
     } else {
         format!(
-            "Tell them in a few natural words that you have asked {who}, that it may take a few minutes, and that you will tell them what {who} says (\"Okay, I've asked {who}. It may take a few minutes; I'll tell you what it says.\"). {who} has not answered yet: never guess or give the answer yourself."
+            "Tell them in a few natural words that you've asked {who} and to wait for the answer (\"I'll ask {who} about that, let's wait for its answer.\"), and that you'll tell them what {who} says. {who} has not answered yet: never guess or give the answer yourself, and don't ask whether to start it: it has started."
         )
     }
 }
@@ -927,7 +976,11 @@ pub fn session_note(place: &Place) -> Option<String> {
              {first} do last week?\", \"ask {last} what it's working on\"): never answer it \
              yourself, never say you don't know and never ask what to do; hand it to them at \
              once with start_agent_task, the task written as \"{QUESTION} \" and then their \
-             question in their own words, and say it back and start it on their yes as any task."
+             question in their own words. It starts at once, with no yes: just say naturally \
+             that you'll ask them and to wait for the answer (\"I'll ask {first} about that, let's \
+             wait for its answer\"). But asking how work already handed over is going (\"how's \
+             it going?\", \"is it done?\", \"what is {first} doing?\") is no question for them: \
+             answer it with check_agent_task, never a new task, and never without calling it."
         )
     } else {
         String::new()
@@ -1496,6 +1549,9 @@ pub struct Place {
     /// A question about or for one of the staff is handed to them as a
     /// question task ([`QUESTIONS_FLAG`], [`QUESTION`]).
     pub questions: bool,
+    /// The yes asked in one short line, with no read-back
+    /// ([`SHORT_CONFIRM_FLAG`]).
+    pub short_confirm: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -1532,6 +1588,12 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         arguments.push(QUESTIONS_FLAG.to_owned());
     }
+    if short_confirm(
+        &arguments,
+        std::env::var(SHORT_CONFIRM_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(SHORT_CONFIRM_FLAG.to_owned());
+    }
     arguments
 }
 
@@ -1539,6 +1601,12 @@ pub fn arguments_from_environment() -> Vec<String> {
 /// [`ASKED_FLAG`], whose session note carries what it says.
 fn questions(arguments: &[String], value: Option<&str>) -> bool {
     value == Some("on") && arguments.iter().any(|flag| flag == ASKED_FLAG)
+}
+
+/// Whether [`SHORT_CONFIRM_FLAG`] goes after `arguments`: `on`, and only
+/// with the tasks part; it needs no other switch.
+fn short_confirm(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && !arguments.is_empty()
 }
 
 /// Whether [`CORRECT_FLAG`] goes after `arguments`: `on`, and only with the
@@ -1691,6 +1759,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == QUESTIONS_FLAG && asked => (true, rest),
         _ => (false, rest),
     };
+    let (short_confirm, rest) = match rest {
+        [flag, rest @ ..] if flag == SHORT_CONFIRM_FLAG => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1707,6 +1779,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             correct,
             sign_in,
             questions,
+            short_confirm,
         }),
         rest,
     ))
@@ -1760,7 +1833,11 @@ const REPLACED_NEXT: &str = "This one replaces the earlier task, which you will 
 /// [`prepared_next`], with [`CORRECT_FLAG`]'s sentence, and begun with
 /// [`REPLACED_NEXT`] when this task replaced one waiting.
 fn next_for(place: &Place, choosing: bool, who: &str, replaced: bool) -> String {
-    let next = prepared_next(place.lead_in, choosing, who);
+    let next = if place.short_confirm {
+        short_prepared_next(computer(place))
+    } else {
+        prepared_next(place.lead_in, choosing, who)
+    };
     if !place.correct {
         return next;
     }
@@ -1844,6 +1921,122 @@ fn unreached(place: &Place) -> Value {
     }
 }
 
+/// Starts the prepared `pending` through the tasks part's voice socket: what
+/// a yes does, and what a question task the person asked does at once.
+fn start_pending(
+    place: &Place,
+    pending: &Pending,
+    request: u64,
+    left: &dyn Fn() -> Duration,
+) -> (Value, bool) {
+    let Some(status) = ask(
+        &place.directory.join("request.sock"),
+        &json!({"op":"status"}),
+        left(),
+    ) else {
+        return (unreached(place), false);
+    };
+    let (Some(guard), Some(session)) = (
+        guard(&status, format!("voice-{request}-confirm-{}", nonce())),
+        status
+            .get("summary")
+            .and_then(|summary| summary.get("session_id"))
+            .and_then(Value::as_str),
+    ) else {
+        return (unreached(place), false);
+    };
+    let confirmed = ask_until_sure(
+        &place.directory.join("voice.sock"),
+        &json!({"op":"confirm","guard":guard,"id":pending.id,"prepared_digest":pending.digest,"session_id":session}),
+        left,
+    );
+    match confirmed {
+        Some(answer) if answer.get("ok") == Some(&json!(true)) => {
+            if let Ok(mut waiting) = PENDING.lock()
+                && waiting
+                    .as_ref()
+                    .is_some_and(|waiting| waiting.id == pending.id)
+            {
+                *waiting = None;
+            }
+            // Asked for by text: its news goes back by text, and only such
+            // work's (`task_news::ForTexts`, #1673).
+            if crate::messages::is_text(pending.request)
+                && let Some(store) = status.get("store_id").and_then(Value::as_str)
+            {
+                crate::task_news::keep_typed(store, pending.id);
+            }
+            let who = pending.who;
+            let next = if place.questions && is_question(&pending.text) {
+                asked_next(place.lead_in, who)
+            } else if place.short_confirm {
+                SHORT_HANDING_OVER_NEXT.to_owned()
+            } else {
+                handing_over_next(place.lead_in, who)
+            };
+            (
+                json!({
+                    "handing_over": true,
+                    "who": who,
+                    "next": next
+                }),
+                true,
+            )
+        }
+        Some(_) => (json!({"error": "It could not be started just now."}), true),
+        None => (unreached(place), false),
+    }
+}
+
+/// The place and request in which a question task last started with no yes:
+/// one a request at most.
+static QUESTION_STARTED: Mutex<Option<(PathBuf, u64)>> = Mutex::new(None);
+
+/// Whether a prepared `task` starts at once, with no yes (the person, 29 Oct
+/// 17:15: a question for an agent needs no confirmation): with
+/// [`QUESTIONS_FLAG`], only a task that begins with [`QUESTION`] exactly,
+/// only when the person's own words or text are this request (heard, or
+/// typed in the app), never the lamp's own turn (task news, an add-on's
+/// note), and at most one in a request. Work that changes things keeps its
+/// read-back and yes. The request's one question is reserved in the same
+/// lock as the check, so two calls in one turn at once (the Live route runs
+/// each on a thread of its own) can't both start one; a start that fails
+/// gives it back ([`Reserved::give_back`], the Reviewer-lead's and
+/// Reviewer-three's P3s on #4421).
+fn starts_unasked(place: &Place, task: &str, request: u64, heard: bool) -> Option<Reserved> {
+    if !(place.questions && task.starts_with(QUESTION)) {
+        return None;
+    }
+    if !(heard || crate::messages::is_text(request)) {
+        return None;
+    }
+    let mut started = QUESTION_STARTED.lock().ok()?;
+    let this = (place.directory.clone(), request);
+    if started.as_ref() == Some(&this) {
+        return None;
+    }
+    let before = started.replace(this.clone());
+    Some(Reserved { this, before })
+}
+
+/// A request's one question, reserved by [`starts_unasked`].
+struct Reserved {
+    this: (PathBuf, u64),
+    before: Option<(PathBuf, u64)>,
+}
+
+impl Reserved {
+    /// Its start failed: the request may still start a question, so what
+    /// was held before comes back, unless another reservation came since.
+    fn give_back(self) {
+        if let Ok(mut started) = QUESTION_STARTED.lock()
+            && started.as_ref() == Some(&self.this)
+        {
+            *started = self.before;
+        }
+    }
+}
+
 /// [`run`] with the staff as known.
 fn run_for(
     place: &Place,
@@ -1923,6 +2116,43 @@ fn run_for(
             } else {
                 task
             };
+            // With the short yes, work for the same agent while one waits
+            // for a yes this request may give: not prepared again, whatever
+            // its words, which would replace the waiting one and make the
+            // yes miss it. On lamp-75c9 a typed "Yes" became a second
+            // start_agent_task in that same request, reworded (30 Oct 05:22
+            // and 06:04), and a task prepared in a request can never be
+            // confirmed in it. Nothing starts here: the yes still goes
+            // through confirm_agent_task. With LAMP_TASKS_CORRECT, other
+            // words still replace it as a corrected ask.
+            // A question is never caught: it starts on its own path, and
+            // the waiting work keeps waiting (Reviewer-three's P2 on #4421).
+            let question = place.questions && task.starts_with(QUESTION);
+            if place.short_confirm && !question {
+                let waiting = PENDING.lock().ok().and_then(|pending| pending.clone());
+                if let Some(waiting) = waiting.filter(|waiting| {
+                    waiting.who == who
+                        && (!place.correct || waiting.text == task)
+                        && may_confirm(waiting, request, heard, Instant::now())
+                }) {
+                    eprintln!(
+                        "lamp-voice: tasks: request {request}: work for {who} again while task {} waits for its yes",
+                        waiting.id
+                    );
+                    let said = question_of(&waiting.text).unwrap_or(&waiting.text);
+                    // Other words may be other work: then the person hears
+                    // which task waits before any yes starts it.
+                    let next = if waiting.text == task {
+                        ALREADY_PREPARED_NEXT.to_owned()
+                    } else {
+                        other_work_waiting_next(said)
+                    };
+                    return (
+                        json!({"prepared": true, "already_prepared": true, "task": said, "next": next}),
+                        true,
+                    );
+                }
+            }
             let Some(status) = ask(
                 &place.directory.join("request.sock"),
                 &json!({"op":"status"}),
@@ -1977,6 +2207,30 @@ fn run_for(
                     ) else {
                         return (unreached(place), false);
                     };
+                    // A question the person asked starts at once, with no
+                    // read-back and no yes ([`starts_unasked`]), from its own
+                    // record: never through [`PENDING`], so work still
+                    // waiting for its yes keeps waiting, and the yes still
+                    // starts it (Reviewer-three's P2 on #4421).
+                    if let Some(reserved) = starts_unasked(place, task, request, heard) {
+                        let question = Pending {
+                            id,
+                            digest: digest.to_owned(),
+                            request,
+                            at: Instant::now(),
+                            who,
+                            text: task.to_owned(),
+                            correct: place.correct,
+                        };
+                        eprintln!(
+                            "lamp-voice: tasks: request {request}: a question task starts with no yes"
+                        );
+                        let started = start_pending(place, &question, request, &left);
+                        if started.0["handing_over"] != json!(true) {
+                            reserved.give_back();
+                        }
+                        return started;
+                    }
                     let mut replaced = None;
                     if let Ok(mut pending) = PENDING.lock() {
                         // With the switch, one still waiting for its yes is
@@ -2041,10 +2295,18 @@ fn run_for(
                         );
                     }
                     let next = next_for(place, choosing(place, staff), who, replaced.is_some());
+                    // A question task is said back as the person's own
+                    // question, never with its opening or the past-work line
+                    // (the Reviewer-lead's P3 on #4359).
+                    let said = if place.questions {
+                        question_of(task).unwrap_or(task)
+                    } else {
+                        task
+                    };
                     (
                         json!({
                             "prepared": true,
-                            "task": task,
+                            "task": said,
                             "where": place_said,
                             "next": next
                         }),
@@ -2097,57 +2359,7 @@ fn run_for(
                     true,
                 );
             }
-            let Some(status) = ask(
-                &place.directory.join("request.sock"),
-                &json!({"op":"status"}),
-                left(),
-            ) else {
-                return (unreached(place), false);
-            };
-            let (Some(guard), Some(session)) = (
-                guard(&status, format!("voice-{request}-confirm-{}", nonce())),
-                status
-                    .get("summary")
-                    .and_then(|summary| summary.get("session_id"))
-                    .and_then(Value::as_str),
-            ) else {
-                return (unreached(place), false);
-            };
-            let confirmed = ask_until_sure(
-                &place.directory.join("voice.sock"),
-                &json!({"op":"confirm","guard":guard,"id":pending.id,"prepared_digest":pending.digest,"session_id":session}),
-                left,
-            );
-            match confirmed {
-                Some(answer) if answer.get("ok") == Some(&json!(true)) => {
-                    if let Ok(mut waiting) = PENDING.lock() {
-                        *waiting = None;
-                    }
-                    // Asked for by text: its news goes back by text, and
-                    // only such work's (`task_news::ForTexts`, #1673).
-                    if crate::messages::is_text(pending.request)
-                        && let Some(store) = status.get("store_id").and_then(Value::as_str)
-                    {
-                        crate::task_news::keep_typed(store, pending.id);
-                    }
-                    let who = pending.who;
-                    let next = if place.questions && is_question(&pending.text) {
-                        asked_next(place.lead_in, who)
-                    } else {
-                        handing_over_next(place.lead_in, who)
-                    };
-                    (
-                        json!({
-                            "handing_over": true,
-                            "who": who,
-                            "next": next
-                        }),
-                        true,
-                    )
-                }
-                Some(_) => (json!({"error": "It could not be started just now."}), true),
-                None => (unreached(place), false),
-            }
+            start_pending(place, &pending, request, &left)
         }
         CHECK => {
             // Only someone named narrows it, and only when there is a choice.
@@ -2412,6 +2624,7 @@ pub fn hand_over(
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         match missing_target(&place, 0, target, "claude", left()) {
@@ -2655,6 +2868,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let told = |place: &Place, name: &str, args: Value| {
@@ -2894,6 +3108,7 @@ pub(crate) mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                short_confirm: false,
                 sign_in: false,
             })
         );
@@ -3309,6 +3524,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
@@ -3839,6 +4055,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -3922,6 +4139,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -4013,6 +4231,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -4069,6 +4288,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let call = |task: &str| ToolCall {
@@ -4127,6 +4347,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let task = json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
@@ -4207,6 +4428,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let seen = tasks_part(
@@ -4692,6 +4914,7 @@ pub(crate) mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         }
     }
@@ -4765,6 +4988,279 @@ pub(crate) mod tests {
         (sent, told)
     }
 
+    #[test]
+    fn only_the_persons_own_first_question_in_a_request_starts_with_no_yes() {
+        let directory = std::env::temp_dir().join(format!("agent-unasked-{}", std::process::id()));
+        let mut place = place(&directory, false);
+        let question = format!("{QUESTION} what was built last week?");
+        // Off, or work rather than a question: the read-back and the yes.
+        assert!(starts_unasked(&place, &question, 11, true).is_none());
+        place.questions = true;
+        assert!(starts_unasked(&place, "Fix the login page.", 11, true).is_none());
+        // A turn of the lamp's own (task news, an add-on's note): the yes.
+        assert!(starts_unasked(&place, &question, 11, false).is_none());
+        // Heard: reserved at once, so a second call in that request, even
+        // at the same moment, needs the yes.
+        let reserved = starts_unasked(&place, &question, 11, true).unwrap();
+        assert!(starts_unasked(&place, &question, 11, true).is_none());
+        // Its start failed: given back, so the request may still start one.
+        reserved.give_back();
+        assert!(starts_unasked(&place, &question, 11, true).is_some());
+        assert!(starts_unasked(&place, &question, 11, true).is_none());
+        // Two at once on separate threads: only one is reserved.
+        let both: Vec<bool> = (0..2)
+            .map(|_| {
+                let place = place.clone();
+                let question = question.clone();
+                std::thread::spawn(move || starts_unasked(&place, &question, 12, true).is_some())
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|thread| thread.join().unwrap())
+            .collect();
+        assert_eq!(both.iter().filter(|reserved| **reserved).count(), 1);
+        // A typed text is the person's own, as heard words are.
+        let typed = crate::messages::REQUESTS_FROM + 5;
+        assert!(starts_unasked(&place, &question, typed, false).is_some());
+    }
+
+    /// With the short yes, the model asking to prepare the same work again
+    /// on the person's "Yes" (lamp-75c9, 30 Oct 05:22) gets it back as
+    /// already waiting, and nothing new is prepared, so the confirm that
+    /// follows still starts it. Without the switch, or for other work, or
+    /// once its yes window has passed, it is prepared as before.
+    #[test]
+    fn with_the_short_yes_the_same_task_again_is_not_prepared_again() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-same-again-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        // Only the confirm reaches the tasks part: no second prepare.
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(1)),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":3,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        let mut place = place(&directory, false);
+        place.short_confirm = true;
+        let typed = crate::messages::REQUESTS_FROM + 1;
+        let task = "Write a two-line poem about tea in tea.txt";
+        *PENDING.lock().unwrap() = Some(Pending {
+            id: 3,
+            digest: "t3".into(),
+            request: typed,
+            at: Instant::now(),
+            who: CLAUDE_CODE,
+            text: task.into(),
+            correct: false,
+        });
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let again = run(
+            &place,
+            &call(START, json!({"task": task})),
+            typed + 1,
+            false,
+            PEER_WAIT,
+        )
+        .0;
+        assert_eq!(again["already_prepared"], true, "{again}");
+        assert_eq!(again["next"], ALREADY_PREPARED_NEXT);
+        assert_eq!(
+            PENDING.lock().unwrap().as_ref().map(|waiting| waiting.id),
+            Some(3)
+        );
+        let yes = run(
+            &place,
+            &call(CONFIRM, json!({})),
+            typed + 1,
+            false,
+            PEER_WAIT,
+        )
+        .0;
+        assert_eq!(yes["handing_over"], true, "{yes}");
+        let first = seen.recv_timeout(PEER_WAIT).unwrap();
+        assert_eq!(first["op"], "status", "{first}");
+        let confirm = seen.recv_timeout(PEER_WAIT).unwrap();
+        assert_eq!(
+            (confirm["op"].clone(), confirm["id"].clone()),
+            (json!("confirm"), json!(3))
+        );
+        assert_eq!(confirm["prepared_digest"], "t3");
+        // Off, other words with corrections on, or past its window: not
+        // taken as already waiting.
+        for (short, correct, text, age) in [
+            (false, false, task, Duration::ZERO),
+            (true, true, "Write a haiku about rain", Duration::ZERO),
+            (true, false, task, CONFIRM_WITHIN + Duration::from_secs(1)),
+        ] {
+            place.short_confirm = short;
+            place.correct = correct;
+            let waiting = Pending {
+                id: 3,
+                digest: "t3".into(),
+                request: typed,
+                at: Instant::now() - age,
+                who: CLAUDE_CODE,
+                text: task.into(),
+                correct: false,
+            };
+            *PENDING.lock().unwrap() = Some(waiting);
+            let told = run(
+                &place,
+                &call(START, json!({"task": text})),
+                typed + 1,
+                false,
+                Duration::from_millis(300),
+            )
+            .0;
+            assert!(
+                told.get("already_prepared").is_none(),
+                "{short} {correct} {text} {age:?}: {told}"
+            );
+        }
+        // Reworded on the yes (lamp-75c9, 06:04), with corrections off: the
+        // waiting one is still what the yes starts, and is said as it is.
+        place.short_confirm = true;
+        place.correct = false;
+        *PENDING.lock().unwrap() = Some(Pending {
+            id: 3,
+            digest: "t3".into(),
+            request: typed,
+            at: Instant::now(),
+            who: CLAUDE_CODE,
+            text: task.into(),
+            correct: false,
+        });
+        let reworded = run(
+            &place,
+            &call(
+                START,
+                json!({"task": "Write a short two-line poem about tea and save it as tea.txt"}),
+            ),
+            typed + 1,
+            false,
+            Duration::from_millis(300),
+        )
+        .0;
+        assert_eq!(reworded["already_prepared"], true, "{reworded}");
+        assert_eq!(reworded["task"], task);
+        // Other words: the person is told which task waits before any yes.
+        assert_eq!(reworded["next"], other_work_waiting_next(task));
+        assert_eq!(
+            PENDING.lock().unwrap().as_ref().map(|waiting| waiting.id),
+            Some(3)
+        );
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Work waiting for its yes, then a question the person asks, which
+    /// starts at once, then the yes: the yes still starts the work (the
+    /// question never takes [`PENDING`], Reviewer-three's P2 on #4421).
+    #[test]
+    fn a_question_asked_while_work_waits_leaves_the_work_to_its_yes() {
+        // With the short yes too: a question is never caught as the work
+        // again (Reviewer-three's P2 on #4421).
+        for short in [false, true] {
+            question_while_work_waits(short);
+        }
+    }
+
+    fn question_while_work_waits(short: bool) {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!(
+            "agent-question-waits-{short}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                // The question: prepared as 7, and started at once.
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"q7","revision":2}),
+                ),
+                ("request.sock", status(2)),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":7,"queued":true,"revision":3}),
+                ),
+                // The yes, for the work waiting (3).
+                ("request.sock", status(3)),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":3,"queued":true,"revision":4}),
+                ),
+            ],
+        );
+        let mut place = place(&directory, false);
+        place.questions = true;
+        place.short_confirm = short;
+        *PENDING.lock().unwrap() = Some(Pending {
+            id: 3,
+            digest: "w3".into(),
+            request: 2,
+            at: Instant::now(),
+            who: "Claude Code",
+            text: "Fix the parser".into(),
+            correct: false,
+        });
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let asked = run(
+            &place,
+            &call(
+                START,
+                json!({"task": format!("{QUESTION} what did Devin do yesterday?")}),
+            ),
+            5,
+            true,
+            PEER_WAIT,
+        )
+        .0;
+        assert_eq!(asked["handing_over"], true, "{asked}");
+        assert_eq!(
+            PENDING.lock().unwrap().as_ref().map(|waiting| waiting.id),
+            Some(3)
+        );
+        let yes = run(&place, &call(CONFIRM, json!({})), 6, true, PEER_WAIT).0;
+        assert_eq!(yes["handing_over"], true, "{yes}");
+        let confirms: Vec<Value> = (0..6)
+            .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
+            .filter(|line| line["op"] == "confirm")
+            .collect();
+        assert_eq!(confirms.len(), 2);
+        assert_eq!(
+            (confirms[0]["id"].clone(), confirms[1]["id"].clone()),
+            (json!(7), json!(3))
+        );
+        assert_eq!(confirms[1]["prepared_digest"], "w3");
+        assert!(PENDING.lock().unwrap().is_none());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     /// One task prepared at `place` through a fake tasks part: what the model
     /// was told of it.
     fn prepared_at(tag: &str, place: &Place) -> Value {
@@ -4796,6 +5292,43 @@ pub(crate) mod tests {
         let told = run_for(&place, &[], &call, 3, true, PEER_WAIT).0;
         std::fs::remove_dir_all(directory).unwrap();
         told
+    }
+
+    /// A question task that still needs the yes (here a turn of the lamp's
+    /// own) is said back as the person's question alone: not its opening or
+    /// the past-work line (the Reviewer-lead's P3 on #4359).
+    #[test]
+    fn a_question_task_is_said_back_as_the_persons_own_question() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-said-back-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ),
+            ],
+        );
+        let mut place = place(&directory, false);
+        place.questions = true;
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task": format!("{QUESTION} what did you build last week?")}),
+        };
+        let told = run_for(&place, &[], &call, 3, false, PEER_WAIT).0;
+        std::fs::remove_dir_all(directory).unwrap();
+        assert_eq!(told["prepared"], true, "{told}");
+        assert_eq!(told["task"], "what did you build last week?", "{told}");
     }
 
     /// #1676: with `LAMP_TASKS_MACHINE_NAMES`, the read-back names the
@@ -5243,7 +5776,12 @@ pub(crate) mod tests {
                 "never ask what to do",
                 "at once with start_agent_task",
                 "\"Answer this question; don't change any code or open any PR: \"",
-                "say it back and start it on their yes as any task",
+                "It starts at once, with no yes",
+                "let's wait for its answer",
+                // lamp-75c9, 30 Oct 06:42: "How's it going?" got the
+                // question's words and no call at all.
+                "how work already handed over is going",
+                "answer it with check_agent_task, never a new task, and never without calling it",
             ] {
                 assert!(note.contains(said), "{said}: {note}");
             }
@@ -5306,11 +5844,119 @@ pub(crate) mod tests {
         assert_eq!(rest, [QUESTIONS_FLAG]);
     }
 
-    /// A question task for Devin is sent with where its past work is
-    /// written, since Devin keeps no memory between sessions; the same
-    /// question for Claude Code, other work for Devin, or the switch off
-    /// send the task as it was said. The read-back and the yes are as for
-    /// any task: prepared, then started on the confirmation.
+    /// `LAMP_TASKS_SHORT_CONFIRM=on` goes last, needs only the tasks part,
+    /// and is read after the questions flag.
+    #[test]
+    fn the_short_confirm_switch_is_on_only_with_the_tasks_part_and_taken_last() {
+        let flags =
+            |list: &[&str]| -> Vec<String> { list.iter().map(|flag| (*flag).to_owned()).collect() };
+        let tasks = flags(&[FLAG, "/run/t"]);
+        assert!(short_confirm(&tasks, Some("on")));
+        for value in [None, Some("off"), Some("ON"), Some("1")] {
+            assert!(!short_confirm(&tasks, value), "{value:?}");
+        }
+        assert!(!short_confirm(&[], Some("on")));
+        let given = flags(&[
+            FLAG,
+            "/run/t",
+            ASKED_FLAG,
+            QUESTIONS_FLAG,
+            SHORT_CONFIRM_FLAG,
+            "--next",
+        ]);
+        let (place, rest) = take(&given).unwrap();
+        let place = place.unwrap();
+        assert!(place.questions && place.short_confirm);
+        assert_eq!(rest, ["--next"]);
+        let (place, _) = take(&flags(&[FLAG, "/run/t"])).unwrap();
+        assert!(!place.unwrap().short_confirm);
+    }
+
+    /// With the short confirm, the yes is asked in one short line, with no
+    /// read-back and no agent named, and after it the lamp says a word or
+    /// two; the yes itself is checked as always. A question task still
+    /// starts with no yes and says it asked.
+    #[test]
+    fn with_the_short_confirm_the_yes_is_one_short_line_and_sent_a_word() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let (_, told) = handed_over_with(
+            "short-work",
+            |place| place.short_confirm = true,
+            Some(&two()),
+            json!({"task": "Fix the login page"}),
+        );
+        let asked = told[0]["next"].as_str().unwrap();
+        assert!(
+            asked.contains("Should I send it to your office computer?"),
+            "{asked}"
+        );
+        assert!(asked.contains("Don't say the task back"), "{asked}");
+        assert!(
+            asked.contains("When they say yes, call confirm_agent_task"),
+            "{asked}"
+        );
+        assert!(
+            !asked.contains("say it back in one short sentence"),
+            "{asked}"
+        );
+        assert_eq!(told[1]["handing_over"], true, "{}", told[1]);
+        assert_eq!(told[1]["next"], SHORT_HANDING_OVER_NEXT);
+        // The start description asks for no read-back either.
+        let mut place = place(Path::new("/run/t"), true);
+        place.short_confirm = true;
+        let start = super::declared(&place, &two())
+            .into_iter()
+            .find(|tool| tool.name == START)
+            .unwrap();
+        assert!(
+            start
+                .description
+                .contains("ask only whether to send it to their computer")
+        );
+        assert!(!start.description.contains("say the task back"));
+        assert!(
+            start
+                .description
+                .contains("on their yes call confirm_agent_task")
+        );
+        let confirm = super::declared(&place, &two())
+            .into_iter()
+            .find(|tool| tool.name == CONFIRM)
+            .unwrap();
+        assert!(
+            confirm
+                .description
+                .contains("says yes to sending it to their computer"),
+            "{}",
+            confirm.description
+        );
+        // A question the person asked still starts at once.
+        let (_, told) = handed_over_with(
+            "short-question",
+            |place| {
+                place.short_confirm = true;
+                place.questions = true;
+                place.asked = true;
+            },
+            Some(&two()),
+            json!({"task": format!("{QUESTION} what was built last week?")}),
+        );
+        assert_eq!(told[0]["handing_over"], true, "{}", told[0]);
+        assert!(
+            told[0]["next"]
+                .as_str()
+                .unwrap()
+                .contains("wait for the answer")
+        );
+    }
+
+    /// A question task is sent with the past-work line whatever the engine,
+    /// since no agent keeps memory between sessions; other work, or the
+    /// switch off, send the task as it was said. A question the person asked
+    /// starts at once with no yes; anything else is prepared, then started
+    /// on the confirmation.
     #[test]
     fn a_question_for_devin_says_where_its_past_work_is_written() {
         let _one = ONE_AT_A_TIME
@@ -5337,14 +5983,21 @@ pub(crate) mod tests {
                 json!({"task": task, "who": who}),
             );
             assert_eq!(sent[1]["op"], "prepare", "{tag}");
-            assert_eq!(sent[3]["op"], "confirm", "{tag}: started on the yes");
+            assert_eq!(sent[3]["op"], "confirm", "{tag}: started");
             assert!(told[0].get("error").is_none(), "{tag}: {}", told[0]);
-            // Once started, a question is said to be asked, its answer to
-            // come; other work is handed over as ever.
+            // A question the person asked starts at once, with no yes: its
+            // answer is said to be on its way, and the yes after finds
+            // nothing waiting. Other work is read back and started on the
+            // yes, as ever.
+            // Only the voice's exact opening starts with no yes; a question
+            // in other case waits for its yes, then is still worded as one.
+            let unasked = on && task.starts_with(QUESTION);
             let asked = on && is_question(task);
-            let who = told[1]["who"].as_str().unwrap();
+            let started = if unasked { &told[0] } else { &told[1] };
+            assert_eq!(started["handing_over"], true, "{tag}: {started}");
+            let who = started["who"].as_str().unwrap();
             assert_eq!(
-                told[1]["next"],
+                started["next"],
                 if asked {
                     asked_next(false, who)
                 } else {
@@ -5352,6 +6005,14 @@ pub(crate) mod tests {
                 },
                 "{tag}"
             );
+            if unasked {
+                assert_eq!(
+                    told[1]["error"], "There is no task waiting to be started.",
+                    "{tag}"
+                );
+            } else {
+                assert_eq!(told[0]["prepared"], true, "{tag}");
+            }
             (
                 sent[1]["text"].as_str().unwrap().to_owned(),
                 sent[1]["target"].as_str().unwrap().to_owned(),
@@ -5408,7 +6069,10 @@ pub(crate) mod tests {
         }
         for lead_in in [false, true] {
             let next = asked_next(lead_in, "Devin");
-            assert!(next.contains("a few minutes"), "{next}");
+            assert!(
+                next.contains("wait for the answer") || next.contains("a few minutes"),
+                "{next}"
+            );
             assert!(
                 next.contains("never guess or give the answer yourself"),
                 "{next}"
@@ -5448,8 +6112,10 @@ pub(crate) mod tests {
                 switched.staff_note = noted;
                 switched.accounts = accounts && asked;
                 switched.named_only = named_only;
-                for correct in [false, true] {
+                for (correct, short) in [(false, false), (true, false), (false, true), (true, true)]
+                {
                     switched.correct = correct;
+                    switched.short_confirm = short;
                     for tool in super::declared(&switched, &staff) {
                         if tool.validate().is_err() {
                             refused.push(format!(
@@ -5961,6 +6627,7 @@ pub(crate) mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                short_confirm: false,
                 sign_in: false,
             })
         );
@@ -6507,6 +7174,7 @@ pub(crate) mod tests {
             named_only: false,
             correct,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         }
     }
