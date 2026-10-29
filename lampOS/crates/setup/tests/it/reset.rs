@@ -1106,6 +1106,7 @@ fn publish_and_watch_as(refused: bool, enabled: bool, events: Vec<TouchEvent>) -
             until,
             || now,
             log,
+            None,
             || {
                 *acted.borrow_mut() += 1;
             },
@@ -1118,6 +1119,7 @@ fn publish_and_watch_as(refused: bool, enabled: bool, events: Vec<TouchEvent>) -
             until,
             || now,
             log,
+            None,
             || {
                 *acted.borrow_mut() += 1;
                 Ok(())
@@ -1476,4 +1478,175 @@ fn an_enabled_watcher_refuses_a_plan_without_detach_at_its_start() {
     let said = String::from_utf8_lossy(&out.stderr);
     assert!(said.contains("needs the plan's detach"), "{said}");
     assert!(!bus.exists(), "the bus was touched before the refusal");
+}
+
+/// A request to turn the lamp off, from `source`, stamped `at_us`.
+fn request(at_us: u64, source: lamp_msgs::ShutdownSource) -> lamp_msgs::ShutdownRequest {
+    lamp_msgs::ShutdownRequest {
+        stamp: ClockStamp {
+            clock_id: CLOCK.into(),
+            at_us,
+            sequence: 1,
+        },
+        source,
+        reason: "primary button held 6000 ms".into(),
+    }
+}
+
+/// Publish `requests` (each under its bus publisher name) on the shutdown's
+/// topic, and watch with the switch `on` or off and `--enable`: how many
+/// shutdowns were started, and the log. The runner takes each start and is
+/// still at work after it.
+fn watch_requests(
+    on: bool,
+    enabled: bool,
+    requests: Vec<(&str, lamp_msgs::ShutdownRequest)>,
+) -> (usize, Vec<String>) {
+    watch_requests_taken(on, enabled, true, requests)
+}
+
+/// As [`watch_requests`], the runner `taken`: still at work after a start,
+/// or (false) refused at once, as while an update installs, and gone.
+fn watch_requests_taken(
+    on: bool,
+    enabled: bool,
+    taken: bool,
+    requests: Vec<(&str, lamp_msgs::ShutdownRequest)>,
+) -> (usize, Vec<String>) {
+    use lamp_msgs::ShutdownRequest;
+    let root = PathBuf::from(format!(
+        "/tmp/ls-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _clean = Root(root.clone());
+    let bus = Bus::new(&root).unwrap();
+    let mut touch = bus
+        .subscribe_typed(TouchEvent::TOPIC, "setup", TouchEvent::TYPE)
+        .unwrap();
+    let mut asked = bus
+        .subscribe_typed(ShutdownRequest::TOPIC, "setup", ShutdownRequest::TYPE)
+        .unwrap();
+    let now = requests
+        .iter()
+        .map(|(_, request)| request.stamp.at_us)
+        .max()
+        .unwrap_or(0)
+        + 1_000;
+    for (publisher, request) in &requests {
+        bus.publisher_declared(
+            ShutdownRequest::TOPIC,
+            &ShutdownRequest::declaration(),
+            publisher,
+        )
+        .unwrap()
+        .publish_json(request.stamp.at_us, request)
+        .unwrap();
+    }
+    let started = std::cell::Cell::new(0);
+    let mut start = || {
+        started.set(started.get() + 1);
+        Ok(())
+    };
+    let mut running = || taken && started.get() > 0;
+    let logged = RefCell::new(Vec::new());
+    lamp_setup::watch(
+        &mut touch,
+        CLOCK,
+        enabled,
+        Some(Instant::now() + Duration::from_millis(600)),
+        || now,
+        |line: &str| logged.borrow_mut().push(line.to_owned()),
+        Some(lamp_setup::ShutdownWatch {
+            requests: &mut asked,
+            start: on.then_some(&mut start as &mut dyn FnMut() -> io::Result<()>),
+            running: &mut running,
+        }),
+        || panic!("no reset was asked"),
+    )
+    .unwrap();
+    (started.get(), logged.into_inner())
+}
+
+#[test]
+fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
+    // Two valid requests: the shutdown is started once.
+    let (started, log) = watch_requests(
+        true,
+        true,
+        vec![
+            ("controls", request(at - 1_000, Button)),
+            ("controls", request(at, Button)),
+        ],
+    );
+    assert_eq!(started, 1, "{log:?}");
+    assert!(
+        log.iter().any(|line| line.contains("already turning off")),
+        "{log:?}"
+    );
+    // Off, or without --enable: logged, never started.
+    let (started, log) = watch_requests(false, true, vec![("controls", request(at, Button))]);
+    assert_eq!(started, 0);
+    assert!(
+        log.iter()
+            .any(|line| line.contains("LAMP_SHUTDOWN is not on")),
+        "{log:?}"
+    );
+    assert_eq!(
+        watch_requests(true, false, vec![("controls", request(at, Button))]).0,
+        0
+    );
+    // Stale, from another boot, or not from its source's publisher.
+    let (started, log) = watch_requests(
+        true,
+        true,
+        // The second, never taken, sets the watcher's clock to `at`.
+        vec![
+            ("controls", request(at - 3_000_000, Button)),
+            ("voice", request(at, Button)),
+        ],
+    );
+    assert_eq!(started, 0);
+    assert!(log.iter().any(|line| line.contains("stale")), "{log:?}");
+    let mut foreign = request(at, Button);
+    foreign.stamp.clock_id = "another-boot".into();
+    assert_eq!(watch_requests(true, true, vec![("controls", foreign)]).0, 0);
+    let (started, log) = watch_requests(true, true, vec![("cloud", request(at, Button))]);
+    assert_eq!(started, 0);
+    assert!(
+        log.iter()
+            .any(|line| line.contains("not from its source's publisher")),
+        "{log:?}"
+    );
+    assert_eq!(
+        watch_requests(true, true, vec![("voice", request(at, Button))]).0,
+        0
+    );
+}
+
+/// The Reviewer-lead's P2 on #3729: `systemd-run` returning only hands the
+/// shutdown to the runner, which refuses while an update installs and is
+/// gone. A flag set on that return passed over every later hold this boot;
+/// the watcher now asks whether the runner is still at work, so the second
+/// hold, once the update is done, turns the lamp off.
+#[test]
+fn a_refused_shutdown_leaves_the_next_hold_acted_on() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
+    let (started, log) = watch_requests_taken(
+        true,
+        true,
+        false,
+        vec![
+            ("controls", request(at - 1_000, Button)),
+            ("controls", request(at, Button)),
+        ],
+    );
+    assert_eq!(started, 2, "{log:?}");
+    assert!(
+        !log.iter().any(|line| line.contains("already turning off")),
+        "{log:?}"
+    );
 }

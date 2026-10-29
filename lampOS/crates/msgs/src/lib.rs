@@ -54,6 +54,8 @@ mod expression;
 pub use expression::*;
 mod controls;
 pub use controls::*;
+mod shutdown;
+pub use shutdown::*;
 mod ears;
 pub use ears::*;
 mod sound_classes;
@@ -1621,6 +1623,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(touch_topics())
         .chain(schedule_topics())
         .chain(keeper_topics())
+        .chain(shutdown_topics())
         .chain(body_topics())
         .chain(arbitration_topics())
         .chain(name_topics())

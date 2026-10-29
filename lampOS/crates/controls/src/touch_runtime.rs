@@ -73,6 +73,9 @@ pub struct Service<G: PinReader, S: StripReader> {
     /// `controls/pet`, declared only with `LAMP_HEAD_PET` on
     /// ([`Self::head_pet`]).
     pets: Option<Publisher>,
+    /// With `LAMP_SHUTDOWN=on`: [`lamp_msgs::ShutdownRequest`], which setup's
+    /// watcher acts on (#3697).
+    shutdown_requests: Option<Publisher>,
     diagnostic: Publisher,
     last_report_us: Option<u64>,
     pub counts: Counts,
@@ -232,7 +235,15 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         let lock = owner_lock(bus.root())?;
         let state =
             bus.publisher_declared(TouchState::TOPIC, &TouchState::declaration(), "controls")?;
-        let engine = TouchEngine::new(touch, clock, state.boot()).map_err(io::Error::other)?;
+        let mut engine = TouchEngine::new(touch, clock, state.boot()).map_err(io::Error::other)?;
+        // The primary button held 5 to 15 s turns the lamp off (#3697).
+        let shutdown = lamp_msgs::shutdown_switched_on();
+        engine.set_shutdown(shutdown);
+        if shutdown {
+            eprintln!(
+                "lamp-controls: LAMP_SHUTDOWN=on: the primary button released after 5 to 15 s asks to turn the lamp off"
+            );
+        }
         // Preserve the installed Voice receiver's primary-button behavior in
         // touch mode, and with `legacy_head` the head's Pet. Base and reset
         // are never sent to this legacy engine.
@@ -251,26 +262,28 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 &ControlsState::declaration(),
                 "controls",
             )?;
-            Some(Primary {
-                engine: Engine::new(
-                    Config {
-                        enabled: config.enabled,
-                        buttons: button.iter().cloned().collect(),
-                        head_pads: if legacy_head {
-                            wiring
-                                .head_pads
-                                .iter()
-                                .map(|pin| pin.name.clone())
-                                .collect()
-                        } else {
-                            vec![]
-                        },
-                        base_selected_mask: None,
+            let mut legacy = Engine::new(
+                Config {
+                    enabled: config.enabled,
+                    buttons: button.iter().cloned().collect(),
+                    head_pads: if legacy_head {
+                        wiring
+                            .head_pads
+                            .iter()
+                            .map(|pin| pin.name.clone())
+                            .collect()
+                    } else {
+                        vec![]
                     },
-                    clock,
-                    state.boot(),
-                )
-                .map_err(io::Error::other)?,
+                    base_selected_mask: None,
+                },
+                clock,
+                state.boot(),
+            )
+            .map_err(io::Error::other)?;
+            legacy.set_shutdown(shutdown);
+            Some(Primary {
+                engine: legacy,
                 state,
                 gestures: bus.publisher_declared(
                     ControlGesture::TOPIC,
@@ -296,6 +309,15 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 "controls",
             )?,
             pets: None,
+            shutdown_requests: shutdown
+                .then(|| {
+                    bus.publisher_declared(
+                        lamp_msgs::ShutdownRequest::TOPIC,
+                        &lamp_msgs::ShutdownRequest::declaration(),
+                        "controls",
+                    )
+                })
+                .transpose()?,
             diagnostic: bus.publisher_declared(
                 Diagnostic::TOPIC,
                 &Diagnostic::declaration(),
@@ -611,6 +633,15 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         );
         for event in &output.events {
             account(&mut self.counts, self.events.publish_json(at_us, event));
+            if let Some(requests) = &mut self.shutdown_requests
+                && let Some(request) = crate::touch::shutdown_request(event)
+            {
+                eprintln!(
+                    "lamp-controls: {}: asking to turn the lamp off",
+                    request.reason
+                );
+                account(&mut self.counts, requests.publish_json(at_us, &request));
+            }
         }
         if let Some(pets) = &mut self.pets {
             for pet in &output.pets {

@@ -27,8 +27,8 @@ use crate::{
 };
 use lamp_msgs::{
     ClockStamp, ControlFault, HEAD_PET_MOST_PER_SECOND, HEAD_PET_SWAPS, HEAD_PET_WITHIN_US,
-    HeadPet, TOUCH_INPUT_TTL_US, TouchEvent, TouchGesture, TouchIntent, TouchSource,
-    TouchSourceState, TouchState,
+    HeadPet, ShutdownRequest, ShutdownSource, TOUCH_INPUT_TTL_US, TouchEvent, TouchGesture,
+    TouchIntent, TouchSource, TouchSourceState, TouchState,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -834,6 +834,9 @@ pub struct TouchEngine {
     pet_sequence: u64,
     state_sequence: u64,
     rejected_inputs: u64,
+    /// [`lamp_msgs::SHUTDOWN_SWITCH`] on: the primary button held 5 s or
+    /// more asks to turn the lamp off, not for the mute ([`Self::set_shutdown`]).
+    shutdown: bool,
 }
 impl TouchEngine {
     pub fn new(
@@ -895,7 +898,16 @@ impl TouchEngine {
             pet_sequence: 0,
             state_sequence: 0,
             rejected_inputs: 0,
+            shutdown: false,
         })
+    }
+    /// With the shutdown switch on (#3697, `docs/shutdown.md`), the primary
+    /// button released after [`lamp_msgs::SHUTDOWN_HOLD_US`] to
+    /// [`lamp_msgs::SHUTDOWN_HOLD_MOST_US`] asks for [`TouchIntent::Shutdown`];
+    /// one released later asks for nothing (cancelled). From 2 s to 5 s it is
+    /// the mute, as with the switch off.
+    pub fn set_shutdown(&mut self, on: bool) {
+        self.shutdown = on;
     }
     /// Whether the body feels the head being pushed by hand now. A head
     /// contact that overlaps a push asks for nothing more (#711).
@@ -1064,6 +1076,12 @@ impl TouchEngine {
                 };
                 let intent = if source == TouchSource::Reset {
                     TouchIntent::FactoryReset
+                } else if self.shutdown && held >= lamp_msgs::SHUTDOWN_HOLD_US {
+                    if !lamp_msgs::shutdown_hold(held) {
+                        // Held past the window: the shutdown is cancelled.
+                        continue;
+                    }
+                    TouchIntent::Shutdown
                 } else if held >= PRIMARY_HOLD_US {
                     TouchIntent::SoftwareMute
                 } else {
@@ -1438,4 +1456,22 @@ impl TouchEngine {
             pets: std::mem::take(&mut self.pending_pets),
         }
     }
+}
+
+/// The general request to turn the lamp off ([`ShutdownRequest`], on its own
+/// topic) for an enabled primary-button release that asked for
+/// [`TouchIntent::Shutdown`], or `None`. Setup's watcher acts on the request,
+/// never on the touch event (#3697).
+pub fn shutdown_request(event: &TouchEvent) -> Option<ShutdownRequest> {
+    (event.enabled
+        && event.source == TouchSource::Primary
+        && event.when_quiet == TouchIntent::Shutdown)
+        .then(|| ShutdownRequest {
+            stamp: event.stamp.clone(),
+            source: ShutdownSource::Button,
+            reason: format!(
+                "primary button held {} ms",
+                (event.observed_us - event.began_us) / 1_000
+            ),
+        })
 }

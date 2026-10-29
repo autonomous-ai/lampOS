@@ -1277,3 +1277,82 @@ fn a_reset_line_released_once_in_its_first_second_still_arms() {
     assert_eq!(e.source, TouchSource::Reset);
     assert_eq!(e.when_speaking, TouchIntent::FactoryReset);
 }
+
+/// The primary button held `held` µs and released, on an engine with the
+/// shutdown switch `on`: what it asks, and whether its state said the hold
+/// past 5 s while it lasted (the ring's warning reads that `held_us`).
+fn primary_hold(on: bool, held: u64) -> (Vec<TouchEvent>, bool) {
+    let mut rig = Rig::new(buttons());
+    rig.engine.set_shutdown(on);
+    rig.gpio(0, false, false, 0);
+    let mut warned = false;
+    for at in (50_000..=50_000 + held).step_by(50_000) {
+        let sample = rig.sample(at, true, false, 0);
+        rig.engine.ingest_gpio(at, sample).unwrap();
+        let output = rig.engine.tick(at);
+        assert!(output.events.is_empty(), "nothing before the release");
+        let primary = output
+            .state
+            .sources
+            .iter()
+            .find(|source| source.source == TouchSource::Primary)
+            .unwrap();
+        warned |= primary.held_us.is_some_and(lamp_msgs::shutdown_hold);
+    }
+    (rig.gpio(50_000 + held + 1, false, false, 0), warned)
+}
+
+/// #3697: 1 s is Stop, 3 s the mute, either way; with the switch on 6 s is
+/// one shutdown and 20 s nothing (cancelled); off, both are the mute, as
+/// before.
+#[test]
+fn a_primary_hold_turns_off_in_its_window_only_with_the_switch_on() {
+    for (on, held, wanted, warned) in [
+        (false, 1_000_000, Some(TouchIntent::Stop), false),
+        (false, 3_000_000, Some(TouchIntent::SoftwareMute), false),
+        (false, 6_000_000, Some(TouchIntent::SoftwareMute), true),
+        (false, 20_000_000, Some(TouchIntent::SoftwareMute), true),
+        (true, 1_000_000, Some(TouchIntent::Stop), false),
+        (true, 3_000_000, Some(TouchIntent::SoftwareMute), false),
+        (true, 6_000_000, Some(TouchIntent::Shutdown), true),
+        (true, 20_000_000, None, true),
+    ] {
+        let (events, saw_window) = primary_hold(on, held);
+        assert_eq!(
+            events
+                .iter()
+                .map(|event| event.when_quiet)
+                .collect::<Vec<_>>(),
+            wanted.into_iter().collect::<Vec<_>>(),
+            "on {on}, held {held}"
+        );
+        // The state says the hold's time either way; the ring warns only
+        // with its own switch on.
+        assert_eq!(saw_window, warned, "on {on}, held {held}");
+        let requests = events
+            .iter()
+            .filter_map(shutdown_request)
+            .collect::<Vec<_>>();
+        if wanted == Some(TouchIntent::Shutdown) {
+            assert_eq!(requests.len(), 1, "exactly one request");
+            assert_eq!(requests[0].source, lamp_msgs::ShutdownSource::Button);
+            assert_eq!(requests[0].stamp, events[0].stamp);
+            assert!(
+                requests[0]
+                    .accept("controls", "boot", events[0].stamp.at_us)
+                    .is_ok()
+            );
+        } else {
+            assert!(requests.is_empty(), "on {on}, held {held}");
+        }
+    }
+}
+
+/// A Controls in shadow asks nothing of setup, even in the window.
+#[test]
+fn a_shadow_controls_shutdown_hold_is_no_request() {
+    let (mut events, _) = primary_hold(true, 6_000_000);
+    let mut event = events.pop().unwrap();
+    event.enabled = false;
+    assert!(shutdown_request(&event).is_none());
+}

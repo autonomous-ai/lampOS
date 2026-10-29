@@ -52,6 +52,12 @@ impl RingHead {
     /// The head's state on the bus under `root`, read by a thread of its
     /// own from now on.
     pub fn on(root: &Path) -> io::Result<Self> {
+        Self::on_source(root, TouchSource::Head)
+    }
+
+    /// The same for another of Controls' sources: the primary button, for
+    /// the shutdown's warning while it is held (#3697, [`crate::ring_worker`]).
+    pub fn on_source(root: &Path, source: TouchSource) -> io::Result<Self> {
         let bus = Bus::new(root)?;
         let found = Arc::new(Found::default());
         let reading = Arc::clone(&found);
@@ -64,7 +70,7 @@ impl RingHead {
                         .latest(TouchState::TOPIC)
                         .ok()
                         .flatten()
-                        .and_then(|message| held(&message));
+                        .and_then(|message| held_of(&message, source));
                     if let Ok(mut slot) = reading.held.lock() {
                         *slot = held;
                     }
@@ -98,6 +104,11 @@ impl Drop for RingHead {
 /// same monotonic clock as the ring's). None for a hand a push from the body
 /// spoiled: Controls gives it no time.
 pub fn held(message: &Message) -> Option<(u64, u64)> {
+    held_of(message, TouchSource::Head)
+}
+
+/// [`held`] for any of Controls' sources.
+pub fn held_of(message: &Message, source: TouchSource) -> Option<(u64, u64)> {
     if message.expired || message.header.source != "controls" {
         return None;
     }
@@ -106,7 +117,7 @@ pub fn held(message: &Message) -> Option<(u64, u64)> {
     let held = state
         .sources
         .iter()
-        .find(|source| source.source == TouchSource::Head)?
+        .find(|found| found.source == source)?
         .held_us?;
     Some((held, state.stamp.at_us.saturating_add(TOUCH_STATE_TTL_US)))
 }
