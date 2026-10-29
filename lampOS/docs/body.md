@@ -925,7 +925,12 @@ With `LAMP_BODY_POSE_ASK=on`, a person can ask the lamp lower ("get lower",
 the lamp's own stand on `body/stand_asked` (`lamp_msgs::StandAsked`, kept
 like `lamp/pause` until the next ask or until the bus is made again at power-up).
 lamp-body reads it at most once a second (`stand_in.rs`) and takes it in place
-of `--stand-share` for as long as it is kept:
+of `--stand-share` for as long as it is kept. The core skill Pose
+(`skills/pose`, its tool `set_pose`) publishes it through lamp-skills' `stand`
+step: 100 for normal, 60 for lower, 30 for sit, only with
+`LAMP_BODY_POSE_ASK=on` in lamp-skills' environment too ([skills.md](skills.md),
+`do.stand`). Asked taller than its usual height, the lamp says so in words and
+calls nothing:
 
 - The arm goes there at the stand's own pace (the same spring as rising),
   and stays there through moods and conversations. The head follows its
