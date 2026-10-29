@@ -992,7 +992,7 @@
       "type": "object",
       "properties": {
         "rates": {
-          "description": "Present only on a dev lamp run with `--rates off`: every rate lifted but `refused` and `phrases`, whose windows are then the only ones told.",
+          "description": "Present when the door's rates are off, lamp-control's default (`--rates default` turns them on): every rate lifted but `refused` and `phrases`, whose windows are then the only ones told.",
           "const": "off"
         },
         "quiet_hours": {

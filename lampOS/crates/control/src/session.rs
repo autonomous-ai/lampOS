@@ -294,7 +294,7 @@ impl Door {
     }
 
     /// Every rate lifted but the refused actions' guard and the phrase
-    /// changes (`--rates off`, a dev lamp's switch, never a product's).
+    /// changes (`--rates off`, lamp-control's default).
     pub fn with_rates_off(mut self) -> Self {
         self.rates = Rates::off();
         self
@@ -978,13 +978,15 @@ fn quiet_hours_of(quiet: Option<lamp_local_time::QuietWindow>) -> Value {
 }
 
 /// Whether the rates are lifted, from `--rates off|default` first, then
-/// `LAMP_CONTROL_RATES`, else `default`. A dev lamp's switch: a product
-/// never passes it. A bad value stops lamp-control at its start.
+/// `LAMP_CONTROL_RATES`, else off: lifted on every lamp, the person's
+/// decision (30 Oct 02:1x, "remove the rate"), the refused actions' guard and the phrase
+/// changes kept ([`crate::rate::Class::kept_when_off`]). `default` turns
+/// the rates back on. A bad value stops lamp-control at its start.
 pub fn rates_off_of(flag: Option<&str>, env: Option<&str>) -> Result<bool, String> {
     let (from, value) = match (flag, env) {
         (Some(flag), _) => ("--rates", flag),
         (None, Some(env)) => ("LAMP_CONTROL_RATES", env),
-        (None, None) => return Ok(false),
+        (None, None) => return Ok(true),
     };
     match value.trim() {
         "off" => Ok(true),
@@ -1731,7 +1733,9 @@ mod tests {
             door.handle(&mut session, light, &mut fake, 3 * S + 20, 1)
                 .close
         );
-        assert_eq!(rates_off_of(None, None), Ok(false));
+        // Off unless `default` turns them back on (the person's decision, 30 Oct).
+        assert_eq!(rates_off_of(None, None), Ok(true));
+        assert_eq!(rates_off_of(None, Some("default")), Ok(false));
         assert_eq!(rates_off_of(Some("off"), None), Ok(true));
         assert_eq!(rates_off_of(None, Some("off")), Ok(true));
         assert_eq!(rates_off_of(Some("default"), Some("off")), Ok(false));
