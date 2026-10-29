@@ -3105,6 +3105,41 @@ pub fn serve(
         );
         engine = engine.carrying_the_name(true);
     }
+    // Asleep for the night and resting through sounds
+    // (`LAMP_REST_THROUGH_SOUNDS=on`, #4285): the lamp's name alone is not
+    // answered, so it only stirs. Read from Expression's newest state when
+    // such a line would be answered.
+    if std::env::var(crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        match files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+        {
+            Some(bus) => {
+                eprintln!(
+                    "lamp-voice second: asleep for the night, the lamp's name alone is not answered, so it stirs and is not woken; a line going on from the name is (LAMP_REST_THROUGH_SOUNDS)"
+                );
+                let bus = Mutex::new(bus);
+                engine = engine.resting_through_sounds(Arc::new(move || {
+                    bus.lock().is_ok_and(|bus| {
+                        bus.latest(lamp_msgs::ExpressionState::TOPIC)
+                            .ok()
+                            .flatten()
+                            .is_some_and(|message| {
+                                crate::second_provider::rests_through_sounds(&message)
+                            })
+                    })
+                }));
+            }
+            None => eprintln!(
+                "lamp-voice second: the lamp's name alone is answered at night as by day: no bus to read Expression's state from (LAMP_REST_THROUGH_SOUNDS)"
+            ),
+        }
+    }
     // The lamp's own words heard back are held as its echo, or taken out
     // of a mixed line's start or end (#2997).
     if std::env::var(crate::second_provider::OWN_ECHO_ENVIRONMENT)

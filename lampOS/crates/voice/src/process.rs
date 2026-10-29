@@ -1197,6 +1197,10 @@ fn worker_command(
             role,
             var(crate::ring_night::ENVIRONMENT).as_deref(),
         ))
+        .envs(rest_through_sounds_worker_environment(
+            role,
+            var(crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT).as_deref(),
+        ))
         .envs(scheduling_worker_environment(
             role,
             var(crate::worker_scheduling::ENVIRONMENT).as_deref(),
@@ -1809,6 +1813,19 @@ fn night_worker_environment(
         .then_some((crate::ring_night::ENVIRONMENT, "on"))
 }
 
+// Resting through sounds at night (#1672, #4285), the same narrow way: the
+// exact `on`, to the second route only, which holds back its answer to the
+// lamp's name alone while Expression says the night's sleep rests so.
+fn rest_through_sounds_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT,
+        "on",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2154,6 +2171,13 @@ mod tests {
                     (
                         second_scoped_context_worker_environment,
                         "LAMP_SECOND_SCOPED_CONTEXT",
+                        ["second"].as_slice(),
+                    ),
+                    // Resting through sounds at night reaches the second
+                    // route alone (#4285).
+                    (
+                        rest_through_sounds_worker_environment,
+                        "LAMP_REST_THROUGH_SOUNDS",
                         ["second"].as_slice(),
                     ),
                     // Rules reach both routes too (twelve-P2).
@@ -2520,6 +2544,7 @@ mod tests {
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
                     crate::ring_night::ENVIRONMENT,
+                    crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                     crate::known_faces::AT_DESK_ENVIRONMENT,
                 ]
@@ -2765,6 +2790,7 @@ mod tests {
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
+                    "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",
