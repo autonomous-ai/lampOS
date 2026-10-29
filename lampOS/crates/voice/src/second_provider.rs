@@ -1466,14 +1466,7 @@ const OPENS_SET_OFF: &[&str] = &[
 /// greeting of its own before it, set off too ("Hello. Gaswa, I changed
 /// jobs."), which [`GREETINGS`] passes over.
 pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
-    let greeted = past_greeting(text);
-    // Past a greeting, a line that still says the name as itself had its
-    // first word heard right: "Hello, Anna. Lamp, …" opens with a person's
-    // name (Reviewer-three's P2 on #4069).
-    if greeted.len() < text.len() && says_the_name(greeted) {
-        return None;
-    }
-    let text = greeted;
+    let text = past_greeting(text);
     let (start, end) = first_word_set_off(text)?;
     let word = &text[start..end];
     let lower = unicode_normalization::UnicodeNormalization::nfc(word)
@@ -1482,7 +1475,13 @@ pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
     let rest = text[end..].trim_start_matches(|c: char| !c.is_alphanumeric());
     let named = lower == "lamp" || lower == "lamb";
     let common = OPENS_SET_OFF.contains(&lower.as_str()) || NOT_A_NAME.contains(&lower.as_str());
-    (!rest.is_empty() && !named && !common).then_some((word, rest))
+    // A line that goes on to call the lamp by its name as itself had its
+    // first word heard right, a person's name: "Hello, Anna. Lamp, …"
+    // (Reviewer-three's P2 on #4069), and past "Hey" or "Hi" too ("Hey,
+    // Anna. Lamp, …", the Reviewer-lead's P3 on #4078). Only the name said
+    // as an address counts, never the noun ("Hello. Gaswa, turn off the
+    // lamp.", the Reviewer-lead's P2 on #4078).
+    (!rest.is_empty() && !named && !common && !addresses_the_name(rest)).then_some((word, rest))
 }
 
 /// Greetings a line may open with, set off by a comma or a stop, before
@@ -1551,11 +1550,47 @@ fn name_call_rest(text: &str) -> Option<&str> {
     (!rest.is_empty()).then_some(rest)
 }
 
-/// Whether `text` says the lamp's name as itself, "Lamp" or "Lamb", as a
-/// word of its own.
-fn says_the_name(text: &str) -> bool {
-    text.split(|c: char| !c.is_alphanumeric())
-        .any(|word| word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb"))
+/// Whether `text` calls the lamp by its name as itself, "Lamp" or "Lamb",
+/// as an address: the word opens a sentence or clause (at the start, or
+/// after a stop or a comma), or follows a greeting ("Hey Lamp", "Hey,
+/// Lamp"). It needn't be set off itself, since speech to text often drops
+/// that comma ("Lamp what's the weather?", "Lamp ơi, …"; both readers' P2
+/// on #4274). The noun is never the call, as a word before it means it
+/// opens no clause: "turn off the lamp.", "dim my lamp, please", "the lamp
+/// is too bright", "lamps", "the lamp's shade". Named limit: a list
+/// ("desk, lamp, and chair") reads as a call.
+fn addresses_the_name(text: &str) -> bool {
+    let words: Vec<(usize, usize)> = text
+        .char_indices()
+        .filter(|&(at, c)| {
+            (c.is_alphanumeric() || c == '\'')
+                && !text[..at].ends_with(|p: char| p.is_alphanumeric() || p == '\'')
+        })
+        .map(|(at, _)| {
+            let len = text[at..]
+                .find(|c: char| !(c.is_alphanumeric() || c == '\''))
+                .unwrap_or(text.len() - at);
+            (at, at + len)
+        })
+        .collect();
+    words.iter().enumerate().any(|(i, &(start, end))| {
+        let word = &text[start..end];
+        if !(word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb")) {
+            return false;
+        }
+        let before = text[..start].trim_end();
+        let opens = before.is_empty() || before.ends_with([',', '.', '!', '?', ';', ':']);
+        let greeted = i > 0 && {
+            let (from, to) = words[i - 1];
+            ["hey", "hi", "ok", "okay", "hello"]
+                .iter()
+                .any(|greeting| text[from..to].eq_ignore_ascii_case(greeting))
+                && text[to..start]
+                    .trim_matches(|c: char| c.is_whitespace() || c == ',')
+                    .is_empty()
+        };
+        opens || greeted
+    })
 }
 
 /// Words that open a line set off and are said, never a name heard for the
