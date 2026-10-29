@@ -223,6 +223,11 @@ Environment=LAMP_RING_ASLEEP=on
 # a person's try on lamp-52e6: a tap, a hold, and sleep and wake (#1798).
 Environment=LAMP_HEAD_TOUCH=on
 Environment=LAMP_RESTORED_MUTE=on
+# A run that fails before its capture gave any audio, with no control input in flight, leaves the lamp as its person
+# left it, and a fault after the stop's signal is the stop's (#1567). On for #4332: a busy first boot (a privacy
+# connection refused, a capture message late) ended the voice before it heard anything, and the guard then muted a
+# new owner's lamp until a tap (lamp-0c89, 29 Oct). A fault while listening still restores muted.
+Environment=LAMP_GUARD_NEVER_LISTENED=on
 Environment=LAMP_OTHER_LANGUAGE=sorry
 Environment=LAMP_NAME_IN_PASSING=ignored
 # An answer plays only when the lamp was spoken to, and the reply to its own news (outside a busy room), a question
