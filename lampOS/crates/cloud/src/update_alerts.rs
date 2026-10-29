@@ -265,6 +265,11 @@ struct Told {
     started_after: Option<Key>,
     /// The build it ran then.
     from: Option<String>,
+    /// Set while the last end told was a refused, failed or not-switched
+    /// one: its stage, build and code. The same end again is not told, nor
+    /// the start of the rounds that lead to it, until a round ends some
+    /// other way.
+    repeating: Option<(String, Option<u64>, Option<String>)>,
 }
 
 /// The file's write, kept to run where it may block: a temporary file,
@@ -357,14 +362,18 @@ impl Watcher {
                     .running
                     .as_ref()
                     .map(|build| Version::running(build).0);
-                alerts.push(Alert {
-                    stage: Stage::Started,
-                    from: told.from.as_deref().and_then(Version::kept),
-                    to: None,
-                    code: None,
-                    took_s: None,
-                    at_s: now_ms / 1000,
-                });
+                // The start is still kept, but not told, while the same end
+                // repeats: its end would not be told either.
+                if told.repeating.is_none() {
+                    alerts.push(Alert {
+                        stage: Stage::Started,
+                        from: told.from.as_deref().and_then(Version::kept),
+                        to: None,
+                        code: None,
+                        took_s: None,
+                        at_s: now_ms / 1000,
+                    });
+                }
             }
         } else if told.ended != current {
             // The end before this one names the round, if its start was told.
@@ -377,22 +386,35 @@ impl Watcher {
                 // The start told is of this round only if it was said after
                 // the end before this one.
                 let from = told.from.take().and_then(|text| Version::kept(&text));
-                alerts.push(Alert {
-                    stage,
-                    from,
-                    to: result.sequence,
-                    code: if stage == Stage::NotSwitched {
-                        Some(not_switched_code(&result.outcome))
-                    } else {
-                        extras.reason
-                    },
-                    took_s: extras
-                        .started_at_unix_ms
-                        .and_then(|began| result.at_unix_ms.checked_sub(began))
-                        .map(|ms| ms / 1000)
-                        .filter(|seconds| *seconds <= LONGEST_TOOK_S),
-                    at_s: now_ms / 1000,
-                });
+                let code = if stage == Stage::NotSwitched {
+                    Some(not_switched_code(&result.outcome))
+                } else {
+                    extras.reason
+                };
+                let triple = matches!(stage, Stage::Refused | Stage::Failed | Stage::NotSwitched)
+                    .then(|| {
+                        (
+                            stage.name().to_owned(),
+                            result.sequence,
+                            code.map(str::to_owned),
+                        )
+                    });
+                let again = triple.is_some() && told.repeating == triple;
+                told.repeating = triple;
+                if !again {
+                    alerts.push(Alert {
+                        stage,
+                        from,
+                        to: result.sequence,
+                        code,
+                        took_s: extras
+                            .started_at_unix_ms
+                            .and_then(|began| result.at_unix_ms.checked_sub(began))
+                            .map(|ms| ms / 1000)
+                            .filter(|seconds| *seconds <= LONGEST_TOOK_S),
+                        at_s: now_ms / 1000,
+                    });
+                }
             }
         }
         let mut write = None;
@@ -824,7 +846,7 @@ mod tests {
             [
                 (Stage::Started, None),
                 (Stage::NotSwitched, Some("not-quiet")),
-                (Stage::Started, None),
+                // The next start is held while that end could repeat.
                 (Stage::Done, None),
             ]
         );
@@ -847,6 +869,72 @@ mod tests {
         let odd = Some(("Alice said s3cret", None, T0 + 510_000));
         let told = watcher.observe(&status("idle", 3310, odd), &none(), T0 + 511_000);
         assert_eq!(told[0].code, Some("other"));
+    }
+
+    /// A lamp that keeps refusing, or is talked to through every update
+    /// window, tells it once, not every round; and a restart mid-streak
+    /// does not tell it again.
+    #[test]
+    fn the_same_refusal_or_not_switched_end_is_told_once_until_another_end() {
+        let stages =
+            |watcher: &mut Watcher, outcome: &'static str, round: u64, last: Last<'static>| {
+                let at = T0 + round * 1_000_000;
+                let mut told = watcher.observe(&status("fetching", 8599, last), &none(), at);
+                let ended = Some((outcome, Some(8600), at + 50_000));
+                told.extend(watcher.observe(&status("idle", 8599, ended), &none(), at + 51_000));
+                (told.into_iter().map(|a| a.stage).collect::<Vec<_>>(), ended)
+            };
+        let dir = folder("streak");
+        let store = dir.join(FILE);
+        let mut watcher = Watcher::new(Some(store.clone()));
+        let old = Some(("up-to-date", Some(8599), T0 - 1));
+        watcher.observe(&status("idle", 8599, old), &none(), T0);
+        let (first, mut last) = stages(&mut watcher, "refused", 1, old);
+        assert_eq!(first, [Stage::Started, Stage::Refused]);
+        // A restart in the middle of the streak.
+        let mut watcher = Watcher::new(Some(store.clone()));
+        for round in 2..4 {
+            let (told, ended) = stages(&mut watcher, "refused", round, last);
+            assert!(told.is_empty(), "round {round}: {told:?}");
+            last = ended;
+        }
+        // Another end breaks it, and is told whole; the build coming
+        // after it is told again.
+        let (told, ended) = stages(&mut watcher, "switched", 4, last);
+        assert_eq!(told, [Stage::Done]);
+        last = ended;
+        let (told, ended) = stages(&mut watcher, "refused", 5, last);
+        assert_eq!(told, [Stage::Started, Stage::Refused]);
+        last = ended;
+        // A different triple (another build) is told even in a streak.
+        watcher.observe(&status("fetching", 8599, last), &none(), T0 + 6_000_000);
+        let other = Some(("refused", Some(8601), T0 + 6_050_000));
+        let told = watcher.observe(&status("idle", 8599, other), &none(), T0 + 6_051_000);
+        assert_eq!(told.len(), 1);
+        last = other;
+        // The not-switched streak: told through the window each round, once.
+        let (told, ended) = stages(&mut watcher, "not-quiet", 7, last);
+        assert_eq!(told, [Stage::NotSwitched]);
+        last = ended;
+        let (told, ended) = stages(&mut watcher, "not-quiet", 8, last);
+        assert!(told.is_empty(), "{told:?}");
+        last = ended;
+        let (told, _) = stages(&mut watcher, "switched", 9, last);
+        assert_eq!(told, [Stage::Done]);
+        // A file from before this field loads: no streak.
+        fs::write(
+            &store,
+            r#"{"ended":["switched",8600,5],"started":false,"started_after":null,"from":null}"#,
+        )
+        .unwrap();
+        let mut old_file = Watcher::new(Some(store));
+        let (told, _) = stages(
+            &mut old_file,
+            "refused",
+            10,
+            Some(("switched", Some(8600), 5)),
+        );
+        assert_eq!(told, [Stage::Started, Stage::Refused]);
     }
 
     /// A round restarts lamp-cloud when it changed, and a reboot begins it
