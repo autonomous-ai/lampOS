@@ -2481,6 +2481,54 @@ async fn an_onboarding_fixed_line_whose_chat_never_begins_is_said_as_it_is() {
     }
 }
 
+/// lamp-52e6, 29 Oct 07:35: the model service out of credit refused every
+/// chat with HTTP 402 in under a second. An onboarding fixed line whose chat
+/// fails before any word is said in its own words, as one not begun in time
+/// (above), so the walk goes on; a line that needs the model still ends
+/// with nothing said.
+#[tokio::test(start_paused = true)]
+async fn an_onboarding_fixed_line_whose_chat_fails_is_said_as_it_is() {
+    let fixed = "(Say only this, nothing before or after it: \"Say 'Hey Lamp' from your seat.\")";
+    let preferences = "(Nobody has spoken. Ask exactly this first: \"Are there hours when I should keep quiet?\" When they have answered, ask exactly this: \"May I say good morning?\")";
+    for (note, words) in [
+        (fixed, Some("Say 'Hey Lamp' from your seat.")),
+        (preferences, None),
+    ] {
+        let script = Arc::new(Script {
+            chats: Mutex::new([vec![Err(net::Error::Status(402))]].into()),
+            ..Script::default()
+        });
+        let (mut engine, calls, _) = scripted(script.clone());
+        engine.submit(written(1, note));
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        let said: Vec<_> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        match words {
+            Some(words) => {
+                assert_eq!(said, [&format!("said:{words}")], "{labels:?}");
+                assert!(
+                    labels.iter().any(|label| label.starts_with("audio:")),
+                    "{labels:?}"
+                );
+                assert!(
+                    labels.ends_with(&["generated".into(), "complete".into()]),
+                    "{labels:?}"
+                );
+            }
+            None => {
+                assert!(said.is_empty(), "{labels:?}");
+                assert!(
+                    !labels.iter().any(|label| label.starts_with("audio:")),
+                    "{labels:?}"
+                );
+            }
+        }
+        assert!(calls.lock().unwrap().is_empty());
+    }
+}
+
 /// #1712, the first builder at 16:04: a spoken line whose chat the route
 /// gave up, not begun within `BEGIN_WITHIN`, is no talk the lamp left
 /// alone. Two of them don't end the conversation, and the person's next
