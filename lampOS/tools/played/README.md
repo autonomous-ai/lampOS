@@ -307,6 +307,23 @@ lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
   lock or lease: on a shared lamp, run it under `lamp-lock.sh <lamp> run`,
   as above.
 
+## Quality rows
+
+`quality_rows.py run LABEL [--stops N]` scores the four quality rows of
+`docs/build-rows.md` on whatever build the lamp runs, nothing changed on it:
+`night.py LABEL-night`, `cutin.sh LABEL-cutin 1 1`, then N (10) stop trials
+(a long story asked at Mac volume 45, a stop line at 90 1.5 s into it), about
+70 minutes. It takes no lock: on a shared lamp run it as
+`lampOS/tools/lamp-lock.sh <lamp> run <holder> <session> "quality q1" -- lampOS/tools/played/quality_rows.py run q1`.
+`quality_rows.py score LABEL` rescores; `selftest` checks the scorer.
+
+- **Cutting in** (bar 0.75): cutin.sh's episodes, a cut-in that commits or an aside that resumes.
+- **Stop words** (0.75): the story stopped (`user_interrupted`) within 2 s of the first stop line; void trials (no story) left out.
+- **Knows when you have finished** (0.85): night's hesitant and long asks answered in one piece.
+- **Not spoken to** (0.90): night's desk talk, `after1`/`after2` included, held.
+
+A missing part is "not measured", never zero. Results: `$PLAYED_OUT/quality/LABEL.txt` and `.json`.
+
 ## What it needs
 
 - A Mac beside the lamp, its speaker where the lamp can hear it.
