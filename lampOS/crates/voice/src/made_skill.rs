@@ -1673,6 +1673,37 @@ light = { dim = 1 }
         assert_eq!(fs::read_to_string(&told).unwrap(), "s1:7:1\n");
     }
 
+    /// Only a yes that put a skill on tells anything (El's P3 on #4268): with
+    /// another skill on already and its news not told, a yes that puts
+    /// nothing on keeps that news untold.
+    #[test]
+    fn a_yes_that_puts_nothing_on_tells_nothing() {
+        let dir = scratch("mk-untold");
+        let made = dir.join("made");
+        fs::create_dir_all(&made).unwrap();
+        write_index(
+            &made,
+            &[
+                json!({"name": "evening-dim", "sha256": "a".repeat(64), "package": "evening-dim.tar", "from": "s1:7:1"}),
+                json!({"name": "morning-glow", "sha256": "b".repeat(64), "package": "morning-glow.tar", "from": "s1:8:1", "on": true}),
+            ],
+        )
+        .unwrap();
+        assert_eq!(on_keys(&made), ["s1:8:1"]);
+        let told = dir.join("told");
+        let socket = dir.join("nobody.sock");
+        let answer = put_on_told(
+            &made,
+            &socket,
+            &dir.join("no-tasks-part"),
+            &told,
+            Some("Yes."),
+            1_000,
+        );
+        assert!(answer.get("put_on").is_none(), "{answer}");
+        assert!(!told.exists(), "nothing put on: nothing told");
+    }
+
     /// A yes not said out loud, or no ask waiting, asks the helper nothing;
     /// a helper's refusal leaves the skill off and still waiting.
     #[test]
