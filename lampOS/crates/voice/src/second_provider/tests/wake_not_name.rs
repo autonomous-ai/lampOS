@@ -194,6 +194,34 @@ fn a_greeting_before_the_name_as_heard_is_passed_over() {
             "Ramon",
             "Nhớ giúp tôi tủ số 12.",
         ),
+        // The Reviewer-lead's P2 on #4078: the noun later in the line is
+        // no call of the lamp, so the name as heard is still passed over.
+        (
+            "Hello. Gaswa, turn off the lamp.",
+            "Gaswa",
+            "turn off the lamp.",
+        ),
+        (
+            "Hello. Gaswa, dim the lamp please.",
+            "Gaswa",
+            "dim the lamp please.",
+        ),
+        (
+            "Good morning, Ramon. Is the lamp too bright? My lamp's shade, I mean.",
+            "Ramon",
+            "Is the lamp too bright? My lamp's shade, I mean.",
+        ),
+        ("Ramon, turn on the lamps.", "Ramon", "turn on the lamps."),
+        (
+            "Gaswa, dim my lamp, please.",
+            "Gaswa",
+            "dim my lamp, please.",
+        ),
+        (
+            "Gaswa, the lamp is too bright.",
+            "Gaswa",
+            "the lamp is too bright.",
+        ),
     ] {
         assert_eq!(wake_heard_as(heard), Some((word, rest)), "{heard}");
     }
@@ -209,23 +237,23 @@ fn a_greeting_before_the_name_as_heard_is_passed_over() {
         // itself means the first word was heard right, a person's name.
         "Good morning, Anna. Lamp, remember Anna's birthday is the fifth of May.",
         "Hello, Anna. Lamp, what's the weather today?",
+        // The Reviewer-lead's P3 on #4078: past "Hey" or "Hi" as well, and
+        // with no greeting at all. "Hi, honey. …" was read as a wake
+        // before; the call after it says "honey" was said to a person.
+        "Hey, Anna. Lamp, what's the weather today?",
+        "Hi, honey. Lamp, what time is it?",
+        "Anna. Lamp, remember Anna's birthday.",
+        "Hello, Anna. Hey Lamp what's the weather?",
+        // Both readers' P2 on #4274: a call whose comma speech to text
+        // dropped is still a call.
+        "Hello, Anna. Lamp what's the weather?",
+        "Hello, Anna. Hey, Lamp what time is it?",
+        "Anna. Lamp what's the weather?",
+        "Anna. Lamp ơi, mấy giờ rồi?",
+        "Anna. Lamp à, mấy giờ rồi?",
+        "Anna. Lamp nhé, nhớ giúp.",
     ] {
         assert_eq!(wake_heard_as(heard), None, "{heard}");
-    }
-    // "Hey" and "Hi" are read as lamp-voice reads them today.
-    for (heard, word, rest) in [
-        (
-            "Hey, Anna. Lamp, what's the weather today?",
-            "Anna",
-            "Lamp, what's the weather today?",
-        ),
-        (
-            "Hi, honey. Lamp, what time is it?",
-            "honey",
-            "Lamp, what time is it?",
-        ),
-    ] {
-        assert_eq!(wake_heard_as(heard), Some((word, rest)), "{heard}");
     }
 }
 
