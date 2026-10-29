@@ -188,7 +188,11 @@ jobs:
     # Also when route was skipped (not asked) or failed: then GitHub-hosted.
     if: ${{ !cancelled() && !inputs.promote_sequence }}
     name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
-    runs-on: ${{ fromJSON(needs.route.outputs.runner || '"ubuntu-22.04-arm"') }}
+    # Any attempt after the first goes GitHub-hosted, whichever re-run button:
+    # "Re-run failed jobs" doesn't re-run route, so its attempt-1 answer would
+    # send the job back to the Studio (40813878711 attempts 2 and 3, 29 Oct;
+    # Fourth on #3997).
+    runs-on: ${{ github.run_attempt == '1' && fromJSON(needs.route.outputs.runner || '"ubuntu-22.04-arm"') || 'ubuntu-22.04-arm' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -360,7 +364,7 @@ jobs:
   # needs only the ARM64 job.
   cache:
     needs: route
-    if: ${{ !cancelled() && github.event_name == 'push' && needs.route.outputs.studio == 'true' }}
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.route.outputs.studio == 'true' && github.run_attempt == '1' }}
     name: lampOS — renew the pull requests' ARM64 cache
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 60
