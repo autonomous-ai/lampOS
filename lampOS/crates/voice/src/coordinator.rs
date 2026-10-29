@@ -3046,6 +3046,14 @@ fn run_source(
         .borrow_mut()
         .as_mut()
         .map_or(Ok(()), HandControls::persist_muted);
+    let persistence = persistence.and_then(|()| {
+        released_restored_on_stop(
+            result.is_ok(),
+            termination.signal_name(),
+            &mut trace,
+            &mut controls.borrow_mut(),
+        )
+    });
     let result = service_privacy::finish(result, persistence);
     crate::say::Says::stop();
     finish_run(output, &mut trace, &mut cues, result, termination)
@@ -4486,6 +4494,33 @@ fn released_after_unreadable_stop(
         }
     }
     result
+}
+
+/// A stop the service was asked for, ended cleanly, ends a mute the restart
+/// guard restored (#4332): it is not the person's, and the app's Restart on
+/// lamp-0c89 (29 Oct 15:22) brought the guard's mute back as the saved state,
+/// deaf until a tap. A mute the person chose, or a press in flight, keeps
+/// ([`HandControls::release_restored_on_stop`]). Said once.
+fn released_restored_on_stop(
+    clean: bool,
+    signal: Option<&str>,
+    trace: &mut SessionState,
+    controls: &mut Option<HandControls>,
+) -> io::Result<()> {
+    let (true, Some(signal), Some(controls)) = (clean, signal, controls.as_mut()) else {
+        return Ok(());
+    };
+    if controls.release_restored_on_stop()? {
+        eprintln!(
+            "lamp-voice: {signal} ended the mute the restart guard restored; the next start listens"
+        );
+        // Advice for the record only: the release is already saved.
+        let _ = record(
+            trace,
+            json!({"kind":"guard_mute_ended_on_stop","at_us":monotonic_us(),"signal":signal}),
+        );
+    }
+    Ok(())
 }
 
 /// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, B): a run that ended in a

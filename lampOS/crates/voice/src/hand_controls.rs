@@ -12,6 +12,10 @@
 //! record, removed with the guard, by a mute the person chose, or by a clear.
 //! A restart that finds the record muted and the marker present knows the mute
 //! was restored by the guard after a fault, not chosen.
+//!
+//! A guard from an earlier boot is a power cut, not a fault of this run
+//! (#4332): pulling the plug is how most people turn a lamp off. That restart
+//! starts with the person's own mute only ([`released_after_power_cut`]).
 use lamp_bus::{Bus, Kind, Message, Notice, Publisher, Subscriber};
 use lamp_controls::{
     mute::MuteRecord,
@@ -850,6 +854,15 @@ impl HandControls {
         shared: Arc<Shared>,
         now_us: u64,
     ) -> io::Result<Self> {
+        let mut restored = restored;
+        let mark_guard = std::env::var(RESTORED_MUTE_ENVIRONMENT).ok().as_deref() == Some("on");
+        if let Some(path) = &options.mute_record
+            && released_after_power_cut(path, mark_guard, &mut restored)?
+        {
+            eprintln!(
+                "lamp-voice: the restart guard was left by an earlier boot (a power cut), so the lamp starts with its person's own mute: listening"
+            );
+        }
         let mut controls = Self::from_parts(
             options.clone(),
             clock_id,
@@ -858,8 +871,7 @@ impl HandControls {
             shared,
             now_us,
         )?;
-        controls.mark_guard =
-            std::env::var(RESTORED_MUTE_ENVIRONMENT).ok().as_deref() == Some("on");
+        controls.mark_guard = mark_guard;
         controls.never_listened =
             std::env::var(NEVER_LISTENED_ENVIRONMENT).ok().as_deref() == Some("on");
         controls.load_could_not_start();
@@ -1030,12 +1042,9 @@ impl HandControls {
     /// mute moves `through_us` forward, so a person's saved mute never matches
     /// a marker left beside it, even one a failed removal could not take.
     ///
-    /// After a reboot, restore saves the record rebased to the new clock, so
-    /// a match rewrites the marker to name that saved record: a second
-    /// restart in the same boot (an update's clean stop) still knows the
-    /// mute is the guard's (the first builder on #997). A rewrite that fails
-    /// leaves the old name, which the next restart no longer matches: it
-    /// fails closed, as a chosen mute.
+    /// Only a guard of this boot gets here matched: one from an earlier boot
+    /// was released before ([`released_after_power_cut`], #4332), so the
+    /// record is not rebased and the marker still names it as saved.
     fn restore_guard_marker(&mut self, stored: Option<(String, u64)>) {
         let Some(marker) = self.guard_marker() else {
             return;
@@ -1046,14 +1055,6 @@ impl HandControls {
             .and_then(|text| marker_identity(&text));
         if self.mark_guard && present && self.muted() && names.is_some() && names == stored {
             self.restored_after_fault = true;
-            let saved = self
-                .options
-                .mute_record
-                .as_deref()
-                .and_then(stored_identity);
-            if let Some(saved) = saved.filter(|saved| Some(saved) != names.as_ref()) {
-                let _ = write_guard_marker(&marker, &saved);
-            }
         } else if present {
             let _ = std::fs::remove_file(&marker);
         }
@@ -1578,6 +1579,54 @@ impl HandControls {
         Ok(!pressed)
     }
 
+    /// A mute the restart guard restored, ended by a stop the service was
+    /// asked for (#4332, lamp-0c89, 29 Oct 15:22): the app's Restart
+    /// stopped the voice clean, and the next start read the guard's mute
+    /// again, so until a tap it was the saved state. The guard's mute is
+    /// not the person's ([`Self::restored_after_fault`]), and a clean stop is
+    /// no fault, so it ends here, saved listening, the marker removed after.
+    /// A mute the person chose since keeps, as does one a press may be
+    /// making: only with nothing in flight or taken unsaved
+    /// ([`Self::still_quiet`]), from the look through the save, and a press
+    /// that came meanwhile puts the guard back, as
+    /// [`Self::release_if_still_quiet`] does. Whether it ended.
+    pub fn release_restored_on_stop(&mut self) -> io::Result<bool> {
+        if !self.restored_after_fault() || self.persistence_failed {
+            return Ok(false);
+        }
+        let Some(path) = self.options.mute_record.clone() else {
+            return Ok(false);
+        };
+        let shared = Arc::clone(&self.shared);
+        let _quiet = shared
+            .quiet
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        shared.pressed_while_held.store(false, Ordering::Release);
+        if !self.still_quiet() {
+            return Ok(false);
+        }
+        #[cfg(test)]
+        if let Some(press) = self.while_held.take() {
+            press();
+        }
+        if let Err(error) = self
+            .receiver
+            .clear_after_explicit_user_request(monotonic_us(), &path)
+        {
+            self.persistence_failed = true;
+            return Err(error);
+        }
+        // Saved listening first: a marker left beside an unmuted record is
+        // removed at the next start.
+        self.drop_guard_marker()?;
+        if shared.pressed_while_held.load(Ordering::Acquire) {
+            self.arm_guard()?;
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
     /// The guard released after a clean stop's cleanup (#960), as
     /// [`Self::disarm_after_cleanup`], with the record's time set to the
     /// conversation's last read of the press queue ([`Self::poll`]): the
@@ -1782,6 +1831,59 @@ fn restored_record(path: &Path, clock_id: &str, now_us: u64) -> io::Result<Resto
         stored,
         late_sleep,
     })
+}
+
+/// At a start, before the controls are built (#4332): a muted record that is
+/// the restart guard of an earlier boot, its marker naming it as stored, is
+/// a power cut, not a fault of this run. It is saved again as the person
+/// left it, listening, and the marker removed. Whether it was.
+///
+/// The person's own mute is what the guard stood over: [`HandControls::arm_active`]
+/// arms only an unmuted latch, and every mute a person makes after it drops
+/// the marker before it is saved ([`HandControls::mute_chosen`]) and moves
+/// `through_us` on, so a marker that still names the record means no mute
+/// was chosen since. The record's `clock_id` is the boot id
+/// (`lamp_controls::runtime::clock_id`), so another clock is another boot; a
+/// marker from a build before this one names its clock the same way. A
+/// guard of this boot (a crash, or a voice that ended before its stop) keeps
+/// its mute: a mute or a privacy change may have been in flight. A press
+/// accepted in the last moment before the power went, before it was saved,
+/// is lost, as any unsaved request is (the module's note).
+///
+/// The record is saved first: a fault between the two leaves an unmuted
+/// record beside the marker, which [`HandControls::restore_guard_marker`]
+/// removes. Without `LAMP_RESTORED_MUTE=on` there is no marker to trust, and
+/// the mute stays.
+fn released_after_power_cut(
+    path: &Path,
+    mark_guard: bool,
+    restored: &mut Restored,
+) -> io::Result<bool> {
+    let record = &mut restored.record;
+    let Some(stored) = &restored.stored else {
+        return Ok(false);
+    };
+    if !mark_guard || !record.muted || record.reason.is_some() || stored.0 == record.clock_id {
+        return Ok(false);
+    }
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(GUARD_MARKER_SUFFIX);
+    let marker = path.with_file_name(name);
+    if !marker.symlink_metadata().is_ok_and(|meta| meta.is_file()) {
+        return Ok(false);
+    }
+    let names = std::fs::read_to_string(&marker)
+        .ok()
+        .and_then(|text| marker_identity(&text));
+    if names.as_ref() != Some(stored) {
+        return Ok(false);
+    }
+    let mut listening = record.clone();
+    listening.muted = false;
+    listening.save(path)?;
+    *record = listening;
+    let _ = std::fs::remove_file(&marker);
+    Ok(true)
 }
 
 /// What [`restored_record`] reads at a start.
