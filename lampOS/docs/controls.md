@@ -1405,8 +1405,8 @@ whose subsequent save fails still has the active durable guard. Persistence
 failure stays visible and cannot clear the live latch.
 
 **A run that never heard, and a fault after the stop** (#1567,
-`LAMP_GUARD_NEVER_LISTENED=on` on the voice, off unless set; the first
-builder's decision of 18 Oct 19:00). On lamp-4ace on 18 Oct six first runs
+`LAMP_GUARD_NEVER_LISTENED=on` on the voice, off unless set, and set by the
+product unit since #4332; the first builder's decision of 18 Oct 19:00). On lamp-4ace on 18 Oct six first runs
 after a restart failed and each left the lamp muted by the guard; two of
 them (15:32, a capture that gave no block; 17:48, a microphone busy at its
 open) had heard nothing. With the switch, two more cases release the guard,
@@ -1611,12 +1611,44 @@ can wake it, as a guard's mute. The person's mute never reached the disk in
 that case, which the persistence fault says.
 
 The marker is written with its folder synced before the guard is saved, so a
-power cut soon after arming cannot leave it empty. After a reboot, restore
-saves the record rebased to the new boot's clock, and when the marker matched
-it is rewritten to name that saved record: a second restart in the same boot,
-such as an update's clean stop, still knows the mute is the guard's (the first
-builder on #997). If that rewrite fails, the next restart no longer matches,
-and the mute reads as a chosen one.
+power cut soon after arming cannot leave it empty.
+
+**A power cut is not a fault of this run** (#4332). Pulling the plug is how
+most people turn a lamp off, and lamp-220c (29 Oct) came back from one muted
+by the guard, deaf until a head tap, with nothing telling the person to tap.
+The record's `clock_id` is the boot id, so a marker that names the record as
+stored, from another boot's clock, is a guard an earlier boot left: before
+the controls are built, restore saves the record as the person left it,
+listening, and removes the marker (`released_after_power_cut`, one log line).
+A matching marker means the person chose no mute since the guard was armed:
+`arm_active` arms only an unmuted latch, and every mute a person makes drops
+the marker before it is saved and moves `through_us` on, so a person's mute
+survives a power cut. A guard of this boot (a crash, or a voice that ended
+before its stop) still restores its mute, known as the guard's, for a tap to
+clear: a mute or a privacy change may have been in flight. A press accepted
+in the last moment before the power went, before it was saved, is lost, as
+any unsaved request is. The record is saved first, so a fault between the two
+leaves an unmuted record beside the marker, which the next restore removes.
+Without `LAMP_RESTORED_MUTE=on` no marker is trusted, and the mute stays. A
+marker an older build rewrote on the boot it restored names that boot, so it
+counts as this boot's there, and is released after the next power cut. Tests:
+`a_power_cut_while_listening_starts_listening_with_no_tap`,
+`a_guard_of_this_boot_still_restores_its_mute`,
+`a_power_cut_keeps_a_mute_the_person_chose` and
+`without_the_marker_switch_a_power_cut_keeps_the_mute`.
+
+**A clean stop ends the guard's mute** (#4332). On lamp-0c89 on 29 Oct at
+15:22 the app's Restart stopped a voice muted by the guard cleanly, and the
+next start read the guard's mute again: until a tap it was the saved state.
+Now a stop the service was asked for (SIGTERM or SIGINT, the service ending
+cleanly) saves a mute the guard restored as listening, the marker removed
+after (`HandControls::release_restored_on_stop`, trace record
+`guard_mute_ended_on_stop`, one log line). It keeps when the person has chosen
+a mute since (the marker went with it), and when a control is in flight or
+taken unsaved, checked from the look through the save as a release is; a
+press that comes meanwhile puts the guard back. Tests:
+`a_clean_stop_ends_a_mute_the_restart_guard_restored` and
+`a_clean_stop_keeps_a_chosen_mute_and_a_guard_with_a_press_in_flight`.
 **A head tap wakes such a mute, as it wakes sleep** (`Receiver::request_wake_after_fault`):
 on lamp-4ace on 2026-10-16 a crash at 12:20 brought the voice up muted, and
 with no main button and the base strip off nothing at the lamp could open it.

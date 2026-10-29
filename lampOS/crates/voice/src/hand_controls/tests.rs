@@ -689,45 +689,178 @@ fn only_a_mute_left_by_the_restart_guard_reads_as_restored_after_a_fault() {
     assert!(chosen.muted() && !chosen.restored_after_fault());
 }
 
-/// The first builder on #997: after a reboot restore saves the record rebased
-/// to the new clock, and a second restart in that boot (an update's clean
-/// stop) must still know the mute is the guard's.
+/// A restart as `restore` does it, on the boot `clock`: the identity as
+/// stored, the record loaded on this boot's clock and saved, a guard of an
+/// earlier boot released ([`released_after_power_cut`]), then the marker read.
+fn restart_as_restore(
+    directory: &Directory,
+    clock: &str,
+    now_us: u64,
+) -> (HandControls, SyncSender<Queued>, bool) {
+    let path = directory.file();
+    let mut restored = Restored {
+        stored: stored_identity(&path),
+        record: MuteRecord::load(&path, clock, now_us).unwrap(),
+        late_sleep: None,
+    };
+    restored.record.save(&path).unwrap();
+    let released = released_after_power_cut(&path, true, &mut restored).unwrap();
+    let stored = restored.stored.clone();
+    let (mut restarted, sender) = from_record(options(false, Some(&path)), restored.record, now_us);
+    restarted.mark_guard = true;
+    restarted.restore_guard_marker(stored);
+    (restarted, sender, released)
+}
+
+/// #4332, lamp-220c: unplugged while it listened, the lamp came back muted
+/// by the restart guard, deaf until a tap. A guard of an earlier boot is a
+/// power cut: the lamp starts listening, the marker gone, and stays so at
+/// the next restart of that boot.
 #[test]
-fn a_guard_mute_is_still_known_as_the_guards_after_a_reboot_and_another_restart() {
+fn a_power_cut_while_listening_starts_listening_with_no_tap() {
     let directory = Directory::new();
     let marker = directory.0.join(format!("mute.json{GUARD_MARKER_SUFFIX}"));
-    // A restart as `restore` does it: the identity as stored, then the
-    // record loaded on this boot's clock and saved, then the marker read.
-    let restart = |clock: &str, now_us: u64| {
-        let stored = stored_identity(&directory.file());
-        let record = MuteRecord::load(&directory.file(), clock, now_us).unwrap();
-        record.save(&directory.file()).unwrap();
-        let (mut restarted, sender) =
-            from_record(options(false, Some(&directory.file())), record, now_us);
-        restarted.mark_guard = true;
-        restarted.restore_guard_marker(stored);
-        (restarted, sender)
-    };
     let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
     owner.mark_guard = true;
     owner.arm_active().unwrap();
     drop(owner);
-    // A power cut: the next boot has another clock, and the record is rebased.
-    let before = stored_identity(&directory.file()).unwrap();
-    let (rebooted, _sender) = restart("after-power-cut", 1_000);
-    assert!(rebooted.muted() && rebooted.restored_after_fault());
-    let rebased = stored_identity(&directory.file()).unwrap();
-    assert_ne!(rebased, before, "the reboot rebased the record");
-    // The marker now names the record as saved.
-    assert_eq!(
-        marker_identity(&fs::read_to_string(&marker).unwrap()),
-        Some(rebased)
+    // The plug pulled: the next boot has another clock.
+    let (rebooted, _sender, released) = restart_as_restore(&directory, "after-power-cut", 1_000);
+    assert!(released);
+    assert!(!rebooted.muted() && !rebooted.restored_after_fault());
+    assert!(!marker.exists());
+    assert!(
+        !MuteRecord::load(&directory.file(), "after-power-cut", 1_000)
+            .unwrap()
+            .muted,
+        "saved as the person left it"
     );
     drop(rebooted);
-    // An update stops it cleanly in the same boot: still the guard's.
-    let (updated, _sender) = restart("after-power-cut", 2_000);
-    assert!(updated.muted() && updated.restored_after_fault());
+    let (updated, _sender, released) = restart_as_restore(&directory, "after-power-cut", 2_000);
+    assert!(!released && !updated.muted());
+}
+
+/// #4332: a guard of this boot (a crash, a voice that ended before its stop)
+/// still restores its mute, known as the guard's, for a tap to clear.
+#[test]
+fn a_guard_of_this_boot_still_restores_its_mute() {
+    let directory = Directory::new();
+    let marker = directory.0.join(format!("mute.json{GUARD_MARKER_SUFFIX}"));
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let (restarted, _sender, released) = restart_as_restore(&directory, CLOCK, START);
+    assert!(!released);
+    assert!(restarted.muted() && restarted.restored_after_fault());
     assert!(marker.is_file());
+}
+
+/// #4332: the person's own mute survives a power cut, whether they muted
+/// before the voice ran or while it listened.
+#[test]
+fn a_power_cut_keeps_a_mute_the_person_chose() {
+    let directory = Directory::new();
+    let (mut owner, sender) = fixture(options(false, Some(&directory.file())));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    let mute = gesture(ControlIntent::SoftwareMute, 1, 4_000_000);
+    observe(
+        &mut owner,
+        &sender,
+        state(1, 4_000_000, Some(mute)),
+        4_000_000,
+    );
+    owner.persist_muted().unwrap();
+    drop(owner);
+    let (rebooted, _sender, released) = restart_as_restore(&directory, "after-power-cut", 1_000);
+    assert!(!released);
+    assert!(rebooted.muted() && !rebooted.restored_after_fault());
+    // And again on the boot after: a chosen mute is never released.
+    drop(rebooted);
+    let (again, _sender, released) = restart_as_restore(&directory, "a-third-boot", 1_000);
+    assert!(!released && again.muted());
+}
+
+/// #4332: without `LAMP_RESTORED_MUTE=on` no marker is trusted, so a muted
+/// record from an earlier boot keeps its mute.
+#[test]
+fn without_the_marker_switch_a_power_cut_keeps_the_mute() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let path = directory.file();
+    let mut restored = Restored {
+        stored: stored_identity(&path),
+        record: MuteRecord::load(&path, "after-power-cut", 1_000).unwrap(),
+        late_sleep: None,
+    };
+    assert!(!released_after_power_cut(&path, false, &mut restored).unwrap());
+    assert!(restored.record.muted);
+}
+
+/// #4332, lamp-0c89 (29 Oct 15:22): the app's Restart stopped the voice
+/// clean, and the next start read the guard's mute again. A clean stop ends
+/// the guard's mute: the next start of the same boot listens.
+#[test]
+fn a_clean_stop_ends_a_mute_the_restart_guard_restored() {
+    let directory = Directory::new();
+    let marker = directory.0.join(format!("mute.json{GUARD_MARKER_SUFFIX}"));
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let (mut restored, _sender, _) = restart_as_restore(&directory, CLOCK, START);
+    assert!(restored.restored_after_fault());
+    assert!(restored.release_restored_on_stop().unwrap());
+    assert!(!restored.muted() && !marker.exists());
+    drop(restored);
+    // The release is saved at the voice's own clock.
+    let (restarted, _sender, _) = restart_as_restore(&directory, CLOCK, monotonic_us());
+    assert!(!restarted.muted() && !restarted.restored_after_fault());
+}
+
+/// #4332: the person's own mute survives a fault and a clean restart after
+/// it, and a guard's mute with a press in flight keeps for the next start.
+#[test]
+fn a_clean_stop_keeps_a_chosen_mute_and_a_guard_with_a_press_in_flight() {
+    let directory = Directory::new();
+    let (mut owner, sender) = fixture(options(false, Some(&directory.file())));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    let mute = gesture(ControlIntent::SoftwareMute, 1, 4_000_000);
+    observe(
+        &mut owner,
+        &sender,
+        state(1, 4_000_000, Some(mute)),
+        4_000_000,
+    );
+    owner.persist_muted().unwrap();
+    // A fault: the voice ends with no stop.
+    drop(owner);
+    let (mut chosen, _sender, _) = restart_as_restore(&directory, CLOCK, 5_000_000);
+    assert!(chosen.muted() && !chosen.restored_after_fault());
+    assert!(!chosen.release_restored_on_stop().unwrap());
+    drop(chosen);
+    let (again, _sender, _) = restart_as_restore(&directory, CLOCK, 6_000_000);
+    assert!(
+        again.muted(),
+        "the person's mute survives the clean restart"
+    );
+
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let (mut restored, _sender, _) = restart_as_restore(&directory, CLOCK, START);
+    restored.queued_for_test().store(1, Ordering::Release);
+    assert!(!restored.release_restored_on_stop().unwrap());
+    drop(restored);
+    let (kept, _sender, _) = restart_as_restore(&directory, CLOCK, START + 1_000);
+    assert!(kept.muted() && kept.restored_after_fault());
 }
 
 /// The marker never outlives its guard: a clean release removes it, and one
