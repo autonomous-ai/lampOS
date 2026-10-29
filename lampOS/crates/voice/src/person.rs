@@ -541,10 +541,14 @@ pub fn without_name(text: &str, name: &str) -> String {
 }
 
 /// What a reply is told when the owner `name` may be named by default
-/// ([`someone_else_now`]).
+/// ([`someone_else_now`]). On lamp-29e7 (29 Oct, 8545, #4118) the owner
+/// asked "can you remember my name?" 4.5 minutes after setup, with their
+/// own answer long out of the recent exchanges, and was told "You haven't
+/// told me your name yet": the note then said "not to answer" and named
+/// only "who they are", so it now says to answer every way of asking.
 pub fn by_default(name: &str) -> String {
     format!(
-        "(For you to know, not to answer: no one else is seen or heard at the lamp now, so the person speaking is most likely “{name}”, who set it up. If they ask who they are, that is their name.)"
+        "(For you to know: no one else is seen or heard at the lamp now, so the person speaking is most likely “{name}”, who set it up. Don't bring it up yourself; but if they ask who they are, what their name is, or whether you know or remember it, it is “{name}”: say it.)"
     )
 }
 
@@ -654,6 +658,19 @@ mod tests {
         ] {
             assert_eq!(held(text, name), text, "{name}");
         }
+    }
+
+    /// lamp-29e7, 29 Oct (#4118): "can you remember my name?" is answered
+    /// from the note, which tells the model to say the name when asked in
+    /// any of those ways, never "not to answer".
+    #[test]
+    fn the_by_default_note_answers_every_way_of_asking_the_name() {
+        let note = by_default("Example Name");
+        assert!(!note.contains("not to answer"), "{note}");
+        for asked in ["who they are", "what their name is", "know or remember it"] {
+            assert!(note.contains(asked), "{asked}: {note}");
+        }
+        assert!(note.contains("“Example Name”: say it."), "{note}");
     }
 
     #[test]
