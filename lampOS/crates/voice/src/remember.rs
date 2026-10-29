@@ -74,6 +74,16 @@ pub const RECALL: &str = "recall";
 pub const FORGET: &str = "forget";
 /// Forgetting everything kept of whoever is at the lamp (#1693).
 pub const FORGET_EVERYTHING: &str = "forget_everything";
+
+/// `forget_everything`'s answer when the line came from a known person's
+/// voice that was not seen speaking (#3564): nothing is forgotten, and the
+/// model asks them to say it again looking at the lamp.
+pub fn forget_everything_unseen() -> serde_json::Value {
+    serde_json::json!({
+        "forgotten": false,
+        "note": "Nothing was forgotten: I couldn't see who asked. Ask them to look at me and say it again."
+    })
+}
 /// Only the exact value `on`, with the Days client: `forget` takes the id of
 /// something recalled, and `forget_everything` is offered (#1693). Off, the
 /// functions are as before.
@@ -7303,6 +7313,18 @@ impl DaysClient {
             FORGET_EVERYTHING if self.forget_all.load(Ordering::Acquire) && person.is_some() => {
                 Some(json!({"op":"forget_all"}))
             }
+            // A known person admitted for the line, but not seen saying it
+            // (#3564, 52e6 on 29 Oct: the asker's mouth read still in 11 of
+            // 11 looks, so the line was the room's). Their memory is not
+            // emptied on that, since a voice off camera beside them reads
+            // the same (reviewer-three's P1). The model is told to ask
+            // again looking at the lamp, not that the lamp doesn't know them.
+            FORGET_EVERYTHING
+                if self.forget_all.load(Ordering::Acquire)
+                    && lease.is_some_and(|lease| lease.admitted_person().is_some()) =>
+            {
+                return (forget_everything_unseen(), true);
+            }
             FORGET_EVERYTHING if self.forget_all.load(Ordering::Acquire) => {
                 return (
                     json!({"forgotten": false, "note": "I can forget everything only for someone I know by face. I don't know who this is. I can forget one thing kept in this room at a time instead."}),
@@ -11433,6 +11455,40 @@ mod tests {
                 "{memory}"
             );
         }
+    }
+
+    /// #3564, lamp-52e6 on 29 Oct: a known person's "forget everything about
+    /// me" whose mouth read still in every look is the room's line, and its
+    /// memory is not emptied on it (reviewer-three's P1). The model is told
+    /// nothing was forgotten because the asker wasn't seen, not that the
+    /// lamp doesn't know them; a line nobody known was admitted for keeps the
+    /// room's answer. Either way the face's answer says its memory is kept.
+    #[test]
+    fn a_known_persons_forget_everything_not_seen_said_asks_them_again() {
+        let socket = PathBuf::from(format!("/tmp/lms-unseen-{}.sock", std::process::id()));
+        let client = DaysClient::new(socket).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let forget = call(FORGET_EVERYTHING, json!({}));
+        let known = scoped_request(Some("Mai"), 1);
+        let lease = known.lease();
+        lease.narrow_to_room();
+        let (told, _) = client.run_for_guarded(&forget, FIRST_READ, None, Some(&lease));
+        assert_eq!(told, forget_everything_unseen());
+        let nobody = scoped_request(None, 2);
+        let lease = nobody.lease();
+        lease.narrow_to_room();
+        let (told, _) = client.run_for_guarded(&forget, FIRST_READ, None, Some(&lease));
+        assert!(
+            told["note"]
+                .as_str()
+                .unwrap()
+                .starts_with("I can forget everything only for someone I know by face"),
+            "{told}"
+        );
+        assert_eq!(
+            face_and_memory(json!({"ok": true}), &forget_everything_unseen()),
+            json!({"ok": true, "memory": FACE_MEMORY_KEPT})
+        );
     }
 
     fn scoped_request(name: Option<&str>, request: u64) -> crate::memory_scope::RequestScope {
