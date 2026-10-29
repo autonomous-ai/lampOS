@@ -1442,6 +1442,29 @@ the latch written as it was:
   Oct: that run had no signal (the first builder, from lamp-4ace's
   journal); its leases lapsed 160 ms after it was ready.
 
+**A switch unreadable, then the stop** (#3697, on for every lamp, no
+switch). An update's round restarts lamp-controls before the voice, in
+startup order, so the old voice loses the privacy switch half a second
+before its own stop: on lamp-06c1 at 08:33:16 on 29 Oct, Controls stopped at
+.238, the run closed on `privacy switch unreadable` at .37, and the voice's
+SIGTERM came at .87, while the service waited for the switch. The run's
+close is no stop, so the guard stood and the lamp came back muted until a
+tap. Now a run that closed on an unreadable switch, its cleanup verified
+(`note_unreadable_close`), then the service's SIGTERM or SIGINT while it
+waits, releases the guard, the latch written as it was
+(`released_after_unreadable_stop`, `HandControls::release_after_unreadable_stop`),
+only with no control input queued, or taken and unsaved, as A's release
+(`release_if_still_quiet`). The journal says `the run closed on an
+unreadable privacy switch before SIGTERM; the mute is kept as it was, not
+restored muted`, and the trace gets `guard_released_unreadable_then_stop`.
+After an update, the journal shows it in this order: lamp-update's
+`switching to build N`, then lamp-voice's `the run closed on an unreadable
+privacy switch before SIGTERM; …`, and the next start with no `muted by the
+restart guard`.
+The switch is read again at every start. A wait that ends in a fault or
+with no signal, a press in flight, a failed cleanup (which hides the
+switch's error), and a later run that ended any other way keep the guard.
+
 Everything else keeps the guard as before: a fault while listening without
 a signal first, any fault with a control input in flight, a persistence
 fault, a privacy exit, and a crash or abort.
