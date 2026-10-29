@@ -291,6 +291,46 @@ fn a_wrong_password_stops_early_puts_the_old_file_back_and_the_hotspot_up() {
 }
 
 #[test]
+fn one_rejected_key_keeps_waiting_and_a_later_join_is_kept() {
+    // A router can refuse the first handshake of a right password: one
+    // rejection is not the early stop.
+    let one_rejection = wrong_password()[..6].to_vec();
+    assert_eq!(wrong_key_failures(&one_rejection), 1);
+    let mut lamp = Lamp {
+        conf: Some(OLD.to_vec()),
+        joined_ssid: Some("Glinks".into()),
+        connect_after_s: Some(20),
+        events: one_rejection.clone(),
+        events_after_s: 4,
+        ..Lamp::default()
+    };
+    assert_eq!(
+        join(&mut lamp, "US", "Glinks", "password1"),
+        Joined::Connected
+    );
+    assert_eq!(lamp.now_ms, 20_000);
+    assert_eq!(lamp.calls, ["station"]);
+    assert_ne!(lamp.conf.as_deref(), Some(OLD));
+
+    // Never joined: the whole minute, then the one rejection names the password.
+    let mut lamp = Lamp {
+        conf: Some(OLD.to_vec()),
+        events: one_rejection,
+        events_after_s: 4,
+        ..Lamp::default()
+    };
+    assert_eq!(
+        join(&mut lamp, "US", "Glinks", "password1"),
+        Joined::Failed {
+            reason: Reason::WrongPassword
+        }
+    );
+    assert_eq!(lamp.now_ms, 60_000);
+    assert_eq!(lamp.conf.as_deref(), Some(OLD));
+    assert_eq!(lamp.calls, ["station", "hotspot"]);
+}
+
+#[test]
 fn a_network_never_found_waits_the_full_minute_then_says_so() {
     let mut lamp = Lamp {
         events: vec!["Successfully initialized wpa_supplicant".into()],
