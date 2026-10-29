@@ -34,7 +34,9 @@ pub fn from_environment() -> bool {
 
 /// `update.status`: `{"running": {"sequence", "commit"} | null, "now":
 /// "idle" | "checking" | "fetching" | "switching" | "watching" | "unknown",
-/// "last": {"outcome", "sequence", "at_unix_ms"} | null, "stale": flag}`.
+/// "last": {"outcome", "sequence", "at_unix_ms", "reason"?,
+/// "started_at_unix_ms"?} | null, "stale": flag}`, `last` as lamp-update said
+/// it (`lamp_msgs::UpdateResult`).
 /// Before lamp-update has said anything, `now` is `unknown` and the rest
 /// null; a value lamp-update could not have said is refused.
 pub fn status(kept: Option<lamp_bus::Message>) -> Result<Option<Value>, String> {

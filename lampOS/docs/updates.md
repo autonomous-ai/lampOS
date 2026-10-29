@@ -1025,7 +1025,13 @@ bus instead: a round that acts says `update/status` (#2194,
 `lamp_update::status`) as each phase begins (`checking`, `fetching`,
 `switching`, `watching`, and `restoring` for a rollback's put-back) and
 `idle` with its outcome's name and build when it ends, with the build
-`state.json` says the lamp runs and no reason text. A round's end is logged
+`state.json` says the lamp runs and no reason text. For a round that did not
+switch, the end also says where it stopped by a fixed name (`reason`: the
+last phase it said, or `models` for `WaitsForModels`), and every end says
+when its round began (`started_at_unix_ms`, its `checking`), for #1683's
+update alerts. A new updater's confirmation of its own switch is a round's
+end too, `self-confirmed` with the build its dry round found, so it is the
+last result the new updater says when it starts telling. A round's end is logged
 in `log.jsonl` with `"round": true` and its build, and read back when
 lamp-update starts, so the last result outlives a restart and its own
 switch. It is said again every minute and lasts three, so a lamp-update that
