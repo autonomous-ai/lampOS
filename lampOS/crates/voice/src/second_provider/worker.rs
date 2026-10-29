@@ -2276,7 +2276,7 @@ pub fn serve(
                                 "lamp-voice second: the owner is not named by default: {why}; their name is taken out of the conversation's earlier lines (LAMP_PERSON_NAME_BY_DEFAULT)"
                             );
                             withheld = Some(name.to_owned());
-                            String::new()
+                            format!("\n\n{}", crate::person::HELD_BACK_NOTE)
                         }
                         None => format!("\n\n{}", crate::person::by_default(name)),
                     }
@@ -9734,22 +9734,42 @@ fn thread_and_history(
         )
     })
     .unwrap_or_default();
-    let said = |text: String| match withheld {
-        Some(name) => crate::person::without_name(&text, name),
-        None => text,
+    // The lamp's own lines only (`person::without_name`): its "You: "
+    // lines in the thread, up to the next "Person: ", and its side of each
+    // exchange.
+    let thread = thread.unwrap_or_default();
+    let (thread, recent) = match withheld {
+        None => (thread, recent),
+        Some(name) => (
+            {
+                let mut lamps = false;
+                thread
+                    .split_inclusive('\n')
+                    .map(|line| {
+                        if let Some(lamp) = line.strip_prefix("You: ") {
+                            lamps = true;
+                            format!("You: {}", crate::person::without_name(lamp, name))
+                        } else {
+                            lamps &= !line.starts_with("Person: ");
+                            if lamps {
+                                crate::person::without_name(line, name)
+                            } else {
+                                line.to_owned()
+                            }
+                        }
+                    })
+                    .collect()
+            },
+            recent
+                .into_iter()
+                .map(|exchange| crate::thread::Recent {
+                    lamp: crate::person::without_name(&exchange.lamp, name),
+                    ..exchange
+                })
+                .collect(),
+        ),
     };
-    (
-        said(thread.unwrap_or_default()),
-        recent
-            .into_iter()
-            .map(|exchange| crate::thread::Recent {
-                written: exchange.written.map(said),
-                person: said(exchange.person),
-                lamp: said(exchange.lamp),
-            })
-            .flat_map(messages)
-            .collect(),
-    )
+    (thread, recent.into_iter().flat_map(messages).collect())
 }
 
 /// What a text's answer (#1673) is told, and how its functions run. It is
@@ -17849,43 +17869,50 @@ mod tests {
         assert!(after.contains("Person: What should I drink?\nYou: Try some tea. It is calm.\n"));
         assert_eq!(steady.history, told.history);
         // A name held back while someone else may be speaking (#3884's two
-        // faces) is said in neither the thread nor the exchanges: here the
-        // lamp's own word, standing in for a name it said earlier.
-        let held =
-            system_message_withheld("You are a lamp.", None, "", Some(&file), None, Some("Tea"));
-        assert_eq!(
-            held.history,
-            [
-                Message::user("What should I drink?"),
-                Message::assistant("Try some (their name). It is calm.")
-            ]
-        );
-        assert!(
-            held.text
-                .contains("You: Try some (their name). It is calm.\n")
-                && !held.text.to_lowercase().contains("tea"),
-            "{}",
-            held.text
-        );
-        let held = steady_first_message_withheld(
-            "You are a lamp.".into(),
+        // faces) is said in neither the thread's lamp lines nor the lamp's
+        // side of the exchanges: here the lamp's own words stand in for a
+        // name it said earlier. The person's words are theirs, kept.
+        for held in [
+            system_message_withheld(
+                "You are a lamp.",
+                None,
+                "",
+                Some(&file),
+                None,
+                Some("Some Tea"),
+            ),
+            steady_first_message_withheld(
+                "You are a lamp.".into(),
+                "",
+                Some(&file),
+                None,
+                Some("Some Tea"),
+            ),
+        ] {
+            assert_eq!(
+                held.history,
+                [
+                    Message::user("What should I drink?"),
+                    Message::assistant("Try (their name). It is calm.")
+                ]
+            );
+            let thread = held.after.unwrap_or(held.text);
+            assert!(
+                thread
+                    .contains("Person: What should I drink?\nYou: Try (their name). It is calm.\n")
+                    && !thread.to_lowercase().contains("tea"),
+                "{thread}"
+            );
+        }
+        let kept = system_message_withheld(
+            "You are a lamp.",
+            None,
             "",
             Some(&file),
             None,
-            Some("Tea"),
+            Some("Drink"),
         );
-        assert!(
-            !held
-                .after
-                .unwrap_or_default()
-                .to_lowercase()
-                .contains("tea")
-        );
-        assert!(
-            !format!("{:?}", held.history).to_lowercase().contains("tea"),
-            "{:?}",
-            held.history
-        );
+        assert_eq!(kept.history[0], Message::user("What should I drink?"));
         // Forgotten, then another person's turn, then back: nothing of it
         // is told or given again (first builder's reviewer on #778).
         crate::thread::THREAD.lock().unwrap().forget();
