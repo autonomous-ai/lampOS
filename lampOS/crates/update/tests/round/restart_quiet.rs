@@ -1,5 +1,9 @@
 //! A prerequisite can finish restarting just as someone begins a sentence.
-//! Its queued speech must reach the quiet guard before Voice is restarted.
+//! Since #3689 the voice is stopped, after the quiet check, before any part
+//! it reads restarts: a clean stop with Controls still up, so no build's
+//! voice arms its restart guard (the 7071 lamps' first home update). A
+//! sentence begun meanwhile reaches no voice, so it doesn't hold the switch:
+//! the new voice starts right after its prerequisites.
 use super::*;
 
 const MEMORY: &str = "lamp-memory.service";
@@ -31,6 +35,10 @@ impl Systemd for SpeechDuringRestart<'_> {
             self.queued.set(true);
         }
         result
+    }
+
+    fn stop(&mut self, unit: &str) -> Result<(), String> {
+        self.systemd.stop(unit)
     }
 
     fn last_line(&mut self, unit: &str) -> Option<String> {
@@ -127,31 +135,27 @@ fn a_sentence_during_the_prerequisite(never_quiet: bool) {
         .iter()
         .filter_map(|(unit, at)| (unit == VOICE).then_some(*at))
         .collect();
-    if never_quiet {
-        assert!(
-            matches!(outcome, Outcome::RolledBack { after: Ok(()), .. }),
-            "{outcome:?}"
-        );
-        assert!(voice_restarts.is_empty(), "{voice_restarts:?}");
-        assert_eq!(lamp.lamp_files(), before);
-        assert!(lamp.now.get() <= began + 665_000, "the wait stays bounded");
-    } else {
-        assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
-        assert_eq!(voice_restarts.len(), 1);
-        assert!(
-            (began + 50_000..=began + 52_000).contains(&voice_restarts[0]),
-            "Voice restarted at {:?}; speech began at {began}",
-            voice_restarts
-        );
-    }
+    // Either way: the voice was stopped before Memory restarted, and is
+    // started right after it, not held for the speech.
+    assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
+    let calls = lamp.calls();
+    let stopped = calls
+        .iter()
+        .position(|call| call == &format!("stop {VOICE}"));
+    let memory = calls
+        .iter()
+        .position(|call| call == &format!("restart {MEMORY}"));
+    assert!(stopped.is_some() && stopped < memory, "{calls:?}");
+    assert_eq!(voice_restarts, [began], "{:?}", lamp.said);
+    assert_ne!(lamp.lamp_files(), before);
 }
 
 #[test]
-fn queued_speech_during_a_prerequisite_is_heard_before_restarting_voice() {
+fn a_sentence_begun_during_a_prerequisite_does_not_hold_the_stopped_voice() {
     a_sentence_during_the_prerequisite(false);
 }
 
 #[test]
-fn continuous_speech_puts_prerequisites_back_without_restarting_voice() {
+fn speech_that_goes_on_during_a_prerequisite_does_not_hold_the_stopped_voice() {
     a_sentence_during_the_prerequisite(true);
 }

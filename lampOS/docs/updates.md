@@ -757,8 +757,10 @@ each under the quiet rule. A round
    Then the build's product skills are written (planned again first, as the
    lamp may have changed a file while the round waited; each file's bytes
    before are in the journal, written with it). Each changed unit that was
-   running is then restarted in the candidate graph's startup order. A unit
-   that was not running is switched without being started.
+   running is then restarted in the candidate graph's startup order, except
+   the voice: when a running part before it restarts too, the voice is
+   stopped first and started last (see "The voice stopped first" below). A
+   unit that was not running is switched without being started.
 
    **Completed product Setup:** `lamp-setup.service` may still be serving
    the phone for its ten-minute grace period, or may have ended while the
@@ -783,26 +785,36 @@ each under the quiet rule. A round
    inspecting overrides and querying the manager, at selection time; this does not lock out a
    simultaneous reset. The earlier activity snapshot remains unchanged.
 
-   At the voice's
-   own restart boundary, queued speech is read and the 45 s quiet gate is
-   checked again: a prerequisite's restart may have taken time. If no quiet
-   moment arrives within `--quiet-wait-s`, the changes are put back,
-   including parts already restarted; the voice has not been restarted.
-   During this wait, old Voice can talk to already-restarted new servers
-   for up to the configured bound (3600 s by default). Compatibility is
-   required in both directions; restart order does not make the round atomic.
+   **The voice stopped first (#3689, the first builder's yes on 30 Oct):**
+   when the voice is running and a running part before it in startup order
+   restarts too (lamp-controls, Memory, Ears, ...), the round reads queued
+   speech and checks the 45 s quiet gate once more, then stops the voice
+   with a plain `systemctl stop`, while lamp-controls is still up. That is a
+   clean stop with nothing in flight, so no build's voice arms its restart
+   guard (#960), not even one from before `1c88f2dbd` (#4280). Then the
+   other parts restart in startup order, and the voice is started last, as
+   the new voice. If no quiet moment arrives within `--quiet-wait-s`, the
+   changes are put back and nothing has been restarted. The voice is marked
+   restarted at its stop, so a part that fails later puts it back, and the
+   old voice is started again. A sentence begun while a prerequisite
+   restarts reaches no voice and doesn't hold the switch: the lamp isn't
+   listening for those few seconds, inside a moment already judged quiet.
+   A round with no other running part before the voice restarts the voice
+   as before, with the quiet gate at its own boundary.
 
-   **Controls before the voice:** the round restarts lamp-controls before
-   the voice, so the old voice's run closes on an unreadable privacy switch
-   and its own stop comes about 0.5 s later. Before train 347 (lamp-voice
-   `1c88f2dbd`, #4280) that stop left the restart guard's mute standing,
-   and the lamp came back muted until a head tap (lamp-06c1, 8474's round,
-   29 Oct). The release runs in the voice being stopped, the old one, so a
-   lamp on a build before `1c88f2dbd` can still come back muted once from
-   the round that brings the fix. Later rounds don't, by this route; a
-   voice can still start muted by others (#4332). The round's order is
-   unchanged; the fix is the voice's ([controls.md](controls.md), "A switch
-   unreadable, then the stop").
+   **Why:** the order before this restarted lamp-controls first. The old
+   voice's run then closed on an unreadable privacy switch, its own stop
+   came about 0.5 s later, and a voice from before train 347
+   (`1c88f2dbd`) kept its restart guard's mute: the lamp came back muted
+   until a head tap (lamp-06c1, 8474's round, 29 Oct). The voice's own
+   release ([controls.md](controls.md), "A switch unreadable, then the
+   stop") runs in the voice being stopped, so it can't help a lamp updating
+   from a build without it. The ten customer lamps are on the 7071 image:
+   their first home update climbs to the new updater first, so this
+   updater's order is what runs their round (Tests' 7071 → 8670 run and
+   trace on #3689, 29–30 Oct). Old voice and restarted new servers still
+   need compatibility in both directions; restart order does not make the
+   round atomic.
 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
    not fail, stop, be in `auto-restart`, be started again by systemd
    (`NRestarts`) or change process (`MainPID`). At the end it must be

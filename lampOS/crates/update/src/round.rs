@@ -2383,6 +2383,35 @@ impl Run<'_, '_> {
             ));
         }
         self.say(&format!("switching to build {}", build.sequence));
+        // The voice is stopped first when a part it reads restarts before it:
+        // a clean stop, with Controls still up, so no build's voice arms its
+        // restart guard. Restarted after its prerequisites, it starts the new
+        // voice. The old voice's own release can't help a lamp updating from
+        // a build without it (the 7071 lamps, #3689; 06c1 on 8474), and a
+        // climb makes this updater the one that runs their round.
+        let voice_at = backs.iter().position(|back| {
+            back.unit == VOICE_UNIT && back.was_active && !unrestarted.contains(&back.unit)
+        });
+        let voice_stopped = match voice_at {
+            Some(voice_at)
+                if backs[..voice_at]
+                    .iter()
+                    .any(|back| back.was_active && !unrestarted.contains(&back.unit)) =>
+            {
+                self.listen(Duration::ZERO);
+                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
+                    return self.put_back(state, &build, &backs, None, why, String::new());
+                }
+                backs[voice_at].restarted = true;
+                if let Err(why) = self.world.systemd.stop(VOICE_UNIT) {
+                    let told = self.told(VOICE_UNIT);
+                    return self.put_back(state, &build, &backs, Some(VOICE_UNIT), why, told);
+                }
+                self.say("the voice is stopped before the parts it reads restart");
+                true
+            }
+            _ => false,
+        };
         let mut watches = Vec::new();
         for at in 0..backs.len() {
             if !backs[at].was_active || unrestarted.contains(&backs[at].unit) {
@@ -2397,10 +2426,11 @@ impl Run<'_, '_> {
                 self.say("setup is complete; its phone grace period is not restarted");
                 continue;
             }
-            if backs[at].unit == VOICE_UNIT {
+            if backs[at].unit == VOICE_UNIT && !voice_stopped {
                 // A prerequisite's restart can take time. Drain speech
                 // queued during it and judge quiet at Voice's own boundary,
                 // before marking it restarted or stopping its old process.
+                // A voice stopped first was judged before its stop.
                 self.listen(Duration::ZERO);
                 if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
                     return self.put_back(state, &build, &backs, None, why, String::new());

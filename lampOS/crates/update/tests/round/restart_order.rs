@@ -166,6 +166,17 @@ fn the_product_voices_declared_managed_prerequisites_restart_before_it() {
             "{prerequisite} must precede Voice: {restarted:?}"
         );
     }
+    // And the voice is stopped before any of them restarts (#3689).
+    let calls = lamp.calls();
+    let stopped = calls
+        .iter()
+        .position(|call| call == "stop lamp-voice.service")
+        .expect("the voice is stopped first");
+    let first_restart = calls
+        .iter()
+        .position(|call| call.starts_with("restart "))
+        .unwrap();
+    assert!(stopped < first_restart, "{calls:?}");
 }
 
 #[test]
