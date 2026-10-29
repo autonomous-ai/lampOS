@@ -772,10 +772,18 @@ impl Host for ImageHost {
     fn write_conf(&mut self, bytes: Option<&[u8]>) -> std::io::Result<()> {
         use std::{io::Write, os::unix::fs::OpenOptionsExt};
         let Some(bytes) = bytes else {
-            return match std::fs::remove_file(&self.conf) {
-                Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
-                _ => Ok(()),
-            };
+            match std::fs::remove_file(&self.conf) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(error) => return Err(error),
+                Ok(()) => {}
+            }
+            // The removal synced too, as a write's rename is: the root is
+            // mounted `commit=600`, so an unplug up to 10 minutes later could
+            // bring the failed join's file back (lamp-06c1, 29 Oct).
+            if let Some(parent) = self.conf.parent() {
+                std::fs::File::open(parent)?.sync_all()?;
+            }
+            return Ok(());
         };
         let temporary = self.conf.with_extension("conf.lamp-setup");
         let _ = std::fs::remove_file(&temporary);
