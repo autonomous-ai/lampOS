@@ -195,7 +195,7 @@ export class FakeLamp {
       ws.close();
       return null;
     }
-    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits: { joints_hz: 20 } });
+    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits: { joints_hz: 40 } });
     return request.client;
   }
 

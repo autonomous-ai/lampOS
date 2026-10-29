@@ -105,6 +105,10 @@ asyncio.run(main())
   `wait=True` on a gesture, move or play returns when it has finished, or,
   where the lamp hands it on and says no more (today `gesture` and `move`,
   answered `{"to": "body"}`), at that answer.
+- **A motion asked while another plays is dropped by the body**, and the
+  lamp has already answered `{"to": "body"}`, so you aren't told (#4209).
+  At one motion a second, wait for your last gesture's or move's length
+  (2 to 10 s; a feeling's move 2.5 to 7 s) before asking for the next.
 - **Leases:** `async with lamp.lease("body"):` holds the body for looks,
   moves and joints, renewed for you, until the block ends or the lamp takes
   it back (a hand on its head, a conversation): `lease.state`,

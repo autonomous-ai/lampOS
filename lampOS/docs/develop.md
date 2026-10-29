@@ -118,6 +118,12 @@ then `heard: good night lamp` and `lease: held`.
   `quiet_hours`. `say` and `sound` are refused in the lamp's quiet hours,
   22:00 to 07:00 its local time unless the lamp sets its own; hello's
   `limits.quiet_hours` says this lamp's window, or `"off"`.
+- **A rate is a ceiling, not a target.** A computer may ask for a motion
+  each second and an `express` 20 times a minute, but a lamp switching
+  feelings every 3 s reads as twitchy, a machine, not a living thing (rule
+  8). Ask for a feeling when something happened, and let the move finish:
+  a feeling's move lasts 2.5 to 7 s, and one asked while another plays is
+  dropped by the body, not queued.
 - **A body lease** (`lamp.lease("body")`) is needed for `look`, `move`,
   `play` and `joints`. For a gesture it keeps the lamp's own idle life
   back. It is renewed for you every 15 s, lasts at most 10 minutes a take,

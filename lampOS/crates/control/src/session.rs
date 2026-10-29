@@ -1418,11 +1418,18 @@ mod tests {
         let refused = door.handle(&mut session, express, &mut fake, 2 * S, 1);
         assert_eq!(code_of(&refused), Some("refused"));
         fake.refuse_with = None;
-        let taken = door.handle(&mut session, express, &mut fake, 3 * S, 1);
-        assert_eq!(reply(&taken)["ok"], true, "{:?}", taken.send);
+        // Twenty a minute are taken (the refused one wasn't counted), and
+        // the twenty-first in that minute is the rate's.
+        for n in 0..20 {
+            let taken = door.handle(&mut session, express, &mut fake, 3 * S + n, 1);
+            assert_eq!(reply(&taken)["ok"], true, "{n}: {:?}", taken.send);
+        }
         let again = door.handle(&mut session, express, &mut fake, 4 * S, 1);
         assert_eq!(code_of(&again), Some("rate"));
-        assert_eq!(reply(&again)["error"]["why"], "express: 1 a minute");
+        assert_eq!(reply(&again)["error"]["why"], "express: 20 a minute");
+        // A minute after the first, one has room again.
+        let later = door.handle(&mut session, express, &mut fake, 63 * S, 1);
+        assert_eq!(reply(&later)["ok"], true, "{:?}", later.send);
     }
 
     /// Fourteen's P3 on #3798: refused actions are bounded, 20 a second;
@@ -1681,17 +1688,17 @@ mod tests {
             1,
         );
         assert_eq!(reply(&play)["ok"], true);
-        // Motion is one each 2 s.
+        // Motion is one each second.
         let again = door.handle(
             &mut session,
             r#"{"id":7,"op":"gesture","name":"nod"}"#,
             &mut fake,
-            4 * S,
+            3 * S + 500_000,
             1,
         );
         assert_eq!(code_of(&again), Some("rate"));
-        assert_eq!(reply(&again)["error"]["retry_ms"], 1000);
-        assert_eq!(reply(&again)["error"]["why"], "motion: 1 each 2 s");
+        assert_eq!(reply(&again)["error"]["retry_ms"], 500);
+        assert_eq!(reply(&again)["error"]["why"], "motion: 1 each second");
         let joints = door.handle(
             &mut session,
             r#"{"id":8,"op":"joints","lease":"l_9","targets":{"pitch":3},"within_ms":200}"#,

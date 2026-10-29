@@ -682,7 +682,7 @@ async fn a_hand_on_the_bus_is_told_and_a_look_at_it_has_the_body_follow() {
         line(&mut lines).await,
         r#"{"hold":{"for_ms":30000,"follow":"hand"}}"#
     );
-    // `stop` ends it, never rated as a look is (one motion in 2 s).
+    // `stop` ends it, never rated as a look is (one motion a second).
     let stopped = send(&mut socket, json!({"id": 6, "op": "stop"})).await;
     assert_eq!(stopped["ok"], true, "{stopped}");
     assert_eq!(line(&mut lines).await, r#"{"hold":{"for_ms":30000}}"#);

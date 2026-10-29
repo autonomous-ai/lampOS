@@ -292,8 +292,8 @@ test('a lease the lamp takes back is lost with its why', async () => {
 test('refusals are typed and say when to try again', async () => {
   await withLamp({ grants: ['body'] }, async (lamp, fake) => {
     await assert.rejects(lamp.say('hello'), byCode.no_grant);
-    fake.refuseNext('gesture', 'rate', '1 every 2 s', 1500);
-    await assert.rejects(lamp.gesture('nod'), (error) => error instanceof byCode.rate && error.retryMs === 1500);
+    fake.refuseNext('gesture', 'rate', 'motion: 1 each second', 500);
+    await assert.rejects(lamp.gesture('nod'), (error) => error instanceof byCode.rate && error.retryMs === 500);
     fake.refuseNext('gesture', 'private', 'the privacy switch is closed');
     await assert.rejects(lamp.gesture('nod'), byCode.private);
   });
