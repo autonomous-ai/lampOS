@@ -779,8 +779,14 @@ passed. Tests: the notes' exact texts in `remember::tests`.
       `LAMP_NAME_NOTE`; the name note given counts too), the first word
       past a greeting set off as a name is ("Ramon. …", "Edeland, …", and
       past one greeting of the line's own set off before it, "Hello. Gaswa,
-      …", "Good morning, …", "Xin chào, …": `GREETINGS`, N4b, unless the
-      line then says "Lamp" as itself, "Hello, Anna. Lamp, …"), not
+      …", "Good morning, …", "Xin chào, …": `GREETINGS`, N4b), unless the
+      line then calls the lamp by "Lamp" as an address: opening a sentence
+      or clause, with or without a comma after it, or after "Hey", "Hi",
+      "OK", "Okay" or "Hello", with or without a comma ("Hello, Anna. Lamp
+      what's …", "Hey, Anna. Lamp, …", "Anna. Lamp ơi, …": the first word
+      was a person's name). The noun, with a word before it ("turn off the
+      lamp", "my lamp", "the lamp is too bright"), is no call
+      (`addresses_the_name`), not
       "Lamp", not a common opener ("Yes,", "Well,", "Please,", "Vâng," …;
       `OPENS_SET_OFF`), not a time, day, request verb or discourse word
       ("Tomorrow,", "Today,", "Remember,", "Honestly,", "Mai,", "Nhớ," …;
