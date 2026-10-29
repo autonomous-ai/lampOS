@@ -1861,13 +1861,23 @@ pub fn known_now(path: &Path) -> Option<String> {
 /// The names of everyone the eyes know (`{"list":true}` on their socket),
 /// or `None` when they can't be asked within [`LIST_WITHIN`].
 pub fn names_known(socket: &Path) -> Option<Vec<String>> {
-    let answer = crate::tools::exchange(socket, &serde_json::json!({"list": true}), LIST_WITHIN)?;
-    answer["people"].as_array().map(|people| {
-        people
-            .iter()
-            .filter_map(|name| name.as_str().map(str::to_owned))
-            .collect()
-    })
+    names_reached(socket).flatten()
+}
+
+/// [`names_known`], told apart: `None` for eyes that can't be reached (none
+/// listening: stopped, crashed, never started), `Some(None)` for eyes
+/// reached that gave no answer within [`LIST_WITHIN`] (the Reviewer-lead's
+/// P2 on #4325).
+pub fn names_reached(socket: &Path) -> Option<Option<Vec<String>>> {
+    let answer = crate::tools::reached(socket, &serde_json::json!({"list": true}), LIST_WITHIN)?;
+    Some(answer.and_then(|answer| {
+        answer["people"].as_array().map(|people| {
+            people
+                .iter()
+                .filter_map(|name| name.as_str().map(str::to_owned))
+                .collect()
+        })
+    }))
 }
 
 /// How long [`names_known`] waits for the eyes: only [`keep_owner_fresh`]
@@ -1948,19 +1958,23 @@ fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .1;
     let owner = file.and_then(crate::onboarding::owner_of);
-    let names = owner.as_ref().and(socket).and_then(names_known);
+    let names = owner.as_ref().and(socket).and_then(names_reached);
     let found = match (owner, names) {
-        (Some(owner), Some(names)) if among(&names, &owner) => Some(owner),
-        (Some(_), Some(_)) => {
+        (Some(owner), Some(Some(names))) if among(&names, &owner) => Some(owner),
+        (Some(_), Some(Some(_))) => {
             if let Some(file) = file {
                 crate::onboarding::face_forgotten(file);
             }
             None
         }
-        // The eyes not answering in time takes nothing back: the mark
+        // Eyes reached but slow to answer take nothing back: the mark
         // stands as kept, and a forget by voice still clears it at once
-        // ([`owner_forgotten`]) (lamp-29e7, 29 Oct, #4118).
-        (Some(owner), None) if socket.is_some() => Some(owner),
+        // ([`owner_forgotten`]) (lamp-29e7, 29 Oct, #4118). Eyes that can't
+        // be reached at all name nobody, as before: nothing could then
+        // tell a stranger is there (the Reviewer-lead's P2 on #4325).
+        // ponytail: a slow-eyes outage keeps the mark as long as it lasts;
+        // a bound of a few refreshes if that ever matters (Reviewer-three's P3).
+        (Some(owner), Some(None)) => Some(owner),
         _ => None,
     };
     let mut now = OWNER_NOW
@@ -2951,19 +2965,21 @@ mod tests {
         assert_eq!(lately.most(at + Duration::from_secs(8)), None);
     }
 
-    /// lamp-29e7, 29 Oct (#4118): eyes too busy to answer in time take
-    /// nothing back; the mark kept at setup stands, and no eyes at all is
-    /// still no owner.
+    /// lamp-29e7, 29 Oct (#4118): eyes reached but too busy to answer in
+    /// time take nothing back; eyes nobody can reach (stopped, crashed), or
+    /// no eyes at all, name no owner (the Reviewer-lead's P2 on #4325).
     #[test]
-    fn the_owner_stands_while_the_eyes_do_not_answer() {
+    fn the_owner_stands_while_the_eyes_are_slow_and_goes_while_they_are_down() {
         let dir = std::env::temp_dir().join(format!("owner-unanswered-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("progress.json");
         std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
-        let silent = dir.join("who.sock");
+        // Slow: a listener that takes the ask and never answers.
+        let slow = dir.join("slow.sock");
+        let _listener = std::os::unix::net::UnixListener::bind(&slow).unwrap();
         // Other tests' forgets share the count: a refresh they cut is tried again.
         for _ in 0..3 {
-            refresh_owner(Some(&file), Some(&silent));
+            refresh_owner(Some(&file), Some(&slow));
             if owner_now().is_some() {
                 break;
             }
@@ -2973,13 +2989,20 @@ mod tests {
             !crate::onboarding::mailbox_of(&file).exists(),
             "nothing is forgotten"
         );
-        for _ in 0..3 {
-            refresh_owner(Some(&file), None);
-            if owner_now().is_none() {
-                break;
+        // Down: a socket nobody listens on, then no eyes at all.
+        for socket in [Some(dir.join("down.sock")), None] {
+            for _ in 0..3 {
+                refresh_owner(Some(&file), socket.as_deref());
+                if owner_now().is_none() {
+                    break;
+                }
             }
+            assert_eq!(owner_now(), None, "{socket:?}");
+            assert!(
+                !crate::onboarding::mailbox_of(&file).exists(),
+                "the mark is kept"
+            );
         }
-        assert_eq!(owner_now(), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
