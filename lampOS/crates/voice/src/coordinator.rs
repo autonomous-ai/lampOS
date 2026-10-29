@@ -3687,6 +3687,7 @@ fn observe_provider_output(
         | ProviderOutput::LookAsked { .. }
         | ProviderOutput::SleepAsked { .. }
         | ProviderOutput::StepCallHeard { .. }
+        | ProviderOutput::OwnWordsSaid { .. }
         | ProviderOutput::RequestedAudio { .. } => {}
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
@@ -5916,6 +5917,9 @@ fn conversation_with_gate_inner(
         })
     });
     let mut onboarding_invitation_turn: Option<(BootId, u64)> = None;
+    // The latest request the second route said an onboarding line's own
+    // words for (`OwnWordsSaid`).
+    let mut own_words_turn: Option<u64> = None;
     // Whether any of the bound invitation's audio played, kept past its
     // reply: a turn that ends unsettled with none is no ask (#3754).
     let mut onboarding_invitation_audio = false;
@@ -7478,11 +7482,15 @@ fn conversation_with_gate_inner(
             key_refusals.observe(&event, monotonic_us());
             // Answered again: the next refusal is a new outage, its line owed.
             // An onboarding line's own words, said on a failed chat (#4263),
-            // are no answer of the model's.
+            // are no answer of the model's; the model's own answer to a
+            // re-offer is (the Reviewer-lead's P2 on #4279).
+            if let ProviderOutput::OwnWordsSaid { request } = &event {
+                own_words_turn = Some(*request);
+            }
             let fixed_line = matches!(
                 &event,
                 ProviderOutput::GenerationComplete { request }
-                    if onboarding_invitation_turn.is_some_and(|(_, turn)| turn == *request)
+                    if own_words_turn == Some(*request)
             );
             if refused_hold && model_refusing.observe(&event, monotonic_us(), fixed_line) {
                 outage = Outage::default();
@@ -7649,7 +7657,7 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
-                ProviderOutput::NewsAnswered { .. } => {}
+                ProviderOutput::NewsAnswered { .. } | ProviderOutput::OwnWordsSaid { .. } => {}
                 // The second route's times for the request, recorded with the
                 // end of speech decision's time, for an A/B scored on each
                 // request's first answer audio (19 Oct).
