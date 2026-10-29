@@ -17,7 +17,7 @@ OUT=${5:-$HOME/jev-verify-runs/$DAY-${START/:/}}
 L="ssh -n -o BatchMode=yes -o ConnectTimeout=15 orangepi@$LAMP.local"
 at() { TZ=Asia/Ho_Chi_Minh date -j -f '%Y-%m-%d %H:%M:%S' "$DAY $1:00" +%s; }
 hm() { TZ=Asia/Ho_Chi_Minh date +%H:%M; }
-loans() { $L "echo \"\$(date '+%F %H:%M') $HOLDER: $*\" >> ~/loans.txt"; }
+loans() { $L "echo \"\$(date '+%F %H:%M') $HOLDER: $*\" | sudo -n tee -a ~/loans.txt >/dev/null"; }
 post() { gh issue comment "$ISSUE" -R "$REPO" --body "$*" >/dev/null || echo "post to #$ISSUE failed" >&2; }
 t0=$(at "$START") && tl=$(at "$LAST") && te=$(at "$END") || exit 2
 

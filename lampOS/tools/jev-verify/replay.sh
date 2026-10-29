@@ -53,7 +53,7 @@ talk() { play t01; play t02; }
 ids() { awk -F'|' -v r="$1" '!/^#/ && NF >= 7 && $3 == r && $4 != "follow_up" {print $1}' lines.txt | grep -E "$ONLY"; }
 follow_ups() { awk -F'|' -v p="$1" '!/^#/ && $4 == "follow_up" && $8 == p {print $1}' lines.txt | grep -E "$ONLY"; }
 due() { [ -n "$DEADLINE" ] && [ "$(date +%s)" -ge "$DEADLINE" ]; }
-loans() { $L "echo \"\$(date '+%F %H:%M') $HOLDER: $*\" >> ~/loans.txt"; }
+loans() { $L "echo \"\$(date '+%F %H:%M') $HOLDER: $*\" | sudo -n tee -a ~/loans.txt >/dev/null"; }
 # order PASS ROOM: the block's ids in that pass's fixed order (md5 of pass+id), so a run is repeatable.
 order() { local id; for id in $(ids "$2"); do echo "$(md5 -q -s "$1$id") $id"; done | sort | cut -d' ' -f2; }
 wait_until() { local t=$1 d; [ -n "$DEADLINE" ] && [ "$DEADLINE" -lt "$t" ] && t=$DEADLINE
