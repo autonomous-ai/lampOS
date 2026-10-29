@@ -128,6 +128,7 @@ impl Rig {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         });
     }
     fn audio(&mut self) {
@@ -280,6 +281,7 @@ fn no_audio_before_real_endpoint_or_without_admitted_authority() {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 }
             )
             .is_err()
@@ -321,6 +323,7 @@ fn fixture_rejects_a_start_bound_to_another_session() {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 },
             )
             .unwrap_err();
@@ -350,6 +353,7 @@ fn cancellation_overtaking_start_reserves_original_owner_and_never_relabels_repl
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     });
     rig.start();
     rig.audio();
@@ -814,6 +818,7 @@ fn real_fixture_worker_exchanges_exact_pcm_and_stops_without_devices_or_cloud() 
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         },
         ProviderInput::Audio {
             request: 1,
@@ -1043,6 +1048,7 @@ fn separate_sockets_new_authority_in_empty_drain_gap_precedes_input_submission()
                             follows_on: false,
                             over_the_lamps_voice: false,
                             heard_of_cut: None,
+                            soft_lead_us: 0,
                         })?;
                     }
                     Ok(control)
@@ -1109,6 +1115,7 @@ fn separate_sockets_stop_or_privacy_in_empty_drain_gap_prevents_input_and_reply(
                                 follows_on: false,
                                 over_the_lamps_voice: false,
                                 heard_of_cut: None,
+                                soft_lead_us: 0,
                             })?;
                         }
                         Ok(control)
@@ -1163,6 +1170,7 @@ fn full_second_control_slice_retains_only_original_input_and_suppresses_output()
                             follows_on: false,
                             over_the_lamps_voice: false,
                             heard_of_cut: None,
+                            soft_lead_us: 0,
                         })?;
                         parent.data.send(ProviderInput::Audio {
                             request: 2,
@@ -1240,6 +1248,7 @@ fn deferred_input_keeps_original_age_and_cannot_wait_indefinitely_on_control() {
                             follows_on: false,
                             over_the_lamps_voice: false,
                             heard_of_cut: None,
+                            soft_lead_us: 0,
                         })?;
                     } else if control.is_some()
                         && let Some(snapshot) = states.pop_front()
@@ -1289,6 +1298,7 @@ fn empty_second_drain_does_not_retry_an_input_without_matching_authority() {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         })
         .unwrap();
     assert!(

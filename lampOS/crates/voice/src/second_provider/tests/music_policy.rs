@@ -320,7 +320,7 @@ async fn held_reports_never_dispatch_music_or_supply_its_private_context() {
             });
             let (engine, calls) = recording_engine(script.clone());
             let mut engine = engine
-                .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+                .heeding(Arc::new(|_, _, _, _, _| Some("a busy room")))
                 .doing_though_held(true);
             engine.submit(start(REQUEST));
             engine.submit(audio(REQUEST, 1));

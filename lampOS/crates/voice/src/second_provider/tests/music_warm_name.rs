@@ -23,7 +23,7 @@ async fn a_warm_name_prefix_carries_words_and_time_without_reusing_music_authori
         Arc::get_mut(&mut engine.shared).unwrap().clock = Arc::new(move || *clock.lock().unwrap());
         let judged: Arc<Mutex<Vec<(u64, u64, String)>>> = Arc::default();
         let seen = judged.clone();
-        let mut engine = engine.heeding(Arc::new(move |request, window, words, _| {
+        let mut engine = engine.heeding(Arc::new(move |request, window, words, _, _| {
             seen.lock()
                 .unwrap()
                 .push((request, window.0, words.to_owned()));

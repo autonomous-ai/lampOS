@@ -3267,7 +3267,22 @@ after a take-over, but now for every turn:
   played 1.5 s after desk talk was dropped 5 times in 20: four at 1686 to
   1822 ms and once at 5554 ms, on 8327 and 8389 alike; the 5554 ms one
   was a line dated from sound carried into it, now dated from its own
-  start (the carried sound above). The first builder at 03:54 on #1722:
+  start (the carried sound above). With soft starts on (`LAMP_SOFT_START`)
+  a line's sound opens up to 0.3 s before its usual start, so every hearing
+  reads that much later into it: on a lamp 939 to 1023 ms with them, 654 to
+  723 ms without (#4226). With `LAMP_NAME_START_USUAL=on` (off unless set)
+  the name at the line's start is dated from the usual start: the
+  coordinator's `Start` says the lead it kept (`soft_lead_us`, from the
+  line's first block to the block `PRE_ROLL_BLOCKS` back from the trigger,
+  at most `SOFT_START_LEAD_BLOCKS` blocks, and 0 for a yield's start or one
+  as the lamp's sound ends), and the rule adds it to the line's start for
+  `NAME_AT_THE_START_US` alone (`Attention::start_of`), and for the
+  hearing kept at the line before's start (`LAMP_NAME_STAYS_IN_ITS_LINE`).
+  A line dated from sound or a name's line carried into it gets no lead;
+  a line going on keeps its first part's usual start. Every other window
+  (`NAME_BEFORE_US`, the own echo, said to a face, near hearings) keeps the
+  line's own start. The journal then says "began N ms into the line (L ms
+  of soft lead)", so a lamp run reads both. The first builder at 03:54 on #1722:
   lamp-4ace's played tests b0333 and b0413 each lost their first four day
   lines, "Hey Lamp, good morning!" heard at 1.000 (`began_ms_ago=480`) with
   its words written "Mainland. Good morning.". The 18:20 shape's words were

@@ -2972,6 +2972,18 @@ pub fn serve(
                 heeding.attention.hold_a_start_said_to_a_person(true);
             }
         }
+        // The name at a line's start is dated from its usual start, not
+        // its soft start's lead (`LAMP_NAME_START_USUAL=on`, #4226).
+        if std::env::var(crate::second_provider::NAME_START_USUAL_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: the lamp's name at a line's start is dated from the line's usual start, not its soft start's lead (LAMP_NAME_START_USUAL)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.date_the_start_from_the_usual_start(true);
+            }
+        }
         // A hearing of the name inside one line's sound counts for that line
         // only (`LAMP_NAME_STAYS_IN_ITS_LINE=on`).
         if std::env::var(crate::second_provider::NAME_STAYS_ENVIRONMENT)
@@ -3430,11 +3442,11 @@ pub fn serve(
             );
         }
         remarked_by = Some(heeding.clone());
-        engine = engine.heeding(Arc::new(move |request, said, heard, from| {
+        engine = engine.heeding(Arc::new(move |request, said, heard, from, lead| {
             heeding
                 .lock()
                 .ok()
-                .and_then(|mut heeding| heeding.heed(request, said, heard, from))
+                .and_then(|mut heeding| heeding.heed_led(request, said, heard, from, lead))
         }));
     }
     // Without the rule, a line's own words say whether it called the lamp.
@@ -4955,10 +4967,11 @@ pub(crate) struct Heeding {
     faces_held: Option<Arc<Mutex<FacesHeld>>>,
     /// `LAMP_NAME_STAYS_IN_ITS_LINE=on` ([`Self::keeping_the_name_in_its_line`]),
     /// and the last [`SAID_KEPT`] requests judged, newest last, each with its
-    /// line's sound and whether its words called the lamp by name, a call
-    /// whose hearing goes on.
+    /// line's sound, whether its words called the lamp by name, a call
+    /// whose hearing goes on, and where the name at its start is dated from
+    /// (`Attention::start_of`, #4226).
     name_stays: bool,
-    said_lately: std::collections::VecDeque<(u64, (u64, u64), bool)>,
+    said_lately: std::collections::VecDeque<(u64, (u64, u64), bool, u64)>,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
@@ -5591,6 +5604,10 @@ pub(crate) struct Signs {
     /// ended it early (`ProviderInput::Start::continues`,
     /// `LAMP_CUT_KEEPS_NAME=on`): the one begun just before, same session.
     pub continues_from: Option<u64>,
+    /// How long the line's sound began before its usual start by the soft
+    /// start's lead (`ProviderInput::Start::soft_lead_us`), when its window
+    /// begins with its own first sound; 0 otherwise (#4226).
+    pub soft_lead_us: u64,
 }
 
 /// The lines judged lately whose sound a later-come hearing of the name is
@@ -7240,12 +7257,28 @@ impl Heeding {
         }
     }
 
+    // The route gives each line's soft lead (`Self::heed_led`); tests judge
+    // lines with none.
+    #[cfg(test)]
     pub(crate) fn heed(
         &mut self,
         request: u64,
         said: (u64, u64),
         heard: &str,
         continues_from: Option<u64>,
+    ) -> Option<&'static str> {
+        self.heed_led(request, said, heard, continues_from, 0)
+    }
+
+    /// [`Self::heed`] for a line whose sound began `soft_lead_us` before its
+    /// usual start (`ProviderInput::Start::soft_lead_us`, #4226).
+    pub(crate) fn heed_led(
+        &mut self,
+        request: u64,
+        said: (u64, u64),
+        heard: &str,
+        continues_from: Option<u64>,
+        soft_lead_us: u64,
     ) -> Option<&'static str> {
         // A line going on from the one judged last began with it, as the
         // rule keeps it (`Attention::continued_at`).
@@ -7255,6 +7288,7 @@ impl Heeding {
             .map_or(said.0, |(began, _)| began.min(said.0));
         let signs = Signs {
             continues_from,
+            soft_lead_us,
             ..self.signs_begun(request, said, onset_us)
         };
         self.heed_signs(request, said, heard, signs)
@@ -7277,8 +7311,9 @@ impl Heeding {
         if self.said_lately.len() == SAID_KEPT {
             self.said_lately.pop_front();
         }
+        let start = self.attention.start_of(said.0, signs.soft_lead_us);
         self.said_lately
-            .push_back((request, said, self.attention.called_in_its_words()));
+            .push_back((request, said, self.attention.called_in_its_words(), start));
         if self.noted.is_none_or(|(judged, _)| judged != request) {
             self.note_the_name(request, said, &signs);
         }
@@ -7327,11 +7362,11 @@ impl Heeding {
                 .said_lately
                 .iter()
                 .rev()
-                .find(|(before, (began, ended), call)| {
+                .find(|(before, (_, ended), call, start)| {
                     *before != request
                         && Some(*before) != from
                         && !call
-                        && *at > began.saturating_add(crate::attention::NAME_AT_THE_START_US)
+                        && *at > start.saturating_add(crate::attention::NAME_AT_THE_START_US)
                         && *at <= *ended
                 });
             if let Some((before, ..)) = owner.filter(|_| *at < said.0) {
@@ -7493,6 +7528,7 @@ impl Heeding {
                     })
                 }),
             continues_from: None,
+            soft_lead_us: 0,
         };
         // The route's own room as the only voice, as the Live worker reads
         // its own (`attention_now`): with people talking past the lamp since
@@ -7668,7 +7704,7 @@ impl Heeding {
             .filter(|(last, _, _, _)| signs.continues_from == Some(*last))
         {
             Some((_, session, before, _)) => {
-                attention.continued_at(request, *session, began_us);
+                attention.continued_at_led(request, *session, began_us, signs.soft_lead_us);
                 // The engine put the words going on from in front of these
                 // (#1168); the rule keeps them already, so it is given only
                 // this request's own (the reviewer on #1226).
@@ -7681,7 +7717,7 @@ impl Heeding {
                 (*session, own)
             }
             None => {
-                attention.began_at(request, self.session, began_us);
+                attention.began_at_led(request, self.session, began_us, signs.soft_lead_us);
                 (self.session, heard)
             }
         };
@@ -7710,6 +7746,13 @@ impl Heeding {
             })
             .map(|(at, _)| (*at as i64 - began_us as i64) / 1_000)
             .min();
+        // The soft start's lead, said beside both so a lamp run reads where
+        // a hearing began against the line's usual start too (#4226).
+        let soft_lead = if signs.soft_lead_us > 0 {
+            format!(" ({} ms of soft lead)", signs.soft_lead_us / 1_000)
+        } else {
+            String::new()
+        };
         for (at_us, score) in signs.names {
             attention.name_heard_scored(at_us, score);
         }
@@ -7765,12 +7808,12 @@ impl Heeding {
         if self.attention.weigh_the_name(signs.turned, signs.going_on) {
             if let Some(word) = said_to_a_person {
                 eprintln!(
-                    "lamp-voice second: request {request}: lamp-name heard the name at the line's start (began {} ms into the line), but its first word, set off, is said to a person (\"{word}\"), and nothing else shows it was called: not counted; the model is not told it was heard (LAMP_NAME_SAID_TO_A_PERSON)",
+                    "lamp-voice second: request {request}: lamp-name heard the name at the line's start (began {} ms into the line{soft_lead}), but its first word, set off, is said to a person (\"{word}\"), and nothing else shows it was called: not counted; the model is not told it was heard (LAMP_NAME_SAID_TO_A_PERSON)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
             } else {
                 eprintln!(
-                    "lamp-voice second: request {request}: its name, heard only in the room's sound, counts for nothing alone: nobody turned to the lamp, not said close to it, its words not calling it, its hearing not at the line's start (began {} ms into the line); the model is not told it was heard (LAMP_NAME_SECOND_SIGN)",
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound, counts for nothing alone: nobody turned to the lamp, not said close to it, its words not calling it, its hearing not at the line's start (began {} ms into the line{soft_lead}); the model is not told it was heard (LAMP_NAME_SECOND_SIGN)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
             }
@@ -7780,7 +7823,7 @@ impl Heeding {
             // Every hearing weighed is dated too, not only one dropped, so
             // `attention::NAME_AT_THE_START_US` can be set from both (#4226).
             eprintln!(
-                "lamp-voice second: request {request}: lamp-name's hearing began {first} ms into the line (the newest {newest} ms); the line's start is up to {} ms",
+                "lamp-voice second: request {request}: lamp-name's hearing began {first} ms into the line{soft_lead} (the newest {newest} ms); the line's start is up to {} ms",
                 crate::attention::NAME_AT_THE_START_US / 1_000
             );
         }
@@ -10399,6 +10442,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let hindi = "नमस्ते, आप कैसे हैं?";
@@ -10445,6 +10489,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let mut heeding = Heeding::new(false, true, None, None);
@@ -10556,6 +10601,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         assert!(went_on_told(5, busy(), said_ago, None, None, true).going_on);
         assert!(!went_on_told(5, busy(), Some(s(18)), None, None, true).going_on);
@@ -10594,6 +10640,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let s = Duration::from_secs;
         let went = |room, said: u64, called: Option<u64>| {
@@ -10639,6 +10686,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let mut heeding = Heeding::new(true, true, None, None);
@@ -10671,6 +10719,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let desk = |on: bool| {
@@ -13838,6 +13887,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = |heeding: &mut Heeding,
                     request: u64,
@@ -13937,6 +13987,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         // The window as the route reads it, 5 s after the lamp's words.
         let window = super::went_on_told(
@@ -14056,6 +14107,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let judge = |same_one: bool| {
@@ -14095,6 +14147,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let judge = |on: bool, line: &str, lamp_asked: bool| {
@@ -14177,6 +14230,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let office = "I'll send the quarterly numbers to finance after lunch.";
@@ -14244,6 +14298,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         for caller_only in [false, true] {
@@ -14940,6 +14995,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let talk = [
@@ -15042,6 +15098,7 @@ mod tests {
                     names: vec![(base + 100_000, 0.95)],
                     near: false,
                     continues_from: None,
+                    soft_lead_us: 0,
                 },
             )];
             for (request, line) in (2u64..).zip(talk) {
@@ -15071,6 +15128,7 @@ mod tests {
                         names: Vec::new(),
                         near: false,
                         continues_from: None,
+                        soft_lead_us: 0,
                     },
                 ));
             }
@@ -15120,6 +15178,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
         let (now, now_us) = (Instant::now(), monotonic_us());
@@ -15207,6 +15266,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
         let (now, now_us) = (Instant::now(), monotonic_us());
@@ -15293,6 +15353,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let held = Some(crate::second_provider::QUIET_GOING_ON_HELD);
         // f1 speaks the call (the eyes' boot "a"), then a line going on,
@@ -15379,6 +15440,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let mut heeding = Heeding::new(true, true, None, None);
         heeding.as_the_only_voice(false, true, false);
@@ -15450,6 +15512,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let mut heeding = Heeding::new(true, true, None, None);
@@ -15510,6 +15573,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_000_000);
         let rest = (11_400_000, 12_000_000);
@@ -15557,6 +15621,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 10_400_000);
         let rest = (10_800_000, 12_000_000);
@@ -15583,6 +15648,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let said = (10_000_000, 11_500_000);
         let mut heeding = Heeding::new(true, true, None, None);
@@ -16312,6 +16378,7 @@ mod tests {
                     continues_cut_off:false, over_the_lamp:false, after_stop:false,
                     follows_on:false, over_the_lamps_voice:false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 },
                 ProviderInput::Audio {
                     request, privacy_generation, sequence:1,
@@ -16548,6 +16615,7 @@ mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             });
             engine.submit(ProviderInput::End {
                 request,
@@ -16757,6 +16825,7 @@ mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         };
         assert!(gate.admits(now_us, &start(first.turn())).unwrap());
         engine.submit(start(first.turn()));
@@ -17357,6 +17426,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let heard = "what time is it in Tokyo now";
         let mut addressed = super::Heeding::new(true, false, None, None);
@@ -18280,6 +18350,7 @@ mod tests {
             names: vec![(1_000_100_000, 0.95)],
             near: true,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_001_500_000);
         let judged = |by_day: bool, night: bool| {
@@ -18760,6 +18831,78 @@ mod tests {
         }
     }
 
+    /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
+    /// before its usual start by the soft start's lead, the name heard
+    /// 1.5 s into its sound (1.2 s from its usual start), is a call at its
+    /// start, played; without the switch it is dropped, as before. With no
+    /// lead the switch changes nothing. And with `LAMP_NAME_STAYS_IN_ITS_LINE`
+    /// a hearing so placed in the line before is that line's call, and goes
+    /// on to the line after it.
+    #[test]
+    fn with_the_usual_start_a_soft_lead_keeps_the_name_at_a_lines_start() {
+        use crate::attention::NAME_AT_THE_START_US;
+        use crate::room_told::Room;
+        let line = (10_000_000, 11_800_000);
+        let lead = 300_000;
+        for room in [Room::Quiet, Room::Busy] {
+            let judged = |usual: bool, lead: u64, at: u64| {
+                let mut heeding = room_name_heeding(true);
+                heeding.attention.date_the_start_from_the_usual_start(usual);
+                heeding.judge(
+                    4_226,
+                    line,
+                    "Mainland. I want to cook something new.",
+                    super::Signs {
+                        soft_lead_us: lead,
+                        ..room_name_signs(room, false, None, false, vec![(at, 1.0)])
+                    },
+                )
+            };
+            let at = line.0 + 1_500_000;
+            assert_eq!(judged(true, lead, at), None, "{room:?}: on");
+            assert!(judged(false, lead, at).is_some(), "{room:?}: off");
+            let bound = line.0 + lead + NAME_AT_THE_START_US;
+            assert_eq!(judged(true, lead, bound), None, "{room:?}");
+            assert!(judged(true, lead, bound + 1).is_some(), "{room:?}");
+            for at in [
+                line.0 + NAME_AT_THE_START_US,
+                line.0 + NAME_AT_THE_START_US + 1,
+                at,
+            ] {
+                assert_eq!(
+                    judged(true, 0, at).is_some(),
+                    judged(false, 0, at).is_some(),
+                    "{room:?}: no lead, {at}"
+                );
+            }
+        }
+        // The line before's call goes on with its usual start: "Ramp." with
+        // a 0.3 s lead, its hearing 1.5 s into its sound and come late, then
+        // "What time is it?" 0.2 s after it.
+        for usual in [false, true] {
+            let signs = |names, lead| super::Signs {
+                soft_lead_us: lead,
+                ..room_name_signs(Room::Busy, false, None, false, names)
+            };
+            let mut heeding = room_name_heeding(true);
+            heeding.keeping_the_name_in_its_line();
+            heeding.attention.date_the_start_from_the_usual_start(usual);
+            heeding.heed_signs(
+                1,
+                (10_000_000, 11_800_000),
+                "Ramp.",
+                signs(Vec::new(), lead),
+            );
+            let second = heeding.heed_signs(
+                2,
+                (12_000_000, 13_000_000),
+                "What time is it?",
+                signs(vec![(11_500_000, 0.95)], 0),
+            );
+            assert_eq!(second.is_none(), usual, "usual start {usual}");
+        }
+    }
+
     /// #829 scene 2, "the lamp named in passing" (the first builder's
     /// `twopeople829.sh`, 15 October), in a busy room: each "lamp" comes a
     /// few words into its line, so a hearing of it begins past
@@ -18917,6 +19060,7 @@ mod tests {
             names,
             near,
             continues_from: None,
+            soft_lead_us: 0,
         }
     }
 
@@ -19018,6 +19162,7 @@ mod tests {
             names: vec![(1_000_200_000, 0.977)],
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let held = heeding.judge(9, (1_000_000_000, 1_003_000_000), "नमस्ते, आप कैसे हैं?", signs);
         assert_eq!(held, Some(crate::not_speech::OTHER_SCRIPT));
@@ -19043,6 +19188,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let held = heeding.judge(9, (1_000_000_000, 1_003_000_000), heard, signs);
         (held, heeding.named_to_a_face(9))
@@ -19167,6 +19313,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         heeding.judge(9, (1_000_000_000, 1_003_000_000), heard, signs)
     }
@@ -19217,6 +19364,7 @@ mod tests {
                 names: vec![],
                 near: false,
                 continues_from: None,
+                soft_lead_us: 0,
             };
             heeding.heed_signs(
                 9,
@@ -19300,6 +19448,7 @@ mod tests {
             names: vec![],
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         }
     }
 
@@ -20851,6 +21000,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (10_000_000, 12_000_000);
         let heard = crate::called::LEAST_SCORE;
@@ -20885,6 +21035,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (10_000_000, 12_000_000);
         let heard = crate::called::LEAST_SCORE;
@@ -21052,6 +21203,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         const S: u64 = 1_000_000;
         let now = monotonic_us();
@@ -21142,6 +21294,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_001_500_000);
         let remarks = [
@@ -21276,6 +21429,7 @@ mod tests {
             names: vec![(1_000_100_000, 0.95)],
             near: true,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_001_500_000);
         let judged = |by_day: bool| {
@@ -21307,6 +21461,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         // Short: a socket's whole path must fit in 103 bytes.
         let bus = PathBuf::from(format!("/tmp/lgo-{}", std::process::id()));
@@ -21395,6 +21550,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_001_500_000);
         let mut heeding = super::Heeding::new(true, false, None, None);
@@ -21420,6 +21576,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let at = |seconds: u64| 1_000_000_000 + seconds * 1_000_000;
         let line = |seconds: u64| (at(seconds), at(seconds) + 1_500_000);
@@ -21461,6 +21618,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_001_500_000);
         let noted = |spoken_to: bool, heard: &str, signs: super::Signs| {
@@ -21682,6 +21840,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_001_500_000);
         let noted = |heard: Option<Heard<'static>>| {
@@ -21733,6 +21892,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_001_500_000);
         let judged = |on: bool, over: bool, lamp_asked: bool, heard: &str| {
@@ -22057,6 +22217,7 @@ mod tests {
             names: Vec::new(),
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_002_000_000);
         let judged = |heard: &str| {
@@ -22082,6 +22243,7 @@ mod tests {
             names,
             near: false,
             continues_from: None,
+            soft_lead_us: 0,
         };
         let line = (1_000_000_000, 1_002_000_000);
         let note = |heard: &str, signs: super::Signs| {

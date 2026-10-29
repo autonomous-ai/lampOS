@@ -9559,6 +9559,7 @@ fn conversation_with_gate_inner(
                         follows_on,
                         count_only,
                         not_now,
+                        detector.began_ordinarily(),
                         rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
@@ -13677,6 +13678,29 @@ fn lamps_voice_heard(reply: Option<&Reply>) -> bool {
     reply.is_some_and(|current| current.had_audio || current.playback.is_some())
 }
 
+/// How long a line's sound begins before its usual start, by the soft
+/// start's lead (`LAMP_SOFT_START=on`, #4226): from `prefix`'s first block to
+/// its usual start, the block [`crate::activity::PRE_ROLL_BLOCKS`] back from
+/// the one that triggered it, by when each was read. 0 when that block is
+/// not in `prefix`, or for a start that was not an ordinary one (a yield's
+/// reach back, or one as the lamp's sound ended), whose lead is not a soft
+/// start's; never more than [`crate::activity::SOFT_START_LEAD_BLOCKS`]
+/// blocks' worth.
+fn soft_lead_us(prefix: &[ObservedAudio], trigger_sequence: u64, began_ordinarily: bool) -> u64 {
+    if !began_ordinarily {
+        return 0;
+    }
+    let usual = trigger_sequence.checked_sub(crate::activity::PRE_ROLL_BLOCKS as u64 - 1);
+    let Some(at) = usual.and_then(|usual| prefix.iter().position(|frame| frame.sequence == usual))
+    else {
+        return 0;
+    };
+    let from = at.saturating_sub(crate::activity::SOFT_START_LEAD_BLOCKS);
+    prefix[at]
+        .captured_at_us
+        .saturating_sub(prefix[from].captured_at_us)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn commit_admitted_input(
     owner: &mut Controller,
@@ -13705,11 +13729,20 @@ fn commit_admitted_input(
     // Begun while the walk is under way ([`sleep_not_now`]): its Start is
     // followed at once by `Onboarding`, before any of its sound.
     not_now: bool,
+    // The detector began it ordinarily, not as a yield's reach back or as
+    // the lamp's sound ended (`TurnDetector::began_ordinarily`): only then
+    // does its soft start's lead count (#4226).
+    began_ordinarily: bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Snapshot> {
     let prefix = accepted.audio;
+    let soft_lead_us = soft_lead_us(
+        &prefix,
+        accepted.candidate.trigger_sequence,
+        began_ordinarily,
+    );
     let replacing = reply.is_some();
     let over_the_lamps_voice = lamps_voice_heard(reply.as_ref());
     let mut interrupted = take_interrupted_reminder(reply);
@@ -13770,6 +13803,8 @@ fn commit_admitted_input(
         // Begun while the lamp's answer could be heard (#828).
         over_the_lamps_voice,
         heard_of_cut,
+        // Its sound's soft lead before the usual start (#4226).
+        soft_lead_us,
     });
     let marks = after_start(
         turn.turn(),
@@ -14157,6 +14192,10 @@ fn continue_after_early_end(
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        // Its sound is what was kept of the first part, not a start of the
+        // detector's: no soft lead is known, and a part going on keeps the
+        // first part's usual start (#4226).
+        soft_lead_us: 0,
     });
     let marks = after_start(
         turn.turn(),
@@ -16005,6 +16044,7 @@ mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             })
             .unwrap();
         request.confirm_start(1).unwrap();
@@ -17542,6 +17582,7 @@ mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         }
     }
 

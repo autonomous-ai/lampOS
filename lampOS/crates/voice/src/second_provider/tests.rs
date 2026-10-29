@@ -340,6 +340,7 @@ fn start(request: u64) -> ProviderInput {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     }
 }
 fn audio(request: u64, sequence: u64) -> ProviderInput {
@@ -1852,7 +1853,7 @@ async fn words_the_heed_holds_end_the_turn_unanswered() {
     type Judged = Vec<(u64, (u64, u64), String)>;
     let judged: Arc<Mutex<Judged>> = Arc::default();
     let seen = judged.clone();
-    let mut engine = engine.heeding(Arc::new(move |request, said, heard, _| {
+    let mut engine = engine.heeding(Arc::new(move |request, said, heard, _, _| {
         seen.lock().unwrap().push((request, said, heard.to_owned()));
         Some("a busy room")
     }));
@@ -1903,7 +1904,7 @@ async fn a_turn_the_heed_holds_is_told_held_back() {
         ..Script::default()
     });
     let (engine, _, _) = scripted(script);
-    let (mut engine, told) = telling(engine.heeding(Arc::new(|_, _, _, _| Some("a busy room"))));
+    let (mut engine, told) = telling(engine.heeding(Arc::new(|_, _, _, _, _| Some("a busy room"))));
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -2014,7 +2015,7 @@ async fn a_held_verdict_is_told_before_its_words_are_taken() {
     let (said, told) = tokio::sync::oneshot::channel();
     let said = Mutex::new(Some(said));
     let mut engine = engine
-        .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+        .heeding(Arc::new(|_, _, _, _, _| Some("a busy room")))
         .telling_verdicts(Arc::new(move |request, verdict| {
             if let Some(said) = said.lock().unwrap().take() {
                 let _ = said.send((request, verdict));
@@ -2048,7 +2049,7 @@ async fn a_turn_the_heed_lets_out_is_told_answered_and_one_not_judged_is_not_tol
         });
         let (engine, _, _) = scripted(script);
         let engine = if heed {
-            engine.heeding(Arc::new(|_, _, _, _| None))
+            engine.heeding(Arc::new(|_, _, _, _, _| None))
         } else {
             engine
         };
@@ -2104,7 +2105,7 @@ async fn a_line_held_as_unclear_is_told_and_a_misheard_cut_in_is_noted_next() {
     let told = cut_ins.clone();
     let mut engine = engine
         .announcing(false)
-        .heeding(Arc::new(|request, _, _, _| {
+        .heeding(Arc::new(|request, _, _, _, _| {
             (request == 1).then_some(CUT_IN_FRAGMENT)
         }))
         .asking_again(
@@ -2647,7 +2648,7 @@ async fn the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next
     type Verdicts = Arc<Mutex<Vec<(u64, Option<&'static str>)>>>;
     let verdicts: Verdicts = Arc::default();
     let (judge, kept) = (heeding.clone(), verdicts.clone());
-    let mut engine = engine.heeding(Arc::new(move |request, said, heard, from| {
+    let mut engine = engine.heeding(Arc::new(move |request, said, heard, from, _| {
         let verdict = judge
             .lock()
             .ok()
@@ -3190,6 +3191,7 @@ fn start_over(request: u64) -> ProviderInput {
             follows_on,
             over_the_lamps_voice: true,
             heard_of_cut,
+            soft_lead_us: 0,
         },
         _ => unreachable!(),
     }
@@ -4610,6 +4612,7 @@ async fn the_sentence_is_heard_for_its_count_and_never_asked_of_the_model() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     });
     engine.submit(audio(2, 1));
     engine.submit(end(2));
@@ -4744,6 +4747,7 @@ async fn the_sentences_sound_is_not_carried_into_the_next_line() {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         });
         engine.submit(audio_at(2, 1, 9_000));
         engine.submit(end(2));
@@ -4805,6 +4809,7 @@ async fn a_request_going_on_from_one_given_up_begins_with_its_words() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     });
     engine.submit(audio(2, 1));
     engine.submit(end(2));
@@ -4841,6 +4846,7 @@ async fn a_request_going_on_takes_only_the_words_of_the_one_just_before_it_in_it
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     };
     let script = Arc::new(Script {
         heard: Mutex::new(
@@ -4910,6 +4916,7 @@ async fn the_first_request_after_a_stop_is_told_of_it_beside_its_words() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     });
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -4948,6 +4955,7 @@ async fn a_stop_whose_request_is_never_asked_is_told_with_the_next_one() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     };
     let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
     for (next_session, told) in [(1, true), (2, false)] {
@@ -4989,6 +4997,7 @@ async fn a_stop_goes_with_a_request_going_on_and_never_past_two_minutes() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     };
     let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
     let answered = || vec![text("Sure."), Ok(ChatEvent::Done)];
@@ -5265,6 +5274,7 @@ async fn a_request_going_on_names_the_one_begun_before_it_in_its_session() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     };
     let script = Arc::new(Script {
         heard: Mutex::new(
@@ -5277,7 +5287,7 @@ async fn a_request_going_on_names_the_one_begun_before_it_in_its_session() {
     let (engine, _, _) = scripted(script);
     let froms: Arc<Mutex<Vec<Option<u64>>>> = Arc::default();
     let seen = froms.clone();
-    let mut engine = engine.heeding(Arc::new(move |_, _, _, from| {
+    let mut engine = engine.heeding(Arc::new(move |_, _, _, from, _| {
         seen.lock().unwrap().push(from);
         Some("held for the test")
     }));
@@ -5805,6 +5815,7 @@ async fn the_first_line_after_a_stop_tells_the_rule_of_it() {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         });
         engine.submit(audio(request, 1));
         engine.submit(end(request));
@@ -7406,7 +7417,7 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         type Verdicts = Arc<Mutex<Vec<(u64, Option<&'static str>)>>>;
         let verdicts: Verdicts = Arc::default();
         let (judge, kept) = (heeding.clone(), verdicts.clone());
-        let mut engine = engine.heeding(Arc::new(move |request, said, heard, from| {
+        let mut engine = engine.heeding(Arc::new(move |request, said, heard, from, _| {
             let verdict = judge
                 .lock()
                 .ok()
@@ -7717,7 +7728,7 @@ async fn words_cut_short_by_a_held_line_are_answered_in_its_place() {
         Arc::new(Instant::now),
     )
     .announcing(false)
-    .heeding(Arc::new(|request, _, _, _| {
+    .heeding(Arc::new(|request, _, _, _, _| {
         (request == 2).then_some("not said to the lamp")
     }));
     engine.submit(start(1));
@@ -8707,7 +8718,7 @@ async fn asked_after(
         Arc::new(move || *clock.lock().unwrap()),
     )
     .announcing(false)
-    .heeding(Arc::new(move |request, _, _, _| {
+    .heeding(Arc::new(move |request, _, _, _, _| {
         (held && request == 2).then_some("not said to the lamp")
     }));
     if let Some(same) = same {
@@ -8760,6 +8771,7 @@ async fn asked_after(
                 follows_on,
                 over_the_lamps_voice,
                 heard_of_cut,
+                soft_lead_us: 0,
             });
             engine.retire_through(1);
         }
@@ -8831,7 +8843,7 @@ pub(super) async fn asked_after_pieces(
         Arc::new(move || *clock.lock().unwrap()),
     )
     .announcing(false)
-    .heeding(Arc::new(|_, _, _, _| None))
+    .heeding(Arc::new(|_, _, _, _, _| None))
     .joining_cut_words(same);
     for request in 1..=count {
         if request > 1 {
@@ -8994,7 +9006,7 @@ async fn a_piece_cut_before_it_was_asked_stays_in_the_chain() {
         )
         .announcing(false)
         // The second piece waits for the Policy, which has not decided.
-        .heeding(Arc::new(|request, _, _, _| {
+        .heeding(Arc::new(|request, _, _, _, _| {
             (request == 2).then_some(WAITS_FOR_POLICY)
         }))
         .asking_the_policy(Arc::new(|_| Some(None)))
@@ -9124,7 +9136,7 @@ async fn a_line_already_answered_is_never_chained_into_the_next() {
         Arc::new(move || *clock.lock().unwrap()),
     )
     .announcing(false)
-    .heeding(Arc::new(|_, _, _, _| None))
+    .heeding(Arc::new(|_, _, _, _, _| None))
     .joining_cut_words(Arc::new(|_, _| Joined::Same("the same voice said both")));
     for request in 1..=2 {
         if request == 2 {
@@ -9177,7 +9189,7 @@ async fn a_piece_cut_while_its_verdict_waits_is_chained_only_in_a_room_not_busy(
             Arc::new(move || *clock.lock().unwrap()),
         )
         .announcing(false)
-        .heeding(Arc::new(|request, _, _, _| {
+        .heeding(Arc::new(|request, _, _, _, _| {
             (request == 1).then_some(WAITS_FOR_POLICY)
         }))
         .asking_the_policy(Arc::new(|_| Some(None)))
@@ -9276,7 +9288,7 @@ async fn a_stop_cut_while_its_verdict_waits_clears_the_chain_in_any_room() {
             Arc::new(move || *clock.lock().unwrap()),
         )
         .announcing(false)
-        .heeding(Arc::new(|request, _, _, _| match request {
+        .heeding(Arc::new(|request, _, _, _, _| match request {
             2 => Some(WAITS_FOR_POLICY),
             3 => Some("not said to the lamp"),
             _ => None,
@@ -9385,7 +9397,7 @@ async fn a_piece_folded_into_the_next_by_its_sound_keeps_the_chain() {
             Arc::new(move || *clock.lock().unwrap()),
         )
         .announcing(false)
-        .heeding(Arc::new(|_, _, _, _| None));
+        .heeding(Arc::new(|_, _, _, _, _| None));
         if joining {
             engine = engine.joining_cut_words(Arc::new(|_, _| {
                 Joined::NoSecond("no sign of a second person".to_owned())
@@ -9719,7 +9731,7 @@ async fn words_carried_through_a_held_line_are_never_joined() {
         Arc::new(Instant::now),
     )
     .announcing(false)
-    .heeding(Arc::new(|request, _, _, _| {
+    .heeding(Arc::new(|request, _, _, _, _| {
         (request == 2).then_some("not said to the lamp")
     }))
     // A and B two people; B's held line and its next, one.
@@ -9872,7 +9884,7 @@ async fn a_line_begun_while_a_join_waits_for_a_print_still_carries_the_words() {
             Arc::new(move || *clock.lock().unwrap()),
         )
         .announcing(false)
-        .heeding(Arc::new(move |request, _, _, _| {
+        .heeding(Arc::new(move |request, _, _, _, _| {
             (request == 3 || (second_held && request == 2)).then_some("not said to the lamp")
         }))
         .joining_cut_words(same);
@@ -9949,7 +9961,7 @@ async fn a_line_going_on_from_one_unanswered_hears_its_sound_first() {
         let (engine, _, now) = scripted(script.clone());
         let windows: Arc<Mutex<Vec<(u64, u64)>>> = Arc::default();
         let seen = windows.clone();
-        let mut engine = engine.heeding(Arc::new(move |request, window, _, _| {
+        let mut engine = engine.heeding(Arc::new(move |request, window, _, _, _| {
             seen.lock().unwrap().push((request, window.0));
             None
         }));
@@ -10050,7 +10062,7 @@ async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
         });
         let (engine, _, _) = scripted(script.clone());
         // The first piece is held, so it is never answered.
-        let mut engine = engine.heeding(Arc::new(|request, _, _, _| {
+        let mut engine = engine.heeding(Arc::new(|request, _, _, _, _| {
             (request == 1).then_some("not said to the lamp")
         }));
         engine.submit(start(1));
@@ -10108,7 +10120,7 @@ async fn the_name_cut_off_by_a_pause_begins_the_next_line_with_the_listener_kept
         // The name piece is held, as a short sound was on lamp-4ace; any
         // other line by its words, as the rule holds a line with no name.
         let mut engine = engine
-            .heeding(Arc::new(move |request, window, words, _| {
+            .heeding(Arc::new(move |request, window, words, _, _| {
                 seen.lock()
                     .unwrap()
                     .push((request, window.0, words.to_owned()));
@@ -10174,7 +10186,7 @@ async fn a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound() {
         let asked_from: Arc<Mutex<Vec<u64>>> = Arc::default();
         let asked = asked_from.clone();
         let mut engine = engine
-            .heeding(Arc::new(move |request, window, _, _| {
+            .heeding(Arc::new(move |request, window, _, _, _| {
                 seen.lock().unwrap().push((request, window.0));
                 None
             }))
@@ -10292,6 +10304,7 @@ fn start_marked(
         follows_on,
         over_the_lamps_voice: over_the_voice,
         heard_of_cut: None,
+        soft_lead_us: 0,
     }
 }
 
@@ -10967,7 +10980,7 @@ async fn a_line_that_waits_for_the_policy_goes_as_it_decides() {
         let polled = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counted = polled.clone();
         let mut engine = engine
-            .heeding(Arc::new(|_, _, _, _| Some(super::WAITS_FOR_POLICY)))
+            .heeding(Arc::new(|_, _, _, _, _| Some(super::WAITS_FOR_POLICY)))
             .asking_the_policy(Arc::new(move |request| {
                 assert_eq!(request, 1);
                 let polls = counted.fetch_add(1, Ordering::SeqCst) + 1;
@@ -11217,6 +11230,7 @@ async fn a_line_ending_before_its_name_waits_for_it() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     };
     let script = |heard: &[&str]| {
         Arc::new(Script {
@@ -11601,6 +11615,7 @@ async fn a_named_asks_call_goes_to_the_agent_its_words_name() {
         follows_on: false,
         over_the_lamps_voice: over,
         heard_of_cut: None,
+        soft_lead_us: 0,
     };
     for (line, named, given, over, wanted) in [
         (
@@ -11893,7 +11908,7 @@ async fn a_held_lines_named_ask_is_said_in_the_journal() {
         let (engine, calls, _) = scripted(script.clone());
         let journal: Arc<Mutex<Vec<String>>> = Arc::default();
         let mut engine = engine
-            .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+            .heeding(Arc::new(|_, _, _, _, _| Some("a busy room")))
             .asking_by_name(Arc::new(asking_codex_and_claude_code))
             .keeping_named_ask_journal(journal.clone());
         engine.submit(start(1));
@@ -12961,7 +12976,7 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
             .announcing(false)
             .preparing(true)
             .telling_cut_ins(true)
-            .heeding(Arc::new(move |_, _, _, _| {
+            .heeding(Arc::new(move |_, _, _, _, _| {
                 (mode == "attention-held").then_some("not said to the lamp")
             }))
             .holding_calls(Arc::new(move |_, _| mode == "call-held"));
@@ -13188,7 +13203,7 @@ async fn carried_words_answered_for_a_held_request_have_no_new_music_identity() 
             .with_memory_scope(boot, Arc::default(), scoped, None)
             .requesting_audio(boot, audio_runner)
             .announcing(false)
-            .heeding(Arc::new(move |request, _, _, _| {
+            .heeding(Arc::new(move |request, _, _, _, _| {
                 (request == 2 && !prefix_only).then_some("not said to the lamp")
             }));
         engine.submit(start(1));
@@ -14093,7 +14108,7 @@ async fn warm_prepared_music_waits_for_final_raw_words_and_admission() {
         let (engine, contexts, ordinary) = warm_music_engine(script.clone());
         let mut engine = engine
             .preparing(true)
-            .heeding(Arc::new(move |request, _, _, _| {
+            .heeding(Arc::new(move |request, _, _, _, _| {
                 (request == 8 && mode == "attention-held").then_some("not said to the lamp")
             }))
             .holding_calls(Arc::new(move |request, _| {
@@ -14197,7 +14212,7 @@ async fn prepared_music_held_as_unclear_cannot_offer_and_written_sorry_has_no_gr
         let mut engine = engine
             .keeping_a_listener_ready(false)
             .preparing(true)
-            .heeding(Arc::new(|request, _, _, _| {
+            .heeding(Arc::new(|request, _, _, _, _| {
                 (request == 7).then_some(CUT_IN_FRAGMENT)
             }))
             .asking_again(
@@ -14319,7 +14334,7 @@ async fn misheard_hum_note_replaces_same_words_prepared_music_with_fresh_context
     let mut engine = engine
         .keeping_a_listener_ready(false)
         .preparing(true)
-        .heeding(Arc::new(|request, _, _, _| {
+        .heeding(Arc::new(|request, _, _, _, _| {
             (request == 7).then_some(CUT_IN_FRAGMENT)
         }))
         .asking_again(
@@ -14514,7 +14529,7 @@ async fn carried_music_after_unclear_handoff_cancels_pending_call_without_anothe
         .with_memory_scope(boot, Arc::default(), scoped, None)
         .requesting_audio(boot, audio_runner)
         .announcing(false)
-        .heeding(Arc::new(|request, _, _, _| {
+        .heeding(Arc::new(|request, _, _, _, _| {
             (request == 8).then_some(CUT_IN_FRAGMENT)
         }))
         .asking_again(

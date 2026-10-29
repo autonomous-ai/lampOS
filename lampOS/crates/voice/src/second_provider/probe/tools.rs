@@ -917,6 +917,7 @@ impl HeedingLine {
             names: Vec::new(),
             near: false,
             continues_from,
+            soft_lead_us: 0,
         };
         let continues_from = self.cut_after.map(|first| {
             let _ = heeding.judge(1, (1_000_000_000, 1_000_800_000), first, signs(None));

@@ -51,7 +51,7 @@ fn lamp_said(
         );
     }
     let engine = engine
-        .heeding(Arc::new(move |request, window, words, _| {
+        .heeding(Arc::new(move |request, window, words, _, _| {
             seen.lock()
                 .unwrap()
                 .push((request, window, words.to_owned()));
@@ -395,6 +395,7 @@ async fn a_name_is_never_carried_across_sessions_or_a_stop() {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         });
         engine.submit(audio_at(2, 3_000_000));
         engine.submit(ended(2, false));
@@ -772,7 +773,7 @@ async fn a_request_in_pieces_after_the_name_is_asked_as_one_named_line() {
     .carrying_the_name(true)
     .telling_one_speaker(Arc::new(|_, _| ONE_FACE), Arc::new(|_, _| {}))
     .joining_cut_words(Arc::new(|_, _| ONE_FACE))
-    .heeding(Arc::new(|_, _, _, _| None));
+    .heeding(Arc::new(|_, _, _, _, _| None));
     say_the_name(&mut engine, false, true);
     say_after(&mut engine, &now, Duration::from_millis(1_200)).await;
     for request in 3..=4 {
@@ -865,7 +866,7 @@ async fn a_line_said_by_the_name_never_goes_on_from_talk_before_the_name() {
     .carrying_the_name(true)
     .telling_one_speaker(Arc::new(|_, _| ONE_FACE), Arc::new(|_, _| {}))
     .joining_cut_words(Arc::new(|_, _| ONE_FACE))
-    .heeding(Arc::new(|_, _, _, _| None));
+    .heeding(Arc::new(|_, _, _, _, _| None));
     engine.submit(start(1));
     engine.submit(audio_at(1, NAME_READ_US / 5));
     engine.submit(ended(1, false));
@@ -929,4 +930,94 @@ async fn a_sound_carried_with_no_name_leaves_the_line_dated_from_its_own_start()
         .expect("the line after is judged");
     assert_eq!(words, "Lamp, I want to cook something new this weekend.");
     assert_eq!(window.0, NAME_READ_US + 1_000_000, "{windows:?}");
+}
+
+/// Each line's soft lead as the rule was given it: its request and lead.
+type Leads = Arc<Mutex<Vec<(u64, u64)>>>;
+
+/// [`lamp`], each line's soft lead kept as the rule was given it: the same
+/// rule, given again.
+fn lamp_leads(
+    script: &Arc<Script>,
+    judged: &Judged,
+    leads: &Leads,
+) -> (Engine, Arc<Mutex<Instant>>) {
+    let (engine, now) = lamp(script, true, judged);
+    let (seen, given) = (judged.clone(), leads.clone());
+    let engine = engine.heeding(Arc::new(move |request, window, words, _, lead| {
+        seen.lock()
+            .unwrap()
+            .push((request, window, words.to_owned()));
+        given.lock().unwrap().push((request, lead));
+        (!crate::attention::begins_with_the_name(words)).then_some(crate::attention::NOT_SPOKEN_TO)
+    }));
+    (engine, now)
+}
+
+/// A line's Start, its sound begun `lead_us` before its usual start.
+fn start_led(request: u64, lead_us: u64) -> ProviderInput {
+    let mut start = start(request);
+    if let ProviderInput::Start { soft_lead_us, .. } = &mut start {
+        *soft_lead_us = lead_us;
+    }
+    start
+}
+
+async fn completed(engine: &mut Engine, request: u64) {
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the line's turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request: done, .. } if done == request) {
+            break;
+        }
+    }
+}
+
+/// #4226: a line's soft lead (`Start`'s `soft_lead_us`) reaches the rule
+/// only while the line is judged from its own first sound: a line alone,
+/// or one after a short sound carried with no name in it. A line said by
+/// the lamp's name before it, its window that line's, is given none: the
+/// lead says nothing of where the name's line began.
+#[tokio::test(start_paused = true)]
+async fn a_lines_soft_lead_reaches_the_rule_only_from_its_own_first_sound() {
+    const LEAD: u64 = 300_000;
+    let played = script(&["Lamp, what time is it?"]);
+    let (judged, leads) = (Judged::default(), Leads::default());
+    let (mut engine, _) = lamp_leads(&played, &judged, &leads);
+    engine.submit(start_led(1, LEAD));
+    engine.submit(audio_at(1, NAME_READ_US));
+    engine.submit(ended(1, false));
+    completed(&mut engine, 1).await;
+    assert_eq!(leads.lock().unwrap().clone(), [(1, LEAD)]);
+    // After a short sound carried with no name heard: its own first sound.
+    // After the lamp's name alone, carried at 1.2 s or put before the line
+    // at 2 s: the name's line's, so none.
+    for (first, after, lead) in [("", 1_000, LEAD), ("Lamp.", 1_200, 0), ("Lamp.", 2_000, 0)] {
+        let line = if first.is_empty() {
+            "Lamp, I want to cook something new this weekend."
+        } else {
+            "I want to cook something new this weekend."
+        };
+        let played = script(&[first, line]);
+        let (judged, leads) = (Judged::default(), Leads::default());
+        let (mut engine, now) = lamp_leads(&played, &judged, &leads);
+        say_the_name(&mut engine, false, true);
+        if first.is_empty() {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        let after = Duration::from_millis(after);
+        tokio::time::sleep(after).await;
+        *now.lock().unwrap() += after;
+        engine.submit(start_led(2, LEAD));
+        engine.submit(audio_at(2, NAME_READ_US + after.as_micros() as u64));
+        engine.submit(ended(2, false));
+        completed(&mut engine, 2).await;
+        let given = leads.lock().unwrap().clone();
+        assert_eq!(
+            given.iter().find(|(request, _)| *request == 2),
+            Some(&(2, lead)),
+            "{first:?} {after:?}: {given:?}"
+        );
+    }
 }

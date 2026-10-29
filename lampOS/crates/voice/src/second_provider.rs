@@ -514,6 +514,13 @@ pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON"
 /// [`worker::Heeding::keeping_the_name_in_its_line`]).
 pub const NAME_STAYS_ENVIRONMENT: &str = "LAMP_NAME_STAYS_IN_ITS_LINE";
 
+/// Where the worker reads whether the lamp's name at a line's start
+/// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
+/// start, not its soft start's lead (`on`, and nothing else;
+/// [`crate::attention::Attention::date_the_start_from_the_usual_start`],
+/// #4226).
+pub const NAME_START_USUAL_ENVIRONMENT: &str = "LAMP_NAME_START_USUAL";
+
 /// Where the worker reads whether a line that begins with the lamp's name,
 /// said to a face turned to the lamp, is always answered (#2191): `on`, and
 /// nothing else. In a busy room the rule does not hold it, and the model's
@@ -676,10 +683,12 @@ pub(crate) fn short_done_note(line: &str) -> String {
 /// the time it was said. The worker's is the Live route's own rule
 /// (`worker::Heeding`, `crate::attention`).
 /// The rule's verdict on a spoken turn: its request, when its line was said,
-/// what was heard, and the request it goes on from (`continues`): the one
-/// begun just before it, in the same session.
+/// what was heard, the request it goes on from (`continues`): the one
+/// begun just before it, in the same session; and how long its sound began
+/// before its usual start by a soft start's lead, in microseconds, when its
+/// window begins with its own first sound, else 0 (#4226).
 pub type Heed =
-    Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+    Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>, u64) -> Option<&'static str> + Send + Sync>;
 /// Whether the same person said a line cut short and the line that cut it
 /// ([`Engine::joining_cut_words`]).
 #[derive(Clone, Debug, PartialEq)]
@@ -2151,6 +2160,11 @@ struct Marks {
     /// goes on only from the name, never from a line before the name, often
     /// the end of other talk (reviewer-three's P2, 23 Oct).
     name_carried: AtomicBool,
+    /// How long its sound began before its usual start by a soft start's
+    /// lead (`Start`'s `soft_lead_us`, #4226): only while its window begins
+    /// with its own first sound, and 0 once it is dated from sound carried
+    /// before it.
+    soft_lead_us: AtomicU64,
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -3559,6 +3573,7 @@ impl Engine {
                 after_stop,
                 follows_on,
                 over_the_lamps_voice,
+                soft_lead_us,
                 ..
             } => {
                 let previous = self.begun_last;
@@ -3823,6 +3838,7 @@ impl Engine {
                     ended_at: Mutex::new(None),
                     words_back: Mutex::default(),
                     name_carried: AtomicBool::new(false),
+                    soft_lead_us: AtomicU64::new(soft_lead_us),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -3872,6 +3888,10 @@ impl Engine {
                             && let Ok(mut said) = said.lock()
                         {
                             *said = (kept.said_from, kept.said_from);
+                            // Dated from the carried sound, not its own
+                            // first: its soft lead no longer says where its
+                            // usual start is (#4226).
+                            marks.soft_lead_us.store(0, Ordering::Release);
                         }
                         KeptSound {
                             request,
@@ -5608,13 +5628,21 @@ async fn spoken(
             // Said by the name just before: its window begins with the
             // name's line, so the name heard there is this line's, as for
             // a heard name.
+            let own = window;
             let window = match &name_of {
                 Some(name) if name.said_from != 0 && window.0 != 0 => {
                     (window.0.min(name.said_from), window.1)
                 }
                 _ => window,
             };
-            heed(request, window, &text, continues_from)
+            // The soft lead counts only for a window that begins with the
+            // line's own first sound (#4226).
+            let lead_us = if window.0 == own.0 {
+                marks.soft_lead_us.load(Ordering::Acquire)
+            } else {
+                0
+            };
+            heed(request, window, &text, continues_from, lead_us)
         }
         _ => None,
     };
@@ -9822,6 +9850,7 @@ mod requested_audio_tests {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 });
                 engine.submit(ProviderInput::Audio {
                     request: 7,
@@ -10022,6 +10051,7 @@ mod requested_audio_tests {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 });
                 if mode != "empty-input" {
                     engine.submit(ProviderInput::Audio {
@@ -10155,6 +10185,7 @@ mod requested_audio_tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             });
             engine.submit(ProviderInput::Audio {
                 request: 7,

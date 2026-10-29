@@ -15,7 +15,7 @@ const NOT_TO_THE_LAMP: &str = "Stop sending the reports to the client.";
 fn held_engine(script: Arc<Script>, though_held: bool) -> (Engine, Calls) {
     let (engine, calls, _) = scripted(script);
     let engine = engine
-        .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+        .heeding(Arc::new(|_, _, _, _, _| Some("a busy room")))
         .doing_though_held(though_held);
     (engine, calls)
 }
@@ -250,7 +250,7 @@ async fn a_held_reports_line_is_told_only_its_admitted_persons_context() {
         })),
     )
     .announcing(false)
-    .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+    .heeding(Arc::new(|_, _, _, _, _| Some("a busy room")))
     .doing_though_held(true);
     engine.memory_camera(true, 1);
     // B is at the lamp when the line is admitted.
