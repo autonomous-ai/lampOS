@@ -701,6 +701,28 @@ from the task 18 host implementation:
   said in the report's message and in `expression/state`, and the lamp is
   well. It also says in its journal which input it refused and why, for
   the first five and then ever more seldom.
+- **What a turn waits for in its ordinary course is not a warning**
+  (`waits_within_a_turn` in `runtime.rs`). The report reads Ok, "planning;
+  this turn waits for ...", when all that is missing is one of: scheduled
+  first audio (most turns in an office get no answer; lamp-4ace,
+  2026-10-14), the current or recent playout level, or fresh person
+  activity. The voice says whether a person is speaking only of a turn it
+  can keep (`Listening` with `accepting_input`): not for a moment after a
+  person cut the lamp off with nothing taken yet, not while it cannot keep
+  what is heard, and not before a listening phase's first word of
+  activity. A working lamp listens without it every day; only the pause
+  nod does not come. The app's Lamp health row was reported showing
+  "expression: waiting for …" as a warning most of the time (2026-10-29);
+  this is the part of it that is ordinary. On lamp-0c89 that day the row
+  read "waiting for light setting, fresh measured joints", which stays a
+  warning (below). Still a warning, alone or beside these, is a part
+  a working lamp always has: measured body lag (fixed in the catalogue at
+  start), the light setting (kept once read), fresh voice timing (said
+  again every 80 ms, stale at 500 ms), fresh measured joints (the body
+  says them 12.5 times a second whether or not the head moves, stale at
+  300 ms) and fresh room state (the voice's worker says it again every
+  second, stale at 5 s). Missing, one of them means a part is not running
+  or not publishing.
 - **The body can take its requests** (`crates/body/src/expression_in.rs`,
   `LAMP_EXPRESSION_BODY=on`, off by default; [body.md](body.md), "What
   Expression may add"). It takes the head's pitch and roll and the base's

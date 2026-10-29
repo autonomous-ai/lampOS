@@ -454,12 +454,34 @@ pub fn standing(counts: &Counts, fault: Option<&str>, state: &ExpressionState) -
 /// lamp-4ace on 2026-10-14, acting in a talkative office where most turns
 /// get no answer, "waiting for scheduled first audio" had the lamp report
 /// a warning most of the time.
+///
+/// Fresh person activity is the same. The voice says whether a person is
+/// speaking only of a turn it can keep (`crates/voice/src/expression_out.rs`:
+/// `Listening` with `accepting_input`). It says `Listening` without it for
+/// a moment after a person cut the lamp off with nothing taken yet, and
+/// whenever it cannot keep what is heard; and a listening phase's first
+/// ticks come before its first word of activity. A working lamp listens
+/// without it every day, and nothing is wrong with the planner then: its
+/// pause nod just does not come. The app's Lamp health row was reported
+/// showing "expression: waiting for …" as a warning most of the time
+/// (2026-10-29); this is the part of that which is ordinary.
+///
+/// What stays a warning is a part a working lamp always has, so its
+/// absence means a part is not running or not publishing: measured body
+/// lag (the catalogue's, fixed at start: none means never measured), the
+/// light setting (kept once read: none means never read), fresh voice
+/// timing (the voice says it again every 80 ms; stale at 500 ms in the
+/// shipped catalogues), fresh measured joints (the body says them every
+/// fourth 20 ms step whether or not the head moves; stale at 300 ms) and
+/// fresh room state (the voice's worker says it again every second on
+/// each tick; stale at 5 s).
 fn waits_within_a_turn(item: &str) -> bool {
     matches!(
         item,
         "scheduled first audio"
             | "current actual playout level"
             | "fresh current or recent playout level"
+            | "fresh person activity"
     )
 }
 
