@@ -1717,6 +1717,64 @@ fn a_switch_cut_short_is_put_back_at_the_next_start() {
     assert!(matches!(lamp.round(), Outcome::Refused(why) if why.contains("was put back")));
 }
 
+/// Tests' P3 on #4431: a cut just after the round stopped the voice first
+/// (#3689) leaves it stopped, with the journal and the new unit in place.
+/// The next start's recovery puts the old unit back and starts the old voice
+/// again: it isn't left down.
+#[test]
+fn a_switch_cut_after_the_voice_was_stopped_first_starts_the_old_voice_again() {
+    let mut lamp = Lamp::new();
+    let (old, new) = (sha("voice 1"), sha("voice 2"));
+    let records = lamp.root.join("var/lib/lampos-update");
+    fs::create_dir_all(records.join("previous")).unwrap();
+    fs::write(
+        records.join("previous/lamp-voice.service"),
+        voice_unit(&old),
+    )
+    .unwrap();
+    fs::write(
+        records.join("journal.json"),
+        format!(
+            "{{\"build\":{{\"sequence\":2,\"commit\":\"{}\"}},\"units\":[{{\"unit\":\"lamp-voice.service\",\"was_active\":true}}]}}",
+            "2".repeat(40)
+        ),
+    )
+    .unwrap();
+    fs::create_dir_all(lamp.root.join(format!("opt/lampOS/releases/{new}"))).unwrap();
+    fs::write(
+        lamp.root
+            .join(format!("opt/lampOS/releases/{new}/lamp-voice")),
+        "voice 2",
+    )
+    .unwrap();
+    fs::write(
+        lamp.root.join("etc/systemd/system/lamp-voice.service"),
+        voice_unit(&new),
+    )
+    .unwrap();
+    // Stopped first, then the power went: no voice runs.
+    lamp.systemd.stop("lamp-voice.service").unwrap();
+    lamp.calls.borrow_mut().clear();
+    let voice_active = |lamp: &Lamp| {
+        lamp.systemd
+            .units
+            .get("lamp-voice.service")
+            .is_some_and(|unit| unit.active == "active")
+    };
+    assert!(!voice_active(&lamp));
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, after: Ok(()), .. } if why.contains("cut short")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-voice.service"]);
+    // Started again, on the old unit and its old voice.
+    assert!(voice_active(&lamp));
+    assert_eq!(running(&lamp)["lamp-voice.service"], "voice 1");
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}
+
 #[test]
 fn a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list() {
     let mut lamp = Lamp::new();

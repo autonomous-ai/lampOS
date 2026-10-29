@@ -800,7 +800,13 @@ each under the quiet rule. A round
    restarts reaches no voice and doesn't hold the switch: the lamp isn't
    listening for those few seconds, inside a moment already judged quiet.
    A round with no other running part before the voice restarts the voice
-   as before, with the quiet gate at its own boundary.
+   as before, with the quiet gate at its own boundary. It applies only when
+   the voice itself changes: a round that leaves the voice as it is
+   restarts the parts it reads under it, which a voice with #4280 survives.
+   The 7071 lamps' first update always changes the voice (Fourth's P3 on
+   #4431). A cut just after the voice's stop leaves it stopped, and the next
+   start's recovery puts the old unit back and starts the old voice
+   (`a_switch_cut_after_the_voice_was_stopped_first_starts_the_old_voice_again`).
 
    **Why:** the order before this restarted lamp-controls first. The old
    voice's run then closed on an unreadable privacy switch, its own stop
