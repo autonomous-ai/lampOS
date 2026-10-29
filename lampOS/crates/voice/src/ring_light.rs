@@ -99,6 +99,12 @@ pub const KEEP_PATH: &str = "/var/lib/lampOS/light/person.json";
 /// `light/command` taken with no session, the ring left as the wait has it.
 pub const WHILE_MUTED_ENVIRONMENT: &str = "LAMP_LIGHT_WHILE_MUTED";
 const KEEP_FLAG: &str = "--light-keep";
+/// A dev lamp's switch, off unless `on`: every pulse asked for is played,
+/// not one a minute per asker ([`LightPattern::PULSE_GAP_US`]), so a demo
+/// can pulse as often as it asks. Never on a product: there twice in a row
+/// is a nag (the first builder on #940).
+pub const EVERY_PULSE_ENVIRONMENT: &str = "LAMP_RING_EVERY_PULSE";
+const EVERY_PULSE_FLAG: &str = "--every-pulse";
 /// The kept light is written at most this often.
 pub const KEEP_EVERY_US: u64 = 1_000_000;
 
@@ -133,6 +139,28 @@ fn speaking_arguments(value: Option<&str>) -> Vec<String> {
     match value {
         Some("on") => vec![SPEAKING_FLAG.to_owned()],
         _ => Vec::new(),
+    }
+}
+
+/// The ring worker's flag for every pulse played, with
+/// `LAMP_RING_EVERY_PULSE=on` (a dev lamp's switch).
+pub fn every_pulse_arguments_from_environment() -> Vec<String> {
+    every_pulse_arguments(std::env::var(EVERY_PULSE_ENVIRONMENT).ok().as_deref())
+}
+
+fn every_pulse_arguments(value: Option<&str>) -> Vec<String> {
+    match value {
+        Some("on") => vec![EVERY_PULSE_FLAG.to_owned()],
+        _ => Vec::new(),
+    }
+}
+
+/// Take a leading `--every-pulse` off the ring worker's flags, after
+/// [`take_keep`].
+pub fn take_every_pulse(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == EVERY_PULSE_FLAG => (true, rest),
+        _ => (false, flags),
     }
 }
 
@@ -280,6 +308,9 @@ pub struct RingLight {
     /// When each asker's last pulse began: a second inside
     /// [`LightPattern::PULSE_GAP_US`] is drawn as already played.
     pulses: Vec<(String, u64)>,
+    /// Every pulse played, not one a minute per asker
+    /// (`LAMP_RING_EVERY_PULSE=on`, a dev lamp's).
+    every_pulse: bool,
     /// Where a request's light is said reached, when switched on.
     reached: Option<Publisher>,
     /// Where the person's light is kept across a restart, when switched on.
@@ -367,6 +398,7 @@ impl RingLight {
                 fading: None,
                 moving: None,
                 pulses: Vec::new(),
+                every_pulse: false,
                 reached: None,
                 outranked: None,
                 reaching: None,
@@ -645,7 +677,7 @@ impl RingLight {
             return;
         };
         let mut since_us = drawn_at_us;
-        if moving.pattern.kind == PatternKind::Pulse {
+        if moving.pattern.kind == PatternKind::Pulse && !self.every_pulse {
             let gap = LightPattern::PULSE_GAP_US;
             self.pulses
                 .retain(|(_, at)| drawn_at_us.saturating_sub(*at) < gap);
@@ -660,6 +692,12 @@ impl RingLight {
             }
         }
         moving.since_us = Some(since_us);
+    }
+
+    /// Play every pulse, not one a minute per asker (a dev lamp's
+    /// `LAMP_RING_EVERY_PULSE=on`).
+    pub fn every_pulse(&mut self, on: bool) {
+        self.every_pulse = on;
     }
 
     /// Let the request shown tint the Speaking face as well, with
@@ -1562,6 +1600,60 @@ mod tests {
         assert_eq!(shown(&mut ring, &mut at, 9, "skill:quiet", false), None);
         at += 10_000_000;
         assert_eq!(shown(&mut ring, &mut at, 10, "skill:quiet", true), Some(0));
+    }
+
+    /// A dev lamp's `LAMP_RING_EVERY_PULSE=on`: the same asker's second
+    /// pulse within the minute plays from its start, not as played; off
+    /// (the default and the product's), it is drawn as played.
+    #[test]
+    fn every_pulse_plays_each_pulse_on_a_dev_lamp_and_only_there() {
+        assert_eq!(
+            every_pulse_arguments(Some("on")),
+            vec![EVERY_PULSE_FLAG.to_owned()]
+        );
+        for value in [None, Some("off"), Some("ON"), Some("")] {
+            assert!(every_pulse_arguments(value).is_empty(), "{value:?}");
+        }
+        let flags = vec![EVERY_PULSE_FLAG.to_owned(), "--rest".to_owned()];
+        assert_eq!(take_every_pulse(&flags), (true, &flags[1..]));
+        assert_eq!(take_every_pulse(&flags[1..]), (false, &flags[1..]));
+        for (every, second) in [(false, Some(4_000_000)), (true, Some(0))] {
+            let root = Root::new(if every {
+                "every-pulse-on"
+            } else {
+                "every-pulse-off"
+            });
+            let (mut ring, _) = RingLight::on(&root.0).unwrap();
+            ring.every_pulse(every);
+            ring.take_requests(&root.0, "boot-test").unwrap();
+            let bus = Bus::new(&root.0).unwrap();
+            let mut glows = bus
+                .publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "skills")
+                .unwrap();
+            let mut at = 0u64;
+            ring.tick(at);
+            let mut shown = |ring: &mut RingLight, at: &mut u64, number| {
+                looked(ring, at);
+                let mut asked = request(
+                    "skill:news",
+                    lamp_msgs::Priority::Skill,
+                    *at + 5_000_000,
+                    "red",
+                );
+                asked.pattern = Some(LightPattern {
+                    kind: PatternKind::Pulse,
+                    period_ms: 4_000,
+                    low: 1,
+                });
+                glows.publish_json(number, &asked).unwrap();
+                looked(ring, at);
+                ring.drew(*at, true);
+                ring.pattern().map(|(_, since)| *at - since)
+            };
+            assert_eq!(shown(&mut ring, &mut at, 1), Some(0));
+            at += 10_000_000;
+            assert_eq!(shown(&mut ring, &mut at, 2), second, "every_pulse {every}");
+        }
     }
 
     /// #940: two skills ask for the light at once. The newer is shown and
