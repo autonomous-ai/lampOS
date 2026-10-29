@@ -785,6 +785,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
+        | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,

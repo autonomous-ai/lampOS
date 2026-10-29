@@ -4735,7 +4735,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
-        | ProviderOutput::StepCallHeard { request } => Some(*request),
+        | ProviderOutput::StepCallHeard { request }
+        | ProviderOutput::OwnWordsSaid { request } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }
@@ -8495,6 +8496,7 @@ async fn answer(
                                 "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the onboarding line's own words are said",
                                 began.elapsed().as_millis()
                             );
+                            shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
                             queue.push(fixed.take().unwrap_or_default()).await?;
                             return Ok(());
                         }
@@ -8562,6 +8564,7 @@ async fn answer(
                             eprintln!(
                                 "lamp-voice second: request {request} chat round {round} failed; the onboarding line's own words are said"
                             );
+                            shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
                             queue.push(words).await?;
                             return Ok(());
                         }

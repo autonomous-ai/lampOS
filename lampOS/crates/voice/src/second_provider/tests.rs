@@ -451,6 +451,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
                 (format!("words_end:{unfinished:?}"), false)
             }
             ProviderOutput::StepCallHeard { request } => (format!("step_call:{request}"), false),
+            ProviderOutput::OwnWordsSaid { request } => (format!("own_words:{request}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -2456,6 +2457,9 @@ async fn an_onboarding_fixed_line_whose_chat_never_begins_is_said_as_it_is() {
         match words {
             Some(words) => {
                 assert_eq!(said, [&format!("said:{words}")], "{labels:?}");
+                // Told as the line's own words, so its completion ends no
+                // refusal (the Reviewer-lead's P2 on #4279).
+                assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
                 assert!(
                     labels.iter().any(|label| label.starts_with("audio:")),
                     "{labels:?}"
@@ -2467,6 +2471,7 @@ async fn an_onboarding_fixed_line_whose_chat_never_begins_is_said_as_it_is() {
             }
             None => {
                 assert!(said.is_empty(), "{labels:?}");
+                assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
                 assert!(
                     !labels.iter().any(|label| label.starts_with("audio:")),
                     "{labels:?}"
@@ -2509,6 +2514,9 @@ async fn an_onboarding_fixed_line_whose_chat_fails_is_said_as_it_is() {
         match words {
             Some(words) => {
                 assert_eq!(said, [&format!("said:{words}")], "{labels:?}");
+                // Told as the line's own words, so its completion ends no
+                // refusal (the Reviewer-lead's P2 on #4279).
+                assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
                 assert!(
                     labels.iter().any(|label| label.starts_with("audio:")),
                     "{labels:?}"
@@ -2520,6 +2528,7 @@ async fn an_onboarding_fixed_line_whose_chat_fails_is_said_as_it_is() {
             }
             None => {
                 assert!(said.is_empty(), "{labels:?}");
+                assert!(!labels.contains(&"own_words:1".to_owned()), "{labels:?}");
                 assert!(
                     !labels.iter().any(|label| label.starts_with("audio:")),
                     "{labels:?}"
