@@ -1513,7 +1513,11 @@ order is kept. A written turn is the same from the chat on.
     (`ProviderInput::Called`), whatever its words. Such a line is never
     held as a short sound, and its answer waits up to `NAME_CARRIES_FOR`
     (2.5 s) after its end, as `OPEN_NAME_WITHIN`'s wait does. A line itself
-    said by a name never waits again.
+    said by a name never waits again. With `LAMP_REST_THROUGH_SOUNDS=on`
+    and Expression naming `resting_through_sounds` (asleep for the night),
+    the name alone, with nothing after it, is held back instead of
+    answered as a call, so the lamp only stirs ([alive.md](alive.md),
+    #4285); a line said by the name is answered as before.
   - **A line begun in that wait is said by the name, only when one person
     said both** (El's P1s on the branch, 22 Oct). Its Start takes the wait
     (`Engine::name_said_before`); `begin` drops the name's request. The

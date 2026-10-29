@@ -15,7 +15,7 @@ mod unplug;
 pub use alive::{
     Alive, BODY_QUIET_US, Breath, DAYTIME_STALE_US, Drift, EYES_QUIET_US, HAND_FRESH_US, LEAN,
     LEAN_IN_US, LEAN_OUT_US, LOOK_UP, LOOK_UP_FACE_US, LOOK_UP_FOR_US, LOOK_UP_IN_US,
-    LOOK_UP_OUT_US, LOOK_UP_TOWARD, RING_BREATH_US, Sleep, Wake, WorkLight,
+    LOOK_UP_OUT_US, LOOK_UP_TOWARD, RESTING_THROUGH_SOUNDS, RING_BREATH_US, Sleep, Wake, WorkLight,
 };
 pub use catalogue::*;
 pub use engine::*;

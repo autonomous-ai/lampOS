@@ -580,6 +580,124 @@ async fn with_the_switch_off_nothing_changes() {
     }
 }
 
+/// `LAMP_REST_THROUGH_SOUNDS=on`, asleep for the night (#4285): B on
+/// lamp-06c1 at 03:20 on 4 Nov, "Lamp." alone, was answered as a call once
+/// its wait was over, and the answer woke the lamp fully, where a bare name
+/// should only stir it. Held back now, with the name carried and without;
+/// a line going on from the name, or begun with it, is still asked, and
+/// awake the name alone is answered as a call, as before.
+#[tokio::test(start_paused = true)]
+async fn asleep_for_the_night_the_lamps_name_alone_is_held_back() {
+    let night = |asleep: bool| -> crate::second_provider::NightRest { Arc::new(move || asleep) };
+    for (name, coordinator_called, carries) in [
+        ("Lamp.", false, true),
+        ("hey, LAMP!", false, true),
+        ("Lamp", true, true),
+        ("Life.", true, true),
+        ("", true, true),
+        ("Lamp.", false, false),
+        ("Lamp.", true, false),
+    ] {
+        let alone = script(&[name]);
+        let judged = Judged::default();
+        let (engine, _) = lamp(&alone, carries, &judged);
+        let mut engine = engine.resting_through_sounds(night(true));
+        say_the_name(&mut engine, coordinator_called, true);
+        tokio::time::sleep(Duration::from_millis(2_400)).await;
+        assert_eq!(
+            turn(&mut engine).await.last().unwrap(),
+            "complete",
+            "{name:?} {carries}"
+        );
+        assert!(asked(&alone).is_empty(), "{name:?} {carries}: answered");
+    }
+    // Going on from the name, within its wait: said by it and asked.
+    let played = script(&["Lamp.", "What time is it?"]);
+    let judged = Judged::default();
+    let (engine, now) = lamp(&played, true, &judged);
+    let mut engine = engine.resting_through_sounds(night(true));
+    say_the_name(&mut engine, false, true);
+    say_after(&mut engine, &now, Duration::from_millis(1_200)).await;
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let asked_once = asked(&played);
+    assert_eq!(asked_once.len(), 1, "the line after the name is asked");
+    assert_eq!(
+        last_words(&asked_once[0]),
+        Some(&Message::user("Lamp. What time is it?"))
+    );
+    // Begun with the name, in one line: asked at once.
+    let asks = script(&["Lamp, what time is it?"]);
+    let judged = Judged::default();
+    let (engine, _) = lamp(&asks, true, &judged);
+    let mut engine = engine.resting_through_sounds(night(true));
+    say_the_name(&mut engine, false, false);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(asked(&asks).len(), 1, "asked at once");
+    turn(&mut engine).await;
+    // Awake (or no such state): the name alone is answered as a call.
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    let alone = script(&["Lamp."]);
+    let judged = Judged::default();
+    let (engine, _) = lamp(&alone, true, &judged);
+    let mut engine = engine.resting_through_sounds(night(false));
+    say_the_name(&mut engine, false, true);
+    tokio::time::sleep(Duration::from_millis(2_400)).await;
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let asked = asked(&alone);
+    assert_eq!(asked.len(), 1);
+    assert!(asked[0].contains(&called), "{:?}", asked[0]);
+}
+
+/// Only Expression's own state naming `resting_through_sounds` says the
+/// night's sleep rests through sounds: not its plain `asleep`, nor another
+/// source's.
+#[test]
+fn only_expressions_state_says_it_rests_through_sounds() {
+    let read = |source: &str, names: &[&str], at_us: u64| {
+        let root = std::env::temp_dir().join(format!(
+            "rest-through-sounds-{}-{source}-{}-{at_us}",
+            std::process::id(),
+            names.len()
+        ));
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut out = bus
+            .publisher(
+                lamp_msgs::ExpressionState::TOPIC,
+                lamp_bus::Kind::Latest,
+                source,
+            )
+            .unwrap();
+        let state = lamp_msgs::ExpressionState {
+            stamp: lamp_msgs::ClockStamp {
+                clock_id: "boot".into(),
+                at_us,
+                sequence: 1,
+            },
+            enabled: true,
+            turn: None,
+            request: None,
+            behaviours: names.iter().map(|name| (*name).to_owned()).collect(),
+            missing: vec![],
+            warnings: vec![],
+            body: true,
+            light: true,
+            asleep: Some(true),
+        };
+        out.publish_json(at_us, &state).unwrap();
+        let message = bus
+            .latest(lamp_msgs::ExpressionState::TOPIC)
+            .unwrap()
+            .unwrap();
+        let _ = std::fs::remove_dir_all(root);
+        crate::second_provider::rests_through_sounds(&message)
+    };
+    let now = lamp_ipc::monotonic_us();
+    let resting = ["asleep", crate::second_provider::RESTING_THROUGH_SOUNDS];
+    assert!(read("expression", &resting, now));
+    assert!(!read("expression", &["asleep"], now));
+    assert!(!read("someone", &resting, now));
+}
+
 /// What counts as the name alone: [`net::key_terms::NAME`] in any case and
 /// with any punctuation, "hey" or "ok" before it at most.
 #[test]
