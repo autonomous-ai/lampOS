@@ -449,8 +449,10 @@ block (`NEAR_ASKER_BLOCKS`), talk whose middle level is more than 6 dB
 (`Interruption::quiet_talk` in `lamp-audio`): the yield resumes at
 stillness or its deadline as one that came to nothing, counted as any
 fruitless yield, and `duplex_resume` gives `under_asker_db`. The asker, or
-anyone about as close, still cuts in at once, and a stop word or a forced
-yield still commits. With no asker's level (a line the lamp began itself,
+anyone about as close, still cuts in at once, and a forced yield still
+commits; a stop word does only with `LAMP_STOP_WORDS` (off in the
+product), so without it a quiet "stop" from farther back resumes the
+answer and a head tap stops it. With no asker's level (a line the lamp began itself,
 one too short to measure, or another turn's), nothing changes. On
 lamp-52e6 on 29 Oct (8474) two people talking with office noise 7 dB under
 the asker cut a long answer within about 40 s (`duplex_commit` 343 ms
