@@ -457,7 +457,10 @@ fn failed_clear_keeps_live_latch_and_blocks_any_later_open() {
     assert!(owner.muted());
     assert!(owner.health().persistence_failed);
     assert!(owner.arm_active().is_err());
-    assert!(MuteRecord::load(&directory.file(), CLOCK, 6_200_000).is_err());
+    // The next start is not refused (#4332): the stray marker reads as muted.
+    let (next, note) = MuteRecord::load_noting(&directory.file(), CLOCK, 6_200_000).unwrap();
+    assert!(next.muted);
+    assert!(note.is_some());
 }
 
 #[test]
@@ -2464,6 +2467,45 @@ fn a_mute_record_from_a_newer_build_restores_muted() {
         serde_json::from_slice(&fs::read(directory.file()).unwrap()).unwrap();
     assert_eq!(saved["muted"], true);
     assert!(saved.get("later").is_none(), "{saved}");
+}
+
+/// #4332, lamp-06c1 on 29 Oct: a plug pulled just after a save leaves the
+/// record's `.pending` marker behind. The voice still starts: a marker that
+/// is the record's own inode is a finished write and the record restores as
+/// it is; any other marker restores muted. Either way the start's own save
+/// works, or `restore` would fail. Linux only, as the live bus tests:
+/// `restore` reads the boot id.
+#[test]
+#[cfg(target_os = "linux")]
+fn a_mute_write_cut_by_a_power_cut_never_stops_the_start() {
+    for own_inode in [true, false] {
+        let directory = Directory::new();
+        let mut record = MuteRecord::new("boot").unwrap();
+        record.clear_after_explicit_user_request(5).unwrap();
+        record.save(&directory.file()).unwrap();
+        let name = directory
+            .file()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let pending = directory.0.join(format!(".{name}.pending"));
+        if own_inode {
+            fs::hard_link(directory.file(), &pending).unwrap();
+        } else {
+            fs::write(&pending, "cut").unwrap();
+        }
+        let options = ControlsOptions {
+            stop: true,
+            mute_record: Some(directory.file()),
+            bus_root: Some(directory.0.join("b")),
+            head_touch: false,
+            wait: false,
+        };
+        let owner = HandControls::restore(&options).unwrap().unwrap();
+        assert_eq!(owner.muted(), !own_inode);
+        assert!(!pending.exists());
+    }
 }
 
 /// #1567, B: with `LAMP_GUARD_NEVER_LISTENED=on`, a run that ends before its
