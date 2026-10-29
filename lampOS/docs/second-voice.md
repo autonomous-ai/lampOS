@@ -3724,7 +3724,11 @@ name is also taken out of the conversation's earlier lines the reply is
 given, the thread and the exchanges alike, each of its words said as
 "(their name)" (`person::without_name`): on lamp-52e6 (29 Oct, two faces in
 view) the rule held the name back 3 times, yet the lamp said it in 2 of
-the answers, from its own earlier ones. Without a name, or off: nothing. `the owner is not named by default: WHY` in the journal when a
+the answers, from its own earlier ones. The faces are counted over the
+eyes' looks of the last 3 s (`known_faces::most_faces_lately`), not their
+newest look alone: in the same run, with two faces in 36 of 37 looks, one
+reply read a look with none and named the owner. Without a name, or off:
+nothing. `the owner is not named by default: WHY` in the journal when a
   sign holds.
 - **A line is a known person's only when their own face was seen speaking
   it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,

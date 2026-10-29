@@ -2204,6 +2204,10 @@ pub fn serve(
                 .as_deref()
                 .and_then(|root| lamp_bus::Bus::new(root).ok());
             let typed = crate::person::from_environment();
+            // The faces counted over the last seconds, not one look.
+            if let Some(bus) = bus.clone() {
+                crate::known_faces::keep_faces_counted(bus);
+            }
             eprintln!(
                 "lamp-voice second: a reply is told the person speaking is most likely the one who set the lamp up, unless someone else is seen or heard now; nothing personal is kept on it (LAMP_PERSON_NAME_BY_DEFAULT; their name {})",
                 if typed.is_some() {
@@ -2260,7 +2264,9 @@ pub fn serve(
                 })
                 .map(|(name, bus)| {
                     let name = name.as_str();
-                    let faces = bus.as_ref().and_then(crate::known_faces::faces_in_view);
+                    let faces = bus
+                        .as_ref()
+                        .and_then(|_| crate::known_faces::most_faces_lately());
                     let known_now = who.as_deref().and_then(crate::known_faces::known_now);
                     let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
                     match crate::person::someone_else_now(name, faces, known_now.as_deref(), another)
