@@ -7487,9 +7487,6 @@ fn conversation_with_gate_inner(
             if refused_hold && model_refusing.observe(&event, monotonic_us(), fixed_line) {
                 outage = Outage::default();
             }
-            if refused_hold && let Some(walk) = onboarding.as_mut() {
-                walk.set_model_refusing(model_refusing.refusing());
-            }
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
             }
@@ -11554,6 +11551,11 @@ fn conversation_with_gate_inner(
                 && unasked_session(&cloud, paused).is_some();
             let face = walk.face_now(clock);
             let still = walk.still_now(clock);
+            // The model service refusing (#4265): the walk begins nothing
+            // while turns are held, so its re-offer is the minute's try.
+            if refused_hold {
+                walk.set_model_refusing(model_refusing.refusing(), model_refusing.holds(clock));
+            }
             let note = walk.tick(
                 clock,
                 clock.saturating_sub(last_turn_us),
@@ -11599,6 +11601,8 @@ fn conversation_with_gate_inner(
                         let bound = (current.owner.boot(), current.owner.turn());
                         if walk.bind_invitation(offer.invitation, bound.0, bound.1) {
                             onboarding_invitation_turn = Some(bound);
+                            // Sent while refusing: the walk's own try (#4265).
+                            model_refusing.tried(monotonic_us());
                             onboarding_invitation_audio = false;
                         }
                     }

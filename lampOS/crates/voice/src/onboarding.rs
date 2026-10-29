@@ -707,8 +707,11 @@ pub struct Onboarding {
     /// [`NUDGE_ENVIRONMENT`].
     nudge: bool,
     /// The model service refusing turns (#4265, `LAMP_SECOND_REFUSED_HOLD`):
-    /// no step is begun, and one that fails meanwhile is held as `later`.
+    /// a step that fails meanwhile is held as `later`.
     model_refusing: bool,
+    /// Turns held while refusing: nothing is begun until the minute's try,
+    /// which is the walk's own re-offer.
+    model_held: bool,
     /// Whether the voice can save a face (`remember_my_face`, the eyes' who
     /// socket set): "who you are" then asks for the face, and is done when it
     /// is saved, not on a name and a yes (#3883's follow-up).
@@ -900,6 +903,7 @@ impl Onboarding {
             body_heard: false,
             nudge: false,
             model_refusing: false,
+            model_held: false,
             face_kept: false,
             released: true,
             near_since: None,
@@ -2228,9 +2232,10 @@ impl Onboarding {
         if !self.storage_idle() {
             return None;
         }
-        // While the model service refuses (#4265), nothing is begun: the
-        // walk waits, unfinished, for a turn answered again.
-        if self.model_refusing {
+        // While the model service refuses (#4265), nothing is begun while
+        // turns are held: once a minute the walk goes on, so its own re-offer
+        // tries the service and the person is never left in silence.
+        if self.model_held {
             return None;
         }
         if can_speak && let Some(note) = self.owed.take() {
@@ -2725,19 +2730,21 @@ impl Onboarding {
         }
     }
 
-    /// Whether the model service refuses turns now (#4265): set by the
-    /// coordinator each loop, only with `LAMP_SECOND_REFUSED_HOLD=on`.
-    pub fn set_model_refusing(&mut self, refusing: bool) {
+    /// Whether the model service refuses turns now, and whether turns are
+    /// held this minute (#4265): set by the coordinator each loop, only with
+    /// `LAMP_SECOND_REFUSED_HOLD=on`.
+    pub fn set_model_refusing(&mut self, refusing: bool, held: bool) {
         self.model_refusing = refusing;
+        self.model_held = refusing && held;
     }
 
     fn finish(&mut self, step: Step, outcome: Outcome, framing: Option<Framing>, now_us: u64) {
         // A step that fails or goes unsaid while the model service refuses
-        // is no answer of the person's (#4265): held as `later`, and offered
-        // again once a turn is answered, never failed on it.
-        let outcome = if self.model_refusing
-            && matches!(outcome, Outcome::Failed | Outcome::NotAvailable)
-        {
+        // is no answer of the person's (#4265): held as `later`, never failed
+        // on it, and offered again by `next_step`'s `later` rules.
+        let held_later =
+            self.model_refusing && matches!(outcome, Outcome::Failed | Outcome::NotAvailable);
+        let outcome = if held_later {
             eprintln!(
                 "lamp-voice: onboarding: {} held as later, not {}: the model service refuses turns",
                 step.name(),
@@ -2765,7 +2772,11 @@ impl Onboarding {
             .filter(|kept| {
                 matches!(outcome, Outcome::Later | Outcome::NotAvailable) && kept.later_offers > 0
             })
-            .map_or(0, |kept| kept.later_offers);
+            .map_or(0, |kept| kept.later_offers)
+            // A re-offer the refusal cut is given back, so the cap counts
+            // only offers the person could answer (Reviewer-three's P3 on
+            // #4279).
+            .saturating_sub(u8::from(held_later));
         let offered_at_unix_s = kept
             .filter(|_| outcome == Outcome::NotAvailable || later_offers > 0)
             .and_then(|kept| kept.offered_at_unix_s);
@@ -5235,40 +5246,53 @@ mod tests {
         assert_eq!(of_who("onboarding_nudge")[0]["name_confirmed"], true);
     }
 
-    // The first builder's P2 on #2526: none of these is a name, so a yes
-    // after it, or the give-up, never ends the step as done.
-    /// #4265: while the model service refuses, a step that would fail is
-    /// held as `later` and the walk begins nothing; answered again, it goes on.
+    /// #4265: while the model service refuses and turns are held, the walk
+    /// begins nothing and the step led isn't failed; once a minute it goes
+    /// on, so its own re-offer is the try, unprompted; a step that would fail
+    /// meanwhile is held as `later`, a re-offer's count given back.
     #[test]
-    fn a_step_failed_while_the_model_service_refuses_is_held_as_later_and_the_walk_waits() {
+    fn a_step_failed_while_the_model_service_refuses_is_held_as_later_and_the_walk_tries_again() {
         let mut room = Room::new("refusing");
         assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
         assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
-        room.walk.set_model_refusing(true);
-        // Nothing begun or asked again, and the step led is not failed.
+        room.walk.set_model_refusing(true, true);
+        // Held: nothing begun or asked again, and the step led not failed.
         assert!(room.wait(300 * S, Some(NEAR_MIDDLE)).is_empty());
         assert_eq!(room.outcome(Step::WhoYouAre), None);
-        // One that ends while refusing is held, never failed or unavailable.
-        for outcome in [Outcome::Failed, Outcome::NotAvailable] {
-            room.walk.finish(Step::Touch, outcome, None, room.at);
-            assert_eq!(
-                room.walk.desired.steps["touch"].outcome,
-                Outcome::Later,
-                "{outcome:?}"
-            );
-        }
-        room.walk.finish(Step::Touch, Outcome::Done, None, room.at);
-        assert_eq!(room.walk.desired.steps["touch"].outcome, Outcome::Done);
-        // Answered again: the step is asked again.
-        room.walk.set_model_refusing(false);
+        // The minute's try: still refusing, the walk asks again by itself.
+        room.walk.set_model_refusing(true, false);
         assert_eq!(
             room.wait(20 * S, Some(NEAR_MIDDLE))
                 .first()
                 .map(String::as_str),
             Some(WHO_NOTE)
         );
+        // One that ends while refusing is held, never failed or unavailable,
+        // and a re-offer it cut is given back.
+        for outcome in [Outcome::Failed, Outcome::NotAvailable] {
+            room.walk.finish(Step::Touch, Outcome::Later, None, room.at);
+            room.walk
+                .desired
+                .steps
+                .get_mut("touch")
+                .unwrap()
+                .later_offers = 1;
+            room.walk.finish(Step::Touch, outcome, None, room.at);
+            let kept = &room.walk.desired.steps["touch"];
+            assert_eq!(kept.outcome, Outcome::Later, "{outcome:?}");
+            assert_eq!(kept.later_offers, 0, "{outcome:?}");
+        }
+        room.walk.finish(Step::Touch, Outcome::Done, None, room.at);
+        assert_eq!(room.walk.desired.steps["touch"].outcome, Outcome::Done);
+        // Not refusing: a failure is a failure.
+        room.walk.set_model_refusing(false, false);
+        room.walk
+            .finish(Step::Touch, Outcome::Failed, None, room.at);
+        assert_eq!(room.walk.desired.steps["touch"].outcome, Outcome::Failed);
     }
 
+    // The first builder's P2 on #2526: none of these is a name, so a yes
+    // after it, or the give-up, never ends the step as done.
     #[test]
     fn a_line_that_is_not_a_name_never_ends_who_you_are() {
         let mut room = Room::new("not-a-name");
