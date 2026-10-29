@@ -2049,7 +2049,22 @@ elif [ "$APP" = "hal" ]; then
     cd "$DIR_TMP" || exit 1
     HAL_LOCK_ARGS=()
     [ ! -f uv.lock ] || HAL_LOCK_ARGS+=(--locked)
-    run_uv_with_activity "$UV_BIN" sync --python 3.12 --extra hardware "${HAL_EXTRA_ARGS[@]}" "${HAL_LOCK_ARGS[@]}" || {
+    hal_uv_sync() {
+      local log rc
+      log=$(mktemp) || return 1
+      run_uv_with_activity "$UV_BIN" sync --python 3.12 --extra hardware "${HAL_EXTRA_ARGS[@]}" "${HAL_LOCK_ARGS[@]}" 2>&1 | tee "$log"
+      rc=${PIPESTATUS[0]}
+      if [ "$rc" -ne 0 ] && grep -qiE 'wheel is invalid|metadata .*(is invalid|not found)|failed to read metadata|failed to unzip|failed to read from the distribution cache' "$log"; then
+        # A damaged cache entry fails every retry. The cache only holds downloads, so drop it and fetch again once.
+        echo "[software-update] uv cache entry is unreadable; clearing $UV_CACHE_DIR and retrying once" >&2
+        "$UV_BIN" cache clean >/dev/null 2>&1 || rm -rf "${UV_CACHE_DIR:?}"/* 2>/dev/null
+        run_uv_with_activity "$UV_BIN" sync --python 3.12 --extra hardware "${HAL_EXTRA_ARGS[@]}" "${HAL_LOCK_ARGS[@]}"
+        rc=$?
+      fi
+      rm -f "$log"
+      return "$rc"
+    }
+    hal_uv_sync || {
       status=$?
       echo "HAL staging failed: uv sync exited $status (uv $("$UV_BIN" --version 2>/dev/null | cli_semver || true) at $UV_BIN, ${HAL_LOCK_ARGS[*]:-no lock}, $(df -Pk "$DIR_TMP" 2>/dev/null | awk 'NR == 2 { print int($4 / 1024) " MiB free" }'))" >&2
       exit 1
