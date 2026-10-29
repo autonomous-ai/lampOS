@@ -1073,7 +1073,7 @@ impl Onboarding {
         self.finish(Step::HowYouSound, outcome, None, now_us);
         self.owed = Some(match outcome {
             Outcome::Done => self.definition.words.sentence_done.clone(),
-            Outcome::Later => self.definition.later_line(),
+            Outcome::Later => self.later_line(Step::HowYouSound),
             _ => self.definition.words.sentence_failed.clone(),
         });
     }
@@ -1258,7 +1258,7 @@ impl Onboarding {
                     "step":Step::HowYouSound.name(),"at_us":now_us}));
             }
             self.invalidate_near();
-            self.led = None;
+            self.drop_led();
             return;
         }
         if self.near.flight.is_some() || self.near.listening.is_some() {

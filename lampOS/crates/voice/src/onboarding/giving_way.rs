@@ -679,7 +679,7 @@ impl Onboarding {
                     "step":Step::GivingWay.name(),"at_us":now_us}));
             }
             self.invalidate_giving();
-            self.led = None;
+            self.drop_led();
             return;
         }
         // Listening for a hand, from the invitation's start.
@@ -776,6 +776,6 @@ fn flow_end(walk: &mut Onboarding, now_us: u64) {
     } else {
         // No push felt in either try: later, said so (#3996).
         walk.finish(Step::GivingWay, Outcome::Later, None, now_us);
-        walk.owed = Some(walk.definition.later_line());
+        walk.owed = Some(walk.later_line(Step::GivingWay));
     }
 }

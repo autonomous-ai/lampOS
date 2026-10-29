@@ -99,7 +99,16 @@ we skipped how you call me. Let's try it now.", the first builder's P2 on
 #4012), then its `reoffer` note, in one go with no yes or no to judge; a file
 without a `later_reoffer` says only the `reoffer`. Its own tries are given back (giving way's two, privacy's
 two invitations, and how you sound's prompts). A re-offer that is tried and
-done is `done`. One left silent again stays `later` with its count. After two
+done is `done`. One left silent again stays `later` with its count and says
+the `later` line; the last one's silent end says instead "That's fine, you can
+redo the setup later. Just ask me to redo the setup." (`skill::LAST_LATER`, in
+code: a new key would be refused by an older build reading the file), since
+it promises no later. A re-offer dropped by the keeper's pause or by nobody
+there for 30 s, with nothing tried in it, is given back
+(`Onboarding::drop_led`, Seventh's P3 4 on #4192): its count goes back to
+what it was, and its date stays the drop's, so it comes back at its usual
+spacing from then (`later_after_s` for the first, `reoffer_after_s` for the
+second), never at once and never spent on an offer nobody had. After two
 re-offers it stays `later` for good, so it never nags. "Redo the setup"
 still redoes everything. **A `later` step counts as not done** in #3530's rows
 and the onboarding quality row. Nobody in front of the lamp for 30 s: the step being led is dropped and

@@ -124,6 +124,11 @@ fn later_after_s() -> u64 {
 pub(crate) const LATER: &str =
     "(Say only this, nothing before or after it: \"No problem, we'll try that one later.\")";
 
+/// What a step says when its last `later` re-offer ends with no attempt:
+/// it is never offered again, so no promise of later. In code, not the
+/// file: a new key would be refused by an older build reading it.
+pub(crate) const LAST_LATER: &str = "(Say only this, nothing before or after it: \"That's fine, you can redo the setup later. Just ask me to redo the setup.\")";
+
 impl Definition {
     /// The line said when a step ends `later` (#3996).
     pub(crate) fn later_line(&self) -> String {
