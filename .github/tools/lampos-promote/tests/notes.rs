@@ -257,6 +257,17 @@ fn on_this_repository_each_listed_switch_has_a_plain_line() {
     let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
     let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
     assert!(page.contains(&format!("\n{PLAIN}\n")));
+    // Each row of the table is exactly two cells: a `|` inside a line would
+    // split it and keep only its start (Second's P3 on #4413).
+    let table = page.split(&format!("\n{PLAIN}\n")).nth(1).unwrap();
+    let table = table.split("\n## ").next().unwrap();
+    for row in table.lines().filter(|line| line.starts_with('|')) {
+        assert_eq!(
+            row.trim().trim_matches('|').split('|').count(),
+            2,
+            "a row of {PLAIN} with other than two cells: {row}"
+        );
+    }
     let on = turned_on(&notes::product_files(&lamp_os).unwrap());
     let missing: Vec<String> = waiting(&page, &on)
         .into_iter()
