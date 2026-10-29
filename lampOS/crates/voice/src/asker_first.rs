@@ -180,6 +180,11 @@ pub enum Judgement {
     Keep(Kept),
 }
 
+/// A level on the face's scale in dBFS: 0 is -48 dBFS, 7.5 to a decibel.
+pub fn level_db(level: u8) -> f32 {
+    -48.0 + f32::from(level) / 7.5
+}
+
 fn median(mut levels: Vec<u8>) -> u8 {
     levels.sort_unstable();
     levels[levels.len() / 2]
@@ -225,6 +230,15 @@ impl AskerFirst {
         self.named = false;
         self.line_us = None;
         level
+    }
+
+    /// The level of `turn`'s asker, the middle of their own speech blocks,
+    /// when it was measured for that turn ([`Self::asked`]); `None` for
+    /// another turn's or none.
+    pub fn level_of(&self, turn: u64) -> Option<u8> {
+        self.asker
+            .filter(|asker| asker.turn == turn)
+            .map(|asker| asker.level)
     }
 
     /// A speech block heard, at `level`, while an answer is awaited with

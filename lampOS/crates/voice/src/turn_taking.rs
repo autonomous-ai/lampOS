@@ -96,6 +96,25 @@ pub fn cut_in_counts_real() -> bool {
         == Some("on")
 }
 
+/// With `LAMP_CUT_IN_NEAR_ASKER=on` (#3967), talk heard in the clear in a
+/// yield commits only if its middle level is no more than this under the
+/// level of the person the lamp is answering (`asker_first`'s middle of
+/// their own line): 6 dB, `asker_first::MARGIN`. Quieter, it is the room
+/// behind them, and the yield resumes ([`Interruption::quiet_talk`]).
+pub const NEAR_ASKER_DB: f32 = 6.0;
+/// Blocks of talk in the clear a yield needs before it is judged against
+/// the asker: as many as commit it (`Confirmation::speech_blocks`).
+pub const NEAR_ASKER_BLOCKS: usize = 6;
+/// The voice's environment switch, with `on`, for [`NEAR_ASKER_DB`]; off
+/// unless set.
+pub const CUT_IN_NEAR_ASKER_ENVIRONMENT: &str = "LAMP_CUT_IN_NEAR_ASKER";
+
+/// Whether the voice's environment says `on` for
+/// [`CUT_IN_NEAR_ASKER_ENVIRONMENT`].
+pub fn cut_in_near_asker() -> bool {
+    std::env::var(CUT_IN_NEAR_ASKER_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
 /// The window is bounded: the consecutive `Over` blocks that made the yield
 /// (its onset run, 7 or 10 blocks) and every block heard while the yield is
@@ -265,6 +284,23 @@ struct Duplex {
     window: YieldEvidence,
     /// See [`PlaybackMask::room_talk`].
     room_talk: bool,
+    /// `LAMP_CUT_IN_NEAR_ASKER=on`: see [`NEAR_ASKER_DB`].
+    near_asker: bool,
+    /// The level of the person the reply answers, in dBFS before
+    /// cancellation, when it is known ([`PlaybackMask::asker_level_db`]).
+    asker_db: Option<f32>,
+    /// The levels of the talk in the clear in the yield in force.
+    yield_clear_db: Vec<f32>,
+    /// How far under the asker the talk of the yield in force, or of the
+    /// last one, was when it was let go as the room's, in dB.
+    under_asker_db: Option<f32>,
+}
+
+/// The middle of nonempty `levels`.
+fn middle_db(levels: &[f32]) -> f32 {
+    let mut sorted = levels.to_vec();
+    sorted.sort_by(f32::total_cmp);
+    sorted[sorted.len() / 2]
 }
 
 impl Duplex {
@@ -359,6 +395,10 @@ impl PlaybackMask {
                 listened_at_us: 0,
                 keeps_listening: false,
                 room_talk: false,
+                near_asker: false,
+                asker_db: None,
+                yield_clear_db: Vec::new(),
+                under_asker_db: None,
                 over_run: 0,
                 counts_real: false,
                 onset: YieldEvidence::default(),
@@ -419,6 +459,28 @@ impl PlaybackMask {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.counts_real = true;
         }
+    }
+    /// `LAMP_CUT_IN_NEAR_ASKER=on` (#3967): talk in the clear in a yield
+    /// commits only when near the level of the person being answered
+    /// ([`NEAR_ASKER_DB`]). Only with ears.
+    pub fn cut_in_near_asker(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.near_asker = true;
+        }
+    }
+    /// The level of the person the reply in hand answers, in dBFS before
+    /// cancellation, or `None` when none is known: a line the lamp began
+    /// itself, one too short to measure, or another turn's. Without it the
+    /// cut-in is judged as without the switch. Set for every block.
+    pub fn asker_level_db(&mut self, level: Option<f32>) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.asker_db = level;
+        }
+    }
+    /// How far under the asker the talk of the latest yield let go as the
+    /// room's was, in dB, for the record.
+    pub fn under_asker_db(&self) -> Option<f32> {
+        self.duplex.as_ref()?.under_asker_db
     }
     /// `LAMP_OWN_LINE_OVER_TALK=on` (#2602): the lamp's own line is sounding
     /// in a room busy as it began, so talk over it is the room's and makes it
@@ -633,7 +695,27 @@ impl PlaybackMask {
                 || !duplex.room_talk && (!fallen || keeps_trying));
         let plain = duplex.hearing.plain(heard, evidence);
         let was_yielded = duplex.interruption.yielded();
+        // The talk in the clear in a yield against the asker (#3967).
+        if !was_yielded {
+            duplex.yield_clear_db.clear();
+        } else if duplex.near_asker && heard == Heard::Clear {
+            duplex
+                .yield_clear_db
+                .push(f32::from(evidence.capture_level.tenths_of_db()) / 10.0);
+        }
+        let under = duplex
+            .asker_db
+            .filter(|_| duplex.near_asker && duplex.yield_clear_db.len() >= NEAR_ASKER_BLOCKS)
+            .map(|asker| asker - middle_db(&duplex.yield_clear_db))
+            .filter(|under| *under > NEAR_ASKER_DB);
+        duplex.interruption.quiet_talk(under.is_some());
+        if under.is_some() {
+            duplex.under_asker_db = under;
+        }
         let step = duplex.interruption.observe(heard, plain, may_yield);
+        if step == Step::Yield {
+            duplex.under_asker_db = None;
+        }
         // The yield's evidence window: its onset run, then every block
         // heard while it is in force, through the one that settles it.
         if was_yielded {
@@ -2120,6 +2202,57 @@ mod tests {
         assert_eq!(steps, [(ONSET + 70, Step::Resume)]);
         assert_eq!(disposition(&mask, ONSET).unwrap(), Disposition::Suppress);
         assert_eq!(mask.duplex_summary(), Some(((1, 0, 1), false)));
+    }
+
+    /// #3967 (`LAMP_CUT_IN_NEAR_ASKER=on`): talk in the clear in a yield
+    /// more than 6 dB under the asker (52e6's office bed, 29 Oct) resumes
+    /// the answer; about as loud as them, or with no asker's level, it
+    /// commits as before; and without the switch nothing changes.
+    #[test]
+    fn talk_well_under_the_asker_is_the_rooms_and_resumes_the_answer() {
+        // The talk at -20 dBFS (`evidence`'s level).
+        let cut_in = |switch: bool, asker: Option<f32>| {
+            let mut mask = PlaybackMask::duplex();
+            if switch {
+                mask.cut_in_near_asker();
+            }
+            mask.assume_matched();
+            mask.asker_level_db(asker);
+            let mut sequence = 1;
+            let mut steps = hear(
+                &mut mask,
+                &mut sequence,
+                ONSET,
+                0.9,
+                &evidence(0, OVER),
+                true,
+            );
+            hear(&mut mask, &mut sequence, 30, 0.1, &evidence(10, None), true);
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                120,
+                0.9,
+                &evidence(40, None),
+                true,
+            ));
+            (
+                steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>(),
+                mask.under_asker_db(),
+            )
+        };
+        // 8 dB under the asker: the room's, resumed at the yield's deadline.
+        let (steps, under) = cut_in(true, Some(-12.0));
+        assert_eq!(steps, [Step::Yield, Step::Resume]);
+        assert!(
+            under.is_some_and(|under| (under - 8.0).abs() < 0.01),
+            "{under:?}"
+        );
+        // 2 dB under: someone as near as the asker, a cut-in.
+        assert_eq!(cut_in(true, Some(-18.0)).0, [Step::Yield, Step::Commit]);
+        // No asker's level known, or the switch off: as before.
+        assert_eq!(cut_in(true, None).0, [Step::Yield, Step::Commit]);
+        assert_eq!(cut_in(false, Some(-12.0)).0, [Step::Yield, Step::Commit]);
     }
 
     #[test]
