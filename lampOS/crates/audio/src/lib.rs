@@ -29,6 +29,7 @@ pub mod replay;
 pub mod steady;
 #[cfg(unix)]
 pub mod testing;
+pub mod underrun;
 
 pub const CAPTURE_RATE: u32 = 16_000;
 pub const RENDER_RATE: u32 = 24_000;
