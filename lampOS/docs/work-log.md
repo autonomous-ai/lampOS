@@ -1,3 +1,17 @@
+## 29 October 2026, 17:00 +07 — the round's mute written down; setup's join pinned at one rejected key; 0c89's wrong-password time in the check
+
+Item 1's rehearsal still waits on a 52e6 slot. Tests (15:20) found 52e6 on 8545, five commits past the builds' base, none in update, setup or the product units, so #4316–4318 stand. 2c follows it.
+
+Landed in train 360: #4344 and #4348.
+- **#4344:** `updates.md`'s step 8 says the round restarts lamp-controls before the voice. A lamp on a build before `1c88f2dbd` can still come back muted once from the round that brings #4280, because the release runs in the old voice. Later rounds are clear of this route, but not of #4332's. El's and Reviewer-three's P3s are taken.
+- **#4348:** a test that one rejected key keeps setup's join waiting. A join at 20 s is kept with no hotspot. One that never joins gets the whole minute and `WrongPassword`. Mutation-checked.
+
+NEXT TRAIN:
+- **#4358** (replaces #4351, which conflicted once #4348 landed under a new SHA; range-diff `=`): the twin test for the app's Wi-Fi change (`wifi_change.rs:285`), and #4348's kept case asserts this join's `psk`. These were three readers' P3s.
+- **#4354:** `setup.md`'s lamp check said a wrong password ends in about 5 s, which is the fake's clock. On 0c89 (Mobile, two runs) the second rejection came at +26 to +27 s and the run ended at +38 s, so the check now says by about 40 s on the lamp and up to about 80 s from the app.
+
+Reads: READ-OK on #4356 (Mobile's owner place), my parts only: the change helper's write and clear, both reset plans and `RESET_PLAN_SHIPPED`'s new SHA (checked against the fixture), and a round carrying the plan. One setup test, #4322's power test, failed once on the full suite. It then passed 60 runs of 60 on lamp-voice and on the PR's head. I guessed at a cause on the PR, found the guess weak on a Mac (posix_spawn has no fork window), and corrected it there. The cause is unknown, and I didn't keep the failed value.
+
 ## 29 October 2026, 09:55 +07 — 2c is (a); item 1's GOOD happened on 52e6 itself; the update's restart mutes voice once
 
 No PR of mine is open.
