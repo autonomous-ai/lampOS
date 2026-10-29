@@ -1,3 +1,17 @@
+## 30 October 2026, 06:30 +07 — the ten lamps' first update may come during their first walk
+
+**What I found:** the customer lamps ship reset (#3530's 4p). At home the person sets up Wi-Fi on 7071, and the 7071 voice starts the walk right away. `serve`'s next round comes within 15 minutes, and it climbs, fetches about 234 MB and switches the voice, guarded only by the 45 s quiet gate. 7071's `voice/state` follows its ring, so a walk waiting silently for the person reads as resting, and a switch can come mid-walk. The voice's `walk` flag (#4367) came tonight, so 7071's voice never sends it.
+
+**What I proposed on #3689 (the first builder's call):** a round holds before it fetches while the walk is under way.
+- **Under way:** setup is done, and the onboarding file lacks an outcome for one of the nine step ids, now in `lamp-msgs` as `ONBOARDING_STEPS`, shared with the voice. No file counts as no walk.
+- **Bounded:** at most 8 rounds held on a lamp, counted in the records, so no clock is needed.
+- **Drafted and gated locally** (lamp-update 738/0, mutation-checked five ways). It's not pushed.
+
+**Also:**
+- Train 389 landed #4440, #4442 and #4443 at their read heads (by patch id).
+- READ-OKs on Tests' #4447 (today's envelope opens on 7071's rules) and #4451 (7071's unit line starts today's updater). For #4451 I checked that the two units' sandboxes are the same.
+- So 2c isn't on the ten lamps' path. I've recommended holding it past the first lamps.
+
 ## 30 October 2026, 05:20 +07 — what a 7071 lamp keeps, read by today's parts
 
 **The question:** Tests' 02:22 run left one thing open for the ten 7071 lamps' first home update: whether the new parts read the data 7071 left. I compared every record in the code, 7071 (`aa9ec9e27a`) against lamp-voice:
