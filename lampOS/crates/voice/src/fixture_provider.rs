@@ -418,7 +418,17 @@ impl FixtureProvider {
             .state()
             .ok_or_else(|| invalid("fixture has no authority"))?;
         let (request, privacy) = match &command {
-            ProviderInput::Start {
+            ProviderInput::FaceQuestion {
+                request,
+                privacy_generation,
+                ..
+            }
+            | ProviderInput::FaceConsentDelivery {
+                request,
+                privacy_generation,
+                ..
+            }
+            | ProviderInput::Start {
                 request,
                 privacy_generation,
                 ..
@@ -478,6 +488,9 @@ impl FixtureProvider {
             .filter(|owner| owner.turn() == request)
             .ok_or_else(|| invalid("fixture input has no matching admitted owner"))?;
         match command {
+            ProviderInput::FaceQuestion { .. } | ProviderInput::FaceConsentDelivery { .. } => {
+                return Err(invalid("face consent requires the real second route"));
+            }
             ProviderInput::Reminder { session, .. } => {
                 if self.input.is_none() && self.reply.is_none() && self.first_owner == Some(owner) {
                     self.first_owner = None;
@@ -786,6 +799,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
+        | ProviderOutput::FaceConsentCandidate { request, .. }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,

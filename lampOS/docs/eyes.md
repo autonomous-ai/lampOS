@@ -1608,15 +1608,31 @@ invalidation discard their enrollment words and identity.
 Voice sends a distinct internal operation on the existing who socket:
 
 ```json
-{"remember_speaker":{"name":"Fixture Speaker","face":"boot/f3","began_us":1000000,"ended_us":3000000,"replace":false,"apart":false}}
+{"remember_speaker_consented":{"name":"Fixture Speaker","face":"boot/f3","began_us":1000000,"ended_us":3000000,"replace":false,"apart":false}}
 ```
 
-The proof is built by Voice, never accepted as model tool arguments. Old
-Eyes refuses this unknown operation; Voice never retries it as a plain
-remember. New Eyes with the switch off also refuses it. With the switch on,
-Eyes refuses legacy live `remember` operations with `speaker_required`, so
-an older Voice cannot silently bypass the check. Photo enrollment retains
-its separate confirmation path.
+The six proof fields are unchanged. Voice constructs this operation only
+once its private runtime admission proves a current explicit request to
+remember, or a current affirmative and own name answering the same face's
+actual face-consent question. A question counts only after its exact typed
+speech was played whole; name questions, queued or cut speech and model
+claims do not supply that authority. No consent words or model-supplied
+consent flag travel to Eyes.
+
+The distinct `remember_speaker_consented` key is also the rolling-upgrade
+boundary. New Eyes never parses the old `remember_speaker` key. With the
+switch on, its real live dispatcher additionally refuses plain live
+`remember` operations with `speaker_required`; an older Voice cannot use
+either old live operation to bypass the new admission. Older Eyes refuses
+the new unknown key, and Voice never retries as either older live operation.
+New Eyes with the switch off refuses the consented operation. The switch-off
+legacy plain-remember behavior and Photo's separate confirmation path remain
+unchanged; this operation does not activate Photo.
+
+The source controls exercise the actual parser/live-admission helper and
+shared guarded-capture constructor, including a local socket exchange and
+People write. These are host protocol/capture controls, not a two-process
+mixed-build or physical classifier acceptance claim.
 
 Eyes reuses its already-computed SFace prints, only when exactly one near
 face is seen speaking in that same look. At most 16 prints, less than

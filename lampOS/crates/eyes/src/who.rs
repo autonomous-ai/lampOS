@@ -1514,16 +1514,30 @@ pub enum Ask {
     Who,
 }
 
+/// Parse the actual live request and apply its feature boundary before any
+/// capture or store work. Photo operations keep their separate admission rules.
+pub fn live_ask_of(line: &[u8], remember_speaker: bool) -> std::result::Result<Ask, &'static str> {
+    let ask = ask_of(line).ok_or("not_understood")?;
+    match ask {
+        Ask::RememberSpeaker(_) if !remember_speaker => Err("not_understood"),
+        Ask::Remember(_) | Ask::RememberOne { .. } if remember_speaker => Err("speaker_required"),
+        ask => Ok(ask),
+    }
+}
+
 pub fn ask_of(line: &[u8]) -> Option<Ask> {
-    // A distinct operation makes older Eyes refuse the guarded request,
-    // rather than silently treating an unknown proof as an ordinary save.
+    // Consent-capable Voice uses a distinct operation. Older Eyes refuse it;
+    // this parser never upgrades the older, pre-consent remember_speaker key.
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Speaker {
-        remember_speaker: crate::remember_speaker::Request,
+        remember_speaker_consented: crate::remember_speaker::Request,
     }
-    if let Ok(Speaker { remember_speaker }) = serde_json::from_slice(line) {
-        return Some(Ask::RememberSpeaker(remember_speaker));
+    if let Ok(Speaker {
+        remember_speaker_consented,
+    }) = serde_json::from_slice(line)
+    {
+        return Some(Ask::RememberSpeaker(remember_speaker_consented));
     }
     // A face from a photo's consent (`--photo-dir`): one of these alone.
     #[derive(Deserialize)]

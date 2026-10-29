@@ -1430,6 +1430,17 @@ fn the_product_sees_who_speaks() {
         // face seen saying it, and without it every one is NOT_THEIRS
         // (#3037, #3038).
         ("lamp-voice.service", "Environment=LAMP_EYES_SPEAKING=on"),
+        // Onboarding must not enroll a nearer bystander under the caller's
+        // name. Both peers require speaking proof; scope and names stay
+        // checked alongside that enrollment boundary.
+        ("lamp-eyes.service", "Environment=LAMP_REMEMBER_SPEAKER=on"),
+        ("lamp-voice.service", "Environment=LAMP_REMEMBER_SPEAKER=on"),
+        (
+            "lamp-voice.service",
+            "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        ),
+        ("lamp-voice.service", "Environment=LAMP_NAMES=checked"),
+        ("lamp-voice.service", "Environment=LAMP_ONBOARDING=on"),
     ] {
         assert!(
             section(unit(name), "Service").contains(&line),

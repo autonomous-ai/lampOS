@@ -127,6 +127,21 @@ pub(crate) fn lower_words(text: &str) -> Vec<String> {
 /// agrees ([`AGREE`]), and nothing anywhere in it that takes it back
 /// ([`DISAGREE`]) but in a yes that holds one ([`AGREE_WITH_A_NO`]).
 /// Refusing a yes costs a turn; keeping a wrong name does not fail safe.
+/// A current reply to a separately proven face question. The invitation
+/// supplies purpose/caller binding; a yes alone never supplies that binding.
+pub(crate) fn face_agreement(said: &str) -> bool {
+    let words = lower_words(said);
+    !said.trim_end().ends_with('?')
+        && agrees(said)
+        && AGREE.iter().any(|phrase| {
+            words
+                .iter()
+                .take(phrase.len())
+                .map(String::as_str)
+                .eq(phrase.iter().copied())
+        })
+}
+
 fn agrees(said: &str) -> bool {
     let words = lower_words(said);
     let phrase_at = |at: usize, phrase: &[&str]| {
@@ -978,6 +993,50 @@ const ASKING_OPENERS: &[&str] = &["can", "could", "would", "will"];
 /// me?"), which asks whether the lamp knows them (the reviewer-lead's P2 on
 /// #3298). English only: [`gives_a_name`], which a forced call needs beside
 /// it, has no Vietnamese forms.
+/// Initial strict enrollment needs an explicit request to save the face,
+/// not merely a request to remember a name or an earlier model suggestion.
+/// The already-checked own-name grammar may precede that direct request.
+pub(crate) fn asks_to_save_face(name: &str, said: &str) -> bool {
+    if !speaker_named_self(name, said)
+        || lower_words(said)
+            .iter()
+            .any(|w| NOT_A_PLAIN_ASK.contains(&w.as_str()) || w.ends_with("n't"))
+    {
+        return false;
+    }
+    explicit_face_save_request(said)
+}
+
+fn explicit_face_save_request(said: &str) -> bool {
+    let face_ask = |part: &str| {
+        asks_to_remember(part)
+            && [
+                &["remember", "my", "face"][..],
+                &["learn", "my", "face"][..],
+                &["save", "my", "face"][..],
+                &["remember", "what", "i", "look", "like"][..],
+            ]
+            .iter()
+            .any(|phrase| {
+                lower_words(part)
+                    .windows(phrase.len())
+                    .any(|words| words.iter().map(String::as_str).eq(phrase.iter().copied()))
+            })
+    };
+    said.split([',', ';']).any(face_ask) || said.split(" and ").any(face_ask)
+}
+
+/// An introduction may offer a question, never a save. A direct request or
+/// refusal already answered that purpose and must not trigger another question.
+pub(crate) fn may_ask_face_consent(said: &str) -> bool {
+    !lower_words(said)
+        .iter()
+        .any(|word| NOT_A_PLAIN_ASK.contains(&word.as_str()) || word.ends_with("n't"))
+        && !asks_to_remember(said)
+        && !explicit_face_save_request(said)
+        && (gives_a_name(said) || crate::onboarding::name_in(said).is_some())
+}
+
 pub fn asks_to_remember(said: &str) -> bool {
     let refused = lower_words(said)
         .iter()
@@ -1023,6 +1082,8 @@ pub fn asks_to_remember(said: &str) -> bool {
 /// #705, 13:43: on 15 October the lamp only said it would remember).
 /// A condition, so that a match that was no name ("I'm Irish.") costs
 /// nothing (the reviewer on #1057).
+pub const CONSENT_NAME_TOLD_NOTE: &str = "A name alone is not consent to save a face. Never call remember_my_face merely for an introduction. Only their current explicit face-save request, or their same-reply yes and own name after the lamp's actual face question, may authorize it. A refusal means it was not saved.";
+
 pub const NAME_TOLD_NOTE: &str = "If they have just told you their own name, call remember_my_face with it now, as they said or spelled it, or if you are not sure of it, say it back and ask them to spell it. Never only say that you will remember it. If what they said was not their name, do nothing about it.";
 
 /// What the model is told when the name is not in what they said.
@@ -1045,6 +1106,11 @@ const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new n
 /// a yes, goes without it and is asked about again (both reviewers' P2 on
 /// #2269).
 const NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Ask them to spell their name, letter by letter, then call this again with the name as they spelled it and apart true.";
+/// [`NEAR_TO`] on the consent-bound path ([`run_scoped`]): the refused
+/// call used up its one-shot consent, so a spelling alone cannot save. The
+/// retry carries its own consent, an explicit face-save request with the
+/// name spelled in the same sentence.
+const CONSENTED_NEAR_TO: &str = "You may have misheard their name. Do not say any name you know. Nothing was saved. If they still want their face remembered, ask them to say \"Remember my face, my name is ...\" and spell their name letter by letter in that same sentence, then call this again with the name as they spelled it and apart true. A spelling alone is not consent.";
 /// What the model is told when the face can't be kept under that name (it
 /// is someone's the lamp knows, and this face isn't near theirs). It says
 /// nothing of who the lamp knows, and no yes changes it (the reviewer's P1
@@ -1080,7 +1146,9 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
     let mut tools = vec![
         Tool {
             name: REMEMBER.into(),
-            description: if checked {
+            description: if switches.remember_speaker {
+                "Only call this when this speaker explicitly asks to save their face, or after they answer the lamp's actual face-consent question with yes and their own name in that same reply. A name alone, a model suggestion, an earlier yes or a yes to another question is not consent. A refusal means no face was saved."
+            } else if checked {
                 "Call this right away when someone tells you their name, or asks you to remember their face \
                  or who they are. It looks at them for a few seconds, so they should face you. Then say in a \
                  few words that you will know them now. Never only say that you will remember a name: this is \
@@ -1320,6 +1388,14 @@ pub fn run_scoped(
     if !speaker_named_self(name, &said.this) {
         return (json!({"error": NOT_OWN_NAME}), true);
     }
+    if !asks_to_save_face(name, &said.this)
+        && !crate::remember_speaker::consent::take(proof, lease.key())
+    {
+        return (
+            json!({"error": "They have not agreed to saving their face, so I have not remembered anyone. Ask the face-consent question and wait for their own yes and name."}),
+            true,
+        );
+    }
     let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
     // No earlier speaker confirmation is proven. Keep the existing
     // replacement check; it conservatively refuses on this scoped path.
@@ -1328,7 +1404,7 @@ pub fn run_scoped(
     }
     let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true)
         && spelled_by_them(name, &said.this);
-    let line = json!({"remember_speaker": {
+    let line = json!({"remember_speaker_consented": {
         "name": name,
         "face": proof.face,
         "began_us": proof.began_us,
@@ -1342,6 +1418,9 @@ pub fn run_scoped(
         // this path cannot prove a later replacement confirmation.
         Some(answer) if answer.get("error").and_then(Value::as_str) == Some("known_as") => {
             (json!({"error": NAME_UNCHANGED}), true)
+        }
+        Some(answer) if answer.get("error").and_then(Value::as_str) == Some("near_to") => {
+            (json!({"error": CONSENTED_NEAR_TO}), true)
         }
         Some(answer) => (told_asking(&answer, switches.visits), true),
         None => (
@@ -1431,6 +1510,9 @@ fn run_switched(
     said: &Said,
     fence: Option<&dyn Fn() -> bool>,
 ) -> (Value, bool) {
+    if switches.remember_speaker && call.name == REMEMBER {
+        return (json!({"error": crate::remember_speaker::NOT_SEEN}), true);
+    }
     let checked = switches.checked;
     let Some(name) = call
         .args

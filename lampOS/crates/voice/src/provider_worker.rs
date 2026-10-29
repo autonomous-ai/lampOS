@@ -689,6 +689,32 @@ fn no_soft_lead(lead_us: &u64) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderInput {
+    /// A trusted, fixed question: no chat model or tool can choose its text.
+    FaceQuestion {
+        request: u64,
+        session: u64,
+        privacy_generation: u64,
+        candidate: crate::remember_speaker::consent::Candidate,
+        voice_boot: [u8; 16],
+    },
+    /// Completion of that exact output owner from actual speaker receipts.
+    /// This is metadata, never fresh input/audio permission.
+    FaceConsentDelivery {
+        request: u64,
+        privacy_generation: u64,
+        candidate: crate::remember_speaker::consent::Candidate,
+        voice_boot: [u8; 16],
+        delivered_us: u64,
+        whole: bool,
+        /// An intervening output, distinct from B's own answer. None is Stop.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by_output: Option<crate::remember_speaker::consent::OutputKey>,
+        /// Reply-window expiry clears an unconsumed invitation only. B's
+        /// timely own grant instead follows its original proof/scope lifetime.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        pending_only: bool,
+    },
+
     Start {
         request: u64,
         /// The connection selected at admission, never replaced at dequeue.
@@ -855,7 +881,9 @@ pub enum ProviderInput {
 impl ProviderInput {
     fn request(&self) -> u64 {
         match self {
-            Self::Start { request, .. }
+            Self::FaceQuestion { request, .. }
+            | Self::FaceConsentDelivery { request, .. }
+            | Self::Start { request, .. }
             | Self::Audio { request, .. }
             | Self::End { request, .. }
             | Self::Called { request, .. }
@@ -869,7 +897,13 @@ impl ProviderInput {
     }
     fn privacy_generation(&self) -> u64 {
         match self {
-            Self::Start {
+            Self::FaceQuestion {
+                privacy_generation, ..
+            }
+            | Self::FaceConsentDelivery {
+                privacy_generation, ..
+            }
+            | Self::Start {
                 privacy_generation, ..
             }
             | Self::Audio {
@@ -915,6 +949,11 @@ pub struct SearchCall {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderOutput {
+    /// Current microphone actor, published only after the raw proof exists.
+    FaceConsentCandidate {
+        request: u64,
+        candidate: crate::remember_speaker::consent::Candidate,
+    },
     Ready {
         setup_us: u64,
     },
@@ -1424,6 +1463,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
+        | ProviderOutput::FaceConsentCandidate { request, .. }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };
@@ -2094,6 +2134,7 @@ async fn serve_with_visual<C: Connect>(
     // With names checked and the eyes there, the request whose given name
     // the model was told to keep.
     let names_told = options.tools.names_checked && options.tools.who.is_some();
+    let names_consent = options.tools.remember_speaker;
     let mut name_told_for: Option<RequestId> = None;
     let mut words_of: Option<(RequestId, String)> = None;
     // When the name was last heard plainly enough to count as a call.
@@ -2423,7 +2464,7 @@ async fn serve_with_visual<C: Connect>(
                     && words_of.as_ref().is_some_and(|(request, words)| {
                         *request == open.request && crate::known_faces::gives_a_name(words)
                     })
-                    && add_note(&provider, &mut intake.handoff.noted, open.request, crate::known_faces::NAME_TOLD_NOTE)
+                    && add_note(&provider, &mut intake.handoff.noted, open.request, if names_consent { crate::known_faces::CONSENT_NAME_TOLD_NOTE } else { crate::known_faces::NAME_TOLD_NOTE })
                         .is_ok()
                 {
                     name_told_for = Some(open.request);
@@ -6034,6 +6075,11 @@ impl InputHandoff {
         input: &impl InputSink,
     ) -> Result<()> {
         self.synchronize(input)?;
+        if matches!(command, ProviderInput::FaceConsentDelivery { .. }) {
+            // No consent state exists on Live. Delayed metadata after a route
+            // or privacy change grants nothing and must not fault that route.
+            return Ok(());
+        }
         let state = self
             .authority
             .ok_or_else(|| io::Error::other("provider has no authority"))?;
@@ -6062,6 +6108,11 @@ impl InputHandoff {
             return Err(io::Error::other("provider input has no matching current owner").into());
         }
         match command {
+            ProviderInput::FaceQuestion { .. } | ProviderInput::FaceConsentDelivery { .. } => {
+                return Err(
+                    io::Error::other("face-consent question requires the second route").into(),
+                );
+            }
             ProviderInput::Reminder {
                 session,
                 text,

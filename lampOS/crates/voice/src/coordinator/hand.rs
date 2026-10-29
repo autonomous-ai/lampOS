@@ -77,6 +77,7 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
+        | ProviderOutput::FaceConsentCandidate { request, .. }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::TurnFailed { request, .. }
         | ProviderOutput::ReminderDeferred { request, .. }
