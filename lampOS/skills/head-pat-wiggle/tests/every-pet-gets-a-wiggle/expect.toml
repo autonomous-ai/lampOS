@@ -1,0 +1,80 @@
+# A pet every 5 s from 20 s to 80 s, each 2 s, the pads free 1.8 s between: a wiggle a second after every one ends, 23 s to 83 s.
+clock = "10:00"
+
+[[expect]]
+at = "23s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "28s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "33s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "38s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "43s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "48s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "53s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "58s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "63s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "68s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "73s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "78s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
+
+[[expect]]
+at = "83s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }

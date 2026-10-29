@@ -17,7 +17,9 @@ check, replaces the written one.
 | Case | What it holds | Result (lamp-skills, #3997) |
 |---|---|---|
 | `a-pet-gets-one-line` | Awake and resting; a pet at 20 s | Pass: one line at 20 s |
-| `at-most-once-a-minute` | Pets at 20 s, 50 s and 90 s | Pass: lines at 20 s and 90 s |
+| `pets-30-s-apart-each-get-a-line` | Pets at 20 s, 50 s and 90 s | Pass: lines at 20 s, 50 s and 90 s |
+| `pets-like-the-lamp-check` | lamp-06c1's pattern: pets at 20 s, 29 s, 57 s and 80 s (+0, +9, +37, +60) | Pass: lines at 20 s, 57 s and 80 s; none 9 s after a line |
+| `petting-every-5-s-for-a-minute` | A pet every 5 s from 20 s to 80 s | Pass: lines at 20, 30, 40, 50, 60, 70 and 80 s: one in 10 s |
 | `a-long-pet-gets-one-line` | One pet going on for 70 s | Pass: one line, at its start (`rearm`) |
 | `never-while-asleep` | Asleep all through, a pet | Pass: nothing |
 | `not-for-the-pet-that-woke-it` | Asleep until 19 s (the kept hand's wake), the pet told apart at 19.2 s; another pet at 90 s | Pass: nothing for the first, a line at 90 s |
@@ -26,7 +28,7 @@ check, replaces the written one.
 | `never-in-quiet-hours` | From 23:00, a pet | Pass: nothing, and nothing kept for the morning |
 | `never-while-it-thinks` | Thinking from 15 s to 30 s, a pet at 20 s | Pass: nothing, and not later |
 | `never-while-it-speaks` | Speaking from 15 s to 30 s, a pet at 20 s | Pass: nothing, and not later |
-| `not-for-a-pet-that-cut-its-words` | Speaking until 19 s, when the pet's touch stopped it; the pet at 20.2 s | Pass: nothing, within 10 s of its words |
+| `not-for-a-pet-that-cut-its-words` | Speaking until 19 s, when the pet's touch stopped it; the pet at 20.2 s | Pass: nothing, within 3 s of its words |
 | `nothing-without-the-switch` | No `controls/pet` at all | Pass: nothing |
 
 Each gate was checked to matter: with its `[[while]]`, `[quiet]`,

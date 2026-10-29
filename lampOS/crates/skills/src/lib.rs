@@ -5033,6 +5033,11 @@ pub struct Engine {
     rest_through_sounds: bool,
     /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709).
     sooner: bool,
+    /// The line each skill last picked from a list of lines, by skill: its
+    /// next pick is one of the others, so a pet twice in a row never gets
+    /// the same words twice (#3997). Behind a lock as [`Engine::still`]
+    /// makes calls from a shared engine; in memory only.
+    picked: std::sync::Mutex<HashMap<String, usize>>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -5224,6 +5229,7 @@ impl Engine {
             dropped: Vec::new(),
             rest_through_sounds: false,
             sooner: false,
+            picked: std::sync::Mutex::default(),
         }
     }
 
@@ -6209,8 +6215,17 @@ impl Engine {
                 .then_some(None)?,
         };
         let run_item = run.from.as_ref().and_then(|(_, item)| item.as_deref());
-        Self::conditions_hold(&self.latest, &self.holding, skill, now_us)
-            .then(|| calls(&self.latest, skill, trigger, now_us, &Value::Null, run_item))
+        Self::conditions_hold(&self.latest, &self.holding, skill, now_us).then(|| {
+            calls(
+                &self.latest,
+                &self.picked,
+                skill,
+                trigger,
+                now_us,
+                &Value::Null,
+                run_item,
+            )
+        })
     }
 
     /// Remember lost eligibility even between trigger-topic publications:
@@ -6480,6 +6495,7 @@ impl Engine {
                             || {
                                 calls(
                                     &self.latest,
+                                    &self.picked,
                                     skill,
                                     Some(trigger),
                                     now_us,
@@ -7182,6 +7198,7 @@ impl Engine {
                     || {
                         calls(
                             &self.latest,
+                            &self.picked,
                             skill,
                             Some(trigger),
                             now_us,
@@ -7291,7 +7308,7 @@ impl Engine {
             )],
             calls: self.told_history(
                 skill,
-                calls(&self.latest, skill, None, now_us, args, None),
+                calls(&self.latest, &self.picked, skill, None, now_us, args, None),
                 now_us,
             ),
             ask: None,
@@ -7504,11 +7521,23 @@ fn pick(now_us: u64, count: usize) -> usize {
     ((now_us.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 32) % count as u64) as usize
 }
 
+/// One of `count` lines, picked from the time as [`pick`] does, but never
+/// `last`, the one picked before: with two or more, one of the others.
+fn next_line(now_us: u64, count: usize, last: Option<usize>) -> usize {
+    match last {
+        Some(last) if count > 1 && last < count => (last + 1 + pick(now_us, count - 1)) % count,
+        _ => pick(now_us, count),
+    }
+}
+
 /// A skill's steps as calls now. The face to look at: the largest in the
 /// newest list of faces that still lasts. With none, the other steps go on.
-/// Only the steps for every trigger and those for `trigger`.
+/// Only the steps for every trigger and those for `trigger`. A list of
+/// lines gives one of them, never the one the skill picked last
+/// ([`next_line`]).
 fn calls(
     latest: &HashMap<String, (Value, u64, Option<u64>)>,
+    picked: &std::sync::Mutex<HashMap<String, usize>>,
     skill: &Skill,
     trigger: Option<&Trigger>,
     now_us: u64,
@@ -7570,7 +7599,14 @@ fn calls(
                 vec![Call::SayFrom(*source, task)]
             }
             Step::Call(other) => vec![other.clone()],
-            Step::Lines(lines) => vec![Call::Words(lines[pick(now_us, lines.len())].clone())],
+            Step::Lines(lines) => {
+                let mut picked = picked
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let line = next_line(now_us, lines.len(), picked.get(&skill.name).copied());
+                picked.insert(skill.name.clone(), line);
+                vec![Call::Words(lines[line].clone())]
+            }
             Step::Gesture { by, again } => {
                 let names: Vec<&String> =
                     match by.iter().find(|(value, _)| Some(value.as_str()) == chosen) {
@@ -8265,6 +8301,23 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_line_never_comes_twice_in_a_row_and_every_line_still_comes() {
+        let mut seen = [0u32; 7];
+        let mut last = None;
+        for at in 0..2_000u64 {
+            let line = next_line(at * 1_234_567, 7, last);
+            assert!(line < 7);
+            assert_ne!(Some(line), last, "the same line twice in a row at {at}");
+            seen[line] += 1;
+            last = Some(line);
+        }
+        assert!(seen.iter().all(|&count| count > 100), "{seen:?}");
+        // One line has no other to pick; a first pick is the time's.
+        assert_eq!(next_line(5, 1, Some(0)), 0);
+        assert_eq!(next_line(5, 7, None), pick(5, 7));
+    }
 
     #[test]
     fn a_change_trigger_requires_bounded_paths_and_compatible_options() {

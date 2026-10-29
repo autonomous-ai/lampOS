@@ -1,0 +1,8 @@
+# A hand pushing the body from 15 s to 30 s, a pet from 20 s: nothing. Another pet from 40 s, the hand gone: a wiggle at 43 s.
+clock = "10:00"
+
+[[expect]]
+at = "43s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }

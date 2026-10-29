@@ -1,0 +1,4 @@
+{"topic": "body/hand", "declaration": {"type": "lamp_msgs/Hand", "version": 1, "kind": "latest"}}
+{"header": {"topic": "body/hand", "kind": "latest", "enc": "json", "type": "lamp_msgs/Hand", "source": "body", "boot": "7c1d2e3f4a5b6c7d", "seq": 1, "at_us": 1, "at_unix_ms": 1792400000000}, "payload_b64": "eyJwdXNoZWQiOmZhbHNlLCJzaW5jZV91cyI6MH0="}
+{"header": {"topic": "body/hand", "kind": "latest", "enc": "json", "type": "lamp_msgs/Hand", "source": "body", "boot": "7c1d2e3f4a5b6c7d", "seq": 2, "at_us": 15000001, "at_unix_ms": 1792400015000}, "payload_b64": "eyJwdXNoZWQiOnRydWUsInNpbmNlX3VzIjowfQ=="}
+{"header": {"topic": "body/hand", "kind": "latest", "enc": "json", "type": "lamp_msgs/Hand", "source": "body", "boot": "7c1d2e3f4a5b6c7d", "seq": 3, "at_us": 30000001, "at_unix_ms": 1792400030000}, "payload_b64": "eyJwdXNoZWQiOmZhbHNlLCJzaW5jZV91cyI6MH0="}

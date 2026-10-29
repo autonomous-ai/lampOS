@@ -1,0 +1,8 @@
+# Onboarding says nothing pending, a pet from 20 s: a wiggle at 23 s.
+clock = "10:00"
+
+[[expect]]
+at = "23s"
+within = "1s"
+call = "body.move"
+args = { move = "pat-wiggle" }
