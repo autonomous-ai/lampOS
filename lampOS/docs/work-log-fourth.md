@@ -1,3 +1,19 @@
+## 2026-10-30 00:4x ICT — #4413, the stable notes in plain words; #4414 read; #4158 still current
+
+**#4413** (Part of #3976, the first builder's 23:4x; NEXT TRAIN):
+- The stable notes' "Built but not on yet" lists each of the 183 switches in a plain line: what a person would notice with it on. The lines come from a new `## In plain words` table in `switches.md`, a separate table because the four switch tables are parsed by position.
+- The names and the rows' words move to a "For developers" fold inside the part. A switch with no line falls back to its row's words.
+- `on_this_repository_each_listed_switch_has_a_plain_line` holds every listed switch to one line (at most 110 characters, no code), and each row of the table to two cells (Second's P3). Red both ways.
+- Four helpers drafted the lines from the rows, and I read all 183. `LAMP_PLACE`'s line was fixed, since asking which area is every lamp's since #4350.
+- Found on the way, for Second: `LAMP_FORGET_ASKED` is on unless set to `off`, yet the notes list it as off on every lamp.
+- READ-OKs from Second and Tests.
+
+**#4414** (Tests' two-promotes rig tests): READ-OK. P3: assert that build 2's fetched-beside folder is pruned after the switch to build 3 (probed: it is).
+
+**#4158**: merges cleanly with lamp-voice `29d4228c7`. On the merge, `known_name` 2/0, `switch_census` 7/0, worker tests 198/0 and `lamp-update --test install` 119/0. It agrees with #4364's by-default name.
+
+No device action. lamp-0c89 (#2836) still waits for access.
+
 ## 2026-10-29 22:5x ICT — #4399 and #4402 landed (#4384's P3s); trains 366–373 checked; 30 GiB freed
 
 **#4399** (train 372): preferences counts an hour word ("two" to "twelve") as the quiet hours only beside a time cue. So "Which two questions?", "Can you repeat the two choices?" and "What, ten?" owe no hello, and "Quiet from ten until I wake up again." still does. The probe lines of all three reads of #4384 are tests. READ-OKs from Reviewer-three and Seventh.
