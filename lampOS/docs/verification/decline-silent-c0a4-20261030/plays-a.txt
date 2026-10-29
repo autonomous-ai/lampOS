@@ -1,0 +1,20 @@
+17:20:53.366 off n=0 voice=aura-2-orion-en call
+17:21:08.935 off n=0 voice=aura-2-orion-en remark1
+17:21:24.491 off n=0 voice=aura-2-orion-en remark2
+17:22:22.781 off n=1 voice=aura-2-luna-en call
+17:22:38.077 off n=1 voice=aura-2-luna-en remark1
+17:22:52.602 off n=1 voice=aura-2-luna-en remark2
+17:23:50.388 off n=2 voice=aura-2-arcas-en call
+17:24:05.423 off n=2 voice=aura-2-arcas-en remark1
+17:24:19.927 off n=2 voice=aura-2-arcas-en remark2
+17:25:17 off PLAY-DONE vol=60
+17:26:20.296 on n=0 voice=aura-2-orion-en call
+17:26:35.826 on n=0 voice=aura-2-orion-en remark1
+17:26:51.379 on n=0 voice=aura-2-orion-en remark2
+17:27:49.180 on n=1 voice=aura-2-luna-en call
+17:28:03.966 on n=1 voice=aura-2-luna-en remark1
+17:28:18.494 on n=1 voice=aura-2-luna-en remark2
+17:29:16.278 on n=2 voice=aura-2-arcas-en call
+17:29:31.327 on n=2 voice=aura-2-arcas-en remark1
+17:29:45.851 on n=2 voice=aura-2-arcas-en remark2
+17:30:43 on PLAY-DONE vol=60

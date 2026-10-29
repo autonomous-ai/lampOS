@@ -1,0 +1,8 @@
+17:35:49.062 on C n=0 voice=aura-2-orion-en call
+17:36:20.579 on C n=0 voice=aura-2-orion-en remark1
+17:36:36.128 on C n=0 voice=aura-2-orion-en remark2
+17:37:39 on C PLAY-DONE vol=60
+17:38:09.322 off C n=0 voice=aura-2-orion-en call
+17:38:40.881 off C n=0 voice=aura-2-orion-en remark1
+17:38:56.448 off C n=0 voice=aura-2-orion-en remark2
+17:39:59 off C PLAY-DONE vol=60
