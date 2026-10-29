@@ -107,6 +107,13 @@ pub const ENVIRONMENT: &str = "LAMP_SAY";
 pub const ADDON_SAY_ENVIRONMENT: &str = "LAMP_ADDON_SAY";
 /// Whether [`ADDON_SAY_ENVIRONMENT`] was `on` when the service started.
 static ADDON_SAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// A dev lamp's switch, off unless `on`: a skill's sound is not held to
+/// one in [`SOUND_EVERY_US`], so a demo can sound as often as it asks; every
+/// other gate stays. Never on a product: there a living thing chimes
+/// rarely.
+pub const EVERY_SOUND_ENVIRONMENT: &str = "LAMP_VOICE_EVERY_SOUND";
+/// Whether [`EVERY_SOUND_ENVIRONMENT`] was `on` when the service started.
+static EVERY_SOUND: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// An add-on's quoted line, at most, as its folder holds it.
 pub const MOST_QUOTED_BYTES: usize = 300;
 /// The socket's path, absolute.
@@ -832,6 +839,13 @@ impl Says {
             std::env::var(ADDON_SAY_ENVIRONMENT).ok().as_deref() == Some("on"),
             std::sync::atomic::Ordering::Relaxed,
         );
+        let every_sound = std::env::var(EVERY_SOUND_ENVIRONMENT).ok().as_deref() == Some("on");
+        if every_sound {
+            eprintln!(
+                "lamp-voice: every skill sound may play, a dev lamp's switch (LAMP_VOICE_EVERY_SOUND=on)"
+            );
+        }
+        EVERY_SOUND.store(every_sound, std::sync::atomic::Ordering::Relaxed);
         let path = std::env::var_os(SOCKET_ENVIRONMENT)
             .map_or_else(|| PathBuf::from(DEFAULT_SOCKET), PathBuf::from);
         let group = match std::env::var(GROUP_ENVIRONMENT) {
@@ -1725,8 +1739,15 @@ pub struct SoundNow {
 
 /// Whether a skill's sound plays now, or why not: only at rest as a say
 /// needs it, [`QUIET_US`] after the last turn, and one sound in
-/// [`SOUND_EVERY_US`]. It never waits for rest.
+/// [`SOUND_EVERY_US`] (lifted on a dev lamp, [`EVERY_SOUND_ENVIRONMENT`]).
+/// It never waits for rest.
 pub fn may_play_sound(now: &SoundNow) -> Result<(), &'static str> {
+    may_play_sound_with(now, EVERY_SOUND.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// [`may_play_sound`], with the dev lamp's switch said: `every_sound` lifts
+/// only the one-in-30-s rarity, never the other gates.
+pub fn may_play_sound_with(now: &SoundNow, every_sound: bool) -> Result<(), &'static str> {
     if now.paused {
         Err("the lamp is paused")
     } else if now.muted {
@@ -1741,9 +1762,10 @@ pub fn may_play_sound(now: &SoundNow) -> Result<(), &'static str> {
         Err("a reminder is said first")
     } else if now.since_turn_us < QUIET_US {
         Err("the lamp spoke a moment ago")
-    } else if now
-        .since_sound_us
-        .is_some_and(|since| since < SOUND_EVERY_US)
+    } else if !every_sound
+        && now
+            .since_sound_us
+            .is_some_and(|since| since < SOUND_EVERY_US)
     {
         Err("a sound played less than 30 s ago")
     } else {
@@ -1896,6 +1918,61 @@ mod tests {
         since_turn_us: QUIET_US,
         since_sound_us: Some(SOUND_EVERY_US),
     };
+
+    /// A dev lamp's `LAMP_VOICE_EVERY_SOUND=on`: a sound a moment after
+    /// another plays; off (the default and the product's), it is held to one
+    /// in 30 s. Every other gate holds either way.
+    #[test]
+    fn every_sound_lifts_only_the_thirty_seconds_on_a_dev_lamp() {
+        let soon = SoundNow {
+            since_sound_us: Some(1_000_000),
+            ..REST
+        };
+        assert_eq!(
+            may_play_sound_with(&soon, false),
+            Err("a sound played less than 30 s ago")
+        );
+        assert_eq!(may_play_sound_with(&soon, true), Ok(()));
+        for (gate, busy) in [
+            (
+                "paused",
+                SoundNow {
+                    paused: true,
+                    ..soon
+                },
+            ),
+            (
+                "muted",
+                SoundNow {
+                    muted: true,
+                    ..soon
+                },
+            ),
+            (
+                "speaking",
+                SoundNow {
+                    speaking: true,
+                    ..soon
+                },
+            ),
+            (
+                "listening",
+                SoundNow {
+                    listening: true,
+                    ..soon
+                },
+            ),
+            (
+                "just spoke",
+                SoundNow {
+                    since_turn_us: 0,
+                    ..soon
+                },
+            ),
+        ] {
+            assert!(may_play_sound_with(&busy, true).is_err(), "{gate}");
+        }
+    }
 
     #[test]
     fn a_sound_plays_only_at_rest_as_a_say_needs_it_and_once_in_30_s() {
