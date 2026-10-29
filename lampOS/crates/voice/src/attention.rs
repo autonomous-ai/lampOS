@@ -1534,7 +1534,10 @@ impl Attention {
         // The line before's sound, when a hearing in it stays with it: not
         // a call, by its words or as a bare call. A hearing at its start is
         // a call however its words were written ("Lamp." heard as "Ramp.",
-        // the reviewer-lead's P2 on `da9a597de`), and goes on too.
+        // the reviewer-lead's P2 on `da9a597de`), and goes on too. That is
+        // the 1.3 s check, so with `LAMP_NAME_START_USUAL` it is dated from
+        // the line before's usual start as the others are; a hearing in its
+        // soft lead is at its start either way (Fourth's P3 on #4286).
         let line_before = (self.name_stays
             && self.request != request
             && !self.called_in_its_words()
