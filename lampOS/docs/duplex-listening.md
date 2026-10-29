@@ -437,6 +437,25 @@ never a line (a television) may cost at most two more fruitless yields
 back as without the switch. `duplex_policy` gives both numbers
 (`keeps_listening`).
 
+**With `LAMP_CUT_IN_NEAR_ASKER=on` (#3967, off unless set), talk well
+under the person being answered is the room's.** Once a yield has
+silenced the lamp, its talk in the clear is compared, before cancellation,
+with the level of the person the reply answers (`asker_first`'s middle of
+their own line, measured with `LAMP_ASKER_FIRST` at `record` or `on`): the
+only place the two can be compared, since over the lamp's own voice the
+canceller takes much of a quiet voice with the echo. From its sixth such
+block (`NEAR_ASKER_BLOCKS`), talk whose middle level is more than 6 dB
+(`NEAR_ASKER_DB`) under the asker commits nothing
+(`Interruption::quiet_talk` in `lamp-audio`): the yield resumes at
+stillness or its deadline as one that came to nothing, counted as any
+fruitless yield, and `duplex_resume` gives `under_asker_db`. The asker, or
+anyone about as close, still cuts in at once, and a stop word or a forced
+yield still commits. With no asker's level (a line the lamp began itself,
+one too short to measure, or another turn's), nothing changes. On
+lamp-52e6 on 29 Oct (8474) two people talking with office noise 7 dB under
+the asker cut a long answer within about 40 s (`duplex_commit` 343 ms
+after its yield, `hearing_margin_db` 3.9).
+
 **With `LAMP_CUT_IN_COUNTS_REAL=on` (#2602, off unless set), only the
 lamp's own voice counts as a fruitless yield.** A resume counts toward
 `FRUITLESS_YIELDS` only when its yield's evidence window points at the
@@ -1315,6 +1334,7 @@ functions:
 | `without_keeps_listening_a_third_line_within_twenty_seconds_is_not_heard` | The switch off: 5 and 19 s after, no yield and no candidate; 21 s after, heard (the forgiven yield) |
 | `with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in` | With the switch: 3,000 blocks of the lamp's own voice, a 25-block word, and 1,000 blocks of voice unexplained before the lamp's sound is found again after a third aside, none a yield |
 | `with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more` | With the switch: four tries that resume cost two more yields, then none |
+| `talk_well_under_the_asker_is_the_rooms_and_resumes_the_answer` (`turn_taking.rs`) | `LAMP_CUT_IN_NEAR_ASKER=on`: talk 8 dB under the asker resumes the answer, 2 dB under commits; no asker's level, or the switch off, commits |
 | `with_counts_real_two_plain_asides_leave_a_third_line_heard` | `LAMP_CUT_IN_COUNTS_REAL=on`: two asides heard plainly, then a third line 5 s after, which commits and ends the story; off, not heard |
 | `with_counts_real_the_lamps_own_voice_twice_still_falls_back` | With the switch: two yields whose windows the render mostly explains count, and a third line 5 s after makes no yield |
 | `with_counts_real_unknown_alone_is_not_the_lamps_own_voice` | With the switch: two yields with plain onsets and 60 `Unknown` blocks after don't count as the lamp's own voice, and the third line commits |
