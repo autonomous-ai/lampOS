@@ -209,9 +209,10 @@ nothing sent. One turn is sent every minute to find the service back. The
 journal says each kind once a refusal, and the voice's health warns with
 the kinds and minutes (`bus_out::model_refusing`). The fault carries no HTTP
 status, so a 400 counts with the other 4xx. Setup waits too
-(`Onboarding::set_model_refusing`): no step is begun, the one being led is
-not failed, and a step that would end failed or not available meanwhile is
-held as `later`, so the walk goes on once a turn is answered. Off unless set.
+(`Onboarding::set_model_refusing`): no step is begun while turns are held,
+the one being led is not failed, and once a minute the walk re-offers it,
+that invitation being the minute's try; a step that would end failed or not
+available meanwhile is held as `later`. Off unless set.
 
 ## Service down: the internet answers, the voice service doesn't (#830)
 
