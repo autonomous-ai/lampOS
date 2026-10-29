@@ -874,7 +874,11 @@ fn wait(
     c: &mut Controller,
     mut predicate: impl FnMut(&OptionalMotor) -> bool,
 ) {
-    let until = crate::scenario_clock::instant() + Duration::from_secs(2);
+    // A watchdog for a child that never gets there, not a bound the product
+    // keeps: on a Mac at load 7 the longest of these waits took 869 ms in a
+    // whole lib run, and four tests crossed the old 2 s with two suites
+    // running at once (#1569, 29 Oct).
+    let until = crate::scenario_clock::instant() + Duration::from_secs(10);
     let mut last = 0;
     let mut last_poll = Instant::now();
     let mut largest_poll_gap = Duration::ZERO;
