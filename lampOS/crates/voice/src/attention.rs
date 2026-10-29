@@ -4764,6 +4764,40 @@ mod tests {
         }
     }
 
+    /// `LAMP_NAME_STAYS_IN_ITS_LINE` with `LAMP_NAME_START_USUAL` (Fourth's
+    /// P3 on #4286): whether a hearing in the line before stays there is the
+    /// 1.3 s check, so it is dated from that line's usual start. A hearing
+    /// in its soft lead is at its start either way and goes on; one 1.45 s
+    /// into its sound, 1.15 s after its usual start, goes on only with the
+    /// usual start, and one past both stays with it.
+    #[test]
+    fn the_line_befores_name_is_at_its_start_by_its_usual_start() {
+        let second = 1_000_000u64;
+        let began = 9 * second;
+        let lead = 300_000;
+        let next_named = |usual: bool, heard_at: u64| {
+            let mut attention = Attention::default();
+            attention.keep_the_name_in_its_line(true);
+            attention.date_the_start_from_the_usual_start(usual);
+            attention.began_at_led(45, 7, began, lead);
+            attention.heard("Can you pass me the charger? The white one.");
+            attention.name_heard_scored(heard_at, 0.92);
+            // The next line begins 0.7 s after the hearing, well inside
+            // `NAME_BEFORE_US`, so only staying keeps it from that line.
+            attention.ended(45, heard_at + 400_000);
+            attention.began_at(46, 7, heard_at + 700_000);
+            attention.named
+        };
+        for usual in [false, true] {
+            assert!(next_named(usual, began + 100_000), "in its lead, {usual}");
+        }
+        assert!(next_named(true, began + 1_450_000), "at its usual start");
+        assert!(!next_named(false, began + 1_450_000), "past its own start");
+        for usual in [false, true] {
+            assert!(!next_named(usual, began + 2_000_000), "past both, {usual}");
+        }
+    }
+
     /// The name is the first thing said, a little before the voice is
     /// sure someone is speaking. It counts for the request that begins
     /// then, and for no later one.
