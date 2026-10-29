@@ -807,12 +807,14 @@ mod tests {
     /// Every unit a build carries for a dev lamp by name (`deploy/lamp-*/`
     /// with its LAMP.md), made from the repository's own folders, leaves
     /// that lamp's round free to take the product's units once it is a
-    /// product install (#3796, #1843): a pinned one has a product unit
-    /// started through `current`, so the round skips it ("skipping pinned",
-    /// crate::round), and one through `current` starts what the product's
-    /// does. Otherwise a lamp of that name, a dev lamp moved onto product
-    /// units or a customer's lamp with the same four last digits, refuses
-    /// every round (lamp-52e6 on 27 Oct).
+    /// product install (#3796, #1843): each is pinned, with a product unit
+    /// of its name started through `current`, so the round skips it
+    /// ("skipping pinned", crate::round). Without a product unit, a lamp of
+    /// that name, a dev lamp moved onto product units or a customer's lamp
+    /// with the same four last digits, refuses every round (lamp-52e6 on 27
+    /// Oct); and one through `current` would be carried in place of the
+    /// product's unit there, with every line of its own (Reviewer-three's P3
+    /// on #4352).
     #[test]
     fn a_dev_lamps_units_never_stop_a_product_install_of_its_name() {
         let folder = tempfile::tempdir().unwrap();
@@ -850,17 +852,15 @@ mod tests {
             let theirs = product
                 .get(unit.unit.as_str())
                 .and_then(|text| unit::linked(text));
-            let ours = unit::linked(&own);
+            let pinned = unit::program(&own);
             assert!(
-                theirs.is_some() && (ours.is_none() || ours == theirs),
-                "{}'s {}: the product's {:?} through current, the lamp's {:?}",
+                theirs.is_some() && pinned.is_some(),
+                "{}'s {}: the product's {:?} through current, the lamp's pinned {:?} (through current {:?})",
                 unit.lamp,
                 unit.unit,
                 theirs,
-                ours.map_or_else(
-                    || format!("{:?}", unit::program(&own)),
-                    |ours| format!("{ours:?}")
-                )
+                pinned,
+                unit::linked(&own)
             );
         }
         // The two dev lamps whose units moved 52e6 back on 27 Oct are read.
