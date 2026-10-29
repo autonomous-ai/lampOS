@@ -15,7 +15,10 @@ it, as before. Woken at night, it sleeps again after the same fifteen
 minutes. A sound the voice only listens to does not wake it. With
 `LAMP_REST_THROUGH_SOUNDS=on`, a sound heard as no words does not start the
 fifteen minutes again either: only words, its name, a push, a touch
-or the lamp speaking do.
+or the lamp speaking do. With the same switch in Expression, the voice
+thinking at a line's end no longer wakes the sleeping lamp either: only
+its own answer does, with a touch and a reminder. Its name stirs it, and
+it settles back if no answer follows.
 
 Turning this skill off is a choice that the lamp not sleep at night: it
 still tells Expression that the night is its own, so Expression does not

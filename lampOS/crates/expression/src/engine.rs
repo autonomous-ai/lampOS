@@ -500,6 +500,18 @@ impl Engine {
         &self.clock_id
     }
 
+    /// `LAMP_REST_THROUGH_SOUNDS=on` (#1672): asleep for the night, the
+    /// voice thinking does not wake the lamp, only its own answer does. Its
+    /// counted name stirs it (the head rises a little) and it settles back
+    /// if no answer comes within 5 s (#4285); a touch and a reminder wake it
+    /// as before.
+    pub fn with_rest_through_sounds(mut self) -> Self {
+        if let Some(life) = &mut self.life {
+            life.sleep_through_thinking();
+        }
+        self
+    }
+
     /// Opt into leased skill scheduling; the default keeps autonomous sleep.
     pub fn with_rest_requests(mut self) -> Self {
         if self.routine.is_some() {
@@ -1012,7 +1024,7 @@ impl Engine {
                 }
                 if activity.speaking {
                     if let Some(life) = &mut self.life {
-                        life.person_speech(activity.stamp.at_us);
+                        life.person_speech(now_us, activity.stamp.at_us);
                     }
                     self.has_speech = true;
                     self.pause_since = None;
