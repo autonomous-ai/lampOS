@@ -74,6 +74,7 @@ mod hand;
 mod holding;
 mod key_refusals;
 mod look_note;
+mod model_refusing;
 mod notices;
 mod open_name;
 mod requested_media;
@@ -5678,6 +5679,10 @@ fn conversation_with_gate_inner(
     let mut asked_in_busy_room: Option<u64> = None;
     let mut busy_answer_since: Option<(u64, u64)> = None;
     let mut key_refusals = key_refusals::KeyRefusals::default();
+    // With `LAMP_SECOND_REFUSED_HOLD=on`: the model service refusing every
+    // turn is said once and held, not failed turn by turn (#4265).
+    let refused_hold = std::env::var(model_refusing::ENVIRONMENT).ok().as_deref() == Some("on");
+    let mut model_refusing = model_refusing::ModelRefusing::default();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
     let mut last_spoke_us: Option<u64> = None;
@@ -7394,6 +7399,10 @@ fn conversation_with_gate_inner(
             }
             observe_provider_output(&mut cloud, reply, &event)?;
             key_refusals.observe(&event, monotonic_us());
+            // Answered again: the next refusal is a new outage, its line owed.
+            if refused_hold && model_refusing.observe(&event, monotonic_us()) {
+                outage = Outage::default();
+            }
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
             }
@@ -9383,11 +9392,11 @@ fn conversation_with_gate_inner(
                         &mut submission_draining,
                         trace,
                     )?;
-                    let Some(provider_session) = cloud
-                        .ready_session()
-                        .filter(|_| provider_control_empty && !submission_draining)
-                    else {
-                        if (offline || service_down) && !cloud.available() {
+                    let held_refused = refused_hold && model_refusing.holds(monotonic_us());
+                    let Some(provider_session) = cloud.ready_session().filter(|_| {
+                        provider_control_empty && !submission_draining && !held_refused
+                    }) else {
+                        if ((offline || service_down) && !cloud.available()) || held_refused {
                             // Heard while offline, or while only the voice
                             // service is down: a turn of its own, never sent.
                             snapshot = commit_offline_input(
@@ -9397,7 +9406,7 @@ fn conversation_with_gate_inner(
                                 &mut provider_queue,
                                 accepted,
                                 rig.playout_start_now(),
-                                service_down && !offline,
+                                (service_down && !offline) || held_refused,
                                 trace,
                                 |state| rig.publish(state),
                             )?;
@@ -9421,6 +9430,9 @@ fn conversation_with_gate_inner(
                     };
                     // Someone is answered: the lamp has shown it is back.
                     back_owed_since = None;
+                    // Sent while refusing: the service is tried, and the
+                    // turns after it held for the time again (#4265).
+                    model_refusing.tried(monotonic_us());
                     // Taking over from the lamp's own answer is cutting in,
                     // and taking over from something that was said is going
                     // on with it. Taking over from a sound is neither.
@@ -10494,7 +10506,7 @@ fn conversation_with_gate_inner(
                 choreography,
                 reply.as_ref().map(|current| current.notice.origin()),
             );
-            choreography.set_offline(offline || service_down);
+            choreography.set_offline(offline || service_down || model_refusing.refusing());
         }
         if let Some(current) = reply
             .as_ref()
@@ -10565,6 +10577,7 @@ fn conversation_with_gate_inner(
             bus.set_could_not_start(controls.as_ref().map_or(0, HandControls::could_not_start));
             bus.set_ring_off(rig.ring.off_for_good());
             bus.set_chat_key_refused(key_refusals.said(clock));
+            bus.set_model_refusing(model_refusing.health(clock));
             bus.report(
                 cloud.available(),
                 cloud.refusal(),
