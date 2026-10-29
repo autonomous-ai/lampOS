@@ -18,7 +18,8 @@ lamp.
 |---|---|
 | The fake lamp, pairing, the SDKs, `lamp-mcp`, `lamp skill check` | merged |
 | `express`: a feeling as the feelings skill's own move and light | merged: #4020 |
-| `look` at `ahead` or an angle, under a body lease | pending: `ten/look` |
+| `look` at `ahead` or an angle, under a body lease | merged: #4247, on a lamp with `--lease-socket` (no product unit passes it yet) |
+| `look` at `face` or `name` | not in this release |
 | lamp-control as a product part, off by default | pending: #3876 |
 | The owner's "Add a developer computer" screen in the app | pending: a later piece of #3504 |
 | `lamp skill check` reading format 2 as the lamp does | merged: #3979 |
@@ -51,8 +52,10 @@ LAMPOS_HOME=/tmp/lampos-try lamp fake
 
 It answers as a lamp does today. `gesture`, `move` and `express` are taken
 (`{"to": "body"}`, and `express` says its move and that it showed the
-light: `{"to": "body", "move": "glad-lift", "light": true}`). `play`, `sound`, `look` and `joints` are refused, in
-lamp-control's own words ("not routed yet: waits for …").
+light: `{"to": "body", "move": "glad-lift", "light": true}`). `play`, `sound` and `joints` are refused, in
+lamp-control's own words ("not routed yet: waits for …"), and `look` with "the
+body's lease socket is not on here", as a product lamp refuses it until its
+unit passes `--lease-socket`.
 `--everything` answers every op instead.
 
 ## 2. Your first program (3 minutes)
@@ -278,8 +281,9 @@ The tools are `lamp_state`, `lamp_wait_for`, `lamp_gesture`, `lamp_light`,
 `lamp_say`, `lamp_look`, `lamp_move`, `lamp_express` and `lamp_stop`. Each
 is offered only with the grant it needs, takes its own short body lease,
 and keeps to the lamp's rates. A refusal comes back as the tool's error,
-in the lamp's words: until `look` lands (above), `lamp_look` is refused
-"not routed yet: waits for the body's lease socket".
+in the lamp's words. `lamp_look` works on a lamp with `--lease-socket` and on
+`lamp fake --everything`; a product lamp refuses it ("the body's lease socket
+is not on here") until its unit passes `--lease-socket`.
 
 ## 5. A skill the lamp runs on its own (2 minutes)
 
