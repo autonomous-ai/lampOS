@@ -2621,7 +2621,14 @@ after a take-over, but now for every turn:
   in Hanoi, keeps `Asia/Ho_Chi_Minh`. Letters in any script, digits,
   spaces, `,` `-` `.` `'`, at most 60 bytes; anything else is no place. It
   reaches the second route's worker alone, whose journal says `lamp-voice
-  second: the lamp's place is … (LAMP_PLACE)`.
+  second: the lamp's place is … (LAMP_PLACE)`. With no place set, as on a
+  product lamp, it is told "You don't know where you are beyond your time
+  zone's city." Either way it is told the area near the person isn't known
+  (`local_time::AREA_ASKED`): for something near them, or a place they name
+  that doesn't sound real, it asks which area before it searches, never
+  picks one, and says where it looked when they didn't say (#4337: on
+  lamp-3e83 on 29 Oct a district speech to text misheard was taken for
+  another, said as fact, kept for the rest of the talk, and searched).
 - **A line let out only as the conversation going on** (with
   `LAMP_SPOKEN_TO` and `not_for_me` offered, `LAMP_TOOLS=on`): no name,
   nobody turned to the lamp, not said close to it, no answer to its own
@@ -4277,7 +4284,10 @@ other word said. It reaches the second route's worker alone
 **A dated search.** The search function's description (`net::search::DESCRIPTION`)
 asks for the month and year the model was told in a query for news,
 results and prices: on lamp-4ace on 19 Oct "Who won the last Formula One
-race?" found last season's.
+race?" found last season's. It also says never to search a guessed place:
+a place that doesn't sound real, or "near me" with no place known, is asked
+about first, and a search near a place the person didn't name says which
+place it used (#4337).
 
 **Through the company relay.** The relay serves Gemini's speech at
 `https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta`
