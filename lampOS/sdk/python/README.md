@@ -11,6 +11,13 @@ It runs on your computer, never on a lamp.
 **Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
 (#3504). Until then, try it with the fake lamp below.
 
+## Changes
+
+- **0.2.0:** `await lamp.get(...)` returns the states asked, by name
+  (`{"presence": {...}, "light": {...}}`), as lamp-control's reply carries them
+  under `state`; 0.1.0 returned the whole reply. A `light` or `mood` the lamp
+  hasn't heard yet is `None`, on the fake lamp too.
+
 ## Install
 
 It isn't on PyPI yet. From a checkout of this repository:

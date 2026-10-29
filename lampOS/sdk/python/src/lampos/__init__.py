@@ -6,4 +6,4 @@ from .errors import LampError, NotPaired, WrongLamp
 from .keys import Keyring, Pairing
 
 __all__ = ["Lamp", "Lease", "Subscription", "LampError", "NotPaired", "WrongLamp", "Keyring", "Pairing", "errors", "schema"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

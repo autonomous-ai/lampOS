@@ -70,7 +70,7 @@ export class FakeLamp {
     this.pings = 0;
     this.leases = new Map();
     this.subscribed = new Map();
-    this.state = { presence: { count: 0, near: 0, facing: false }, light: {}, mood: {}, lamp: { talking: false, paused: false, private: false, asleep: false } };
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false } };
     this.refusals = new Map();
     this.nextLease = 1;
     // The newest light a computer asked for, and until when (the fake's
@@ -122,13 +122,16 @@ export class FakeLamp {
   // person's own (`state.light`: on, colour, level) and `shows`, what the ring
   // draws now. That's the newest light a computer asked for while it lasts,
   // else the person's own. With neither, no `shows`. No pattern.
+  // null with nothing to say, as lamp-control answers before it has heard
+  // light/state or light/drawn. The person's own stands in for light/drawn here,
+  // as the ring publishes both when it draws the person's light.
   lightState() {
     const own = { ...(this.state.light ?? {}) };
     if (this.shown && this.shown.until > this.clock()) own.shows = { ...this.shown.light };
     else if (['on', 'colour', 'level'].some((key) => key in own)) {
       own.shows = Object.fromEntries(['on', 'colour', 'level'].filter((key) => key in own).map((key) => [key, own[key]]));
     }
-    return own;
+    return Object.keys(own).length ? own : null;
   }
 
   // Tell a lease's holder it is `held`, `suspended` or `lost` (and, lost, end it here).

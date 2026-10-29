@@ -12,6 +12,13 @@ computer, never on a lamp. Node 20.11 or later.
 **Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
 (#3504). Until then, try it with the fake lamp below.
 
+## Changes
+
+- **0.2.0:** `await lamp.get(...)` returns the states asked, by name
+  (`{"presence": {...}, "light": {...}}`), as lamp-control's reply carries them
+  under `state`; 0.1.0 returned the whole reply. A `light` or `mood` the lamp
+  hasn't heard yet is `null`, on the fake lamp too.
+
 ## Install
 
 It isn't on npm yet. From a checkout of this repository, in your project:

@@ -1,6 +1,6 @@
 {
   "name": "lampos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Program a lampOS lamp from your own computer: the v1 control protocol (docs/control.md)",
   "type": "module",
   "license": "Apache-2.0",

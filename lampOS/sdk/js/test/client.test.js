@@ -312,7 +312,8 @@ test('the fake light state shows what the ring draws', async () => {
   await withLamp({ grants: ['light'] }, async (lamp, fake) => {
     let now = 100_000;
     fake.clock = () => now;
-    assert.deepEqual(await lamp.get('light'), { light: {} }); // neither: no `shows`
+    // Nothing heard yet: null, as lamp-control answers.
+    assert.deepEqual(await lamp.get('light', 'mood'), { light: null, mood: null });
     const own = { on: true, colour: 'warm', level: 3 };
     fake.state.light = { ...own };
     assert.deepEqual(await lamp.get('light'), { light: { ...own, shows: own } });
