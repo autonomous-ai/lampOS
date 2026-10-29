@@ -677,6 +677,9 @@ pub struct Onboarding {
     led: Option<Led>,
     /// A word owed before the next step: how "where you sit" ended.
     owed: Option<String>,
+    /// A second word owed once [`Self::owed`] is said: how_you_sound's
+    /// `near_failed`, after its sentence's line.
+    owed_after: Option<String>,
     /// "Where you sit"'s intro was handed out by this tick, for the caller
     /// to bind to its turn ([`Self::bind_opener`]).
     opener_said: bool,
@@ -874,6 +877,7 @@ impl Onboarding {
             fixture_storage: None,
             led: None,
             owed: None,
+            owed_after: None,
             opener_said: false,
             opener_turn: None,
             opener_unsaid: 0,
@@ -964,6 +968,7 @@ impl Onboarding {
         self.forget_near();
         self.forget_giving();
         self.owed = None;
+        self.owed_after = None;
         self.gesture = None;
     }
 
@@ -1019,6 +1024,7 @@ impl Onboarding {
             self.erase_on_commit = false;
             self.pending_records.clear();
             self.owed = None;
+            self.owed_after = None;
             self.led = None;
             self.privacy_flow.offer = None;
             self.privacy_flow.attempt = None;
@@ -1567,6 +1573,7 @@ impl Onboarding {
         }
         self.pending_records.retain(|row| row["step"] != "privacy");
         self.owed = None;
+        self.owed_after = None;
         self.privacy_flow.erase_pending = true;
         self.fence_storage();
     }
@@ -2225,6 +2232,7 @@ impl Onboarding {
             return None;
         }
         if can_speak && let Some(note) = self.owed.take() {
+            self.owed = self.owed_after.take();
             return Some(note);
         }
         let Some(step) = self.next_step() else {
@@ -2789,6 +2797,7 @@ impl Onboarding {
         if self.led.as_ref().is_some_and(|led| led.step == step) {
             self.led = None;
             self.owed = None;
+            self.owed_after = None;
         }
         self.finished_recorded = false;
         self.pending_records
@@ -2829,6 +2838,7 @@ impl Onboarding {
                 self.opener_unsaid = 0;
                 self.led = None;
                 self.owed = None;
+                self.owed_after = None;
                 self.finished_recorded = false;
                 self.pending_records.clear();
                 self.pending_records
