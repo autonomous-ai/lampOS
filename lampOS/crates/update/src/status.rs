@@ -46,9 +46,10 @@ pub fn result(outcome: &Outcome, at_unix_ms: u64) -> UpdateResult {
     }
 }
 
-/// [`result`], with when the round began and, for a round that did not
-/// switch, where it stopped: `phase`, the last of [`UpdateStatus::NOW`] it
-/// said, or `models`. Only a name of [`UpdateResult::REASONS`] is given.
+/// [`result`], with when the round began and, for a round that refused,
+/// failed, rolled back, was unreachable or found no quiet moment, where it
+/// stopped: `phase`, the last of [`UpdateStatus::NOW`] it said, or `models`.
+/// Only a name of [`UpdateResult::REASONS`] is given.
 pub fn ended(
     outcome: &Outcome,
     at_unix_ms: u64,
@@ -376,6 +377,18 @@ mod tests {
         let failed = kept().last.unwrap();
         assert_eq!(failed.reason.as_deref(), Some("fetching"));
         assert!(failed.started_at_unix_ms.unwrap() >= began);
+        // A round that ends before its first phase (its lock taken) says
+        // neither, and takes nothing from the round before.
+        telling.ended(&Outcome::Failed("another lamp-update is at work".into()), 9);
+        let locked = kept().last.unwrap();
+        assert_eq!(
+            (
+                locked.outcome.as_str(),
+                locked.reason,
+                locked.started_at_unix_ms
+            ),
+            ("failed", None, None)
+        );
 
         // Said again: a newer value of the same status within a few periods.
         let first = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap().header.seq;

@@ -1192,14 +1192,17 @@ pub struct UpdateResult {
     pub outcome: String,
     pub sequence: Option<u64>,
     pub at_unix_ms: u64,
-    /// For a round that did not switch, a fixed name for where it stopped,
-    /// one of [`UpdateResult::REASONS`]: never the reason's text, which may
-    /// carry paths. None for a round that switched or had nothing to do, and
-    /// for one read back from the records at start (#1683's update alerts).
+    /// For a round that refused, failed, rolled back, was unreachable or
+    /// found no quiet moment, a fixed name for where it stopped, one of
+    /// [`UpdateResult::REASONS`]: never the reason's text, which may carry
+    /// paths. None for a round that switched or had nothing to do, for one
+    /// that ended before its first phase, and for one read back from the
+    /// records at start (#1683's update alerts).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     /// When the round began, its `checking`, in Unix milliseconds. None for
-    /// one read back from the records at start.
+    /// one that ended before its first phase (its lock taken), and for one
+    /// read back from the records at start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub started_at_unix_ms: Option<u64>,
 }
