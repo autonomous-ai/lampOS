@@ -683,6 +683,38 @@ pub fn chat_key_refused(report: lamp_msgs::Diagnostic, refused: bool) -> lamp_ms
     out.with("refused", "key")
 }
 
+/// The voice's report with the model service refusing the lamp's turns
+/// (#4265, `LAMP_SECOND_REFUSED_HOLD`): a warning naming the refusal's
+/// kinds and how long it has lasted, beside what else is said, so the team
+/// hears of it before a person does. `None`, the report as it is.
+pub fn model_refusing(
+    report: lamp_msgs::Diagnostic,
+    refusing: Option<&(String, u64)>,
+) -> lamp_msgs::Diagnostic {
+    use lamp_msgs::{Diagnostic, Level};
+    let Some((kinds, for_us)) = refusing else {
+        return report;
+    };
+    let minutes = for_us / 60_000_000;
+    let said = format!(
+        "the model service refuses this lamp's turns ({kinds}) for {minutes} min; the lamp says so once and tries again every minute"
+    );
+    let message = if report.message.is_empty() {
+        said
+    } else {
+        format!("{said}; {}", report.message)
+    };
+    let level = match report.level {
+        Level::Ok => Level::Warn,
+        level => level,
+    };
+    let mut out = Diagnostic::new(level, SOURCE, &message);
+    out.values = report.values;
+    out.with("model", "refusing")
+        .with("refusing", kinds)
+        .with("refusing_for_s", for_us / 1_000_000)
+}
+
 /// The voice's report with, while `runs` is above 0, that so many runs in a
 /// row failed before they heard anything (#1567): a warning, never that it
 /// is muted, since it is not, and the count as the fact `could_not_start`.
@@ -1033,6 +1065,8 @@ pub struct BusOut {
     /// The light ring faulted and stays off this session (#1620).
     ring_off: bool,
     chat_key_refused: bool,
+    /// The model service refusing turns: its kinds and for how long (#4265).
+    model_refusing: Option<(String, u64)>,
 }
 
 impl BusOut {
@@ -1084,6 +1118,7 @@ impl BusOut {
             could_not_start: 0,
             ring_off: false,
             chat_key_refused: false,
+            model_refusing: None,
         })
     }
 
@@ -1202,9 +1237,12 @@ impl BusOut {
             .map_or(0, |since| now_us.saturating_sub(since));
         let report = ring_off(
             could_not_start(
-                chat_key_refused(
-                    health(link_up, down_for, refusal, mic_at_start),
-                    self.chat_key_refused,
+                model_refusing(
+                    chat_key_refused(
+                        health(link_up, down_for, refusal, mic_at_start),
+                        self.chat_key_refused,
+                    ),
+                    self.model_refusing.as_ref(),
                 ),
                 self.could_not_start,
             ),
@@ -1226,6 +1264,12 @@ impl BusOut {
     /// (#2231): said with each report while it does.
     pub fn set_chat_key_refused(&mut self, refused: bool) {
         self.chat_key_refused = refused;
+    }
+
+    /// The model service refusing this lamp's turns, said with each report
+    /// while it does (#4265).
+    pub fn set_model_refusing(&mut self, refusing: Option<(String, u64)>) {
+        self.model_refusing = refusing;
     }
 
     /// How many runs in a row failed before they heard anything, as the
@@ -1375,6 +1419,32 @@ mod tests {
             health(true, 0, Some(Fault::Authentication), None).level,
             lamp_msgs::Level::Ok
         );
+    }
+
+    /// #4265: the model service refusing is a warning beside the rest,
+    /// with its kinds and minutes, and nothing while it answers.
+    #[test]
+    fn the_model_service_refusing_is_said_with_its_kinds_and_minutes() {
+        let well = health(true, 0, None, None);
+        assert_eq!(model_refusing(well.clone(), None), well);
+        let refusing = model_refusing(well, Some(&("quota".to_owned(), 600_000_000)));
+        assert_eq!(refusing.level, lamp_msgs::Level::Warn);
+        assert!(
+            refusing
+                .message
+                .starts_with("the model service refuses this lamp's turns (quota) for 10 min"),
+            "{}",
+            refusing.message
+        );
+        let has = |key: &str, value: &str| {
+            refusing
+                .values
+                .iter()
+                .any(|fact| fact.key == key && fact.value == value)
+        };
+        assert!(has("model", "refusing") && has("refusing", "quota"));
+        assert!(has("refusing_for_s", "600"));
+        assert!(has("link", "ready"), "what else is said stays");
     }
 
     /// #2231 (the lead on #1711): a key a voice service refuses turn after

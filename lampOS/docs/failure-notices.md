@@ -193,6 +193,20 @@ recordings are reported in `failure_notice_capability` (`offline`,
 `back_online`). The other-language rule needs speech-to-text and does not apply
 with no internet; only the local sound rule does.
 
+## The model service refusing (#4265)
+
+With `LAMP_SECOND_REFUSED_HOLD=on`, a turn that fails because the model
+service refused it or could not be reached (`coordinator/model_refusing.rs`:
+a quota, key or rate refusal, any other 4xx, a 5xx, a refused or timed-out
+connection; never a turn that was only slow) starts a refusal. Until a turn
+is answered again (the model's generation completes), speech is admitted as
+a local-only turn, as in a service-down outage below: the
+`voice_service_unreachable` recording once a refusal, the offline breath,
+nothing sent. One turn is sent every minute to find the service back. The
+journal says each kind once a refusal, and the voice's health warns with
+the kinds and minutes (`bus_out::model_refusing`). The fault carries no HTTP
+status, so a 400 counts with the other 4xx. Off unless set.
+
 ## Service down: the internet answers, the voice service doesn't (#830)
 
 With `LAMP_SERVICE_DOWN_LINE=on`, beside `LAMP_OFFLINE_VOICE=on` and
