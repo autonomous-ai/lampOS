@@ -1,0 +1,10 @@
+14:43:46.054 n=0 voice=aura-2-orion-en pause=0.7 cut
+14:44:08.913 n=1 voice=aura-2-orion-en pause=1.0 cut
+14:44:32.049 n=2 voice=aura-2-luna-en pause=0.7 cut
+14:44:54.209 n=3 voice=aura-2-luna-en pause=1.0 cut
+14:45:16.136 n=4 voice=aura-2-asteria-en pause=0.7 cut
+14:45:39.308 n=5 voice=aura-2-asteria-en pause=1.0 cut
+14:46:02.254 n=6 voice=aura-2-arcas-en pause=0.7 cut
+14:46:24.427 n=7 voice=aura-2-arcas-en pause=1.0 cut
+14:46:46.815 control
+14:47:01 PLAY-DONE vol=70
