@@ -1,3 +1,21 @@
+## 29 October 2026, 22:00 +07 — the stable notes' "Built but not on yet", and NOTES.md beside the build
+
+Item 1's rehearsal won't run tonight (Tests, 21:56: 52e6 runs #4305 from 00:00). I asked the first builder on #3689 at 20:2x whether 2c may be built now as an unready draft, and there's no answer yet. Until there is, no 2c code goes up.
+
+Landed:
+- **#4389 (train 370):** a round's end synced with its folder, and #4376's doc P3s.
+- **#4393 (train 370):** the put-back's line order.
+- **#4400 (train 372),** the first builder's 20:59 ask on #3976:
+  - **The new part:** the stable notes' `### Built but not on yet`, the `switches.md` rows counted `until` or `now` that no product file turns on, read from the units (183 today, folded by table).
+  - **The copy:** the notes kept on the build's release as `NOTES.md`. Not in its body, because `lampos-promote` reads that body as one provenance line, and a later promote of the build would have refused.
+  - **Rust, not Python:** a second binary in `lampos-promote`, since my role file allows no Python.
+  - Third's P3 is taken: cut at a whole word, with no code span left open.
+  - Whether the rows' developer words are right for the notes is still the first builder's question.
+
+Reads: READ-OK on #4370 (Backend2's alerts, update side, on `cc0bacc53c`) and #4397 (Third's `lamp-msgs` lease flake).
+
+A slip of my own while mutation-checking: the file was untracked, so `git checkout` didn't restore it. I restored it from a copy and checked the diff before going on. Since then, mutation copies go to the scratchpad first.
+
 ## 29 October 2026, 20:05 +07 — the update half of the OTA alerts, a failed self-switch made visible, and a round's end made durable
 
 Item 1's rehearsal still waits on a 52e6 slot. 2c follows it.
