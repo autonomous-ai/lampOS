@@ -2409,9 +2409,10 @@ words, and a line not joined with it that kept its start hearing, its own
 words not opening with "Ma'am," (request 13 on a lamp run). The line
 after it is held on the cut line's first word when the hearing at the cut
 line's start is the one at its own start
-(`Attention::start_said_to_a_person`); a cut line of two words or fewer
-needs no comma after the word ("Ma'am could"), a longer one and a whole
-line still do. A line joined with the one it cut short is read on the
+(`Attention::start_said_to_a_person`). In a cut line of two words or
+fewer the word may be bare ("Ma'am could"), but only for the line after
+it: the cut line itself, a longer one and a whole line still need the
+comma. A line joined with the one it cut short is read on the
 joined words. Lamp
 check on c0a4 (28 Oct, a person speaking, turned away): the one "Ma'am, …"
 lamp-name heard as the name (1.00, begun 0.9 s in) was held, the other
