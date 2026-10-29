@@ -1,8 +1,8 @@
 //! The stable notes' "Built but not on yet" part (#3976): which rows are
 //! listed, from what the product turns on, and where the part goes.
 use lampos_promote::notes::{
-    self, DEVELOPERS, HEADING, PLAIN, PLAIN_MOST, Waiting, placed, plain_lines, section, turned_on,
-    waiting,
+    self, DEVELOPERS, HEADING, ON_UNSET, PLAIN, PLAIN_MOST, Waiting, placed, plain_lines, section,
+    turned_on, waiting,
 };
 use std::{collections::BTreeMap, path::Path};
 
@@ -25,6 +25,8 @@ const PAGE: &str = "\
 | LAMP_SOON | `on`; off. Proposed now | — | — | now |
 | LAMP_SAID_ON_BUT_NOT | `on`; off. The cell says on, the units don't | on | on | until |
 | LAMP_SET_OFF | `on`; off. Set to off in a unit | off | off | until |
+| LAMP_BY_DEFAULT | `off` to turn it off; unset, on. On by its code | on (unset) | on (unset) | until |
+| LAMP_OFF_UNSET | `on`; unset, off. Off by its code | — | off (unset) | until |
 
 ## The voice's own flags (`lamp-voice serve`)
 
@@ -87,6 +89,7 @@ fn a_row_counted_until_or_now_that_no_product_file_turns_on_is_listed_once() {
             "LAMP_SOON",
             "LAMP_SAID_ON_BUT_NOT",
             "LAMP_SET_OFF",
+            "LAMP_OFF_UNSET",
             "--flag-off"
         ]
     );
@@ -97,7 +100,7 @@ fn a_rows_words_are_its_first_sentence_after_its_values_and_bounded() {
     let found = waiting(PAGE, &turned_on(&product()));
     assert_eq!(found[0].words, "Answers a person who waits.");
     assert_eq!(found[0].part, "The voice: hearing, turns and the ring");
-    assert_eq!(found[4].part, "The voice's own flags");
+    assert_eq!(found[5].part, "The voice's own flags");
     let long = format!(
         "| LAMP_LONG | `on`; off. {} | — | — | until |",
         "word ".repeat(80)
@@ -130,9 +133,9 @@ fn the_part_says_how_many_and_folds_the_list_by_table() {
     let found = waiting(PAGE, &turned_on(&product()));
     let part = section(&found);
     assert!(part.starts_with(&format!(
-        "{HEADING}\n5 features are in this build but off on every lamp"
+        "{HEADING}\n6 features are in this build but off on every lamp"
     )));
-    assert!(part.contains("<details><summary>The 5, by part</summary>"));
+    assert!(part.contains("<details><summary>The 6, by part</summary>"));
     // Once in the plain list and once in the developers' fold.
     assert_eq!(
         part.matches("**The voice: hearing, turns and the ring**")
@@ -155,6 +158,7 @@ fn the_part_replaces_its_own_or_goes_before_the_developers_and_nothing_else_move
         switch: "LAMP_X".to_owned(),
         words: "X.".to_owned(),
         plain: None,
+        product: None,
     }]);
     let hand = "## lampOS build 8652\n\nThe notes in plain words.\n";
     let developers = format!("{DEVELOPERS}\nMerged since 8600:\n- #1 one\n");
@@ -180,6 +184,29 @@ fn the_part_replaces_its_own_or_goes_before_the_developers_and_nothing_else_move
     // No developers part: at the end; an empty body: the part alone.
     assert_eq!(placed(hand, &part), format!("{hand}\n{part}"));
     assert_eq!(placed("", &part), part);
+}
+
+/// Second on #3976 (30 Oct 02:0x): a switch on by its code's default, which
+/// no product file sets, says so in its "Product unit" cell as exactly
+/// [`ON_UNSET`] and is not listed. Any other "(unset)" cell is read as the
+/// files say.
+#[test]
+fn a_switch_on_by_its_codes_default_is_not_listed() {
+    let found = waiting(PAGE, &turned_on(&product()));
+    assert!(!found.iter().any(|w| w.switch == "LAMP_BY_DEFAULT"));
+    let off = found.iter().find(|w| w.switch == "LAMP_OFF_UNSET").unwrap();
+    assert_eq!(off.product.as_deref(), Some("off (unset)"));
+    // Only the exact cell: another wording is listed as the files say.
+    let page = format!(
+        "## The other parts\n\n| Switch | Values | Product unit | Counted as |\n|---|---|---|---|\n\
+         | LAMP_A | `on`. A | {ON_UNSET} | until |\n\
+         | LAMP_B | `on`. B | on (unset, #1) | until |\n"
+    );
+    let listed: Vec<String> = waiting(&page, &BTreeMap::new())
+        .into_iter()
+        .map(|w| w.switch)
+        .collect();
+    assert_eq!(listed, ["LAMP_B"]);
 }
 
 /// The first builder on #3976 (29 Oct 23:4x): the list says what a person
@@ -247,6 +274,28 @@ fn on_this_repository_each_listed_switch_is_off_in_every_product_file() {
         }
     }
     assert!(!found.iter().any(|w| w.switch == "LAMP_ATTENTION"));
+}
+
+/// The real page: `LAMP_FORGET_ASKED`, on unless set to `off`, is not listed
+/// (Fourth on #4413), and no listed switch's "Product unit" cell says it is
+/// on unset in other words, so a second on-by-default switch can't slip in
+/// (Second on #3976, 30 Oct 02:0x).
+#[test]
+fn on_this_repository_a_switch_on_by_default_is_not_listed() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let found = waiting(&page, &on);
+    assert!(!found.iter().any(|w| w.switch == "LAMP_FORGET_ASKED"));
+    for w in &found {
+        if let Some(product) = w.product.as_deref().filter(|p| p.contains("(unset)")) {
+            assert!(
+                !product.starts_with("on"),
+                "{} is listed, but its Product unit cell says {product:?}: write it as exactly {ON_UNSET:?} if it is on by default",
+                w.switch
+            );
+        }
+    }
 }
 
 /// The real page: every switch the notes list has a plain line in its

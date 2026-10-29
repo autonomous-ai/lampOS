@@ -35,6 +35,13 @@ const TABLES: [(&str, &str); 4] = [
 ];
 /// How a row is counted when it is a feature waiting for its check.
 const WAITING: [&str; 2] = ["until", "now"];
+/// A "Product unit" cell for a switch on by its code's default, which no
+/// product file sets: the one place the notes take the row's cell, since no
+/// file states that default (Second on #3976, 30 Oct 02:0x, for
+/// `LAMP_FORGET_ASKED`). Exactly this, so another wording isn't taken.
+pub const ON_UNSET: &str = "on (unset)";
+/// The column of a switch table that says what the product unit does.
+const PRODUCT_COLUMN: &str = "Product unit";
 /// A value that leaves a switch off.
 const OFF: [&str; 5] = ["", "off", "0", "false", "no"];
 /// One sentence of a row's words at most this long.
@@ -49,6 +56,8 @@ pub struct Waiting {
     pub words: String,
     /// Its line in [`PLAIN`], if the page has one.
     pub plain: Option<String>,
+    /// Its row's "Product unit" cell, if its table has one.
+    pub product: Option<String>,
 }
 
 fn cells(line: &str) -> Vec<&str> {
@@ -160,12 +169,15 @@ pub fn turned_on(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
 }
 
 /// Every row of the page's switch tables counted `until` or `now` whose
-/// switch isn't in `on`, in the page's order, each switch once.
+/// switch isn't in `on`, in the page's order, each switch once. A row whose
+/// "Product unit" cell is exactly [`ON_UNSET`] is on by its code's default,
+/// and is not listed.
 pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
     let plain = plain_lines(page);
     let mut found = Vec::new();
     let mut part = None;
     let mut header = false;
+    let mut product_at = None;
     for line in page.lines() {
         if line.starts_with("## ") {
             part = TABLES
@@ -173,6 +185,7 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
                 .find(|(heading, _)| line.starts_with(heading))
                 .map(|(_, name)| *name);
             header = false;
+            product_at = None;
             continue;
         }
         let Some(part) = part else {
@@ -183,18 +196,23 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
         }
         if !header {
             header = true;
+            product_at = cells(line).iter().position(|cell| *cell == PRODUCT_COLUMN);
             continue;
         }
         let row = cells(line);
         if row.len() < 3 || row[0].starts_with("---") {
             continue;
         }
+        let product = product_at
+            .and_then(|at| row.get(at))
+            .map(|cell| (*cell).to_owned());
         let Some(switch) = switch_of(row[0]) else {
             continue;
         };
         let counted = row.last().copied().unwrap_or_default();
         if !WAITING.contains(&counted)
             || on.contains_key(&switch)
+            || product.as_deref() == Some(ON_UNSET)
             || found.iter().any(|w: &Waiting| w.switch == switch)
         {
             continue;
@@ -204,6 +222,7 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
             plain: plain.get(&switch).cloned(),
             switch,
             words: words_of(row[1]),
+            product,
         });
     }
     found
