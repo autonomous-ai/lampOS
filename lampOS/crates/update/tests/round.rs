@@ -82,6 +82,9 @@ struct FakeChannel {
     unreachable_under: Option<String>,
     /// Every URL asked for, in order.
     fetched: Vec<String>,
+    /// A newer build's envelope, published once the round has read the one
+    /// it serves: a promote that lands while a lamp is mid-round.
+    promoted: Option<Vec<u8>>,
 }
 
 impl Channel for FakeChannel {
@@ -100,7 +103,13 @@ impl Channel for FakeChannel {
             return Err(Fetch::Failed("larger than expected".into()));
         }
         out.write_all(bytes).unwrap();
-        Ok(bytes.len() as u64)
+        let size = bytes.len() as u64;
+        if url == format!("{CHANNEL}{}", manifest::ENVELOPE)
+            && let Some(newer) = self.promoted.take()
+        {
+            self.files.insert(url.to_owned(), newer);
+        }
+        Ok(size)
     }
 }
 
@@ -1309,6 +1318,105 @@ fn no_network_changes_nothing_and_says_so() {
     // Nothing published yet is not an error either.
     let mut lamp = Lamp::new();
     assert_eq!(lamp.round(), Outcome::NothingPublished);
+}
+
+/// Builds 2 and 3, with build 3 promoted once the round has read build 2's
+/// envelope: two promotes in one night (8545 to 8652 at 20:19, then 8670 at
+/// 22:36 on 29 Oct) and a lamp mid-round between them.
+fn promoted_mid_round(lamp: &mut Lamp) {
+    let envelope = format!("{CHANNEL}{}", manifest::ENVELOPE);
+    build_two_parts(lamp, 2);
+    let two = lamp.channel.files[&envelope].clone();
+    build_two_parts(lamp, 3);
+    let three = lamp.channel.files.insert(envelope, two).unwrap();
+    lamp.channel.promoted = Some(three);
+}
+
+fn build_two_parts(lamp: &mut Lamp, sequence: u64) -> Manifest {
+    let controls = if sequence == 2 {
+        "controls 1".to_owned()
+    } else {
+        format!("controls {sequence}")
+    };
+    lamp.publish(
+        sequence,
+        &[
+            ("lamp-voice", &format!("voice {sequence}")),
+            ("lamp-turn-end", &format!("turn-end {sequence}")),
+            ("lamp-body", &format!("body {sequence}")),
+            ("lamp-controls", &controls),
+        ],
+        &[],
+    )
+}
+
+/// What each running part starts, by part: the binary's text.
+fn running(lamp: &Lamp) -> BTreeMap<String, String> {
+    running_binaries(&lamp.root).into_iter().collect()
+}
+
+/// The first builder on 29 Oct (#3997, 23:4x): a lamp that has fetched one
+/// build and waits for its quiet moment when the channel moves on finishes
+/// the round it began, with the envelope it read, and takes the newer build
+/// at the next round. It never mixes the two builds' parts: a round reads
+/// the envelope once (`look`), and each build's files sit under its own
+/// signed `files_url`.
+#[test]
+fn a_build_promoted_while_a_round_waits_is_taken_whole_by_the_next_round() {
+    let mut lamp = Lamp::new();
+    promoted_mid_round(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let parts = running(&lamp);
+    assert_eq!(parts["lamp-voice.service"], "voice 2");
+    assert_eq!(parts["lamp-body.service"], "body 2");
+    assert_eq!(parts["lamp-controls.service"], "controls 1");
+    assert!(
+        !lamp
+            .channel
+            .fetched
+            .iter()
+            .any(|url| url.starts_with("https://channel.test/build-3/")),
+        "{:?}",
+        lamp.channel.fetched
+    );
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    let parts = running(&lamp);
+    assert_eq!(parts["lamp-voice.service"], "voice 3");
+    assert_eq!(parts["lamp-body.service"], "body 3");
+    assert_eq!(parts["lamp-controls.service"], "controls 3");
+    assert_eq!(lamp.state()["installed"]["sequence"], 3);
+}
+
+/// The same, when the round's wait finds no quiet moment: nothing is
+/// switched, and the next round starts over from the newer envelope and
+/// takes build 3 whole, never build 2's parts beside it.
+#[test]
+fn a_round_with_no_quiet_moment_starts_over_on_the_build_promoted_meanwhile() {
+    let mut lamp = Lamp::new();
+    promoted_mid_round(&mut lamp);
+    lamp.talking = Some(Box::new(|at| at % 30_000 == 0));
+    lamp.config.quiet_wait = Duration::from_secs(300);
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::NotQuiet(why) if why.contains("someone was heard")),
+        "{outcome:?}"
+    );
+    let parts = running(&lamp);
+    assert_eq!(parts["lamp-voice.service"], "voice 1");
+    assert_eq!(parts["lamp-body.service"], "body 1");
+    // Mid-round when the channel moved: build 2 was fetched beside.
+    let two = sha("voice 2");
+    assert!(lamp.exists(&format!("/opt/lampOS/releases/{two}/lamp-voice")));
+
+    lamp.talking = Some(Box::new(|_| false));
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    let parts = running(&lamp);
+    assert_eq!(parts["lamp-voice.service"], "voice 3");
+    assert_eq!(parts["lamp-body.service"], "body 3");
+    assert_eq!(parts["lamp-controls.service"], "controls 3");
+    assert_eq!(lamp.state()["installed"]["sequence"], 3);
 }
 
 #[test]
