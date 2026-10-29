@@ -378,6 +378,27 @@ pub struct Progress {
     /// the count: nothing of the sentence is kept.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub sentence_prompts: u8,
+    /// The near-call prompt counted in `near_call_prompts` whose invitation
+    /// has not played yet (#3754): 0 once its first audio reached the
+    /// speaker, or with none offered. A voice that starts and finds it still
+    /// the count gives it back ([`Progress::give_unheard_back`]): a restart
+    /// between the offer and its first audio never spends a prompt. An older
+    /// voice ignores it and counts the prompt, as it always did.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub near_call_unheard: u8,
+    /// [`Self::near_call_unheard`], for the sentence part's prompts.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub sentence_unheard: u8,
+    /// A near-call prompt was given back this setup/redo
+    /// ([`Progress::give_unheard_back`]): it is given back at most once per
+    /// part, so an invitation that itself stops the voice is counted on the
+    /// second restart and the step still ends, instead of a restart loop
+    /// (Fourth's P2 on #4446). An older voice ignores it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub near_call_given_back: bool,
+    /// [`Self::near_call_given_back`], for the sentence part.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sentence_given_back: bool,
     /// The name `remember_my_face` saved with the face that ended "who you
     /// are" (#4118, lamp-29e7): the owner, named by default
     /// (`LAMP_PERSON_NAME_BY_DEFAULT`) on a lamp set up by voice, which has no
@@ -495,6 +516,34 @@ mod steps_file {
 }
 
 impl Progress {
+    /// As a voice starts (#3754): a how_you_sound prompt counted but whose
+    /// invitation never played (the voice stopped between its offer and its
+    /// first audio) is given back, so the next offer asks it again with the
+    /// same number. Only while the step has no outcome, only a prompt
+    /// with no try of its own, and only once per part per setup/redo (a
+    /// second restart before first audio counts it); the marks are cleared
+    /// either way.
+    pub(crate) fn give_unheard_back(&mut self) {
+        let open = !self.steps.contains_key(Step::HowYouSound.name());
+        let (near, sentence) = (
+            std::mem::take(&mut self.near_call_unheard),
+            std::mem::take(&mut self.sentence_unheard),
+        );
+        if open
+            && !self.near_call_given_back
+            && near != 0
+            && near == self.near_call_prompts
+            && self.near_call_tries.len() < usize::from(near)
+        {
+            self.near_call_prompts = near - 1;
+            self.near_call_given_back = true;
+        }
+        if open && !self.sentence_given_back && sentence != 0 && sentence == self.sentence_prompts {
+            self.sentence_prompts = sentence - 1;
+            self.sentence_given_back = true;
+        }
+    }
+
     /// The storage executor accepts only the bounded onboarding schema.
     pub(crate) fn check(&self) -> io::Result<()> {
         let invalid = || io::Error::new(io::ErrorKind::InvalidData, "invalid onboarding progress");
@@ -706,6 +755,8 @@ pub struct Onboarding {
     committed: Progress,
     storage: storage::Client,
     initialized: bool,
+    /// The progress was first loaded in this voice cycle ([`Progress::give_unheard_back`]).
+    started: bool,
     storage_epoch: u64,
     storage_busy: bool,
     storage_failed: bool,
@@ -923,6 +974,7 @@ impl Onboarding {
             committed: Progress::default(),
             storage,
             initialized: false,
+            started: false,
             storage_epoch: 0,
             storage_busy: true,
             storage_failed: false,
@@ -1108,6 +1160,12 @@ impl Onboarding {
                 return;
             };
             self.desired = progress.clone();
+            // Only as this voice cycle starts, never after a fence in it:
+            // a prompt it offered stays its own to give back (#3754).
+            if !std::mem::replace(&mut self.started, true) {
+                self.desired.give_unheard_back();
+            }
+            self.dirty = self.desired != progress;
             self.committed = progress;
             self.storage_epoch = snapshot.epoch;
             self.initialized = true;
@@ -1931,6 +1989,13 @@ impl Onboarding {
             self.desired.opened = true;
             self.save();
         }
+    }
+
+    /// The bound invitation's first audio reached the speaker
+    /// (`latch_invitation_sounded`): only now is a how_you_sound prompt
+    /// counted for good (#3754). Called on every poll while it is latched.
+    pub(crate) fn invitation_sounded(&mut self, voice_boot: BootId, turn: u64) {
+        self.near_invitation_sounded(voice_boot, turn);
     }
 
     pub(crate) fn invitation_refused(&mut self, token: u64, now_us: u64) {
@@ -2931,6 +2996,10 @@ impl Onboarding {
                 self.desired.near_call_tries.clear();
                 self.desired.near_call_prompts = 0;
                 self.desired.sentence_prompts = 0;
+                self.desired.near_call_unheard = 0;
+                self.desired.sentence_unheard = 0;
+                self.desired.near_call_given_back = false;
+                self.desired.sentence_given_back = false;
                 // The whole step again, from its call part: the part is
                 // chosen by whether the name part ended (`near.named`),
                 // which a silent first walk left failed in this process, so
@@ -3088,6 +3157,10 @@ impl Onboarding {
                 self.desired.near_call_prompts = 0;
                 self.desired.near_call_tries.clear();
                 self.desired.sentence_prompts = 0;
+                self.desired.near_call_unheard = 0;
+                self.desired.sentence_unheard = 0;
+                self.desired.near_call_given_back = false;
+                self.desired.sentence_given_back = false;
             }
             Step::GivingWay => {
                 self.redo_giving();

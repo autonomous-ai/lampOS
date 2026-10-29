@@ -703,6 +703,27 @@ asked for by the same core skill (a step it does not know, from a newer voice,
 is read as `unknown` and its token still asked for: the say service decides), and only the prompt's complete playback opens
 a try. A prompt counts once its budget commit lands, before it is published;
 one dropped before the model took it (nobody there, the pause) is given back.
+It counts across a restart only once its invitation was heard (#3754): the
+commit marks it unheard (`near_call_unheard`, `sentence_unheard` in the
+progress file, the prompt's number), and the mark is cleared when its first
+audio reaches the speaker (the coordinator's latch, #3831) or its turn ends
+said. A voice that starts and finds the mark still on the count gives that
+prompt back, so the next offer is the same prompt number
+(`Progress::give_unheard_back`, only on the voice cycle's first load, never
+after a fence). On lamp-06c1 (30 Oct 04:42, stable 8670) the voice exited
+right after prompt 2 was handed over (`say: dropped (runtime_failed)`, no
+first audio), the next voice asked prompt 3 with one try made, and the name
+part failed one prompt early. In a running voice nothing changes: an unsaid
+prompt is given back there as before. An older voice reads past the marks
+and counts the prompt. A prompt is given back at most once per part per
+setup or redo (`near_call_given_back`, `sentence_given_back`, cleared with
+the counts on a redo), so an invitation that itself stops the voice is
+counted on the second restart and the step still ends, instead of looping
+until systemd stops restarting the voice. Tests:
+`a_restart_before_a_prompts_first_audio_leaves_that_prompt_owed`,
+`a_prompt_whose_first_audio_played_stays_counted_across_a_restart`,
+`a_second_restart_before_first_audio_counts_the_prompt`,
+`a_second_restart_before_a_sentence_prompts_first_audio_counts_it`.
 One cut before it played whole (someone spoke over it: an office's voices, or
 the person answering early, as on lamp-52e6's row 10, try 1), or answered
 over its last word (below), is offered again with its own number and spends
