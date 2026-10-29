@@ -2020,6 +2020,74 @@ pub fn faces_in_view(bus: &lamp_bus::Bus) -> Option<usize> {
         .map(|faces| faces.faces.len())
 }
 
+/// How far back [`most_faces_lately`] looks: one look that missed a face
+/// (lamp-52e6, 29 Oct 13:03: two faces in 36 of 37 looks, and the reply
+/// read the one with none) never makes two people one.
+pub const FACES_WITHIN: Duration = Duration::from_secs(3);
+
+/// How often [`keep_faces_counted`] reads the eyes' newest look: they look
+/// about four times a second.
+pub const FACES_EVERY: Duration = Duration::from_millis(100);
+
+/// The eyes' face counts of the last [`FACES_WITHIN`], as [`faces_in_view`]
+/// read them.
+#[derive(Debug, Default)]
+pub struct FacesLately(std::collections::VecDeque<(std::time::Instant, usize)>);
+
+impl FacesLately {
+    pub fn seen(&mut self, at: std::time::Instant, faces: usize) {
+        self.0.push_back((at, faces));
+        self.forget_before(at);
+    }
+
+    /// The most faces of any look within [`FACES_WITHIN`] of `now`, `None`
+    /// with no look in it.
+    pub fn most(&mut self, now: std::time::Instant) -> Option<usize> {
+        self.forget_before(now);
+        self.0.iter().map(|(_, faces)| *faces).max()
+    }
+
+    fn forget_before(&mut self, now: std::time::Instant) {
+        while self
+            .0
+            .front()
+            .is_some_and(|(at, _)| now.saturating_duration_since(*at) > FACES_WITHIN)
+        {
+            self.0.pop_front();
+        }
+    }
+}
+
+static FACES_LATELY: std::sync::Mutex<FacesLately> =
+    std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new()));
+
+/// Read the eyes' newest look every [`FACES_EVERY`] into
+/// [`most_faces_lately`], on a thread of its own.
+// ponytail: polls `latest`, so a look between two reads can be missed; a
+// bus subscriber if that ever matters.
+pub fn keep_faces_counted(bus: lamp_bus::Bus) {
+    std::thread::spawn(move || {
+        loop {
+            if let Some(faces) = faces_in_view(&bus) {
+                FACES_LATELY
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .seen(std::time::Instant::now(), faces);
+            }
+            std::thread::sleep(FACES_EVERY);
+        }
+    });
+}
+
+/// The most faces in any of the eyes' looks of the last [`FACES_WITHIN`]
+/// ([`keep_faces_counted`]), `None` with none in it.
+pub fn most_faces_lately() -> Option<usize> {
+    FACES_LATELY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .most(std::time::Instant::now())
+}
+
 /// [`known_now`] for the eyes the environment names.
 pub fn known_from_environment() -> Option<String> {
     let socket = std::env::var_os(ENVIRONMENT)?;
@@ -2858,6 +2926,22 @@ mod tests {
         std::fs::remove_file(&mailbox).unwrap();
         refresh_owner(Some(&file), Some(&socket.with_file_name("none.sock")));
         assert_eq!(told(), "");
+    }
+
+    /// lamp-52e6, 29 Oct 13:03: one look that missed a face among two in
+    /// view never makes them one; the owner looking away is still none.
+    #[test]
+    fn the_most_faces_of_the_last_seconds_count_not_one_look() {
+        let at = std::time::Instant::now();
+        let mut lately = FacesLately::default();
+        assert_eq!(lately.most(at), None);
+        lately.seen(at, 2);
+        lately.seen(at + Duration::from_millis(250), 0);
+        assert_eq!(lately.most(at + Duration::from_millis(300)), Some(2));
+        // Past the window: the newest looks alone.
+        lately.seen(at + Duration::from_secs(4), 0);
+        assert_eq!(lately.most(at + Duration::from_secs(4)), Some(0));
+        assert_eq!(lately.most(at + Duration::from_secs(8)), None);
     }
 
     /// The eyes stand-in on a real socket: what each request sent, and the
