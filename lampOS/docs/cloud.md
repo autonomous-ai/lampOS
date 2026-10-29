@@ -1208,15 +1208,21 @@ untouched.
 
 **Off unless set,** by the same three gates as the reports: `LAMP_CLOUD=on`,
 `LAMP_REPORTS=on`, and the person's yes, read at each send through the
-reports' own reading. A stage seen while any gate is closed is dropped, not
-kept for later.
+reports' own reading. Nothing is sent or retried without them, and a stage
+seen while any gate is closed is dropped, not kept for later. The small
+file below is kept either way: it holds no personal data (outcomes, builds
+and times) and is what stops a stage seen before the yes being sent after
+it.
 
 **One alert per stage of a round,** from `update/status`: `started` (the
 first phase after `idle` that goes on to fetch; a round that only checks
 says nothing), then `done` (`switched`), `failed`, `refused`, `rolled-back`
 or `self-switched` (lamp-update switched itself; its new self confirms on
-its next round). `up-to-date`, `unreachable`, `nothing-published`,
-`not-quiet` and `would` are not alerts. The message is a fixed template:
+its next round). A round whose `started` was told and that ends with
+nothing switched (`not-quiet`, `unreachable`, `would`, `up-to-date`,
+`nothing-published`) ends as `not-switched`, with `code:` the outcome's
+own name (`other` for a name not known), so no start is left without an
+end. Those outcomes in a round with no `started` told are not alerts. The message is a fixed template:
 
 ```
 Software update lamp - done
