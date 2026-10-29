@@ -47,6 +47,8 @@ pub(crate) struct StepWords {
     /// Said first when a `later` step is offered again, naming it, so a
     /// person half an hour on knows why the lamp asks (#3996, the first
     /// builder's P2 on #4012). Optional: without one, only `reoffer`.
+    /// "Where you sit" is never `later`: its line is said in place of its
+    /// `reoffer` on a later visit ([`Definition::visit_reoffer`]).
     #[serde(default)]
     pub(crate) later_reoffer: Option<String>,
     pub(crate) nudge: Option<Nudge>,
@@ -258,6 +260,18 @@ impl Definition {
 
     pub(crate) fn later_reoffer(&self, step: Step) -> Option<&str> {
         self.steps[&step].later_reoffer.as_deref()
+    }
+
+    /// The note a kept step is offered again with on a later visit: its
+    /// `reoffer`. "Where you sit"'s `reoffer` is also its short line within
+    /// a walk (#4095), so a later visit says its `later_reoffer` instead, a
+    /// lead-in as touch's "One more thing: …" (jarvis's P3 on #4095). A
+    /// new key would be refused by an older build reading this file.
+    pub(crate) fn visit_reoffer(&self, step: Step) -> &str {
+        match self.later_reoffer(step) {
+            Some(line) if step == Step::WhereYouSit => line,
+            _ => self.note(step, true),
+        }
     }
 
     pub(crate) fn skipped(&self, step: Step) -> Option<&str> {

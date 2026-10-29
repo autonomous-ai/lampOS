@@ -926,7 +926,7 @@ impl Onboarding {
 
     /// Fixture construction waits outside the production input loop.
     #[cfg(test)]
-    fn at(file: PathBuf) -> Self {
+    pub(crate) fn at(file: PathBuf) -> Self {
         let owner = storage::ServiceStorage::start(storage::Paths {
             progress: file.clone(),
             checkpoint: file.parent().unwrap().join("privacy-pending.json"),
@@ -1806,7 +1806,12 @@ impl Onboarding {
 
     /// The intro is kept as said (`opened`) only when its turn was heard
     /// whole or played through; cut or never said, the next ask says it
-    /// again, [`MOST_UNSAID`] times more at most.
+    /// again, [`MOST_UNSAID`] times more at most. Never said, the step is
+    /// asked again at once, as near and giving way offer an unsaid
+    /// invitation again (jarvis's P3 on #4120): nobody heard what to do.
+    /// Cut, it is not: someone spoke over it or stopped it with a touch,
+    /// and the step goes on from what the eyes see, needing no line heard,
+    /// so the intro is said again only at the step's next ask.
     fn opener_finished(&mut self, voice_boot: BootId, turn: u64, delivery: Delivery, now_us: u64) {
         if self.opener_turn != Some((voice_boot, turn)) {
             return;
@@ -1817,9 +1822,21 @@ impl Onboarding {
             self.opener_unsaid = self.opener_unsaid.saturating_add(1);
         }
         let opened = heard || self.opener_unsaid > MOST_UNSAID;
+        let again = delivery == Delivery::Unsaid
+            && !opened
+            && self
+                .led
+                .as_ref()
+                .is_some_and(|led| led.step == Step::WhereYouSit && led.asked_us.is_some());
+        if again {
+            self.led = Some(Led {
+                step: Step::WhereYouSit,
+                ..Led::default()
+            });
+        }
         self.records
             .push(json!({"kind":"onboarding_opener","heard":heard,
-            "opened":opened,"at_us":now_us}));
+            "opened":opened,"asked_again":again,"at_us":now_us}));
         if opened && !self.desired.opened {
             self.desired.opened = true;
             self.save();
@@ -2324,7 +2341,7 @@ impl Onboarding {
                 );
                 if again.is_some() {
                     self.save();
-                    self.owed = Some(self.definition.note(step, true).to_owned());
+                    self.owed = Some(self.definition.visit_reoffer(step).to_owned());
                     return None;
                 }
                 let opened = step == Step::WhereYouSit && self.desired.opened;
@@ -3832,6 +3849,51 @@ mod tests {
             room.wait(4 * S, Some(NEAR_MIDDLE)),
             ["(Offer the preferences once more.)"]
         );
+    }
+
+    /// A day-later re-offer of a `not_available` "where you sit" opens with
+    /// its lead-in, as touch's re-offer does (jarvis's P3 on #4095); within
+    /// a walk its asks stay the short line. A file without the line, as an
+    /// older updater writes, says the short line there too.
+    #[test]
+    fn a_later_visit_offers_where_you_sit_again_with_its_lead_in() {
+        for (name, lead_in, said) in [
+            ("sit-visit", true, SIT_VISIT_OFFER),
+            ("sit-visit-old", false, SIT_OFFER),
+        ] {
+            let mut room = Room::new(name);
+            let mut definition = (*skill::fixture()).clone();
+            if !lead_in {
+                definition
+                    .steps
+                    .get_mut(&Step::WhereYouSit)
+                    .unwrap()
+                    .later_reoffer = None;
+            }
+            room.walk.definition = Arc::new(definition.checked().unwrap());
+            let now = unix_ms() / 1_000;
+            for step in room.walk.definition.order.iter().copied() {
+                let sit = step == Step::WhereYouSit;
+                room.walk.desired.steps.insert(
+                    step.name().into(),
+                    Kept {
+                        outcome: if sit {
+                            Outcome::NotAvailable
+                        } else {
+                            Outcome::Skipped
+                        },
+                        at_unix_s: now,
+                        framing: None,
+                        offered_at_unix_s: Some(if sit { now - 86_400 } else { now }),
+                        later_offers: 0,
+                    },
+                );
+            }
+            assert_eq!(room.walk.next_step(), Some(Step::WhereYouSit), "{name}");
+            room.walk.save();
+            room.walk.drain_storage_for_test(0);
+            assert_eq!(room.wait(4 * S, Some(SIDE)), [said], "{name}");
+        }
     }
 
     const LEFT: Framing = Framing {
@@ -5377,18 +5439,50 @@ mod tests {
             asked_again(&mut room);
             assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
         }
+        // Cut: not said again while the step goes on, only at its next ask.
         let mut room = Room::new("opener-unheard");
-        for (unheard, last) in [
-            (Delivery::Cut, false),
-            (Delivery::Unsaid, false),
-            (Delivery::Cut, true),
-        ] {
-            assert_eq!(room.wait_played(4 * S, Some(SIDE), unheard), [SIT_NOTE]);
+        for last in [false, false, true] {
+            assert_eq!(
+                room.wait_played(4 * S, Some(SIDE), Delivery::Cut),
+                [SIT_NOTE]
+            );
             // The third unheard intro is kept as said: it is not repeated forever.
-            assert_eq!(room.walk.kept().opened, last, "{unheard:?}");
+            assert_eq!(room.walk.kept().opened, last);
             asked_again(&mut room);
         }
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_OFFER]);
+    }
+
+    /// An intro never said is said again at once, while the step goes on,
+    /// as near's and giving way's unsaid invitations are (jarvis's P3 on
+    /// #4120); the third is kept as said, and the step goes on silent. A
+    /// heard one after an unsaid one is kept, and not said again.
+    #[test]
+    fn an_unsaid_intro_is_said_again_at_once_three_times_at_most() {
+        let mut room = Room::new("opener-unsaid");
+        assert_eq!(
+            room.wait_played(10 * S, Some(SIDE), Delivery::Unsaid),
+            [SIT_NOTE, SIT_NOTE, SIT_NOTE]
+        );
+        assert!(room.walk.kept().opened);
+        assert!(room.walk.leading());
+        let records = room.walk.take_records();
+        let agains: Vec<_> = records
+            .iter()
+            .filter(|line| line["kind"] == "onboarding_opener")
+            .map(|line| line["asked_again"].clone())
+            .collect();
+        assert_eq!(agains, [true, true, false], "{records:?}");
+
+        let mut room = Room::new("opener-unsaid-heard");
+        assert_eq!(
+            room.wait_played(4 * S, Some(SIDE), Delivery::Unsaid),
+            [SIT_NOTE]
+        );
+        assert!(!room.walk.kept().opened);
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        assert!(room.walk.kept().opened);
+        assert_eq!(room.wait(3 * S, Some(SIDE)), NONE);
     }
 
     #[test]
