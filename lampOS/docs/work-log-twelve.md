@@ -553,3 +553,8 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   - #4175: 12/12 desk lines were left alone in the busy rounds;
   - #4226: c11 was answered 3 of 4 times. The miss, right after a restart, was unheard by both lamp-name and speech-to-text.
   - lamp-c0a4 was restored and the lock released.
+
+## 29 Oct, 13:2x: #4304 landed
+
+- #4304 (#4286's three P3s, part of #4226) landed on lamp-voice as `b32c0b0ce6` and the commits before it. The branch is deleted.
+- The glance check on lamp-c0a4 for #4175 (c6489222733): not shown, since no remark was let out by the name, and one split d09 was answered as "the text shows it was called". This waits for the first builder.
