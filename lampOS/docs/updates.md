@@ -1121,9 +1121,14 @@ build could carry it units or settings.
    `self.json` is there and lamp-update is not `active`/`running`, or 10 min
    (`own::DEADLINE`) have passed since the link moved, it points
    `update/current` at the old build again, adds the new binary's SHA-256 to
-   `self-refused` (never switched to again), removes `self.json`, and runs
-   `systemctl reset-failed` and `restart --no-block lamp-update`. Otherwise it
-   ends, having changed nothing. The unit has
+   `self-refused` (never switched to again), removes `self.json`, logs a
+   round's end, `self-put-back`, and runs `systemctl reset-failed` and
+   `restart --no-block lamp-update`. Otherwise it ends, having changed
+   nothing. So the old updater's `update/status` says `self-put-back` as the
+   last result when it starts again (#1683's update alerts). An unreadable
+   `self.json` it puts back logs the same. A helper copied from a build
+   before this says it only in its journal, until a confirmed lamp-update
+   refreshes it. The unit has
    `ConditionPathExists=/usr/local/lib/lampos/lamp-update-back`: on a lamp
    not installed since #1680 (a round adds only the product units of
    `install`'s list, never this helper, and never changes

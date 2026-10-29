@@ -3000,6 +3000,13 @@ fn a_new_updater_that_exits_at_once_is_put_back() {
     );
     assert!(lamp.pending().is_none());
     assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    // A round's end, so `update/status` says it when the old updater
+    // starts telling again (#1683's update alerts).
+    let told = lamp_update::status::last_in_records(&lamp.records()).unwrap();
+    assert_eq!(
+        (told.outcome.as_str(), told.sequence),
+        ("self-put-back", None)
+    );
     // The old updater, started again, does not take that binary again.
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
     assert_eq!(lamp.own_build(), old);
@@ -4959,6 +4966,8 @@ fn lamp_update_back_puts_back_an_unreadable_self_json() {
     assert_eq!(lamp.own_build(), old);
     assert_eq!(own::refused(&lamp.records()), vec![new]);
     assert_eq!(lamp.set_aside("self.json").len(), 1);
+    let told = lamp_update::status::last_in_records(&lamp.records()).unwrap();
+    assert_eq!(told.outcome, "self-put-back");
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
 }
 

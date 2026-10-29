@@ -252,7 +252,12 @@ fn settle(records: &Path, root: &Path, say: &mut dyn FnMut(&str)) -> Result<Unre
         ),
     };
     say(&line);
-    held.log(event, &line);
+    // A put-back is a round's end, as `back`'s is; a set-aside changes no
+    // build and is a line only.
+    match settled {
+        Unreadable::PutBack { .. } => held.log_round(event, &line, None),
+        Unreadable::SetAside => held.log(event, &line),
+    }
     Ok(settled)
 }
 
@@ -547,11 +552,15 @@ pub fn back(
     }
     refuse(records, root, &pending.new)?;
     end(records).map_err(|error| format!("{PENDING}: {error}"))?;
-    say(&format!(
+    let line = format!(
         "lamp-update's build {} did not confirm itself ({}): {CURRENT} names {} again",
         &pending.new[..12],
         if running { "too late" } else { "not running" },
         &pending.old[..12]
-    ));
+    );
+    say(&line);
+    // A round's end, so `update/status` says it as the last one when the
+    // old updater starts telling again (#1683's update alerts).
+    held.log_round("self-put-back", &line, None);
     Ok(Back::PutBack(pending))
 }
