@@ -173,6 +173,23 @@ class Names:
     def close(self): self.p.kill()
 
 
+class Journal:
+    """lamp-voice's journal followed live over one ssh, read by a thread: (lamp time, text). A fetch at the end loses
+    what journald has already dropped: 52e6 kept only ~15 min of lamp-voice (30 Oct, every row before 00:52 lost)."""
+    def __init__(self):
+        import threading
+        self.rows = []
+        self.p = subprocess.Popen(SSH + ['exec journalctl -u lamp-voice -f -n 0 -o short-unix'], stdout=subprocess.PIPE,
+                                  stdin=subprocess.DEVNULL, text=True, bufsize=1)
+        def read():
+            for l in self.p.stdout:
+                m = re.match(r'([\d.]+) \S+ \S+: (.*)', l.rstrip('\n'))
+                if m: self.rows.append((float(m.group(1)), m.group(2)))
+        threading.Thread(target=read, daemon=True).start()
+
+    def close(self): self.p.kill()
+
+
 class Heard:
     """What the voice heard, off the bus (voice/heard: the model's transcript with its request), followed live."""
     def __init__(self):
@@ -317,14 +334,15 @@ def main():
     if subprocess.run(SSH + ['true'], stdin=subprocess.DEVNULL, timeout=30).returncode != 0:
         sys.exit('night.py: the lamp did not answer over lamp_ssh (LAMP_HOST, README.md)')
     os.makedirs(OUT + '/night', exist_ok=True)
-    ev = Events(); hb = Heard(); nm = Names(); time.sleep(2); played = []; began = time.time()
+    # Each stream is a new ssh (5-6 s to connect to 52e6): let all of them attach before the first scene.
+    ev = Events(); hb = Heard(); nm = Names(); jl = Journal(); time.sleep(10); played = []; began = time.time()
     try:
         for n in names:
             run_scene(n, SCENES[n], ev, played); hb.pump(); nm.pump()
         time.sleep(3); ev.pump(); hb.pump(); nm.pump()
     finally:
-        ev.close(); hb.close(); nm.close(); stop_on_lamp()
-    J = journal(began, time.time())
+        time.sleep(2); ev.close(); hb.close(); nm.close(); jl.close(); stop_on_lamp()
+    J = [(t, l) for t, l in jl.rows if t >= began - 2]
     rows = score(played, ev, J, L, hb.by)
     # lamp-name's best score per topic within 3.5 s of the clip's start (its hearings land 1.45–1.90 s in).
     for r in rows:

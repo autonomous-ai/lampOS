@@ -115,15 +115,30 @@ def level_cutin_lines(out):
 CUTIN_SCENE = os.environ.get('CUTIN_SCENE') or os.path.join(HERE, 'cutin_scene.py')
 
 
-def first_answer_audio(lamp, since, longest):
-    """This Mac's time when lamp-voice's journal shows "first answer audio" since the lamp's epoch `since`, or None."""
-    end = time.time() + longest
-    while time.time() < end:
-        try: got = lamp(f"journalctl -u lamp-voice --since @{since} --no-pager -o cat | grep -m 1 'first answer audio'", timeout=5)
-        except subprocess.TimeoutExpired: got = ''
-        if got.strip(): return time.time()
-        time.sleep(0.5)
-    return None
+class FirstAudio:
+    """lamp-voice's journal followed over ONE ssh for the whole scene: each "first answer audio" line with this Mac's time
+    it came. A new ssh to a lamp can take 5-6 s to connect (52e6, 30 Oct 01:0x), so a poll per check misses every story."""
+    def __init__(self, ssh):
+        import queue, threading
+        self.q = queue.Queue()
+        self.p = subprocess.Popen(ssh + ["exec journalctl -u lamp-voice -f -n 0 -o cat"], stdout=subprocess.PIPE,
+                                  stdin=subprocess.DEVNULL, text=True, bufsize=1)
+        def read():
+            for line in self.p.stdout:
+                if 'first answer audio' in line: self.q.put((time.time(), line.strip()))
+        threading.Thread(target=read, daemon=True).start()
+
+    def after(self, t, longest):
+        """The Mac time of the first such line that came at or after t, waiting up to `longest` s, or None."""
+        import queue
+        end = time.time() + longest
+        while True:
+            try: at, _ = self.q.get(timeout=max(0.0, end - time.time()))
+            except queue.Empty: return None
+            if at >= t: return at
+
+    def close(self):
+        self.p.terminate()
 
 
 def play(path):
@@ -145,7 +160,7 @@ def stopped_after(ev, story, start, end):
 
 def stop_scene(label, n):
     sys.path.insert(0, HERE); import night
-    ev = night.Events(); time.sleep(2); trials, played = [], []
+    ev = night.Events(); fa = FirstAudio(night.SSH); time.sleep(8); trials, played = [], []
     try:
         for i in range(n):
             # night.run_scene's quiet wait: nothing playing, and QUIET_BEFORE s since anything played or was said.
@@ -157,10 +172,9 @@ def stop_scene(label, n):
                 time.sleep(0.5)
             topic, line = TOPICS[i % len(TOPICS)], STOPS[i % len(STOPS)]
             t = {'topic': topic, 'stop_line': line, 'result': 'no story, void', 'gap_s': None}
-            since = night.lamp('date +%s', timeout=10).strip()
             volume(45); _, ask_end = play(clip(f'Hey Lamp, tell me a long story about {topic}.')); played.append(ask_end)
             # The stop is timed from the journal's "first answer audio"; the event file only names the story's turn.
-            first = first_answer_audio(night.lamp, since, 14.0) if since.isdigit() else None
+            first = fa.after(ask_end, 14.0)
             if first is not None:
                 ev.pump()
                 w = next((r for r in reversed(ev.rows) if r['_mac'] >= ask_end and r.get('kind') == 'speaker_first_write'), {})
@@ -173,7 +187,7 @@ def stop_scene(label, n):
                     if stopped_after(ev, story, s, e) is not None: t['result'] = 'stopped on the second'
             trials.append(t); print(f"stop {i + 1}/{n}: {topic}; {line!r}: {t['result']} {t['gap_s'] or ''}", flush=True)
     finally:
-        volume(45); ev.close(); night.stop_on_lamp()
+        volume(45); fa.close(); ev.close(); night.stop_on_lamp()
     os.makedirs(f'{OUT}/quality', exist_ok=True)
     json.dump({'label': label, 'at': time.strftime('%Y-%m-%d %H:%M'), 'trials': trials}, open(f'{OUT}/quality/{label}-stop.json', 'w'), indent=1)
 
@@ -298,6 +312,7 @@ def main():
     level_cutin_lines(OUT)
     env = {**os.environ, 'PLAYED_OUT': OUT, 'NIGHT_WAV': kit}
     env.pop('CUTIN_ENV', None)   # cutin.sh never adds a drop-in or restarts lamp-voice
+    env['LAMP_SSH'] = HERE + '/lamp_ssh'   # cutin.sh runs "$LAMP_SSH" as one program, never a command with options
     volume(45)
     # A failed part leaves its row "not measured"; the rest still run.
     cmds = [[sys.executable, HERE + '/night.py', label + '-night']]
