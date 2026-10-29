@@ -1797,6 +1797,7 @@ mod tests {
                 step: OnboardingStep::Privacy,
                 ready: true,
             }],
+            walk: true,
         };
         let mut off = BusOut::on(&bus)
             .unwrap()

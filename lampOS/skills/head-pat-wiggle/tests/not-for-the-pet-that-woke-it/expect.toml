@@ -1,9 +1,9 @@
 # Asleep until the kept hand's wake at 19 s, the pet told apart at 19.2 s, ending 21.2 s: nothing for it.
-# A later pet, from 90 s, awake for long: a wiggle a second after it ends, at 93 s.
+# A later pet, from 90 s, awake for long: a wiggle 2 s after it ends, at 94 s.
 clock = "10:00"
 
 [[expect]]
-at = "93s"
+at = "94s"
 within = "1s"
 call = "body.move"
 args = { move = "pat-wiggle" }

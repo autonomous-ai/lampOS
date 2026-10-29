@@ -1904,6 +1904,19 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
             .iter()
             .any(|call| call.contains("lamp-skills.service"))
     );
+    // A pet on the head is said in the product, and Head pat and its wiggle
+    // answer it (#4133's design owner's yes, 29 Oct).
+    let controls =
+        fs::read_to_string(lamp.on("/etc/systemd/system/lamp-controls.service")).unwrap();
+    assert!(section(&controls, "Service").contains(&"Environment=LAMP_HEAD_PET=on"));
+    for skill in ["head-pat", "head-pat-wiggle"] {
+        assert!(install::PRODUCT_SKILLS.contains(&skill), "{skill}");
+        assert!(
+            lamp.on(&format!("/var/lib/lampOS/skills/{skill}/skill.toml"))
+                .is_file(),
+            "{skill}"
+        );
+    }
     let voice = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-voice.service")).unwrap();
     let service = section(&voice, "Service");
     assert!(service.contains(&"Environment=LAMP_SAY=on"));
@@ -2000,8 +2013,9 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .collect();
     // Not feeling well came with the product after its lamp check (#1681);
     // the seven of PRODUCT_SKILLS_OFF come installed disabled; the startle
-    // came with its move (#2822); the four wellbeing nudges since 25 Oct.
-    assert_eq!(installed.len(), 25);
+    // came with its move (#2822); the four wellbeing nudges since 25 Oct;
+    // Head pat and its wiggle since #4133's design owner's yes (29 Oct).
+    assert_eq!(installed.len(), 27);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -2026,12 +2040,13 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The seventeen live skills (with music sway and
-    // watch you leave since #2834, which declare none) offer Dance,
+    // contribute functions. The nineteen live skills (with music sway and
+    // watch you leave since #2834, and Head pat and its wiggle, which declare
+    // none) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 25);
+    assert_eq!(inventory.len(), 27);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -2054,7 +2069,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 17);
+    assert_eq!(live.len(), 19);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 3 above are all a session is told.

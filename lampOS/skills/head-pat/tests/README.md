@@ -24,7 +24,8 @@ check, replaces the written one.
 | `never-while-asleep` | Asleep all through, a pet | Pass: nothing |
 | `not-for-the-pet-that-woke-it` | Asleep until 19 s (the kept hand's wake), the pet told apart at 19.2 s; another pet at 90 s | Pass: nothing for the first, a line at 90 s |
 | `never-during-setup` | An onboarding step pending all through, a pet | Pass: nothing |
-| `a-lamp-done-with-setup-answers` | Onboarding says nothing pending, a pet | Pass: one line |
+| `a-lamp-done-with-setup-answers` | Setup done: nothing pending and `walk` false, a pet | Pass: one line |
+| `never-in-a-setup-step-without-an-invitation` | The walk under way (`walk` true) in a step led by talk, nothing pending, a pet | Pass: nothing |
 | `never-in-quiet-hours` | From 23:00, a pet | Pass: nothing, and nothing kept for the morning |
 | `never-while-it-thinks` | Thinking from 15 s to 30 s, a pet at 20 s | Pass: nothing, and not later |
 | `never-while-it-speaks` | Speaking from 15 s to 30 s, a pet at 20 s | Pass: nothing, and not later |

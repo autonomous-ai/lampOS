@@ -1,18 +1,17 @@
 # Head pat wiggle (#3997, Part of #4133): when a hand that petted the lamp's
-# head lifts and the head's pads stay free a second, the lamp gives a small,
+# head lifts and the head's pads stay free 2 s, the lamp gives a small,
 # quick, happy side-to-side of its base, every pet, at most once in 4 s.
 # Head pat's line is its own skill's, at most once in 10 s: a pet the hand
-# lifts from for a second gets the wiggle, and a line at most every 10 s. A
+# lifts from for 2 s gets the wiggle, and a line at most every 10 s. A
 # skill of its own because a skill's [[while]] conditions are all its
 # triggers': the line waits for a quiet voice, the wiggle does not (a body
 # move is fine while the lamp speaks). Controls says `controls/pet` only with
-# LAMP_HEAD_PET=on (docs/controls.md); without it nothing here ever runs.
+# LAMP_HEAD_PET=on (docs/controls.md), on in the product's lamp-controls.
 # Written to lamp-skills' schema (docs/skills.md, "The schema, as
 # lamp-skills reads it").
 needs = ["body"]
-# Its owner puts it on beside Head pat, and only after its lamp check: held
-# out of the product's install by install::NOT_PRODUCT_SKILLS.
-kind = "installable"
+# In the product beside Head pat since #4133's design owner's yes (29 Oct).
+kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: the pet, the head's pads,
@@ -23,14 +22,15 @@ topics = ["controls/pet", "controls/state", "expression/state", "onboarding/pend
 body = true
 
 # Two triggers: the pet ending opens the chance, and the pads staying free
-# for a second after it takes it. Never during the pet, nor under a hand
+# for 2 s after it takes it (2 s, the design owner's choice at the lamp,
+# #4133: the line's first sound, about 2.5 s after the pet, then lands in it). Never during the pet, nor under a hand
 # coming back for the next one: a move under a hand fights the person and
 # can trip the stall and give-way rule (#4056), and the body stops nothing
 # for a palm on the pads, which pushes no joint (the Reviewer-lead on
 # #4324). The move lasts about 3.1 s, so a hand back on the head after
-# that second can still meet it turning; a person petting again lifts and
-# comes back within the second (pets 1.5 s apart leave the pads free for
-# 0.3 s), and a pet that comes back within it gets no wiggle of its own:
+# those 2 s can still meet it turning; a person petting again lifts and
+# comes back within them (pets 1.5 s apart leave the pads free for 0.3 s),
+# and a pet that comes back within them gets no wiggle of its own:
 # the next pet's end opens the chance again.
 [[trigger]]
 name = "pet_ended"        # opens the chance and does nothing of itself (no step names it)
@@ -44,7 +44,7 @@ name = "pads_free"
 topic = "controls/state"
 field = "head_active"
 equals = false            # no hand on the head's pads, by controls that say so every 100 ms
-for = "1s"                # counted from the pet's end on (`follows`): the wiggle comes about 1 s after the hand lifts
+for = "2s"                # counted from the pet's end on (`follows`): the wiggle comes about 2 s after the hand lifts, so the line's first sound lands during it (the design owner at the lamp, #4133)
 rearm = "ends"
 follows = { trigger = "pet_ended", within = "10s" }  # once for each pet's end, and only within 10 s of it
 cooldown = "4s"           # at most once in 4 s: petting on and on is not motion on and on
@@ -66,6 +66,12 @@ field = "invitations"
 equals = []
 unknown = "holds"         # a lamp with onboarding off never says the topic
 
+[[while]]                 # never during the setup walk, its steps led by talk included (#4367)
+topic = "onboarding/pending"
+field = "walk"
+equals = false
+unknown = "holds"         # a lamp with onboarding off never says the topic, and an older voice no walk
+
 [[while]]                 # no hand pushing the body: never while someone holds or moves the lamp
 topic = "body/hand"
 field = "pushed"
@@ -80,8 +86,8 @@ to = "07:00"
 policy = "nudge"
 
 # The wiggle (moves/pat-wiggle.json): the base alone, a little left, right
-# and left again, then a softer sway, eased in and out, about 3.1 s (begun a
-# second after the hand lifts, still going as head pat's line plays), at
+# and left again, then a softer sway, eased in and out, about 3.1 s (begun
+# 2 s after the hand lifts, going as head pat's line plays), at
 # most 64 counts (about 5.6 degrees, under half the 150 a move may turn the
 # base) and about 370 counts a second (the base may go 1,000). The head stays
 # still under the hand that just left it. Not the body's `happy` clip: that
