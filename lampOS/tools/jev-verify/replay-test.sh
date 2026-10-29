@@ -27,8 +27,8 @@ case $a in
   *"voice/mute/latest"*) echo '{"muted":false}' ;;
   *"/cmdline"*) [ "$f" = act ] && echo "/opt/lamp-policy --shadow --act hello" || echo "/opt/lamp-policy --shadow" ;;
   *"ls -l /var/lib/lampos-policy"*) echo "-rw-r----- 1 lamp lamp 812 Oct 29 06:00 decisions-2026-10-29.jsonl"; echo READABLE ;;
-  *"for b in lamp-bus"*) [ "$f" = bus ] && exit 1; echo lamp-bus ;;
-  *"latest room/state"*) # busy while the colleagues' talk is among the last 3 clips played
+  *"for f in room/state voice/state"*) case $f in bus) echo plain ;; sudobus) echo sudo; echo sudo ;; *) echo plain; echo plain ;; esac ;;
+  *"room/state/latest"*) # busy while the colleagues' talk is among the last 3 clips played
     [ "$f" != roomnotbusy ] && tail -3 "$DRY_PLAYLOG" 2>/dev/null | grep -q t02 && echo '"busy"' || echo '"quiet"' ;;
   *"heard [1-9]"*) echo 0 ;;
   *"a face in"*) case $f in face) echo 2 ;; noeyes) ;; *) echo 0 ;; esac ;;
@@ -74,6 +74,7 @@ for pf in q02:f01 q04:f02 q06:f03 b04:f04 b02:f05; do
   { echo "FAIL a busy line's room_read is not busy"; fails=$((fails+1)); }
 o=$(export FAIL=; PASSES=1 DEADLINE=1 r run "$T/dl"); want deadline '^ABORT the deadline has passed already; nothing ran' "$o"
 grep -q 'aborted, nothing ran' "$T/stub.log" || { echo "FAIL deadline abort loans line"; fails=$((fails+1)); }
+o=$(export FAIL=sudobus; r preflight "$T/sb"); want sudo-bus '^ok room/state=quiet from /run/lampos-bus/room/state/latest \(with sudo\)' "$o"; want sudo-bus-done 'preflight done' "$o"
 o=$(export FAIL=; DRY_MACMUTED=true r preflight "$T/mm"); want mac-muted "^ABORT the Mac's output is muted" "$o"
 o=$(export FAIL=sudo; r preflight "$T/su"); want sudo-noted 'hello/progress NOT MEASURED: the drop-in could not be put in' "$o"; want sudo-goes-on 'preflight done' "$o"
 o=$(export FAIL=; POLICY_EXTRA='--hello --act hello' r preflight "$T/pa"); want extra-act '^ABORT POLICY_EXTRA has --act' "$o"
@@ -85,7 +86,7 @@ o=$(export FAIL=roomnotbusy; PASSES=1 r run "$T/rb"); want busy-abort 'ABORT bus
 [ "$(awk -F'\t' 'NR>1' "$T/rb/plays.tsv" | wc -l | tr -d ' ')" = 27 ] || { echo "FAIL busy abort kept quiet results"; fails=$((fails+1)); }
 
 for c in "muted:muted by the restart guard" "act:runs with --act" "face:saw a face" "lock:not held by jev-verifier" \
-         "bus:no lamp-bus answers" "dropin:foreign /run drop-in" "noeyes:no report in 15 s" \
+         "bus:cannot both be read" "dropin:foreign /run drop-in" "noeyes:no report in 15 s" \
          "policyfailed:decision on the wake failed .timed_out."; do
   o=$(export FAIL=${c%%:*}; r preflight "$T/f-${c%%:*}")
   want "fail-${c%%:*}" "^ABORT .*${c#*:}.*; nothing ran\$" "$o"

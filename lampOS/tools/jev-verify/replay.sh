@@ -76,7 +76,11 @@ face() { local n; n=$($L "sudo -n journalctl -u lamp-eyes --since -15s --no-page
   if [ -z "$n" ]; then echo "no eyes report"; elif [ "$n" -gt 0 ]; then echo "a face (in $n)"; else echo "no face"; fi; }
 standing() { local s; s=$($L "sudo -n journalctl -u lamp-body --since -35s --no-pager -o cat | grep -oE 'stand [0-9.]+' | tail -1")
   note "lamp-body: ${s:-no stand line}"; [ -n "$s" ] && [ "$s" != "stand 0.00" ]; }
-room() { $L "$BUS latest room/state 2>/dev/null" | grep -oE 'quiet|busy|unknown' | head -1; }
+# The bus is read from its files, as the lamp-bus CLI reads them (crates/bus/src/wire.rs: a topic's
+# latest file is a JSON header line, then the payload): 8652 ships no lamp-bus CLI. SU is "sudo -n " when
+# the files need it, set at the preflight; a polling loop runs under one sudo, not one per read.
+BR=/run/lampos-bus SU=
+room() { $L "${SU}tail -n +2 $BR/room/state/latest 2>/dev/null" | grep -oE 'quiet|busy|unknown' | head -1; }
 # sig: what the scores belong to: units and their MainPIDs, lamp-policy's cmdline, the build, the mute.
 # Taken after the preflight; any change at a pass start aborts the run.
 sig() { $L "systemctl is-active lamp-voice lamp-policy lamp-body lamp-eyes; systemctl show -p MainPID --value lamp-voice lamp-policy; sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline; echo; sudo -n grep -o '\"build\":{[^}]*}' /var/lib/lampos-update/state.json; readlink /opt/lampOS/voice/current /opt/lampOS/policy/current; true" | tr '\n' ' '
@@ -88,22 +92,22 @@ verdict() { local last
   case $last in *played*) echo played ;; *) echo held ;; esac; }
 # speech_done: waits (on the lamp, up to 60 s) until voice/state has not read speaking for 2 s;
 # prints the seconds it read speaking.
-speech_done() { $LI "sh -s -- '$BUS' voice/state" <<'EOF'
+speech_done() { $LI "${SU}sh -s -- '$BR' voice/state" <<'EOF'
 s=0 q=0 i=0
 while [ $q -lt 2 ] && [ $i -lt 60 ]; do
-  if $1 latest "$2" 2>/dev/null | grep -q speaking; then s=$((s+1)); q=0; else q=$((q+1)); fi
+  if tail -n +2 "$1/$2/latest" 2>/dev/null | grep -q speaking; then s=$((s+1)); q=0; else q=$((q+1)); fi
   i=$((i+1)); sleep 1; done; echo $s
 EOF
 }
 # answer_end [HALF_SECONDS=40]: after a played verdict, waits (on the lamp) up to that long for voice/state
 # to read speaking, then until it has not for 1.5 s (up to 60 s); prints the half-seconds it read speaking
 # (0: it never spoke).
-answer_end() { $LI "sh -s -- '$BUS' voice/state '${1:-40}'" <<'EOF'
+answer_end() { $LI "${SU}sh -s -- '$BR' voice/state '${1:-40}'" <<'EOF'
 s=0 q=0 i=0
-while [ $i -lt "$3" ] && ! $1 latest "$2" 2>/dev/null | grep -q speaking; do i=$((i+1)); sleep 0.5; done
+while [ $i -lt "$3" ] && ! tail -n +2 "$1/$2/latest" 2>/dev/null | grep -q speaking; do i=$((i+1)); sleep 0.5; done
 [ $i -lt "$3" ] || { echo 0; exit 0; }
 i=0; while [ $q -lt 3 ] && [ $i -lt 120 ]; do
-  if $1 latest "$2" 2>/dev/null | grep -q speaking; then s=$((s+1)); q=0; else q=$((q+1)); fi
+  if tail -n +2 "$1/$2/latest" 2>/dev/null | grep -q speaking; then s=$((s+1)); q=0; else q=$((q+1)); fi
   i=$((i+1)); sleep 0.5; done; echo $s
 EOF
 }
@@ -192,10 +196,11 @@ pl=$($L "sudo -n ls -l /var/lib/lampos-policy/ && echo READABLE")
 case $pl in *READABLE*) ;; *) abort "/var/lib/lampos-policy cannot be listed with sudo -n: ${pl:-none}" ;; esac
 ok "policy log dir listed ($(printf '%s\n' "$pl" | grep -c 'decisions-') decisions files)"
 
-BUS=$($L 'for b in lamp-bus "sudo -n lamp-bus" /opt/lampOS/bus/current/lamp-bus "sudo -n /opt/lampOS/bus/current/lamp-bus"; do $b latest room/state >/dev/null 2>&1 && { echo "$b"; exit 0; }; done; exit 1')
-[ -n "$BUS" ] || abort "no lamp-bus answers 'latest room/state' (tried lamp-bus, /opt/lampOS/bus/current/lamp-bus, with sudo -n): the busy block depends on it"
-r=$(room); case $r in quiet|busy|unknown) ;; *) abort "room/state reads '${r}' via $BUS, not quiet/busy/unknown" ;; esac
-ok "room/state=$r via $BUS"
+bf=$($L "for f in room/state voice/state; do test -r $BR/\$f/latest && echo plain || { sudo -n test -r $BR/\$f/latest && echo sudo; }; done" | tr '\n' ' ')
+case $bf in "plain plain ") SU= ;; "sudo sudo "|"plain sudo "|"sudo plain ") SU="sudo -n " ;;
+  *) abort "the bus files $BR/room/state/latest and $BR/voice/state/latest cannot both be read (${bf:-no answer}): the busy block and the answer waits depend on them" ;; esac
+r=$(room); case $r in quiet|busy|unknown) ;; *) abort "room/state reads '${r}' from $BR/room/state/latest, not quiet/busy/unknown" ;; esac
+ok "room/state=$r from $BR/room/state/latest${SU:+ (with sudo)}"
 
 k=0; while h=$(heard); [ "${h:-0}" != 0 ] && [ $k -lt 60 ]; do
   [ $k = 0 ] && note "room not quiet ($h requests heard words in 20 s): waiting up to 60 s"; sleep 5; k=$((k+5)); done
