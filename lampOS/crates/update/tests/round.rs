@@ -41,6 +41,9 @@ pub(crate) mod process_cuts;
 #[path = "round/setup_lifecycle.rs"]
 mod setup_lifecycle;
 
+#[path = "round/setup_walk.rs"]
+mod setup_walk;
+
 #[path = "round/head_touch.rs"]
 mod head_touch;
 

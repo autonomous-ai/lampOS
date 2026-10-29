@@ -34,6 +34,7 @@ mod setup_lifecycle;
 pub mod status;
 pub mod switches;
 pub mod unit;
+pub mod walk;
 pub mod world;
 pub mod writer_files;
 pub(crate) mod writer_plan;
