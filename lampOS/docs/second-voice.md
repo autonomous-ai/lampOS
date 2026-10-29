@@ -3309,7 +3309,14 @@ after a take-over, but now for every turn:
     "Ma'am, …" (#3923) needs a face, a conversation or closeness. Lamp
     check on c0a4 (28 Oct): a person's "Ma'am, …" heard as the name at
     1.00 was held, two "Lamp, …" calls were answered
-    ([attention.md](attention.md)).
+    ([attention.md](attention.md)). Whatever the switch, a hearing that
+    does count says which second sign let it (#3945: on 28 Oct a "Ma'am,
+    …" line from the Mac was answered for its name and the journal could
+    not say why): `its name, heard in the room's sound, counts by: <signs>
+    (LAMP_NAME_SECOND_SIGN)`, each of "a face turned to the lamp", "the
+    name said close to it", "said to the lamp from close to it", "its
+    words calling it", "a conversation going on" and "its hearing at the
+    line's start" that held (`Attention::second_signs`), never the words.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard

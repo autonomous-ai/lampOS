@@ -1177,6 +1177,10 @@ pub struct Attention {
     /// A hearing of the name inside a line's sound counts for that line
     /// only (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, [`Self::keep_the_name_in_its_line`]).
     name_stays: bool,
+    /// The second signs that let the name heard in the room's sound count
+    /// for the line last weighed ([`Self::weigh_the_name`]), for the
+    /// journal (#3945).
+    name_signs: Vec<&'static str>,
 }
 
 /// The most text kept for one request.
@@ -1288,20 +1292,33 @@ impl Attention {
         // held, never a second sign for other lines (#1722's rule; the
         // Reviewer-lead's P3 on #4082).
         let going_on = going_on && said_to_a_person;
-        let alone = self.name_second_sign
-            && self.named
-            && !(turned == Some(true)
-                || self.near
-                || self.addressed
-                || text_calls
-                || going_on
-                || start_counts);
+        let signs: Vec<&'static str> = [
+            (turned == Some(true), "a face turned to the lamp"),
+            (self.near, "the name said close to it"),
+            (self.addressed, "said to the lamp from close to it"),
+            (text_calls, "its words calling it"),
+            (going_on, "a conversation going on"),
+            (start_counts, "its hearing at the line's start"),
+        ]
+        .into_iter()
+        .filter_map(|(shown, sign)| shown.then_some(sign))
+        .collect();
+        let weighed = self.name_second_sign && self.named;
+        let alone = weighed && signs.is_empty();
+        self.name_signs = if weighed { signs } else { Vec::new() };
         if alone {
             self.named = false;
             self.named_sure = false;
             self.best_score = 0.0;
         }
         alone
+    }
+
+    /// The second signs that let the name count for the line last weighed
+    /// ([`Self::weigh_the_name`]): none when it counted for nothing, or
+    /// none was asked.
+    pub fn second_signs(&self) -> &[&'static str] {
+        &self.name_signs
     }
 
     /// In a busy room, let a line out only as the conversation going on
@@ -5017,7 +5034,33 @@ mod tests {
                 "{line}"
             );
         }
-        // Every other second sign still lets it count.
+        // Every other second sign still lets it count, and the journal
+        // names it (#3945's 23:33 run, request 2: which one let it out?).
+        let signs = |turned: Option<bool>, going_on: bool, near: bool, on: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.hold_a_start_said_to_a_person(on);
+            attention.began_at(1, 1, began);
+            attention.name_heard_scored(began + 200_000, 0.996);
+            attention.heard(maam);
+            attention.set_near(near);
+            attention.weigh_the_name(turned, going_on);
+            attention.second_signs().to_vec()
+        };
+        assert_eq!(
+            signs(Some(true), false, false, true),
+            ["a face turned to the lamp"]
+        );
+        assert_eq!(signs(None, true, false, true), ["a conversation going on"]);
+        assert_eq!(
+            signs(None, false, true, true),
+            ["the name said close to it"]
+        );
+        assert_eq!(
+            signs(None, false, false, false),
+            ["its hearing at the line's start"]
+        );
+        assert!(signs(None, false, false, true).is_empty());
         assert!(!weighed(maam, true, Some(true), false, false).0);
         assert!(!weighed(maam, true, None, true, false).0);
         assert!(!weighed(maam, true, None, false, true).0);

@@ -7776,13 +7776,25 @@ impl Heeding {
             }
             // The name note goes with the name (`heed_signs`).
             self.noted = Some((request, None));
-        } else if let (Some(first), Some(newest)) = (name_first_ms, name_into_ms) {
-            // Every hearing weighed is dated too, not only one dropped, so
-            // `attention::NAME_AT_THE_START_US` can be set from both (#4226).
-            eprintln!(
-                "lamp-voice second: request {request}: lamp-name's hearing began {first} ms into the line (the newest {newest} ms); the line's start is up to {} ms",
-                crate::attention::NAME_AT_THE_START_US / 1_000
-            );
+        } else {
+            // Which second sign let the name count, never the words (#3945:
+            // a "Ma'am, …" line let out with nothing saying why).
+            let signs = self.attention.second_signs();
+            if !signs.is_empty() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard in the room's sound, counts by: {} (LAMP_NAME_SECOND_SIGN)",
+                    signs.join(", ")
+                );
+            }
+            if let (Some(first), Some(newest)) = (name_first_ms, name_into_ms) {
+                // Every hearing weighed is dated too, not only one dropped,
+                // so `attention::NAME_AT_THE_START_US` can be set from both
+                // (#4226).
+                eprintln!(
+                    "lamp-voice second: request {request}: lamp-name's hearing began {first} ms into the line (the newest {newest} ms); the line's start is up to {} ms",
+                    crate::attention::NAME_AT_THE_START_US / 1_000
+                );
+            }
         }
         let turned = signs.turned.filter(|_| self.strict);
         // `LAMP_SAME_SPEAKER_CARRIES`: a print come after its line's verdict
