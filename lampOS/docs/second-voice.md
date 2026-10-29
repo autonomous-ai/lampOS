@@ -3710,9 +3710,13 @@ after a take-over, but now for every turn:
   only while the eyes still know that person (`known_faces::still_known`,
   `{"list":true}`), refreshed every 10 s on a thread of its own
   (`known_faces::keep_owner_fresh`), so no reply waits on the eyes. Any face
-  forgotten, whoever's, clears it at once (`known_faces::owner_forgotten`)
-  and the walk drops the mark from the file, so a later face saved under that
-  name is never taken for the owner; a whole redo or a reset drops it too. The name kept is the one the eyes
+  forgotten by voice, whoever's, clears it at once
+  (`known_faces::owner_forgotten`) and the walk drops the mark from the file;
+  one the eyes answer they no longer know (removed in the app, or any other
+  way) loses the mark at the next refresh, so a later face saved under that
+  name is never taken for the owner (the eyes' ids can't tell the two apart:
+  a forgotten name gets the same id back); a whole redo or a reset drops it
+  too. Names match as the eyes match them, in any case. The name kept is the one the eyes
   kept (`remembered`). On lamp-29e7 (8474, 29 Oct) the owner, set up by voice,
   asked who they were and was told the lamp remembered no name: no name
   source reached the reply (#4118). Without a name, or off: nothing. `the owner is not named by default: WHY` in the journal when a
