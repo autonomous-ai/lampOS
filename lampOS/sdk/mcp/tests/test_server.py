@@ -392,6 +392,17 @@ def test_without_look_presence_is_neither_offered_nor_asked(tmp_path):
     run(go())
 
 
+def test_a_lamp_with_its_rates_off_slows_nothing_here():
+    """Hello's `limits` with the rates off (the fake's, as lamp-control's):
+    only its two guards, neither of which an op counts against here."""
+    from lampos.testing import LIMITS
+
+    limits = Limits(LIMITS, clock=lambda: 0.0)
+    for _ in range(50):
+        for op in ("gesture", "move", "look", "light", "say", "express"):
+            limits.take(op)
+
+
 def test_the_lamps_limits_are_kept_here_too():
     now = [0.0]
     limits = Limits({"say": [{"most": 2, "within_ms": 60_000}], "joints": 20}, clock=lambda: now[0])

@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import re
 import stat
 from pathlib import Path
 
@@ -127,7 +128,7 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
     assert unknown == {"ev": "lamp.changed", "token": "<not shown>", "lamp": {"id": "lamp-1", "badge": "<not shown>"}}
     # What a lamp sends beyond the schema's own fields is decided too.
     for sample in ({"re": 3, "ok": True, "to": "body", "move": "glad-lift", "light": True},
-                  {"re": 1, "ok": True, "limits": {"joints_hz": 20}},
+                  {"re": 1, "ok": True, "limits": {"rates": "off", "refused": [{"most": 20, "within_ms": 1_000}], "phrases": [{"most": 6, "within_ms": 60_000}]}},
                   {"re": 2, "ok": True, "state": {"mood": {"energy": 0.5, "warmth": 0.6, "awake": True, "asleep": False},
                                                   "light": {"on": True, "colour": "warm", "level": 3,
                                                             "shows": {"on": True, "colour": "warm", "level": 3}}}},
@@ -227,8 +228,10 @@ def test_greet_a_person_who_arrives(tmp_path):
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 greeted = asyncio.Event()
+                heard = []
 
                 async def greet(event):
+                    heard.append(event)
                     await lamp.gesture("greeting")
                     greeted.set()
 
@@ -238,6 +241,8 @@ def test_greet_a_person_who_arrives(tmp_path):
                 await fake.emit("person.arrived", count=1, near=0.3)
                 await greeted.wait()
             assert fake.asked("gesture") == [{"name": "greeting"}]
+            # `at` as lamp-control stamps it: UTC, to the second, ending Z.
+            assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", heard[0]["at"]), heard[0]["at"]
 
     run(go())
 
