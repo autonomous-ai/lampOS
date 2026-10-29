@@ -721,6 +721,9 @@ struct StepFile {
     /// A fixed local WAV for a spoken tool request, after its confirmation.
     requested_audio: Option<String>,
     look: Option<bool>,
+    /// The body's stand a person asked for, a percent of its own stand
+    /// (#4135): read as a plain integer so that one out of range is told.
+    stand: Option<i64>,
     /// `"say"`: this step and every one after it wait for the say to end.
     after: Option<String>,
     /// The name of the trigger this step is made for; for every one without.
@@ -1323,6 +1326,7 @@ impl Permissions {
             | Call::Gesture(_)
             | Call::Move(_)
             | Call::Mood { .. }
+            | Call::Stand(_)
             | Call::Rest(_) => ("body", self.body),
             Call::Light { .. }
             | Call::Relative { .. }
@@ -1640,6 +1644,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
             || step.requested_audio.is_some()
             || step.look.is_some()
             || step.show.is_some()
+            || step.stand.is_some()
             || step.after.is_some()
             || step.if_choice.is_some()
         {
@@ -2323,6 +2328,11 @@ pub enum Call {
         /// voice listening to someone, and the run with it.
         until_spoken: bool,
     },
+    /// The stand a person asked for, a percent of the body's own (#4135):
+    /// one [`lamp_msgs::StandAsked`] on `body/stand_asked`, kept by the bus
+    /// until the next. Made only with [`lamp_body::stand_in::ENVIRONMENT`]
+    /// on in lamp-skills' environment.
+    Stand(u8),
     /// A colour, to the actions part's `light_colour`, then stepped to its
     /// level; held for its while in a run with no say. With `keep`, it is
     /// the person's light, set as they asked and never given back (#1679).
@@ -2523,6 +2533,7 @@ impl Call {
             }
             Self::Gesture(name) => ("body.gesture", json!({ "gesture": name })),
             Self::Move(clip) => ("body.move", json!({ "move": clip.name })),
+            Self::Stand(share) => ("body.stand", json!({ "share": share })),
             Self::Mood {
                 mood,
                 lasting_us,
@@ -3110,6 +3121,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 && step.rest.is_none()
                 && step.look.is_none()
                 && step.requested_audio.is_none()
+                && step.stand.is_none()
                 && step.after.is_none()
                 && step.on.is_none()
                 && step.if_choice.is_none()
@@ -3126,6 +3138,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 && step.rest.is_none()
                 && step.look.is_none()
                 && step.say.is_none()
+                && step.stand.is_none()
                 && step.on.is_none()
                 && step.if_choice.is_none()
                 && step.show.is_none()
@@ -3692,10 +3705,11 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             && step.requested_audio.is_none()
             && step.look.is_none()
             && step.show.is_none()
+            && step.stand.is_none()
             && step.propose.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show or propose"
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand or propose"
                     .into(),
             );
         }
@@ -3738,7 +3752,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                     || step.requested_audio.is_some()
                     || step.look.is_some()
                 {
-                    return Err("a step for some choices only makes body, light or show".into());
+                    return Err(
+                        "a step for some choices only makes body, light, show or stand".into(),
+                    );
                 }
                 Some(Only::Choice(values.clone()))
             }
@@ -3896,6 +3912,23 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 ));
             }
             steps.push(Step::Call(call));
+        }
+        if let Some(share) = step.stand {
+            let least = i64::from(lamp_msgs::StandAsked::LEAST);
+            let most = i64::from(lamp_msgs::StandAsked::MOST);
+            if !(least..=most).contains(&share) {
+                return Err(format!(
+                    "stand = {share}: a percent of the lamp's own stand, {least} to {most}"
+                ));
+            }
+            // Kept until the next ask or power-up: only a person asks it.
+            if !asked_alone {
+                return Err(
+                    "stand only in a skill started by its tool alone: a stand is kept, so only a person asks it"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Stand(share as u8)));
         }
         if let Some(show) = step.show {
             if !asked_alone {
@@ -6176,18 +6209,20 @@ impl Engine {
 
     /// The skill whose tool `name` is and what the model is told of a call
     /// while its run is under way, if such a call is refused: a run with no
-    /// pose to hold again and no look to take again has nothing to do again
-    /// (a dance plays on). Refused before [`Engine::tool`], it is no run:
+    /// pose to hold again, no stand to ask again and no look to take again
+    /// has nothing to do again (a dance plays on). Refused before [`Engine::tool`], it is no run:
     /// `[again]`'s while does not begin again from it.
     pub fn refused_under_way(&self, name: &str) -> Option<(&str, &str)> {
         self.skills
             .iter()
             .find(|skill| skill.tool.as_deref() == Some(name))
             .filter(|skill| {
-                !skill
-                    .steps
-                    .iter()
-                    .any(|(_, step)| matches!(step, Step::Call(Call::Mood { .. } | Call::Look)))
+                !skill.steps.iter().any(|(_, step)| {
+                    matches!(
+                        step,
+                        Step::Call(Call::Mood { .. } | Call::Look | Call::Stand(_))
+                    )
+                })
             })
             .map(|skill| (skill.name.as_str(), skill.still.as_str()))
     }

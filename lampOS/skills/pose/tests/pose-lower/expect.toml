@@ -1,0 +1,13 @@
+# "get lower": the stand at 60 percent of the lamp's own, and the note.
+[[call_tool]]
+name = "set_pose"
+at = "0s"
+args = { pose = "lower" }
+
+[[expect]]
+call = "say"
+args = { note = "Say one short line that you are changing your height as asked, and stop. For lower: \"Okay, I'll sit lower.\" For sit: \"Okay, sitting down low.\" For normal: \"Back to my usual height.\"" }
+
+[[expect]]
+call = "body.stand"
+args = { share = 60 }

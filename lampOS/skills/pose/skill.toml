@@ -1,0 +1,38 @@
+# Pose (#4135): "get lower", "sit down", "back to normal". Started by its
+# tool alone: no trigger and no [ask], since a person asked. Each call asks
+# the body's stand once on `body/stand_asked`, a percent of the lamp's own
+# stand, kept until the next ask or power-up. lamp-skills publishes it only
+# with LAMP_BODY_POSE_ASK=on, as lamp-body reads it only with that switch.
+needs = ["voice", "body"]
+# Comes with the lamp (docs/skills.md, "Core and installable skills").
+kind = "core"
+version = "1.0.0"
+tool = "set_pose"
+
+# What it may use, and nothing more: the model's line and the body's stand.
+# It reads no topic.
+[permissions]
+speak = true
+body = true
+
+[choice]
+name = "pose"
+about = "How tall to stand: lower or sit when asked to get lower or sit down, normal when asked to stand up tall or go back to normal. Always give one."
+one_of = ["normal", "lower", "sit"]
+
+# Every call: the note for the model's one short line.
+[[do]]
+say = "Say one short line that you are changing your height as asked, and stop. For lower: \"Okay, I'll sit lower.\" For sit: \"Okay, sitting down low.\" For normal: \"Back to my usual height.\""
+
+# The stand for each choice, a percent of the lamp's own.
+[[do]]
+if_choice = ["normal"]
+stand = 100
+
+[[do]]
+if_choice = ["lower"]
+stand = 60
+
+[[do]]
+if_choice = ["sit"]
+stand = 30

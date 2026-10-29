@@ -514,6 +514,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "not-feeling-well",
             "onboarding",
             "point-light",
+            "pose",
             "prepare-unplug",
             "reminders",
             "rest-your-eyes",
@@ -7644,6 +7645,11 @@ impl ToolProgram {
     /// With the skill `name` of `toml` and its `shows/`, the light shown
     /// blue at 3, ready for a call.
     fn with(name: &str, toml: &str, shows: &[(&str, &str)]) -> Self {
+        Self::with_env(name, toml, shows, &[])
+    }
+
+    /// As [`ToolProgram::with`], the program run with `env` set.
+    fn with_env(name: &str, toml: &str, shows: &[(&str, &str)], env: &[(&str, &str)]) -> Self {
         // Short: a socket's whole path has to fit in 103 bytes.
         let dir = tempfile::Builder::new()
             .prefix("tp")
@@ -7705,6 +7711,7 @@ impl ToolProgram {
                     camera_yes(&root, &[name]).as_os_str(),
                 ])
                 .args(clock.args())
+                .envs(env.iter().copied())
                 .spawn()
                 .unwrap(),
         );
@@ -7922,6 +7929,145 @@ body = { mood = "reading", for = "10s", toward = -0.5 }
     );
 }
 
+/// #4135: a `stand` step is a percent of the lamp's own stand, 1 to 100,
+/// in a skill its tool alone starts, and needs `body`. Out of range or
+/// without the grant, the skill is refused as it loads.
+#[test]
+fn a_stand_step_is_a_percent_its_tool_asks_with_the_body_grant() {
+    let dir = tempfile::tempdir().unwrap();
+    let with = |name: &str, step: &str, body: bool| {
+        load(&skill_with(
+            dir.path(),
+            name,
+            &format!("tool = \"{name}\"\n[permissions]\nbody = {body}\n[[do]]\n{step}\n"),
+        ))
+    };
+    let skill = with("lower", "stand = 60", true).unwrap();
+    let mut engine = Engine::new(vec![skill], false);
+    assert_eq!(
+        engine
+            .tool("lower", &serde_json::json!({}), 1)
+            .unwrap()
+            .calls,
+        [Call::Stand(60)]
+    );
+    assert_eq!(
+        Call::Stand(60).named(),
+        ("body.stand", serde_json::json!({"share": 60}))
+    );
+    for (name, share) in [("zero", 0), ("past", 101), ("far", 300)] {
+        let why = with(name, &format!("stand = {share}"), true).unwrap_err();
+        assert!(
+            why.contains(&format!(
+                "stand = {share}: a percent of the lamp's own stand, 1 to 100"
+            )),
+            "{why}"
+        );
+    }
+    let why = with("ungranted", "stand = 60", false).unwrap_err();
+    assert!(
+        why.contains("not permitted") && why.contains("body"),
+        "{why}"
+    );
+    // A trigger's run is the lamp's own: a kept stand is only a person's.
+    let why = load(&skill_with(
+        dir.path(),
+        "unasked",
+        "[permissions]\nbody = true\ntopics = [\"voice/state\"]\n\
+         [trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+         [ask]\npolicy = \"nudge\"\n[[do]]\nstand = 60\n",
+    ))
+    .unwrap_err();
+    assert!(why.contains("tool alone"), "{why}");
+}
+
+/// #4135: the Pose skill's tool, `set_pose`, with its three heights, each
+/// a stand of its own: normal 100, lower 60, sit 30.
+#[test]
+fn the_pose_skill_asks_a_stand_for_each_of_its_three_choices() {
+    let pose = load(&skills_root().join("pose")).unwrap();
+    let tools = tools_file(std::slice::from_ref(&pose));
+    assert_eq!(tools["body"], serde_json::json!(["set_pose"]));
+    let tool = &tools["tools"][0];
+    assert_eq!(tool["name"], "set_pose");
+    assert_eq!(
+        tool["parameters"]["properties"]["pose"]["enum"],
+        serde_json::json!(["normal", "lower", "sit"])
+    );
+    let description = tool["description"].as_str().unwrap();
+    assert!(
+        description.contains("This is as tall as I stand."),
+        "{description}"
+    );
+    let mut engine = Engine::new(vec![pose], false);
+    for (choice, share) in [("normal", 100), ("lower", 60), ("sit", 30)] {
+        let calls = engine
+            .tool("set_pose", &serde_json::json!({ "pose": choice }), 1)
+            .unwrap()
+            .calls;
+        let stands: Vec<_> = calls
+            .iter()
+            .filter(|call| matches!(call, Call::Stand(_)))
+            .collect();
+        assert_eq!(stands, [&Call::Stand(share)], "{choice}");
+    }
+}
+
+/// #4135: with `LAMP_BODY_POSE_ASK=on`, a call publishes one stand on
+/// `body/stand_asked`, as `skills`; off, nothing is published and the run
+/// says the stand was not acted on.
+#[test]
+fn a_stand_is_published_only_with_the_pose_ask_switch_on() {
+    let skill = "tool = \"set_pose\"\n[permissions]\nbody = true\nspeak = true\n\
+                 [choice]\nname = \"pose\"\nabout = \"How tall.\"\none_of = [\"lower\"]\n\
+                 [[do]]\nsay = \"Say it.\"\n[[do]]\nif_choice = [\"lower\"]\nstand = 60\n";
+    let stand = |program: &ToolProgram| {
+        Bus::new(program._dir.path().join("bus"))
+            .unwrap()
+            .latest(lamp_msgs::StandAsked::TOPIC)
+            .unwrap()
+    };
+    let on = ToolProgram::with_env("pose", skill, &[], &[("LAMP_BODY_POSE_ASK", "on")]);
+    assert_eq!(on.call("set_pose", r#"{"pose":"lower"}"#)["ok"], true);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let kept = loop {
+        if let Some(kept) = stand(&on) {
+            break kept;
+        }
+        assert!(Instant::now() < deadline, "no stand published");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(kept.header.source, "skills");
+    assert_eq!(
+        kept.parse::<lamp_msgs::StandAsked>().unwrap(),
+        lamp_msgs::StandAsked { share: 60 }
+    );
+
+    let off = ToolProgram::with_env("pose", skill, &[], &[("LAMP_BODY_POSE_ASK", "off")]);
+    let mut events = Bus::new(off._dir.path().join("bus"))
+        .unwrap()
+        .subscribe(SkillEvent::TOPIC, "test")
+        .unwrap();
+    assert_eq!(off.call("set_pose", r#"{"pose":"lower"}"#)["ok"], true);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let done = loop {
+        assert!(Instant::now() < deadline, "no done");
+        if let Ok(Some(message)) = events.recv(Duration::from_millis(100)) {
+            let event: SkillEvent = message.parse().unwrap();
+            if event.stage == SkillStage::Done {
+                break event;
+            }
+        }
+    };
+    assert!(
+        done.why
+            .contains("stand 60%: not acted on, LAMP_BODY_POSE_ASK is not on"),
+        "{}",
+        done.why
+    );
+    assert!(stand(&off).is_none());
+}
+
 /// A short show for the program's tests: three frames of two seconds.
 const SHORT_SHOW: &str = r#"
 [[light]]
@@ -8029,15 +8175,15 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
         ),
         (
             format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nsay = \"Hi.\"\n"),
-            "body, light or show",
+            "body, light, show or stand",
         ),
         (
             format!("{TOOL}[[do]]\nif_choice = [\"a\"]\ncue = \"hum\"\n"),
-            "body, light or show",
+            "body, light, show or stand",
         ),
         (
             format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nrest = {{ op = \"wake\" }}\n"),
-            "body, light or show",
+            "body, light, show or stand",
         ),
         (
             "tool = \"t\"\n[[do]]\nif_choice = [\"a\"]\nlight = { colour = \"warm\" }\n".into(),
