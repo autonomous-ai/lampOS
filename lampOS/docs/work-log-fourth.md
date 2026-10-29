@@ -1,3 +1,25 @@
+## 2026-10-29 20:5x ICT — #4379 and #4380 landed; #4384 HOLD and lift; #4395; update reads
+
+**Landed in train 366:**
+- **#4379**: #4369's docs sentence (a joined piece is asked twice, up to 8 s).
+- **#4380**: `switches.md`'s `LAMP_PLACE` row says what a lamp with no place is told.
+
+**#4395** (Part of #4337, NEXT TRAIN): `the_lamps_place_follows_its_time` now pins the no-place time note: the time, "You don't know where you are beyond your time zone.", then `AREA_ASKED`. Red with `AREA_ASKED` dropped. It merges with #4356 (landed in train 368).
+
+**#4384** (Seventh, onboarding for the ship):
+- HOLD on `b5ded946d2`. "one" to "twelve" counted as times wherever they appeared. Probed against lamp-voice: "Can you say that one more time?" handed out the hello, and "Yes, that one is fine." no longer answered it.
+- Lifted on `895f85c181` ("one" out, hour words only in `quiet_hours`), probed again.
+- P3 for after the ship: a question saying a number word ("Which two questions?") still hands out the hello.
+
+**Reads:**
+- #4382 (`self-put-back` as a round's end; P3 on a cut between `end()` and the log line).
+- #4393 (its docs answer to that P3).
+- #4376 earlier.
+
+**After-merge, train 365:** `second_provider` 867/0, `local_time` 12/0, `onboarding` 214/0, `known_faces` 29/0, `person` 13/0 (Mac).
+
+No device action. lamp-0c89 (#2836) still waits for access.
+
 ## 2026-10-29 19:0x ICT — trains 364 and 365: #4368, #4369, #4373 landed; two carries; three update reads
 
 **Landed:**
