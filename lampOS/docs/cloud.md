@@ -495,11 +495,13 @@ parts for a minute after, `restoring` while a rollback puts the previous
 build back and watches it, `idle` between rounds), and how the last round
 ended, by the outcome's name (`up-to-date`, `switched`, `refused`,
 `rolled-back`, `failed`, ...) and the build it was about. It carries no reason
-text, which may name paths. A round that did not switch also says where it
-stopped by a fixed name, `reason`: the phase it was in (`checking`,
-`fetching`, `switching`, `watching`, `restoring`), or `models` for a build
-whose models wait for the models switch. Every round's end says when it
-began, `started_at_unix_ms`. A new lamp-update's confirmation of its own
+text, which may name paths. A round that refused, failed, rolled back, was
+unreachable or found no quiet moment also says where it stopped by a fixed
+name, `reason`: the phase it was in (`checking`, `fetching`, `switching`,
+`watching`, `restoring`), or `models` for a build whose models wait for the
+models switch. A round's end says when it began, `started_at_unix_ms`. A
+round that ends before its first phase, such as one that finds the update's
+lock taken, has neither. A new lamp-update's confirmation of its own
 switch is an end too, `self-confirmed`, after the `self-switched` that
 began it. Both are absent from a value read back from the
 records at start, and from an older lamp-update. lamp-cloud answers from that value and never
