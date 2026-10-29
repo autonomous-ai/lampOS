@@ -3407,8 +3407,9 @@ after a take-over, but now for every turn:
     ([attention.md](attention.md)). A line cut short is read too
     (request 13 on a lamp run): when the line after it, not joined with
     it, keeps its start hearing, that start is held on the cut line's
-    first word as well, and a cut line of two words or fewer needs no
-    comma ("Ma'am could"); a whole line still does. With `LAMP_NAME_SECOND_SIGN=on`, with
+    first word as well. In a cut line of two words or fewer the word may be
+    bare ("Ma'am could"), for the line after it only; the cut line itself
+    and a whole line still need the comma. With `LAMP_NAME_SECOND_SIGN=on`, with
     or without this switch, a hearing that
     does count says which second sign let it (#3945: on 28 Oct a "Ma'am,
     …" line from the Mac was answered for its name and the journal could
