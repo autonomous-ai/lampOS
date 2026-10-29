@@ -1609,6 +1609,9 @@ fn second_route_worker_environment(
         crate::second_provider::LOOK_NOTE_ENVIRONMENT,
         crate::second_provider::LOOK_WALK_ENVIRONMENT,
         crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
+        // A line the model declines says nothing and carries no
+        // conversation (#3945).
+        crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -1738,6 +1741,7 @@ mod tests {
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
             crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
+            crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -2370,6 +2374,7 @@ mod tests {
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
                     || name == crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT
+                    || name == crate::second_provider::DECLINE_SILENT_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
@@ -2451,6 +2456,7 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_DECLINE_SILENT=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
