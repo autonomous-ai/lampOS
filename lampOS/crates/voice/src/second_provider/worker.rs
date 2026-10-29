@@ -20062,8 +20062,9 @@ mod tests {
         let mut eyes = bus
             .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
             .unwrap();
-        // A look lives 300 ms here: one with none waits it out.
-        eyes.expires_after(Some(Duration::from_millis(300)));
+        // A look given lives 10 s, so a loaded run still reads it fresh; a
+        // line with none is told by a look that lives 1 ms, waited out
+        // (it failed under load when every look lived 300 ms, 29 Oct).
         let face = |n: usize| Face {
             speaking: None,
             id: format!("f{n}"),
@@ -20084,6 +20085,7 @@ mod tests {
         for (request, faces) in (1..).zip(in_view.iter().copied()) {
             match faces {
                 Some(faces) => {
+                    eyes.expires_after(Some(Duration::from_secs(10)));
                     eyes.publish_json(
                         monotonic_us(),
                         &Faces {
@@ -20092,7 +20094,17 @@ mod tests {
                     )
                     .unwrap();
                 }
-                None => std::thread::sleep(Duration::from_millis(400)),
+                None => {
+                    eyes.expires_after(Some(Duration::from_millis(1)));
+                    eyes.publish_json(
+                        monotonic_us(),
+                        &Faces {
+                            faces: vec![face(9)],
+                        },
+                    )
+                    .unwrap();
+                    std::thread::sleep(Duration::from_millis(1 + lamp_bus::EXPIRY_GRACE_MS + 100));
+                }
             }
             let line = (monotonic_us().saturating_sub(2_000_000), monotonic_us());
             let signs = heeding.signs(request, line);
