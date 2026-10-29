@@ -1238,6 +1238,17 @@ that list is empty until lamp-update's names are agreed. Every value is
 typed so that no text that came in can reach an alert (the part, a build,
 a stage, a number); a canary test plants secrets in every input.
 
+**A repeat is told once.** A lamp that keeps being refused, failing, or
+talked to through every update window would send the same alert each round.
+A `refused`, `failed` or `not-switched` end is told once per stage, build
+and code (a missing build or code counts as its own value), and told again
+only after a round ends some other way (`done`, `rolled-back`,
+`self-switched`, or a different stage, build or code). While such a streak
+holds, the `started` of the next rounds is not told either, since its end
+would not be. The streak is kept in `update-alerts.json` too, so a restart
+mid-streak tells nothing again; a file from before this field loads as no
+streak.
+
 **Once, across restarts.** `update/status` says the last result every
 minute and again whenever lamp-update or lamp-cloud starts, and a round
 restarts lamp-cloud when it changed it. `update-alerts.json` in
