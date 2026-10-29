@@ -9329,7 +9329,13 @@ async fn answer(
         let mut after = false;
         // The answer's words, for a holding answer's check.
         let mut whole = String::new();
-        while let Some((text, mut packets)) = queued.recv().await {
+        // A piece the voice could not start twice (`services::UNSAID`,
+        // #4338): said with the next piece, as one, so no sentence of the
+        // answer is silently dropped.
+        let mut carried: Option<String> = None;
+        while let Some((text, packets)) = queued.recv().await {
+            // Its words, kept for a piece said with the next (#4338).
+            let own = text.clone();
             // The announcement is heard, not written: the coordinator reads
             // an answer's opening words for its look ("Let me look.") and
             // for the body's gesture, and they are the model's (#1075 on
@@ -9357,8 +9363,47 @@ async fn answer(
                     return Err(Stop::Gone);
                 }
             }
-            while let Some(packet) = packets.recv().await {
-                let samples = packet.map_err(|error| Stop::Failed(fault(&error)))?;
+            // After a piece not said, this one is said with it, in order
+            // (#4338): its own speech, already started, is let go. The two
+            // go to the voice as the lamp's words, without the speech tags
+            // (`LAMP_SECOND_SPEECH_TAGS`) the pieces were given apart.
+            let (piece, mut packets) = match carried.take().filter(|_| answering) {
+                Some(unsaid) => {
+                    let joined = format!("{unsaid} {own}");
+                    eprintln!(
+                        "lamp-voice second: request {request}: the piece not said goes with the next one, as one piece ({} words)",
+                        joined.split_whitespace().count()
+                    );
+                    let speech = shared
+                        .services
+                        .speak_for(joined.clone(), net::Turn { request, heard_at });
+                    (joined, speech)
+                }
+                None => (
+                    own,
+                    futures_util::stream::unfold(packets, |mut packets| async move {
+                        packets.recv().await.map(|packet| (packet, packets))
+                    })
+                    .boxed(),
+                ),
+            };
+            let mut played = false;
+            while let Some(packet) = packets.next().await {
+                let samples = match packet {
+                    // Not started twice, and none of it played: kept for the
+                    // next piece (#4338). The announcement is never carried.
+                    Err(error) if services::unsaid(&error) && !played => {
+                        if answering {
+                            eprintln!(
+                                "lamp-voice second: request {request}: a piece of the answer could not be started twice; it is said with the next piece"
+                            );
+                            carried = Some(piece);
+                        }
+                        break;
+                    }
+                    packet => packet.map_err(|error| Stop::Failed(fault(&error)))?,
+                };
+                played = true;
                 for part in samples.chunks(PACKET_SAMPLES) {
                     let audio = ProviderOutput::Audio {
                         request,
@@ -9435,6 +9480,13 @@ async fn answer(
                     }
                 }
             }
+        }
+        // The answer's last piece could not be started twice: nothing came
+        // after it to say it with (#4338).
+        if carried.is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the answer's last piece could not be started twice and was not said"
+            );
         }
         // The lamp's words for the turn are over, said as the Live route
         // says its own are over: a last piece, empty and finished. Without

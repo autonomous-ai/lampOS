@@ -4170,12 +4170,26 @@ the configured provider's, and the chosen voice's model is
 voice fails to start (a refusal, a quota, a broken connection, an answer
 with no sound, or no first sound within 4 s, `START_WITHIN`) is asked of it
 once more, `lamp-voice second: <voice> failed to start a sentence (…);
-asked once more`; failing again it is not said, `<voice> failed again (…);
-the sentence is not said, and the turn goes on`, and the turn goes on with
-the next sentence. Before #1844's C the second failure failed the whole
-turn, against what this said, and a host that took the connection and never
-answered cost the connection's 10 s and its response's, twice: now at most
-8 s a sentence. A sentence begun and then lost fails as any does. The journal at start names the voice: `the voice is ElevenLabs,
+asked once more, on a connection of its own`. For a piece of a turn's
+answer in the configured voice, that second asking goes over HTTP on a
+connection opened for it, never the speech socket or a pooled connection
+that may have held the first (`net::fresh_client`, `Tts::speak_fresh`), in
+the turn's model, so the answer keeps one voice. Failing again, the piece
+fails with `services::UNSAID` (`<voice> failed again (…); the sentence is
+said with the next one`), and the answer's player says it with the next
+piece, as one, in order (`a piece of the answer could not be started twice;
+it is said with the next piece`, then `the piece not said goes with the next
+one, as one piece (N words)`), so no sentence is silently dropped (#4338:
+on lamp-3e83 on 29 Oct ElevenLabs' first sound timed out at 14:15:13 and
+14:15:48, and one sentence of each of those answers was never said). Only
+the answer's last piece has nothing to go with: it is not said, `the
+answer's last piece could not be started twice and was not said`, and the
+turn ends as ever. The announcement is never carried. Before #1844's C the
+second failure failed the whole turn, against what this said, and a host
+that took the connection and never answered cost the connection's 10 s and
+its response's, twice: now at most 8 s a sentence. A sentence begun and
+then lost fails as any does. Turnless speech (the wait's sounds, the down
+line) takes `UNSAID` as nothing said, as it took an empty answer. The journal at start names the voice: `the voice is ElevenLabs,
 model eleven_v4_turbo, the lamp's one voice`.
 
 **The key.** The voice unit's credential `gemini.key`

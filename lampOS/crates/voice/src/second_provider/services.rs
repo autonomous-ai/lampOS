@@ -725,6 +725,37 @@ impl Voice {
             }
         }
     }
+
+    /// [`Voice::first`] asked again after a piece failed to start (#4338):
+    /// the configured voice over a connection of its own
+    /// ([`net::Tts::speak_fresh`]); Gemini as before.
+    async fn first_fresh(
+        &self,
+        text: &str,
+        turn: Option<net::Turn>,
+    ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
+        match (self, turn) {
+            (Self::Configured(tts, _), Some(turn)) => {
+                let mut speech = tts.speak_fresh(text, turn).await?;
+                let first = speech.next().await?;
+                let rest = stream::try_unfold(speech, |mut speech| async move {
+                    Ok(speech.next().await?.map(|packet| (packet, speech)))
+                });
+                Ok(stream::iter(first.map(Ok)).chain(rest).boxed())
+            }
+            _ => self.first(text, turn).await,
+        }
+    }
+}
+
+/// What a piece of an answer's speech fails with when it could not be
+/// started twice ([`in_one_voice_near`], #4338): not said, so the answer's
+/// player says it with the next piece rather than drop it.
+pub(crate) const UNSAID: &str = "a sentence's speech";
+
+/// Whether `error` is [`UNSAID`]: a piece not started, never begun.
+pub(crate) fn unsaid(error: &net::Error) -> bool {
+    matches!(error, net::Error::Timeout(what) if *what == UNSAID)
 }
 
 /// How long a voice has to give a sentence's first sound, each time asked
@@ -734,10 +765,12 @@ const START_WITHIN: std::time::Duration = std::time::Duration::from_secs(4);
 
 /// `text` in the lamp's one voice, never another's (#1712, the owner: "one
 /// voice per lamp"). A sentence the voice fails to start within
-/// [`START_WITHIN`] is asked once more; failing again, it is not said, and
-/// the turn goes on with the next sentence (#1844's C: before, the second
-/// failure failed the whole turn). A sentence begun and then lost fails as
-/// any does.
+/// [`START_WITHIN`] is asked once more, on a connection of its own
+/// ([`Voice::first_fresh`], #4338); failing again, it fails with [`UNSAID`],
+/// which the answer's player says with the next piece, so the turn goes on
+/// and no sentence is silently dropped (#1844's C: before, the second
+/// failure failed the whole turn; #4338: before, the sentence was dropped).
+/// A sentence begun and then lost fails as any does.
 #[cfg(test)]
 fn in_one_voice(
     voice: Voice,
@@ -770,6 +803,15 @@ fn in_one_voice_near(
                     .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
             }
         };
+        let fresh = |voice: &Voice| {
+            let text = text.clone();
+            let voice = voice.clone();
+            async move {
+                tokio::time::timeout(START_WITHIN, voice.first_fresh(&text, turn))
+                    .await
+                    .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
+            }
+        };
         let mut voice = voice;
         let mut tried = first(&voice).await;
         let why = tried.as_ref().err().and_then(routes::fallback_why);
@@ -782,17 +824,17 @@ fn in_one_voice_near(
             Ok(speech) => Ok(speech),
             Err(error) => {
                 eprintln!(
-                    "lamp-voice second: {} failed to start a sentence ({error}); asked once more",
+                    "lamp-voice second: {} failed to start a sentence ({error}); asked once more, on a connection of its own",
                     voice.name()
                 );
-                match first(&voice).await {
+                match fresh(&voice).await {
                     Ok(speech) => Ok(speech),
                     Err(again) => {
                         eprintln!(
-                            "lamp-voice second: {} failed again ({again}); the sentence is not said, and the turn goes on",
+                            "lamp-voice second: {} failed again ({again}); the sentence is said with the next one",
                             voice.name()
                         );
-                        Ok(stream::empty().boxed())
+                        Err(net::Error::Timeout(UNSAID))
                     }
                 }
             }
@@ -1192,8 +1234,9 @@ pub(crate) mod tests {
         "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n";
 
     /// #1712, one voice per lamp: a sentence Gemini refuses is asked of
-    /// Gemini once more, and said when it answers; refused again, it is not
-    /// said. No other voice is ever asked.
+    /// Gemini once more, and said when it answers; refused again, it fails
+    /// with [`UNSAID`], for the player to say with the next piece (#4338).
+    /// No other voice is ever asked.
     #[tokio::test]
     async fn a_sentence_the_voice_cannot_start_is_asked_once_more_never_of_another() {
         let (gemini_url, gemini_asked) = servers(
@@ -1224,11 +1267,14 @@ pub(crate) mod tests {
         let results: Vec<_> = in_one_voice(Voice::Gemini(gemini), "Hello there.".into(), None)
             .collect()
             .await;
-        assert!(results.is_empty(), "not said, and no error: {results:?}");
+        assert!(
+            matches!(results.as_slice(), [Err(error)] if unsaid(error)),
+            "not said, and said so: {results:?}"
+        );
         assert_eq!(gemini_asked.await.unwrap(), 2, "asked twice, no more");
     }
 
-    /// The same for the configured voice: once more, then not said.
+    /// The same for the configured voice: once more, then [`UNSAID`].
     #[tokio::test]
     async fn the_configured_voice_is_asked_once_more_then_not() {
         let (openai, asked) = servers(
@@ -1259,13 +1305,41 @@ pub(crate) mod tests {
         )
         .collect()
         .await;
-        assert!(results.is_empty(), "not said, and no error: {results:?}");
+        assert!(
+            matches!(results.as_slice(), [Err(error)] if unsaid(error)),
+            "not said, and said so: {results:?}"
+        );
+        assert_eq!(asked.await.unwrap(), 2);
+    }
+
+    /// #4338 (lamp-3e83, 29 Oct): a piece of a turn's answer the configured
+    /// voice fails to start is asked again on a connection of its own
+    /// ([`net::Tts::speak_fresh`]), and said when it answers.
+    #[tokio::test]
+    async fn a_turns_piece_not_started_is_asked_again_on_its_own_connection() {
+        let (openai, asked) = servers(
+            vec![(REFUSED, Vec::new()), (PCM, bytes(&[100, -100]))],
+            "k-fresh",
+        )
+        .await;
+        let tts = Arc::new(Tts::with(TtsProvider::OpenAi, &openai, "k-fresh", None).unwrap());
+        let turn = net::Turn {
+            request: 4338,
+            heard_at: std::time::Instant::now(),
+        };
+        let samples = said(in_one_voice(
+            Voice::Configured(tts, "OpenAI"),
+            "Hello there.".into(),
+            Some(turn),
+        ))
+        .await;
+        assert_eq!(samples, [200, -200], "said on its second asking");
         assert_eq!(asked.await.unwrap(), 2);
     }
 
     /// #1844's C: a voice whose host takes the connection and never answers
-    /// is given 4 s a try, twice, and the sentence is not said, with no
-    /// error, so the turn goes on.
+    /// is given 4 s a try, twice, and the sentence fails with [`UNSAID`],
+    /// which the player says with the next piece, so the turn goes on.
     #[tokio::test(start_paused = true)]
     async fn a_voice_that_never_answers_is_given_four_seconds_twice() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1293,7 +1367,10 @@ pub(crate) mod tests {
         )
         .collect()
         .await;
-        assert!(results.is_empty(), "{results:?}");
+        assert!(
+            matches!(results.as_slice(), [Err(error)] if unsaid(error)),
+            "{results:?}"
+        );
         let took = began.elapsed();
         assert!(
             took >= 2 * START_WITHIN && took < 2 * START_WITHIN + std::time::Duration::from_secs(1),
