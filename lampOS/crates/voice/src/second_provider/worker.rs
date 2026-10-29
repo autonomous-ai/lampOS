@@ -23684,6 +23684,7 @@ mod memory_observer {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let tools = crate::agent_tasks::tools(&place);
@@ -23870,6 +23871,7 @@ mod memory_observer {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let tools = crate::agent_tasks::tools(&place);

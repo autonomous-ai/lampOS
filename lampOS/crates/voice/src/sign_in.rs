@@ -1544,6 +1544,7 @@ mod tests {
                 make_skill: false,
                 named_only: false,
                 correct: false,
+                questions: false,
                 sign_in: true,
             }
         }
@@ -2028,6 +2029,7 @@ mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -2177,6 +2179,7 @@ mod tests {
             make_skill: false,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: true,
         };
         // `bad_request`: a tasks part too old for the sign-in's ops.
