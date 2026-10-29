@@ -2061,11 +2061,16 @@ impl FacesLately {
         self.forget_before(at);
     }
 
-    /// The most faces of any look within [`FACES_WITHIN`] of `now`, `None`
-    /// with no look in it.
+    /// The most faces seen in at least two looks within [`FACES_WITHIN`] of
+    /// `now` (in the one look, when there is only one), `None` with no look
+    /// in it: one look that missed a face never makes two people one, and
+    /// one look that saw a second face that isn't there (lamp-52e6, 29 Oct
+    /// 16:52, the one screen face) never makes one person two (#4118).
     pub fn most(&mut self, now: std::time::Instant) -> Option<usize> {
         self.forget_before(now);
-        self.0.iter().map(|(_, faces)| *faces).max()
+        let mut counts: Vec<usize> = self.0.iter().map(|(_, faces)| *faces).collect();
+        counts.sort_unstable_by(|a, b| b.cmp(a));
+        counts.get(1).or(counts.first()).copied()
     }
 
     fn forget_before(&mut self, now: std::time::Instant) {
@@ -2107,6 +2112,28 @@ pub fn most_faces_lately() -> Option<usize> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .most(std::time::Instant::now())
+}
+
+/// How long ago the eyes may have written the known file for
+/// [`known_lately`]: they rewrite it at each check, about every 2 s and
+/// slower when busy, and remove it as soon as the near face matches nobody,
+/// so a file still there is the last check's word.
+pub const KNOWN_LATELY: Duration = Duration::from_secs(8);
+
+/// The name in the eyes' known file at `path` while it is at most
+/// [`KNOWN_LATELY`] old, for the by-default rule (#3884): [`known_now`]'s
+/// 3 s read a file rewritten every 2–3 s as nobody (lamp-52e6, 29 Oct
+/// 16:49, "an unknown face in view" with the file there; #4118).
+pub fn known_lately(path: &Path) -> Option<String> {
+    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
+    let age = SystemTime::now().duration_since(modified).ok()?;
+    if age > KNOWN_LATELY {
+        return None;
+    }
+    let text = std::fs::read_to_string(path).ok()?;
+    (text.len() <= 4096)
+        .then(|| lamp_msgs::known::read_known(&text).map(|(name, _)| name.to_owned()))
+        .flatten()
 }
 
 /// [`known_now`] for the eyes the environment names.
@@ -2957,9 +2984,17 @@ mod tests {
         let mut lately = FacesLately::default();
         assert_eq!(lately.most(at), None);
         lately.seen(at, 2);
+        assert_eq!(lately.most(at), Some(2), "one look alone counts");
         lately.seen(at + Duration::from_millis(250), 0);
-        assert_eq!(lately.most(at + Duration::from_millis(300)), Some(2));
-        // Past the window: the newest looks alone.
+        lately.seen(at + Duration::from_millis(500), 2);
+        assert_eq!(lately.most(at + Duration::from_millis(600)), Some(2));
+        // One spurious second face among looks of one: one person.
+        let mut one = FacesLately::default();
+        for (k, faces) in [1, 1, 2, 1].into_iter().enumerate() {
+            one.seen(at + Duration::from_millis(250 * k as u64), faces);
+        }
+        assert_eq!(one.most(at + Duration::from_secs(1)), Some(1));
+        // Past the window: the newest look alone.
         lately.seen(at + Duration::from_secs(4), 0);
         assert_eq!(lately.most(at + Duration::from_secs(4)), Some(0));
         assert_eq!(lately.most(at + Duration::from_secs(8)), None);
@@ -3003,6 +3038,32 @@ mod tests {
                 "the mark is kept"
             );
         }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// lamp-52e6, 29 Oct 16:49 (#4118): a known file rewritten every 2–3 s
+    /// still names its person at 5 s, as `known_now`'s 3 s did not; one
+    /// past [`KNOWN_LATELY`], or none, names nobody.
+    #[test]
+    fn the_known_file_counts_for_the_by_default_rule_a_few_seconds_old() {
+        let dir = std::env::temp_dir().join(format!("known-lately-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("known");
+        assert_eq!(known_lately(&path), None);
+        std::fs::write(&path, "Example Name\n").unwrap();
+        let aged = |seconds| {
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(SystemTime::now() - Duration::from_secs(seconds))
+                .unwrap();
+        };
+        aged(5);
+        assert_eq!(known_now(&path), None, "the 3 s read misses it");
+        assert_eq!(known_lately(&path).as_deref(), Some("Example Name"));
+        aged(KNOWN_LATELY.as_secs() + 2);
+        assert_eq!(known_lately(&path), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
