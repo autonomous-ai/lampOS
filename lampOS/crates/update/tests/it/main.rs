@@ -6,6 +6,7 @@
 //!   `flock`, and a process another test in the same binary starts holds a
 //!   copy of it until its exec (`round.rs`'s note on `FORKS`).
 mod ci_paths;
+mod climb_from_7071;
 mod image_journal;
 mod image_ramlog;
 mod scratch_paths;
