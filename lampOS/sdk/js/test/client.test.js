@@ -109,7 +109,7 @@ test('the debug log redacts what would pair or hello as this computer', async ()
   // What a lamp sends beyond the schema's own fields is decided too.
   for (const frame of [
     { re: 3, ok: true, to: 'body', move: 'glad-lift', light: true },
-    { re: 1, ok: true, limits: { joints_hz: 20 } },
+    { re: 1, ok: true, limits: { rates: 'off', refused: [{ most: 20, within_ms: 1000 }], phrases: [{ most: 6, within_ms: 60000 }] } },
     { re: 2, ok: true, state: { mood: { energy: 0.5, warmth: 0.6, awake: true, asleep: false }, light: { on: true, colour: 'warm', level: 3, shows: { on: true, colour: 'warm', level: 3 } } } },
     { ev: 'hand', seen: true, x: 0.4, y: 0.5, size: 0.12, open: true, confidence: 0.9 },
     { re: 4, ok: true, to: 'body', follow: 'hand' },
@@ -274,10 +274,13 @@ test('greet a person who arrives', async () => {
   await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
     let greeted;
     const done = new Promise((resolve) => { greeted = resolve; });
-    await lamp.on('person.arrived', async () => { await lamp.gesture('greeting'); greeted(); });
+    let at;
+    await lamp.on('person.arrived', async (event) => { at = event.at; await lamp.gesture('greeting'); greeted(); });
     fake.emit('person.arrived', { count: 1, near: 0.3 });
     await done;
     assert.deepEqual(fake.asked('gesture'), [{ name: 'greeting' }]);
+    // `at` as lamp-control stamps it: UTC, to the second, ending Z.
+    assert.match(at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
   });
 });
 
@@ -453,7 +456,9 @@ test('the tour runs every step against a fake lamp', async () => {
       child.on('error', reject);
       child.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`exit ${code}: ${out}`))));
     });
-    assert.ok(!said.includes('refused'), said);
+    // A step's refusal prints as "name: refused, …" (`limits` has a `refused`
+    // window, so the word alone isn't one).
+    assert.ok(!said.includes(': refused,'), said);
     for (const op of ['get', 'light', 'say', 'gesture', 'express', 'look', 'joints', 'stop']) assert.ok(fake.asked(op).length, `${op}: ${said}`);
     assert.deepEqual(fake.asked('joints')[0].targets, { pitch: 5 });
   } finally {

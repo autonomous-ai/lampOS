@@ -33,7 +33,7 @@ export const SHOWN = new Set([
 // answer, `mood`, `light`, a pushed skill's parts, Nine's `shows` and `hand`,
 // and a `look` at `hand`'s `follow`).
 export const SHOWN_BEYOND_SCHEMA = new Set([
-  'joints_hz', 'to', 'move', 'on', 'energy', 'warmth', 'awake', 'shows', 'seen', 'x', 'y', 'size', 'open',
+  'to', 'move', 'on', 'energy', 'warmth', 'awake', 'shows', 'seen', 'x', 'y', 'size', 'open',
   'confidence', 'sha256', 'part', 'follow',
 ]);
 // A said text's tag is keyed with this process's own random key: the same text
