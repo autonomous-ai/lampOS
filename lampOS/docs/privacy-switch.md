@@ -31,7 +31,11 @@ starts after Controls and so, at a shutdown or reboot, stops before it
 (`After=lamp-controls.service` and `Wants=` in the voice's unit; #3697:
 with the old order, Controls after the voice, every reboot stopped Controls
 first, the voice saw the switch go unreadable, ended with 1, and the lamp
-came back muted by the restart guard). A voice still holding the line on
+came back muted by the restart guard). An update's round still restarts
+Controls before the voice, in startup order, so the old voice closes on the
+unreadable switch just before its own stop; that close, then the stop, no
+longer leaves the guard (lamp-06c1, 29 Oct 08:33; "A switch unreadable,
+then the stop" in controls.md). A voice still holding the line on
 its direct route is no obstacle: Controls asks for the line again each
 second (below), so the microphones stay closed meanwhile.
 
