@@ -1026,6 +1026,79 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
     );
 }
 
+/// #4333 on the second route: with `LAMP_OWNER_PLACE=on` and a place kept,
+/// a line that needs a place is asked with the owner's place beside its
+/// words, and a line that doesn't is asked as before; without the switch
+/// (no note given to the engine), the place question is asked as before
+/// too, and after a clear nothing is told, so the model asks where.
+#[test]
+fn the_owners_place_is_told_beside_a_place_question_alone() {
+    let directory = std::env::temp_dir().join(format!("second-place-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let file = directory.join("place");
+    let place = lamp_msgs::owner_place::Place {
+        name: "Thao Dien, Thu Duc".into(),
+        lat: 10.8,
+        lon: 106.74,
+        set_at: "2026-10-29T08:30:00Z".into(),
+    };
+    std::fs::write(&file, lamp_msgs::owner_place::text(&place)).unwrap();
+    let asked = |heard: &str, noted: bool| -> Vec<Message> {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.to_owned())].into()),
+            chats: Mutex::new([vec![text("There is one."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            worker::tool_runner(crate::tools::Settings::default(), None, None, false),
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        if noted {
+            engine = engine.noting_the_place(worker::place_noting(file.clone()));
+        }
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+                turn(&mut engine).await
+            });
+        let asked_of = script.asked.lock().unwrap();
+        asked_of[0].clone()
+    };
+    let question = "What's a good coffee place near me?";
+    assert_eq!(
+        asked(question, true),
+        [
+            Message::system("SYSTEM"),
+            Message::system(crate::owner_place::note(&place)),
+            Message::user(question),
+        ]
+    );
+    let other = "Tell me a joke.";
+    assert_eq!(
+        asked(other, true),
+        [Message::system("SYSTEM"), Message::user(other)]
+    );
+    assert_eq!(
+        asked(question, false),
+        [Message::system("SYSTEM"), Message::user(question)]
+    );
+    std::fs::remove_file(&file).unwrap();
+    assert_eq!(
+        asked(question, true),
+        [Message::system("SYSTEM"), Message::user(question)]
+    );
+    let _ = std::fs::remove_dir_all(&directory);
+}
+
 /// #1390 on the second route (the first builder's 20:15 on #1722): news the
 /// person asks about (`check_agent_task`) is put on the turn it was
 /// answered in, as `NewsAnswered`, and its key is never the model's. A key

@@ -145,6 +145,7 @@ lamp says so.
 | `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. `data` is not read. Without the switch, V1's "not on this lamp" |
 | `system.shutdown` | with `LAMP_SHUTDOWN=on` (#3697, "The lamp turned off from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"shutting_down": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). `data` is not read. Once taken, asked again within 60 s (`lamp::YES_KEPT`) it is answered the same `success` and the helper is not asked again; after that the helper is asked again. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
+| `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### News for the phone, unasked (`messages/out`)
@@ -1403,6 +1404,26 @@ the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
   socket is not there.
 - **Installed:** the helper's two units are in `lamp-update`'s install list
   (`install::PRODUCT`, #2853): the socket enabled, the template never.
+
+### The owner's place (`owner.place`, #4333)
+
+The app gives the lamp its owner's approximate place, so "near me" needs no
+asking ([owner-place.md](owner-place.md) has the whole contract). Off unless
+`LAMP_OWNER_PLACE=on`, beside `LAMP_SETTINGS_CHANGE=on` and `LAMP_CLOUD=on`;
+`can` lists `owner.place` and `owner.place.clear` only then. With it off,
+`owner.place.clear` is still taken, unlisted, whenever the helper is there
+(`settings::PLACE_CLEAR_KIND`, #4356), so a place kept while it was on
+never outlives it. `name` is an area name, the neighbourhood, district or
+city the phone's geocoder gives (the app joins sub-locality and locality),
+never a street address; digits are not refused ("District 1"). `lat`/`lon`
+is where the lamp stands, set by the person at setup (with the lamp) or when
+they tap Update now, never the phone's position resent as the owner moves. The app
+rounds `lat`/`lon` to 2 decimals before sending, so the exact position never
+crosses the relay. `lamp-cloud` checks and rounds the place (`lamp_msgs::owner_place::fit`: latitude to
+0.01°, longitude to a step at least 1 km wide), so what leaves it is never
+finer than the grid, and hands `{"owner_place": …}` (or `null` to clear) to
+`lamp-setup change`, which rounds it again and keeps it beside the person's
+name. The journal names the kind and its status only, never the place.
 
 ### The Wi-Fi (`wifi.set`)
 

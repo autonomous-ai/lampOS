@@ -1622,6 +1622,15 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // The owner's own: the place the app set goes too, on the same
+            // mark (#4333), its switch on or not (#4356); never for another
+            // person's line or the room's.
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::owner_place::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),

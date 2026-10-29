@@ -17,8 +17,14 @@
 //!   the voice, memory, Expression and skills follow `/etc/localtime` at each
 //!   reading. `lamp-schedule` takes `LAMP_ZONE` from `zone.env` at start, so
 //!   it is restarted, once the lamp is quiet ([`wait_for_quiet`]). Reminders
-//!   already set keep the zone they were set in.
-use crate::serve::{Config, Files, Save};
+//!   already set keep the zone they were set in;
+//! - the owner's approximate place (`/etc/lampOS/person/place`, beside the
+//!   name, #4333, `docs/owner-place.md`): rounded here again to about a
+//!   kilometre ([`lamp_msgs::owner_place::fit`]) and kept root's, 0600; the
+//!   voice reads it again for each question that needs a place, so nothing
+//!   restarts and a clear holds from the next question. `lamp-cloud` sends
+//!   it only with `LAMP_OWNER_PLACE=on`.
+use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
 use std::{fs, io, path::Path, time::Duration};
@@ -38,7 +44,7 @@ pub const QUIET_MOST: Duration = Duration::from_secs(30 * 60);
 pub const SCHEDULE_UNIT: &str = "lamp-schedule.service";
 
 /// One change, checked.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Change {
     /// The person's name; `None` removes it.
     PersonName(Option<String>),
@@ -46,6 +52,8 @@ pub enum Change {
     DisplayName(String),
     /// An IANA zone the lamp's zone data and the parts' both have.
     Zone(String),
+    /// The owner's place, rounded; `None` clears it.
+    OwnerPlace(Option<lamp_msgs::owner_place::Place>),
 }
 
 /// A control character, a line or paragraph separator, or a mark that turns
@@ -68,7 +76,8 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 }
 
 /// The one line `lamp-cloud` sends, checked against `config`: exactly
-/// `{"person_name": s}`, `{"display_name": s}` or `{"timezone": s}`.
+/// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`, or
+/// `{"owner_place": {"name", "lat", "lon", "set_at"}}` (`null` clears it).
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -103,6 +112,12 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
             }
             Ok(Change::Zone(zone.to_owned()))
         }
+        // Rounded again here, whatever lamp-cloud sent: root's copy of the
+        // rule is the one that writes.
+        "owner_place" if given.is_null() => Ok(Change::OwnerPlace(None)),
+        "owner_place" => Ok(Change::OwnerPlace(Some(lamp_msgs::owner_place::fit(
+            given,
+        )?))),
         _ => Err("the request names no change this lamp makes".into()),
     }
 }
@@ -174,6 +189,26 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_schedule: before != after,
                 // A zone is no one's name: said, as setup's own line says it.
                 said: format!("the time zone is now {zone}"),
+            })
+        }
+        // The journal says only that it changed: never the name or where.
+        Change::OwnerPlace(Some(place)) => {
+            write_private(
+                &lamp_msgs::owner_place::beside_name(&config.name),
+                lamp_msgs::owner_place::text(place).as_bytes(),
+            )?;
+            Ok(Done {
+                data: json!(place),
+                restart_schedule: false,
+                said: "the owner's place was set".into(),
+            })
+        }
+        Change::OwnerPlace(None) => {
+            remove(&lamp_msgs::owner_place::beside_name(&config.name))?;
+            Ok(Done {
+                data: json!({"cleared": true}),
+                restart_schedule: false,
+                said: "the owner's place was cleared".into(),
             })
         }
     }
