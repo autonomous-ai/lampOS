@@ -1,3 +1,23 @@
+## 30 October 2026, 05:20 +07 — what a 7071 lamp keeps, read by today's parts
+
+**The question:** Tests' 02:22 run left one thing open for the ten 7071 lamps' first home update: whether the new parts read the data 7071 left. I compared every record in the code, 7071 (`aa9ec9e27a`) against lamp-voice:
+- onboarding and its near-call bar;
+- faces, memory and tasks;
+- the mute record and its guard markers;
+- setup's files;
+- lamp-control's pairings.
+
+**What I found:**
+- **All compatible.** Every field added since has a default, and the version gates and step order are the same. Faces keep the same SFace pin, and memory's schema is byte-identical. 7071 has no lamp-control, so there are no pairings to carry.
+- **Two had no saved-file test, so I wrote them:**
+  - **#4442:** a whole 7071 onboarding file loads, and its finished walk asks nothing. Mutation-checked four ways.
+  - **#4443:** 7071 mute records read as they were (unmuted, muted, asleep) on the same boot and after a reboot. A refused record would read as muted for privacy, and a lamp left listening would come back deaf. Mutation-checked three ways.
+- **One behaviour gap, for the first builder:** owner naming by default comes from the typed name or the onboarding `owner`, and 7071 never wrote `owner`. A 7071 lamp set up by voice doesn't get it after the update. Nothing is lost.
+
+**Also:**
+- READ-OK on #4432 (Nine, lamp-control's rates off by default), with three docs P3s.
+- #4440 has its two reads and is NEXT TRAIN.
+
 ## 30 October 2026, 04:50 +07 — the round stops the voice first, so the ten 7071 lamps don't come back muted
 
 **What Tests found (02:22):** a lamp on the 7071 image updates straight to stable 8670 by climbing first. 7071's updater (level 5) installs and switches to 8670's (level 8), which runs the round. But from the code, it most likely came back muted once. The round restarted lamp-controls before the voice, and 7071's voice, without #4280's release, kept its restart guard. That would have been the ten customer lamps' first home update, about 5 Nov.
