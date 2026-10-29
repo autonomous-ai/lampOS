@@ -1,6 +1,6 @@
 use lamp_tasks::runtime::{
-    Config, DAEMON_RETRY_AFTER, REPORT_EVERY, SET_UP_LOOK_EVERY, SetUpLater, SystemClock,
-    read_targets_or_newer, request, serve,
+    Config, DAEMON_RETRY_AFTER, HarnessSwitches, REPORT_EVERY, SET_UP_LOOK_EVERY, SetUpLater,
+    SystemClock, read_targets_or_newer, request, serve,
 };
 use std::{
     io::{self, Read},
@@ -61,6 +61,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut set_up_later = false;
     let mut sign_in_by_code = false;
     let mut folder_missing = false;
+    let mut route = false;
     let mut engines_ready = false;
     let mut from_machines = None;
     let mut seen = std::collections::BTreeSet::new();
@@ -79,6 +80,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--set-up-later" => set_up_later = true,
             "--sign-in-by-code" => sign_in_by_code = true,
             "--folder-missing" => folder_missing = true,
+            "--route" => route = true,
             "--engines-ready" => engines_ready = true,
             "--targets-from-machines" => {
                 let engine = args
@@ -186,9 +188,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         config,
         clock,
         executable,
-        as_person,
-        folder_missing,
-        engines_ready,
+        HarnessSwitches {
+            as_person,
+            folder_missing,
+            engines_ready,
+            route,
+        },
         stop,
     )?;
     Ok(())
