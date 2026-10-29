@@ -504,12 +504,12 @@ impl Door {
         let client = session.client.clone().or(before);
         let client = client.as_deref().unwrap_or(journal::NOBODY);
         let ms = started.elapsed().as_secs_f64() * 1000.0;
-        let line = format!(
-            "{}: {op}{fields}: {}, {ms:.1} ms",
+        let head = format!(
+            "{}: {op}{fields}: {}",
             self.who(client),
             answered(&outcome, went)
         );
-        self.journal.line(client, now_us, &line);
+        self.journal.command(client, now_us, &head, ms);
         outcome
     }
 
