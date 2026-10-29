@@ -8,6 +8,7 @@
 use crate::{
     RENDER_RATE, RENDER_SAMPLES, Result,
     ownership::{OwnershipFailure, PlaybackCursor, PlaybackOwnership, QueuedRange},
+    underrun::UnderrunBudget,
 };
 use alsa::{
     Direction, ValueOr,
@@ -18,10 +19,25 @@ use lamp_turn_owner::{
     BootId, BoundaryGuard, MonoTime, OutputKind, OutputPermit, Snapshot, ZeroAuthority,
 };
 use serde::Serialize;
-use std::io;
+use std::{fmt, io};
 
 /// 40 ms maximum negotiated PCM queue plus 60 ms scheduling/device margin.
 const MAX_FINISH_US: u64 = 100_000;
+
+/// The speaker underran with only zeros queued (#3697): ALSA's EPIPE outside
+/// a declared drain, within the budget of `crate::underrun`. The device was
+/// stopped as by `stop`, its discard counted, and the guard kept, so the
+/// worker reports the reset and primes again; nothing said was queued.
+#[derive(Debug)]
+pub struct Underrun;
+
+impl fmt::Display for Underrun {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("the speaker underran with only zeros queued; stopped to prime again")
+    }
+}
+
+impl std::error::Error for Underrun {}
 
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct PcmFormat {
@@ -64,8 +80,12 @@ pub struct Speaker {
     clock_mode: bool,
     clock_started: bool,
     last_discard: Option<QueuedRange>,
+    underruns: UnderrunBudget,
     #[cfg(test)]
     post_write_check_at: Option<MonoTime>,
+    // The software null sink never underruns; tests inject ALSA's errno.
+    #[cfg(test)]
+    avail_errno: Option<i32>,
 }
 
 impl Speaker {
@@ -136,8 +156,11 @@ impl Speaker {
             clock_mode,
             clock_started: false,
             last_discard: None,
+            underruns: UnderrunBudget::default(),
             #[cfg(test)]
             post_write_check_at: None,
+            #[cfg(test)]
+            avail_errno: None,
         })
     }
 
@@ -229,7 +252,14 @@ impl Speaker {
         // ALSA synchronizes both values with the same hardware observation.
         // Available ring space and total I/O delay are different quantities;
         // never retire ownership using buffer_frames - available.
-        let (available, queued) = match self.pcm.avail_delay() {
+        #[cfg(test)]
+        let observed = match self.avail_errno.take() {
+            Some(errno) => Err(alsa::Error::new("snd_pcm_avail_delay", errno)),
+            None => self.pcm.avail_delay(),
+        };
+        #[cfg(not(test))]
+        let observed = self.pcm.avail_delay();
+        let (available, queued) = match observed {
             Ok((available, delay)) if available >= 0 && delay >= 0 => {
                 (available as usize, delay as usize)
             }
@@ -248,10 +278,7 @@ impl Speaker {
             {
                 (0, 0)
             }
-            Err(error) => {
-                self.fault()?;
-                return Err(error.into());
-            }
+            Err(error) => return Err(self.discontinuity(error)),
         };
         self.check_finish_deadline()?;
         if !self.clock_mode || self.clock_started {
@@ -462,12 +489,9 @@ impl Speaker {
             {
                 0
             }
-            Err(error) => {
-                // An underrun, disconnect or suspend is a discontinuity. Do not
-                // recover by replaying queued speech under an old permission.
-                self.fault()?;
-                return Err(error.into());
-            }
+            // An underrun, disconnect or suspend is a discontinuity. Do not
+            // recover by replaying queued speech under an old permission.
+            Err(error) => return Err(self.discontinuity(error)),
         };
         let tracked_before = self.pending.pending_frames();
         let first_sample = self.pending.accepted_cursor();
@@ -647,6 +671,31 @@ impl Speaker {
             return Err(error.into());
         }
         Ok(())
+    }
+
+    /// An ALSA error outside a declared drain. #3697: an underrun (EPIPE) with
+    /// only zeros queued is a held-up worker, never the voice (on lamp-52e6,
+    /// 0.39 s into a start as the models loaded): discard and prepare as
+    /// `stop` does, keep the guard, and return `Underrun` for the worker to
+    /// report and prime again. Queued speech, a retiring tail, an unreported
+    /// discard, a disconnect or suspend (ENODEV, EBADFD, ESTRPIPE), or more
+    /// underruns than `crate::underrun` allows latch the guard closed.
+    fn discontinuity(&mut self, error: alsa::Error) -> Box<dyn std::error::Error + Send + Sync> {
+        if error.errno() == rustix::io::Errno::PIPE.raw_os_error()
+            && self.pending.pending_speech_frames() == 0
+            && !self.pending.is_retiring_tail()
+            && self.discarded.is_none()
+            && self.underruns.admit(monotonic_us())
+        {
+            return match self.stop() {
+                Ok(()) => Underrun.into(),
+                Err(stop) => stop,
+            };
+        }
+        match self.fault() {
+            Ok(()) => error.into(),
+            Err(fault) => fault,
+        }
     }
 
     /// Control transport loss or malformed control input latches the guard closed.
@@ -966,5 +1015,123 @@ mod finish_tests {
         assert_eq!(loss.queued_frames, RENDER_SAMPLES);
         assert_eq!(loss.range.accepted_through, written.end_sample.frame);
         assert!(!speaker.speech_retired(written.end_sample));
+    }
+}
+
+#[cfg(test)]
+mod underrun_tests {
+    use super::*;
+    use crate::underrun::MAX_UNDERRUNS;
+    use lamp_turn_owner::{AdmissionState, AdmittedInput, CaptureState, Controller, Permission};
+
+    /// A started zero clock with nothing said: the speaker between answers,
+    /// or 0.39 s into a start as on lamp-52e6 (#3697).
+    fn started_clock() -> (Speaker, Controller) {
+        let boot = BootId::new([121; 16]).unwrap();
+        let mut speaker = Speaker::open_clock("null", boot).unwrap();
+        let mut controller = Controller::new(boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let until = now().checked_add(500_000).unwrap();
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        speaker
+            .install(controller.snapshot(now()).unwrap())
+            .unwrap();
+        prime(&mut speaker);
+        (speaker, controller)
+    }
+
+    fn prime(speaker: &mut Speaker) {
+        let token = speaker.zero_authority().unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        speaker.start_clock(token).unwrap();
+        speaker.maintain().unwrap(); // The software null sink consumes its prime.
+    }
+
+    fn underrun(
+        speaker: &mut Speaker,
+        errno: rustix::io::Errno,
+    ) -> Box<dyn std::error::Error + Send + Sync> {
+        speaker.avail_errno = Some(errno.raw_os_error());
+        speaker.maintain().unwrap_err()
+    }
+
+    #[test]
+    fn an_underrun_with_only_zeros_queued_stops_keeps_the_guard_and_primes_again() {
+        let (mut speaker, _controller) = started_clock();
+        let flushes = speaker.flush_count();
+        let epoch = speaker.queued_range().epoch;
+        let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
+        assert!(error.downcast_ref::<Underrun>().is_some(), "{error}");
+        assert!(!speaker.clock_started());
+        assert_eq!(speaker.flush_count(), flushes + 1, "a discard to report");
+        assert!(speaker.last_discard().is_some());
+        assert_eq!(speaker.queued_range().epoch, epoch + 1);
+        // The guard is kept: the same authority primes and starts again.
+        prime(&mut speaker);
+        assert!(speaker.clock_started());
+    }
+
+    #[test]
+    fn one_underrun_past_the_budget_latches_the_guard_closed() {
+        let (mut speaker, _controller) = started_clock();
+        for n in 0..MAX_UNDERRUNS {
+            let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
+            assert!(
+                error.downcast_ref::<Underrun>().is_some(),
+                "underrun {n}: {error}"
+            );
+            prime(&mut speaker);
+        }
+        let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
+        assert!(error.downcast_ref::<Underrun>().is_none(), "{error}");
+        assert!(speaker.zero_authority().is_err(), "the guard is closed");
+    }
+
+    #[test]
+    fn a_disconnect_suspend_or_bad_state_is_still_a_fault() {
+        for errno in [
+            rustix::io::Errno::NODEV,
+            rustix::io::Errno::BADFD,
+            rustix::io::Errno::STRPIPE,
+        ] {
+            let (mut speaker, _controller) = started_clock();
+            let error = underrun(&mut speaker, errno);
+            assert!(
+                error.downcast_ref::<Underrun>().is_none(),
+                "{errno:?}: {error}"
+            );
+            assert!(
+                speaker.zero_authority().is_err(),
+                "{errno:?}: the guard is closed"
+            );
+        }
+    }
+
+    #[test]
+    fn an_underrun_with_speech_queued_is_still_a_fault() {
+        let (mut speaker, mut controller) = started_clock();
+        let owner = controller.admit(now(), AdmittedInput::NewTurn).unwrap();
+        controller.input_ended(now(), owner).unwrap();
+        let plan = controller
+            .plan_output(now(), owner, OutputKind::Speech, None)
+            .unwrap();
+        let permit = controller.issue_output(now(), plan, 250_000).unwrap();
+        speaker
+            .install(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let token = speaker.zero_authority().unwrap();
+        // Inject queued ownership for the null-sink model, not real hardware PCM.
+        speaker.pending.push_clock(permit, token, 240).unwrap();
+        let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
+        assert!(error.downcast_ref::<Underrun>().is_none(), "{error}");
+        assert!(speaker.zero_authority().is_err(), "the guard is closed");
     }
 }

@@ -27,7 +27,7 @@ use lamp_audio::{
         StartReport,
     },
     device::{AlsaCapture, CaptureDevice},
-    pcm::{Speaker, Written},
+    pcm::{Speaker, Underrun, Written},
 };
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{
@@ -1404,13 +1404,24 @@ fn speaker_loop(
             match control {
                 Control::Authority { snapshot } => {
                     if let Err(error) = speaker.install(snapshot) {
-                        if error
+                        if underran(error.as_ref()) {
+                            // Installed before the check underran (#3697).
+                            underrun(
+                                channels,
+                                speaker,
+                                &mut output,
+                                &mut flush_count,
+                                speech.unfinished_owner().is_some(),
+                                &mut speech,
+                                &pending,
+                                recording,
+                            )?;
+                        } else if error
                             .downcast_ref::<InteractionError>()
                             .is_some_and(|reason| rejected_old_state(*reason))
                         {
                             continue;
-                        }
-                        if snapshot.microphone_permission() == Permission::Allowed
+                        } else if snapshot.microphone_permission() == Permission::Allowed
                             || error.downcast_ref::<InteractionError>()
                                 != Some(&InteractionError::PrivacyClosed)
                         {
@@ -1512,6 +1523,21 @@ fn speaker_loop(
         // It may lapse during the tick too; the device has then stopped.
         match speaker.maintain() {
             Ok(()) => {}
+            Err(error) if underran(error.as_ref()) => {
+                underrun(
+                    channels,
+                    speaker,
+                    &mut output,
+                    &mut flush_count,
+                    speech.unfinished_owner().is_some(),
+                    &mut speech,
+                    &pending,
+                    recording,
+                )?;
+                stall_pass.done();
+                finish_tick(tick);
+                continue 'tick;
+            }
             Err(error) if lapsed(error.as_ref()) => {
                 lapse(
                     channels,
@@ -1663,6 +1689,21 @@ fn speaker_loop(
         if output.privacy.is_some() && !speaker.clock_started() {
             match output.prime(speaker, link, recording) {
                 Ok(()) => {}
+                Err(error) if underran(error.as_ref()) => {
+                    underrun(
+                        channels,
+                        speaker,
+                        &mut output,
+                        &mut flush_count,
+                        speech.unfinished_owner().is_some(),
+                        &mut speech,
+                        &pending,
+                        recording,
+                    )?;
+                    stall_pass.done();
+                    finish_tick(tick);
+                    continue 'tick;
+                }
                 Err(error) if lapsed(error.as_ref()) => {
                     lapse(
                         channels,
@@ -1720,6 +1761,17 @@ fn speaker_loop(
                     flush_count,
                 )?,
                 Err(error) if old_interaction_error(error.as_ref()) => {}
+                // Installed before the check underran (#3697); reset below.
+                Err(error) if underran(error.as_ref()) => underrun(
+                    channels,
+                    speaker,
+                    &mut output,
+                    &mut flush_count,
+                    speech.unfinished_owner().is_some(),
+                    &mut speech,
+                    &pending,
+                    recording,
+                )?,
                 Err(error) => return Err(error),
             }
             if report_discard(channels, speaker, &mut output, &mut flush_count, recording)? {
@@ -1736,6 +1788,8 @@ fn speaker_loop(
         if speaker.clock_started() && writable_block {
             let mut wrote_speech = false;
             if let Some(partial) = pending.as_mut() {
+                // Read before this write's reset report clears it (#3697).
+                let speaking = speech.unfinished_owner().is_some() || partial.offset > 0;
                 let result = speaker.try_write(
                     partial.chunk.permit,
                     &partial.chunk.samples[partial.offset..],
@@ -1835,6 +1889,21 @@ fn speaker_loop(
                         })?;
                         pending = None;
                     }
+                    Err(error) if underran(error.as_ref()) => {
+                        underrun(
+                            channels,
+                            speaker,
+                            &mut output,
+                            &mut flush_count,
+                            speaking,
+                            &mut speech,
+                            &None,
+                            recording,
+                        )?;
+                        stall_pass.done();
+                        finish_tick(tick);
+                        continue 'tick;
+                    }
                     Err(error) => return Err(error),
                 }
             }
@@ -1850,6 +1919,21 @@ fn speaker_loop(
                     .and_then(|token| speaker.try_write_silence(token, RENDER_SAMPLES))
                 {
                     Ok(written) => written,
+                    Err(error) if underran(error.as_ref()) => {
+                        underrun(
+                            channels,
+                            speaker,
+                            &mut output,
+                            &mut flush_count,
+                            speech.unfinished_owner().is_some(),
+                            &mut speech,
+                            &pending,
+                            recording,
+                        )?;
+                        stall_pass.done();
+                        finish_tick(tick);
+                        continue 'tick;
+                    }
                     Err(error) if lapsed(error.as_ref()) => {
                         lapse(
                             channels,
@@ -2057,7 +2141,8 @@ fn lapse(
     *lapsed_since = Some(monotonic_us());
     match speaker.maintain() {
         Ok(()) => {}
-        Err(error) if lapsed(error.as_ref()) => {}
+        // Either way the device has stopped; its discard is reported below.
+        Err(error) if lapsed(error.as_ref()) || underran(error.as_ref()) => {}
         Err(error) => return Err(error),
     }
     if speaker.flush_count() == *flush_count {
@@ -2076,6 +2161,43 @@ fn lapse(
     }
     eprintln!(
         "lamp-voice speaker: its authority lapsed while it was held up; silent until a fresh one"
+    );
+    Ok(())
+}
+
+/// Whether an error is the speaker underrunning with only zeros queued (#3697).
+fn underran(error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+    error.downcast_ref::<Underrun>().is_some()
+}
+
+/// The speaker underran while it was held up (#3697): on lamp-52e6 0.39 s
+/// into a start, as the models loaded, it ended the voice, and the restart
+/// guard muted the next start. With only zeros queued `pcm` stopped the
+/// device and kept the guard, so, as after any reset, the discard is
+/// reported and the clock primed again through the barrier: a gap, never
+/// the voice. An answer already under way, or a chunk part-written, would
+/// lose what it was saying mid-word; that stays a fault, as before.
+/// `speaking` is read before any reset this tick reported clears it.
+#[allow(clippy::too_many_arguments)]
+fn underrun(
+    channels: &mut WorkerChannels,
+    speaker: &mut Speaker,
+    output: &mut ReferenceOutput,
+    flush_count: &mut u64,
+    speaking: bool,
+    speech: &mut SpeechPlayback,
+    pending: &Option<PendingChunk>,
+    recording: &mut Option<Recording>,
+) -> Result<()> {
+    if speaking || pending.as_ref().is_some_and(|p| p.offset > 0) {
+        speaker.fault()?;
+        return Err(io::Error::other("the speaker underran with an answer under way").into());
+    }
+    if report_discard(channels, speaker, output, flush_count, recording)? {
+        report_speech_reset(channels, speech)?;
+    }
+    eprintln!(
+        "lamp-voice speaker: it underran while held up with only zeros queued; priming again"
     );
     Ok(())
 }
