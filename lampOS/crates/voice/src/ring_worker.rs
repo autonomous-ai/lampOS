@@ -164,6 +164,8 @@ pub struct RingOptions<'a> {
     pub light_requests: bool,
     pub skill_light_speaking: bool,
     pub light_keep: Option<&'a std::path::Path>,
+    /// Every pulse played (`LAMP_RING_EVERY_PULSE=on`, a dev lamp's).
+    pub every_pulse: bool,
     pub output_caps: bool,
 }
 
@@ -197,12 +199,14 @@ pub fn run_continuous(
         light_requests,
         skill_light_speaking,
         light_keep,
+        every_pulse,
         output_caps,
     } = options;
     let caps = output_caps.then(|| open_caps(bus_root));
     let light = bus_root.and_then(|root| match RingLight::on_keeping(root, light_keep) {
         Ok((mut light, begins)) => {
             light.tint_speaking(light_requests && skill_light_speaking);
+            light.every_pulse(every_pulse);
             // Without them the ring still shows the person's light.
             if light_requests
                 && let Err(error) = boot_clock().and_then(|clock| light.take_requests(root, &clock))
