@@ -36,21 +36,26 @@ impl StandIn {
         let now = Instant::now();
         if self.looked.is_none_or(|at| now - at >= LOOK_EVERY) {
             self.looked = Some(now);
-            self.share = asked(&self.bus);
+            if let Some(read) = asked(&self.bus) {
+                self.share = read;
+            }
         }
         self.share
     }
 }
 
-/// What the kept value asks; nothing kept, unreadable or out of range asks
-/// nothing, and the lamp stands as made.
-fn asked(bus: &Bus) -> Option<f32> {
-    bus.latest(StandAsked::TOPIC)
-        .ok()
-        .flatten()
-        .and_then(|message| message.parse::<StandAsked>().ok())
-        .filter(|asked| asked.check().is_ok())
-        .map(|asked| f32::from(asked.share) / 100.0)
+/// What the kept value asks: `Some(None)` for nothing kept, or a value
+/// unparseable or out of range (the lamp stands as made); `None` when the
+/// bus could not be read just now, so the last share read is kept rather
+/// than the arm heading toward full height for a second (the Reviewer-lead's
+/// P3 on #4278).
+fn asked(bus: &Bus) -> Option<Option<f32>> {
+    let kept = bus.latest(StandAsked::TOPIC).ok()?;
+    Some(
+        kept.and_then(|message| message.parse::<StandAsked>().ok())
+            .filter(|asked| asked.check().is_ok())
+            .map(|asked| f32::from(asked.share) / 100.0),
+    )
 }
 
 #[cfg(test)]

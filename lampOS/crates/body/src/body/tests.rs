@@ -14896,3 +14896,38 @@ fn a_stand_asked_lower_is_kept_and_back_as_made_when_it_is_gone() {
     assert_eq!(at(18), lowered, "kept, not drifting");
     assert_eq!(at(31), as_made);
 }
+
+/// The Reviewer-lead's P2 on #4278: an ask never stands the arm higher than
+/// the lamp's own `--stand-share` (a careful bring-up's 30 %), only lower.
+#[test]
+fn a_stand_asked_never_goes_above_the_lamps_own_share() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(24));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen: Vec<(Duration, [u16; 2])> = Vec::new();
+    run_alive(
+        &mut lamp,
+        &mut clock,
+        gesture_limits(),
+        Some(HOME),
+        Some(standing(30, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || Asked {
+            stand_share: (time.get() >= Duration::from_secs(10)).then_some(0.6),
+            ..Asked::default()
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.arm_goals)),
+    );
+    let at = |secs: u64| {
+        seen.iter()
+            .rfind(|step| step.0 < Duration::from_secs(secs))
+            .unwrap()
+            .1
+    };
+    let capped = at(9);
+    assert!(capped[0] > 2_100 && capped[0] < 2_300, "{capped:?}");
+    assert_eq!(at(23), capped, "asked 60 %, held at its own 30 %");
+}
