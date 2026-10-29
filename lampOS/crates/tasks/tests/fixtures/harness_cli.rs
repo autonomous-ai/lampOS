@@ -200,6 +200,8 @@ pub fn main() -> io::Result<()> {
                 "{}",
                 json!({"ok":true,"name":"lamp-task-001","id":args.get(3),"message":"m1","state":"queued"})
             ),
+            // As harness route's design (29 Oct) answers new work.
+            "route" => println!("{}", json!({"decided":"new","reason":"fixture"})),
             _ => return Err(io::Error::other("fixture operation unknown")),
         }
     }

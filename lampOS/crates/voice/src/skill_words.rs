@@ -226,6 +226,12 @@ pub struct NewsWords {
     /// updated there. A skill without it says the built-in words.
     #[serde(default = "failed_no_prompt")]
     pub failed_no_prompt: String,
+    /// ...or did not, as the session the router chose for it on
+    /// `{computer}` is busy (lamp-tasks' `agent_busy`, `serve --route`):
+    /// nothing was typed into it, and no new one was started. A skill
+    /// without it says the built-in words.
+    #[serde(default = "failed_busy")]
+    pub failed_busy: String,
     /// A question task answered (`agent_tasks::QUESTION`), with its answer
     /// whole: the slots of [`Self::done`], `{asked}` the person's question.
     /// A skill without it says the built-in words, so one written before it
@@ -284,6 +290,11 @@ fn failed_no_prompt() -> String {
     "The work the person asked you to hand over, \"{asked}\", did not reach {who}: {computer} can't start it with work yet, so trying again won't help. Tell them that in one plain, light sentence, with no technical words, and that the software on that computer has to be updated first.".into()
 }
 
+/// [`NewsWords::failed_busy`]'s words, built in.
+fn failed_busy() -> String {
+    "The work the person asked you to hand over, \"{asked}\", did not reach {who}: {who} on {computer} is busy with something else right now, so it was not given to it. Tell them that in one plain, light sentence, with no technical words, and to ask you again once it is done.".into()
+}
+
 /// [`NewsWords::answered`]'s words, built in.
 fn answered() -> String {
     ANSWERED.into()
@@ -327,6 +338,7 @@ impl NewsWords {
             failed_folder: failed_folder(),
             failed_signed_out: failed_signed_out(),
             failed_no_prompt: failed_no_prompt(),
+            failed_busy: failed_busy(),
             answered: answered(),
             answered_cut: answered_cut(),
             together: "News from {how_many} pieces of work you handed over for the person. {each} Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. No code, lists, file paths or links.{goes_on} No question.".into(),
@@ -405,6 +417,11 @@ impl NewsWords {
                     "failed_no_prompt",
                     &self.failed_no_prompt,
                     &["asked", "computer", "who"],
+                ),
+                (
+                    "failed_busy",
+                    &self.failed_busy,
+                    &["asked", "computer", "who", "who"],
                 ),
                 (
                     "together",
@@ -503,6 +520,7 @@ impl NewsWords {
                 ("failed_folder", note(&self.failed_folder, &[])),
                 ("failed_signed_out", note(&self.failed_signed_out, &[])),
                 ("failed_no_prompt", note(&self.failed_no_prompt, &[])),
+                ("failed_busy", note(&self.failed_busy, &[])),
                 ("answered", note(&self.answered, &done)),
                 ("answered_cut", note(&self.answered_cut, &done)),
                 (
@@ -716,6 +734,7 @@ mod tests {
                     "failed_folder = ",
                     "failed_signed_out = ",
                     "failed_no_prompt = ",
+                    "failed_busy = ",
                     "answered = ",
                     "answered_cut = ",
                 ]
@@ -735,6 +754,7 @@ mod tests {
         assert_eq!(read.failed_folder, failed_folder());
         assert_eq!(read.failed_signed_out, failed_signed_out());
         assert_eq!(read.failed_no_prompt, failed_no_prompt());
+        assert_eq!(read.failed_busy, failed_busy());
         let installed = NewsWords::in_dir(&skills());
         assert_eq!(installed.failed_folder, failed_folder());
         assert_eq!(installed.failed_signed_out, failed_signed_out());

@@ -2037,15 +2037,24 @@ fn publish<T: serde::Serialize>(out: &mut Publisher, value: &T, errors: &mut u64
     }
 }
 
+/// How the production adapter calls Harness: `serve`'s switches for it
+/// (`--harness-as-person`, `--folder-missing`, `--engines-ready`,
+/// `--route`), each [`CliConfig`]'s field of that name.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct HarnessSwitches {
+    pub as_person: bool,
+    pub folder_missing: bool,
+    pub engines_ready: bool,
+    pub route: bool,
+}
+
 /// Production adapter. CLI configuration and environment are inspected only
 /// after the default-off check. Harness owns account/session provisioning.
 pub fn serve<C: Clock>(
     config: Config,
     clock: C,
     executable: PathBuf,
-    as_person: bool,
-    folder_missing: bool,
-    engines_ready: bool,
+    switches: HarnessSwitches,
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
@@ -2066,9 +2075,10 @@ pub fn serve<C: Clock>(
         }
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
-        cli.as_person = as_person;
-        cli.folder_missing = folder_missing;
-        cli.engines_ready = engines_ready;
+        cli.as_person = switches.as_person;
+        cli.folder_missing = switches.folder_missing;
+        cli.engines_ready = switches.engines_ready;
+        cli.route = switches.route;
         Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
 }
