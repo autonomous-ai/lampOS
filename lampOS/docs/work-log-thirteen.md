@@ -241,3 +241,14 @@ Ready for lamp-voice: yes (#4295, journal only, Part of #3945)
 - c0a4 check, 03:24–03:27Z: a "Ma'am" line soon after a call counted by "a conversation going on". One counted by "its words calling it, its hearing at the line's start" (probably a stand-in first word).
 - Gate: voice lib 4062/0, the other targets 1/0, 275/0, 4/0, 6/0; clippy and fmt clean.
 - Restored after, lock released, Twelve told.
+
+### #3945 (b), a "Ma'am" start hearing in a cut line
+
+Ready for lamp-voice: yes (branch `thirteen/said-to-a-person-cut-3945`, Part of #3945)
+
+- With `LAMP_NAME_SAID_TO_A_PERSON=on`, a start hearing on a set-off "Ma'am" in a line cut short holds for the line after it. The fix is in `attention.rs` (`cut_said_to_a_person`), with the Reviewer-lead's P3 line in `second-voice.md`.
+- Two Mac-played runs on lamp-c0a4, 14:39–14:47Z, at Mac 60% and 70%. Run 1: all eight cut lines held, the control answered. No hearing over the bar at a "Ma'am" line's start, so the new path was proven by unit tests only.
+- Run 2 began 39 s after an answered call. Lines inside that conversation were answered, and a held "Sir, …" line made the cut words before it answered in its place. This is outside the change; noted on #3945.
+- Gate: voice lib 4138/0 (15 ignored), the other targets 1/0, 275/0, 4/0, 6/0; workspace build, clippy and fmt clean.
+- Restored after, lock released, Twelve told.
+- Next: the declined line (a decline says nothing and carries no conversation).
