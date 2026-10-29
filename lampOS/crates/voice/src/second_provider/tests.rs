@@ -50,8 +50,8 @@ struct Script {
     speech_ready: Option<mpsc::UnboundedSender<String>>,
     /// An empty successful stream, as speech skipped after bounded retries.
     skipped: Option<&'static str>,
-    /// A piece the voice could not start twice (`services::UNSAID`, #4338).
-    unsaid: Option<&'static str>,
+    /// Pieces the voice could not start twice (`services::UNSAID`, #4338).
+    unsaid: &'static [&'static str],
     /// Speech of this sentence never ends.
     endless: Option<&'static str>,
     /// Held by every live stream: dropped streams let go of it.
@@ -237,7 +237,7 @@ impl Services for Script {
         if self.skipped == Some(text.as_str()) {
             return stream::empty().boxed();
         }
-        if self.unsaid == Some(text.as_str()) {
+        if self.unsaid.contains(&text.as_str()) {
             return stream::once(async { Err(net::Error::Timeout(super::services::UNSAID)) })
                 .boxed();
         }
@@ -15442,7 +15442,7 @@ async fn a_piece_not_started_twice_is_said_with_the_next_one() {
             ]]
             .into(),
         ),
-        unsaid: Some("The second one is lost."),
+        unsaid: &["The second one is lost."],
         ..Script::default()
     });
     let (engine, _, _) = scripted(script);
@@ -15476,7 +15476,7 @@ async fn a_last_piece_not_started_twice_ends_the_turn_as_ever() {
             ]]
             .into(),
         ),
-        unsaid: Some("The last one is lost."),
+        unsaid: &["The last one is lost."],
         ..Script::default()
     });
     let (engine, _, _) = scripted(script);
@@ -15489,6 +15489,42 @@ async fn a_last_piece_not_started_twice_ends_the_turn_as_ever() {
             "said:The first one is here.".into(),
             format!("audio:{}", "The first one is here.".len()),
             "said: The last one is lost.".into(),
+            "generated".into(),
+            "complete".into(),
+        ]
+    );
+}
+
+/// #4338, Tests' P3 on #4345: a joined piece that can't be started either is
+/// carried again, into the piece after it, so nothing is dropped while a
+/// piece is still to come; it fails as `UNSAID`, never the whole turn.
+#[tokio::test]
+async fn a_joined_piece_not_started_either_goes_on_into_the_next() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                text("One is here. Two is lost. Three is lost too. Four comes last."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        unsaid: &["Two is lost.", "Two is lost. Three is lost too."],
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.announcing(false);
+    engine.submit(written(1, "Tell me four things."));
+    let joined = "Two is lost. Three is lost too. Four comes last.";
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1".to_owned(),
+            "said:One is here.".into(),
+            format!("audio:{}", "One is here.".len()),
+            "said: Two is lost.".into(),
+            "said: Three is lost too.".into(),
+            "said: Four comes last.".into(),
+            format!("audio:{}", joined.len()),
             "generated".into(),
             "complete".into(),
         ]

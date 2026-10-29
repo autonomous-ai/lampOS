@@ -4188,10 +4188,13 @@ piece, as one, in order (`a piece of the answer could not be started twice;
 it is said with the next piece`, then `the piece not said goes with the next
 one, as one piece (N words)`), so no sentence is silently dropped (#4338:
 on lamp-3e83 on 29 Oct ElevenLabs' first sound timed out at 14:15:13 and
-14:15:48, and one sentence of each of those answers was never said). Only
-the answer's last piece has nothing to go with: it is not said, `the
-answer's last piece could not be started twice and was not said`, and the
-turn ends as ever. The announcement is never carried. Before #1844's C the
+14:15:48, and one sentence of each of those answers was never said). A joined
+piece that can't be started either is carried again into the piece after
+it. Only the answer's last piece has nothing to go with: it is not said,
+`the answer's last piece could not be started twice and was not said`, and
+the turn ends as ever. Its words were already given as the lamp's (the
+turn's `Transcript`, `said_piece`), so the lamp's own record holds words
+the person never heard, as it did when a sentence was dropped before this. The announcement is never carried. Before #1844's C the
 second failure failed the whole turn, against what this said, and a host
 that took the connection and never answered cost the connection's 10 s and
 its response's, twice: now at most 8 s a sentence. A sentence begun and
