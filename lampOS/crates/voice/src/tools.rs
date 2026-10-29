@@ -1694,7 +1694,13 @@ fn run_call_with_scope(
                 && told.0["ok"] == true
                 && let Some(file) = onboarding
             {
-                crate::onboarding::face_saved(file, call.args.get("name").and_then(Value::as_str));
+                // The name the eyes kept (Fourth on #4290), else the one asked.
+                crate::onboarding::face_saved(
+                    file,
+                    told.0["remembered"]
+                        .as_str()
+                        .or_else(|| call.args.get("name").and_then(Value::as_str)),
+                );
             }
             if call.name == crate::known_faces::FORGET
                 && told.0["ok"] == true

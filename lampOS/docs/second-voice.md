@@ -3708,8 +3708,10 @@ after a take-over, but now for every turn:
   file (`onboarding::owner_of`; a face saved once the step is done, a
   guest's, never changes it, and a reset wipes it with the file), and named
   only while the eyes still know that person (`known_faces::still_known`,
-  `{"list":true}` asked at each reply, 250 ms at most), so a forgotten face
-  is never named. On lamp-29e7 (8474, 29 Oct) the owner, set up by voice,
+  `{"list":true}`), refreshed every 2 s on a thread of its own
+  (`known_faces::keep_owner_fresh`), so no reply waits on the eyes and a
+  forgotten face is named for 2 s at most. The name kept is the one the eyes
+  kept (`remembered`). On lamp-29e7 (8474, 29 Oct) the owner, set up by voice,
   asked who they were and was told the lamp remembered no name: no name
   source reached the reply (#4118). Without a name, or off: nothing. `the owner is not named by default: WHY` in the journal when a
   sign holds.
