@@ -681,6 +681,11 @@ fn room_wait_us(patient_writes: bool) -> u64 {
     }
 }
 
+/// Whether a Start's soft lead is none, and left off the wire (#4226).
+fn no_soft_lead(lead_us: &u64) -> bool {
+    *lead_us == 0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderInput {
@@ -736,6 +741,15 @@ pub enum ProviderInput {
         /// only those words of it as the lamp's. Left off the wire otherwise.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         heard_of_cut: Option<crate::said_as_heard::HeardOfCut>,
+        /// How long the line's sound begins before its usual start, the
+        /// detector's 300 ms pre-roll, by the soft start's lead
+        /// (`LAMP_SOFT_START=on`), in microseconds: never more than
+        /// [`crate::activity::SOFT_START_LEAD_BLOCKS`] blocks' worth, and 0
+        /// for any start that is not an ordinary one (#4226). The second
+        /// route dates the name at the line's start from the usual start with
+        /// `LAMP_NAME_START_USUAL=on`. Left off the wire when 0.
+        #[serde(default, skip_serializing_if = "no_soft_lead")]
+        soft_lead_us: u64,
     },
     Audio {
         request: u64,
@@ -7699,6 +7713,7 @@ pub(crate) mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         }
     }
 
@@ -8076,6 +8091,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             }
         ));
         for field in ["request", "session", "privacy_generation"] {
@@ -8101,6 +8117,7 @@ pub(crate) mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         };
         // Without `LAMP_CUT_KEEPS_NAME` the coordinator never sets it, and
         // the line on the worker's socket is the one it always was.
@@ -8134,6 +8151,7 @@ pub(crate) mod tests {
             follows_on: false,
             over_the_lamps_voice: true,
             heard_of_cut,
+            soft_lead_us: 0,
         };
         let plain = serde_json::to_string(&start(None)).unwrap();
         assert!(!plain.contains("heard_of_cut"), "{plain}");
@@ -8174,6 +8192,7 @@ pub(crate) mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         };
         assert_eq!(
             serde_json::to_string(&plain).unwrap(),
@@ -8190,6 +8209,7 @@ pub(crate) mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         };
         let written = serde_json::to_value(&cut_off).unwrap();
         assert_eq!(written["continues_cut_off"], true);
@@ -8211,6 +8231,7 @@ pub(crate) mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         };
         assert_eq!(serde_json::to_value(&stopped).unwrap()["after_stop"], true);
         let old =
@@ -8406,6 +8427,7 @@ pub(crate) mod tests {
                         follows_on: false,
                         over_the_lamps_voice: false,
                         heard_of_cut: None,
+                        soft_lead_us: 0,
                     },
                     NOW,
                     &sink
@@ -8528,6 +8550,7 @@ pub(crate) mod tests {
                                 follows_on: false,
                                 over_the_lamps_voice: false,
                                 heard_of_cut: None,
+                                soft_lead_us: 0,
                             })?;
                         }
                         Ok(control)
@@ -8591,6 +8614,7 @@ pub(crate) mod tests {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 })
                 .unwrap();
             assert_eq!(rig.tick(NOW).unwrap(), ControlDrain::Empty);
@@ -8667,6 +8691,7 @@ pub(crate) mod tests {
                                     follows_on: false,
                                     over_the_lamps_voice: false,
                                     heard_of_cut: None,
+                                    soft_lead_us: 0,
                                 },
                                 ProviderInput::Audio {
                                     request: new.turn(),
@@ -8813,6 +8838,7 @@ pub(crate) mod tests {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 })
                 .unwrap();
             rig.parent
@@ -8919,6 +8945,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             })
             .unwrap();
         let error = rig.tick(NOW).unwrap_err();
@@ -9047,6 +9074,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             },
             ProviderInput::Audio {
                 request: next.turn(),
@@ -10292,6 +10320,7 @@ pub(crate) mod tests {
                     follows_on,
                     over_the_lamps_voice,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 })
                 .unwrap();
             self.parent
@@ -12435,6 +12464,7 @@ pub(crate) mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         };
 
         first.service.send(resumable()).await;
@@ -12518,6 +12548,7 @@ pub(crate) mod tests {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 },
                 NOW,
                 &provider,
@@ -13053,6 +13084,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             })
             .unwrap();
         assert!(
@@ -13388,6 +13420,7 @@ pub(crate) mod tests {
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 },
                 NOW,
                 &provider,
@@ -13465,6 +13498,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             })
             .unwrap();
         rig.parent
@@ -13669,6 +13703,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             })
             .unwrap();
         let message = rig.exit().await.0.unwrap_err().to_string();
@@ -14224,6 +14259,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             })
             .unwrap();
         rig.parent
@@ -14961,6 +14997,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             },
             ProviderInput::Audio {
                 request: next,
@@ -15107,6 +15144,7 @@ pub(crate) mod tests {
                 follows_on: false,
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
+                soft_lead_us: 0,
             })
             .unwrap();
         assert!(matches!(
@@ -15299,6 +15337,7 @@ pub(crate) mod tests {
                         follows_on: false,
                         over_the_lamps_voice: false,
                         heard_of_cut: None,
+                        soft_lead_us: 0,
                     })
                     .unwrap();
                 loop {

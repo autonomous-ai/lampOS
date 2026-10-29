@@ -1062,6 +1062,11 @@ pub struct Attention {
     /// if it has, by this process's clock.
     began_us: Option<u64>,
     ended_us: Option<u64>,
+    /// When the request's usual start was: [`Self::began_at_led`]'s time
+    /// with the soft start's lead after it, the start the name at the line's
+    /// start is dated from with `LAMP_NAME_START_USUAL=on`
+    /// ([`Self::date_the_start_from_the_usual_start`], #4226).
+    usual_began_us: Option<u64>,
     /// When the lamp's name last began to be heard in the room's sound.
     named_us: Option<u64>,
     /// The name was heard for the request in hand: as it began, or in its
@@ -1177,6 +1182,10 @@ pub struct Attention {
     /// A hearing of the name inside a line's sound counts for that line
     /// only (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, [`Self::keep_the_name_in_its_line`]).
     name_stays: bool,
+    /// The name at the line's start is dated from the line's usual start,
+    /// not its soft start's lead (`LAMP_NAME_START_USUAL=on`,
+    /// [`Self::date_the_start_from_the_usual_start`]).
+    name_start_usual: bool,
 }
 
 /// The most text kept for one request.
@@ -1228,6 +1237,40 @@ impl Attention {
     /// which was answered.
     pub fn keep_the_name_in_its_line(&mut self, on: bool) {
         self.name_stays = on;
+    }
+
+    /// A hearing of the name is at the line's start ([`NAME_AT_THE_START_US`])
+    /// when it began within that of the line's usual start, the detector's
+    /// 300 ms pre-roll, not of the soft start's lead before it
+    /// (`LAMP_NAME_START_USUAL=on`, #4226). The bound was measured before
+    /// soft starts were kept, and on a lamp every hearing then came 0.29 s
+    /// later into the line (939 to 1023 ms with soft starts, 654 to 723 ms
+    /// without). Only the name at the line's start is dated so; every other
+    /// window keeps the line's own start.
+    pub fn date_the_start_from_the_usual_start(&mut self, on: bool) {
+        self.name_start_usual = on;
+    }
+
+    /// Where the name at the start of a line begun at `began_us`, its sound
+    /// beginning `lead_us` before its usual start, is dated from: its usual
+    /// start with [`Self::date_the_start_from_the_usual_start`], otherwise
+    /// `began_us` itself.
+    pub fn start_of(&self, began_us: u64, lead_us: u64) -> u64 {
+        if self.name_start_usual {
+            began_us.saturating_add(lead_us)
+        } else {
+            began_us
+        }
+    }
+
+    /// Where the name at the start of the request in hand is dated from
+    /// ([`Self::start_of`]).
+    fn start_in_hand(&self) -> Option<u64> {
+        if self.name_start_usual {
+            self.usual_began_us.or(self.began_us)
+        } else {
+            self.began_us
+        }
     }
 
     /// Whether the lamp's head was tapped for the request in hand.
@@ -1437,6 +1480,14 @@ impl Attention {
 
     /// A request began on `session`, at `now_us`.
     pub fn began_at(&mut self, request: u64, session: u64, now_us: u64) {
+        self.began_at_led(request, session, now_us, 0);
+    }
+
+    /// [`Self::began_at`], its sound beginning `lead_us` before its usual
+    /// start by a soft start's lead (#4226): with
+    /// [`Self::date_the_start_from_the_usual_start`], the name at its start
+    /// is dated from `now_us + lead_us`. Nothing else is.
+    pub fn began_at_led(&mut self, request: u64, session: u64, now_us: u64, lead_us: u64) {
         // The line before, if it called someone else by name and ended just
         // now (#829).
         let after_another = self.spoken_to
@@ -1490,7 +1541,7 @@ impl Attention {
             && self
                 .bare_call_us
                 .is_none_or(|(call, _, _)| call != self.request))
-        .then_some(self.began_us.zip(self.ended_us))
+        .then_some(self.start_in_hand().zip(self.ended_us))
         .flatten();
         let its_own = move |named: u64| {
             line_before.is_none_or(|(began, ended)| {
@@ -1513,12 +1564,14 @@ impl Attention {
         self.after_question = after_question;
         self.after_unanswered = after_unanswered;
         self.began_us = Some(now_us);
+        self.usual_began_us = Some(now_us.saturating_add(lead_us));
+        let start = self.start_of(now_us, lead_us);
         self.named = self.named_us.is_some_and(counts);
         self.named_sure = self.named_sure_us.is_some_and(counts);
         self.named_at_start = self.named
             && self
                 .named_us
-                .is_some_and(|named| named <= now_us.saturating_add(NAME_AT_THE_START_US));
+                .is_some_and(|named| named <= start.saturating_add(NAME_AT_THE_START_US));
         self.tapped = self.tapped_us.is_some_and(|tapped| {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
         });
@@ -1556,6 +1609,13 @@ impl Attention {
     /// was close, and whether it was said to the lamp from close to it. Its window begins where the first part's did.
     /// Anything else is as for [`Self::began_at`].
     pub fn continued_at(&mut self, request: u64, session: u64, now_us: u64) {
+        self.continued_at_led(request, session, now_us, 0);
+    }
+
+    /// [`Self::continued_at`] with the continuation's soft lead
+    /// ([`Self::began_at_led`]): the first part's usual start is kept, as
+    /// its start is; the lead counts only when nothing goes on.
+    pub fn continued_at_led(&mut self, request: u64, session: u64, now_us: u64, lead_us: u64) {
         let tapped = session == self.session && self.began_us.is_some() && self.tapped;
         let after_call = session == self.session && self.began_us.is_some() && self.after_call;
         let after_another = self.after_another;
@@ -1569,14 +1629,14 @@ impl Attention {
                 std::mem::take(&mut self.heard),
                 self.near,
                 self.addressed,
-                self.began_us,
+                (self.began_us, self.usual_began_us),
             )
         });
         // The first part's hearings are this line's own: kept past
         // `began_at`, which lets go of one that stays with the line before.
         let hearings = (self.named_us, self.named_sure_us);
         let continuing = before.is_some();
-        self.began_at(request, session, now_us);
+        self.began_at_led(request, session, now_us, lead_us);
         if continuing {
             (self.named_us, self.named_sure_us) = hearings;
         }
@@ -1587,7 +1647,7 @@ impl Attention {
             heard,
             near,
             addressed,
-            began_us,
+            (began_us, usual_began_us),
         )) = before
         {
             self.named |= named;
@@ -1597,13 +1657,15 @@ impl Attention {
             self.near |= near;
             self.addressed |= addressed;
             self.began_us = began_us;
+            self.usual_began_us = usual_began_us;
             // At the start is judged against the first part's start, not
             // the continuation's: a hearing mid-way through the first part
             // is never at the start because the line was cut there.
+            let start = self.start_in_hand();
             self.named_at_start = named_at_start
                 || (self.named
                     && self.named_us.is_some_and(|n| {
-                        began_us.is_some_and(|b| n <= b.saturating_add(NAME_AT_THE_START_US))
+                        start.is_some_and(|b| n <= b.saturating_add(NAME_AT_THE_START_US))
                     }));
             self.after_another = after_another;
             self.after_question = after_question;
@@ -1653,7 +1715,8 @@ impl Attention {
         {
             self.named = true;
             self.named_sure |= sure;
-            self.named_at_start |= at_us <= began.saturating_add(NAME_AT_THE_START_US);
+            let start = self.start_in_hand().unwrap_or(began);
+            self.named_at_start |= at_us <= start.saturating_add(NAME_AT_THE_START_US);
             self.best_score = self.best_score.max(score);
         }
     }
@@ -1681,6 +1744,7 @@ impl Attention {
         self.heard.clear();
         self.verdict = None;
         self.began_us = None;
+        self.usual_began_us = None;
         self.ended_us = None;
         self.named = false;
         self.named_sure = false;
@@ -4969,6 +5033,61 @@ mod tests {
         attention.name_heard_scored(began + 1_600_000, 0.95);
         attention.continued_at(2, 1, began + 1_800_000);
         assert!(attention.weigh_the_name(None, false));
+    }
+
+    /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
+    /// before its usual start by the soft start's lead, the name heard 1.5 s
+    /// after its sound began (1.2 s after its usual start), has the name at
+    /// its start: its own second sign. Without the switch the hearing is
+    /// past [`NAME_AT_THE_START_US`] and dropped, as before; a lead of 0
+    /// changes nothing. Heard before the line began or in it, and for the
+    /// line going on after the lamp ended it early, alike. Every other
+    /// window keeps the line's own start ([`Attention::window`]).
+    #[test]
+    fn with_the_usual_start_the_name_at_the_lines_start_is_dated_past_the_soft_lead() {
+        let began = 10_000_000;
+        let lead = 300_000;
+        let weighed = |usual: bool, lead: u64, at: u64, before: bool, going_on: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.date_the_start_from_the_usual_start(usual);
+            if before {
+                attention.name_heard_scored(at, 0.95);
+            }
+            attention.began_at_led(1, 1, began, lead);
+            assert_eq!(attention.window(), Some((began, None)));
+            if !before {
+                attention.name_heard_scored(at, 0.95);
+            }
+            if going_on {
+                attention.continued_at_led(2, 1, began + 3_000_000, 0);
+            }
+            let at_start = attention.named_at_start;
+            (attention.weigh_the_name(None, false), at_start)
+        };
+        for going_on in [false, true] {
+            let at = began + 1_500_000;
+            assert_eq!(weighed(true, lead, at, false, going_on), (false, true));
+            assert_eq!(weighed(false, lead, at, false, going_on), (true, false));
+            let bound = began + lead + NAME_AT_THE_START_US;
+            assert!(!weighed(true, lead, bound, false, going_on).0);
+            assert!(weighed(true, lead, bound + 1, false, going_on).0);
+            for before in [false, true] {
+                for at in [
+                    began - NAME_BEFORE_US,
+                    began + NAME_AT_THE_START_US,
+                    began + NAME_AT_THE_START_US + 1,
+                    began + 1_500_000,
+                ] {
+                    if before && at > began {
+                        continue;
+                    }
+                    let off = weighed(false, 0, at, before, going_on);
+                    assert_eq!(weighed(true, 0, at, before, going_on), off, "{at}");
+                    assert_eq!(weighed(false, lead, at, before, going_on), off, "{at}");
+                }
+            }
+        }
     }
 
     /// #3945, `LAMP_NAME_SAID_TO_A_PERSON=on`: "Ma'am, could you pass me

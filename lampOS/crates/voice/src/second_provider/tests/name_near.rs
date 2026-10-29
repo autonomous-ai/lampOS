@@ -31,7 +31,7 @@ async fn asked_with(
         ..Script::default()
     });
     let (engine, _, _) = scripted(script.clone());
-    let mut engine = engine.heeding(Arc::new(|_, _, words, _| {
+    let mut engine = engine.heeding(Arc::new(|_, _, words, _, _| {
         (!crate::attention::begins_with_the_name(words)).then_some(crate::attention::NOT_SPOKEN_TO)
     }));
     let asked_of: Arc<Mutex<Vec<u64>>> = Arc::default();
@@ -206,7 +206,7 @@ async fn a_line_going_on_from_an_earlier_piece_is_not_rewritten() {
     });
     let (engine, _, now) = scripted(script.clone());
     let mut engine = engine
-        .heeding(Arc::new(|_, _, words, _| {
+        .heeding(Arc::new(|_, _, words, _, _| {
             (!crate::attention::begins_with_the_name(words))
                 .then_some(crate::attention::NOT_SPOKEN_TO)
         }))
@@ -227,6 +227,7 @@ async fn a_line_going_on_from_an_earlier_piece_is_not_rewritten() {
         follows_on: false,
         over_the_lamps_voice: false,
         heard_of_cut: None,
+        soft_lead_us: 0,
     });
     engine.submit(audio(2, 1));
     engine.submit(end(2));

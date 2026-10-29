@@ -257,6 +257,9 @@ pub struct TurnDetector {
     /// past one that was not. Empty otherwise.
     lamp_silent: VecDeque<bool>,
     soft_start: bool,
+    /// Whether the last start was an ordinary one, neither a yield's
+    /// reach back nor one as the lamp's sound ends ([`Self::began_ordinarily`]).
+    began_ordinarily: bool,
     /// Whether the next block pushed is heard with the lamp silent.
     next_lamp_silent: bool,
     start_count: u16,
@@ -314,6 +317,7 @@ impl Default for TurnDetector {
             reach_onset: false,
             lamp_silent: VecDeque::new(),
             soft_start: false,
+            began_ordinarily: true,
             next_lamp_silent: false,
             start_count: 0,
             silence_count: 0,
@@ -403,6 +407,14 @@ impl TurnDetector {
     /// [`SOFT_START_LEAD_BLOCKS`] more ([`SOFT_START_ENVIRONMENT`]).
     pub fn keep_soft_starts(&mut self, on: bool) {
         self.soft_start = on;
+    }
+
+    /// Whether the last utterance started was an ordinary start: neither a
+    /// yield's reach back ([`Self::reach_back`]) nor one as the lamp's sound
+    /// ends ([`Self::reach_back_to_onset`]). Only such a start keeps a soft
+    /// start's lead (#4226).
+    pub fn began_ordinarily(&self) -> bool {
+        self.began_ordinarily
     }
 
     /// Whether the next block is heard with the lamp silent. Only for the
@@ -671,6 +683,7 @@ impl TurnDetector {
         };
         if self.start_count >= START_BLOCKS {
             let begin = self.begin(reach_back, reach_onset);
+            self.began_ordinarily = !(reach_back || reach_onset);
             self.prefix.drain(..begin);
             self.scores.clear();
             self.lamp_silent.clear();

@@ -414,6 +414,7 @@ impl Harness {
                 false,
                 false,
                 false,
+                self.detector.began_ordinarily(),
                 PlayoutStart::default(),
                 &mut self.trace,
                 |_| Ok(()),
@@ -926,6 +927,80 @@ fn with_soft_starts_a_line_after_the_lamps_answer_keeps_its_300_ms() {
         usual - crate::activity::SOFT_START_LEAD_BLOCKS as u64
     );
     assert_eq!(on.last(), off.last());
+}
+
+/// #4226: the Start of a line begun with a soft start says how long its
+/// sound began before its usual start, by when each block was read, for the
+/// second route to date the name at the line's start from; without soft
+/// starts, and for a yield's start reaching back, none.
+#[test]
+fn a_soft_starts_lead_goes_with_its_start() {
+    let start = |soft: bool, yielded: bool| {
+        let mut h = Harness::keeping_first_words(true, 100);
+        h.soft_start = soft;
+        h.detector.keep_soft_starts(soft);
+        h.reply.as_mut().unwrap().pcm.clear();
+        h.blocks(50, 0.1, Some(evidence(0, OWN)));
+        for quiet in 1..=100 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        let mut line = h.blocks(5, 0.95, Some(evidence(101, None)));
+        // A yield's start reaches back, taken for the block that starts it.
+        if yielded {
+            h.detector.reach_back();
+        }
+        line.push(h.block(0.95, Some(evidence(101, None))));
+        assert_eq!(h.detector.began_ordinarily(), !yielded);
+        let accepted = line[5].accepted.as_ref().expect("the line was not let in");
+        let lead = h
+            .provider_queue
+            .iter()
+            .find_map(|input| match input {
+                ProviderInput::Start { soft_lead_us, .. } => Some(*soft_lead_us),
+                _ => None,
+            })
+            .expect("the line's Start is queued");
+        let read = |sequence: u64| h.reads[sequence as usize];
+        let usual = accepted.trigger_sequence + 1 - crate::activity::PRE_ROLL_BLOCKS as u64;
+        (lead, read(usual) - read(accepted.audio[0]))
+    };
+    let (lead, kept) = start(true, false);
+    assert!(kept > 0);
+    assert_eq!(lead, kept);
+    assert_eq!(start(false, false).0, 0);
+    assert_eq!(start(true, true).0, 0);
+}
+
+/// [`soft_lead_us`]: from the line's first block to its usual start, at
+/// most [`crate::activity::SOFT_START_LEAD_BLOCKS`] blocks' worth; none
+/// without the usual start's block, or for a start that was not ordinary.
+#[test]
+fn a_soft_lead_is_counted_only_for_an_ordinary_start() {
+    let frames = |first: u64, count: u64| -> Vec<ObservedAudio> {
+        (first..first + count)
+            .map(|sequence| ObservedAudio {
+                sequence,
+                captured_at_us: sequence * 10_000,
+                samples: [0; 160],
+            })
+            .collect()
+    };
+    let pre_roll = crate::activity::PRE_ROLL_BLOCKS as u64;
+    let lead = crate::activity::SOFT_START_LEAD_BLOCKS as u64;
+    // An ordinary soft start: 30 blocks more than the usual 30.
+    let soft = frames(100, pre_roll + lead);
+    let trigger = soft.last().unwrap().sequence;
+    assert_eq!(soft_lead_us(&soft, trigger, true), lead * 10_000);
+    assert_eq!(soft_lead_us(&soft, trigger, false), 0);
+    // The usual start alone: none.
+    let usual = frames(130, pre_roll);
+    assert_eq!(soft_lead_us(&usual, trigger, true), 0);
+    // The usual start's block missing: none.
+    assert_eq!(soft_lead_us(&soft[..10], trigger, true), 0);
+    // More than a soft start keeps: no more than its lead counted.
+    let longer = frames(50, 80 + pre_roll);
+    let trigger = longer.last().unwrap().sequence;
+    assert_eq!(soft_lead_us(&longer, trigger, true), lead * 10_000);
 }
 
 /// #1722: only a start as the lamp's sound ends reaches back: with the
@@ -2840,6 +2915,7 @@ fn provider_pcm_threshold_keeps_exactly_one_terminal_allowance_in_both_modes() {
             follows_on: false,
             over_the_lamps_voice: false,
             heard_of_cut: None,
+            soft_lead_us: 0,
         });
         for n in 1..bound {
             queue_input(

@@ -213,6 +213,7 @@ fn run_with_notice_policy(
                     follows_on: false,
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
+                    soft_lead_us: 0,
                 })
                 .unwrap();
         }

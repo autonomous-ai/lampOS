@@ -91,7 +91,7 @@ async fn chats_after_a_cut_of(
         Arc::new(move || *clock.lock().unwrap()),
     )
     .announcing(false)
-    .heeding(Arc::new(move |request, _, _, _| {
+    .heeding(Arc::new(move |request, _, _, _, _| {
         (held_line && request == 2).then_some("not said to the lamp")
     }))
     .joining_cut_words(Arc::new(move |_, _| {
@@ -695,7 +695,7 @@ async fn a_played_answer_after_words_let_go_keeps_the_conversation_going() {
     )
     .announcing(false)
     // Each line a second long, ended now, as the microphone would read it.
-    .heeding(Arc::new(move |request, _, heard, from| {
+    .heeding(Arc::new(move |request, _, heard, from, _| {
         let now_us = monotonic_us();
         let held = judged.lock().unwrap().heed(
             request,
