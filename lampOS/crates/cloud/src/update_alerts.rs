@@ -3,10 +3,14 @@
 //! behind the same three gates as health and crash reports: `LAMP_CLOUD=on`,
 //! `LAMP_REPORTS=on`, and the person's yes, read at each send through the
 //! reports' own reading ([`crate::reports::Reports::consent`]). Nothing is
-//! sent, kept or retried before the yes.
+//! sent or retried without the yes. The small file of what was told is kept
+//! either way: it holds no personal data (outcomes, builds, times), and it
+//! is what stops a stage seen before the yes being sent after it.
 //!
 //! One alert per stage of a round: `started`, `done`, `failed`, `refused`,
-//! `rolled-back`, and `self-switched` under its own name. Each is built
+//! `rolled-back`, and `self-switched` under its own name; and `not-switched`
+//! for a round that began (its `started` was told) and ended with nothing
+//! switched, so no start is left without an end. Each is built
 //! from `update/status` (`lamp_msgs::UpdateStatus`) and a fixed template,
 //! and every value in it is typed so that nothing that came in can ride
 //! along: the stage is one of [`Stage`], the running build is digits and
@@ -74,6 +78,9 @@ pub enum Stage {
     /// lamp-update switched itself; its new self confirms on its next
     /// round, so this is not a round's `done`.
     SelfSwitched,
+    /// A round whose start was told ended with nothing switched; its code
+    /// is the outcome's own name from [`NOT_SWITCHED`].
+    NotSwitched,
 }
 
 impl Stage {
@@ -85,6 +92,7 @@ impl Stage {
             Self::Refused => "refused",
             Self::RolledBack => "rolled-back",
             Self::SelfSwitched => "self-switched",
+            Self::NotSwitched => "not-switched",
         }
     }
 }
@@ -101,6 +109,26 @@ fn told_as(outcome: &str) -> Option<Stage> {
         "failed" => Some(Stage::Failed),
         _ => None,
     }
+}
+
+/// The outcomes that change nothing, which end a round whose start was
+/// told as `not-switched`, with the name as the code.
+const NOT_SWITCHED: &[&str] = &[
+    "not-quiet",
+    "unreachable",
+    "would",
+    "up-to-date",
+    "nothing-published",
+];
+
+/// The fixed code of a round that switched nothing: its outcome's name
+/// from [`NOT_SWITCHED`], else `other`.
+fn not_switched_code(outcome: &str) -> &'static str {
+    NOT_SWITCHED
+        .iter()
+        .copied()
+        .find(|name| *name == outcome)
+        .unwrap_or("other")
 }
 
 /// A build the lamp ran: its sequence and, when it is hex digits, its
@@ -213,7 +241,15 @@ struct Key(String, Option<u64>, u64);
 
 impl Key {
     fn of(result: &UpdateResult) -> Self {
-        Self(result.outcome.clone(), result.sequence, result.at_unix_ms)
+        // Only a known name is kept, so the file never holds text that came in.
+        let known =
+            told_as(&result.outcome).is_some() || NOT_SWITCHED.contains(&result.outcome.as_str());
+        let outcome = if known {
+            result.outcome.as_str()
+        } else {
+            "other"
+        };
+        Self(outcome.to_owned(), result.sequence, result.at_unix_ms)
     }
 }
 
@@ -229,6 +265,31 @@ struct Told {
     started_after: Option<Key>,
     /// The build it ran then.
     from: Option<String>,
+}
+
+/// The file's write, kept to run where it may block: a temporary file,
+/// synced, renamed over the file.
+#[derive(Debug)]
+pub struct FileWrite {
+    path: PathBuf,
+    bytes: Vec<u8>,
+}
+
+impl FileWrite {
+    pub fn run(self) {
+        let temporary = self.path.with_extension("tmp");
+        let _ = fs::remove_file(&temporary);
+        let written = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&temporary)
+            .and_then(|mut file| file.write_all(&self.bytes).and_then(|()| file.sync_all()))
+            .and_then(|()| fs::rename(&temporary, &self.path));
+        if written.is_err() {
+            let _ = fs::remove_file(&temporary);
+        }
+    }
 }
 
 /// Turns what `update/status` says, over time, into alerts. The only
@@ -248,30 +309,31 @@ impl Watcher {
         Self { store, told }
     }
 
-    fn keep(&self, told: &Told) {
-        let Some(path) = &self.store else {
-            return;
-        };
-        let temporary = path.with_extension("tmp");
-        let _ = fs::remove_file(&temporary);
-        let Ok(bytes) = serde_json::to_vec(told) else {
-            return;
-        };
-        let written = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&temporary)
-            .and_then(|mut file| file.write_all(&bytes).and_then(|()| file.sync_all()))
-            .and_then(|()| fs::rename(&temporary, path));
-        if written.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
+    fn write_of(&self, told: &Told) -> Option<FileWrite> {
+        Some(FileWrite {
+            path: self.store.clone()?,
+            bytes: serde_json::to_vec(told).ok()?,
+        })
     }
 
     /// What `status`, seen at `now_ms`, is news of. A value past its life
     /// is not given here.
     pub fn observe(&mut self, status: &UpdateStatus, extras: &Extras, now_ms: u64) -> Vec<Alert> {
+        let (alerts, write) = self.observe_deferred(status, extras, now_ms);
+        if let Some(write) = write {
+            write.run();
+        }
+        alerts
+    }
+
+    /// As [`Watcher::observe`], with the file's write handed back for the
+    /// caller to run where it may block.
+    pub fn observe_deferred(
+        &mut self,
+        status: &UpdateStatus,
+        extras: &Extras,
+        now_ms: u64,
+    ) -> (Vec<Alert>, Option<FileWrite>) {
         let current = status.last.as_ref().map(Key::of);
         let Some(told) = self.told.clone() else {
             // Nothing kept: what is said now was told, or was not to be.
@@ -279,9 +341,9 @@ impl Watcher {
                 ended: current,
                 ..Told::default()
             };
-            self.keep(&told);
+            let write = self.write_of(&told);
             self.told = Some(told);
-            return Vec::new();
+            return (Vec::new(), write);
         };
         let mut told = told;
         let mut alerts = Vec::new();
@@ -305,9 +367,12 @@ impl Watcher {
                 });
             }
         } else if told.ended != current {
+            // The end before this one names the round, if its start was told.
+            let began = told.started && told.started_after == told.ended;
             told.ended = current.clone();
             if let Some(result) = &status.last
-                && let Some(stage) = told_as(&result.outcome)
+                && let Some(stage) =
+                    told_as(&result.outcome).or_else(|| began.then_some(Stage::NotSwitched))
             {
                 // The start told is of this round only if it was said after
                 // the end before this one.
@@ -316,7 +381,11 @@ impl Watcher {
                     stage,
                     from,
                     to: result.sequence,
-                    code: extras.reason,
+                    code: if stage == Stage::NotSwitched {
+                        Some(not_switched_code(&result.outcome))
+                    } else {
+                        extras.reason
+                    },
                     took_s: extras
                         .started_at_unix_ms
                         .and_then(|began| result.at_unix_ms.checked_sub(began))
@@ -326,11 +395,12 @@ impl Watcher {
                 });
             }
         }
+        let mut write = None;
         if self.told.as_ref() != Some(&told) {
-            self.keep(&told);
+            write = self.write_of(&told);
             self.told = Some(told);
         }
-        alerts
+        (alerts, write)
     }
 }
 
@@ -395,7 +465,11 @@ impl Alerts {
         let Some((status, extras)) = status else {
             return 0;
         };
-        let alerts = self.watcher.observe(status, extras, now_ms);
+        let (alerts, write) = self.watcher.observe_deferred(status, extras, now_ms);
+        if let Some(write) = write {
+            // Off the runtime's worker: a slow flash sync stalls nothing else.
+            let _ = tokio::task::spawn_blocking(move || write.run()).await;
+        }
         let mut sent = 0;
         for alert in alerts {
             // Read at each send.
@@ -713,6 +787,68 @@ mod tests {
         );
     }
 
+    /// A round that began and switched nothing is ended, so no start is left
+    /// alone; one that never began sends nothing; an unknown name is `other`.
+    #[test]
+    fn a_started_round_that_switches_nothing_ends_as_not_switched() {
+        let mut watcher = Watcher::new(None);
+        let old = Some(("up-to-date", Some(3309), T0 - 1_000));
+        assert!(
+            watcher
+                .observe(&status("idle", 3309, old), &none(), T0)
+                .is_empty()
+        );
+        // A round with no start told ends as up-to-date: nothing.
+        let quiet = Some(("up-to-date", Some(3309), T0 + 10_000));
+        assert!(
+            watcher
+                .observe(&status("checking", 3309, old), &none(), T0 + 5_000)
+                .is_empty()
+        );
+        assert!(
+            watcher
+                .observe(&status("idle", 3309, quiet), &none(), T0 + 11_000)
+                .is_empty()
+        );
+        let mut stages = Vec::new();
+        let mut last = quiet;
+        for (i, outcome) in ["not-quiet", "switched"].into_iter().enumerate() {
+            let at = T0 + 100_000 * (i as u64 + 1);
+            stages.extend(watcher.observe(&status("fetching", 3309, last), &none(), at));
+            last = Some((outcome, Some(3310), at + 50_000));
+            stages.extend(watcher.observe(&status("idle", 3309, last), &none(), at + 51_000));
+        }
+        let told: Vec<_> = stages.iter().map(|a| (a.stage, a.code)).collect();
+        assert_eq!(
+            told,
+            [
+                (Stage::Started, None),
+                (Stage::NotSwitched, Some("not-quiet")),
+                (Stage::Started, None),
+                (Stage::Done, None),
+            ]
+        );
+        for name in [
+            "not-quiet",
+            "unreachable",
+            "would",
+            "up-to-date",
+            "nothing-published",
+        ] {
+            assert_eq!(not_switched_code(name), name);
+        }
+        assert_eq!(not_switched_code("Alice said s3cret"), "other");
+        assert_eq!(
+            stages[1].message(),
+            "Software update lamp - not-switched\nfrom: 3309+4a39f04\nto: 3310\ncode: not-quiet"
+        );
+        // An unknown name after a started round is told as other.
+        watcher.observe(&status("fetching", 3310, last), &none(), T0 + 500_000);
+        let odd = Some(("Alice said s3cret", None, T0 + 510_000));
+        let told = watcher.observe(&status("idle", 3310, odd), &none(), T0 + 511_000);
+        assert_eq!(told[0].code, Some("other"));
+    }
+
     /// A round restarts lamp-cloud when it changed, and a reboot begins it
     /// again: the file joins the start and the end, and tells neither twice.
     #[test]
@@ -1008,11 +1144,15 @@ mod tests {
             ("idle", Some(("switched", Some(3311), T0 + 30_000))),
             ("idle", Some(("failed", None, T0 + 40_000))),
             ("idle", Some(("self-switched", Some(3312), T0 + 50_000))),
+            ("fetching", Some(("self-switched", Some(3312), T0 + 50_000))),
+            ("idle", Some(("not-quiet", None, T0 + 60_000))),
+            ("fetching", Some(("not-quiet", None, T0 + 60_000))),
+            ("idle", Some((secret, None, T0 + 70_000))),
         ] {
             look(&mut alerts, planted(now, last)).await;
         }
         let seen = requests.lock().unwrap().clone();
-        assert!(seen.len() >= 6, "{}", seen.len());
+        assert!(seen.len() >= 9, "{}", seen.len());
         for request in &seen {
             let body = request.split("\r\n\r\n").nth(1).unwrap();
             for secret in [
