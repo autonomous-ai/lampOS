@@ -180,9 +180,14 @@ the `### Built but not on yet` part. It lists each `switches.md` row counted
 `until` or `now` whose switch no product file turns on, read from the
 units themselves (`Environment=` lines, `ExecStart` flags and the settings'
 `.env` files in `deploy/product`), not from the row's "Product unit" cell.
-Each row gets its words to the end of their first sentence (140
-characters at most). It says how many, then gives the list folded and grouped
-by the page's four tables. The part goes between the notes in plain words and
+Each switch is listed in plain words: its line in `switches.md`'s "In plain
+words" table, what a person would notice with it on, with no switch name. A
+switch with no line there falls back to its row's words. Every switch listed
+has one, held by `on_this_repository_each_listed_switch_has_a_plain_line`
+(the first builder on #3976). The part says how many, then gives the list
+folded and grouped by the page's four tables. A second fold, "For
+developers", gives each switch's name and its row's words to the end of their
+first sentence (140 characters at most). The part goes between the notes in plain words and
 `### For developers`, or replaces itself, and it is written only when the
 body is already this build's. The same notes are kept on the build's own
 release as an asset, `NOTES.md`, which no promotion reads (it checks only

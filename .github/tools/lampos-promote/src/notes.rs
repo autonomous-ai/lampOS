@@ -13,6 +13,12 @@ pub const HEADING: &str = "### Built but not on yet";
 pub const DEVELOPERS: &str = "### For developers";
 /// The build's own copy of the notes, an asset beside its files.
 pub const ASSET: &str = "NOTES.md";
+/// The page's table of what a person would notice with each switch on, one
+/// plain line per switch, which the list prints (the first builder on
+/// #3976, 29 Oct 23:4x: the rows' own words are for developers).
+pub const PLAIN: &str = "## In plain words";
+/// The longest plain line.
+pub const PLAIN_MOST: usize = 110;
 /// The headings of the page's four tables of switches, and the name each
 /// is listed under.
 const TABLES: [(&str, &str); 4] = [
@@ -41,6 +47,8 @@ pub struct Waiting {
     pub part: &'static str,
     pub switch: String,
     pub words: String,
+    /// Its line in [`PLAIN`], if the page has one.
+    pub plain: Option<String>,
 }
 
 fn cells(line: &str) -> Vec<&str> {
@@ -91,6 +99,31 @@ fn words_of(cell: &str) -> String {
     format!("{cut}…")
 }
 
+/// Each switch's line in the page's [`PLAIN`] table.
+pub fn plain_lines(page: &str) -> BTreeMap<String, String> {
+    let mut lines = BTreeMap::new();
+    let mut inside = false;
+    for line in page.lines() {
+        if line.starts_with("## ") {
+            inside = line.trim() == PLAIN;
+            continue;
+        }
+        if !inside || !line.starts_with('|') {
+            continue;
+        }
+        let row = cells(line);
+        if row.len() < 2 || row[0].starts_with("---") {
+            continue;
+        }
+        if let Some(switch) = switch_of(row[0])
+            && !row[1].is_empty()
+        {
+            lines.insert(switch, row[1].to_owned());
+        }
+    }
+    lines
+}
+
 /// What the product units and settings turn on: each `NAME=value` of an
 /// `Environment=` line or a settings `.env` file with a value that isn't
 /// off, and each `--flag` of an `ExecStart` line.
@@ -129,6 +162,7 @@ pub fn turned_on(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
 /// Every row of the page's switch tables counted `until` or `now` whose
 /// switch isn't in `on`, in the page's order, each switch once.
 pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
+    let plain = plain_lines(page);
     let mut found = Vec::new();
     let mut part = None;
     let mut header = false;
@@ -167,6 +201,7 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
         }
         found.push(Waiting {
             part,
+            plain: plain.get(&switch).cloned(),
             switch,
             words: words_of(row[1]),
         });
@@ -175,7 +210,9 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
 }
 
 /// The part, from its heading to its last line: how many, then the list by
-/// table, folded, since it runs to many lines.
+/// table in plain words, folded, since it runs to many lines, and then each
+/// switch's name and its row's words, folded, for developers. A switch with
+/// no plain line is listed in its row's words.
 pub fn section(waiting: &[Waiting]) -> String {
     let mut lines = vec![HEADING.to_owned()];
     if waiting.is_empty() {
@@ -192,6 +229,27 @@ pub fn section(waiting: &[Waiting]) -> String {
         "<details><summary>The {}, by part</summary>",
         waiting.len()
     ));
+    by_part(&mut lines, waiting, |w| {
+        format!("- {}", w.plain.as_deref().unwrap_or(&w.words))
+    });
+    lines.push(String::new());
+    lines.push("</details>".to_owned());
+    lines.push(String::new());
+    lines.push(
+        "<details><summary>For developers: each switch and its row's words \
+         (docs/switches.md)</summary>"
+            .to_owned(),
+    );
+    by_part(&mut lines, waiting, |w| {
+        format!("- `{}`: {}", w.switch, w.words)
+    });
+    lines.push(String::new());
+    lines.push("</details>".to_owned());
+    lines.join("\n") + "\n"
+}
+
+/// `waiting`'s lines under their tables' names, in order.
+fn by_part(lines: &mut Vec<String>, waiting: &[Waiting], line: impl Fn(&Waiting) -> String) {
     let mut part = None;
     for w in waiting {
         if part != Some(w.part) {
@@ -199,11 +257,8 @@ pub fn section(waiting: &[Waiting]) -> String {
             lines.push(format!("**{}**", w.part));
             part = Some(w.part);
         }
-        lines.push(format!("- `{}`: {}", w.switch, w.words));
+        lines.push(line(w));
     }
-    lines.push(String::new());
-    lines.push("</details>".to_owned());
-    lines.join("\n") + "\n"
 }
 
 /// `body` with its part replaced by `part`: in place when it is there, else
