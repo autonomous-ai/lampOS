@@ -993,7 +993,12 @@ turned to the lamp". Now a request that begins within 3 s
 (`AFTER_CALL_US`) of the end of one that was only the name
 (`ProviderInput::Called`, then its End) is let out as the tap's is, in
 every room and every form of the rule, on the Live route. The second
-route drops `ProviderInput::Called`, so there it is judged as before.
+route drops `ProviderInput::Called`, so there it is judged as before,
+except for the line after a name held back at night: with
+`LAMP_REST_THROUGH_SOUNDS=on`, the lamp asleep for the night, the name
+alone only stirs it, and a line the same person begins within the stir's
+hold (5 s, `NIGHT_NAME_CARRIES_FOR`) is said by that name and answered
+([second-voice.md](second-voice.md), [alive.md](alive.md), #4285).
 
 It counts only if the call itself showed the lamp was called, as the busy
 room judges any request (`Attention::call_shown`):

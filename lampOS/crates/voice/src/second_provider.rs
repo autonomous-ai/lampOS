@@ -1556,6 +1556,10 @@ struct Shared {
     /// A line that was only the lamp's name waits for the line after it,
     /// which is then said by it ([`Engine::carrying_the_name`]).
     name_carries: bool,
+    /// Whether the lamp is asleep for the night and resting through sounds
+    /// (`LAMP_REST_THROUGH_SOUNDS=on`, [`Engine::resting_through_sounds`]):
+    /// its answer to its name alone is then held back.
+    night_rest: Option<NightRest>,
     /// That line, while its answer waits ([`NameWait`]).
     name_waits: Mutex<Option<NameWait>>,
     /// The name whose words wait as words cut short because the line after
@@ -1852,6 +1856,18 @@ pub const OPEN_NAME_WITHIN: Duration = Duration::from_millis(2_500);
 /// short sound or as said to nobody, and each piece after it as said to
 /// nobody.
 pub const NAME_CARRIES_FOR: Duration = Duration::from_millis(2_500);
+
+/// How long after its end a line that was only the lamp's name waits for
+/// the line after it while the lamp is asleep for the night and rests
+/// through sounds ([`Engine::resting_through_sounds`]), in place of
+/// [`NAME_CARRIES_FOR`]: the stir's hold, `lamp_expression::STIR_HOLD_US`
+/// (5 s; a test pins the two equal, as this crate depends on
+/// `lamp-expression` only in tests). The name alone is held back then, so
+/// the lamp only stirs; a person who sees its head lift and asks within
+/// the hold is answered, as said by the name (the reviewer's P2 on #4285:
+/// "Lamp.", a pause, then "What time is it?" 3 s later was judged fresh
+/// and held as said to nobody).
+pub const NIGHT_NAME_CARRIES_FOR: Duration = Duration::from_secs(5);
 
 /// What a line waiting as the lamp's name said: its words, as it would
 /// have been asked, and whether the coordinator ended it as only the name
@@ -2990,6 +3006,41 @@ pub(crate) const WAITS_FOR_POLICY: &str = "it waits for the Policy's decision";
 /// held).
 pub type PolicyNow = Arc<dyn Fn(u64) -> Option<Option<&'static str>> + Send + Sync>;
 
+/// Whether the lamp is asleep for the night, resting through sounds, now
+/// (`expression/state` names [`RESTING_THROUGH_SOUNDS`]).
+pub type NightRest = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// The switch the voice shares with `lamp-expression` and `lamp-skills`
+/// (#1672).
+pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
+
+/// What `expression/state` names while the night's sleep rests through
+/// sounds (`lamp_expression::RESTING_THROUGH_SOUNDS`).
+pub const RESTING_THROUGH_SOUNDS: &str = "resting_through_sounds";
+
+/// Why the answer to the lamp's name alone is held back in the night's
+/// sleep ([`Engine::resting_through_sounds`]).
+const NIGHT_REST_HELD: &str = "only the lamp's name, and the lamp asleep for the night: it stirs and is not woken by its own answer (LAMP_REST_THROUGH_SOUNDS)";
+
+/// Whether Expression's state says the night's sleep rests through sounds:
+/// from Expression, not expired, valid, and naming
+/// [`RESTING_THROUGH_SOUNDS`]. Anything else, as with no state at all, is
+/// not, so the name alone is answered as by day.
+pub fn rests_through_sounds(message: &lamp_bus::Message) -> bool {
+    !message.expired
+        && message.header.source == "expression"
+        && message
+            .parse::<lamp_msgs::ExpressionState>()
+            .ok()
+            .filter(|state| state.check().is_ok())
+            .is_some_and(|state| {
+                state
+                    .behaviours
+                    .iter()
+                    .any(|name| name == RESTING_THROUGH_SOUNDS)
+            })
+}
+
 /// How often a line that waits for the Policy asks again.
 const POLICY_POLL: Duration = Duration::from_millis(50);
 
@@ -3342,6 +3393,7 @@ impl Engine {
                 pause_kept: Mutex::new(None),
                 pause_cut: Mutex::new(None),
                 name_carries: false,
+                night_rest: None,
                 name_waits: Mutex::new(None),
                 name_refused: Mutex::new(None),
                 one_speaker: None,
@@ -3976,6 +4028,22 @@ impl Engine {
     pub fn joining_pauses(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.pause_join = on;
+        }
+        self
+    }
+
+    /// With `LAMP_REST_THROUGH_SOUNDS=on` (#1672, #4285): `night` says
+    /// whether the lamp is asleep for the night now, resting through
+    /// sounds. Then a line that is only the lamp's name, answered as a call
+    /// otherwise ("Yes?"), is held back: its answer would wake the lamp,
+    /// where the first builder's call on #4285 is that a bare name only
+    /// stirs it and a line going on from the name wakes it. On lamp-06c1 at
+    /// 03:20 on 4 Nov, "Lamp." alone was answered as a call once the name's
+    /// wait was over, and the answer woke the lamp fully. Asked when the
+    /// line would be answered, after the name's wait. Before any turn only.
+    pub fn resting_through_sounds(mut self, night: NightRest) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.night_rest = Some(night);
         }
         self
     }
@@ -7223,10 +7291,27 @@ async fn spoken(
         && !whole_already(&text)
         && (called || name_first(&text));
     if name_waits {
-        let left = NAME_CARRIES_FOR.saturating_sub(finishing.elapsed());
+        // Only the name, asleep for the night, resting through sounds
+        // (#4285): held back, the lamp only stirs, so the wait is the
+        // stir's hold, and a person who sees the head lift and asks within
+        // it is answered (the reviewer's P2 on #4285).
+        let night = (called || name_alone(&text))
+            && shared.night_rest.as_ref().is_some_and(|night| night());
+        let carries_for = if night {
+            NIGHT_NAME_CARRIES_FOR
+        } else {
+            NAME_CARRIES_FOR
+        };
+        let left = carries_for.saturating_sub(finishing.elapsed());
         if called || name_alone(&text) {
             eprintln!(
-                "lamp-voice second: request {request}: only the lamp's name: its answer waits for the line after it (LAMP_SECOND_NAME_CARRIES)"
+                "lamp-voice second: request {request}: only the lamp's name: its answer waits {} ms for the line after it (LAMP_SECOND_NAME_CARRIES{})",
+                left.as_millis(),
+                if night {
+                    ", the stir's hold: asleep for the night, LAMP_REST_THROUGH_SOUNDS"
+                } else {
+                    ""
+                }
             );
         } else {
             eprintln!(
@@ -7505,6 +7590,20 @@ async fn spoken(
         )
         .await;
         return;
+    }
+    // Only the lamp's name, answered as a call, while the lamp is asleep
+    // for the night and rests through sounds (`LAMP_REST_THROUGH_SOUNDS`,
+    // #4285): held back, so the name only stirs it, and a TV's "Lamp." or a
+    // name with nobody going on never wakes it. A line that goes on from
+    // the name is said by it and answered as before, and wakes it.
+    if heeded.is_none()
+        && !echoed
+        && !held
+        && !empty
+        && (called || name_alone(&text))
+        && shared.night_rest.as_ref().is_some_and(|night| night())
+    {
+        heeded = Some(NIGHT_REST_HELD);
     }
     // A held echo's journal line, with its counts, is said above.
     if let Some(why) = heeded.filter(|_| !echoed) {
@@ -8566,6 +8665,19 @@ async fn said_by_the_name(
                 "lamp-voice second: request {request} is not said by the name of request {}: {why}; it is judged as its own (LAMP_SECOND_NAME_CARRIES)",
                 name.request
             );
+            // Asleep for the night, resting through sounds (#4285): the
+            // name is not answered in the held line's place either, as the
+            // name alone is not: that answer would wake the lamp for a line
+            // not shown to be its caller's.
+            if (called || name_alone(&words))
+                && shared.night_rest.as_ref().is_some_and(|night| night())
+            {
+                eprintln!(
+                    "lamp-voice second: request {}'s name is not answered in request {request}'s place: the lamp is asleep for the night (LAMP_REST_THROUGH_SOUNDS)",
+                    name.request
+                );
+                return None;
+            }
             let asked = if name_first(&words) {
                 words
             } else {

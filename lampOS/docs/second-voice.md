@@ -1519,7 +1519,24 @@ order is kept. A written turn is the same from the chat on.
     (`ProviderInput::Called`), whatever its words. Such a line is never
     held as a short sound, and its answer waits up to `NAME_CARRIES_FOR`
     (2.5 s) after its end, as `OPEN_NAME_WITHIN`'s wait does. A line itself
-    said by a name never waits again.
+    said by a name never waits again. With `LAMP_REST_THROUGH_SOUNDS=on`
+    and Expression naming `resting_through_sounds` (asleep for the night),
+    the name alone, with nothing after it, is held back instead of
+    answered as a call, so the lamp only stirs ([alive.md](alive.md),
+    #4285); a line said by the name is answered as before. Then the
+    wait of the name alone (not of a short line begun with it, which is
+    still answered) is the stir's hold, `NIGHT_NAME_CARRIES_FOR` (5 s,
+    `lamp_expression::STIR_HOLD_US`), not 2.5 s: a person who says
+    "Lamp.", sees the head lift and asks "What time is it?" 3 s later is
+    answered, the line said by the name as below, and the answer wakes the
+    lamp (the reviewer's P2 on #4285: past 2.5 s the line was judged fresh
+    and held as said to nobody). A line begun past 5 s is judged as its
+    own, so the room still can't wake it. A line in the wait not shown to
+    be the same person's is judged as its own, and the name is not
+    answered in its place: that answer would wake the lamp. Tests:
+    `name_carries.rs`
+    `asleep_for_the_night_a_held_name_carries_for_the_stirs_hold` and
+    `a_held_names_window_is_the_stirs_hold`.
   - **A line begun in that wait is said by the name, only when one person
     said both** (El's P1s on the branch, 22 Oct). Its Start takes the wait
     (`Engine::name_said_before`); `begin` drops the name's request. The
