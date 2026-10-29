@@ -1249,7 +1249,8 @@ only after a round ends some other way (`done`, `rolled-back`,
 holds, the `started` of the next rounds is not told either, since its end
 would not be. The streak is kept in `update-alerts.json` too, so a restart
 mid-streak tells nothing again; a file from before this field loads as no
-streak.
+streak. So the end that breaks a streak is told without its start, and with
+`took:` once lamp-update gives when the round began.
 
 **Once, across restarts.** `update/status` says the last result every
 minute and again whenever lamp-update or lamp-cloud starts, and a round
