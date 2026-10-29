@@ -341,6 +341,21 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   100 ms bound, and a refused message names its socket (for example
   `capture.c.p: stale, …`). A receiver held up later in its run is #784's
   (`HELD_UP_US`), separate from this.
+- **The microphone's first frame older than 100 ms.** Capture sends its first
+  frame as soon as it is asked to; lamp-0c89 at build 8545 read one 154 ms
+  old at boot (`capture.d.p: stale, … sequence 1 after 0`) and the voice
+  exited 1 (#4332). Capture sends a frame every 10 ms, so the frames behind
+  the first are stale too. The run of frames at the start of `capture.d.p`,
+  in order from the worker's boot and stale by their age alone, is now
+  dropped up to the first fresh one and said once, with its count, the
+  oldest and the bound (`capture.d.p: 6 stale first messages dropped, the
+  oldest … us (bound 100000 us), the next taken`). The run is bounded: once
+  its first frame is over 1 s old (`FIRST_CONTROL_MAX_AGE_US`), a stale one
+  ends the voice. A frame from another boot, out of order or stamped after
+  now ends it anywhere in the run, and once a frame is taken the frames
+  after it keep the 100 ms bound. If nothing fresh is waiting yet, nothing is
+  taken and the next look goes on with the run. The bound itself is
+  unchanged, and no other channel drops.
 - **The first direct capture-ready message while the speaker starts.** On
   build 6963 after setup, lamp-dbda reported `ref.c.speaker` sequence 1
   after 0, aged 143402 us against 100000 us, then restarted muted (#3530).

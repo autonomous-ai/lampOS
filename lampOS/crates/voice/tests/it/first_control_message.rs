@@ -40,10 +40,27 @@ fn a_first_control_message_may_wait_for_the_receiver_and_nothing_after_it() {
         .receive_with::<WorkerEvent>(|| t)
         .unwrap_err();
     assert!(error.to_string().starts_with("capture.c.p: "), "{error}");
-    // A first data message gets no first-message grace either.
+    // The capture's stale first data message is dropped, not taken (#4332).
+    worker.data.send_with(WorkerEvent::Ready, || t).unwrap();
+    t += 154_172;
+    assert!(
+        parent
+            .data
+            .receive_with::<WorkerEvent>(|| t)
+            .unwrap()
+            .is_none()
+    );
+    // The first fresh one is taken, and a stale one after it is refused, and
+    // says which socket.
+    worker.data.send_with(WorkerEvent::Ready, || t).unwrap();
+    assert!(matches!(
+        parent.data.receive_with::<WorkerEvent>(|| t).unwrap(),
+        Some(WorkerEvent::Ready)
+    ));
     worker.data.send_with(WorkerEvent::Ready, || t).unwrap();
     t += 1_700_000;
-    assert!(parent.data.receive_with::<WorkerEvent>(|| t).is_err());
+    let error = parent.data.receive_with::<WorkerEvent>(|| t).unwrap_err();
+    assert!(error.to_string().starts_with("capture.d.p: "), "{error}");
 
     // The plain `send` and `receive` read the host's clock: a message sent
     // now is taken now (the fifth on #1128, so their wiring stays tested).
@@ -59,4 +76,11 @@ fn a_first_control_message_may_wait_for_the_receiver_and_nothing_after_it() {
         parent.control.receive::<WorkerEvent>().unwrap(),
         Some(WorkerEvent::Ready)
     ));
+    // Elsewhere a first data message gets no first-message grace, nor is it
+    // dropped (#4332).
+    let mut t = monotonic_us();
+    worker.data.send_with(WorkerEvent::Ready, || t).unwrap();
+    t += 1_700_000;
+    let error = parent.data.receive_with::<WorkerEvent>(|| t).unwrap_err();
+    assert!(error.to_string().starts_with("speaker.d.p: "), "{error}");
 }
