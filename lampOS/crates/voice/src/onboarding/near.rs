@@ -664,6 +664,7 @@ impl Onboarding {
             && *self.prompts(sentence) == prompt
         {
             *self.prompts(sentence) = prompt - 1;
+            *self.unheard(sentence) = 0;
             self.save();
         }
         // The name part's stored bar stands: the sentence part goes on. The
@@ -683,6 +684,34 @@ impl Onboarding {
             &mut self.desired.sentence_prompts
         } else {
             &mut self.desired.near_call_prompts
+        }
+    }
+
+    /// The part's prompt counted but not yet heard (#3754): given back as
+    /// the next voice cycle starts (`Progress::give_unheard_back`).
+    fn unheard(&mut self, sentence: bool) -> &mut u8 {
+        if sentence {
+            &mut self.desired.sentence_unheard
+        } else {
+            &mut self.desired.near_call_unheard
+        }
+    }
+
+    /// The part's prompt was heard: it counts for good, across a restart.
+    fn prompt_heard(&mut self, sentence: bool) {
+        if *self.unheard(sentence) != 0 {
+            *self.unheard(sentence) = 0;
+            self.save();
+        }
+    }
+
+    /// [`Onboarding::invitation_sounded`]: the bound prompt's first audio
+    /// reached the speaker.
+    pub(super) fn near_invitation_sounded(&mut self, voice_boot: BootId, turn: u64) {
+        if self.near_binding() == Some((voice_boot, turn))
+            && let Some(sentence) = self.near.offer.as_ref().map(|offer| offer.sentence)
+        {
+            self.prompt_heard(sentence);
         }
     }
 
@@ -802,6 +831,7 @@ impl Onboarding {
         if again {
             self.near.reoffered += 1;
             *self.prompts(sentence) = prompt - 1;
+            *self.unheard(sentence) = 0;
             self.save();
         }
         again
@@ -839,6 +869,8 @@ impl Onboarding {
             self.give_prompt_back(offer.sentence, offer.prompt, NOT_SAID, now_us);
             return;
         }
+        // Some of it played: heard, if its first audio was not told already.
+        self.prompt_heard(offer.sentence);
         if delivery == Delivery::Cut {
             self.near.retry_after_us = now_us.saturating_add(1_000_000);
             let kind = if offer.sentence {
@@ -876,6 +908,7 @@ impl Onboarding {
     fn give_prompt_back(&mut self, sentence: bool, prompt: u8, why: &str, now_us: u64) {
         if *self.prompts(sentence) == prompt {
             *self.prompts(sentence) = prompt - 1;
+            *self.unheard(sentence) = 0;
             self.save();
         }
         self.near.unsaid = self.near.unsaid.saturating_add(1);
@@ -1327,6 +1360,7 @@ impl Onboarding {
                 } else {
                     let (part, prompt) = (offer.sentence, offer.prompt);
                     *self.prompts(part) = prompt;
+                    *self.unheard(part) = prompt;
                     self.save();
                     return;
                 }
@@ -1359,8 +1393,11 @@ impl Onboarding {
             offered_us: now_us,
             bound: None,
         });
-        // Its budget is committed before the invitation is published.
+        // Its budget is committed before the invitation is published, marked
+        // unheard until its first audio plays (#3754): a voice stopped before
+        // then gives it back as it starts again (`Progress::give_unheard_back`).
         *self.prompts(sentence) = prompt;
+        *self.unheard(sentence) = prompt;
         self.save();
         if let Some(led) = self.led.as_mut() {
             led.asked_us = Some(now_us);

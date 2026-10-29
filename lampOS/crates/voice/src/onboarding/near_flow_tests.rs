@@ -65,19 +65,35 @@ impl Store {
             serde_json::to_vec(&progress).unwrap(),
         )
         .unwrap();
-        let paths = storage::Paths {
+        let paths = Self::paths(&path);
+        let owner = match hook {
+            Some(hook) => storage::ServiceStorage::start_with_hook(paths, hook).unwrap(),
+            None => storage::ServiceStorage::start(paths).unwrap(),
+        };
+        Self { path, owner }
+    }
+    fn paths(path: &std::path::Path) -> storage::Paths {
+        storage::Paths {
             progress: path.join("progress.json"),
             checkpoint: path.join("privacy-pending.json"),
             mailbox: path.join("progress.json.told"),
             near_call: path.join("near-call.json"),
             room_sounds: path.join("room-sounds.json"),
             room_sounds_group: None,
-        };
-        let owner = match hook {
-            Some(hook) => storage::ServiceStorage::start_with_hook(paths, hook).unwrap(),
-            None => storage::ServiceStorage::start(paths).unwrap(),
-        };
-        Self { path, owner }
+        }
+    }
+    /// The whole voice process stopped and started again: its storage
+    /// worker too, so the next cycle reads the onboarding file from disk.
+    fn restart(&mut self) {
+        assert_eq!(
+            self.owner.finish(Duration::from_secs(2)).unwrap(),
+            storage::StorageShutdown::Finished
+        );
+        self.owner = storage::ServiceStorage::start(Self::paths(&self.path)).unwrap();
+    }
+    /// The onboarding file as it is on disk.
+    fn on_disk(&self) -> Value {
+        serde_json::from_slice(&std::fs::read(self.path.join("progress.json")).unwrap()).unwrap()
     }
     fn near_file(&self) -> PathBuf {
         self.path.join("near-call.json")
@@ -1818,7 +1834,12 @@ fn late_lines_skip_redo_and_a_new_cycle_in_the_sentence_part() {
         walk.take_invitation(token, 110 * S).unwrap(),
         SENTENCE_AGAIN
     );
-    // Claimed and never judged: with both prompts spent the step fails.
+    // Heard (its first audio played) and never judged: with both prompts
+    // spent the step fails. One never heard is owed again (#3754).
+    let boot = BootId::new([3; 16]).unwrap();
+    assert!(walk.bind_invitation(token, boot, 5));
+    walk.invitation_sounded(boot, 5);
+    walk.drain_storage_for_test(110 * S);
     drop(walk);
     let mut walk = store.cycle(120 * S);
     assert_eq!(settle(&mut walk, 120 * S), [NEAR_DONE, SENTENCE_FAILED]);
@@ -1952,4 +1973,167 @@ fn a_refused_call_heard_only_as_text_then_silence_ends_failed() {
     // At the step's end: the sentence's line, then the call's.
     assert_eq!(settle(&mut walk, 140 * S), [SENTENCE_FAILED, NEAR_FAILED]);
     assert_eq!(outcome(&walk), Some(Outcome::Failed));
+}
+
+/// A prompt offered and handed to the model, whose turn never reached the
+/// speaker: what lamp-06c1 saw on 30 Oct (#3754), prompt 2 handed over and
+/// `say: dropped (runtime_failed)` as the whole voice exited.
+fn hand_over(walk: &mut Onboarding, at: u64, turn: u64) -> u64 {
+    let token = offer(walk, at);
+    let attempt = walk.pending().invitations[0].attempt;
+    walk.take_invitation(token, at).unwrap();
+    assert!(walk.bind_invitation(token, BootId::new([3; 16]).unwrap(), turn));
+    walk.drain_storage_for_test(at);
+    attempt
+}
+
+/// lamp-06c1, 30 Oct 04:42 (#3754): the voice exited between prompt 2's
+/// offer and its first audio, and the next voice found it counted, so the
+/// name part asked prompt 3 with one try made and failed a prompt early.
+/// A prompt counts only once its invitation was heard: after a whole
+/// restart before then, the count is where it was and the same prompt is
+/// asked again. The sentence part's prompts are kept the same way.
+#[test]
+fn a_restart_before_a_prompts_first_audio_leaves_that_prompt_owed() {
+    let mut store = Store::new(None);
+    let mut walk = store.cycle(S);
+    assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
+    assert_eq!(hand_over(&mut walk, 30 * S, 2), 2);
+    // Committed before it was published, as before, and marked unheard.
+    assert_eq!(walk.kept().near_call_prompts, 2);
+    assert_eq!(store.on_disk()["near_call_unheard"], 2);
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(40 * S);
+    walk.drain_storage_for_test(40 * S);
+    assert_eq!(walk.kept().near_call_prompts, 1);
+    assert_eq!(walk.kept().near_call_tries.len(), 1);
+    assert_eq!(store.on_disk()["near_call_prompts"], 1);
+    assert!(store.on_disk().get("near_call_unheard").is_none());
+    // Asked again with its own number, and a try in it counts.
+    assert_eq!(call(&mut walk, 50 * S, 25.0, 3)["prompt"], 2);
+    assert_eq!(walk.kept().near_call_prompts, 2);
+    assert_eq!(walk.kept().near_call_tries.len(), 2);
+    // The sentence part: its first prompt handed over, never heard.
+    assert_eq!(call(&mut walk, 70 * S, 23.1, 4)["accepted"], true);
+    assert_eq!(settle(&mut walk, 90 * S), [NEAR_DONE]);
+    assert_eq!(hand_over(&mut walk, 100 * S, 5), 6);
+    assert_eq!(walk.kept().sentence_prompts, 1);
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(110 * S);
+    // Given back as the voice started; the step offers it again at once.
+    assert_eq!(settle(&mut walk, 110 * S), [NEAR_DONE]);
+    let token = offer(&mut walk, 120 * S);
+    assert_eq!(walk.pending().invitations[0].attempt, 6);
+    assert_eq!(walk.kept().sentence_prompts, 1);
+    assert_eq!(
+        walk.take_invitation(token, 120 * S).unwrap(),
+        SENTENCE_FIRST
+    );
+}
+
+/// An invitation that itself stops the voice (Fourth's P2 on #4446) must
+/// not loop: a prompt is given back at most once per part per setup/redo,
+/// so the second restart before first audio on the same prompt leaves it
+/// counted, as before #3754, and the step still ends. Both parts; a
+/// `redo_step` makes a give-back available again.
+#[test]
+fn a_second_restart_before_first_audio_counts_the_prompt() {
+    let mut store = Store::new(None);
+    let mut walk = store.cycle(S);
+    // The name part's first prompt, handed over and never heard, twice.
+    assert_eq!(hand_over(&mut walk, 10 * S, 1), 1);
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(20 * S);
+    walk.drain_storage_for_test(20 * S);
+    assert_eq!(walk.kept().near_call_prompts, 0);
+    assert_eq!(store.on_disk()["near_call_given_back"], true);
+    assert_eq!(hand_over(&mut walk, 30 * S, 2), 1);
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(40 * S);
+    walk.drain_storage_for_test(40 * S);
+    assert_eq!(walk.kept().near_call_prompts, 1);
+    assert!(store.on_disk().get("near_call_unheard").is_none());
+    offer(&mut walk, 50 * S);
+    assert_eq!(walk.pending().invitations[0].attempt, 2);
+    // A redo of the step: the once-only marks go with its counts.
+    walk.apply_mailbox("{\"redo_step\":\"how_you_sound\"}\n", 60 * S);
+    walk.drain_storage_for_test(60 * S);
+    assert!(store.on_disk().get("near_call_given_back").is_none());
+    assert_eq!(walk.kept().near_call_prompts, 0);
+    assert_eq!(hand_over(&mut walk, 70 * S, 3), 1);
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(80 * S);
+    walk.drain_storage_for_test(80 * S);
+    assert_eq!(walk.kept().near_call_prompts, 0);
+}
+
+/// [`a_second_restart_before_first_audio_counts_the_prompt`], for the
+/// sentence part: its once-only mark is its own.
+#[test]
+fn a_second_restart_before_a_sentence_prompts_first_audio_counts_it() {
+    let mut store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for (at, turn) in [(10 * S, 1), (30 * S, 2), (50 * S, 3)] {
+        assert_eq!(call(&mut walk, at, 23.1, turn)["accepted"], true);
+    }
+    assert_eq!(settle(&mut walk, 70 * S), [NEAR_DONE]);
+    let first = hand_over(&mut walk, 80 * S, 4);
+    assert_eq!(walk.kept().sentence_prompts, 1);
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(90 * S);
+    walk.drain_storage_for_test(90 * S);
+    assert_eq!(walk.kept().sentence_prompts, 0);
+    assert_eq!(store.on_disk()["sentence_given_back"], true);
+    assert!(store.on_disk().get("near_call_given_back").is_none());
+    assert_eq!(settle(&mut walk, 90 * S), [NEAR_DONE]);
+    assert_eq!(hand_over(&mut walk, 100 * S, 5), first);
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(110 * S);
+    walk.drain_storage_for_test(110 * S);
+    assert_eq!(walk.kept().sentence_prompts, 1);
+}
+
+/// A prompt whose first audio played was heard: it counts, and stays
+/// counted across a whole restart, whether its turn ended or not.
+#[test]
+fn a_prompt_whose_first_audio_played_stays_counted_across_a_restart() {
+    let mut store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let boot = BootId::new([3; 16]).unwrap();
+    // Its first audio reached the speaker; the voice stopped mid-prompt.
+    assert_eq!(hand_over(&mut walk, 10 * S, 1), 1);
+    walk.invitation_sounded(boot, 1);
+    walk.drain_storage_for_test(10 * S);
+    assert_eq!(walk.kept().near_call_prompts, 1);
+    assert!(store.on_disk().get("near_call_unheard").is_none());
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(20 * S);
+    walk.drain_storage_for_test(20 * S);
+    assert_eq!(walk.kept().near_call_prompts, 1);
+    // Only the bound turn's audio counts its prompt: another's does not.
+    assert_eq!(hand_over(&mut walk, 30 * S, 2), 2);
+    walk.invitation_sounded(boot, 7);
+    walk.drain_storage_for_test(30 * S);
+    assert_eq!(store.on_disk()["near_call_unheard"], 2);
+    // Played whole, and the voice stopped before its try was judged: heard,
+    // so still counted.
+    set_clock(1_760_000_031_000);
+    walk.invitation_finished(boot, 2, Delivery::Whole, 31 * S);
+    walk.drain_storage_for_test(31 * S);
+    assert!(store.on_disk().get("near_call_unheard").is_none());
+    drop(walk);
+    store.restart();
+    let mut walk = store.cycle(70 * S);
+    walk.drain_storage_for_test(70 * S);
+    assert_eq!(walk.kept().near_call_prompts, 2);
+    offer(&mut walk, 80 * S);
+    assert_eq!(walk.pending().invitations[0].attempt, 3);
 }

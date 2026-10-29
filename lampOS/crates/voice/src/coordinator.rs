@@ -11606,6 +11606,11 @@ fn conversation_with_gate_inner(
             {
                 onboarding_invitation_audio |= current.invitation_reached_speaker();
             }
+            // Its first audio played: only now does its prompt count across
+            // a restart (#3754).
+            if onboarding_invitation_audio && let Some((boot, turn)) = onboarding_invitation_turn {
+                walk.invitation_sounded(boot, turn);
+            }
             if let Some((boot, turn)) = walk.invitation_binding()
                 && reply
                     .as_ref()
