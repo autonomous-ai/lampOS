@@ -803,4 +803,68 @@ mod tests {
         let too_old = manifest::too_old(&written, manifest::SETTINGS_UPDATER).unwrap();
         assert_eq!(too_old.needed, manifest::IMAGE_UPDATER);
     }
+
+    /// Every unit a build carries for a dev lamp by name (`deploy/lamp-*/`
+    /// with its LAMP.md), made from the repository's own folders, leaves
+    /// that lamp's round free to take the product's units once it is a
+    /// product install (#3796, #1843): a pinned one has a product unit
+    /// started through `current`, so the round skips it ("skipping pinned",
+    /// crate::round), and one through `current` starts what the product's
+    /// does. Otherwise a lamp of that name, a dev lamp moved onto product
+    /// units or a customer's lamp with the same four last digits, refuses
+    /// every round (lamp-52e6 on 27 Oct).
+    #[test]
+    fn a_dev_lamps_units_never_stop_a_product_install_of_its_name() {
+        let folder = tempfile::tempdir().unwrap();
+        let out = folder.path().join("out");
+        fs::create_dir_all(&out).unwrap();
+        fs::write(out.join("lamp-update"), "update").unwrap();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let made = make(
+            &out,
+            &root.join("deploy"),
+            &root.join("skills"),
+            "lamp-voice",
+            7,
+            &"c".repeat(40),
+            "https://channel.test/build-7/",
+            None,
+            Vec::new(),
+        )
+        .unwrap();
+        let text = |unit: &Unit| fs::read_to_string(out.join(unit.file_name())).unwrap();
+        let product: BTreeMap<&str, String> = made
+            .units
+            .iter()
+            .filter(|unit| unit.lamp == manifest::PRODUCT_LAMP)
+            .map(|unit| (unit.unit.as_str(), text(unit)))
+            .collect();
+        let mut hosts = BTreeMap::<&str, usize>::new();
+        for unit in made
+            .units
+            .iter()
+            .filter(|unit| unit.lamp != manifest::PRODUCT_LAMP)
+        {
+            *hosts.entry(unit.lamp.as_str()).or_default() += 1;
+            let own = text(unit);
+            let theirs = product
+                .get(unit.unit.as_str())
+                .and_then(|text| unit::linked(text));
+            let ours = unit::linked(&own);
+            assert!(
+                theirs.is_some() && (ours.is_none() || ours == theirs),
+                "{}'s {}: the product's {:?} through current, the lamp's {:?}",
+                unit.lamp,
+                unit.unit,
+                theirs,
+                ours.map_or_else(
+                    || format!("{:?}", unit::program(&own)),
+                    |ours| format!("{ours:?}")
+                )
+            );
+        }
+        // The two dev lamps whose units moved 52e6 back on 27 Oct are read.
+        assert_eq!(hosts.get("lamp-52e6"), Some(&12), "{hosts:?}");
+        assert_eq!(hosts.get("lamp-4ace"), Some(&16), "{hosts:?}");
+    }
 }
