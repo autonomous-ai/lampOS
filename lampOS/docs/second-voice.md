@@ -4192,8 +4192,9 @@ on lamp-3e83 on 29 Oct ElevenLabs' first sound timed out at 14:15:13 and
 14:15:48, and one sentence of each of those answers was never said). A joined
 piece that can't be started either is carried again into the piece after
 it. The joined piece is asked for only when the player reaches it, after the
-two tries' up to 8 s, and the next piece's speech asked ahead is let go, so
-its first sound can come up to one more start, 4 s, after that. Speech
+two tries' up to 8 s, and the next piece's speech asked ahead is let go.
+It is asked as any piece is, twice, so its first sound can come up to 8 s
+after that, or it is carried on in turn. Speech
 outside an answer's pieces, such as the wait's sounds and the down line, has
 no next piece: a sentence not started twice is not said, as before. Only the answer's last piece has nothing to go with: it is not said,
 `the answer's last piece could not be started twice and was not said`, and
