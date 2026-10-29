@@ -197,9 +197,11 @@ jobs:
         shard: ${{ fromJSON(inputs.full && '[1, 2, 3, 4]' || '[1]') }}
     steps:
       - name: system packages
+        # A fresh runner's unattended-upgrades can hold dpkg's lock as the job
+        # starts (the Studio VM, run 40799231439, 29 Oct): apt waits up to 5 min.
         run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          sudo apt-get -o DPkg::Lock::Timeout=300 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends \
             ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
       - uses: actions/checkout@v4
         with:
@@ -289,6 +291,8 @@ jobs:
         # The two tests with their own harness (harness = false) cannot be listed by nextest; the first runner runs them below.
         # Profile `pr` skips the realtime group (lampOS/.config/nextest.toml); the -E below is intersected with it.
         # A full run uses `default`: every test, one at a time. A pull request's picked crates narrow the -E.
+        # On the Studio's 20-vCPU VM, 8 at a time: at 20, tests with a real 2 s bound were starved
+        # (runs 40803036942 and 40807983463, 29 Oct); GitHub-hosted's 4 cores pass every one.
         env:
           PICKED: ${{ steps.scope.outputs.filter }}
         run: |
@@ -297,7 +301,7 @@ jobs:
           if [ -n "$PICKED" ]; then filter="$filter & ($PICKED)"; fi
           cargo nextest run --locked --release --workspace \
             --profile ${{ inputs.full && 'default' || 'pr' }} \
-            --no-tests=pass -j ${{ inputs.full && '1' || 'num-cpus' }} \
+            --no-tests=pass -j ${{ inputs.full && '1' || (needs.route.outputs.studio == 'true' && '8' || 'num-cpus') }} \
             --partition hash:${{ matrix.shard }}/${{ strategy.job-total }} \
             -E "$filter"
       - name: doc tests and the own-harness tests (nextest runs neither)
@@ -362,9 +366,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: system packages
+        # A fresh runner's unattended-upgrades can hold dpkg's lock as the job
+        # starts (the Studio VM, run 40799231439, 29 Oct): apt waits up to 5 min.
         run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          sudo apt-get -o DPkg::Lock::Timeout=300 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends \
             ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
       - uses: actions/checkout@v4
       - name: Rust 1.96.0
