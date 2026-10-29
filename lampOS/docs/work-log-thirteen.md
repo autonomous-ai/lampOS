@@ -252,3 +252,13 @@ Ready for lamp-voice: yes (branch `thirteen/said-to-a-person-cut-3945`, Part of 
 - Gate: voice lib 4138/0 (15 ignored), the other targets 1/0, 275/0, 4/0, 6/0; workspace build, clippy and fmt clean.
 - Restored after, lock released, Twelve told.
 - Next: the declined line (a decline says nothing and carries no conversation).
+
+### #3945, the declined line (#4417)
+
+Ready for lamp-voice: yes (#4417, behind `LAMP_DECLINE_SILENT`, off; Part of #3945)
+
+- A line the model declines says nothing, and its let-out is undone so it carries no conversation (`Did::Declined`). Round 1's words wait for its end on spoken lines told `DECLINE_NOTE`/`CONVERSATION_ALONE`; named lines don't wait.
+- #4406 merged in train 375; its two wording P3s ride in #4417.
+- c0a4, 17:20–17:40Z, Mac-played, the switch off and on: two declines silent with "no conversation going on from it". Words before a call, and a decline carrying a line, weren't reached on the lamp; the unit tests cover them. Restored after, lock released, Twelve told (its #4175 drop-in saved, with the local manager's yes).
+- Gate on 2c28a0f974: voice lib 4144/1, the one being the timed `CarryDesk` test, 3 of 3 alone; before the rebase 4142/0 and 1, 275, 4, 6.
+- #4385: HOLD then READ-OK on 9ff9b3929b.
