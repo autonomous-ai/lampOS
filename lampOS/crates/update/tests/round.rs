@@ -1002,11 +1002,13 @@ fn a_part_that_dies_is_put_back_and_its_build_refused() {
     assert!(why.contains("lamp-voice.service ended"), "{why}");
     assert_eq!(after, &Ok(()));
     // These fixture units declare no ordering edge: both directions use
-    // name order. The failed voice is put back without waiting.
+    // name order. The voice is stopped before Body restarts, and started
+    // last (#3689). The failed voice is put back without waiting.
     assert_eq!(
         lamp.calls(),
         [
             "reload",
+            "stop lamp-voice.service",
             "restart lamp-body.service",
             "restart lamp-voice.service",
             "reload",
@@ -1024,7 +1026,109 @@ fn a_part_that_dies_is_put_back_and_its_build_refused() {
         matches!(&outcome, Outcome::Refused(why) if why.contains("was put back")),
         "{outcome:?}"
     );
-    assert_eq!(lamp.calls().len(), 6);
+    // Nothing more than the first round's seven calls.
+    assert_eq!(lamp.calls().len(), 7);
+}
+
+/// What a voice from before #4280 (7071's, say) does at a round, replayed
+/// over the round's systemd calls: it keeps its restart guard, and the lamp
+/// comes back muted, when lamp-controls restarts while that old voice still
+/// runs (lamp-06c1 on 8474; #3689). Stopped first, with Controls up, it
+/// stops cleanly and releases the guard (#960, Tests' trace at 02:34).
+fn old_voice_keeps_its_guard(calls: &[String]) -> bool {
+    let mut old_voice_up = true;
+    for call in calls {
+        match call.as_str() {
+            "stop lamp-voice.service" | "restart lamp-voice.service" => old_voice_up = false,
+            "restart lamp-controls.service" if old_voice_up => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+/// The first builder on #3689 (30 Oct 02:5x): a round stops the voice first,
+/// while Controls is up, then restarts Controls and the rest, and starts the
+/// voice last. The order before it, Controls first, muted an old voice.
+#[test]
+fn a_round_stops_the_voice_before_controls_and_starts_it_last() {
+    let today = [
+        "restart lamp-controls.service",
+        "restart lamp-voice.service",
+    ]
+    .map(String::from);
+    assert!(
+        old_voice_keeps_its_guard(&today),
+        "the order before #3689 mutes"
+    );
+
+    let mut lamp = Lamp::new();
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2"),
+            ("lamp-turn-end", "turn-end 2"),
+            ("lamp-body", "body 2"),
+            ("lamp-controls", "controls 2"),
+        ],
+        &[],
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let calls = lamp.calls();
+    let at = |call: &str| calls.iter().position(|c| c == call).unwrap();
+    let stopped = at("stop lamp-voice.service");
+    assert!(stopped < at("restart lamp-controls.service"), "{calls:?}");
+    assert!(stopped < at("restart lamp-body.service"), "{calls:?}");
+    assert_eq!(
+        calls.last().unwrap(),
+        "restart lamp-voice.service",
+        "{calls:?}"
+    );
+    assert!(!old_voice_keeps_its_guard(&calls), "{calls:?}");
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line == "the voice is stopped before the parts it reads restart")
+    );
+    assert_eq!(running(&lamp)["lamp-voice.service"], "voice 2");
+}
+
+/// A part that fails after the voice was stopped first is put back, and the
+/// stopped voice is started again, the old one: never left down.
+#[test]
+fn a_part_that_fails_after_the_voice_was_stopped_first_puts_the_old_voice_back() {
+    let mut lamp = Lamp::new();
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 2, which crashes"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
+        "{outcome:?}"
+    );
+    let calls = lamp.calls();
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|c| *c == "stop lamp-voice.service")
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls.last().unwrap(),
+        "restart lamp-voice.service",
+        "{calls:?}"
+    );
+    let parts = running(&lamp);
+    assert_eq!(parts["lamp-voice.service"], "voice 1");
+    assert_eq!(parts["lamp-body.service"], "body 1");
 }
 
 /// #1505 (lamp-4ace, 18 Oct 13:51): a part not well says why in the
@@ -1796,11 +1900,13 @@ fn both_kinds_of_part_switch_in_one_round_each_its_own_way() {
     assert_eq!(lamp.read("/opt/lampOS/eyes/current/lamp-eyes"), "eyes 2");
     assert!(lamp.exists(&format!("/opt/lampOS/eyes/{}/lamp-eyes", sha("eyes 1"))));
     // No ordering edge in these fixtures: name order, with one reload for
-    // the voice's unit. Real product declarations are covered separately.
+    // the voice's unit, and the voice stopped before Eyes restarts (#3689).
+    // Real product declarations are covered separately.
     assert_eq!(
         lamp.calls(),
         [
             "reload",
+            "stop lamp-voice.service",
             "restart lamp-eyes.service",
             "restart lamp-voice.service"
         ]
