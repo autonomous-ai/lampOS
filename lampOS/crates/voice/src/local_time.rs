@@ -271,15 +271,22 @@ pub fn place_here() -> Option<String> {
     place_from(std::env::var(PLACE_ENVIRONMENT).ok().as_deref())
 }
 
-/// Told beside the time when the lamp's place is set ([`place_here`]):
-/// where it is, and that what is asked about without a place is there.
+/// Told beside the time: where the lamp is when its place is set
+/// ([`place_here`]), and that what is asked about without a place is there;
+/// and either way that the area near the person is not known, so it is
+/// asked, never picked. On lamp-3e83 on 29 Oct a district misheard by
+/// speech to text was taken for another, said as fact and searched (#4337).
 pub fn place_told(place: Option<&str>) -> Option<String> {
-    place.map(|place| {
-        format!(
-            " You are in {place}. When someone asks about the weather, the news or anything nearby without naming a place, they mean {place}."
-        )
+    Some(match place {
+        Some(place) => format!(
+            " You are in {place}. When someone asks about the weather, the news or anything nearby without naming a place, they mean {place}. {AREA_ASKED}"
+        ),
+        None => format!(" You don't know where you are beyond your time zone's city. {AREA_ASKED}"),
     })
 }
+
+/// [`place_told`]'s rule for the area near the person (#4337).
+pub const AREA_ASKED: &str = "You don't know which part of town they are in: when they ask for something near them, or name a place that doesn't sound real, ask which area they mean before you search, and never pick one yourself. When you looked somewhere they didn't name, say where.";
 
 /// The place the lamp's own zone names ("Ho Chi Minh"), or `None` when it
 /// names none ([`own_place`]).
@@ -954,11 +961,19 @@ mod tests {
         );
         assert_eq!(here_in_at(None, "Asia/Ho_Chi_Minh"), "Here in Ho Chi Minh");
         assert_eq!(here_in_at(None, "Etc/GMT-7"), "Here");
-        assert_eq!(place_told(None), None);
+        // #4337: with no place, it says so, and either way the area near
+        // the person is asked, never picked.
+        assert_eq!(
+            place_told(None).unwrap(),
+            format!(" You don't know where you are beyond your time zone's city. {AREA_ASKED}")
+        );
         assert_eq!(
             place_told(Some("Hanoi")).unwrap(),
-            " You are in Hanoi. When someone asks about the weather, the news or anything nearby without naming a place, they mean Hanoi."
+            format!(
+                " You are in Hanoi. When someone asks about the weather, the news or anything nearby without naming a place, they mean Hanoi. {AREA_ASKED}"
+            )
         );
+        assert!(AREA_ASKED.contains("ask which area") && AREA_ASKED.contains("never pick"));
     }
 
     #[test]
