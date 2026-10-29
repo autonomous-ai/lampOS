@@ -198,8 +198,11 @@ with no internet; only the local sound rule does.
 With `LAMP_SECOND_REFUSED_HOLD=on`, a turn that fails because the model
 service refused it or could not be reached (`coordinator/model_refusing.rs`:
 a quota, key or rate refusal, any other 4xx, a 5xx, a refused or timed-out
-connection; never a turn that was only slow) starts a refusal. Until a turn
-is answered again (the model's generation completes), speech is admitted as
+connection; never a turn that was only slow) starts a refusal: a quota or
+key refusal at once, any other on the second refused turn in a row, and never
+a turn cut while its answer was already playing. Until the model answers a
+turn again (its generation completes; an onboarding line's own words, said on
+a failed chat, #4263, are no answer), speech is admitted as
 a local-only turn, as in a service-down outage below: the
 `voice_service_unreachable` recording once a refusal, the offline breath,
 nothing sent. One turn is sent every minute to find the service back. The
