@@ -2820,10 +2820,16 @@ impl Onboarding {
                 continue;
             };
             // A face forgotten ([`face_forgotten`]): one saved earlier no
-            // longer answers "who you are".
+            // longer answers "who you are", and the owner mark goes, whoever's
+            // face it was, so a later face saved under that name is never
+            // taken for the owner (Reviewer-three's and the Reviewer-lead's
+            // P2 on #4290).
             if told.get("face_forgotten").and_then(Value::as_bool) == Some(true) {
                 self.face_saved_unasked = false;
                 self.face_saved_name = None;
+                if self.desired.owner.take().is_some() {
+                    self.save();
+                }
                 continue;
             }
             if told.get("redo").and_then(Value::as_bool) == Some(true) {
@@ -4894,6 +4900,12 @@ mod tests {
         // Committed to the file, where the second worker reads it.
         room.wait(5 * S, Some(NEAR_MIDDLE));
         assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Example Name"));
+        // A face forgotten, whoever's: the mark goes, from the file too, so a
+        // later face saved under that name is never the owner.
+        face_forgotten(&room.walk.file);
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.walk.desired.owner, None);
+        assert_eq!(owner_of(&room.walk.file), None);
         // Saved before it was asked: kept for it, and the owner when it ends.
         let mut early = Room::new("owner-early");
         face_saved(&early.walk.file, Some("Example Name"));

@@ -1882,30 +1882,63 @@ pub fn still_known(socket: Option<&Path>, owner: &str) -> bool {
         .is_some_and(|names| names.iter().any(|name| name == owner))
 }
 
-/// How often [`keep_owner_fresh`] reads the owner mark and asks the eyes.
-pub const OWNER_EVERY: Duration = Duration::from_secs(2);
+/// How often [`keep_owner_fresh`] reads the owner mark and asks the eyes:
+/// a save is seen within it; a forget clears the owner at once
+/// ([`owner_forgotten`]).
+pub const OWNER_EVERY: Duration = Duration::from_secs(10);
+
+/// The owner as [`keep_owner_fresh`] last found them, and how many forgets
+/// there have been, so a refresh begun before a forget never brings back
+/// the name it cleared.
+static OWNER_NOW: std::sync::Mutex<(Option<String>, u64)> = std::sync::Mutex::new((None, 0));
+
+/// The owner kept at setup while the eyes still know them, as last found:
+/// no reply waits on the eyes (Reviewer-two's P3 on #4290).
+pub fn owner_now() -> Option<String> {
+    OWNER_NOW
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .0
+        .clone()
+}
+
+/// A face forgotten, whoever's: the owner is named no more from now, and
+/// the onboarding walk drops the mark (Reviewer-three's P3 on #4290).
+pub fn owner_forgotten() {
+    let mut now = OWNER_NOW
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    *now = (None, now.1.wrapping_add(1));
+}
 
 /// The owner kept at setup (`onboarding::owner_of`) while the eyes still
-/// know them ([`still_known`]), refreshed into `owner` every [`OWNER_EVERY`]
-/// on a thread of its own, so no reply waits on the eyes (Reviewer-two's P3
-/// on #4290): a forgotten face is named for at most that long.
-pub fn keep_owner_fresh(
-    owner: std::sync::Arc<std::sync::Mutex<Option<String>>>,
-    file: Option<PathBuf>,
-    socket: Option<PathBuf>,
-) {
+/// know them ([`still_known`]), refreshed into [`owner_now`] every
+/// [`OWNER_EVERY`] on a thread of its own.
+pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
     std::thread::spawn(move || {
         loop {
-            let now = file
-                .as_deref()
-                .and_then(crate::onboarding::owner_of)
-                .filter(|name| still_known(socket.as_deref(), name));
-            *owner
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) = now;
+            refresh_owner(file.as_deref(), socket.as_deref());
             std::thread::sleep(OWNER_EVERY);
         }
     });
+}
+
+/// One refresh of [`owner_now`]: dropped if a forget came while the eyes
+/// were asked.
+fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
+    let forgets = OWNER_NOW
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .1;
+    let found = file
+        .and_then(crate::onboarding::owner_of)
+        .filter(|name| still_known(socket, name));
+    let mut now = OWNER_NOW
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if now.1 == forgets {
+        now.0 = found;
+    }
 }
 
 /// The file the eyes keep the known person's name in while they are at the
@@ -2762,16 +2795,23 @@ mod tests {
     /// path, from the onboarding file's mark and the eyes' list.
     #[test]
     fn the_owner_is_kept_fresh_off_the_replys_path() {
-        let (socket, _asked) = eyes(vec![serde_json::json!({"people": ["Example Name"]})]);
+        let (socket, _asked) = eyes(vec![
+            serde_json::json!({"people": ["Example Name"]}),
+            serde_json::json!({"people": ["Example Name"]}),
+        ]);
         let file = socket.with_file_name("progress.json");
         std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
-        let owner = std::sync::Arc::new(std::sync::Mutex::new(None));
-        keep_owner_fresh(owner.clone(), Some(file), Some(socket));
-        let until = Instant::now() + Duration::from_secs(2);
-        while owner.lock().unwrap().is_none() && Instant::now() < until {
-            std::thread::sleep(Duration::from_millis(20));
+        // Other tests' forgets share the count: a refresh they cut is tried again.
+        for _ in 0..2 {
+            refresh_owner(Some(&file), Some(&socket));
+            if owner_now().is_some() {
+                break;
+            }
         }
-        assert_eq!(owner.lock().unwrap().as_deref(), Some("Example Name"));
+        assert_eq!(owner_now().as_deref(), Some("Example Name"));
+        // Forgotten: named no more at once, not at the next refresh.
+        owner_forgotten();
+        assert_eq!(owner_now(), None);
     }
 
     /// The eyes stand-in on a real socket: what each request sent, and the

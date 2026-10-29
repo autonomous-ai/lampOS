@@ -1443,6 +1443,7 @@ fn face_gone_with_everything(settings: &Settings, route: &Route, told: &Value) {
         && told["face"] == "forgotten too"
         && let Some(file) = &settings.onboarding
     {
+        crate::known_faces::owner_forgotten();
         crate::onboarding::face_forgotten(file);
     }
 }
@@ -1706,6 +1707,7 @@ fn run_call_with_scope(
                 && told.0["ok"] == true
                 && let Some(file) = onboarding
             {
+                crate::known_faces::owner_forgotten();
                 crate::onboarding::face_forgotten(file);
             }
             // A face saved in a line of the room's: the caller's own lines
