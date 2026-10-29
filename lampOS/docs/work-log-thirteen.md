@@ -279,3 +279,12 @@ Ready for lamp-voice: yes (#4435, behind `LAMP_DECLINE_SILENT`, off; Part of #39
 - A decline's saved carry window takes the live window's copies only while the live window is still that conversation's (same `first_request`), so a new caller's held line no longer stretches it (Reviewer-three's P3).
 - #4429's hand-written test is replaced by three tests driven through judge. Each fails with its copy taken out (checked in a throwaway worktree).
 - Gate on 4369df29aa: voice lib 4152/0 (15 ignored), the other targets 1, 275, 4, 6; clippy, fmt, workspace build clean.
+
+### #4435's P3, the request a window was begun for (#4444)
+
+Ready for lamp-voice: yes (#4444, behind `LAMP_DECLINE_SILENT`, off; Part of #3945)
+
+- #4435 merged in train 387.
+- The decline's saved carry window and the live one are matched by the request each was begun for, which an answer leaves, so an answer to an earlier chained line no longer splits them within one conversation (the Reviewer-lead's P3).
+- One new test, which fails under the old comparison.
+- Gate on f56d04bae0: voice lib 4155/2 and it 274/1, all three known timed process tests (#1569); the motor ones fail on lamp-voice itself here too. Others 1, 4, 6; clippy, fmt, workspace build clean.
