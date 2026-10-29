@@ -1,9 +1,12 @@
 //! `lamp-name`: listen to what the microphone hears, on the bus, for the
 //! lamp's name, and say when it was heard. See `docs/name.md`.
 use lamp_bus::{Bus, Notice, Publisher};
-use lamp_msgs::{Audio, Diagnostic, Level, NameHeard, StopHeard, Voice, VoiceState};
+use lamp_msgs::{
+    Audio, BodyGesture, Diagnostic, GestureState, Level, NameHeard, StopHeard, Voice, VoiceState,
+};
 use lamp_name::{
     hear::Hearer,
+    moving::{self, DEFAULT_MOVING_LEAST, Moving},
     not_self::Speaking,
     quiet::{self, Loudness, Quiet},
     rescue::Rescue,
@@ -16,7 +19,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--near SCORE] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
+const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--near SCORE] [--moving-least SCORE] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
 const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs/name.md.
 
   --models      a directory holding melspectrogram.onnx, embedding_model.onnx and name.onnx
@@ -40,6 +43,9 @@ const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs
   --near        also say each hearing that reaches this lower bar, 0.05 to under --least,
                 on name/near when it is over, with its highest score; nothing else changes.
                 LAMP_NAME_NEAR=on is --near 0.5. Off unless set
+  --moving-least  a hearing that began while the body played a gesture (body/gesture),
+                or within 0.8 s after, is said only at this higher bar, over --least, to 1.
+                LAMP_NAME_MOVING_LEAST=on is --moving-least 0.99. Off unless set
   --bus-root    the bus's directory (LAMP_BUS_ROOT, or /run/lampos-bus)
 
 It listens to MICROPHONE/audio and publishes name/rising as each hearing begins,
@@ -93,6 +99,8 @@ struct Arguments {
     not_while_speaking: bool,
     /// `--near`: the lower bar of the hearings said on `name/near`.
     near: Option<f32>,
+    /// `--moving-least`: the bar while the body moves (#4208), over `--least`.
+    moving_least: Option<f32>,
     bus: Option<PathBuf>,
 }
 
@@ -172,6 +180,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
     let mut rescue = RescueGiven::default();
     let mut not_while_speaking = None;
     let mut near = None;
+    let mut moving_least = None;
     while let Some(option) = arguments.next() {
         if option == "--help" || option == "-h" {
             return Ok(None);
@@ -210,6 +219,15 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
             "--step-ms" => step_ms.replace(step_of(&value)?).is_some(),
             "--wake" => wake.replace(wake_of(&value)?).is_some(),
             "--near" => near.replace(near_of(&value)?).is_some(),
+            "--moving-least" => moving_least
+                .replace(
+                    value
+                        .parse::<f32>()
+                        .ok()
+                        .filter(|score| (0.5..=1.0).contains(score))
+                        .ok_or("--moving-least is a score from 0.5 to 1, over --least")?,
+                )
+                .is_some(),
             "--not-while-speaking" => not_while_speaking
                 .replace(match value.as_str() {
                     "on" => true,
@@ -236,6 +254,9 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
     if near.is_some_and(|near| near >= least) {
         return Err("--near is under --least".into());
     }
+    if moving_least.is_some_and(|moving| moving <= least) {
+        return Err("--moving-least is over --least".into());
+    }
     Ok(Some(Arguments {
         models: models.ok_or("--models is required")?,
         microphone: microphone.unwrap_or_else(|| "mic2".to_owned()),
@@ -247,6 +268,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
         rescue: rescue.done()?,
         not_while_speaking: not_while_speaking.unwrap_or(false),
         near,
+        moving_least,
         bus,
     }))
 }
@@ -260,6 +282,18 @@ fn near_of(value: &str) -> Result<f32, String> {
         .filter(|score| (0.05..1.0).contains(score))
         .ok_or_else(|| "--near is a score from 0.05 to under --least".to_owned())
 }
+
+/// The bar while the body plays a gesture: `--moving-least` when given, else
+/// [`DEFAULT_MOVING_LEAST`] when `LAMP_NAME_MOVING_LEAST` is `on` and over
+/// `least`, else none (#4208).
+fn moving_from(given: Option<f32>, switch: Option<&str>, least: f32) -> Option<f32> {
+    given.or_else(|| {
+        (switch == Some("on") && DEFAULT_MOVING_LEAST > least).then_some(DEFAULT_MOVING_LEAST)
+    })
+}
+
+/// The switch for the bar while the body moves (#4208), off unless `on`.
+const MOVING_ENVIRONMENT: &str = "LAMP_NAME_MOVING_LEAST";
 
 /// The near bar: `--near` as given, else [`DEFAULT_NEAR`] when the switch
 /// (`LAMP_NAME_NEAR`, `switch`) is `on` and under `least`, else none.
@@ -507,6 +541,17 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         .then(|| bus.subscribe_typed(VoiceState::TOPIC, NAME, VoiceState::TYPE))
         .transpose()?;
     let mut speaking = Speaking::default();
+    // When the body moves, with `--moving-least` (#4208).
+    let mut gestures = arguments
+        .moving_least
+        .map(|_| bus.subscribe_typed(BodyGesture::TOPIC, NAME, BodyGesture::TYPE))
+        .transpose()?;
+    let mut moving = Moving::default();
+    if let Some(bar) = arguments.moving_least {
+        log(&format!(
+            "moving_least={bar}: while the body moves, a hearing needs that"
+        ));
+    }
     log(&format!(
         "started models={} loaded_ms={} listening_to={topic} least={} near={} quiet_below={} step_ms={} wake={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
         arguments.models.display(),
@@ -573,10 +618,34 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                 speaking.gone(now);
             }
         }
-        // Whether a hearing said now, begun `ago_ms` before, goes out.
+        if let Some(gestures) = gestures.as_mut() {
+            while let Ok(Some(gesture)) = gestures.recv(Duration::ZERO) {
+                // The body's own shifts at rest and its look around are not
+                // a gesture played (#4385).
+                if let Some(gesture) = gesture
+                    .parse::<BodyGesture>()
+                    .ok()
+                    .filter(|gesture| moving::counts(&gesture.name))
+                {
+                    match gesture.state {
+                        GestureState::Began => moving.began(now),
+                        GestureState::Over | GestureState::Dropped => moving.ended(now),
+                    }
+                }
+            }
+        }
+        // Whether a hearing said now, begun `ago_ms` before, goes out:
+        // never one begun while the lamp spoke, and one begun while the body
+        // moved only at `--moving-least`.
         let mut lets_through = |name: &NameHeard| {
-            voice.is_none()
-                || speaking.lets_through(Duration::from_millis(u64::from(name.ago_ms)), now)
+            let ago = Duration::from_millis(u64::from(name.ago_ms));
+            if !(voice.is_none() || speaking.lets_through(ago, now)) {
+                return false;
+            }
+            match arguments.moving_least {
+                Some(bar) => moving.lets_through(name.score, bar, ago, now),
+                None => true,
+            }
         };
         for notice in sound.notices() {
             match notice {
@@ -719,12 +788,24 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         if let Some(name) = name_said
             && !lets_through(&name)
         {
-            log(&format!(
-                "passed over a hearing that began while the lamp spoke: score={:.3} began_ms_ago={}{}",
-                name.score,
-                name.ago_ms,
-                after_speech(&speaking, &name, now)
-            ));
+            let began = now
+                .checked_sub(Duration::from_millis(u64::from(name.ago_ms)))
+                .unwrap_or(now);
+            if voice.is_some() && speaking.covers(began, now) {
+                log(&format!(
+                    "passed over a hearing that began while the lamp spoke: score={:.3} began_ms_ago={}{}",
+                    name.score,
+                    name.ago_ms,
+                    after_speech(&speaking, &name, now)
+                ));
+            } else {
+                log(&format!(
+                    "passed over a hearing that began while the body moved: score={:.3} began_ms_ago={} under moving_least={}",
+                    name.score,
+                    name.ago_ms,
+                    arguments.moving_least.unwrap_or(1.0)
+                ));
+            }
         } else if let Some(name) = name_said {
             total_heard += 1;
             counted.heard += 1;
@@ -788,7 +869,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             woken_before = woken;
             if counted.steps + counted.rested > 0 {
                 log(&format!(
-                    "last minute: steps={} rested={} ms_a_step={:.1} longest_block_ms={:.1} heard={} stops={} rescued_steps={} sound_lost={}{wakes} steps_in_all={total_steps} passed_over_in_all={}{}",
+                    "last minute: steps={} rested={} ms_a_step={:.1} longest_block_ms={:.1} heard={} stops={} rescued_steps={} sound_lost={}{wakes} steps_in_all={total_steps} passed_over_in_all={} passed_over_moving_in_all={}{}",
                     counted.steps,
                     counted.rested,
                     counted.busy.as_secs_f64() * 1e3 / counted.steps.max(1) as f64,
@@ -798,6 +879,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                     counted.rescued,
                     counted.lost,
                     speaking.passed_over,
+                    moving.passed_over,
                     loudest.map_or(String::new(), |(median, top)| format!(
                         " loudest_db_p50={median:.1} loudest_db_p99={top:.1}"
                     )),
@@ -1094,6 +1176,11 @@ fn main() -> ExitCode {
                 std::env::var(NameHeard::NEAR_ENVIRONMENT).ok().as_deref(),
                 arguments.least,
             ),
+            moving_least: moving_from(
+                arguments.moving_least,
+                std::env::var(MOVING_ENVIRONMENT).ok().as_deref(),
+                arguments.least,
+            ),
             ..arguments
         },
         Ok(None) => {
@@ -1288,6 +1375,41 @@ mod tests {
         );
     }
 
+    /// `--moving-least` (#4208): a score over `--least`, from 0.5 to 1; and
+    /// `LAMP_NAME_MOVING_LEAST=on` is 0.99 when that is over `--least`.
+    #[test]
+    fn the_bar_while_the_body_moves_is_over_the_usual_one_and_off_unless_given() {
+        let moving = |line: &str| of(line).unwrap().unwrap().moving_least;
+        assert_eq!(moving("--models /m"), None);
+        assert_eq!(moving("--models /m --moving-least 0.99"), Some(0.99));
+        for refused in [
+            "--models /m --moving-least 0.9",
+            "--models /m --moving-least 0.4",
+            "--models /m --moving-least 1.1",
+            "--models /m --moving-least high",
+            "--models /m --least 0.995 --moving-least 0.99",
+            "--models /m --moving-least 0.99 --moving-least 0.99",
+        ] {
+            assert!(of(refused).is_err(), "{refused}");
+        }
+        assert_eq!(moving_from(None, None, 0.9), None);
+        assert_eq!(moving_from(None, Some("off"), 0.9), None);
+        assert_eq!(
+            moving_from(None, Some("on"), 0.9),
+            Some(DEFAULT_MOVING_LEAST)
+        );
+        assert_eq!(
+            moving_from(None, Some("on"), 0.995),
+            None,
+            "not over --least"
+        );
+        assert_eq!(
+            moving_from(Some(0.97), Some("on"), 0.9),
+            Some(0.97),
+            "given wins"
+        );
+    }
+
     #[test]
     fn the_options_are_read_and_the_rest_have_their_defaults() {
         assert_eq!(
@@ -1303,6 +1425,7 @@ mod tests {
                 rescue: None,
                 not_while_speaking: false,
                 near: None,
+                moving_least: None,
                 bus: None,
             }
         );
@@ -1321,6 +1444,7 @@ mod tests {
                 rescue: None,
                 not_while_speaking: false,
                 near: None,
+                moving_least: None,
                 bus: Some("/run/lampos-bus".into()),
             }
         );

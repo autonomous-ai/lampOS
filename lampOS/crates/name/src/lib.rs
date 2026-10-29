@@ -25,6 +25,7 @@
 #![deny(clippy::print_stderr, clippy::print_stdout, clippy::dbg_macro)]
 
 pub mod hear;
+pub mod moving;
 pub mod not_self;
 pub mod quiet;
 pub mod rescue;

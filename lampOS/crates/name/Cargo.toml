@@ -27,6 +27,8 @@ sha2.workspace = true
 [dev-dependencies]
 # `stop_words_replay` reads a replay's `operations.jsonl`.
 serde_json.workspace = true
+# `moving::AT_REST` is checked against the body's own shifts at rest.
+lamp-body = { path = "../body" }
 
 # Offline, run only when named: played stops scored on each canceller
 # stage (#828, docs/stop-word.md). Its tests run with the crate's.
