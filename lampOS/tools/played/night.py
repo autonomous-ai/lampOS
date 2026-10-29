@@ -23,6 +23,8 @@ KIT_SHA256 = os.environ.get('NIGHT_KIT_SHA256', '60128bcda66193ba118a2b442ff42c2
 WAV = os.environ.get('NIGHT_WAV') or f'{OUT}/{KIT}/wav'
 # This run's name on the lamp: its bus taps subscribe under it and its events tail runs as it, so stop_on_lamp() ends
 # exactly this run's (a tap on a quiet topic would otherwise live until its next write fails, hours later).
+# The lamp-bus CLI as a command (LAMP_BUS_BIN, e.g. "sudo -n /tmp/x_lamp-bus" on a build that installs none).
+BUS = os.environ.get('LAMP_BUS_BIN') or '/usr/local/bin/lamp-bus'
 TAG = f'night{os.getpid()}'   # the bus's rule for a name: [a-z][a-z0-9_]{0,31}
 
 # Each scene: (line id, when). The first step of a scene waits for a quiet lamp. Timers and reminders are left out: they
@@ -142,7 +144,7 @@ class Events:
 class Names:
     """lamp-name's hearings off the bus (name/heard, name/rising, name/near when it exists), each with the Mac time it came."""
     def __init__(self):
-        cmd = ('for t in name/heard name/rising name/near; do /usr/local/bin/lamp-bus tap $t --name ' + TAG + '_names --seconds 36000 '
+        cmd = ('for t in name/heard name/rising name/near; do ' + BUS + ' tap $t --name ' + TAG + '_names --seconds 36000 '
                '| sed -u "s|^|$t |" & done; wait')
         self.p = subprocess.Popen(SSH + [cmd], stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True, bufsize=1)
         os.set_blocking(self.p.stdout.fileno(), False)
@@ -174,7 +176,7 @@ class Names:
 class Heard:
     """What the voice heard, off the bus (voice/heard: the model's transcript with its request), followed live."""
     def __init__(self):
-        self.p = subprocess.Popen(SSH + [f'exec /usr/local/bin/lamp-bus tap voice/heard --name {TAG}_heard --seconds 36000'],
+        self.p = subprocess.Popen(SSH + [f'exec {BUS} tap voice/heard --name {TAG}_heard --seconds 36000'],
                                   stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True, bufsize=1)
         os.set_blocking(self.p.stdout.fileno(), False)
         self.by, self.buf = {}, ''

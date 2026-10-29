@@ -12,10 +12,13 @@ scores. Every clip is trimmed and levelled to -20 LUFS first: night.py's kit (fr
 (into scenario.py's cache) and the stop scene's lines; the Mac is at volume 45 for all but the stop lines. Nothing on the
 lamp is changed (no switches, no drop-ins). It takes no lamp lock: on a shared lamp run it under
 lamp-lock.sh <lamp> run, as the kit's other scripts. The stop scene, N trials (default 10): a quiet lamp (as night.py),
-"Hey Lamp, tell me a long story about <topic>." at Mac volume 45, the story's first write (none in 14 s: void), 1.5 s,
-then a stop line at volume 90 (Seventh's clips in STOP_KIT when present, else say). Stopped: the story's turn_finished as user_interrupted within 2.0 s of the stop clip's
+"Hey Lamp, tell me a long story about <topic>." at Mac volume 45, the journal's "first answer audio" line (none in 14 s:
+void), 1.5 s, then a stop line at volume 90 (Seventh's clips in STOP_KIT when present, else say). Stopped: the story's turn_finished as user_interrupted within 2.0 s of the stop clip's
 end (the gap is from its start). Not stopped and still speaking: the next stop phrasing once more, "stopped on the second",
-still a miss. Saves $PLAYED_OUT/quality/LABEL-stop.json, and the score as LABEL.txt and LABEL.json."""
+still a miss. Saves $PLAYED_OUT/quality/LABEL-stop.json, and the score as LABEL.txt and LABEL.json. cutin.sh runs with
+CUTIN_ENV unset and its scenes through CUTIN_SCENE (default cutin_scene.py beside it), which plays its closing stop
+line at Mac 90 after the journal's first answer audio + 1.5 s; without that file cutin.sh is not run. Cutting in has a
+handful of trials: it is reported as an indication, not a score."""
 import hashlib, json, os, re, shutil, signal, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -109,6 +112,20 @@ def level_cutin_lines(out):
         with open(f'{gen}/index.tsv', 'a') as f: f.write(f"{os.path.basename(path)[:-4]}\t{voice}\t{rate}\t{text}\n")
 
 
+CUTIN_SCENE = os.environ.get('CUTIN_SCENE') or os.path.join(HERE, 'cutin_scene.py')
+
+
+def first_answer_audio(lamp, since, longest):
+    """This Mac's time when lamp-voice's journal shows "first answer audio" since the lamp's epoch `since`, or None."""
+    end = time.time() + longest
+    while time.time() < end:
+        try: got = lamp(f"journalctl -u lamp-voice --since @{since} --no-pager -o cat | grep -m 1 'first answer audio'", timeout=5)
+        except subprocess.TimeoutExpired: got = ''
+        if got.strip(): return time.time()
+        time.sleep(0.5)
+    return None
+
+
 def play(path):
     start = time.time(); subprocess.run(['/usr/bin/afplay', path], check=True); return start, time.time()
 
@@ -140,10 +157,13 @@ def stop_scene(label, n):
                 time.sleep(0.5)
             topic, line = TOPICS[i % len(TOPICS)], STOPS[i % len(STOPS)]
             t = {'topic': topic, 'stop_line': line, 'result': 'no story, void', 'gap_s': None}
+            since = night.lamp('date +%s', timeout=10).strip()
             volume(45); _, ask_end = play(clip(f'Hey Lamp, tell me a long story about {topic}.')); played.append(ask_end)
-            first = ev.wait_for('speaker_first_write', ask_end, 14.0)
+            # The stop is timed from the journal's "first answer audio"; the event file only names the story's turn.
+            first = first_answer_audio(night.lamp, since, 14.0) if since.isdigit() else None
             if first is not None:
-                w = next(r for r in ev.rows if r['_mac'] == first and r.get('kind') == 'speaker_first_write')
+                ev.pump()
+                w = next((r for r in reversed(ev.rows) if r['_mac'] >= ask_end and r.get('kind') == 'speaker_first_write'), {})
                 story = (w.get('owner') or {}).get('turn', w.get('turn'))
                 time.sleep(1.5); volume(90); s, e = play(clip(line)); volume(45); played.append(e)
                 t['gap_s'] = stopped_after(ev, story, s, e)
@@ -164,9 +184,13 @@ def read(path, how):
     except (OSError, ValueError): return None
 
 
-def row(name, bar, passes, trials, detail):
+def row(name, bar, passes, trials, detail, indication=False):
     if not trials: return {'row': name, 'bar': bar, 'measured': False, 'line': f'{name}  not measured  bar {bar}', 'detail': detail}
     sc = round(passes / trials, 2)
+    if indication:  # too few trials to hold against the bar
+        return {'row': name, 'bar': bar, 'measured': True, 'indication': True, 'passes': passes, 'trials': trials, 'score': sc,
+                'pass': None, 'line': f'{name}  {passes}/{trials} = {sc:.2f}  indication ({trials} trials), not a score  bar {bar}',
+                'detail': detail}
     return {'row': name, 'bar': bar, 'measured': True, 'passes': passes, 'trials': trials, 'score': sc, 'pass': sc >= bar,
             'line': f"{name}  {passes}/{trials} = {sc:.2f}  bar {bar}  {'PASS' if sc >= bar else 'below'}", 'detail': detail}
 
@@ -185,7 +209,8 @@ def score(label, out=OUT):
                 d = e.split()[0] if e.split() else ''
                 got.append(d == {'cutin': 'commit', 'aside': 'resume'}[m.group(1)]); detail.append(f'{m.group(1)} {m.group(2)} s: {d}')
         elif l.startswith('idle:'): detail.append(l)
-    rows.append(row('Cutting in', bars['Cutting in'], sum(got), len(got), detail if cutin is not None else ['no cutin report']))
+    rows.append(row('Cutting in', bars['Cutting in'], sum(got), len(got), detail if cutin is not None else ['no cutin report'],
+                    indication=True))
     # Stop words: stopped on the first stop line, of the trials where a story began.
     real = [t for t in (stop or {}).get('trials', []) if t['result'] != 'no story, void']
     gaps = [t['gap_s'] for t in real if t['result'] == 'stopped']
@@ -229,7 +254,8 @@ def selftest():
     json.dump({'trials': [trial('stopped', 0.9), trial('stopped', 1.4), trial('stopped on the second'), trial('not stopped'),
                           trial('no story, void')]}, open(f'{d}/quality/t-stop.json', 'w'))
     r = {x['row']: x for x in score('t', d)}
-    assert (r['Cutting in']['passes'], r['Cutting in']['trials']) == (2, 4) and not r['Cutting in']['pass']
+    assert (r['Cutting in']['passes'], r['Cutting in']['trials']) == (2, 4) and r['Cutting in']['pass'] is None
+    assert r['Cutting in']['indication'] and 'indication (4 trials), not a score' in r['Cutting in']['line']
     assert (r['Stop words']['passes'], r['Stop words']['trials'], r['Stop words']['score']) == (2, 4, 0.5)
     assert 'stopped on the second 1' in r['Stop words']['detail'] and 'gaps [0.9, 1.4]' in r['Stop words']['detail']
     assert (r['Knows when you have finished']['passes'], r['Knows when you have finished']['trials']) == (2, 4)
@@ -271,9 +297,15 @@ def main():
     kit = level_kit(os.environ.get('NIGHT_WAV') or os.path.expanduser('~/lamp-played/desk-kit-2/wav'), f'{OUT}/levelled-kit')
     level_cutin_lines(OUT)
     env = {**os.environ, 'PLAYED_OUT': OUT, 'NIGHT_WAV': kit}
+    env.pop('CUTIN_ENV', None)   # cutin.sh never adds a drop-in or restarts lamp-voice
     volume(45)
     # A failed part leaves its row "not measured"; the rest still run.
-    for cmd in ([sys.executable, HERE + '/night.py', label + '-night'], [HERE + '/cutin.sh', label + '-cutin', '1', '1']):
+    cmds = [[sys.executable, HERE + '/night.py', label + '-night']]
+    if os.path.exists(CUTIN_SCENE):
+        cmds.append([HERE + '/cutin.sh', label + '-cutin', '1', '1'])
+        env.update(CUTIN_SCENARIO=CUTIN_SCENE, CV_SCENARIO=HERE + '/scenario.py')
+    else: print(f'quality_rows.py: no {CUTIN_SCENE}: cutin.sh not run (its closing stop would play on a timer)', file=sys.stderr)
+    for cmd in cmds:
         rc = subprocess.run(cmd, env=env).returncode
         if rc: print(f'quality_rows.py: {os.path.basename(cmd[1] if cmd[0] == sys.executable else cmd[0])} exited {rc}', file=sys.stderr)
         volume(45)
