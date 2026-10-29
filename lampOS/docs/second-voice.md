@@ -2902,7 +2902,12 @@ after a take-over, but now for every turn:
   any words of its answer told (`Did::Said`; none, with the hold, on a
   line that may be declined) keep nothing going, while another answer's
   words told meanwhile still count. Only the line let out last is undone:
-  one declined after a newer line was let out changes nothing. Not undone:
+  one declined after a newer line was let out changes nothing. What
+  changed after the let-out is kept (#4417): a stop or a privacy change
+  ends the carry and a privacy change drops the caller's faces, a later
+  held line's reset (two colleague lines, the caller turned away, a voice
+  known late as another's, the window over) stands, and another answer's
+  words count in the restored carry window too. Not undone:
   the room's count of talk past the lamp, which the call reset
   (`RoomTold::called`), and the held colleagues of the carry. Journal:
   `declined by the model: no conversation going on from it
@@ -2910,8 +2915,12 @@ after a take-over, but now for every turn:
   call says nothing`, `a not for me written on a line not let out alone
   says nothing`, `the switch off and a line said by name keep todays
   behaviour`, `the hold costs the first audio only on lines that may be
-  declined` (`second_provider/tests/decline_silent.rs`) and `a declined
-  line leaves no conversation going on for the next line` (worker).
+  declined` (`second_provider/tests/decline_silent.rs`), `a declined
+  line leaves no conversation going on for the next line`, `a decline does
+  not bring back a carry stopped after its let out`, `a decline does not
+  bring back the callers faces after a privacy change`, `a held lines reset
+  after a let out stays after its decline` and `another answer while
+  carrying is kept in the restored carry window` (worker).
 - **Said by name, or perhaps not for the lamp** (`worker::call_note`,
   `Engine::noting_whether_called`). Each spoken line gets one note beside
   its words. A line whose words or the lamp's name heard in its sound
