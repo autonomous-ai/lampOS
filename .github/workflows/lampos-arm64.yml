@@ -512,6 +512,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -I .github/scripts/lampos-stable-notes.py --receipt "$RUNNER_TEMP/promotion-receipt.json"
+      # Then the part before it, "Built but not on yet": each switches.md row
+      # waiting for its lamp check that no product unit turns on, read from
+      # the units (#3976). The notes are also kept on the build's own release
+      # as NOTES.md; its one-line body is the provenance a promotion reads,
+      # never touched. Never a gate either.
+      - name: fill the stable notes' built-but-not-on part
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROMOTE_SEQUENCE: ${{ inputs.promote_sequence }}
+        run: cargo run --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --bin lampos-notes -- --sequence "$PROMOTE_SEQUENCE"
 
   # A full run that fails opens an issue (or comments on the open one), so a
   # realtime test broken by a merge is not left unseen: no other run has it.

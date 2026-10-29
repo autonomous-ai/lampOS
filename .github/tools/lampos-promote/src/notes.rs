@@ -1,0 +1,320 @@
+//! The stable notes' "Built but not on yet" part (#3976, the first builder's
+//! 20:59 on 29 Oct): each `switches.md` row counted `until` or `now` whose
+//! switch no product unit turns on, in its row's own words, so nobody
+//! expects a feature the lamp doesn't run. Read from the code: the product
+//! units' `Environment=` lines, `ExecStart` flags and settings files, never
+//! the row's own "Product unit" cell. The notes are also kept on the
+//! build's own release as an asset, `NOTES.md`; its one-line body is the
+//! provenance the promotion reads and is never touched. Never a gate.
+use std::{collections::BTreeMap, fs, io, path::Path, process::Command};
+
+pub const HEADING: &str = "### Built but not on yet";
+/// The part after it, which the developers step owns.
+pub const DEVELOPERS: &str = "### For developers";
+/// The build's own copy of the notes, an asset beside its files.
+pub const ASSET: &str = "NOTES.md";
+/// The headings of the page's four tables of switches, and the name each
+/// is listed under.
+const TABLES: [(&str, &str); 4] = [
+    (
+        "## The voice: hearing",
+        "The voice: hearing, turns and the ring",
+    ),
+    (
+        "## The voice: tasks",
+        "The voice: tasks, memory, schedule, skills and looks",
+    ),
+    ("## The voice's own flags", "The voice's own flags"),
+    ("## The other parts", "The other parts"),
+];
+/// How a row is counted when it is a feature waiting for its check.
+const WAITING: [&str; 2] = ["until", "now"];
+/// A value that leaves a switch off.
+const OFF: [&str; 5] = ["", "off", "0", "false", "no"];
+/// One sentence of a row's words at most this long.
+const MOST_WORDS: usize = 140;
+
+/// A switch that is built but not on.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Waiting {
+    /// The name of its table.
+    pub part: &'static str,
+    pub switch: String,
+    pub words: String,
+}
+
+fn cells(line: &str) -> Vec<&str> {
+    line.trim()
+        .trim_start_matches('|')
+        .trim_end_matches('|')
+        .split('|')
+        .map(str::trim)
+        .collect()
+}
+
+/// The switch a row names: its first `LAMP_…` name or `--flag`, without
+/// backticks.
+fn switch_of(cell: &str) -> Option<String> {
+    cell.split(|c: char| c.is_whitespace() || c == '/' || c == ',')
+        .map(|word| word.trim_matches('`'))
+        .find(|word| {
+            (word.starts_with("LAMP_") || word.starts_with("--"))
+                && word.len() > 2
+                && word
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        })
+        .map(str::to_owned)
+}
+
+/// A row's words: its "Values and default" cell after the values, to the
+/// end of that sentence.
+fn words_of(cell: &str) -> String {
+    let after = cell.split_once(". ").map_or(cell, |(_, rest)| rest);
+    let sentence = after.split(". ").next().unwrap_or(after).trim();
+    let sentence = sentence.trim_end_matches('.');
+    if sentence.chars().count() <= MOST_WORDS {
+        return format!("{sentence}.");
+    }
+    let cut: String = sentence.chars().take(MOST_WORDS).collect();
+    format!("{}…", cut.trim_end())
+}
+
+/// What the product units and settings turn on: each `NAME=value` of an
+/// `Environment=` line or a settings `.env` file with a value that isn't
+/// off, and each `--flag` of an `ExecStart` line.
+pub fn turned_on(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    let mut on = BTreeMap::new();
+    for (name, text) in files {
+        let env = name.ends_with(".env");
+        for line in text.lines().map(str::trim) {
+            if line.starts_with('#') {
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("ExecStart=") {
+                for word in rest.split_whitespace().filter(|w| w.starts_with("--")) {
+                    on.insert(word.to_owned(), name.clone());
+                }
+                continue;
+            }
+            let assignments = match line.strip_prefix("Environment=") {
+                Some(rest) => rest,
+                None if env => line,
+                None => continue,
+            };
+            for assignment in assignments.split_whitespace() {
+                let assignment = assignment.trim_matches('"');
+                if let Some((key, value)) = assignment.split_once('=')
+                    && !OFF.contains(&value.trim_matches('"'))
+                {
+                    on.insert(key.to_owned(), name.clone());
+                }
+            }
+        }
+    }
+    on
+}
+
+/// Every row of the page's switch tables counted `until` or `now` whose
+/// switch isn't in `on`, in the page's order, each switch once.
+pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
+    let mut found = Vec::new();
+    let mut part = None;
+    let mut header = false;
+    for line in page.lines() {
+        if line.starts_with("## ") {
+            part = TABLES
+                .iter()
+                .find(|(heading, _)| line.starts_with(heading))
+                .map(|(_, name)| *name);
+            header = false;
+            continue;
+        }
+        let Some(part) = part else {
+            continue;
+        };
+        if !line.starts_with('|') {
+            continue;
+        }
+        if !header {
+            header = true;
+            continue;
+        }
+        let row = cells(line);
+        if row.len() < 3 || row[0].starts_with("---") {
+            continue;
+        }
+        let Some(switch) = switch_of(row[0]) else {
+            continue;
+        };
+        let counted = row.last().copied().unwrap_or_default();
+        if !WAITING.contains(&counted)
+            || on.contains_key(&switch)
+            || found.iter().any(|w: &Waiting| w.switch == switch)
+        {
+            continue;
+        }
+        found.push(Waiting {
+            part,
+            switch,
+            words: words_of(row[1]),
+        });
+    }
+    found
+}
+
+/// The part, from its heading to its last line: how many, then the list by
+/// table, folded, since it runs to many lines.
+pub fn section(waiting: &[Waiting]) -> String {
+    let mut lines = vec![HEADING.to_owned()];
+    if waiting.is_empty() {
+        lines.push("Nothing: every feature waiting for a lamp check is on.".to_owned());
+        return lines.join("\n") + "\n";
+    }
+    lines.push(format!(
+        "{} features are in this build but off on every lamp, each until its own \
+         check on a lamp passes (docs/switches.md). Don't expect them yet.",
+        waiting.len()
+    ));
+    lines.push(String::new());
+    lines.push(format!(
+        "<details><summary>The {}, by part</summary>",
+        waiting.len()
+    ));
+    let mut part = None;
+    for w in waiting {
+        if part != Some(w.part) {
+            lines.push(String::new());
+            lines.push(format!("**{}**", w.part));
+            part = Some(w.part);
+        }
+        lines.push(format!("- `{}`: {}", w.switch, w.words));
+    }
+    lines.push(String::new());
+    lines.push("</details>".to_owned());
+    lines.join("\n") + "\n"
+}
+
+/// `body` with its part replaced by `part`: in place when it is there, else
+/// before the developers part, else at the end. Nothing else changes.
+pub fn placed(body: &str, part: &str) -> String {
+    let body = body.trim_end_matches('\n');
+    if let Some(start) = body.find(HEADING) {
+        let after = &body[start + HEADING.len()..];
+        let end = after
+            .find("\n### ")
+            .map_or(body.len(), |at| start + HEADING.len() + at + 1);
+        let rest = body[end..].trim_start_matches('\n');
+        let kept = body[..start].trim_end_matches('\n');
+        let mut new = format!("{kept}\n\n{part}");
+        if !rest.is_empty() {
+            new.push('\n');
+            new.push_str(rest);
+            new.push('\n');
+        }
+        return new;
+    }
+    if let Some(start) = body.find(&format!("\n{DEVELOPERS}")) {
+        let kept = body[..start].trim_end_matches('\n');
+        let rest = &body[start + 1..];
+        return format!("{kept}\n\n{part}\n{rest}\n");
+    }
+    if body.is_empty() {
+        return part.to_owned();
+    }
+    format!("{body}\n\n{part}")
+}
+
+/// The product's files a switch can be turned on in: every unit and
+/// drop-in in `deploy/product`, and its settings' `.env` files.
+pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
+    let mut files = BTreeMap::new();
+    let product = lamp_os.join("deploy/product");
+    for folder in [product.clone(), product.join("settings")] {
+        for entry in fs::read_dir(&folder)? {
+            let path = entry?.path();
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default()
+                .to_owned();
+            let unit = [".service", ".conf", ".socket", ".timer"]
+                .iter()
+                .any(|end| name.ends_with(end));
+            if path.is_file() && (unit || name.ends_with(".env")) {
+                files.insert(name, fs::read_to_string(&path)?);
+            }
+        }
+    }
+    Ok(files)
+}
+
+/// One `gh` call's standard output, or why not.
+fn gh(arguments: &[&str]) -> Result<String, String> {
+    let output = Command::new("gh")
+        .args(arguments)
+        .env("GH_HOST", "github.com")
+        .env_remove("LAMPOS_UPDATE_KEY")
+        .output()
+        .map_err(|_| "cannot start GitHub CLI".to_owned())?;
+    if !output.status.success() {
+        let first = String::from_utf8_lossy(&output.stderr)
+            .lines()
+            .next()
+            .unwrap_or("no stderr")
+            .chars()
+            .take(200)
+            .collect::<String>();
+        return Err(format!("gh {} failed: {first}", arguments[0]));
+    }
+    String::from_utf8(output.stdout).map_err(|_| "GitHub CLI said non-UTF-8".to_owned())
+}
+
+/// Fills the stable release's part and keeps the notes on build
+/// `sequence`'s own release as [`ASSET`]. What it did, for the log.
+pub fn fill(lamp_os: &Path, sequence: u64, scratch: &Path) -> Result<String, String> {
+    let page = fs::read_to_string(lamp_os.join("docs/switches.md"))
+        .map_err(|_| "docs/switches.md cannot be read".to_owned())?;
+    let files = product_files(lamp_os).map_err(|_| "the product units cannot be read")?;
+    let waiting = waiting(&page, &turned_on(&files));
+    let repo = crate::REPO;
+    let body = gh(&[
+        "release",
+        "view",
+        crate::STABLE,
+        "--repo",
+        repo,
+        "--json",
+        "body",
+        "--jq",
+        ".body",
+    ])?;
+    let header = format!("## lampOS build {sequence}");
+    if body.lines().next() != Some(header.as_str()) {
+        return Err(format!(
+            "the stable notes are not build {sequence}'s yet: nothing written"
+        ));
+    }
+    let notes = placed(&body, &section(&waiting));
+    let file = scratch.join(ASSET);
+    fs::write(&file, &notes).map_err(|_| "the notes cannot be staged".to_owned())?;
+    let path = file.to_str().ok_or("the notes' path is not UTF-8")?;
+    gh(&[
+        "release",
+        "edit",
+        crate::STABLE,
+        "--repo",
+        repo,
+        "--notes-file",
+        path,
+    ])?;
+    let tag = format!("lampos-lamp-voice-{sequence}");
+    let kept = gh(&["release", "upload", &tag, path, "--repo", repo, "--clobber"]).map_or_else(
+        |why| format!("not kept on {tag}: {why}"),
+        |_| format!("kept on {tag} as {ASSET}"),
+    );
+    Ok(format!(
+        "{} switches built but not on; the stable notes written; {kept}",
+        waiting.len()
+    ))
+}

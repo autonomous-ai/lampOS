@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod github;
+pub mod notes;
 pub const REPO: &str = "autonomous-ai/lampOS";
 pub const STABLE: &str = "lampos-stable";
 pub const CHANNEL: &str = "lamp-voice";
