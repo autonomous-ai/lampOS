@@ -398,7 +398,8 @@ def test_the_fakes_light_state_shows_what_the_ring_draws(tmp_path):
             async with await Lamp.connect(keyring=ring) as lamp:
                 now = [100.0]
                 fake.clock = lambda: now[0]
-                assert await lamp.get("light") == {"light": {}}  # neither: no `shows`
+                # Nothing heard yet: null, as lamp-control answers.
+                assert await lamp.get("light", "mood") == {"light": None, "mood": None}
                 fake.state["light"] = {"on": True, "colour": "warm", "level": 3}
                 own = {"on": True, "colour": "warm", "level": 3}
                 assert await lamp.get("light") == {"light": {**own, "shows": own}}
