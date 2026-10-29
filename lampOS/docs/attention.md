@@ -2395,7 +2395,17 @@ alphabetic are never on the list, so "Lamp, …", "Blake, …" and
 costs: "man" and "mom" stay stand-ins, so "Man, …" is still read as a
 call by its words before the hearing matters; and a real "Lamp, …"
 written by the speech to text as "Ma'am, …" (#3923, name.md) is held
-unless a face, a conversation going on, or closeness shows the call. Lamp
+unless a face, a conversation going on, or closeness shows the call. A
+line cut short is read as well: "Ma'am, could you pass me the salt,
+please? Sir, what time is this?" came as "Ma'am could", cut after two
+words, and a line not joined with it that kept its start hearing, its own
+words not opening with "Ma'am," (request 13 on a lamp run). The line
+after it is held on the cut line's first word when the hearing at the cut
+line's start is the one at its own start
+(`Attention::start_said_to_a_person`); a cut line of two words or fewer
+needs no comma after the word ("Ma'am could"), a longer one and a whole
+line still do. A line joined with the one it cut short is read on the
+joined words. Lamp
 check on c0a4 (28 Oct, a person speaking, turned away): the one "Ma'am, …"
 lamp-name heard as the name (1.00, begun 0.9 s in) was held, the other
 "Ma'am, …" lines had no hearing and were left alone; "Lamp, what time is it in
