@@ -163,16 +163,28 @@ October, 0.39 s into a plain start, as the models loaded, ALSA's
 held up past its 40 ms queue. Outside a declared drain every EPIPE was a
 fault (`pcm.rs`, `discontinuity`), so the worker exited 1, the voice with it
 ("verified cleanup failed: speaker worker exited abnormally"), and the
-restart guard muted its next start. Now an EPIPE with only zeros queued (no
-speech in the ledger, no retiring tail, no unreported discard) is stopped and
-prepared as by `stop`, the guard kept, and returned as `pcm::Underrun`. The
-worker (`audio_workers.rs`, `underrun`) reports the reset as after any
-discard and primes the clock again through the barrier, with one journal
-line: "it underran while held up with only zeros queued; priming again".
-Nothing said is lost, because nothing said was queued. Still faults, as
-before:
-- an underrun with speech queued, or with an answer under way (its speech
-  begun, or a chunk part-written), since its gap would cut it mid-word;
+restart guard muted its next start. Now an EPIPE (no retiring tail, no
+unreported discard or underrun receipt) is stopped and prepared as by
+`stop`, the guard kept, and returned as `pcm::Underrun`. The worker
+(`audio_workers.rs`, `underrun`) reports the reset as after any discard and
+primes the clock again through the barrier.
+- With only zeros queued, nothing said is lost, and the journal says "it
+  underran while held up with only zeros queued; priming again".
+- With an answer under way (speech in the ledger, its speech begun, or a
+  chunk part-written), it is cut as after a lapse (#1178): the speech the
+  ledger held is reported dropped (`PlaybackDiscarded`, reason `underran`,
+  its oldest owner and frames from `Speaker::take_underran`), and that
+  answer's waiting or part-written chunk is refused as lapsed, so nothing is
+  written again under its old permit. The coordinator cuts the answer
+  (`cut_after_speaker_lapse`), and the voice goes on. Another owner's chunk,
+  never begun, waits for the prime. The person hears the answer stop
+  mid-word, with no line of its own, as after a lapse. The journal says "it
+  underran while held up mid-answer; the answer is cut, priming again", and
+  the coordinator "the speaker was held up (its authority lapsed, or it
+  underran); its answer is cut, the voice goes on".
+
+Still faults, as before:
+- a retiring tail, or an underrun before the last one's receipt is reported;
 - `ENODEV`, `EBADFD` and `ESTRPIPE`: a disconnect, a bad state or a
   suspend;
 - more than `MAX_UNDERRUNS` (3) within `UNDERRUN_WINDOW_US` (10 s), in
@@ -189,12 +201,17 @@ Tests:
     and primes and starts again;
   - the fourth within the window closes the guard;
   - `ENODEV`, `EBADFD` and `ESTRPIPE` close it;
-  - an EPIPE with speech queued closes it.
+  - an EPIPE with speech queued drops it into the underrun receipt, keeps
+    the guard, and the clock starts again only once the receipt is taken;
+  - an EPIPE before the last receipt is taken closes the guard.
+- `queued_ownership.rs` (any host): the speech owner is the oldest queued
+  speech's, and a mixed queue is named.
+- `coordinator::tests` (any host): an `underran` discard of the current
+  answer leaves the voice up, and `cut_after_speaker_lapse` cuts that answer
+  and drops what the provider had queued for it.
 
 The worker's own branch has no test: `null` never underruns, and the worker
 loop's one test (`tests/speaker_lapse_worker.rs`) cannot inject an errno.
-An underrun mid-answer stays a fault; recovering it needs a discard reason
-the coordinator cuts an answer on, as it does for a lapse.
 
 **A speaker held up, with recovery off** (#1178, lamp-cb94 at 04:53:53 UTC
 on 17 October, 4 h 34 min into Thirteen's soak). The journal had a bare

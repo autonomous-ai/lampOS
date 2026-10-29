@@ -427,6 +427,17 @@ impl PlaybackOwnership {
         cursor.epoch == self.epoch && cursor.frame > 0 && cursor.frame <= self.retired
     }
 
+    /// The owner of the oldest queued speech, and whether another owner's
+    /// speech is queued with it; `None` with only zeros queued (#3697).
+    pub fn speech_owner(&self) -> Option<(TurnOwner, bool)> {
+        let mut owners = self.queue.iter().filter_map(|entry| match entry.authority {
+            FrameAuthority::Speech { permit, .. } => Some(permit.owner()),
+            FrameAuthority::Silence(_) => None,
+        });
+        let first = owners.next()?;
+        Some((first, owners.any(|owner| owner != first)))
+    }
+
     pub fn pending_speech_frames(&self) -> usize {
         self.queue
             .iter()
