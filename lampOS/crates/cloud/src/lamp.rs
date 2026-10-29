@@ -116,13 +116,20 @@ pub struct Real {
 pub const RESTART_ENVIRONMENT: &str = "LAMP_APP_RESTART";
 
 /// The app's `system.shutdown` (#3697): setup's change helper's socket, and
-/// its yes once given, so an app that asks again is answered the same and
-/// the helper is asked once.
+/// its yes once given, with when, so an app that asks again within
+/// [`YES_KEPT`] is answered the same and the helper is asked once.
 #[derive(Debug, Default)]
 pub struct Shutdown {
     pub socket: PathBuf,
-    pub accepted: Option<Value>,
+    pub accepted: Option<(Value, Instant)>,
 }
+
+/// How long the helper's yes to a shutdown is kept: a lamp turns off well
+/// within it. One still on after it was refused by the runner (an update
+/// took the lock first), so the helper is asked again, and the app hears
+/// why instead of a `success` that does nothing (the Reviewer-lead's P3 on
+/// #3735).
+pub const YES_KEPT: Duration = Duration::from_secs(60);
 
 /// `on` takes the app's `system.shutdown` (#3697): `lamp_setup::shutdown::SWITCH`,
 /// named here as lamp-cloud doesn't build `lamp-setup`.
@@ -712,11 +719,13 @@ impl Lamp for Real {
             .shutdown
             .as_mut()
             .ok_or_else(|| crate::wire::not_here("system.shutdown"))?;
-        if let Some(accepted) = &shutdown.accepted {
+        if let Some((accepted, at)) = &shutdown.accepted
+            && at.elapsed() < YES_KEPT
+        {
             return Ok(accepted.clone());
         }
         let accepted = ask_power(&shutdown.socket, lamp_keeper::restart::SHUTDOWN_REQUEST)?;
-        shutdown.accepted = Some(accepted.clone());
+        shutdown.accepted = Some((accepted.clone(), Instant::now()));
         Ok(accepted)
     }
 
