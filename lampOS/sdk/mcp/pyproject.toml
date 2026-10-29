@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lamp-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "One paired lampOS lamp as MCP tools, for an agent on your own computer (docs/control.md)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ license = "Apache-2.0"
 # 1.22 at least: 1.21 and older don't import with today's pydantic (2.14,
 # `eval_type_backport`), and lamp-mcp's tests pass on 1.22 and 1.30 (El's P3
 # on #4215).
-dependencies = ["lampos>=0.1", "mcp>=1.22,<2"]
+dependencies = ["lampos>=0.2", "mcp>=1.22,<2"]
 
 [project.optional-dependencies]
 test = ["pytest>=8", "jsonschema>=4.20"]

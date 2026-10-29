@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lampos"
-version = "0.1.0"
+version = "0.2.0"
 description = "Program a lampOS lamp from your own computer: the v1 control protocol (docs/control.md)"
 readme = "README.md"
 requires-python = ">=3.10"

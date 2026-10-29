@@ -123,6 +123,11 @@ then `heard: good night lamp` and `lease: held`.
   back. It is renewed for you every 15 s, lasts at most 10 minutes a take,
   and is let go when the block ends.
 
+**Reading state:** `await lamp.get("presence", "lamp")` gives the states asked,
+by name: `{"presence": {"count": 1, "near": 0.31, "facing": true}, "lamp": {...}}`.
+That's the lamp's reply's `state` (since SDK 0.2.0). A `light` or `mood` the
+lamp hasn't heard yet is `None`.
+
 ### What takes control back
 
 The person always wins (control.md, "Who wins"). Your lease follows the

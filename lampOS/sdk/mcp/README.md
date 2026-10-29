@@ -65,6 +65,8 @@ someone is talking to it, comes back as the tool's error, never retried.
 `rate: … (try again in 900 ms)`. The server keeps to the lamp's `limits` itself,
 so an agent in a loop is slowed before the lamp refuses it.
 
+`lamp_state`, and the `lamp://state/<name>` resources, return the states by name (`{"presence": {...}}`), as lamp-control's `get` carries them under `state`. Before 0.2.0 they returned that whole `{"state": {...}}`. A `light` or `mood` the lamp hasn't heard yet is `null`.
+
 ## Resources
 
 All JSON, read when asked; none takes a parameter.

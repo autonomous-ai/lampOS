@@ -122,7 +122,7 @@ def own_version() -> str:
     try:
         return importlib.metadata.version("lamp-mcp")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.0"
+        return "0.2.0"
 
 
 class StrictMCP(FastMCP):

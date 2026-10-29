@@ -142,8 +142,9 @@ class FakeLamp:
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
             "presence": {"count": 0, "near": 0.0, "facing": False},
-            "light": {},
-            "mood": {},
+            # null until the lamp has heard them, as lamp-control's Watch answers.
+            "light": None,
+            "mood": None,
             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
         }
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
@@ -206,13 +207,16 @@ class FakeLamp:
         """`get`'s light, as lamp-control answers it (Nine's light/drawn): the
         person's own (`state["light"]`: on, colour, level) and `shows`, what the
         ring draws now. That's the newest light a computer asked for while it
-        lasts, else the person's own. With neither, no `shows`. No pattern."""
+        lasts, else the person's own. With neither, no `shows`. No pattern.
+        null with nothing to say, as lamp-control answers before it has heard
+        light/state or light/drawn. The person's own stands in for light/drawn
+        here, as the ring publishes both when it draws the person's light."""
         own = dict(self.state.get("light") or {})
         if self.shown is not None and self.shown[1] > self.clock():
             own["shows"] = dict(self.shown[0])
         elif any(key in own for key in ("on", "colour", "level")):
             own["shows"] = {key: own[key] for key in ("on", "colour", "level") if key in own}
-        return own
+        return own or None
 
     async def lease_event(self, lease: str, state: str, why: str | None = None) -> None:
         """Tell a lease's holder its lease is `held`, `suspended` or `lost`
