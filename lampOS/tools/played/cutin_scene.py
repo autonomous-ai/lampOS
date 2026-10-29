@@ -48,6 +48,14 @@ def speaking(rows=None):
     return last('speaker_first_write') > last('turn_finished')
 
 
+def stop_us(rows, now):
+    """The lamp's clock at the stop: the newest event's at_us (the session's clock, as cutin.sh times the scene) plus the
+    Mac time since it came, so no ssh is opened at the stop; and that event's age in s. (None, None) with no event."""
+    last = max((r for r in rows if isinstance(r.get('at_us'), int)), key=lambda r: r['_mac'], default=None)
+    if last is None: return None, None
+    return last['at_us'] + int((now - last['_mac']) * 1e6), now - last['_mac']
+
+
 def volume(v): subprocess.run(['/usr/bin/osascript', '-e', f'set volume output volume {v}'], check=False)
 
 
@@ -58,6 +66,8 @@ def main():
         assert split(['n', f'Samantha|{STOP}|8'])[2] is None and split(['n'])[2] is None
         w, f = {'kind': 'speaker_first_write'}, {'kind': 'turn_finished'}
         assert speaking([dict(f, at_us=1), dict(w, at_us=2)]) and not speaking([dict(w, at_us=2), dict(f, at_us=3)]) and not speaking([])
+        assert stop_us([{'at_us': 5_000_000, '_mac': 100.0}, {'kind': 'x', '_mac': 101.0}], 102.0) == (7_000_000, 2.0)
+        assert stop_us([], 1.0) == (None, None) and stop_us([{'kind': 'x', '_mac': 1.0}], 2.0) == (None, None)
         return print('cutin_scene.py selftest: ok')
     if not os.path.isfile(REAL): sys.exit('cutin_scene.py: CV_SCENARIO is not scenario.py')
     name, steps, wait = split(sys.argv[1:])
@@ -82,11 +92,11 @@ def main():
             sys.exit(7)
         wav = f"{OUT}/prompts/generated/{hashlib.sha256(f'Daniel|{RATE}|{STOP}'.encode()).hexdigest()[:16]}.wav"
         if not os.path.exists(wav): sys.exit(f'cutin_scene.py: {wav} missing (quality_rows.py levels it); no stop played')
-        # The lamp's clock at the stop: the newest event's at_us (the session's clock, as cutin.sh times the scene) plus
-        # the Mac time since it came, so no ssh is opened here.
-        last = max((r for r in ev.rows if isinstance(r.get('at_us'), int)), key=lambda r: r['_mac'], default=None)
-        at = str(last['at_us'] + int((time.time() - last['_mac']) * 1e6)) if last else ''
-        if last: print(f'cutin_scene.py: {name}: stop at lamp {at} us, from an event {time.time() - last["_mac"]:.2f} s old', file=sys.stderr)
+        at, age = stop_us(ev.rows, time.time())
+        if at is None:
+            print(f'cutin_scene.py: {name}: no event to time the stop; void, no stop played', file=sys.stderr)
+            sys.exit(7)
+        print(f'cutin_scene.py: {name}: stop at lamp {at} us, from an event {age:.2f} s old', file=sys.stderr)
     finally:
         fa.close(); ev.p.terminate()
     volume(90)
@@ -94,7 +104,7 @@ def main():
     finally: volume(45)
     time.sleep(wait)
     scenes = sorted(glob.glob(f'{OUT}/scenarios/*-{name}.txt'), key=os.path.getmtime)
-    if not scenes or not at.isdigit(): sys.exit(f'cutin_scene.py: {name}: no scene file or lamp time; the stop line is not recorded')
+    if not scenes: sys.exit(f'cutin_scene.py: {name}: no scene file; the stop line is not recorded')
     with open(scenes[-1], 'a') as f: f.write(f'#PLAY_US {at} Daniel: {STOP}\n')
 
 
