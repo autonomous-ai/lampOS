@@ -95,6 +95,9 @@ const OVER_PROMPT_MS: u64 = crate::activity::CALL_BEFORE_US / 1_000;
 /// over its last word ([`OVER_PROMPT_MS`]), is offered again with its own
 /// number, this many times in a step at most.
 const MOST_REOFFERS: u8 = 2;
+
+/// Why a gapped prompt with nothing said after it is given back.
+const GAPPED: &str = "the prompt was played with a gap";
 /// The sentence's level bar is never under this rise over the room's quiet
 /// (a doubling of its power): in a loud office, where the person's own
 /// calls rose only 3.9 dB (lamp-52e6, row 10), a line under it is not told
@@ -239,6 +242,11 @@ struct Listening {
     /// The coordinator's clock at the same moment: only for the deadline and
     /// the clock-jump check, never as a Unix time.
     ended_us: u64,
+    /// Its prompt was said through with a gap (#4035): heard, so the window
+    /// opens, but with nothing said in it the prompt is given back and no
+    /// try is spent (lamp-29e7's re-test: a gapped prompt with no window
+    /// let two calls fall to the chat, which led the step itself).
+    gapped: bool,
 }
 
 #[derive(Default)]
@@ -403,6 +411,7 @@ impl NearFlow {
                 prompt: 1,
                 ended_ms,
                 ended_us,
+                gapped: false,
             }),
             seen: names_ms
                 .iter()
@@ -798,8 +807,9 @@ impl Onboarding {
         again
     }
 
-    /// The whole prompt's playback is the only start of a try. Its end is
-    /// read from the Unix clock now, at that boundary.
+    /// The prompt's playback heard through (whole or with a gap) is the only
+    /// start of a try. Its end is read from the Unix clock now, at that
+    /// boundary.
     pub(super) fn near_invitation_finished(
         &mut self,
         voice_boot: BootId,
@@ -823,37 +833,13 @@ impl Onboarding {
             },
             if offer.sentence { "sentence" } else { "call" }
         );
-        if delivery == Delivery::Unsaid || delivery == Delivery::Gapped {
+        if delivery == Delivery::Unsaid {
             // Never said, never asked: its prompt is given back, and none of
-            // the cut prompts' budget is spent (#3754). So is one said
-            // through with a gap and nobody's turn taken over it (#4035).
-            if *self.prompts(offer.sentence) == offer.prompt {
-                *self.prompts(offer.sentence) = offer.prompt - 1;
-                self.save();
-            }
-            self.near.unsaid = self.near.unsaid.saturating_add(1);
-            let again = self.near.unsaid <= MOST_UNSAID;
-            let kind = if offer.sentence {
-                "onboarding_sentence_try"
-            } else {
-                "onboarding_near_try"
-            };
-            let why = if delivery == Delivery::Unsaid {
-                NOT_SAID
-            } else {
-                "the prompt was played with a gap"
-            };
-            self.records.push(json!({"kind":kind,"prompt":offer.prompt,
-                "accepted":false,"why":why,"offered_again":again,"at_us":now_us}));
-            if again {
-                self.near.retry_after_us = now_us.saturating_add(1_000_000);
-            } else {
-                self.invalidate_near();
-                self.finish(Step::HowYouSound, Outcome::NotAvailable, None, now_us);
-            }
+            // the cut prompts' budget is spent (#3754).
+            self.give_prompt_back(offer.sentence, offer.prompt, NOT_SAID, now_us);
             return;
         }
-        if delivery != Delivery::Whole {
+        if delivery == Delivery::Cut {
             self.near.retry_after_us = now_us.saturating_add(1_000_000);
             let kind = if offer.sentence {
                 "onboarding_sentence_try"
@@ -873,12 +859,40 @@ impl Onboarding {
         self.near.spoiled = None;
         self.near.line = None;
         self.near.awaited = None;
+        // Whole, or said through with a gap (#4035): either way the person
+        // heard it, so the try's window opens.
         self.near.listening = Some(Listening {
             sentence: offer.sentence,
             prompt: offer.prompt,
             ended_ms: (self.unix_clock)(),
             ended_us: now_us,
+            gapped: delivery == Delivery::Gapped,
         });
+    }
+
+    /// A prompt that asked nothing of the person (never said), or a gapped
+    /// one nothing was said after: its prompt is given back and none of the
+    /// budget is spent, [`MOST_UNSAID`] times at most, then `not_available`.
+    fn give_prompt_back(&mut self, sentence: bool, prompt: u8, why: &str, now_us: u64) {
+        if *self.prompts(sentence) == prompt {
+            *self.prompts(sentence) = prompt - 1;
+            self.save();
+        }
+        self.near.unsaid = self.near.unsaid.saturating_add(1);
+        let again = self.near.unsaid <= MOST_UNSAID;
+        let kind = if sentence {
+            "onboarding_sentence_try"
+        } else {
+            "onboarding_near_try"
+        };
+        self.records.push(json!({"kind":kind,"prompt":prompt,
+            "accepted":false,"why":why,"offered_again":again,"at_us":now_us}));
+        if again {
+            self.near.retry_after_us = now_us.saturating_add(1_000_000);
+        } else {
+            self.invalidate_near();
+            self.finish(Step::HowYouSound, Outcome::NotAvailable, None, now_us);
+        }
     }
 
     /// Whether the voice holds its reply to an utterance whose speech began
@@ -1002,6 +1016,11 @@ impl Onboarding {
         }
         let listening = self.near.listening.take().expect("open");
         let line = self.near.line.take();
+        if listening.gapped && line.is_none() {
+            self.near.seen.clear();
+            self.give_prompt_back(true, listening.prompt, GAPPED, now_us);
+            return;
+        }
         if line.is_some() {
             self.mark_tried(Step::HowYouSound);
         }
@@ -1147,6 +1166,10 @@ impl Onboarding {
             self.mark_tried(Step::HowYouSound);
         }
         let (hearings, said_lines, levels, mut spoke, spoiled) = self.near.take_evidence();
+        if listening.gapped && heard.is_empty() && said.is_empty() {
+            self.give_prompt_back(false, listening.prompt, GAPPED, now_us);
+            return;
+        }
         // The prompt itself: the lamp spoke until its end.
         spoke.push(Spoke {
             began_ms: listening.ended_ms.saturating_sub(1),

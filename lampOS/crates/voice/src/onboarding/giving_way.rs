@@ -290,6 +290,15 @@ impl GivingWayFlow {
     }
 }
 
+/// PARKED (#3702): giving way is out of the onboarding walk (the owner's
+/// call, 28 Oct). While this is true, lamp-voice keeps the step
+/// `not_available` (coordinator.rs, `set_giving_way_available`) and the
+/// model is never told of it: `setup_step` and `redo_setup` name no such
+/// step (lamp-29e7's re-test, 29 Oct: told of "the body giving way", the
+/// model asked for it itself). Its code, words and tests stay. To put it
+/// back, set this to false: both follow.
+pub(crate) const PARKED: bool = true;
+
 impl Onboarding {
     /// The coordinator says whether it has a body, the bus and the say
     /// service. Without them the step is `not_available`.

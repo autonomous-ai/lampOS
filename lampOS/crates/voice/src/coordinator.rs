@@ -1154,7 +1154,7 @@ impl Reply {
 
     /// How an onboarding invitation's turn ended, as it completes. Nothing
     /// of it played is no ask at all (#3754); played through with a gap is
-    /// no ask either, but said (#4035).
+    /// said and heard (#4035), its try open as after a whole one (#3702).
     fn invitation_delivery(
         &self,
         speaker_pending: &Option<PendingSpeaker>,
@@ -6812,10 +6812,16 @@ fn conversation_with_gate_inner(
             }
             // No body to give way: the step is not available.
             // PARKED (#3702): giving way is out of the onboarding walk (the owner's call, 28 Oct): the step is
-            // never offered and is kept `not_available`. Its code, words and tests stay. To put it back,
-            // restore the line below in place of `false`.
-            // says.is_some() && bus_out.is_some() && body_link.is_some() && onboarding_feel.is_some() && !trace.onboarding_privacy_disabled
-            walk.set_giving_way_available(false);
+            // never offered and is kept `not_available`, and the model is told nothing of it. To put it
+            // back, set `onboarding::giving_way::PARKED` to false.
+            walk.set_giving_way_available(
+                !crate::onboarding::giving_way::PARKED
+                    && says.is_some()
+                    && bus_out.is_some()
+                    && body_link.is_some()
+                    && onboarding_feel.is_some()
+                    && !trace.onboarding_privacy_disabled,
+            );
             if let Some(feel) = onboarding_feel.as_mut() {
                 let now_us = monotonic_us();
                 for felt in feel.take(now_us) {
