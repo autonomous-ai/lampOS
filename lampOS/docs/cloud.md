@@ -1219,7 +1219,12 @@ first phase after `idle` that goes on to fetch; a round that only checks
 says nothing), then `done` (`switched`), `failed`, `refused`, `rolled-back`
 `self-switched` (lamp-update switched itself) or `self-confirmed` (its new
 self confirmed that switch; a self-switch has this confirmation alert once
-lamp-update says it, and it breaks a repeating streak like `done`). A round whose `started` was told and that ends with
+lamp-update says it, and it breaks a repeating streak like `done`), or `self-put-back` (the old
+lamp-update was put back because the new one did not take, always told,
+with no build, reason or time, and it breaks a streak like `done`). A lamp
+whose put-back helper is older than lamp-update's change writes
+`self-put-back` only to its journal, so it is not told there until a
+confirmed lamp-update refreshes the helper. A round whose `started` was told and that ends with
 nothing switched (`not-quiet`, `unreachable`, `would`, `up-to-date`,
 `nothing-published`) ends as `not-switched`, with `code:` the outcome's
 own name (`other` for a name not known), so no start is left without an
