@@ -830,11 +830,13 @@ ARM64 run and the keeper's `--setup-marker` (#816):
    while waiting, blue at once after Setup, dark before the marker,
    and the voice's ring worker starting with no "ring startup" fault.
 4. **Failures.** A wrong password (expect `wrong_password` and the hotspot back
-   by about 40 s: on lamp-0c89, 29 Oct, the router's second rejection came 26
-   to 27 s after the join began and the run ended at 38 s, in both runs; the
-   tests' 5 s is the fake's clock), a network out of range (`ssid_not_found` at 60 s), a name with
-   an accent and one with a `"`. Each failure must leave the previous Wi-Fi file,
-   and the ring amber until the next try.
+   by about 40 s on the lamp: on lamp-0c89, 29 Oct, the router's second
+   rejection came 26 to 27 s after the join began and the run ended at 38 s,
+   in both runs; the tests' 5 s is the fake's clock. From the app, expect up
+   to about 80 s, with the phone's rejoin of the hotspot), a network out of
+   range (`ssid_not_found` at 60 s), a name with an accent and one with a `"`.
+   Each failure must leave the previous Wi-Fi file, and the ring amber until
+   the next try.
 5. **Reset.** Controls with `--touch` and a `reset` line in its pins file. Hold
    the RESET pinhole 5 s with a paperclip and release: the lamp pauses, folds, reboots into the
    hotspot, and every path in the plan is empty. Once, cut the power during the
