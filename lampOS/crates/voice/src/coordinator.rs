@@ -7487,6 +7487,9 @@ fn conversation_with_gate_inner(
             if refused_hold && model_refusing.observe(&event, monotonic_us(), fixed_line) {
                 outage = Outage::default();
             }
+            if refused_hold && let Some(walk) = onboarding.as_mut() {
+                walk.set_model_refusing(model_refusing.refusing());
+            }
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
             }

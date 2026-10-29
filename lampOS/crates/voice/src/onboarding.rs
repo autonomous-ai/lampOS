@@ -706,6 +706,9 @@ pub struct Onboarding {
     gesture: Option<&'static str>,
     /// [`NUDGE_ENVIRONMENT`].
     nudge: bool,
+    /// The model service refusing turns (#4265, `LAMP_SECOND_REFUSED_HOLD`):
+    /// no step is begun, and one that fails meanwhile is held as `later`.
+    model_refusing: bool,
     /// Whether the voice can save a face (`remember_my_face`, the eyes' who
     /// socket set): "who you are" then asks for the face, and is done when it
     /// is saved, not on a name and a yes (#3883's follow-up).
@@ -896,6 +899,7 @@ impl Onboarding {
             goals: None,
             body_heard: false,
             nudge: false,
+            model_refusing: false,
             face_kept: false,
             released: true,
             near_since: None,
@@ -2224,6 +2228,11 @@ impl Onboarding {
         if !self.storage_idle() {
             return None;
         }
+        // While the model service refuses (#4265), nothing is begun: the
+        // walk waits, unfinished, for a turn answered again.
+        if self.model_refusing {
+            return None;
+        }
         if can_speak && let Some(note) = self.owed.take() {
             return Some(note);
         }
@@ -2716,7 +2725,31 @@ impl Onboarding {
         }
     }
 
+    /// Whether the model service refuses turns now (#4265): set by the
+    /// coordinator each loop, only with `LAMP_SECOND_REFUSED_HOLD=on`.
+    pub fn set_model_refusing(&mut self, refusing: bool) {
+        self.model_refusing = refusing;
+    }
+
     fn finish(&mut self, step: Step, outcome: Outcome, framing: Option<Framing>, now_us: u64) {
+        // A step that fails or goes unsaid while the model service refuses
+        // is no answer of the person's (#4265): held as `later`, and offered
+        // again once a turn is answered, never failed on it.
+        let outcome = if self.model_refusing
+            && matches!(outcome, Outcome::Failed | Outcome::NotAvailable)
+        {
+            eprintln!(
+                "lamp-voice: onboarding: {} held as later, not {}: the model service refuses turns",
+                step.name(),
+                serde_json::to_value(outcome)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .unwrap_or_default()
+            );
+            Outcome::Later
+        } else {
+            outcome
+        };
         let at_unix_s = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_secs());
@@ -5204,6 +5237,38 @@ mod tests {
 
     // The first builder's P2 on #2526: none of these is a name, so a yes
     // after it, or the give-up, never ends the step as done.
+    /// #4265: while the model service refuses, a step that would fail is
+    /// held as `later` and the walk begins nothing; answered again, it goes on.
+    #[test]
+    fn a_step_failed_while_the_model_service_refuses_is_held_as_later_and_the_walk_waits() {
+        let mut room = Room::new("refusing");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.set_model_refusing(true);
+        // Nothing begun or asked again, and the step led is not failed.
+        assert!(room.wait(300 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        // One that ends while refusing is held, never failed or unavailable.
+        for outcome in [Outcome::Failed, Outcome::NotAvailable] {
+            room.walk.finish(Step::Touch, outcome, None, room.at);
+            assert_eq!(
+                room.walk.desired.steps["touch"].outcome,
+                Outcome::Later,
+                "{outcome:?}"
+            );
+        }
+        room.walk.finish(Step::Touch, Outcome::Done, None, room.at);
+        assert_eq!(room.walk.desired.steps["touch"].outcome, Outcome::Done);
+        // Answered again: the step is asked again.
+        room.walk.set_model_refusing(false);
+        assert_eq!(
+            room.wait(20 * S, Some(NEAR_MIDDLE))
+                .first()
+                .map(String::as_str),
+            Some(WHO_NOTE)
+        );
+    }
+
     #[test]
     fn a_line_that_is_not_a_name_never_ends_who_you_are() {
         let mut room = Room::new("not-a-name");
