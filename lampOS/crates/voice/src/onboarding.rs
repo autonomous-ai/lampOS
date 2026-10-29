@@ -2130,19 +2130,28 @@ impl Onboarding {
                 } else {
                     agrees(&words)
                 };
-                let answer = !greeting && !text.contains('?') && !words.is_empty();
+                // Asking to hear it again is no answer, with or without its
+                // "?" ("Sorry, can you repeat that", Reviewer-two's P3 on
+                // #4346).
+                let again = words
+                    .iter()
+                    .any(|word| matches!(word.as_str(), "repeat" | "pardon" | "again"));
+                let answer = !greeting && !again && !text.contains('?') && !words.is_empty();
                 if about_hello
                     || (heard.hello_asked && !names_hours(&words) && (yes || refuses(&words)))
                 {
                     heard.hello = true;
-                } else if answer && !heard.quiet_hours && !heard.hello {
+                } else if (answer || quiet_hours(&words)) && !heard.quiet_hours && !heard.hello {
                     // The hello question is the walk's own, owed once, after
                     // the first answer to the quiet hours, whatever its words:
                     // the model is told never to ask it, so "Only when I'm
                     // sleeping." left the walk silent until its give-up
                     // (Reviewer-two's P2 on #4326). On lamp-29e7 (29 Oct,
                     // 8545) the model answered "Already set" and asked nothing
-                    // more. That answer is the quiet hours'.
+                    // more. That answer is the quiet hours', and so is a line
+                    // naming them asked as a question or after a greeting
+                    // ("Hi, quiet after ten at night please.", Reviewer-two's
+                    // P2 on #4346).
                     ask_hello = true;
                     heard.quiet_hours = true;
                 } else if quiet_hours(&words) {
@@ -5733,6 +5742,10 @@ mod tests {
             "Only when I'm sleeping.",
             "Weekends, please.",
             "From ten to six.",
+            "Could you keep quiet after 10 PM?",
+            "Can you be quiet at night?",
+            "Hi, quiet after ten at night please.",
+            "Hey, no quiet hours.",
         ]
         .into_iter()
         .enumerate()
@@ -5784,6 +5797,23 @@ mod tests {
         room.walk.heard("Yes.", room.at);
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+    }
+
+    /// Reviewer-two's P3 on #4346: asking to hear the question again, its
+    /// "?" dropped by the speech-to-text, is no answer and owes no hello.
+    #[test]
+    fn asking_again_owes_no_hello() {
+        let mut room = Room::new("asking-again");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        room.walk.heard("Sorry, can you repeat that", room.at);
+        room.walk.lamp_said();
+        assert!(room.wait(6 * S, Some(NEAR_MIDDLE)).is_empty());
+        room.walk.heard("After ten at night.", room.at);
+        room.walk.lamp_said();
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
     }
 
     /// The lead's bound on #4326 (lamp-52e6, 29 Oct: the hello ~15 s after
