@@ -1076,6 +1076,11 @@ impl Onboarding {
             Outcome::Later => self.definition.later_line(),
             _ => self.definition.words.sentence_failed.clone(),
         });
+        // The call wasn't learned: said after the sentence's line, unless
+        // the step is left for later.
+        if !called && outcome != Outcome::Later {
+            self.owed_after = Some(self.definition.words.near_failed.clone());
+        }
     }
 
     /// Judge the try being listened for, once its evidence is all in. Pure
@@ -1238,16 +1243,10 @@ impl Onboarding {
         self.near.named = Some(outcome);
         self.records.push(json!({"kind":"onboarding_near_call",
             "outcome":outcome,"at_us":now_us}));
-        // No call heard at all: a silent sentence part ends the step
-        // `later`, so the name part says nothing and the person hears only
-        // that one line, not a failure first (Seventh's P3 2 on #4192).
-        self.owed = if outcome == Outcome::Done {
-            Some(self.definition.words.near_done.clone())
-        } else if self.was_tried(Step::HowYouSound) {
-            Some(self.definition.words.near_failed.clone())
-        } else {
-            None
-        };
+        // A name part short of a bar says `near_failed` at the step's end,
+        // after the sentence's line, so a step left `later` says only that
+        // one line (Seventh's P3 2 on #4192, the Reviewer-lead's P2 on #4269).
+        self.owed = (outcome == Outcome::Done).then(|| self.definition.words.near_done.clone());
     }
 
     /// The step being led, with storage idle.
