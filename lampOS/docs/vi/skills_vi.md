@@ -71,7 +71,9 @@ Diễn ra như sau:
      "có" vẫn được nhận (fourteen-P10 trên #2814). Lượt bị cắt ngang hoặc
      không có tiếng thì vẫn không tính là đã hỏi. Khi một lời "có" đã cài
      kỹ năng lên đèn, tin về nó không được kể lại nữa
-     (`made_skill::is_on`): không còn gì để hỏi.
+     (`made_skill::is_on`): không còn gì để hỏi. Lời "có" đã cài nó ghi tin
+     đó là đã kể và báo cho phần tasks (`task_news::answered`), nên với
+     `--close-told` harness của nó trên máy tính của người dùng được đóng.
 7. **Cài khi người dùng nói "có" thành tiếng** (quyết định của trưởng nhóm,
    20/10 08:37 trên #1711: lời đồng ý bằng giọng nói gắn với SHA-256, một
    ngoại lệ của quy định 18:33 chỉ cho kỹ năng tạo trên đèn; ứng dụng không

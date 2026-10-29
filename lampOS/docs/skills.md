@@ -1948,7 +1948,9 @@ happens:
      after the question played whole with a gap). A turn cut short, or one
      with no audio, still asks nothing. Once a yes has put the skill on,
      its news isn't told again (`made_skill::is_on`): nothing is left to
-     ask. The news is told in the voice's own process,
+     ask. The yes that put it on keeps that news as told and tells the
+     tasks part so (`task_news::answered`), so with `--close-told` its
+     harness on the person's computer is closed. The news is told in the voice's own process,
      and the yes comes to the worker that runs the call.
 7. **Put on at a spoken yes** (the lead, 20 Oct 08:37 on #1711: a spoken
    yes bound to the SHA-256, an exception to the 18:33 "only signed
