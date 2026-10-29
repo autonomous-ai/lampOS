@@ -185,6 +185,18 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
             Level::Warn,
             format!("{warmest} is warm: it reads {reading}, and the body stops at 62"),
         )
+    } else if let Some(joint) = glimpse.cannot_lift {
+        (
+            Level::Warn,
+            format!(
+                "its {} pushed as hard as it may and did not move, in two long rests' tries: the lamp stays folded until it is started again, and the arm may need looking at",
+                match joint {
+                    "base_pitch" => "shoulder",
+                    "elbow_pitch" => "elbow",
+                    other => other,
+                }
+            ),
+        )
     } else if glimpse.resting_s > 0 {
         (
             Level::Warn,
@@ -843,6 +855,7 @@ mod tests {
             bad_reads: [0; 5],
             retreats: 0,
             resting_s: 0,
+            cannot_lift: None,
             waiting: None,
         }
     }
