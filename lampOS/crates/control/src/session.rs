@@ -293,6 +293,13 @@ impl Door {
         self.journal.line(client, now_us, &line);
     }
 
+    /// Every rate lifted but the refused actions' guard (`--rates off`, a
+    /// dev lamp's switch, never a product's).
+    pub fn with_rates_off(mut self) -> Self {
+        self.rates = Rates::off();
+        self
+    }
+
     /// The quiet hours held on the door (lamp-control's `serve` always
     /// wires them; a door without, as in tests, holds none).
     pub fn with_quiet_hours(mut self, quiet: Quiet) -> Self {
@@ -898,7 +905,10 @@ impl Door {
             json!({
                 "lamp": self.lamp,
                 "grants": grants,
-                "limits": limits(self.quiet.as_ref().and_then(|quiet| quiet.window)),
+                "limits": limits(
+                    self.quiet.as_ref().and_then(|quiet| quiet.window),
+                    self.rates.lifted()
+                ),
             }),
         )
     }
@@ -917,8 +927,10 @@ impl Door {
 pub const PUSH_OFF: &str = "skill push is not on this lamp";
 
 /// The rates and caps `hello` tells, so a client keeps inside them, and
-/// this lamp's quiet hours (`"off"` when none).
-pub fn limits(quiet: Option<lamp_local_time::QuietWindow>) -> Value {
+/// this lamp's quiet hours (`"off"` when none). With the rates lifted
+/// (`--rates off`) it says `"rates": "off"` and only the refused actions'
+/// window, so a client doesn't pace itself to rates the door doesn't hold.
+pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> Value {
     let class = |class: Class| -> Value {
         class
             .windows()
@@ -926,6 +938,16 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>) -> Value {
             .map(|(most, within)| json!({"most": most, "within_ms": within / 1_000}))
             .collect()
     };
+    if rates_off {
+        return json!({
+            "rates": "off",
+            "refused": class(Class::Refused),
+            "hold_max_ms": protocol::HOLD_MAX_MS,
+            "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
+            "say_max_chars": protocol::SAY_MAX_CHARS,
+            "quiet_hours": quiet_hours_of(quiet),
+        });
+    }
     json!({
         "joints": class(Class::Joints),
         "motion": class(Class::Motion),
@@ -950,6 +972,22 @@ fn quiet_hours_of(quiet: Option<lamp_local_time::QuietWindow>) -> Value {
     match quiet {
         Some(window) => json!({"from": hhmm(window.from), "to": hhmm(window.to)}),
         None => json!("off"),
+    }
+}
+
+/// Whether the rates are lifted, from `--rates off|default` first, then
+/// `LAMP_CONTROL_RATES`, else `default`. A dev lamp's switch: a product
+/// never passes it. A bad value stops lamp-control at its start.
+pub fn rates_off_of(flag: Option<&str>, env: Option<&str>) -> Result<bool, String> {
+    let (from, value) = match (flag, env) {
+        (Some(flag), _) => ("--rates", flag),
+        (None, Some(env)) => ("LAMP_CONTROL_RATES", env),
+        (None, None) => return Ok(false),
+    };
+    match value.trim() {
+        "off" => Ok(true),
+        "default" => Ok(false),
+        other => Err(format!("{from} {other:?}: off or default")),
     }
 }
 
@@ -1612,6 +1650,73 @@ mod tests {
         assert_eq!(
             reply(&door.handle(&mut session, say, &mut fake, 2 * S, 1_000))["ok"],
             true
+        );
+    }
+
+    /// `--rates off`: hello says so and holds only the refused actions'
+    /// window; each class is lifted at the door, the refused guard still
+    /// closes a connection; the setting is read as the quiet hours' is.
+    #[test]
+    fn rates_off_lifts_the_doors_rates_but_not_the_refused_guard() {
+        let computer = Computer::new(30);
+        let (door, mut session, mut fake) =
+            paired(&computer, &[Grant::Body, Grant::Light, Grant::Speak]);
+        let mut door = door.with_rates_off();
+        let (mut hello_session, welcome) = door.open();
+        let hello = door.handle(
+            &mut hello_session,
+            &computer.hello_frame(&welcome),
+            &mut fake,
+            S,
+            1,
+        );
+        let limits = &reply(&hello)["limits"];
+        assert_eq!(limits["rates"], "off");
+        assert!(
+            limits["motion"].is_null() && limits["express"].is_null(),
+            "{limits}"
+        );
+        assert_eq!(limits["refused"][0], json!({"most": 20, "within_ms": 1000}));
+        // Motion, express, light and say at any pace.
+        for n in 0..10 {
+            for frame in [
+                r#"{"id":3,"op":"gesture","name":"nod"}"#,
+                r#"{"id":4,"op":"express","feeling":"glad"}"#,
+                r#"{"id":5,"op":"light","colour":"warm","level":2,"for_ms":1000}"#,
+                r#"{"id":6,"op":"say","text":"Hi."}"#,
+            ] {
+                let outcome = door.handle(&mut session, frame, &mut fake, 2 * S + n, 1);
+                assert_eq!(reply(&outcome)["ok"], true, "{n} {frame}: {outcome:?}");
+            }
+        }
+        // The refused actions' guard still closes the connection.
+        fake.refuse_with = Some(Error::new(ErrorCode::Refused, "no"));
+        let light = r#"{"id":7,"op":"light","colour":"warm","level":2,"for_ms":1000}"#;
+        for n in 0..20 {
+            assert!(
+                !door
+                    .handle(&mut session, light, &mut fake, 3 * S + n, 1)
+                    .close,
+                "{n}"
+            );
+        }
+        assert!(
+            door.handle(&mut session, light, &mut fake, 3 * S + 20, 1)
+                .close
+        );
+        assert_eq!(rates_off_of(None, None), Ok(false));
+        assert_eq!(rates_off_of(Some("off"), None), Ok(true));
+        assert_eq!(rates_off_of(None, Some("off")), Ok(true));
+        assert_eq!(rates_off_of(Some("default"), Some("off")), Ok(false));
+        assert!(
+            rates_off_of(Some("none"), None)
+                .unwrap_err()
+                .starts_with("--rates ")
+        );
+        assert!(
+            rates_off_of(None, Some(""))
+                .unwrap_err()
+                .starts_with("LAMP_CONTROL_RATES ")
         );
     }
 

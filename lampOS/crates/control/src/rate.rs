@@ -96,11 +96,27 @@ impl Class {
 #[derive(Debug, Default)]
 pub struct Rates {
     seen: HashMap<(String, Class), VecDeque<u64>>,
+    /// `--rates off`, a dev lamp's switch: every class lifted but
+    /// [`Class::Refused`], which still closes a connection that spins.
+    off: bool,
 }
 
 impl Rates {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Every rate lifted but the refused actions' guard (`--rates off`).
+    pub fn off() -> Self {
+        Self {
+            off: true,
+            ..Self::default()
+        }
+    }
+
+    /// Whether the rates are lifted.
+    pub fn lifted(&self) -> bool {
+        self.off
     }
 
     /// Counts `client`'s action of `class` at `now_us`, or refuses it with
@@ -115,6 +131,9 @@ impl Rates {
     /// nothing: the door counts it once the part takes it, so a refused
     /// action isn't counted (harness-reviewer's P2 on #3778).
     pub fn check(&mut self, client: &str, class: Class, now_us: u64) -> Result<(), u64> {
+        if self.off && class != Class::Refused {
+            return Ok(());
+        }
         let seen = self.seen.entry((client.to_owned(), class)).or_default();
         let longest = class.longest();
         while seen.front().is_some_and(|at| at + longest <= now_us) {
@@ -180,6 +199,32 @@ mod tests {
         }
         assert_eq!(rates.take("c_1", Class::Express, 20 * S), Err(40_000));
         assert_eq!(rates.take("c_1", Class::Express, 60 * S), Ok(()));
+    }
+
+    /// `--rates off`: every class lifted, at any pace, but the refused
+    /// actions' guard, which still bites at 20 a second.
+    #[test]
+    fn rates_off_lifts_every_class_but_the_refused_guard() {
+        let mut rates = Rates::off();
+        assert!(rates.lifted() && !Rates::new().lifted());
+        for class in [
+            Class::Joints,
+            Class::Motion,
+            Class::Light,
+            Class::Say,
+            Class::Express,
+            Class::Phrases,
+            Class::Push,
+            Class::Manage,
+        ] {
+            for n in 0..1_000 {
+                assert_eq!(rates.take("c_1", class, n), Ok(()), "{class:?} {n}");
+            }
+        }
+        for n in 0..20 {
+            assert_eq!(rates.take("c_1", Class::Refused, n), Ok(()), "{n}");
+        }
+        assert!(rates.take("c_1", Class::Refused, 20).is_err());
     }
 
     #[test]

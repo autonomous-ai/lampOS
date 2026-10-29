@@ -17,6 +17,8 @@ export const SUMMARISED = new Set(['text', 'data']);
 // an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
 // phrase, events' fields, and a refusal's `why`.
 export const SHOWN = new Set([
+  // A dev lamp's `--rates off`, said in hello's limits.
+  'rates',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',
