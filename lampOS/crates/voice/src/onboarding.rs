@@ -4062,6 +4062,57 @@ mod tests {
         assert_eq!(read.steps["where_you_sit"].outcome, Outcome::Done);
     }
 
+    /// A file as the 7071 image (`aa9ec9e27a`, 26 Oct) keeps it, the build
+    /// the first customer lamps left on: every field it writes, each try's
+    /// score a bare number, and no `owner`, `later` or `tried`. Their first
+    /// update jumps straight to this build, so it loads, and a walk it
+    /// finished stays finished (#3689).
+    #[test]
+    fn a_file_the_7071_image_kept_loads_and_its_walk_stays_finished() {
+        let on_disk = r#"{"steps":{
+            "where_you_sit":{"outcome":"done","at_unix_s":1761450000,"framing":{"size":0.2,"x":0.05,"y":-0.1}},
+            "who_you_are":{"outcome":"done","at_unix_s":1761450010},
+            "how_you_sound":{"outcome":"done","at_unix_s":1761450020},
+            "touch":{"outcome":"failed","at_unix_s":1761450030},
+            "privacy":{"outcome":"done","at_unix_s":1761450040},
+            "giving_way":{"outcome":"done","at_unix_s":1761450050},
+            "room_sounds":{"outcome":"not_available","at_unix_s":1761450060,"offered_at_unix_s":1761450070},
+            "face_expressions":{"outcome":"skipped","at_unix_s":1761450080},
+            "preferences":{"outcome":"done","at_unix_s":1761450090}
+            },
+            "privacy_done_attempt":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],
+            "privacy_invitation_tries":1,"privacy_discard_pending":false,
+            "near_call_prompts":3,
+            "near_call_tries":[{"rise_db":22.4,"score":0.98},{"rise_db":25.0,"score":0.97},{"rise_db":23.1,"score":1.0}],
+            "sentence_prompts":1,"giving_way_tries":1}"#;
+        let read: Progress = serde_json::from_str(on_disk).unwrap();
+        assert!(read.check().is_ok());
+        assert_eq!(read.steps.len(), Step::IDS.len());
+        assert_eq!(read.privacy_done_attempt, BootId::new([7; 16]).ok());
+        assert!(
+            read.near_call_tries
+                .iter()
+                .all(|done| done.heard_surely() && done.heard_by == lamp_near_call::HeardBy::Name)
+        );
+        assert_eq!(read.owner, None);
+        assert!(read.steps.values().all(|kept| kept.later_offers == 0));
+        assert!(read.tried.is_empty());
+        // The updated voice's first start: nothing asked, nothing moved, and
+        // every step's outcome as the old voice left it.
+        let file = file("from-7071");
+        std::fs::write(&file, on_disk).unwrap();
+        let mut room = Room {
+            walk: Onboarding::at(file),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.walk.take_gesture(), None);
+        assert_eq!(room.walk.kept().steps, read.steps);
+    }
+
     fn file(name: &str) -> PathBuf {
         let directory = std::env::temp_dir().join(format!(
             "onboarding-{name}-{}-{:?}",
