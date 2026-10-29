@@ -13709,7 +13709,8 @@ fn lamps_voice_heard(reply: Option<&Reply>) -> bool {
 /// not in `prefix`, or for a start that was not an ordinary one (a yield's
 /// reach back, or one as the lamp's sound ended), whose lead is not a soft
 /// start's; never more than [`crate::activity::SOFT_START_LEAD_BLOCKS`]
-/// blocks' worth.
+/// blocks' worth. Read times bunch after a stall, so it is never more than
+/// its blocks hold either, 10 ms each (Reviewer-three's P3 on #4286).
 fn soft_lead_us(prefix: &[ObservedAudio], trigger_sequence: u64, began_ordinarily: bool) -> u64 {
     if !began_ordinarily {
         return 0;
@@ -13723,6 +13724,7 @@ fn soft_lead_us(prefix: &[ObservedAudio], trigger_sequence: u64, began_ordinaril
     prefix[at]
         .captured_at_us
         .saturating_sub(prefix[from].captured_at_us)
+        .min((at - from) as u64 * BLOCK_US)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -15115,6 +15117,33 @@ fn handle_playback_gap(
 
 #[cfg(test)]
 mod tests {
+    /// The soft start's lead is read from when its blocks were read, held
+    /// to what they hold: 30 blocks read 10 ms apart are 300 ms, and the
+    /// same blocks read late after a stall, bunched at the end, are still
+    /// no more (Reviewer-three's P3 on #4286).
+    #[test]
+    fn the_soft_lead_is_never_more_than_its_blocks_hold() {
+        use crate::activity::{PRE_ROLL_BLOCKS, SOFT_START_LEAD_BLOCKS};
+        let blocks = |read_at: &dyn Fn(u64) -> u64| {
+            (1..=(SOFT_START_LEAD_BLOCKS + PRE_ROLL_BLOCKS) as u64)
+                .map(|sequence| ObservedAudio {
+                    sequence,
+                    captured_at_us: read_at(sequence),
+                    samples: [0; 160],
+                })
+                .collect::<Vec<_>>()
+        };
+        let trigger = (SOFT_START_LEAD_BLOCKS + PRE_ROLL_BLOCKS) as u64;
+        let even = blocks(&|sequence| 1_000_000 + sequence * BLOCK_US);
+        assert_eq!(soft_lead_us(&even, trigger, true), 300_000);
+        assert_eq!(soft_lead_us(&even, trigger, false), 0, "not ordinary");
+        // The first block read, then a 400 ms stall before the others.
+        let stalled = blocks(&|sequence| {
+            1_000_000 + sequence * BLOCK_US + if sequence > 1 { 400_000 } else { 0 }
+        });
+        assert_eq!(soft_lead_us(&stalled, trigger, true), 300_000);
+    }
+
     /// #2231 (the reviewer-lead on #2459): a refused key waits only the
     /// second time in a row; a quota or a rate limit at once; any other end
     /// clears the stamp.
