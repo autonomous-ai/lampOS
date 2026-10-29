@@ -1,3 +1,21 @@
+## 2026-10-29 22:5x ICT — #4399 and #4402 landed (#4384's P3s); trains 366–373 checked; 30 GiB freed
+
+**#4399** (train 372): preferences counts an hour word ("two" to "twelve") as the quiet hours only beside a time cue. So "Which two questions?", "Can you repeat the two choices?" and "What, ten?" owe no hello, and "Quiet from ten until I wake up again." still does. The probe lines of all three reads of #4384 are tests. READ-OKs from Reviewer-three and Seventh.
+
+**#4402** (train 373): Seventh's three P3s on #4399.
+- `CUE_AFTER` is only "o'clock", "am", "pm" and "thirty", so "Which two to pick?", "What, two and three?" and "the two in the middle" owe nothing, and "Ten to six." counts by "to six".
+- "Ten again." and "Hi, ten please." are pinned as no answer.
+- The doc gets "til".
+- Red with #4399's list. READ-OKs from Reviewer-three and Seventh.
+
+**#4395** (train 370): the no-place time note test.
+
+**After-merge, lamp-voice `d5efaa9a7`:** `second_provider` 870/0, `local_time` 12/0, `onboarding` 217/0, `known_faces` 29/0, `person` 13/0 (Mac).
+
+**Disk:** the office Mac fell to 6.1 GiB free. My cargo target held earlier heads' `lamp_*` builds. Removing those older than 21:00 freed 30 GiB (43 GiB free), and the target is now 9 GiB.
+
+No device action. lamp-0c89 (#2836) still waits for access.
+
 ## 2026-10-29 20:5x ICT — #4379 and #4380 landed; #4384 HOLD and lift; #4395; update reads
 
 **Landed in train 366:**
