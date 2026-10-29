@@ -1873,13 +1873,21 @@ pub fn names_known(socket: &Path) -> Option<Vec<String>> {
 /// How long [`names_known`] waits for the eyes: a reply's context waits on it.
 pub const LIST_WITHIN: Duration = Duration::from_millis(250);
 
-/// Whether the eyes still know `owner` ([`names_known`]): asked at each
-/// reply, so a forgotten face is never named (the Reviewer-lead's P3 on
-/// #4290). No socket, or the eyes not answering, is no.
+/// Whether the eyes still know `owner` ([`names_known`]), by their own
+/// rule for one name (any case): so a forgotten face is never named (the
+/// Reviewer-lead's P3 on #4290). No socket, or the eyes not answering, is
+/// no.
 pub fn still_known(socket: Option<&Path>, owner: &str) -> bool {
     socket
         .and_then(names_known)
-        .is_some_and(|names| names.iter().any(|name| name == owner))
+        .is_some_and(|names| among(&names, owner))
+}
+
+/// Whether `owner` is one of the eyes' `names`, as the eyes match a name.
+fn among(names: &[String], owner: &str) -> bool {
+    names
+        .iter()
+        .any(|name| name.to_lowercase() == owner.to_lowercase())
 }
 
 /// How often [`keep_owner_fresh`] reads the owner mark and asks the eyes:
@@ -1924,15 +1932,30 @@ pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
 }
 
 /// One refresh of [`owner_now`]: dropped if a forget came while the eyes
-/// were asked.
+/// were asked. An owner the eyes answer they no longer know loses the mark
+/// for good, however they were forgotten (the app's face removal too), so
+/// a face saved later under that name is never taken for the owner (the
+/// Reviewer-lead's and Reviewer-two's P2 on #4290). The eyes' ids can't
+/// tell them apart: a name forgotten gets the same id back.
+// ponytail: a forget and a save of the same name within one OWNER_EVERY
+// keeps the mark; the eyes would need to say when a face was added.
 fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
     let forgets = OWNER_NOW
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .1;
-    let found = file
-        .and_then(crate::onboarding::owner_of)
-        .filter(|name| still_known(socket, name));
+    let owner = file.and_then(crate::onboarding::owner_of);
+    let names = owner.as_ref().and(socket).and_then(names_known);
+    let found = match (owner, names) {
+        (Some(owner), Some(names)) if among(&names, &owner) => Some(owner),
+        (Some(_), Some(_)) => {
+            if let Some(file) = file {
+                crate::onboarding::face_forgotten(file);
+            }
+            None
+        }
+        _ => None,
+    };
     let mut now = OWNER_NOW
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -2812,6 +2835,29 @@ mod tests {
         // Forgotten: named no more at once, not at the next refresh.
         owner_forgotten();
         assert_eq!(owner_now(), None);
+    }
+
+    /// The Reviewer-lead's and Reviewer-two's P2 on #4290: an owner the
+    /// eyes no longer know, removed in the app too, loses the mark for good;
+    /// the eyes not answering keeps it; a name in another case is theirs.
+    #[test]
+    fn an_owner_the_eyes_no_longer_know_loses_the_mark_however_forgotten() {
+        let (socket, _asked) = eyes(vec![
+            serde_json::json!({"people": ["example name"]}),
+            serde_json::json!({"people": ["Robin"]}),
+        ]);
+        let file = socket.with_file_name("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
+        let mailbox = crate::onboarding::mailbox_of(&file);
+        let told = || std::fs::read_to_string(&mailbox).unwrap_or_default();
+        refresh_owner(Some(&file), Some(&socket));
+        assert_eq!(told(), "");
+        refresh_owner(Some(&file), Some(&socket));
+        assert_eq!(told(), "{\"face_forgotten\":true}\n");
+        // No eyes to ask: nothing is told.
+        std::fs::remove_file(&mailbox).unwrap();
+        refresh_owner(Some(&file), Some(&socket.with_file_name("none.sock")));
+        assert_eq!(told(), "");
     }
 
     /// The eyes stand-in on a real socket: what each request sent, and the
