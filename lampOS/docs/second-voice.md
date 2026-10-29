@@ -2907,7 +2907,8 @@ after a take-over, but now for every turn:
   ends the carry and a privacy change drops the caller's faces, a later
   held line's reset (two colleague lines, the caller turned away, a voice
   known late as another's, the window over) stands, and another answer's
-  words count in the restored carry window too. Not undone:
+  words, a colleague's line held with the carry standing and a carried
+  line's end count in the restored carry window too. Not undone:
   the room's count of talk past the lamp, which the call reset
   (`RoomTold::called`), and the held colleagues of the carry. Journal:
   `declined by the model: no conversation going on from it
@@ -2920,7 +2921,8 @@ after a take-over, but now for every turn:
   not bring back a carry stopped after its let out`, `a decline does not
   bring back the callers faces after a privacy change`, `a held lines reset
   after a let out stays after its decline` and `another answer while
-  carrying is kept in the restored carry window` (worker).
+  carrying is kept in the restored carry window` and `a colleagues line
+  held after a let out stays in the restored carry window` (worker).
 - **Said by name, or perhaps not for the lamp** (`worker::call_note`,
   `Engine::noting_whether_called`). Each spoken line gets one note beside
   its words. A line whose words or the lamp's name heard in its sound
