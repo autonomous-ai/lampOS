@@ -76,8 +76,19 @@ fn words_of(cell: &str) -> String {
     if sentence.chars().count() <= MOST_WORDS {
         return format!("{sentence}.");
     }
+    // At the last whole word, and before a code span the cut would leave
+    // open (Third's P3 on #4400).
     let cut: String = sentence.chars().take(MOST_WORDS).collect();
-    format!("{}…", cut.trim_end())
+    let mut cut = cut
+        .rsplit_once(' ')
+        .map_or(cut.as_str(), |(whole, _)| whole);
+    if cut.matches('`').count() % 2 == 1
+        && let Some((before, _)) = cut.rsplit_once('`')
+    {
+        cut = before;
+    }
+    let cut = cut.trim_end_matches(|c: char| c.is_whitespace() || c == ',' || c == '(' || c == ';');
+    format!("{cut}…")
 }
 
 /// What the product units and settings turn on: each `NAME=value` of an
