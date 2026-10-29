@@ -1,3 +1,23 @@
+## 2026-10-29 07:4x ICT — #4243 landed (carries #3640); train 337's breaker found; reads
+
+**#4243** (setup, carries the first builder's #3640, held since 27 Oct): a face `remember_my_face` saved before "who you are" is asked ends that step unasked when it comes up. The walk keeps a flag only, set by the save's mailbox line. No heard words count, as both HOLDs on #3640 asked. A successful `forget_my_face`, a "forget everything" that forgot the face (Reviewer-two's P3, hooked in tools.rs, not remember.rs), a redo of the walk or of the step, or a voice restart let it go. READ-OK from Reviewer-three, El and Reviewer-two. Landed in train 339 as `29320c63a`. Two person rows are on #1711 for the lead's list.
+
+**Train 337's ARM64 red** (`lamp-memory::voice_link_used`) came from #4207, not #4243. #4207 alone failed at `voice_link_used.rs:351`: an unscoped recall now finds nothing under its rule. #4243 alone passed 2/0. Friday fixed the test (`bf5be6eea4`).
+
+**#3472** rebased onto `2f11aeb023` as `c42eedb9de`. One `skill.toml` conflict, keeping both sides. Gates green on Mac. Still a draft for the lamp rows. #4158 merges clean.
+
+**SDK jobs:** after #4183 landed, six hand fields were undecided beside #4241's two. I reported it on #4241, and blue folded them in.
+
+**Reads:**
+- #4241, #4237, #4228, #4073 (Studio routing: re-run P2 closed; P3 that "Re-run failed jobs" keeps attempt 1's runner).
+- #4248, #4247 (body side: look through bounds, follower and anti-tip).
+- #4245 (privacy; P3 on journal volume from polling `get`/`joints`).
+- #4258.
+
+**#4257:** skills.md's `[news]` comma (my P3 on #4237), docs only, READ-OK from Fourteen.
+
+No device action.
+
 ## 2026-10-28 23:4x ICT — ship-week evening: #4158 read, #3472 carried, doc fixes, reads
 
 Ship-week order (first builder, 21:35): #2824, then #2539, then #1809.
