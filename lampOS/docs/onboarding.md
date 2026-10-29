@@ -345,11 +345,13 @@ other shipped re-offer matches its former invitation.
 
 With `LAMP_SECOND_REFUSED_HOLD=on`, while the model service refuses the
 lamp's turns (failure-notices.md, "The model service refusing"), the walk
-begins nothing and the step being led is not failed: it waits, unfinished.
-A step that would end `failed` or `not_available` meanwhile is kept as
-`later` instead, and one journal line says so. The first answered turn ends
-the refusal and the walk goes on, asking the step it was on again. Off
-unless set.
+begins nothing while turns are held and the step being led is not failed.
+Once a minute the hold lifts and the walk goes on by itself: its own
+re-offer is the try, so the person is never left in silence and setup
+resumes when the service answers, nobody having to speak first. A step that
+would end `failed` or `not_available` meanwhile is kept as `later` instead,
+with one journal line; a `later` re-offer cut that way gets its count back,
+and is offered again by the `later` rules above. Off unless set.
 
 ## Why a step is not_available
 
