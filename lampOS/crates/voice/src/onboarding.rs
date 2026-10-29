@@ -566,6 +566,9 @@ struct Led {
     touched: bool,
     /// Asked again after its conversation ended unanswered ([`MOST_UNSAID`]).
     asked_again: u8,
+    /// A `later` re-offer: the step's count before this offer was counted,
+    /// given back if the offer is dropped with nothing tried ([`Onboarding::drop_led`]).
+    counted_from: Option<u8>,
 }
 
 /// "Who you are"'s fallback: the name heard, asked back once.
@@ -1716,7 +1719,7 @@ impl Onboarding {
             self.owed = Some(match outcome {
                 Outcome::Done if camera => self.definition.words.privacy_done_camera.clone(),
                 Outcome::Done => self.definition.words.privacy_done.clone(),
-                Outcome::Later => self.definition.later_line(),
+                Outcome::Later => self.later_line(Step::Privacy),
                 _ => self.definition.words.privacy_failed.clone(),
             });
             self.erase_on_commit = true;
@@ -2234,7 +2237,7 @@ impl Onboarding {
             // The keeper's pause stops the walk; a step being led is asked
             // again afterwards.
             self.nudge_record(false, now_us);
-            if self.led.take().is_some_and(|led| led.asked_us.is_some()) {
+            if self.drop_led().is_some_and(|led| led.asked_us.is_some()) {
                 self.records
                     .push(json!({"kind":"onboarding_stopped","why":"paused","at_us":now_us}));
             }
@@ -2303,9 +2306,10 @@ impl Onboarding {
             if later && !(can_speak && face.is_some() && quiet_us >= START_QUIET_US) {
                 return None;
             }
-            self.begin_later_offer(step);
+            let counted_from = self.begin_later_offer(step);
             self.led = Some(Led {
                 step,
+                counted_from,
                 ..Led::default()
             });
             if later && let Some(line) = self.definition.later_reoffer(step) {
@@ -2319,7 +2323,7 @@ impl Onboarding {
                 .is_some_and(|seen| now_us.saturating_sub(seen) >= GONE_US)
             {
                 self.invalidate_privacy(privacy::Invalidation::FenceFailure);
-                self.led = None;
+                self.drop_led();
                 return None;
             }
             // A receipt that never turns open and fresh (faulted, stale, or a
@@ -2390,7 +2394,7 @@ impl Onboarding {
         };
         if gone {
             self.nudge_record(false, now_us);
-            self.led = None;
+            self.drop_led();
             self.records.push(
                 json!({"kind":"onboarding_stopped","why":"nobody_there","step":step.name(),"at_us":now_us}),
             );
@@ -2405,7 +2409,7 @@ impl Onboarding {
             } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
                 // No touch felt is no attempt: later, not failed (#3996).
                 self.finish(step, Outcome::Later, None, now_us);
-                self.owed = Some(self.definition.later_line());
+                self.owed = Some(self.later_line(step));
             } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
                 led.guided_us = Some(now_us);
                 self.records
@@ -2481,7 +2485,7 @@ impl Onboarding {
                 } else {
                     // Nothing heard in any ask: later, said so (#3996).
                     self.finish(step, Outcome::Later, None, now_us);
-                    self.owed = Some(self.definition.later_line());
+                    self.owed = Some(self.later_line(step));
                 }
                 return None;
             }
@@ -2661,9 +2665,12 @@ impl Onboarding {
                             kept.outcome == Outcome::Later
                                 && kept.later_offers < MOST_LATER_OFFERS
                                 && match kept.offered_at_unix_s.filter(|_| kept.later_offers > 0) {
+                                    // An offer given back ([`Self::drop_led`])
+                                    // waits from when it was dropped.
                                     None => {
-                                        unix_s.saturating_sub(ended)
-                                            >= self.definition.later_after_s
+                                        unix_s.saturating_sub(
+                                            ended.max(kept.offered_at_unix_s.unwrap_or(0)),
+                                        ) >= self.definition.later_after_s
                                     }
                                     Some(at) => {
                                         unix_s.saturating_sub(at) >= self.definition.reoffer_after_s
@@ -2705,18 +2712,18 @@ impl Onboarding {
 
     /// A `later` step led again: counted as one of its re-offers, and its
     /// own tries given back, so the person has the step's whole chance.
-    fn begin_later_offer(&mut self, step: Step) {
-        let Some(kept) = self.desired.steps.get_mut(step.name()) else {
-            return;
-        };
+    /// Returns the count before this offer, when it counted one.
+    fn begin_later_offer(&mut self, step: Step) -> Option<u8> {
+        let kept = self.desired.steps.get_mut(step.name())?;
         // A `later` step, or one that came from `later` and whose offer was
         // left unsaid: each such offer counts toward the cap (the first
         // builder's P2 on #4012).
         if kept.outcome != Outcome::Later
             && !(kept.outcome == Outcome::NotAvailable && kept.later_offers > 0)
         {
-            return;
+            return None;
         }
+        let counted_from = kept.later_offers;
         kept.later_offers = kept.later_offers.saturating_add(1);
         kept.offered_at_unix_s = Some(unix_ms() / 1_000);
         match step {
@@ -2741,6 +2748,40 @@ impl Onboarding {
             _ => {}
         }
         self.save();
+        Some(counted_from)
+    }
+
+    /// The step being led, dropped by the keeper's pause or by nobody
+    /// there. A `later` re-offer with nothing tried in it is given back:
+    /// its count as before, so the cap is not spent on an offer nobody had,
+    /// and its date kept, so it comes back at its usual spacing from now,
+    /// never at once (Seventh's P3 4 on #4192).
+    fn drop_led(&mut self) -> Option<Led> {
+        let led = self.led.take()?;
+        if let Some(count) = led.counted_from
+            && !self.was_tried(led.step)
+            && let Some(kept) = self.desired.steps.get_mut(led.step.name())
+        {
+            kept.later_offers = count;
+            self.save();
+        }
+        Some(led)
+    }
+
+    /// The line a step that ends `later` says: the skill's `later`, or, on
+    /// its last re-offer, when it is never offered again, that the setup
+    /// can be redone (#3996's later re-offers).
+    pub(super) fn later_line(&self, step: Step) -> String {
+        if self
+            .desired
+            .steps
+            .get(step.name())
+            .is_some_and(|kept| kept.later_offers >= MOST_LATER_OFFERS)
+        {
+            skill::LAST_LATER.to_owned()
+        } else {
+            self.definition.later_line()
+        }
     }
 
     /// The move to ask of the body for a step just done, once.
@@ -5998,10 +6039,47 @@ mod tests {
         back_date(&mut room, 86_401);
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [named, again]);
         assert_eq!(room.walk.desired.steps["touch"].later_offers, 2);
-        assert_eq!(room.wait(61 * S, Some(NEAR_MIDDLE)), [TOUCH_REMIND, later]);
+        // The last offer's end promises no later: the setup can be redone.
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, crate::onboarding::skill::LAST_LATER]
+        );
         back_date(&mut room, 2 * 86_401);
         assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Later));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Seventh's P3 4 on #4192: a `later` re-offer dropped by the keeper's
+    /// pause or by nobody there, with nothing tried, is given back: not
+    /// counted, and offered again at its usual spacing from the drop.
+    #[test]
+    fn a_later_offer_dropped_by_the_pause_or_nobody_there_is_given_back() {
+        let later = crate::onboarding::skill::LATER;
+        let (mut room, _says, root) = at_touch("later-back");
+        assert_eq!(
+            room.wait(61 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_REMIND, later, PREFERENCES_NOTE]
+        );
+        report(&room.walk, "preferences", "done");
+        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        back_date(&mut room, 1_801);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)).len(), 2);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        // The keeper's pause mid-offer: given back.
+        room.walk
+            .tick(room.at, 0, true, true, Some(NEAR_MIDDLE), room.still);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 0);
+        // Not at once: `later_after_s` from the drop.
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        back_date(&mut room, 1_801);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)).len(), 2);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 1);
+        // Nobody there mid-offer: given back too, the step still `later`.
+        room.wait(31 * S, None);
+        assert_eq!(room.walk.desired.steps["touch"].later_offers, 0);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Later));
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
         std::fs::remove_dir_all(root).unwrap();
     }
 
