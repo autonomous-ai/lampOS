@@ -6342,6 +6342,22 @@ fn conversation_with_gate_inner(
     // points at the lamp's own voice (#2602, `LAMP_CUT_IN_COUNTS_REAL=on`).
     // Off unless set.
     let counts_real = duplex && crate::turn_taking::cut_in_counts_real();
+    // Talk in the clear in a yield commits only when near the level of the
+    // person being answered (#3967, `LAMP_CUT_IN_NEAR_ASKER=on`): the room
+    // behind them resumes the answer. Off unless set; needs the asker's
+    // level, which `LAMP_ASKER_FIRST` (`record` or `on`) measures.
+    let near_asker = duplex && crate::turn_taking::cut_in_near_asker();
+    if near_asker {
+        eprintln!(
+            "lamp-voice: cut-ins near the asker: talk in a yield more than {:.0} dB under the person being answered is the room's and resumes the answer{}",
+            crate::turn_taking::NEAR_ASKER_DB,
+            if rig.asker_first.applies() {
+                ""
+            } else {
+                "; LAMP_ASKER_FIRST is off, so no asker's level is known and nothing changes"
+            }
+        );
+    }
     detector.keep_first_words(first_words);
     // A line that begins softly keeps its first word (`LAMP_SOFT_START=on`):
     // an ordinary start, the lamp silent, may begin at it. Off unless set;
@@ -6546,6 +6562,9 @@ fn conversation_with_gate_inner(
         }
         if counts_real {
             mask.count_real_cut_ins();
+        }
+        if near_asker {
+            mask.cut_in_near_asker();
         }
         if backchannel_holds {
             mask.hold_backchannels();
@@ -8541,6 +8560,14 @@ fn conversation_with_gate_inner(
                         )
                     }),
             );
+            // The level of the person this reply answers, for cut-ins near
+            // them (#3967): `asker_first`'s, of this reply's own turn only.
+            playback_mask.asker_level_db(asker_first.as_ref().and_then(|rule| {
+                reply
+                    .as_ref()
+                    .and_then(|current| rule.level_of(current.owner.turn()))
+                    .map(crate::asker_first::level_db)
+            }));
             let (heard, yielded) = hear_capture_block(
                 &mut playback_mask,
                 reply,
@@ -12376,6 +12403,12 @@ fn hear_capture_block(
     "reply_queued_frames":reply.as_ref().map(|current| current.pcm.len()),
     "hearing_margin_db":mask.hearing_margin_db(),
     "boundary":"coordinator hearing decision; not acoustic onset or stopped output"});
+    // A yield whose talk was the room's behind the asker (#3967).
+    if listened.step == DuplexStep::Resume
+        && let Some(under) = mask.under_asker_db()
+    {
+        event["under_asker_db"] = json!(under);
+    }
     if listened.step != DuplexStep::Yield {
         // #2939: how long the commit was held for the yield's words, and
         // whether they were a backchannel (null: none came).

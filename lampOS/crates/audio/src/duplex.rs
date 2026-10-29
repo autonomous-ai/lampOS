@@ -280,6 +280,9 @@ pub struct Interruption {
     /// Blocks the commit of the yield in force, or the last one, was held
     /// for its words.
     held: u16,
+    /// The speech in the clear of the yield in force is talk well under the
+    /// person the lamp is answering ([`Self::quiet_talk`], #3967).
+    quiet_talk: bool,
 }
 
 /// How long a yield's commit is held for its words once they have been
@@ -315,6 +318,7 @@ impl Interruption {
             speech_at_words: 0,
             speech_at_ask: None,
             held: 0,
+            quiet_talk: false,
         }
     }
 
@@ -414,6 +418,16 @@ impl Interruption {
         }
     }
 
+    /// `LAMP_CUT_IN_NEAR_ASKER=on` (#3967): the speech heard in the clear in
+    /// the yield in force is talk well under the person the lamp is
+    /// answering, the room behind them: it commits nothing, and the yield
+    /// resumes on stillness or at its deadline as one that came to nothing.
+    /// A stop word and a forced yield still commit. Set before each block;
+    /// a new yield starts without it.
+    pub fn quiet_talk(&mut self, quiet: bool) {
+        self.quiet_talk = quiet && self.yielded();
+    }
+
     /// Blocks of stillness in a row in the yield in force, while one is.
     pub fn still_blocks(&self) -> Option<u8> {
         match self.state {
@@ -474,6 +488,7 @@ impl Interruption {
                 };
                 self.yields += 1;
                 self.forced_yield = forced;
+                self.quiet_talk = false;
                 self.backchannel = None;
                 self.speech_at_words = 0;
                 self.speech_at_ask = None;
@@ -507,13 +522,17 @@ impl Interruption {
                 // first word came as "yeah" over the lamp and whose second,
                 // 250 ms in the clear, was held as that backchannel).
                 let after_words = speech.saturating_sub(self.speech_at_words);
+                // Talk well under the asker commits nothing (#3967): the
+                // room behind them, not someone cutting in.
+                let room_behind = self.quiet_talk && !self.forced_yield;
                 let due = self.stop_heard
-                    || if self.holds_backchannels && self.backchannel == Some(true) {
-                        sentence || after_words >= self.rule.speech_blocks.max(1)
-                    } else {
-                        *speech >= self.rule.speech_blocks.max(1)
-                            || (quiet && *seen >= self.rule.plain_blocks.max(1))
-                    };
+                    || (!room_behind
+                        && if self.holds_backchannels && self.backchannel == Some(true) {
+                            sentence || after_words >= self.rule.speech_blocks.max(1)
+                        } else {
+                            *speech >= self.rule.speech_blocks.max(1)
+                                || (quiet && *seen >= self.rule.plain_blocks.max(1))
+                        });
                 // Awaiting words that may yet be a backchannel: a due
                 // commit waits for them, and one whose words never come
                 // resumes the reply rather than end it (lamp-52e6 on #3200:
@@ -852,6 +871,45 @@ mod tests {
         assert_eq!(steps, [(39 + ONSET, Step::Yield), (84, Step::Commit)]);
         assert!(!interruption.yielded());
         assert_eq!(interruption.counts(), (1, 1, 0));
+    }
+
+    /// #3967 (`LAMP_CUT_IN_NEAR_ASKER`): talk in the clear well under the
+    /// person being answered, the room behind them, commits nothing; the
+    /// yield resumes at its deadline as one that came to nothing. A stop
+    /// word still commits it, and a new yield starts without the mark.
+    #[test]
+    fn talk_well_under_the_asker_resumes_the_reply_and_a_stop_word_still_ends_it() {
+        let yielded = |interruption: &mut Interruption| {
+            let steps = run(
+                interruption,
+                &[(Heard::Own, 40), (Heard::Over, 16), (Heard::Unknown, 23)],
+            );
+            assert_eq!(steps, [(39 + ONSET, Step::Yield)]);
+        };
+        let mut room = Interruption::new(Confirmation::EVALUATED);
+        yielded(&mut room);
+        let mut steps = Vec::new();
+        for index in 0..100 {
+            room.quiet_talk(true);
+            match room.block(Heard::Clear, true) {
+                Step::Carry => {}
+                step => steps.push((index, step)),
+            }
+        }
+        // The yield's deadline, 110 blocks from it, resumes it.
+        let before = 16 - ONSET + 23;
+        assert_eq!(steps, [(110 - before - 1, Step::Resume)]);
+        assert_eq!(room.counts(), (1, 0, 1));
+        // A stop word still ends the reply.
+        let mut stop = Interruption::new(Confirmation::EVALUATED);
+        yielded(&mut stop);
+        stop.quiet_talk(true);
+        stop.words(true, false);
+        assert_eq!(run(&mut stop, &[(Heard::Clear, 1)]), [(0, Step::Commit)]);
+        // The mark is for the yield in force only.
+        room.quiet_talk(true);
+        yielded(&mut room);
+        assert_eq!(run(&mut room, &[(Heard::Clear, 6)]), [(5, Step::Commit)]);
     }
 
     /// #828, step 2: a yield that waits for the words said in it. A short
