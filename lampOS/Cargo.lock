@@ -2096,6 +2096,7 @@ dependencies = [
 name = "lamp-name"
 version = "0.1.0"
 dependencies = [
+ "lamp-body",
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
