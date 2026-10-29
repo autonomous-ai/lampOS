@@ -11,6 +11,13 @@ cat > "$T/ssh" <<'EOF'
 a="$*"; [ "$1" = -n ] || in=$(cat); a="$a ${in:-}"
 f=${FAIL:-}
 case $a in
+  *"loans.txt"*) echo "$a" >> "$STUBLOG" ;;
+  *"lampos-update/state.json"*) echo '"build":{"sequence":8652,"commit":"f756b8678"}' ;;
+  *"systemctl cat lamp-policy"*) echo 'ExecStart=/opt/lampOS/policy/current/lamp-policy --key-file %d/jev.key --log-dir /var/lib/lampos-policy' ;;
+  *"tee /run/systemd"*) [ "$f" = sudo ] && exit 1; echo "DROPIN ${in:-}" >> "$STUBLOG" ;;
+  *"rm -f /run/systemd"*) echo "DROPIN-REMOVED" >> "$STUBLOG" ;;
+  *"is-active lamp-policy && sudo"*) echo active; echo "/opt/lamp-policy --key-file /k --hello --progress" ;;
+  *"is-active lamp-policy"*) echo active ;;
   *"bash -s -- status"*) [ "$f" = lock ] && h=someone-else || h=jev-verifier
     printf 'holder: %s\nsession: s1\nmachine: mac\n' "$h"; exit 10 ;;
   *"date +%s%3N"*) echo 1761700000123 ;;
@@ -21,8 +28,8 @@ case $a in
   *"/cmdline"*) [ "$f" = act ] && echo "/opt/lamp-policy --shadow --act hello" || echo "/opt/lamp-policy --shadow" ;;
   *"ls -l /var/lib/lampos-policy"*) echo "-rw-r----- 1 lamp lamp 812 Oct 29 06:00 decisions-2026-10-29.jsonl"; echo READABLE ;;
   *"for b in lamp-bus"*) [ "$f" = bus ] && exit 1; echo lamp-bus ;;
-  *"latest room/state"*) # busy right after the colleagues' talk (the last clip played is t02)
-    [ "$f" != roomnotbusy ] && tail -1 "$DRY_PLAYLOG" 2>/dev/null | grep -q t02 && echo '"busy"' || echo '"quiet"' ;;
+  *"latest room/state"*) # busy while the colleagues' talk is among the last 3 clips played
+    [ "$f" != roomnotbusy ] && tail -3 "$DRY_PLAYLOG" 2>/dev/null | grep -q t02 && echo '"busy"' || echo '"quiet"' ;;
   *"heard [1-9]"*) echo 0 ;;
   *"a face in"*) case $f in face) echo 2 ;; noeyes) ;; *) echo 0 ;; esac ;;
   *"sget Speaker"*) echo "  Front Left: Playback 26 [52%] [on]" ;;
@@ -51,15 +58,31 @@ for c in clips lock units "no /run drop-in" "not muted" shadow "policy log" room
   want "check $c" "^ok .*$c" "$o"; done
 grep -qE 'sset Speaker 26( |$)' "$T/stub.log" || { echo "FAIL Speaker not put back"; fails=$((fails+1)); }
 
-o=$(export FAIL=; PASSES=1 r run "$T/r"); want run-ok 'pulled: 37 lines played' "$o"
-[ "$(head -1 "$T/r/plays.tsv")" = "$(printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol')" ] || { echo "FAIL plays.tsv header"; fails=$((fails+1)); }
-[ "$(awk -F'\t' 'NR>1 && $1==1 && $5=="played" && $6==45' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 37 ] || { echo "FAIL plays.tsv rows"; fails=$((fails+1)); }
+grep -q 'DROPIN \[Service\]' "$T/stub.log" && grep -q 'DROPIN-REMOVED' "$T/stub.log" || { echo "FAIL policy drop-in not put in and removed"; fails=$((fails+1)); }
+want policy-extra '^ok lamp-policy restarted in shadow with --hello --progress' "$o"
+grep -q 'preflight only, no labelled line played' "$T/stub.log" || { echo "FAIL preflight loans line"; fails=$((fails+1)); }
+
+: > "$T/stub.log"; o=$(export FAIL=; PASSES=1 r run "$T/r"); want run-ok 'pulled: 42 lines played' "$o"
+grep -q 'done (42 lines played)' "$T/stub.log" || { echo "FAIL run loans done line"; fails=$((fails+1)); }
+[ "$(head -1 "$T/r/plays.tsv")" = "$(printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol\troom_read')" ] || { echo "FAIL plays.tsv header"; fails=$((fails+1)); }
+[ "$(awk -F'\t' 'NR>1 && $1==1 && $5=="played" && $6==45' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 42 ] || { echo "FAIL plays.tsv rows"; fails=$((fails+1)); }
+# Each follow-up right after its parent, and every busy-block line read room/state busy before it.
+for pf in q02:f01 q04:f02 q06:f03 b04:f04 b02:f05; do
+  awk -F'\t' -v p=${pf%:*} -v f=${pf#*:} 'prev == p && $2 == f {ok=1} {prev=$2} END {exit !ok}' "$T/r/plays.tsv" ||
+    { echo "FAIL $pf: the follow-up is not right after its parent"; fails=$((fails+1)); }; done
+[ "$(awk -F'\t' 'NR>1 && ($2 ~ /^b/ || $2 == "f04" || $2 == "f05") && $7 != "busy"' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 0 ] ||
+  { echo "FAIL a busy line's room_read is not busy"; fails=$((fails+1)); }
+o=$(export FAIL=; PASSES=1 DEADLINE=1 r run "$T/dl"); want deadline '^ABORT the deadline has passed already; nothing ran' "$o"
+grep -q 'aborted, nothing ran' "$T/stub.log" || { echo "FAIL deadline abort loans line"; fails=$((fails+1)); }
+o=$(export FAIL=; DRY_MACMUTED=true r preflight "$T/mm"); want mac-muted "^ABORT the Mac's output is muted" "$o"
+o=$(export FAIL=sudo; r preflight "$T/su"); want sudo-noted 'hello/progress NOT MEASURED: the drop-in could not be put in' "$o"; want sudo-goes-on 'preflight done' "$o"
+o=$(export FAIL=; POLICY_EXTRA='--hello --act hello' r preflight "$T/pa"); want extra-act '^ABORT POLICY_EXTRA has --act' "$o"
 o2=$(export FAIL=; PASSES=1 r run "$T/r2"); cmp -s <(cut -f2 "$T/r/plays.tsv") <(cut -f2 "$T/r2/plays.tsv") || { echo "FAIL order not repeatable"; fails=$((fails+1)); }
 o3=$(export FAIL=; PASSES=2 ONLY='^q0[1-4]$' r run "$T/r3")
 [ "$(awk -F'\t' '$1==1{printf "%s ",$2}' "$T/r3/plays.tsv")" != "$(awk -F'\t' '$1==2{printf "%s ",$2}' "$T/r3/plays.tsv")" ] || { echo "FAIL passes share an order"; fails=$((fails+1)); }
 
 o=$(export FAIL=roomnotbusy; PASSES=1 r run "$T/rb"); want busy-abort 'ABORT busy block \(pass 1\)' "$o"
-[ "$(awk -F'\t' 'NR>1' "$T/rb/plays.tsv" | wc -l | tr -d ' ')" = 24 ] || { echo "FAIL busy abort kept quiet results"; fails=$((fails+1)); }
+[ "$(awk -F'\t' 'NR>1' "$T/rb/plays.tsv" | wc -l | tr -d ' ')" = 27 ] || { echo "FAIL busy abort kept quiet results"; fails=$((fails+1)); }
 
 for c in "muted:muted by the restart guard" "act:runs with --act" "face:saw a face" "lock:not held by jev-verifier" \
          "bus:no lamp-bus answers" "dropin:foreign /run drop-in" "noeyes:no report in 15 s" \

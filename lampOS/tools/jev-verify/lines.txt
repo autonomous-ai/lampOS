@@ -1,8 +1,10 @@
-# The labelled set for #4306: id|split|room|class|label|speaker|text
+# The labelled set for #4306: id|split|room|class|label|speaker|text[|after]
 # split: tune (may be looked at when choosing thresholds) or held (never used to tune; scored only).
 # room: quiet (nothing played before the block) or busy (two colleagues talk before and between lines).
 # label: lamp (said to the lamp: it should take the turn) or not (it should stay quiet).
 # speaker: Daniel (the person at the chair), Samantha and Karen (colleagues), TV (a set across the room).
+# after: a follow_up line's parent. It is played right after the lamp's answer to the parent, and only
+# when the lamp answered; it never plays on its own.
 # Every name is made up. No line asks the lamp to change its light, volume, a timer or a memory, so a
 # run leaves nothing to put back.
 #
@@ -45,8 +47,14 @@ b11|held|busy|tv|not|TV|What time is it in Tokyo right now? Our reporter is ther
 q20|tune|quiet|about_lamp|not|Samantha|Look at that lamp, it's so cute when it moves.
 q21|held|quiet|about_lamp|not|Karen|I think the lamp is listening to us all the time.
 q22|held|quiet|about_lamp|not|Daniel|My kids would love a lamp like this one.
-b12|held|busy|about_lamp|not|Samantha|Does the lamp ever answer the wrong person?
+b12|held|busy|about_lamp|not|Samantha|I bought the same lamp for my sister last week.
 # "Ma'am" said to a person
 q23|tune|quiet|maam|not|Daniel|Ma'am, your coffee is ready.
 q24|held|quiet|maam|not|Daniel|Excuse me, ma'am, is this seat taken?
 b13|held|busy|maam|not|Daniel|Ma'am, what time do you close today?
+# a follow-up: the same speaker goes on right after the lamp's answer, without the name
+f01|held|quiet|follow_up|lamp|Daniel|Tell me another one.|q02
+f02|tune|quiet|follow_up|lamp|Daniel|And what about New Year's?|q04
+f03|held|quiet|follow_up|lamp|Samantha|Why is that?|q06
+f04|held|busy|follow_up|lamp|Samantha|Why isn't it Sydney?|b04
+f05|tune|busy|follow_up|lamp|Daniel|And how do you spell separate?|b02

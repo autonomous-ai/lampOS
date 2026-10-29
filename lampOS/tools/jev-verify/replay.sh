@@ -6,13 +6,16 @@
 #   run:       the same, then the passes.
 # Run it only inside your own booked slot, under the lamp lock (the preflight checks the holder):
 #   tools/lamp-lock.sh lamp-52e6 run jev-verifier <session> "jev-verify set" -- tools/jev-verify/replay.sh run OUT
-# The one change it makes on the lamp: its Speaker is set to 50% for the run and put back on exit.
-# The Mac's output volume is put back too. No unit, drop-in, skill or file on the lamp is touched;
-# lamp-policy must already run in shadow (no --act): this kit never turns --act on.
+# The changes it makes on the lamp, each put back on exit: its Speaker is set to 50%, and (POLICY_EXTRA)
+# a /run drop-in restarts lamp-policy with --hello --progress, still shadow. A loans.txt line is written
+# at the start and one at the end. No skill or other file on the lamp is touched; lamp-policy must already
+# run in shadow (no --act): this kit never turns --act on. The Mac's output volume is put back too.
 # Any failed check prints "ABORT <why>; nothing ran" and writes it to OUT/aborted.
 # OUT_DIR holds what the lamp heard in the window: keep it on the Mac, never commit or post it.
-# Env: LAMP (lamp-52e6), MACVOL (45, raised to 60/75 if the wake needs it), PASSES (3), ONLY (an id
-# regex, default all), DRY=1 with DRY_SSH=<stub> (tests: ssh, afplay, osascript and sleep are faked).
+# Env: LAMP (lamp-52e6), MACVOL (45, raised to 60/75 if the wake is held back), PASSES (3), ONLY (an id
+# regex, default all), DEADLINE (epoch s on the Mac: no line or wait starts after it; the run aborts and
+# pulls), POLICY_EXTRA (shadow flags added to lamp-policy for the run, default "--hello --progress"; empty:
+# none), DRY=1 with DRY_SSH=<stub> (tests: ssh, afplay, osascript and sleep are faked).
 set -u
 MODE=${1:-} OUT=${2:-}
 case $MODE in preflight|run) [ -n "$OUT" ] ;; *) false ;; esac || { sed -n 2,6p "$0"; exit 2; }
@@ -21,6 +24,8 @@ mkdir -p "$OUT" && OUT=$(cd "$OUT" && pwd) || exit 1
 git -C "$OUT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && { echo "OUT $OUT is inside a git work tree: put it outside the repo" >&2; exit 2; }
 cd "$(dirname "$0")" || exit 1
 LAMP=${LAMP:-lamp-52e6} MACVOL=${MACVOL:-45} PASSES=${PASSES:-3} ONLY=${ONLY:-.} HOLDER=jev-verifier
+DEADLINE=${DEADLINE:-} POLICY_EXTRA=${POLICY_EXTRA---hello --progress}
+DROPIN=/run/systemd/system/lamp-policy.service.d/jev-verify.conf
 GAP=22   # Jev counts the lamp "in conversation" for 20 s after it last spoke
 L="ssh -n -o BatchMode=yes -o ConnectTimeout=15 orangepi@$LAMP.local"
 LI="ssh -o BatchMode=yes -o ConnectTimeout=15 orangepi@$LAMP.local"   # for scripts on stdin
@@ -29,11 +34,11 @@ if [ -n "${DRY:-}" ]; then
   ssh() { "${DRY_SSH:?DRY=1 needs DRY_SSH, a stub ssh}" "$@"; }
   export LAMP_SSH=$DRY_SSH   # lamp-lock.sh's ssh
   afplay() { echo "[dry] afplay $*"; [ -z "${DRY_PLAYLOG:-}" ] || echo "$*" >> "$DRY_PLAYLOG"; }
-  osascript() { case $* in *"get volume"*) echo 30 ;; *) echo "[dry] osascript $*" >&2 ;; esac; }
+  osascript() { case $* in *"output muted"*) echo "${DRY_MACMUTED:-false}" ;; *"get volume"*) echo 30 ;; *) echo "[dry] osascript $*" >&2 ;; esac; }
   sleep() { :; }
 fi
 rm -f "$OUT/aborted"; : > "$OUT/run.txt"
-PLAYED=0 PULLED= SPK0= MACVOL_WAS= start_s=
+PLAYED=0 PULLED= SPK0= MACVOL_WAS= start_s= LOANED= DROPPED= VD=
 
 note() { echo "$*" | tee -a "$OUT/run.txt"; }
 ok() { note "ok $*"; }
@@ -44,10 +49,15 @@ lamp_ms() { $L 'date +%s%3N'; }
 vol() { osascript -e "set volume output volume $1"; }
 play() { afplay "clips/$1.wav"; }
 talk() { play t01; play t02; }
-ids() { awk -F'|' -v r="$1" '!/^#/ && NF >= 7 && $3 == r {print $1}' lines.txt | grep -E "$ONLY"; }
+# ids ROOM: the block's lines that play on their own (a follow_up plays only after its parent).
+ids() { awk -F'|' -v r="$1" '!/^#/ && NF >= 7 && $3 == r && $4 != "follow_up" {print $1}' lines.txt | grep -E "$ONLY"; }
+follow_ups() { awk -F'|' -v p="$1" '!/^#/ && $4 == "follow_up" && $8 == p {print $1}' lines.txt | grep -E "$ONLY"; }
+due() { [ -n "$DEADLINE" ] && [ "$(date +%s)" -ge "$DEADLINE" ]; }
+loans() { $L "echo \"\$(date '+%F %H:%M') $HOLDER: $*\" >> ~/loans.txt"; }
 # order PASS ROOM: the block's ids in that pass's fixed order (md5 of pass+id), so a run is repeatable.
 order() { local id; for id in $(ids "$2"); do echo "$(md5 -q -s "$1$id") $id"; done | sort | cut -d' ' -f2; }
-wait_until() { local d=$(( $1 - $(date +%s) )); [ "$d" -le 0 ] || sleep "$d"; }
+wait_until() { local t=$1 d; [ -n "$DEADLINE" ] && [ "$DEADLINE" -lt "$t" ] && t=$DEADLINE
+  d=$(( t - $(date +%s) )); [ "$d" -le 0 ] || sleep "$d"; }
 
 # ---- lamp reads, copied from the Mac kits (lib.sh, onb-walk3.sh, row-faces-run2.sh)
 nv() { $L "sudo -n journalctl -u lamp-voice --since @$1 --no-pager -o cat | grep -cE '$V'"; }
@@ -67,6 +77,10 @@ face() { local n; n=$($L "sudo -n journalctl -u lamp-eyes --since -15s --no-page
 standing() { local s; s=$($L "sudo -n journalctl -u lamp-body --since -35s --no-pager -o cat | grep -oE 'stand [0-9.]+' | tail -1")
   note "lamp-body: ${s:-no stand line}"; [ -n "$s" ] && [ "$s" != "stand 0.00" ]; }
 room() { $L "$BUS latest room/state 2>/dev/null" | grep -oE 'quiet|busy|unknown' | head -1; }
+# sig: what the scores belong to: units and their MainPIDs, lamp-policy's cmdline, the build, the mute.
+# Taken after the preflight; any change at a pass start aborts the run.
+sig() { $L "systemctl is-active lamp-voice lamp-policy lamp-body lamp-eyes; systemctl show -p MainPID --value lamp-voice lamp-policy; sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline; echo; sudo -n grep -o '\"build\":{[^}]*}' /var/lib/lampos-update/state.json; readlink /opt/lampOS/voice/current /opt/lampOS/policy/current; true" | tr '\n' ' '
+  echo "muted=$(muted)"; }
 # verdict SINCE COUNT: the voice's first new verdict within 25 s: played|held|none.
 verdict() { local last
   jwait lamp-voice "@$1" "$V" 25 1 $(( $2 + 1 )) >/dev/null || { echo none; return; }
@@ -81,11 +95,26 @@ while [ $q -lt 2 ] && [ $i -lt 60 ]; do
   i=$((i+1)); sleep 1; done; echo $s
 EOF
 }
+# answer_end [HALF_SECONDS=40]: after a played verdict, waits (on the lamp) up to that long for voice/state
+# to read speaking, then until it has not for 1.5 s (up to 60 s); prints the half-seconds it read speaking
+# (0: it never spoke).
+answer_end() { $LI "sh -s -- '$BUS' voice/state '${1:-40}'" <<'EOF'
+s=0 q=0 i=0
+while [ $i -lt "$3" ] && ! $1 latest "$2" 2>/dev/null | grep -q speaking; do i=$((i+1)); sleep 0.5; done
+[ $i -lt "$3" ] || { echo 0; exit 0; }
+i=0; while [ $q -lt 3 ] && [ $i -lt 120 ]; do
+  if $1 latest "$2" 2>/dev/null | grep -q speaking; then s=$((s+1)); q=0; else q=$((q+1)); fi
+  i=$((i+1)); sleep 0.5; done; echo $s
+EOF
+}
 # rest VERDICT ROOM: no carryover. If the lamp spoke, the next line waits GAP s from its last speech;
 # in the busy block one colleagues' exchange plays inside that gap (and resets it if the lamp answers it).
 # The talk's own verdicts and decisions land within SETTLE s, before the next line starts.
 SETTLE=8
-rest() { local s t0 tk=0 spoke=0; s=$(speech_done); { [ "${s:-0}" -gt 0 ] || [ "$1" = played ]; } && spoke=1
+# On played it waits up to 8 s for the answer to start, then for it to end, so no line lands mid-answer.
+rest() { local s t0 tk=0 spoke=0
+  if [ "$1" = played ]; then s=$(answer_end 16); else s=$(speech_done); fi
+  { [ "${s:-0}" -gt 0 ] || [ "$1" = played ]; } && spoke=1
   t0=$(date +%s)
   if [ "$2" = busy ]; then talk; tk=$(date +%s); s=$(speech_done); [ "${s:-0}" -gt 0 ] && { spoke=1; t0=$(date +%s); }; fi
   if [ $spoke = 1 ]; then wait_until $(( t0 + GAP )); else sleep 3; fi
@@ -98,18 +127,30 @@ pull() { local day0 day1; PULLED=1; sleep 5
   $L "sudo -n journalctl -u lamp-voice --since @$start_s --no-pager -o short-unix | grep -E '$V'" > "$OUT/voice.txt"
   note "pulled: $(( $(wc -l < "$OUT/plays.tsv") - 1 )) lines played, $(wc -l < "$OUT/decisions.jsonl" | tr -d ' ') decisions, $(wc -l < "$OUT/voice.txt" | tr -d ' ') verdicts"; }
 # Restores first: under lamp-lock.sh run a TERM is followed by a KILL 10 s later.
+policy_back() { $L "sudo -n rm -f $DROPIN && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-policy" &&
+  sleep 3 && [ "$($L 'systemctl is-active lamp-policy')" = active ]; }
 cleanup() { [ -n "$MACVOL_WAS" ] && vol "$MACVOL_WAS"
   [ -n "$SPK0" ] && $L "amixer -q -c device_cmedia sset Speaker $SPK0" && note "lamp Speaker back to $SPK0"
-  [ "$PLAYED" -gt 0 ] && [ -z "$PULLED" ] && pull; true; }
+  if [ -n "$DROPPED" ]; then policy_back && note "lamp-policy back to its own unit (drop-in removed, active)" ||
+    note "LAMP-POLICY NOT PUT BACK: remove $DROPIN and restart lamp-policy by hand"; fi
+  [ "$PLAYED" -gt 0 ] && [ -z "$PULLED" ] && pull
+  if [ -n "$LOANED" ]; then
+    if [ -e "$OUT/aborted" ]; then
+      if [ "$PLAYED" = 0 ]; then loans "aborted, nothing ran; $LAMP back"; else loans "aborted after $PLAYED lines played, results pulled; $LAMP back"; fi
+    elif [ "$MODE" = preflight ]; then loans "preflight only, no labelled line played; $LAMP back"
+    elif [ "$PLAYED" = 0 ]; then loans "aborted, nothing ran; $LAMP back"
+    else loans "done ($PLAYED lines played); $LAMP back"; fi
+  fi; true; }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 # ---- ETA: a line the voice answers ~37 s (clip, verdict, answer, GAP), one it holds ~12 s, +12 s of talk in busy
 nl=$(ids quiet | wc -l | tr -d ' ') nb=$(ids busy | wc -l | tr -d ' ')
+nf=$(awk -F'|' '!/^#/ && $4 == "follow_up" {print $1}' lines.txt | grep -cE "$ONLY")
 eta=$(awk -F'|' -v o="$ONLY" '!/^#/ && NF >= 7 && $1 ~ o { t += ($5 == "lamp") ? 37 : ($3 == "busy" ? 24 : 12) }
   END { print t + 0 }' lines.txt)
 eta=$(( (eta + 120) * PASSES + 90 ))   # + per pass 20 s quiet lead, 2 exchanges, ~60 s for busy to end; + wake and pull
-note "replay $MODE: lamp=$LAMP lines=$((nl + nb)) (quiet $nl, busy $nb) x passes $PASSES; ETA of run ~$(( eta / 60 )) min"
+note "replay $MODE: lamp=$LAMP lines=$((nl + nb)) (quiet $nl, busy $nb) + $nf follow-ups x passes $PASSES; ETA of run ~$(( eta / 60 )) min"
 
 # ---- preflight: read-only checks first, then the two volume changes, then the wake
 miss=; for id in $(awk -F'|' '!/^#/ && NF >= 7 {print $1}' lines.txt) w00 t01 t02; do
@@ -121,6 +162,8 @@ lk=$(../lamp-lock.sh "$LAMP" status 2>&1)
 printf '%s\n' "$lk" | grep -qE "^ *holder: $HOLDER\$" ||
   abort "the lamp lock is not held by $HOLDER (run under lamp-lock.sh run): $(printf '%s' "$lk" | head -1)"
 ok "lock held by $HOLDER"
+loans "#4306 labelled set ($MODE), voice-only$([ -n "$DEADLINE" ] && date -r "$DEADLINE" '+, until %H:%M')" && LOANED=1 && note "loans.txt: start line written"
+due && abort "the deadline has passed already"
 
 st=$($L "systemctl is-active lamp-voice lamp-policy lamp-body lamp-eyes; true" | tr '\n' ' ')
 [ "$st" = "active active active active " ] || abort "a unit is not active (lamp-voice lamp-policy lamp-body lamp-eyes: $st)"
@@ -163,11 +206,35 @@ case "$(face)" in "a face"*) abort "lamp-eyes saw a face in the last 15 s (a rea
   "no eyes report") abort "lamp-eyes printed no report in 15 s: a face could not be seen" ;; esac
 ok "no face seen in 15 s"
 
+# Hello and progress, shadow only (the lead on #1711: option b): a /run drop-in (gone on a reboot too)
+# restarts lamp-policy with POLICY_EXTRA for the run; cleanup removes it and restarts lamp-policy.
+# Not reached is noted, not fatal: attention is still scored.
+if [ -n "$POLICY_EXTRA" ]; then
+  case " $POLICY_EXTRA " in *" --act"*|*" --gate"*) abort "POLICY_EXTRA has --act or --gate: this kit only scores shadow" ;; esac
+  es=$($L "systemctl cat lamp-policy | grep '^ExecStart=/' | tail -1")
+  if [ -z "$es" ]; then note "hello/progress NOT MEASURED: lamp-policy's ExecStart could not be read"
+  else DROPPED=1
+    if printf '[Service]\nExecStart=\n%s %s\n' "$es" "$POLICY_EXTRA" |
+         $LI "sudo -n mkdir -p ${DROPIN%/*} && sudo -n tee $DROPIN >/dev/null && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-policy"; then
+      sleep 3
+      pc=$($L "systemctl is-active lamp-policy && sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline" | tr '\n' ' ')
+      case " $pc " in *" --act"*) abort "lamp-policy restarted with --act: $pc" ;; esac
+      up=1; for f in $POLICY_EXTRA; do case " $pc " in *" $f "*) ;; *) up= ;; esac; done
+      case $pc in "active "*) ;; *) up= ;; esac
+      if [ -n "$up" ]; then note "policy_cmdline=${pc#active }"; ok "lamp-policy restarted in shadow with $POLICY_EXTRA (put back on exit)"
+      else note "hello/progress NOT MEASURED: lamp-policy did not come up with $POLICY_EXTRA ($pc)"
+        policy_back && DROPPED= && ok "lamp-policy back to its own unit" || abort "lamp-policy not active after putting its unit back"; fi
+    else note "hello/progress NOT MEASURED: the drop-in could not be put in (sudo refused?)"
+      policy_back && DROPPED= || abort "lamp-policy not active after removing the drop-in"; fi
+  fi
+fi
+
 SPK0=$($L "amixer -c device_cmedia sget Speaker" | grep -oE 'Playback [0-9]+ \[' | head -1 | grep -oE '[0-9]+')   # raw: exact on restore
 [ -n "$SPK0" ] || abort "cannot read the lamp's Speaker level"
 $L "amixer -q -c device_cmedia sset Speaker 50%" || abort "cannot set the lamp's Speaker to 50%"
 ok "lamp Speaker 50% (was $SPK0, put back on exit)"
 
+[ "$(osascript -e 'output muted of (get volume settings)')" = false ] || abort "the Mac's output is muted (or cannot be read)"
 MACVOL_WAS=$(osascript -e 'output volume of (get volume settings)')
 vol "$MACVOL"; ok "Mac volume $MACVOL (was $MACVOL_WAS, put back on exit)"
 
@@ -178,12 +245,14 @@ note "offset_ms=$off start_s=$start_s"
 
 # ---- wake: answered within 12 s, raising the Mac 45 -> 60 -> 75 if not (RULES: small MacBook speaker); then standing
 woke=; v=$MACVOL
-for k in 1 2 3; do s=$(( $(lamp_ms) / 1000 )); c=$(nv "$s"); vol "$v"; play w00
-  if jwait lamp-voice "@$s" 'its answer is played' 12 1 $(( ${c:-0} + 1 )) >/dev/null; then
-    note "wake: answered at Mac $v (try $k)"; sleep 6; standing && { woke=1; break; }
-  else note "wake: no answer at Mac $v (try $k)"; for x in 60 75; do [ "$x" -gt "$v" ] && { v=$x; break; }; done; fi
+for k in 1 2 3 4; do s=$(( $(lamp_ms) / 1000 )); c=$(nv "$s"); vol "$v"; play w00; w=$(verdict "$s" "${c:-0}")
+  case $w in
+    played) note "wake: answered at Mac $v (try $k)"; sleep 6; standing && { woke=1; break; } ;;
+    held) note "wake: held back at Mac $v (try $k)"; for x in 60 75; do [ "$x" -gt "$v" ] && { v=$x; break; }; done ;;
+    *) note "wake: no verdict at Mac $v (try $k): replayed at the same level"; sleep 5 ;;
+  esac
 done
-[ -n "$woke" ] || abort "the lamp was not woken and standing after 3 wake tries (last Mac $v)"
+[ -n "$woke" ] || abort "the lamp was not woken and standing after 4 wake tries (last Mac $v)"
 MACVOL=$v; ok "woken and standing at Mac $MACVOL; labelled lines play at Mac $MACVOL"
 sleep 5   # the wake's decision: asked within the 3 s deadline
 wd=$($L "sudo -n cat /var/lib/lampos-policy/decisions-$(date -u +%F).jsonl 2>/dev/null | sort -u" |
@@ -192,6 +261,7 @@ wd=$($L "sudo -n cat /var/lib/lampos-policy/decisions-$(date -u +%F).jsonl 2>/de
 wf=$(printf '%s' "$wd" | jq -r '.failed // empty')
 [ -z "$wf" ] || abort "lamp-policy's decision on the wake failed ($wf): every decision would be failed"
 ok "policy decided on the wake (request $(printf '%s' "$wd" | jq -r '.request // "none"'))"
+SIG0=$(sig); note "lamp state at preflight: $SIG0"
 if [ "$MODE" = preflight ]; then
   # Busy probe (no labelled line): whether two exchanges make room/state busy, as the busy block needs.
   rest played quiet; talk; talk; sleep "$SETTLE"; r=$(room)
@@ -200,27 +270,38 @@ if [ "$MODE" = preflight ]; then
 rest played quiet   # the wake's answer: GAP s before the first line
 
 # ---- passes
-printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol\n' > "$OUT/plays.tsv"
+# trial ID: one play: the face check, room/state read just before, the clip, the voice's verdict (in VD).
+trial() { local id=$1 s c a b rr
+  due && abort "deadline reached before $id (pass $pass)"
+  case "$(face)" in "a face"*|"no eyes report") abort "before $id (pass $pass): a face seen, or no eyes report, in 15 s" ;; esac
+  rr=$(room); s=$(( $(lamp_ms) / 1000 )); c=$(nv "$s")
+  a=$(( $(now_ms) + off )); play "$id"; b=$(( $(now_ms) + off ))
+  VD=$(verdict "$s" "${c:-0}"); PLAYED=$((PLAYED + 1))
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pass" "$id" "$a" "$b" "$VD" "$MACVOL" "${rr:-none}" >> "$OUT/plays.tsv"
+  echo "$(date +%H:%M:%S) pass $pass $id voice=$VD room=${rr:-none}"; }
+printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol\troom_read\n' > "$OUT/plays.tsv"
 for pass in $(seq 1 "$PASSES"); do
+  s1=$(sig); [ "$s1" = "$SIG0" ] || abort "the lamp changed since preflight (pass $pass start): now $s1"
   for blk in quiet busy; do
+    [ -n "$(order "$pass" "$blk")" ] || continue
     if [ "$blk" = busy ]; then
       talk; talk; sleep "$SETTLE"; r=$(room); note "pass $pass busy block: room/state=$r"
       [ "$r" = busy ] || { note "ABORT busy block (pass $pass): room/state=$r after two exchanges; busy lines not played, quiet results kept"; continue; }
     else
       # busy ends 60 s after the last talk with LAMP_BUSY_ENDS_SOONER, 180 s without (crates/voice/src/room_told.rs)
-      k=0; while r=$(room); [ "$r" != quiet ] && [ $k -lt 200 ]; do sleep 5; k=$((k+5)); done
+      k=0; while r=$(room); [ "$r" != quiet ] && [ $k -lt 200 ] && ! due; do sleep 5; k=$((k+5)); done
       note "pass $pass quiet block: room/state=$r"
       [ "$r" = busy ] && { note "ABORT quiet block (pass $pass): room/state still busy after 200 s; not played"; continue; }
       sleep 20                             # a quiet room: nobody has talked for a while
     fi
     for id in $(order "$pass" "$blk"); do
-      case "$(face)" in "a face"*|"no eyes report") abort "before $id (pass $pass): a face seen, or no eyes report, in 15 s" ;; esac
-      s=$(( $(lamp_ms) / 1000 )); c=$(nv "$s")
-      a=$(( $(now_ms) + off )); play "$id"; b=$(( $(now_ms) + off ))
-      v=$(verdict "$s" "${c:-0}"); PLAYED=$((PLAYED + 1))
-      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$pass" "$id" "$a" "$b" "$v" "$MACVOL" >> "$OUT/plays.tsv"
-      echo "$(date +%H:%M:%S) pass $pass $id voice=$v"
-      rest "$v" "$blk"
+      trial "$id"; pv=$VD
+      # A follow-up goes on right after the lamp's answer to its parent, and only if it answered.
+      for f in $(follow_ups "$id"); do
+        if [ "$pv" = played ] && [ "$(answer_end)" -gt 0 ] 2>/dev/null; then trial "$f"; VD=played
+        else note "pass $pass $f not played: the lamp did not answer $id"; fi
+      done
+      rest "$VD" "$blk"
     done
   done
 done

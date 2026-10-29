@@ -21,7 +21,7 @@ render() { # render <id> <speaker> <text>
 render w00 Daniel "Lamp, are you there?"
 render t01 Samantha "So did you see the numbers from the last sprint? I thought the review went fine but the deadline moved again."
 render t02 Karen "Yeah, the review was fine, I just hope finance signs off on the budget this time."
-while IFS='|' read -r id _ _ _ _ who text; do
+while IFS='|' read -r id _ _ _ _ who text _; do
   case $id in ''|'#'*) continue ;; esac
   render "$id" "$who" "$text"
 done < lines.txt

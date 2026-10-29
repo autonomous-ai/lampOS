@@ -3,28 +3,48 @@
 How right Jev (`lamp-policy`, [policy.md](../../docs/policy.md)) is, in shadow, against the voice's own
 judgement and against a label, line by line. The jev-verifier keeps it.
 
-- `lines.txt`: the labelled set, one line each: id, split, room, class, label, speaker, text. Classes:
-  said to the lamp, a bare "Lamp", desk talk, two people by name, the TV, a remark about the lamp, and
-  "Ma'am" said to a person, in a quiet and a busy room. Lines marked `held` are never used to tune:
-  they are only scored. All names are made up; no line changes the lamp's light, volume, timers or
-  memory.
+- `lines.txt`: the labelled set, one line each: id, split, room, class, label, speaker, text, and for a
+  follow-up its parent. Classes: said to the lamp, a bare "Lamp", a follow-up (the same speaker goes on
+  right after the lamp's answer, without the name), desk talk, two people by name, the TV, a remark
+  about the lamp, and "Ma'am" said to a person, in a quiet and a busy room. Lines marked `held` are
+  never used to tune: they are only scored. All names are made up; no line changes the lamp's light,
+  volume, timers or memory. q08 ("Lamp?") is short: the voice may drop it as a short sound, which is a
+  verdict like any other.
 - `render.sh`: renders each line on the Mac (ElevenLabs, the Mac kit's voices), levelled to -20 LUFS,
-  into `clips/` (not committed). The TV goes through a small speaker's band, 6 dB under.
-- `replay.sh OUT`: wakes the lamp, plays the quiet block, makes the room busy with two colleagues'
-  talk (and checks `room/state` reads busy before the busy block), plays it, then pulls that window's
-  decisions and the voice's verdicts into `OUT`. Run it only in a booked slot, under the lock:
+  into `clips/` (not committed). The TV is a colleague's voice through a small speaker's band, 6 dB
+  under the rest on purpose: the TV class tests what is said, not a voice the lamp has never heard.
+- `slot.sh DAY START LAST END`: the way to run it in a booked slot, under `caffeinate`:
 
-      tools/lamp-lock.sh lamp-52e6 run jev-verifier <session> "jev-verify set" -- tools/jev-verify/replay.sh run OUT
+      SESS=<session> caffeinate -dimsu tools/jev-verify/slot.sh 2026-10-30 02:30 02:40 03:50
+
+  It tries the lamp lock from START; not free by LAST, it writes "aborted, nothing ran" to loans.txt and
+  stops. Taken, it posts PLAYING on #3336, runs `replay.sh run` with a deadline of END - 4 min, renews
+  the lock, and on exit posts QUIET with the result and releases the lock. `slot-test.sh` tests it.
+- `replay.sh run OUT`: wakes the lamp (the Mac goes 45 -> 60 -> 75 only on "held back"), plays the
+  quiet block, makes the room busy with two colleagues' talk (and checks `room/state` reads busy before
+  the busy block), plays it, then pulls that window's decisions and the voice's verdicts into `OUT`.
+  A follow-up plays right after the lamp's answer to its parent, only when it answered. Every play
+  records `room/state` just before it. The units, their MainPIDs, lamp-policy's cmdline, the build and
+  the mute are taken after the preflight and checked at each pass start: any change aborts. With
+  DEADLINE set, no line or wait starts after it. It writes a loans.txt line at the start and one at the
+  end ("done", or "aborted, nothing ran"). For hello and progress it restarts lamp-policy in shadow
+  with `--hello --progress` through a /run drop-in, and puts it back on exit; if that can't be done it
+  says "hello/progress NOT MEASURED" and goes on with attention.
 
   `replay.sh preflight OUT` runs every check, the wake (which must produce a policy decision that did
   not fail) and a busy probe (two exchanges, no labelled line: does `room/state` read busy?), then
   stops. `OUT` holds what the lamp heard: it stays on the Mac, and is refused inside a git work tree.
 - `score.sh OUT`: the scored table (per class and room, Jev vs the voice vs the label), the totals on
   the held lines, the false answers to desk talk, and the decision latency. Each (pass, id) is one
-  trial; it says which ids flipped across passes. A trial is clean unless the lamp was in conversation
-  (spoke within 20 s) or the room it saw is not the label's; totals show all and clean trials, and
-  "Decision inputs" gives the held clean rates with 95% Wilson intervals, the margin and the verdict.
-  It prints ids and classes, never the words. `score-test.sh` tests it with no lamp.
+  trial; it says which ids flipped across passes. A missing or failed Jev decision is wrong, on "not"
+  lines too. A busy line whose `room/state` did not read busy just before it is void (counted, not
+  scored). A trial is clean unless the lamp was in conversation (spoke within 20 s; a follow-up is in
+  conversation by design and stays clean) or the room it saw is not the label's; totals show all and
+  clean trials, and "Decision inputs" gives the held clean rates with 95% Wilson intervals, the margin
+  and the verdict. The per-line table shows probabilities, so it defaults to the tune lines. Hello and
+  progress decisions are counted by choice: the set has no arrival (no face is ever in view) and hands
+  no work over, so those numbers are thin by design and say so. It prints ids and classes, never the
+  words. `score-test.sh` tests it with no lamp.
 
 Jev takes the turn with `answer` or `look_up`; the voice takes it when its answer is played.
 
