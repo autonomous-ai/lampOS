@@ -421,6 +421,61 @@ fn a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is() {
     );
 }
 
+/// A lamp listening with nobody speaking to a turn it can keep has no
+/// fresh person activity, and is well: a healthy Lamp 2's row in the app
+/// read "expression: waiting for fresh person activity" as a warning most
+/// of the time. A part a working lamp always has (joints, room, voice
+/// timing, light setting, body lag) still warns when it is missing.
+#[test]
+fn listening_without_person_activity_is_ordinary_and_a_missing_part_still_warns() {
+    use lamp_msgs::Level;
+    let state = |missing: &[&str]| ExpressionState {
+        stamp: ClockStamp {
+            clock_id: "test".into(),
+            at_us: 1,
+            sequence: 1,
+        },
+        enabled: true,
+        turn: Some(1),
+        request: Some(1),
+        behaviours: Vec::new(),
+        missing: missing.iter().map(|text| (*text).to_owned()).collect(),
+        warnings: Vec::new(),
+        body: true,
+        light: true,
+        asleep: None,
+    };
+    let well = runtime::Counts::default();
+    assert_eq!(
+        runtime::standing(&well, None, &state(&["fresh person activity"])),
+        (
+            Level::Ok,
+            "planning; this turn waits for fresh person activity".to_owned()
+        )
+    );
+    for part in [
+        "measured body lag",
+        "light setting",
+        "fresh voice timing",
+        "fresh measured joints",
+        "fresh room state",
+    ] {
+        assert_eq!(
+            runtime::standing(&well, None, &state(&[part])),
+            (Level::Warn, format!("waiting for {part}")),
+            "{part}"
+        );
+        assert_eq!(
+            runtime::standing(&well, None, &state(&["fresh person activity", part])),
+            (
+                Level::Warn,
+                format!("waiting for fresh person activity, {part}")
+            ),
+            "{part}"
+        );
+    }
+}
+
 mod sleep_name {
     use super::*;
     use lamp_bus::Publisher;
