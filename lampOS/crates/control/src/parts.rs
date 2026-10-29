@@ -236,15 +236,16 @@ impl Lamp {
 
     fn look(&self, client: &str, re: u64, at: &LookAt) -> Result<Value, Error> {
         // A look at `hand` starts the body following it (said on each hold);
-        // any other look ends that, said or not.
-        let hand = *at == LookAt::Target(LookTarget::Hand);
-        match &self.follow {
-            Some(follow) => *follow.lock().expect("follower") = hand.then(|| client.to_owned()),
-            None if hand => return Err(waits_for("the body's lease socket")),
-            None => {}
-        }
+        // any other look ends that once it is taken, never a refused one
+        // (Nine's P3 on #4375: the SDKs end a following only on a taken look).
         let look = match at {
-            LookAt::Target(LookTarget::Hand) => return Ok(json!({"to": "body", "follow": "hand"})),
+            LookAt::Target(LookTarget::Hand) => {
+                let Some(follow) = &self.follow else {
+                    return Err(waits_for("the body's lease socket"));
+                };
+                *follow.lock().expect("follower") = Some(client.to_owned());
+                return Ok(json!({"to": "body", "follow": "hand"}));
+            }
             LookAt::Angles(Angles { yaw, pitch }) => json!({"yaw": yaw, "pitch": pitch}),
             LookAt::Target(LookTarget::Ahead) => json!("ahead"),
             // Out of this release, said as that (the local leader, 29 Oct).
@@ -265,6 +266,9 @@ impl Lamp {
                 line: json!({ "look": look }).to_string(),
             })
             .map_err(|_| not_here("the body's lease"))?;
+        if let Some(follow) = &self.follow {
+            *follow.lock().expect("follower") = None;
+        }
         Ok(json!({"to": "body"}))
     }
 
@@ -693,7 +697,8 @@ mod tests {
     }
 
     /// `look` at `hand` follows it through the lease socket's hold; any
-    /// other look, or its own client's `stop`, ends that.
+    /// other look taken, or its own client's `stop`, ends that; a refused
+    /// look doesn't (Nine's P3 on #4375).
     #[test]
     fn a_look_at_the_hand_follows_it_until_another_look_or_a_stop() {
         let at_hand = op(r#"{"id":1,"op":"look","at":"hand"}"#);
@@ -709,9 +714,23 @@ mod tests {
             json!({"to": "body", "follow": "hand"})
         );
         assert_eq!(following().as_deref(), Some("c_1"));
+        // Refused looks leave it: one out of this release, and one with no
+        // lease socket to take it.
+        let face = op(r#"{"id":2,"op":"look","at":"face"}"#);
+        assert!(lamp.act("c_1", 2, &face, 0).is_err());
         let ahead = op(r#"{"id":2,"op":"look","at":"ahead"}"#);
         assert!(lamp.act("c_1", 2, &ahead, 0).is_err());
-        assert_eq!(following(), None, "another look ends it");
+        assert_eq!(following().as_deref(), Some("c_1"), "a refused look");
+        let (looks, _looked) = tokio::sync::mpsc::unbounded_channel();
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet())
+            .following(follow.clone())
+            .looking(looks);
+        lamp.act("c_1", 2, &at_hand, 0).unwrap();
+        assert_eq!(
+            lamp.act("c_1", 2, &ahead, 0).unwrap(),
+            json!({"to": "body"})
+        );
+        assert_eq!(following(), None, "another look taken ends it");
         lamp.act("c_1", 3, &at_hand, 0).unwrap();
         lamp.stop("c_2", 0);
         assert_eq!(following().as_deref(), Some("c_1"), "another client's stop");
