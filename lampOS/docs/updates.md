@@ -180,6 +180,9 @@ the `### Built but not on yet` part. It lists each `switches.md` row counted
 `until` or `now` whose switch no product file turns on, read from the
 units themselves (`Environment=` lines, `ExecStart` flags and the settings'
 `.env` files in `deploy/product`), not from the row's "Product unit" cell.
+The one exception is a cell of exactly `on (unset)`: a switch on by its
+code's default that no file sets, such as `LAMP_FORGET_ASKED`, which is not
+listed.
 Each switch is listed in plain words: its line in `switches.md`'s "In plain
 words" table, what a person would notice with it on, with no switch name. A
 switch with no line there falls back to its row's words. Every switch listed

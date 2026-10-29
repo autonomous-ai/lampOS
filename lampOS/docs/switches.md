@@ -21,7 +21,10 @@ on or removed.
 - **lamp-4ace (repo unit)** and **Product unit:** what
   `lampOS/deploy/lamp-4ace/` and `lampOS/deploy/product/` set, reading only
   lines that aren't commented out. lamp-4ace may also run drop-ins that aren't
-  in the repo (see "What the census found").
+  in the repo (see "What the census found"). A switch that is on by its
+  code's default, with no unit setting it, is written exactly `on (unset)`.
+  That is the one cell the stable notes read, since no file states that
+  default: such a switch is never listed as built but not on.
 - **Added by:** the merged pull request that brought the name in, or the commit
   for the ones added to `lamp-voice` directly before pull requests were the rule.
 - **Lamp check it named:** what that pull request or its doc said must be seen
