@@ -1870,8 +1870,11 @@ pub fn names_known(socket: &Path) -> Option<Vec<String>> {
     })
 }
 
-/// How long [`names_known`] waits for the eyes: a reply's context waits on it.
-pub const LIST_WITHIN: Duration = Duration::from_millis(250);
+/// How long [`names_known`] waits for the eyes: only [`keep_owner_fresh`]
+/// asks, off any reply's path, and the eyes answer between two of their
+/// looks, slower on a busy lamp (lamp-29e7, 29 Oct: a remembering answered
+/// in 2.1 s), so a wait of 250 ms could leave the owner unnamed (#4118).
+pub const LIST_WITHIN: Duration = Duration::from_secs(3);
 
 /// Whether the eyes still know `owner` ([`names_known`]), by their own
 /// rule for one name (any case): so a forgotten face is never named (the
@@ -1954,6 +1957,10 @@ fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
             }
             None
         }
+        // The eyes not answering in time takes nothing back: the mark
+        // stands as kept, and a forget by voice still clears it at once
+        // ([`owner_forgotten`]) (lamp-29e7, 29 Oct, #4118).
+        (Some(owner), None) if socket.is_some() => Some(owner),
         _ => None,
     };
     let mut now = OWNER_NOW
@@ -2942,6 +2949,38 @@ mod tests {
         lately.seen(at + Duration::from_secs(4), 0);
         assert_eq!(lately.most(at + Duration::from_secs(4)), Some(0));
         assert_eq!(lately.most(at + Duration::from_secs(8)), None);
+    }
+
+    /// lamp-29e7, 29 Oct (#4118): eyes too busy to answer in time take
+    /// nothing back; the mark kept at setup stands, and no eyes at all is
+    /// still no owner.
+    #[test]
+    fn the_owner_stands_while_the_eyes_do_not_answer() {
+        let dir = std::env::temp_dir().join(format!("owner-unanswered-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
+        let silent = dir.join("who.sock");
+        // Other tests' forgets share the count: a refresh they cut is tried again.
+        for _ in 0..3 {
+            refresh_owner(Some(&file), Some(&silent));
+            if owner_now().is_some() {
+                break;
+            }
+        }
+        assert_eq!(owner_now().as_deref(), Some("Example Name"));
+        assert!(
+            !crate::onboarding::mailbox_of(&file).exists(),
+            "nothing is forgotten"
+        );
+        for _ in 0..3 {
+            refresh_owner(Some(&file), None);
+            if owner_now().is_none() {
+                break;
+            }
+        }
+        assert_eq!(owner_now(), None);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// The eyes stand-in on a real socket: what each request sent, and the
