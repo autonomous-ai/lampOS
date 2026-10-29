@@ -310,7 +310,11 @@ fn one_rejected_key_keeps_waiting_and_a_later_join_is_kept() {
     );
     assert_eq!(lamp.now_ms, 20_000);
     assert_eq!(lamp.calls, ["station"]);
-    assert_ne!(lamp.conf.as_deref(), Some(OLD));
+    assert!(
+        String::from_utf8(lamp.conf.unwrap())
+            .unwrap()
+            .contains("psk=\"password1\"")
+    );
 
     // Never joined: the whole minute, then the one rejection names the password.
     let mut lamp = Lamp {
