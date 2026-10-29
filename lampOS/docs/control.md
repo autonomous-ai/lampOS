@@ -537,6 +537,13 @@ lamp-control: c_3f9a (lab-mac): event phrase.heard sent
 
 An event's line names its kind and the computer, never its fields.
 
+**The same command again is counted, not written.** Within a computer's
+second, a command with the same fields and answer as the one just before it
+adds to a count. One line says it when the run ends, at another line, the
+second's end or the door's tick: `…: get (presence): ok, to the door, again
+19 times`. So a dashboard polling `get` 20 times a second writes about two
+lines a second, and every command is still told.
+
 **At most 10 lines a second for each computer.** Past that, its next second
 begins with one line, `c_3f9a: N more not logged`: at the computer's next
 line, or at the door's next 250 ms tick once the second is over, whichever
