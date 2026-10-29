@@ -121,12 +121,14 @@ then `heard: good night lamp` and `lease: held`.
   `quiet_hours`. `say` and `sound` are refused in the lamp's quiet hours,
   22:00 to 07:00 its local time unless the lamp sets its own; hello's
   `limits.quiet_hours` says this lamp's window, or `"off"`.
-- **A dev lamp can lift the rates** (`lamp-control --rates off`, or
-  `LAMP_CONTROL_RATES=off`) to try things quickly, like a toy. Hello's
-  `limits` then says `"rates": "off"`. Never on a product: there the rates
-  below hold, and the body bounds every move whatever the rate.
-- **A rate is a ceiling, not a target.** A computer may ask for a motion
-  each second and an `express` 20 times a minute, but a lamp switching
+- **The rates are off by default** (the person's decision, 30 Oct 02:1x): hello's `limits`
+  says `"rates": "off"`, and only the refused actions' guard and the phrase
+  changes (6 a minute) hold. `lamp-control --rates default` (or
+  `LAMP_CONTROL_RATES=default`) turns the rates below back on. Either way
+  the body bounds every move, whatever the rate.
+- **A rate is a ceiling, not a target, and so is no rate.** With the rates
+  on, a computer may ask for a motion each second and an `express` 20 times
+  a minute, but a lamp switching
   feelings every 3 s reads as twitchy, a machine, not a living thing (rule
   8). Ask for a feeling when something happened, and let the move finish:
   a feeling's move lasts 2.5 to 7 s, and one asked while another plays is

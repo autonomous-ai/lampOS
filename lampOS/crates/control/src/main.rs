@@ -132,17 +132,20 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(window) => eprintln!("lamp-control: quiet hours {window} local"),
         None => eprintln!("lamp-control: quiet hours off, this lamp's setting"),
     }
-    // `--rates off` (or LAMP_CONTROL_RATES=off): a dev lamp's switch, every
-    // rate lifted but the refused actions' guard and the phrase changes. A
-    // product never passes it.
+    // The rates are off unless `--rates default` (or
+    // LAMP_CONTROL_RATES=default) turns them back on: every rate lifted but
+    // the refused actions' guard and the phrase changes (the person's
+    // decision, 30 Oct 02:1x: "remove the rate").
     let rates_off = session::rates_off_of(
         option(arguments, "--rates").as_deref(),
         std::env::var("LAMP_CONTROL_RATES").ok().as_deref(),
     )?;
     if rates_off {
         eprintln!(
-            "lamp-control: rates off, a dev lamp's switch: every rate lifted but refused actions' and phrase changes"
+            "lamp-control: rates off: every rate lifted but refused actions' and phrase changes"
         );
+    } else {
+        eprintln!("lamp-control: rates on, this lamp's setting");
     }
     let mut door = session::Door::new(
         &host,
