@@ -1272,7 +1272,8 @@ fn too_few_calls_or_too_far_apart_keep_no_file_and_the_default() {
         room(&mut walk, &prompt, 2_400, 21.0);
         assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
     }
-    assert_eq!(settle(&mut walk, 70 * S), [NEAR_FAILED]);
+    // No call tried: the name part says nothing (Seventh's P3 2 on #4192).
+    assert!(settle(&mut walk, 70 * S).is_empty());
     assert_eq!(named(&walk), Some(Outcome::Failed));
     assert!(!store.near_file().exists());
     assert_eq!(walk.kept().near_call_prompts, 3);
@@ -1283,7 +1284,8 @@ fn too_few_calls_or_too_far_apart_keep_no_file_and_the_default() {
     for (turn, rise) in [(1, 18.0), (2, 28.1), (3, 20.0)] {
         assert_eq!(call(&mut walk, turn * 20 * S, rise, turn)["accepted"], true);
     }
-    settle(&mut walk, 80 * S);
+    // Calls were tried and refused: the name part's failure is said.
+    assert_eq!(settle(&mut walk, 80 * S), [NEAR_FAILED]);
     assert_eq!(named(&walk), Some(Outcome::Failed));
     assert!(!store.near_file().exists());
 }
@@ -1663,7 +1665,9 @@ fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
         let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
         judge(&mut walk, &prompt);
     }
-    assert_eq!(settle(&mut walk, 70 * S), [NEAR_FAILED]);
+    // No call was tried, so the name part says nothing (Seventh's P3 2 on
+    // #4192).
+    assert!(settle(&mut walk, 70 * S).is_empty());
     assert_eq!(named(&walk), Some(Outcome::Failed));
     ask(&mut walk, 80 * S, 4);
     // Nothing said in the window: "louder".
@@ -1862,14 +1866,11 @@ fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
         room(&mut walk, &prompt, 2_400, 21.0);
         assert_eq!(judge(&mut walk, &prompt)["accepted"], false);
     }
-    // The name part's failed line is said, as in a walk.
+    // Nothing was called, so the name part ends saying nothing.
     let mut said = settle(&mut walk, 120 * S);
     assert_eq!(named(&walk), Some(Outcome::Failed));
     said.extend(settle(&mut walk, 121 * S));
-    assert!(
-        said.contains(&walk.definition.words.near_failed),
-        "{said:?}"
-    );
+    assert!(said.is_empty(), "{said:?}");
     // Its sentence part met with silence too: the step was left for later.
     walk.desired.steps.insert(
         Step::HowYouSound.name().into(),
@@ -1890,4 +1891,62 @@ fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
     let first = play(&mut walk, 200 * S, 1_760_000_200_000, 6);
     assert!(first.words.contains("how you call me"), "{}", first.words);
     assert!(!first.words.contains("sentence"), "{}", first.words);
+}
+
+/// Seventh's P3 2 on #4192: a how_you_sound met with silence throughout
+/// said the name part's failure ("I couldn't learn how you call me... redo
+/// the setup") and then "we'll try that one later". With no call tried the
+/// name part says nothing, and the step ends `later` with that one line.
+#[test]
+fn a_silent_how_you_sound_ends_later_with_one_line_and_no_failure() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for turn in 1..=3 {
+        let at = turn * 20 * S;
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 2_400, 21.0);
+        assert_eq!(judge(&mut walk, &prompt)["accepted"], false);
+    }
+    let mut said = settle(&mut walk, 70 * S);
+    said.extend(settle(&mut walk, 71 * S));
+    assert_eq!(named(&walk), Some(Outcome::Failed));
+    for (at, turn) in [(80 * S, 4), (110 * S, 5)] {
+        ask(&mut walk, at, turn);
+        assert_eq!(sentence_none(&mut walk, at)["short"], "level");
+    }
+    said.extend(settle(&mut walk, 140 * S));
+    assert_eq!(outcome(&walk), Some(Outcome::Later));
+    assert_eq!(said, [walk.definition.later_line()]);
+}
+
+/// Seventh's P3 3 on #4192: a call caught only by speech to text is a try,
+/// as a hearing is. Refused, with nothing else heard and a silent sentence
+/// part, the step was tried and ends `failed`, not `later`.
+#[test]
+fn a_refused_call_heard_only_as_text_then_silence_ends_failed() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    // Begun as the prompt ended: not measured, but someone called.
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 300, 21.0);
+    assert!(by_text(&mut walk, &prompt, 0).is_some());
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], false, "{judged}");
+    assert_eq!(judged["heard"], json!([]), "{judged}");
+    for turn in 2..=3 {
+        let at = turn * 20 * S;
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(&mut walk, &prompt, 2_400, 21.0);
+        assert_eq!(judge(&mut walk, &prompt)["accepted"], false);
+    }
+    let mut said = settle(&mut walk, 70 * S);
+    said.extend(settle(&mut walk, 71 * S));
+    assert_eq!(said, [NEAR_FAILED]);
+    assert_eq!(named(&walk), Some(Outcome::Failed));
+    for (at, turn) in [(80 * S, 4), (110 * S, 5)] {
+        ask(&mut walk, at, turn);
+        sentence_none(&mut walk, at);
+    }
+    assert_eq!(settle(&mut walk, 140 * S), [SENTENCE_FAILED]);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
 }
