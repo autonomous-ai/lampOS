@@ -146,6 +146,14 @@ impl EngineKind {
     fn has_modes(self) -> bool {
         !matches!(self, Self::Devin | Self::DevinCloud | Self::Hermes)
     }
+
+    /// Whether Harness starts this agent with no first message: Devin on
+    /// the computer ("Devin cannot start with a first message", Harness
+    /// 0.5.6, 29 Oct). Its task is typed in with `harness reply` once it is
+    /// idle ([`Cli::first_message`]).
+    fn typed_after(self) -> bool {
+        matches!(self, Self::Devin)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -230,6 +238,9 @@ pub const ENGINES_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
 /// nothing: a second hand-over within it asks nothing. A refusal is never
 /// kept: the person may sign in at once and ask again.
 pub const ENGINES_KEPT: Duration = Duration::from_secs(300);
+/// How often a Devin just started is looked at until it is idle, for its
+/// first message ([`Cli::first_message`]).
+const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
 
 /// Strict when stored too: an observation's `digest` is over what this
 /// build would write of it, so a later field would not match it anyway; a
@@ -605,12 +616,12 @@ impl Cli {
         if launch.target.engine.has_modes() {
             args.extend(["--mode".into(), "auto".into()]);
         }
-        args.extend([
-            "--json".into(),
-            "--task".into(),
-            launch.prompt.clone().into(),
-        ]);
-        // One `launch_timeout` for the whole `new`, a retry included.
+        args.push("--json".into());
+        if !launch.target.engine.typed_after() {
+            args.extend(["--task".into(), launch.prompt.clone().into()]);
+        }
+        // One `launch_timeout` for the whole `new`, a retry included, and
+        // Devin's first message after it.
         let until = Instant::now() + self.config.launch_timeout;
         let mut reply = self.run(&args, self.config.launch_timeout);
         seen.took(&reply);
@@ -635,6 +646,10 @@ impl Cli {
             seen.took(&reply);
         }
         match reply {
+            Ok(reply) if reply.success && launch.target.engine.typed_after() => {
+                let outcome = parse_launch(&reply.stdout, launch);
+                self.first_message(launch, outcome, until, seen)
+            }
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
                 not_sent("folder_missing")
@@ -642,6 +657,84 @@ impl Cli {
             Ok(_) => uncertain("new_failed"),
             Err(error) if error.spawned => uncertain(error.code),
             Err(error) => not_sent(error.code),
+        }
+    }
+
+    /// Devin's task, typed in as its first message: once Harness reads the
+    /// harness just started idle, `harness reply` gives it the task as the
+    /// person would type it (openharness#2157, behind the person's own
+    /// `programs-reply` switch), within what is left of the launch's bound.
+    /// The harness is started either way, so a task not typed in is
+    /// uncertain, never sent again: `never_idle`, `stopped_before_message`,
+    /// or the reply's refusal (`reply_off` while the person hasn't turned
+    /// the switch on, `reply_not_idle`, `reply_not_running`, `reply_failed`).
+    fn first_message(
+        &self,
+        launch: &Launch,
+        outcome: LaunchOutcome,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> LaunchOutcome {
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
+        let agent_id = match outcome {
+            LaunchOutcome::Created { agent_id } => agent_id,
+            // Still being made: there is no harness to type into yet.
+            LaunchOutcome::Pending { .. } => return uncertain("first_message_unsent"),
+            other => return other,
+        };
+        let on = |verb: &str| -> Vec<OsString> {
+            vec![
+                verb.into(),
+                "--machine".into(),
+                launch.target.machine_id.clone().into(),
+                agent_id.clone().into(),
+                "--json".into(),
+            ]
+        };
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return uncertain("never_idle");
+            }
+            let shown = self.run(&on("show"), left.min(self.config.read_timeout));
+            seen.took(&shown);
+            let observation = match &shown {
+                Ok(reply) if reply.success => parse_observation(&reply.stdout, &agent_id).ok(),
+                // Under its own code, not retried: `cancelled`,
+                // `cleanup_incomplete`, `executable_changed`, a timeout.
+                Err(error) => return uncertain(error.code),
+                _ => None,
+            };
+            match observation.as_ref().map(|seen| seen.state.as_str()) {
+                Some("idle") => break,
+                // A Harness before the fresh-Devin fix (0.5.6) reads a Devin
+                // that has done nothing yet as `needs-input`: nothing is
+                // asked of it, so the reply is tried at once, and Harness
+                // takes or refuses it (`reply_not_idle`), never 60 s of looks
+                // (the Reviewer-lead's P2 on #4374).
+                Some("needs-input") if observation.as_ref().is_some_and(fresh) => break,
+                Some("stopped" | "failed" | "offline") => {
+                    return uncertain("stopped_before_message");
+                }
+                _ => {}
+            }
+            let left = until.saturating_duration_since(Instant::now());
+            std::thread::sleep(FIRST_MESSAGE_LOOK.min(left));
+        }
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return uncertain("never_idle");
+        }
+        let mut args = on("reply");
+        args.extend(["--".into(), launch.prompt.clone().into()]);
+        let reply = self.run(&args, left);
+        seen.took(&reply);
+        match reply {
+            Ok(reply) if reply.success && replied(&reply.stdout, &agent_id) => {
+                LaunchOutcome::Created { agent_id }
+            }
+            Ok(reply) => uncertain(reply_refusal(&reply.stdout)),
+            Err(error) => uncertain(error.code),
         }
     }
 
@@ -1721,6 +1814,31 @@ fn name_taken(bytes: &[u8], project: &str) -> Option<String> {
         && !folder.chars().any(char::is_control)
         && folder.rsplit('/').next() == Some(project);
     well_formed.then(|| folder.to_owned())
+}
+
+/// Whether a harness has done nothing yet: nothing asked of it, no answer and
+/// no tool used ([`Cli::first_message`]).
+fn fresh(observation: &Observation) -> bool {
+    observation.ask.is_none() && observation.answer.is_empty() && observation.tools == 0
+}
+
+/// Whether `harness reply --json` took the words for `agent_id`: queued in
+/// its machine's mailbox, not refused there.
+fn replied(bytes: &[u8], agent_id: &str) -> bool {
+    serde_json::from_slice::<Value>(bytes).is_ok_and(|reply| {
+        reply["ok"] == true && reply["id"] == agent_id && reply["state"] != "failed"
+    })
+}
+
+/// A refused or failed `harness reply`, by Harness's code.
+fn reply_refusal(bytes: &[u8]) -> &'static str {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    match reply["error"].as_str() {
+        Some("REPLY_OFF") => "reply_off",
+        Some("NOT_IDLE") => "reply_not_idle",
+        Some("NOT_RUNNING") => "reply_not_running",
+        _ => "reply_failed",
+    }
 }
 
 fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
