@@ -9879,9 +9879,10 @@ fn audio_at(request: u64, sequence: u64, at_us: u64) -> ProviderInput {
 /// #1712, the owner on lamp-4ace at 16:37: "Lamp, … what's the weather?"
 /// came as two lines of about 1.3 s, each its own speech-to-text stream,
 /// and the one with the name got no words. A line begun right after one
-/// not answered, in the same session, has that line's sound sent first,
-/// and its window begins where that line's did. Not after 2 s, and not
-/// after a line that was answered.
+/// not answered, in the same session, has that line's sound sent first.
+/// Its window begins at its own first sound when no name was heard in the
+/// carried one (#4226), the words then calling the lamp themselves. Not
+/// after 2 s, and not after a line that was answered.
 #[tokio::test]
 async fn a_line_going_on_from_one_unanswered_hears_its_sound_first() {
     let frame = lamp_audio::CAPTURE_SAMPLES;
@@ -9925,8 +9926,8 @@ async fn a_line_going_on_from_one_unanswered_hears_its_sound_first() {
     // No words in the first line: the name's piece, unanswered.
     assert_eq!(
         run("", Duration::from_millis(500)).await,
-        (3 * frame, Some(1_000)),
-        "its sound, then this line's, and its window from the first piece"
+        (3 * frame, Some(9_000)),
+        "its sound, then this line's, and its window from its own start"
     );
     assert_eq!(
         run("", Duration::from_secs(3)).await,
@@ -10157,8 +10158,8 @@ async fn a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound() {
     );
     assert_eq!(
         run(false).await,
-        (3 * frame, Some(1_000), vec![1_000]),
-        "no name heard: its sound goes again"
+        (3 * frame, Some(9_000), vec![1_000]),
+        "no name heard: its sound goes again, the line dated from its own start (#4226)"
     );
 }
 

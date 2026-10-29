@@ -2936,8 +2936,14 @@ after a take-over, but now for every turn:
   M: the name heard in it counts; its sound is not sent again`; without,
   that sound goes into the line's stream first:
   `request N goes on from request M: its <ms> ms of sound go first`. Its
-  window then begins where the first piece's did, so a name lamp-name heard
-  there counts for it, and the old words are not put before its own as well.
+  window then begins at its own first sound, not where the first piece's
+  did (#4226): that piece's time is when its line began, not its last 1.5 s,
+  so on lamp-c0a4 on 29 Oct "Lamp, I want to cook something new this
+  weekend." going on from desk talk read its name about 4.9 to 5.6 s in and
+  was dropped 3 times in 10. A name in the carried sound still calls the
+  lamp by the words it gives the line, and its hearing, come late, counts
+  from up to `NAME_BEFORE_US` before it. The old words are not put before
+  its own as well.
   The sound is let go 2 s after its line ended (`KEEP_AFTER_END`), at the
   next start, and never crosses a session.
 - **Words cut short by the next line.** A new line ends the turn in
@@ -3254,10 +3260,13 @@ after a take-over, but now for every turn:
   began ("began N ms into the line"), which is what the bound is set
   from. A hearing weighed and not dropped says it too (#4226): "lamp-name's
   hearing began N ms into the line (the newest M ms)", N the first that
-  counts for the line, so both sides of the bound are read. On lamp-c0a4
-  on 29 Oct, "Lamp, I want to cook something new this weekend." played
-  1.5 s after desk talk was dropped 5 times in 20 at 1686 to 1822 ms (and
-  once at 5554 ms), on 8327 and 8389 alike. The first builder at 03:54 on #1722:
+  counts for the line, so both sides of the bound are read; a hearing
+  up to `NAME_BEFORE_US` before the line reads as a negative N. On
+  lamp-c0a4 on 29 Oct, "Lamp, I want to cook something new this weekend."
+  played 1.5 s after desk talk was dropped 5 times in 20: four at 1686 to
+  1822 ms and once at 5554 ms, on 8327 and 8389 alike; the 5554 ms one
+  was a line dated from sound carried into it, now dated from its own
+  start (the carried sound above). The first builder at 03:54 on #1722:
   lamp-4ace's played tests b0333 and b0413 each lost their first four day
   lines, "Hey Lamp, good morning!" heard at 1.000 (`began_ms_ago=480`) with
   its words written "Mainland. Good morning.". The 18:20 shape's words were
