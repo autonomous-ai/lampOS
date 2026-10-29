@@ -3818,6 +3818,37 @@ after a take-over, but now for every turn:
   `held_back`), for Expression's one small glance with
   `LAMP_REMARK_GLANCE=on`.
   Tests (`worker.rs`, `with_remarks_held_a_remark_about_the_lamp_opens_no_conversation`).
+  **It keeps the person's conversation** (#4175, build 8652's busy_day on
+  lamp-4ace, 29 Oct, `rUTNR-2031`: with the switch, "That lamp is cute."
+  held renewed nothing, and the owner's next lines after the colleagues'
+  talk were held as "no conversation going on"; without it, its answer had
+  renewed the window). With the switch:
+  - a line held as a remark, as the line right after one, or as another
+    voice's, said while the lamp's words still kept a conversation going
+    (the thread's 45 s), renews the window from its verdict as its answer
+    would have: the next lines go on from it as from the lamp's words
+    (`Heeding::verdict`, `held_in_conversation_us`). Forgetting the
+    thread's words leaves nothing for it to renew;
+  - the line right after a held remark, let out only as the conversation
+    going on, not found in the conversation's own voice and answering no
+    question of the lamp's, is held as carrying that talk on to someone
+    else ("It's from the office, they're testing it.";
+    `remark_about_it::AFTER_A_REMARK`);
+  - someone else's line ends nothing of the conversation: one held as
+    another voice's no longer counts as talk past the lamp for the next
+    line, which goes on when it is in the conversation's own voice; and a
+    print come after its answer, another's, is said and ends nothing
+    (`voice_going_on_in`).
+  Without a voice model nothing tells d11 and d12's lines from the owner's:
+  let out as the conversation going on, they are answered as without the
+  switch. Tests (`worker.rs`: `on_the_product_unit_the_owners_lines_after_a_held_remark_are_answered`,
+  `with_remarks_held_a_colleagues_late_print_ends_not_the_owners_conversation`,
+  `with_remarks_held_the_owners_line_after_held_colleagues_goes_on_in_a_busy_room`,
+  `with_remarks_held_the_owners_conversation_outlives_the_colleagues_talk`).
+  Without the switch, every line the lamp's own rule held is kept until it
+  is closed (`RoomTold::held`, the latest eight), not only the last: two
+  held lines judged before either closes are both no talk
+  (`two_held_lines_closed_after_both_verdicts_are_no_talk_past_the_lamp`).
 - **A busy room's call by the text, narrowed** (`LAMP_BUSY_CALLED_STRICT=on`;
   with `--attention`). On #1712's branch the busy room let out "Man, that
   meeting ran long.", "Plan the sprint for tomorrow.", "Mom, can you pick me

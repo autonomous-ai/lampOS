@@ -5203,6 +5203,12 @@ pub(crate) struct Heeding {
     remark_about_it: bool,
     /// The last line held as a remark about the lamp ([`Self::remarked`]).
     remarked: Option<u64>,
+    /// A remark held and no line judged since ([`Self::judged_verdict`]).
+    after_remark: bool,
+    /// When the last line held as a remark, or right after one, was held
+    /// while the lamp's words still kept a conversation going: the window
+    /// goes on from then, as the line's answer would have renewed it.
+    held_in_conversation_us: Option<u64>,
     /// `LAMP_TURNED_SPEAKING=on` ([`Self::counting_only_turned_speakers`]).
     turned_speaking: bool,
     /// `LAMP_TURNED_FACE_SPEAKS=on` ([`Self::needing_the_turned_face_to_speak`]),
@@ -6035,6 +6041,8 @@ impl Heeding {
             busy_called_strict: false,
             remark_about_it: false,
             remarked: None,
+            after_remark: false,
+            held_in_conversation_us: None,
             turned_speaking: false,
             turned_face_speaks: false,
             face_not_speaking: None,
@@ -6916,6 +6924,9 @@ impl Heeding {
         // voice ended goes on again only soon after the lamp's words, as any
         // other does.
         let follows_up = !busy || self.follows_up_from_its_start();
+        // `LAMP_REMARK_ABOUT_IT` (#4175): someone else's line ends nothing
+        // of the person's own conversation with the lamp.
+        let remarks = self.remark_about_it;
         let Some(voices) = self.voices.as_mut() else {
             return (going_on, false, false, None);
         };
@@ -6955,6 +6966,16 @@ impl Heeding {
                 self.carried_last
             );
             at.late_other = None;
+        }
+        // `LAMP_REMARK_ABOUT_IT`: someone else's line, known late, ends
+        // nothing of the person's own conversation. On lamp-4ace on 29 Oct
+        // at 20:3x (`rUTNR-2031`) a colleague's line let out as the
+        // conversation going on had its print back at the owner's next line,
+        // and the owner's c04 to c06 were held as no conversation (#4175).
+        if remarks && let Some(late) = at.late_other.take() {
+            eprintln!(
+                "lamp-voice second: request {request}: request {late}'s voice, known after its answer, was another's: it ends nothing of the conversation going on (LAMP_REMARK_ABOUT_IT)"
+            );
         }
         if let Some(late) = at.late_other {
             // Someone else's after all: a line from someone else, as
@@ -7013,6 +7034,12 @@ impl Heeding {
                     "lamp-voice second: request {request}: another voice than the conversation's (cosine {likeness:.2}): no conversation is going on for it"
                 );
                 (false, true, false)
+            }
+            Some(likeness) if under_the_mark && remarks => {
+                eprintln!(
+                    "lamp-voice second: request {request}: the conversation's voice (cosine {likeness:.2}), after another voice's line: someone else's line ends nothing of it, the conversation goes on (LAMP_REMARK_ABOUT_IT)"
+                );
+                (true, false, true)
             }
             Some(likeness) if under_the_mark && attention.asks_a_question() => {
                 eprintln!(
@@ -7875,6 +7902,19 @@ impl Heeding {
         // about tomorrow?" 18 s after the weather line, a long answer, was
         // held in a busy room).
         let said_ago = to_the_end(said_ago, ended_ago(said_until_us, monotonic_us()));
+        // `LAMP_REMARK_ABOUT_IT`: from a remark held in the conversation,
+        // as from words the lamp said then (#4175).
+        let held_ago = self
+            .held_in_conversation_us
+            // Forgetting removes the thread's words: no held line revives them.
+            .filter(|_| self.remark_about_it && said_ago.is_some())
+            .map(|at| Duration::from_micros(monotonic_us().saturating_sub(at)));
+        let said_ago = match (said_ago, held_ago) {
+            (Some(said), Some(held)) => Some(said.min(held)),
+            (said, held) => said.or(held),
+        };
+        let said_going_on =
+            said_going_on || held_ago.is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
         let going_on = going_on_from(said_going_on, said_ago, called_ago);
         // `LAMP_NAME_OR_FOLLOW_UP`: whether the line is a follow-up begun
         // while the lamp's words played or soon after them, or its call,
@@ -7914,7 +7954,11 @@ impl Heeding {
         {
             signs.room = room.at(monotonic_us());
             left_alone = Some(room.left_alone_since_spoke());
-            talked_past = room.talked_past_the_lamp();
+            // `LAMP_REMARK_ABOUT_IT`: lines held as someone else's end
+            // nothing of the person's own conversation (#4175); the verdict
+            // reads the line's own voice ([`Self::voice_going_on_in`]).
+            talked_past = room.talked_past_the_lamp()
+                && !(self.remark_about_it && room.ended_only_by_another_voice());
             signs.going_on &= !talked_past;
         }
         let switch = self.name_or_follow_up;
@@ -8582,6 +8626,39 @@ impl Heeding {
         // (#4175): Expression's small glance.
         if why == Some(crate::remark_about_it::HELD) {
             self.remarked = Some(request);
+            self.after_remark = true;
+        }
+        // A held remark keeps, not ends, the person's conversation (#4175):
+        // on lamp-4ace on 29 Oct (`rUTNR-2031`) "That lamp is cute.", held,
+        // renewed nothing, and the owner's next lines, after the colleagues'
+        // talk, were held as no conversation; answered with the switch off,
+        // it had renewed the window.
+        // So does a line held as another voice's (#4175, d10 to d12).
+        if self.remark_about_it
+            && ([
+                Some(crate::remark_about_it::HELD),
+                Some(crate::remark_about_it::AFTER_A_REMARK),
+            ]
+            .contains(&why)
+                || (why.is_some() && seen.other_voice))
+        {
+            let now = Instant::now();
+            let in_conversation = crate::thread::current(self.thread.as_deref(), |thread| {
+                thread
+                    .said_last_ago_but(now, &self.chain)
+                    .is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR)
+            })
+            .unwrap_or_default()
+                || self.held_in_conversation_us.is_some_and(|at| {
+                    Duration::from_micros(monotonic_us().saturating_sub(at))
+                        <= crate::thread::GOING_ON_FOR
+                });
+            if in_conversation {
+                eprintln!(
+                    "lamp-voice second: request {request}: held, said while a conversation with the lamp was going on: it goes on from here, as its answer would have renewed it (LAMP_REMARK_ABOUT_IT)"
+                );
+                self.held_in_conversation_us = Some(monotonic_us());
+            }
         }
         why
     }
@@ -8594,6 +8671,7 @@ impl Heeding {
     fn judged_verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
         self.marking_the_line(request, seen);
         let someone_else = self.someone_else(seen);
+        let after_remark = std::mem::take(&mut self.after_remark);
         // #3945: whether only one person is at the lamp (no other voice, no
         // face speaking it but the caller's, at most one face in view), read
         // only for a line opening with a set-off name that is also a word
@@ -8688,6 +8766,21 @@ impl Heeding {
             && crate::turned_away::turns_to_another(heard)
         {
             verdict = Some(crate::attention::Verdict::Hold(crate::turned_away::HELD));
+        }
+        // The line right after a remark held about the lamp, let out only as
+        // the conversation going on, carries on that talk to someone else
+        // unless it is in the conversation's own voice or answers the
+        // lamp's question (#4175, d10).
+        if self.remark_about_it
+            && after_remark
+            && attention.played_only_as_going_on()
+            && matches!(verdict, Some(crate::attention::Verdict::Play(_)))
+            && !lamp_asked
+            && !seen.same_voice
+        {
+            verdict = Some(crate::attention::Verdict::Hold(
+                crate::remark_about_it::AFTER_A_REMARK,
+            ));
         }
         // A stop said over the lamp's answer is not a short line of a busy
         // room's either (the Reviewer-lead's P2 on #4019).
@@ -19391,6 +19484,502 @@ mod tests {
                 )
             },
             None
+        );
+    }
+
+    /// How #4175's scene's voice prints come ([`remark_scene`]): none (no
+    /// voice check), each known at its own line's verdict, or each known
+    /// only after it, at the next line's.
+    #[derive(Clone, Copy, PartialEq, Debug)]
+    enum Prints {
+        None,
+        AtVerdict,
+        Late,
+    }
+
+    /// How #4175's scene is run ([`remark_scene`]): a room made busy before
+    /// it (three lines left alone) or not yet known, `LAMP_REMARK_ABOUT_IT`,
+    /// the prints, and `LAMP_SAME_SPEAKER_CARRIES`. With `product`, the
+    /// product unit's switches instead of the follow-up and not-own ones
+    /// ([`remark_scene`]). `left_by_model`: lines let out that the model
+    /// leaves unanswered (`not_for_me`), closed as talk.
+    #[derive(Clone, Copy, Debug)]
+    struct Scene {
+        left_by_model: &'static [u64],
+        product: bool,
+        busy: bool,
+        remark: bool,
+        prints: Prints,
+        carries: bool,
+    }
+
+    /// One line of #4175's scene: begun at virtual millisecond `at`, `long`
+    /// ms long, in `voice` (1 the owner, -1 a colleague), its words, and
+    /// whether lamp-name heard the name at its start (0.977, as on
+    /// lamp-4ace).
+    type SceneLine = (u64, u64, i16, &'static str, bool);
+
+    /// #4175's scene on this route: `--spoken-to` (only talk counted), `LAMP_NAME_SECOND_SIGN`,
+    /// `LAMP_NAME_OR_FOLLOW_UP` (held talk counted), `LAMP_GOING_ON_NOT_OWN`,
+    /// and `scene`'s switches. Each line is judged at its end, as virtual
+    /// time passes; one let out is answered 1 s after its end with words
+    /// 3 s long (the thread, `Did::Said`, `RoomTold::spoke`); one held is
+    /// left unanswered (`RoomTold::unanswered`). Requests are 101 on: the
+    /// three lines that make the room busy are 1 to 3. The verdicts, each
+    /// also said in the journal.
+    /// With `scene.product`, as the product unit of 8652 runs it
+    /// (`deploy/product/lamp-voice.service` at f756b8678): strict
+    /// (`LAMP_ATTENTION=busy-near`, no bus so nothing near),
+    /// `LAMP_NAME_IN_PASSING=ignored`, `--spoken-to`,
+    /// `LAMP_NAME_SECOND_SIGN`, `LAMP_NAME_STAYS_IN_ITS_LINE` and
+    /// `LAMP_BUSY_ENDS_SOONER`; no voice model, no `LAMP_NAME_OR_FOLLOW_UP`,
+    /// no `LAMP_GOING_ON_NOT_OWN`. The engine's switches
+    /// (`LAMP_SECOND_NAME_CARRIES`, `LAMP_CALL_TAKES_NEXT_LINE`,
+    /// `LAMP_NOT_FOR_ME_WORDS`) are not on this path.
+    fn remark_scene(scene: Scene, lines: &[SceneLine]) -> Vec<Option<&'static str>> {
+        use crate::room_told::Room;
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, each given only once released.
+        struct Late(
+            Arc<Mutex<Vec<u64>>>,
+            std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>,
+        );
+        impl crate::same_voice::Printer for Late {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.1.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                let released = self.0.lock().unwrap();
+                let at = self
+                    .1
+                    .iter()
+                    .position(|(request, _)| released.contains(request))?;
+                self.1.remove(at)
+            }
+        }
+        let ms = Duration::from_millis;
+        // The route's clock moves with the scene, so a name heard in one
+        // line is not heard again in the next ones' sound.
+        let clock = clock_with_history();
+        let by = std::rc::Rc::new(std::cell::Cell::new(Duration::ZERO));
+        let passing = by.clone();
+        clock
+            .set_pump(move |phase| {
+                if matches!(phase, crate::scenario_clock::Phase::Run) {
+                    crate::scenario_clock::elapse_for_fault(passing.get())?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            *room = crate::room_told::RoomTold::new();
+            room.count_only_talk(true);
+            if scene.product {
+                // `LAMP_BUSY_ENDS_SOONER` (`keeping_room`).
+                room.end_busy_sooner(true);
+                room.end_busy_once_answered(true);
+            } else {
+                room.count_held_talk(true);
+            }
+            if scene.busy {
+                for other in 1..=3 {
+                    room.unanswered(other, monotonic_us());
+                }
+                assert_eq!(room.at(monotonic_us()), Room::Busy);
+            }
+        }
+        let mut heeding = room_name_heeding(true);
+        heeding.as_the_only_voice(false, true, false);
+        if scene.product {
+            // `LAMP_NAME_STAYS_IN_ITS_LINE`.
+            heeding.keeping_the_name_in_its_line();
+        } else {
+            heeding.needing_name_or_follow_up();
+            heeding.not_counting_own_answers();
+        }
+        if scene.remark {
+            heeding.holding_remarks_about_it();
+        }
+        if scene.carries {
+            heeding.carrying_the_same_speaker();
+        }
+        let released: Arc<Mutex<Vec<u64>>> = Arc::default();
+        if scene.prints != Prints::None {
+            heeding.checking_the_voice(Box::new(Late(
+                released.clone(),
+                std::collections::VecDeque::new(),
+            )));
+        }
+        // (request, words, its answer's virtual start)
+        let mut answered: Vec<(u64, &str, u64)> = Vec::new();
+        let mut was = 0;
+        let mut verdicts = Vec::new();
+        for (request, &(at, long, voice, heard, named)) in (101..).zip(lines) {
+            // Time passes to the line's end: the route's clock moves, and
+            // the thread's answers and the call are that much older.
+            let end = at + long;
+            let passed = ms(end - was);
+            was = end;
+            by.set(passed);
+            assert!(crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap());
+            heeding.called_at = heeding.called_at.map(|at| at - passed);
+            let now = Instant::now();
+            let mut thread = crate::thread::Thread::new();
+            for (asked, person, began) in &answered {
+                let then = now - ms(end - began);
+                thread.person(person, true, then);
+                thread.lamp(*asked, "Sure, here is what I think.", then);
+            }
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let now_us = monotonic_us();
+            let said = (now_us - long * 1_000, now_us);
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                room.heard(request, said.0);
+                room.ended(request, now_us);
+            }
+            if scene.prints != Prints::None {
+                heeding.hear(
+                    request,
+                    Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                heeding.hear(request, Heard::Ended);
+            }
+            if scene.prints == Prints::AtVerdict {
+                released.lock().unwrap().push(request);
+            }
+            let held = if named {
+                let mut signs = heeding.signs(request, said);
+                signs.names = vec![(said.0 + 200_000, 0.977)];
+                heeding.judge(request, said, heard, signs)
+            } else {
+                heeding.heed(request, said, heard, None)
+            };
+            eprintln!("#4175 scene {scene:?}: request {request} \"{heard}\": {held:?}");
+            released.lock().unwrap().push(request);
+            let mut room = crate::room_told::room().lock().unwrap();
+            if held.is_none() && scene.left_by_model.contains(&request) {
+                eprintln!("#4175 scene: request {request}: left unanswered by the model");
+                room.unanswered(request, now_us);
+            } else if held.is_none() {
+                answered.push((request, heard, end + 1_000));
+                heeding.lamp_did(crate::second_provider::Did::Said(
+                    request,
+                    now_us + 4_000_000,
+                ));
+                room.spoke(request, now_us + 1_000_000);
+            } else {
+                room.unanswered(request, now_us);
+            }
+            verdicts.push(held);
+        }
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        drop(clock);
+        verdicts
+    }
+
+    /// #4175's scene as lamp-4ace heard it in build 8327's busy_day check
+    /// on 2026-10-28, at its lines' rough timings (each 1.5 to 3 s long,
+    /// 1.5 s apart, every answer 3 s long): the owner (voice 1) calls the
+    /// lamp and goes on twice (c01 to c03), two colleagues (voice -1) talk
+    /// (d09 to d12), and the owner goes on (c04 to c06). The colleagues
+    /// begin `gap` ms after the lamp's words to c03 ended (at 23 s); the
+    /// lines after d09 keep their spacing.
+    fn remark_scene_lines(gap: u64) -> [SceneLine; 10] {
+        let d = 23_000 + gap - 24_500;
+        [
+            (
+                0,
+                3_000,
+                1,
+                "Lamp, I have not been sleeping well lately.",
+                false,
+            ),
+            (
+                8_500,
+                2_500,
+                1,
+                "I keep waking up at three every night.",
+                false,
+            ),
+            (
+                16_500,
+                2_500,
+                1,
+                "I think it is mostly stress from work.",
+                false,
+            ),
+            (24_500 + d, 1_500, -1, "That lamp is cute.", true),
+            (
+                27_500 + d,
+                3_000,
+                -1,
+                "It's from the office, they're testing it.",
+                false,
+            ),
+            (
+                36_000 + d,
+                3_000,
+                -1,
+                "Do you want coffee? I'm going downstairs.",
+                false,
+            ),
+            (
+                40_500 + d,
+                2_500,
+                -1,
+                "Yes please, a latte, no sugar.",
+                false,
+            ),
+            (44_500 + d, 2_500, 1, "Maybe. What would you do?", false),
+            (
+                52_500 + d,
+                2_500,
+                1,
+                "Any tips to sleep better tonight?",
+                false,
+            ),
+            (
+                60_500 + d,
+                2_500,
+                1,
+                "Thanks. You're a good listener.",
+                false,
+            ),
+        ]
+    }
+
+    /// #4175, a voice print come late: the owner calls the lamp and goes
+    /// on, a colleague's line is let out as the conversation going on
+    /// before its print is back, and the owner's lines after it go on: the
+    /// late print ends nothing. Each print comes only at the next line's
+    /// verdict, in a room not yet known busy.
+    #[test]
+    fn with_remarks_held_a_colleagues_late_print_ends_not_the_owners_conversation() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let scene = Scene {
+            left_by_model: &[],
+            product: false,
+            busy: false,
+            remark: true,
+            prints: Prints::Late,
+            carries: false,
+        };
+        let held = remark_scene(
+            scene,
+            &[
+                (
+                    0,
+                    3_000,
+                    1,
+                    "Lamp, I have not been sleeping well lately.",
+                    false,
+                ),
+                (
+                    8_500,
+                    2_500,
+                    1,
+                    "I keep waking up at three every night.",
+                    false,
+                ),
+                (
+                    16_500,
+                    3_000,
+                    -1,
+                    "It's from the office, they're testing it.",
+                    false,
+                ),
+                (24_000, 2_500, 1, "Maybe. What would you do?", false),
+                (32_000, 2_500, 1, "Any tips to sleep better tonight?", false),
+            ],
+        );
+        assert_eq!(held[3], None, "c04 after the colleague's line");
+        assert_eq!(held[4], None, "c05");
+    }
+
+    /// #4175: d10, a colleague's "It's from the office, they're testing
+    /// it." said in the owner's conversation, is held by its voice print at
+    /// its verdict. With the print back only after it and no remark held
+    /// before it, nothing tells it from the owner's own line: that case is
+    /// [`with_remarks_held_the_owners_conversation_outlives_the_colleagues_talk`]'s
+    /// line after a remark.
+    #[test]
+    fn with_remarks_held_a_colleagues_line_after_the_owners_conversation_is_held() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let lines = [
+            (
+                0,
+                3_000,
+                1,
+                "Lamp, I have not been sleeping well lately.",
+                false,
+            ),
+            (
+                8_500,
+                2_500,
+                1,
+                "I keep waking up at three every night.",
+                false,
+            ),
+            (
+                16_500,
+                3_000,
+                -1,
+                "It's from the office, they're testing it.",
+                false,
+            ),
+        ];
+        let scene = Scene {
+            left_by_model: &[],
+            product: false,
+            busy: false,
+            remark: true,
+            prints: Prints::AtVerdict,
+            carries: false,
+        };
+        assert!(remark_scene(scene, &lines)[2].is_some());
+    }
+
+    /// #4175: in a busy room with `LAMP_NAME_OR_FOLLOW_UP`, "That lamp is
+    /// cute." held 9 s after the lamp's words to the owner and the
+    /// colleagues' lines held after it each renew the follow-up's 8 s, so
+    /// the owner's next line goes on, whenever the prints come.
+    #[test]
+    fn with_remarks_held_the_owners_line_after_held_colleagues_goes_on_in_a_busy_room() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for prints in [Prints::None, Prints::AtVerdict, Prints::Late] {
+            let scene = Scene {
+                left_by_model: &[],
+                product: false,
+                busy: true,
+                remark: true,
+                prints,
+                carries: false,
+            };
+            let held = remark_scene(scene, &remark_scene_lines(9_000));
+            assert_eq!(
+                held[3],
+                Some(crate::remark_about_it::HELD),
+                "{prints:?}: d09"
+            );
+            assert_eq!(held[7], None, "{prints:?}: c04");
+        }
+    }
+
+    /// #4175: the room keeps every request held by the lamp's rule until it
+    /// is closed, so a held line judged before the one held before it is
+    /// closed leaves neither counted as talk past the lamp.
+    #[test]
+    fn two_held_lines_closed_after_both_verdicts_are_no_talk_past_the_lamp() {
+        use crate::attention::Verdict;
+        let hold = Some(Verdict::Hold(crate::attention::NOT_SPOKEN_TO));
+        let mut room = crate::room_told::RoomTold::new();
+        room.count_only_talk(true);
+        room.spoke(10, 1_000_000);
+        room.judged(11, hold, false);
+        room.judged(12, hold, false);
+        room.unanswered(11, 2_000_000);
+        room.unanswered(12, 3_000_000);
+        assert_eq!(room.left_alone_since_spoke(), 0, "d11 and d12");
+        // Three so, as d09, d11 and d12 could be: talk past the lamp.
+        room.spoke(20, 4_000_000);
+        for request in 21..=23 {
+            room.judged(request, hold, false);
+        }
+        for request in 21..=23 {
+            room.unanswered(request, 5_000_000);
+        }
+        assert!(!room.talked_past_the_lamp(), "three held lines");
+    }
+
+    /// #4175 on the product unit of 8652 (lamp-4ace's busy_day check on
+    /// 2026-10-28), at the scene's timings, colleagues 1.5 s to 20 s after
+    /// the lamp's words to c03, in a room the talk before it made busy (three
+    /// lines the model left alone): with `LAMP_REMARK_ABOUT_IT` the remark
+    /// is held and the owner's c04 to c06 are still answered, as without it.
+    #[test]
+    fn on_the_product_unit_the_owners_lines_after_a_held_remark_are_answered() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut wrong = Vec::new();
+        // At 37 s the busy room ends (a minute after the lamp's first
+        // answer since the talk, `LAMP_BUSY_ENDS_SOONER`) between d09 and
+        // d10, as longer answers would have it; d11 and d12 let out and
+        // left alone by the model, or answered.
+        // With d11 and d12 left alone by the model the owner's lines are
+        // held as talk past the lamp with the switch off too: the switch
+        // only must not make them worse.
+        for (gap, left_by_model) in [
+            (1_500, &[][..]),
+            (9_000, &[][..]),
+            (16_000, &[][..]),
+            (20_000, &[][..]),
+            (37_000, &[][..]),
+            (37_000, &[106, 107][..]),
+        ] {
+            let [off, on] = [false, true].map(|remark| {
+                let scene = Scene {
+                    left_by_model,
+                    product: true,
+                    busy: true,
+                    remark,
+                    prints: Prints::None,
+                    carries: false,
+                };
+                remark_scene(scene, &remark_scene_lines(gap))
+            });
+            let answered = left_by_model.is_empty();
+            if on[7..] != off[7..] || (answered && on[7..] != [None, None, None]) {
+                wrong.push(format!(
+                    "gap {gap}, left {left_by_model:?}: off {off:?}, on {on:?}"
+                ));
+            }
+            if gap >= 16_000 && on[3] != Some(crate::remark_about_it::HELD) {
+                wrong.push(format!("gap {gap}: d09 not held as a remark: {on:?}"));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// #4175 end to end on this route, c01 to c06 at their rough timings,
+    /// with the colleagues 9 s after the lamp's words to c03 and each
+    /// print back only after its verdict, in a busy room: the remark and
+    /// the line after it are held, the owner's c04 to c06 answered. In a
+    /// room not known busy the remark rule doesn't hold the remark.
+    #[test]
+    fn with_remarks_held_the_owners_conversation_outlives_the_colleagues_talk() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let scene = Scene {
+            left_by_model: &[],
+            product: false,
+            busy: true,
+            remark: true,
+            prints: Prints::Late,
+            carries: false,
+        };
+        let held = remark_scene(scene, &remark_scene_lines(9_000));
+        // d11 and d12, prints late and no sign of their own, are let out
+        // as the conversation going on, as without the switch.
+        let let_out: Vec<bool> = held[..5]
+            .iter()
+            .chain(&held[7..])
+            .map(Option::is_none)
+            .collect();
+        assert_eq!(
+            let_out,
+            [true, true, true, false, false, true, true, true],
+            "{held:?}"
         );
     }
 
