@@ -7,6 +7,7 @@ const RECENT_ENDS: usize = 4;
 
 #[derive(Clone, Default)]
 pub(super) struct CarryWindow {
+    begun_for: Option<u64>,
     first_request: Option<u64>,
     answer: Option<(u64, u64)>,
     used: bool,
@@ -22,21 +23,25 @@ impl CarryWindow {
     /// Whether nothing is kept: no conversation carried.
     #[cfg(test)]
     pub(super) fn is_clear(&self) -> bool {
-        self.first_request.is_none()
+        self.begun_for.is_none()
+            && self.first_request.is_none()
             && self.answer.is_none()
             && !self.used
             && self.held_end.is_none()
             && self.ends.is_empty()
     }
 
-    /// The request the window was begun, or last answered, for: a window
-    /// begun since for a new caller has another.
-    pub(super) fn first_request(&self) -> Option<u64> {
-        self.first_request
+    /// The request the window was begun for: a window begun since for a
+    /// new caller has another. An answer leaves it, as the two copies of a
+    /// window answer under different chains (the Reviewer-lead's P3 on
+    /// #4435).
+    pub(super) fn begun_for(&self) -> Option<u64> {
+        self.begun_for
     }
 
     pub(super) fn begin(&mut self, request: u64) {
         self.clear();
+        self.begun_for = Some(request);
         self.first_request = Some(request);
     }
 
