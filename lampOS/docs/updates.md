@@ -1025,14 +1025,18 @@ bus instead: a round that acts says `update/status` (#2194,
 `lamp_update::status`) as each phase begins (`checking`, `fetching`,
 `switching`, `watching`, and `restoring` for a rollback's put-back) and
 `idle` with its outcome's name and build when it ends, with the build
-`state.json` says the lamp runs and no reason text. For a round that did not
-switch, the end also says where it stopped by a fixed name (`reason`: the
-last phase it said, or `models` for `WaitsForModels`), and every end says
-when its round began (`started_at_unix_ms`, its `checking`), for #1683's
-update alerts. A new updater's confirmation of its own switch is a round's
+`state.json` says the lamp runs and no reason text. For a round that refused,
+failed, rolled back, was unreachable or found no quiet moment, the end also
+says where it stopped by a fixed name (`reason`: the last phase it said, or
+`models` for `WaitsForModels`). An end says when its round began
+(`started_at_unix_ms`, its `checking`), for #1683's update alerts. A round
+that ends before its first phase, such as one whose lock is taken
+(`round.rs`, the lock before `checking`), says neither. A new updater's confirmation of its own switch is a round's
 end too, `self-confirmed` with the build its dry round found, so it is the
 last result the new updater says when it starts telling. A round's end is logged
-in `log.jsonl` with `"round": true` and its build, and read back when
+in `log.jsonl` with `"round": true` and its build, synced with its folder
+(the root mount's `commit=600` would otherwise lose it to a power cut within
+10 minutes; the log's other lines are not synced), and read back when
 lamp-update starts, so the last result outlives a restart and its own
 switch. It is said again every minute and lasts three, so a lamp-update that
 died mid-round reads stale.

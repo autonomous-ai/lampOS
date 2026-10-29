@@ -493,6 +493,18 @@ impl Records {
             "round": true,
             "sequence": sequence,
         }));
+        // A round's end is the last result `update/status` reads back at
+        // start: synced, file and folder, so a power cut within the root
+        // mount's `commit=600` (its 10 minutes, El's on lamp-06c1, 29 Oct)
+        // doesn't bring back the one before. Once a round, so the flash
+        // barely sees it; other lines are left to the mount.
+        let path = self.folder.join("log.jsonl");
+        if let Ok(file) = File::open(&path) {
+            let _ = file.sync_all();
+        }
+        if let Ok(folder) = File::open(&self.folder) {
+            let _ = folder.sync_all();
+        }
     }
 
     /// The last round's end the log holds, newest file first: its event,
