@@ -952,3 +952,65 @@ mod product_settings_tests {
         );
     }
 }
+
+/// The updater's own unit is one no round switches (`round::OWN_UNIT`): a
+/// lamp keeps the line its image installed, and every `lamp-update` it
+/// climbs to is started by it. On the 7071 image (#3689) that is
+/// `aa9ec9e27a`'s `deploy/product/lamp-update.service:26`. If this program
+/// no longer took it, a climbed updater would end with 2 at each start,
+/// unconfirmed, and `lamp-update-back` would put 7071's back at its
+/// deadline: every 7071 lamp would climb and fall back, round after round.
+#[cfg(test)]
+mod own_unit_line_tests {
+    use super::*;
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    const LINE_7071: &str = "/opt/lampOS/update/current/lamp-update serve \
+        --channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/ \
+        --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on";
+    const PRODUCT_UNIT: &str = include_str!("../../../deploy/product/lamp-update.service");
+
+    /// The line's command and options, as this program reads them, on a
+    /// lamp whose key and host name are under `root`.
+    fn read(line: &str, root: &Path) -> Result<(String, Config), String> {
+        let words: Vec<String> = line.split_whitespace().skip(1).map(String::from).collect();
+        let (command, rest) = words.split_first().ok_or("no command")?;
+        let mut options = options(rest).ok_or("not --name value pairs")?;
+        // Its key is at an absolute path: the same file, under `root`.
+        let key = options.get_mut("key-file").ok_or("no --key-file")?;
+        *key = root.join(key.trim_start_matches('/')).display().to_string();
+        options.insert("root".into(), root.display().to_string());
+        let (config, _, _) = config(command, &options)?;
+        Ok((command.clone(), config))
+    }
+
+    #[test]
+    fn the_7071_images_own_unit_line_still_starts_this_updater() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("etc/lampOS/update")).unwrap();
+        fs::write(
+            root.path().join("etc/lampOS/update/key.pub"),
+            format!("{}\n", STANDARD.encode([7_u8; 32])),
+        )
+        .unwrap();
+        fs::write(root.path().join("etc/hostname"), "lamp-7071\n").unwrap();
+        let product = PRODUCT_UNIT
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .unwrap();
+        for line in [LINE_7071, product] {
+            let (command, config) =
+                read(line, root.path()).unwrap_or_else(|why| panic!("{line}: {why}"));
+            assert_eq!(command, "serve", "{line}");
+            assert_eq!(
+                config.channel_url,
+                "https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/",
+                "{line}"
+            );
+            assert_eq!(config.channel, "lamp-voice", "{line}");
+            assert_eq!(config.key, [7_u8; 32], "{line}");
+            assert_eq!(config.lamp, "lamp-7071", "{line}");
+            assert!(config.apply, "{line}");
+        }
+    }
+}
