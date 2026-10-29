@@ -226,6 +226,15 @@ pub struct NewsWords {
     /// updated there. A skill without it says the built-in words.
     #[serde(default = "failed_no_prompt")]
     pub failed_no_prompt: String,
+    /// A question task answered (`agent_tasks::QUESTION`), with its answer
+    /// whole: the slots of [`Self::done`], `{asked}` the person's question.
+    /// A skill without it says the built-in words, so one written before it
+    /// still passes.
+    #[serde(default = "answered")]
+    pub answered: String,
+    /// ...or cut: the same slots.
+    #[serde(default = "answered_cut")]
+    pub answered_cut: String,
     /// Two or three finished, told together: `{how_many}`, `{each}`,
     /// `{first}` and `{goes_on}`.
     pub together: String,
@@ -275,6 +284,19 @@ fn failed_no_prompt() -> String {
     "The work the person asked you to hand over, \"{asked}\", did not reach {who}: {computer} can't start it with work yet, so trying again won't help. Tell them that in one plain, light sentence, with no technical words, and that the software on that computer has to be updated first.".into()
 }
 
+/// [`NewsWords::answered`]'s words, built in.
+fn answered() -> String {
+    ANSWERED.into()
+}
+
+/// [`NewsWords::answered_cut`]'s words, built in.
+fn answered_cut() -> String {
+    ANSWERED_CUT.into()
+}
+
+const ANSWERED: &str = "News from a question you handed over for the person. {who} {when} answered the question they asked it: \"{asked}\". Its answer: \"{answer}\". Tell them now in one or two natural spoken sentences, starting with something like \"{who} says…\", then the answer in plain words. Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. {no_question}";
+const ANSWERED_CUT: &str = "News from a question you handed over for the person. {who} {when} answered the question they asked it: \"{asked}\". Its answer is long; it begins: \"{answer}\". Tell them now in one or two natural spoken sentences, starting with something like \"{who} says…\", then the answer in one plain line from that beginning, then that the rest is on {computer}. No code, lists, file paths or links, {no_question}";
+
 /// [`NewsWords::failed_signed_out`]'s words, built in.
 fn failed_signed_out() -> String {
     "The work the person asked you to hand over, \"{asked}\", did not reach {who}, as it isn't signed in on {computer}, so it could not start. Tell them that in one plain, light sentence, with no technical words, and that it has to be signed in there first.".into()
@@ -305,6 +327,8 @@ impl NewsWords {
             failed_folder: failed_folder(),
             failed_signed_out: failed_signed_out(),
             failed_no_prompt: failed_no_prompt(),
+            answered: answered(),
+            answered_cut: answered_cut(),
             together: "News from {how_many} pieces of work you handed over for the person. {each} Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. No code, lists, file paths or links.{goes_on} No question.".into(),
             together_each: "{who} finished \"{asked}\" {when}: \"{answer}\".".into(),
             two: "two".into(),
@@ -375,6 +399,8 @@ impl NewsWords {
                     &self.failed_signed_out,
                     &["asked", "computer", "who"],
                 ),
+                ("answered", &self.answered, done),
+                ("answered_cut", &self.answered_cut, done),
                 (
                     "failed_no_prompt",
                     &self.failed_no_prompt,
@@ -477,6 +503,8 @@ impl NewsWords {
                 ("failed_folder", note(&self.failed_folder, &[])),
                 ("failed_signed_out", note(&self.failed_signed_out, &[])),
                 ("failed_no_prompt", note(&self.failed_no_prompt, &[])),
+                ("answered", note(&self.answered, &done)),
+                ("answered_cut", note(&self.answered_cut, &done)),
                 (
                     "together",
                     note(
@@ -675,7 +703,8 @@ mod tests {
     /// Each line has exactly its slots, a slot named twice twice; and a
     /// value filled in is never read as a slot.
     /// A Task news written before `failed_folder` (#2840) and
-    /// `failed_signed_out` (openharness#1788) still passes, with the
+    /// `failed_signed_out` (openharness#1788), or before `answered` and
+    /// `answered_cut` (a question task's answer), still passes, with the
     /// built-in words for them, and the skill's own are the same.
     #[test]
     fn a_task_news_without_the_folder_words_passes_with_the_built_in_ones() {
@@ -683,9 +712,15 @@ mod tests {
         let older: String = text
             .lines()
             .filter(|line| {
-                !line.starts_with("failed_folder = ")
-                    && !line.starts_with("failed_signed_out = ")
-                    && !line.starts_with("failed_no_prompt = ")
+                ![
+                    "failed_folder = ",
+                    "failed_signed_out = ",
+                    "failed_no_prompt = ",
+                    "answered = ",
+                    "answered_cut = ",
+                ]
+                .iter()
+                .any(|key| line.starts_with(key))
             })
             .map(|line| format!("{line}\n"))
             .collect();
@@ -704,6 +739,13 @@ mod tests {
         assert_eq!(installed.failed_folder, failed_folder());
         assert_eq!(installed.failed_signed_out, failed_signed_out());
         assert_eq!(installed.failed_no_prompt, failed_no_prompt());
+        assert_eq!(read.answered, answered());
+        assert_eq!(read.answered_cut, answered_cut());
+        let installed = NewsWords::in_dir(&skills());
+        assert_eq!(installed.failed_folder, failed_folder());
+        assert_eq!(installed.failed_signed_out, failed_signed_out());
+        assert_eq!(installed.answered, answered());
+        assert_eq!(installed.answered_cut, answered_cut());
     }
 
     #[test]

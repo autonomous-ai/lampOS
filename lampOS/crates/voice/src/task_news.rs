@@ -1513,7 +1513,7 @@ fn note_failed(
     unsure: bool,
     code: Option<&str>,
 ) -> Option<String> {
-    let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+    let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
     let who = who(task);
     let say = |line: &str, computer: &str| {
         fitted(&asked, "", false, |asked, _, _| {
@@ -1716,8 +1716,10 @@ pub(crate) fn quoted(text: &str, most: usize) -> (String, bool) {
 /// nothing to tell.
 fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<String> {
     let who = who(task);
+    // A question task (`agent_tasks::QUESTION`) is told as its answer.
+    let question = crate::agent_tasks::question_of(task["text"].as_str()?).is_some();
     let computer = their_computer(task);
-    let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+    let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
     let (answer, cut) = quoted(
         data["answer"].as_str().unwrap_or_default(),
         MOST_ANSWER_CHARS,
@@ -1751,9 +1753,22 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
         let (line, no_question, waiting) = match state {
             // Cut: the gist first, from what is kept, then where the rest is.
             "idle" if !more.is_empty() => {
-                (&words.done_cut, no_question_cut.as_str(), String::new())
+                let line = if question {
+                    &words.answered_cut
+                } else {
+                    &words.done_cut
+                };
+                (line, no_question_cut.as_str(), String::new())
             }
-            "idle" => (&words.done, no_question.as_str(), String::new()),
+            "idle" => (
+                if question {
+                    &words.answered
+                } else {
+                    &words.done
+                },
+                no_question.as_str(),
+                String::new(),
+            ),
             "needs-input" if said.is_empty() => {
                 (&words.asking, "", waiting(words, who, &computer, ""))
             }
@@ -1780,13 +1795,20 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
     fitted(&asked, &answer, cut, say)
 }
 
+/// What the person asked, as the news says it: a question task's own
+/// question (`agent_tasks::question_of`), any other task's text.
+fn asked_text(task: &Value) -> Option<&str> {
+    let text = task["text"].as_str()?;
+    Some(crate::agent_tasks::question_of(text).unwrap_or(text))
+}
+
 /// A task finished with an answer, as [`note`] reads it, for telling with
 /// others; none for any other state.
 fn finished(task: &Value, data: &Value, age_ms: u64) -> Option<Finished> {
     if data["state"].as_str()? != "idle" {
         return None;
     }
-    let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+    let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
     let (answer, cut) = quoted(
         data["answer"].as_str().unwrap_or_default(),
         MOST_ANSWER_CHARS,
@@ -2005,7 +2027,7 @@ fn note_progress(
     working_s: Option<u64>,
 ) -> Option<String> {
     let who = who(task);
-    let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+    let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
     let (about, cut) = quoted(about, MOST_ABOUT_CHARS);
     if about.is_empty() {
         return None;
@@ -2681,6 +2703,54 @@ mod tests {
             serde_json::json!({"op":"sign_in_asked","id":5,"request":42})
         );
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// A question task (`agent_tasks::QUESTION`) that finished is told as
+    /// its answer, "Devin says…", quoting the person's own question with
+    /// neither the opening nor the past-work line; cut, with
+    /// the cut words. Any other task is told as before, and a question that
+    /// failed quotes the question too.
+    #[test]
+    fn a_finished_question_task_is_told_as_its_answer() {
+        use crate::agent_tasks::{PAST_WORK, QUESTION};
+        let words = own();
+        for engine in ["devin-cloud", "devin"] {
+            let records = PAST_WORK;
+            let mut asked = task(engine, json!([]));
+            asked["text"] = json!(format!(
+                "{QUESTION} what did Devin build last week? {records}"
+            ));
+            let done =
+                json!({"state":"idle","answer":"A settings page and two fixes.","truncated":false});
+            let note = super::note(&words, &asked, &done, 0).unwrap();
+            assert!(
+                note.contains("Devin just answered the question they asked it: \"what did Devin build last week?\"")
+                    && note.contains("Its answer: \"A settings page and two fixes.\"")
+                    && note.contains("\"Devin says…\""),
+                "{note}"
+            );
+            for left_out in [QUESTION, records, "finished the task"] {
+                assert!(!note.contains(left_out), "{left_out}: {note}");
+            }
+            let long = json!({"state":"idle","answer":"A settings page.","truncated":true});
+            let cut = super::note(&words, &asked, &long, 0).unwrap();
+            assert!(
+                cut.contains("Its answer is long; it begins: \"A settings page."),
+                "{cut}"
+            );
+            assert!(cut.contains("\"Devin says…\""), "{cut}");
+            let failed = super::note_failed(&words, &asked, false, None).unwrap();
+            assert!(
+                failed.contains("\"what did Devin build last week?\""),
+                "{failed}"
+            );
+            assert!(!failed.contains(QUESTION), "{failed}");
+        }
+        let work = task("claude", json!([]));
+        let done = json!({"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false});
+        let note = super::note(&words, &work, &done, 0).unwrap();
+        assert!(note.contains("finished the task they gave it"), "{note}");
+        assert!(!note.contains("says…"), "{note}");
     }
 
     fn task(engine: &str, observations: Value) -> Value {
@@ -3539,6 +3609,7 @@ mod tests {
             make_skill: true,
             named_only: false,
             correct: false,
+            questions: false,
             sign_in: false,
         };
         let kept = read(&on);
