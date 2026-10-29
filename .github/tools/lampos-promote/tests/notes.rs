@@ -102,6 +102,19 @@ fn a_rows_words_are_its_first_sentence_after_its_values_and_bounded() {
         words.ends_with('…') && words.chars().count() <= 141,
         "{words}"
     );
+    assert!(words.ends_with("word…"), "cut at a whole word: {words}");
+    // A cut inside a code span ends before it, so no backtick is left open
+    // (Third's P3 on #4400).
+    let spanned = format!(
+        "| LAMP_SPAN | `on`; off. {}the file (`lamp-near-call --from the chair of the person`), and more | — | — | until |",
+        "word ".repeat(22)
+    );
+    let page = format!(
+        "## The other parts\n\n| Switch | Values | a | b | Counted as |\n|---|---|---|---|---|\n{spanned}\n"
+    );
+    let words = &waiting(&page, &BTreeMap::new())[0].words;
+    assert_eq!(words.matches('`').count() % 2, 0, "{words}");
+    assert!(words.ends_with("the file…"), "{words}");
 }
 
 #[test]
@@ -175,6 +188,13 @@ fn on_this_repository_each_listed_switch_is_off_in_every_product_file() {
     assert!(found.len() > 10, "{}", found.len());
     for listed in &found {
         assert!(!on.contains_key(&listed.switch), "{} is on", listed.switch);
+        assert_eq!(
+            listed.words.matches('`').count() % 2,
+            0,
+            "{}: {}",
+            listed.switch,
+            listed.words
+        );
         for (name, text) in &files {
             for line in text.lines().filter(|l| !l.trim_start().starts_with('#')) {
                 assert!(
