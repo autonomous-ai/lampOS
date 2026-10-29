@@ -31,7 +31,11 @@ impl Drop for Root {
 #[test]
 fn every_first_topic_is_declared_on_the_bus_and_carries_its_type() {
     let root = Root::new();
-    let bus = Bus::new(&root.0).unwrap();
+    // A lease far past the test's own length: a publisher that has not
+    // spoken renews its entry only when it speaks, so with the bus's 3 s a
+    // loaded host that takes longer to declare all seventeen saw the first
+    // as gone (`board/state`, 0 publishers; #1569, Third, 29 Oct).
+    let bus = Bus::new(&root.0).unwrap().lease(Duration::from_secs(60));
     // The bus takes every name and every declaration: seventeen topics,
     // each with a publisher that has not spoken yet.
     let mut publishers: Vec<Publisher> = first_topics()
