@@ -4149,6 +4149,8 @@ fn spawn_rig(
     // And whether the person's light is kept across a restart
     // (`LAMP_LIGHT_KEEP=on`, #1464).
     let ring_keep = crate::ring_light::keep_arguments_from_environment();
+    // And, on a dev lamp, every pulse played (`LAMP_RING_EVERY_PULSE=on`).
+    let ring_every_pulse = crate::ring_light::every_pulse_arguments_from_environment();
     let ring_caps = crate::ring_caps::arguments_from_environment();
     if lifetime.continuous() {
         ring_arguments.extend(ring_bus.iter().map(String::as_str));
@@ -4157,6 +4159,7 @@ fn spawn_rig(
         ring_arguments.extend(ring_requests.iter().map(String::as_str));
         ring_arguments.extend(ring_speaking.iter().map(String::as_str));
         ring_arguments.extend(ring_keep.iter().map(String::as_str));
+        ring_arguments.extend(ring_every_pulse.iter().map(String::as_str));
         ring_arguments.extend(ring_caps.iter().map(String::as_str));
     } else if !ring_caps.is_empty() {
         ring_arguments.extend(ring_caps.iter().map(String::as_str));
