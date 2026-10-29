@@ -147,14 +147,20 @@ fn not_switched_code(outcome: &str) -> &'static str {
         .unwrap_or("other")
 }
 
-/// A build the lamp ran: its sequence and, when it is hex digits, its
-/// commit, as [`reports::Build`] takes one.
+/// A build the lamp ran: its sequence and, when it is hex digits, the
+/// first [`SHORT_COMMIT`] characters of its commit, as [`reports::Build`]
+/// takes one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Version(String);
 
+/// How much of the commit `from` carries: a manifest's commit is 40 hex
+/// characters, more than [`reports::Build`] takes after the sequence.
+const SHORT_COMMIT: usize = 7;
+
 impl Version {
     fn running(build: &lamp_msgs::UpdateBuild) -> Self {
-        let whole = format!("{}+{}", build.sequence, build.commit);
+        let commit: String = build.commit.chars().take(SHORT_COMMIT).collect();
+        let whole = format!("{}+{}", build.sequence, commit);
         match reports::Build::of(&whole) {
             Some(_) => Self(whole),
             None => Self(build.sequence.to_string()),
@@ -631,6 +637,20 @@ mod tests {
 
     fn none() -> Extras {
         Extras::default()
+    }
+
+    #[test]
+    fn a_manifests_whole_commit_is_cut_to_seven_so_from_keeps_it() {
+        let build = UpdateBuild {
+            sequence: 3309,
+            commit: "bc3fccb546a22baaef180fcd57b3291a44e0e4c1".into(),
+        };
+        assert_eq!(Version::running(&build).0, "3309+bc3fccb");
+        let not_hex = UpdateBuild {
+            sequence: 3309,
+            commit: "main".into(),
+        };
+        assert_eq!(Version::running(&not_hex).0, "3309");
     }
 
     #[test]

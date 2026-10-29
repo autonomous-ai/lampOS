@@ -1235,8 +1235,9 @@ to: 3310
 took: 95 s
 ```
 
-`from` is the build the lamp ran when the round began (digits, hex digits
-and `+`), `to` the build the round was about. A `code:` line (a fixed
+`from` is the build the lamp ran when the round began: its sequence, `+`
+and the first seven characters of its commit (the sequence alone if the
+commit is not hex), and `to` the build the round was about. A `code:` line (a fixed
 reason name: the last phase the round said, or `models`) and the `took`
 time (the end's time less `last.started_at_unix_ms`, the round's
 `checking`, in whole seconds, never negative) come from lamp-update's
