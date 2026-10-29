@@ -131,6 +131,11 @@ fn offer(walk: &mut Onboarding, now: u64) -> u64 {
 
 /// The prompt is played whole; its end is read from the Unix clock then.
 fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
+    play_as(walk, now, unix_ms, turn, Delivery::Whole)
+}
+
+/// [`play`], its playback ended as `delivery`.
+fn play_as(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64, delivery: Delivery) -> Prompt {
     let token = offer(walk, now);
     let words = walk.take_invitation(token, now).unwrap();
     assert!(
@@ -145,7 +150,7 @@ fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
         speaking: true,
     });
     set_clock(unix_ms);
-    walk.invitation_finished(boot, turn, Delivery::Whole, now);
+    walk.invitation_finished(boot, turn, delivery, now);
     walk.near_seen(Seen::Speaking {
         at_ms: unix_ms + 20,
         speaking: false,
@@ -705,31 +710,29 @@ fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
 
 /// lamp-52e6, 28 Oct 12:10 (#4035): prompt 1 was said through a yield to
 /// the lamp's own voice three times, nobody's turn taken over it, and the
-/// cut prompts' two re-offers were spent on it. Said with a gap, a prompt is
-/// offered again as one never said is: none of the budget is spent, and
-/// past [`MOST_UNSAID`] the step is left for later, never failed.
+/// cut prompts' two re-offers were spent on it. Said with a gap and nothing
+/// said in its window, a prompt is offered again as one never said is: none
+/// of the budget is spent, and past [`MOST_UNSAID`] the step is left for
+/// later, never failed.
 #[test]
-fn a_prompt_said_with_a_gap_and_no_call_over_it_spends_nothing() {
+fn a_prompt_said_with_a_gap_and_no_call_after_it_spends_nothing() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
-    let boot = BootId::new([3; 16]).unwrap();
     let gapped = |walk: &mut Onboarding, at: u64, turn: u64| {
-        let token = offer(walk, at);
-        let attempt = walk.pending().invitations[0].attempt;
-        walk.take_invitation(token, at).unwrap();
-        assert!(walk.bind_invitation(token, boot, turn));
-        walk.invitation_finished(boot, turn, Delivery::Gapped, at);
-        walk.drain_storage_for_test(at);
-        let row = walk
-            .take_records()
-            .into_iter()
-            .rfind(|row| row["kind"] == "onboarding_near_try")
-            .unwrap();
+        let prompt = play_as(
+            walk,
+            at,
+            1_760_000_000_000 + at / 1_000,
+            turn,
+            Delivery::Gapped,
+        );
+        let row = judge(walk, &prompt);
         assert_eq!(row["why"], "the prompt was played with a gap", "{row}");
-        (attempt, row["offered_again"].clone())
+        assert_eq!(row["prompt"], 1, "{row}");
+        row["offered_again"].clone()
     };
-    assert_eq!(gapped(&mut walk, 10 * S, 1), (1, json!(true)));
-    assert_eq!(gapped(&mut walk, 20 * S, 2), (1, json!(true)));
+    assert_eq!(gapped(&mut walk, 10 * S, 1), json!(true));
+    assert_eq!(gapped(&mut walk, 20 * S, 2), json!(true));
     assert_eq!(walk.kept().near_call_prompts, 0);
     // The cut prompts' own re-offers are still there for a person over one.
     assert_eq!(call(&mut walk, 30 * S, 22.0, 3)["prompt"], 1);
@@ -741,6 +744,25 @@ fn a_prompt_said_with_a_gap_and_no_call_over_it_spends_nothing() {
     settle(&mut walk, 40 * S);
     assert_eq!(outcome(&walk), Some(Outcome::NotAvailable));
     assert_eq!(walk.kept().near_call_prompts, 0);
+}
+
+/// lamp-29e7's re-test, 29 Oct 09:36:27: prompt 3 was said through with a
+/// gap and no try window opened, so the two calls said after it went to the
+/// chat ("answered as a call"), and the model counted them and led a step
+/// of its own. A gapped prompt was heard: its window opens, and a call in it
+/// is a try like one after a whole prompt.
+#[test]
+fn a_call_after_a_prompt_said_with_a_gap_is_a_try() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play_as(&mut walk, 10 * S, 1_760_000_010_000, 1, Delivery::Gapped);
+    room(&mut walk, &prompt, 2_400, 22.0);
+    name(&mut walk, &prompt, 2_000, 0.98);
+    let row = judge(&mut walk, &prompt);
+    assert_eq!(row["accepted"], true, "{row}");
+    assert_eq!(row["prompt"], 1, "{row}");
+    assert_eq!(walk.kept().near_call_prompts, 1);
+    assert_eq!(walk.desired.near_call_tries.len(), 1);
 }
 
 /// The tester on lamp-29e7, 28 October (#3702): the lamp never said what
@@ -1444,13 +1466,43 @@ fn past_the_name(walk: &mut Onboarding) {
 
 /// A sentence prompt asked and played whole at `at`: its words.
 fn ask(walk: &mut Onboarding, at: u64, turn: u64) -> String {
+    ask_as(walk, at, turn, Delivery::Whole)
+}
+
+/// [`ask`], its playback ended as `delivery`.
+fn ask_as(walk: &mut Onboarding, at: u64, turn: u64, delivery: Delivery) -> String {
     let token = offer(walk, at);
     assert!(walk.pending().invitations[0].attempt > 5);
     let words = walk.take_invitation(token, at).unwrap();
     let boot = BootId::new([3; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
-    walk.invitation_finished(boot, turn, Delivery::Whole, at);
+    walk.invitation_finished(boot, turn, delivery, at);
     words
+}
+
+/// lamp-29e7's re-test (#3702): a sentence prompt said through with a gap
+/// was heard, so a sentence after it is its try; with none, the prompt is
+/// given back and spends nothing.
+#[test]
+fn a_sentence_after_a_prompt_said_with_a_gap_is_a_try() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    past_the_name(&mut walk);
+    assert_eq!(
+        ask_as(&mut walk, 80 * S, 4, Delivery::Gapped),
+        SENTENCE_FIRST
+    );
+    let none = sentence_none(&mut walk, 80 * S);
+    assert_eq!(none["why"], "the prompt was played with a gap", "{none}");
+    assert_eq!(walk.kept().sentence_prompts, 0);
+    assert_eq!(
+        ask_as(&mut walk, 100 * S, 5, Delivery::Gapped),
+        SENTENCE_FIRST
+    );
+    let judged = sentence(&mut walk, 100 * S, 3_000, 20.0, Some(9));
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(settle(&mut walk, 120 * S), [SENTENCE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
 }
 
 /// A line ended 4 s after the prompt, its words back, and the try judged.

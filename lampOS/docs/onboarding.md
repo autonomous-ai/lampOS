@@ -5,7 +5,7 @@ the onboarding switch. Device qualification is outstanding; local evidence
 and rollout limitations are recorded with each PR.
 
 
-> **PARKED (#3702), 28 Oct:** giving way is out of the onboarding walk by the owner's call. lamp-voice sets the step unavailable (`set_giving_way_available(false)` in coordinator.rs), so it is kept `not_available` and never offered; touch is followed by room sounds. Its code, words and tests stay; to put it back, restore the availability condition kept in the comment there.
+> **PARKED (#3702), 28 Oct:** giving way is out of the onboarding walk by the owner's call. While `onboarding::giving_way::PARKED` is true, lamp-voice sets the step unavailable (`set_giving_way_available` in coordinator.rs), so it is kept `not_available` and never offered; touch is followed by room sounds. The model is told nothing of it either: `setup_step` and `redo_setup` leave `giving_way` out of their steps and their words, and the skill's `SKILL.md` description no longer names it (lamp-29e7's re-test, 29 Oct 09:39: told of "the body giving way" by `setup_step`'s words, the model asked "push gently against my arm or head, and I'll give way" itself and reported the step skipped; test `a_parked_step_is_never_told_to_the_model`). Its code, words and tests stay, and `skill.toml` keeps it in `order` (an installed lamp-skills reads the same keys); to put it back, set `PARKED` to false and restore the `SKILL.md` description as its PARKED note says.
 
 ## What it is for
 
@@ -50,7 +50,12 @@ led is taken; a report of any other is refused and recorded
 eyes measure, `touch` only by what Controls feels, and `how_you_sound`,
 `privacy` and `giving_way` only by their measured evidence: the model may
 only skip them, and the worker refuses any other
-outcome with words it can say. Never reported, a step is
+outcome with words it can say. `setup_step`'s words also tell the model
+that the runner asks each step in its own words and counts every try: it
+never names, announces, explains or asks a step itself, and never counts
+calls (lamp-29e7's re-test, 29 Oct: with the runner's calls unheard, the
+model said "That's twice now", "that's three", and led a "touch" step of
+its own while how you sound was still led). Never reported, a step is
 failed after 90 s once the room has been quiet for 20 s, and the walk goes
 on.
 
@@ -528,13 +533,14 @@ invitation's audio either (lamp-52e6, 29 Oct 07:35: a chat refused with HTTP
 offered again once the voice can speak, `MOST_UNSAID` (2) times at most, then
 the step is `not_available`, never `failed`, with an
 `onboarding_privacy_try` row whose `why` is `"invitation not said"`. Giving
-way and how you sound do the same with their own rows. They also take an
-invitation played to its end with a gap in its playback and nobody's turn
-taken over it (`Delivery::Gapped`: on lamp-52e6 on 28 October the lamp
-yielded to its own voice and resumed, every word said, #4035) as one not
-said, under the same `MOST_UNSAID` bound and counter; their rows' `why` is
-`"the invitation was played with a gap"` and `"the prompt was played with a
-gap"`. Privacy keeps such an invitation as cut. A model-led step whose
+way and how you sound do the same with their own rows. An invitation
+played to its end with a gap in its playback and nobody's turn taken over it
+(`Delivery::Gapped`: on lamp-52e6 on 28 October the lamp yielded to its own
+voice and resumed, every word said, #4035) was heard: privacy keeps its
+attempt armed as after a whole one, and how you sound opens its try's window
+(below). Giving way, before any push began, takes it as one not said, under
+the same `MOST_UNSAID` bound and counter, its row's `why` `"the invitation
+was played with a gap"`. A model-led step whose
 90 s run out after its conversation ended (20 s of quiet) is asked again too,
 twice at most, and fails only after that. Software mute, sleep, an initial open level,
 and model `setup_step done` are not evidence of physical close followed by
@@ -645,12 +651,19 @@ over its last word (below), is offered again with its own number and spends
 nothing, twice in a step at most (`MOST_REOFFERS`, kept through absence); a
 third such prompt counts. Its record
 says `offered_again`. A prompt said through a playback gap with nobody's turn
-taken over it, no call heard over it (`Delivery::Gapped`, #4035: on
-lamp-52e6 prompt 1 was "cut" three times by the lamp yielding to its own
-voice and the step failed early), spends neither the budget nor these two
+taken over it (`Delivery::Gapped`, #4035: on lamp-52e6 prompt 1 was "cut"
+three times by the lamp yielding to its own voice and the step failed early)
+was heard, so it opens its try's window as a whole one does, and a call or a
+sentence in it is a try (lamp-29e7's re-test, 29 Oct 09:36:27: prompt 3
+played with a gap opened no window, the next two calls went to the chat as
+"answered as a call", and the model counted them itself). With nothing heard
+in the window (no name, no line), it spends neither the budget nor these two
 re-offers: it is offered again as a prompt never said, `MOST_UNSAID` times
-at most, then the step is `not_available`. Test:
-`a_prompt_said_with_a_gap_and_no_call_over_it_spends_nothing`.
+at most, then the step is `not_available`; its row's `why` is `"the prompt
+was played with a gap"`. Tests:
+`a_call_after_a_prompt_said_with_a_gap_is_a_try`,
+`a_sentence_after_a_prompt_said_with_a_gap_is_a_try`,
+`a_prompt_said_with_a_gap_and_no_call_after_it_spends_nothing`.
 
 **What each prompt says (#3702).** The tester on lamp-29e7 (28 October)
 said a bare "Lamp" four times, never told what to say or how many calls were
