@@ -33,7 +33,9 @@ finish() { rc=$?; [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && { kill -TERM "$
   # replay.sh writes its own loans.txt lines once the lock check passed; before that, this writes one.
   grep -q '^loans.txt: start line written' "$OUT/run.txt" 2>/dev/null || loans "#4306: aborted, nothing ran"
   r=$(cat "$OUT/aborted" 2>/dev/null || grep -E '^pulled:' "$OUT/run.txt" 2>/dev/null | tail -1)
-  post "Jev-verifier, QUIET $LAMP $(hm): #4306 run ended (exit $rc). ${r:-no result}. Speaker and lamp-policy put back, lock released."
+  back="Speaker and lamp-policy put back"
+  grep -q 'LAMP-POLICY NOT PUT BACK' "$OUT/run.txt" 2>/dev/null && back="LAMP-POLICY NOT PUT BACK: its /run drop-in needs removing by hand"
+  post "Jev-verifier, QUIET $LAMP $(hm): #4306 run ended (exit $rc). ${r:-no result}. $back; lock released."
   "$LOCK" "$LAMP" release "$HOLDER" "$SESS" >/dev/null 2>&1 || echo "lock release failed" >&2; }
 trap finish EXIT
 trap 'exit 130' INT TERM

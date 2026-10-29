@@ -9,7 +9,7 @@ mkdir "$T/bin"
 printf '#!/bin/sh\necho "ssh $*" >> "%s/log"\n' "$T" > "$T/bin/ssh"
 printf '#!/bin/sh\necho "gh $*" >> "%s/log"\n' "$T" > "$T/bin/gh"
 printf '#!/bin/sh\necho "lock $2" >> "%s/log"; [ "$2" = try ] && [ -n "${LOCKFAIL:-}" ] && exit 1; exit 0\n' "$T" > "$T/lock"
-printf '#!/bin/sh\necho "replay $* DEADLINE=$DEADLINE" >> "%s/log"\nprintf "loans.txt: start line written\\npulled: 42 lines played\\n" > "$2/run.txt"\n' "$T" > "$T/replay"
+printf '#!/bin/sh\necho "replay $* DEADLINE=$DEADLINE" >> "%s/log"\nprintf "loans.txt: start line written\\npulled: 42 lines played\\n${NOTBACK:-}" > "$2/run.txt"\n' "$T" > "$T/replay"
 chmod +x "$T/bin/ssh" "$T/bin/gh" "$T/lock" "$T/replay"
 DAY=$(TZ=Asia/Ho_Chi_Minh date +%F) NOW=$(TZ=Asia/Ho_Chi_Minh date +%H:%M)
 END=$(TZ=Asia/Ho_Chi_Minh date -v+30M +%H:%M)
@@ -26,4 +26,5 @@ grep -q 'loans.txt' "$T/log" && { echo "FAIL taken: slot.sh wrote loans.txt (rep
 [ $rc = 4 ] || { echo "FAIL not free: exit $rc"; fails=$((fails+1)); }
 want 'aborted, nothing ran' not-free; want 'loans.txt' not-free
 grep -qE 'PLAYING|QUIET|^replay' "$T/log" && { echo "FAIL not free: posted or ran"; fails=$((fails+1)); }
+: > "$T/log"; NOTBACK='LAMP-POLICY NOT PUT BACK' run; want 'LAMP-POLICY NOT PUT BACK: its /run drop-in' not-back
 [ $fails = 0 ] && echo PASS || { cat "$T/log"; exit 1; }
