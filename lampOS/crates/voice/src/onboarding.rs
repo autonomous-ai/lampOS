@@ -130,17 +130,8 @@ pub enum Step {
 
 impl Step {
     /// Stable mechanism IDs for validation and the tool schema, not walk order.
-    pub const IDS: [&'static str; 9] = [
-        "where_you_sit",
-        "who_you_are",
-        "how_you_sound",
-        "touch",
-        "privacy",
-        "giving_way",
-        "room_sounds",
-        "face_expressions",
-        "preferences",
-    ];
+    /// lamp-update reads them too, to hold a round while a walk is under way.
+    pub const IDS: [&'static str; 9] = lamp_msgs::ONBOARDING_STEPS;
 
     pub fn name(self) -> &'static str {
         match self {
