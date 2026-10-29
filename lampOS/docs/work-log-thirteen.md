@@ -270,3 +270,12 @@ Ready for lamp-voice: yes (#4429, behind `LAMP_DECLINE_SILENT`, off; Part of #39
 - #4417 merged in train 381.
 - The live carry window's `held`/`remember` writes after a let-out now reach the decline's snapshot (Sixth's and Reviewer-three's P3s). The new test fails without the `colleague_held` mirror.
 - Gate: voice lib 4150/0, the other targets 1, 275, 4, 6; clippy, fmt, workspace build clean.
+
+### #4429's P3s, a new caller and the driven copies (#4435)
+
+Ready for lamp-voice: yes (#4435, behind `LAMP_DECLINE_SILENT`, off; Part of #3945)
+
+- #4429 merged in train 384.
+- A decline's saved carry window takes the live window's copies only while the live window is still that conversation's (same `first_request`), so a new caller's held line no longer stretches it (Reviewer-three's P3).
+- #4429's hand-written test is replaced by three tests driven through judge. Each fails with its copy taken out (checked in a throwaway worktree).
+- Gate on 4369df29aa: voice lib 4152/0 (15 ignored), the other targets 1, 275, 4, 6; clippy, fmt, workspace build clean.
