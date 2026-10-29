@@ -3399,9 +3399,20 @@ fn greets(words: &[String]) -> bool {
 
 /// An answer about the hours to keep quiet: a time named, or none. The
 /// question's own words ("quiet", "hours") are no answer: "What are quiet
-/// hours?" names none (Reviewer-three's P2 on #4346).
+/// hours?" names none (Reviewer-three's P2 on #4346). An hour said as a
+/// word, two to twelve, is a time here too, so "Quiet from ten until I wake
+/// up again." answers despite its "again". Not "one": "Can you say that one
+/// more time?" asks again, and the hour one comes with "am", "pm" or
+/// "o'clock". Not in [`names_hours`]: "Yes, any time from seven." answers the
+/// hello (Reviewer-three's P2s on #4384).
 fn quiet_hours(words: &[String]) -> bool {
-    names_a_time(words) || words.iter().any(|word| NO.contains(&word.as_str()))
+    const HOUR_WORDS: [&str; 11] = [
+        "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+    ];
+    names_a_time(words)
+        || words
+            .iter()
+            .any(|word| NO.contains(&word.as_str()) || HOUR_WORDS.contains(&word.as_str()))
 }
 
 /// Hours named, in any words: a time, or "quiet" or "hours" ("Please stay
@@ -3414,12 +3425,9 @@ fn names_hours(words: &[String]) -> bool {
 }
 
 /// A time or a part of the day. A part of the day right after "good" is a
-/// greeting, not an hour: "Good evening, Lamp." names none. An hour said as
-/// a word, one to twelve, is a time too, so "Quiet from ten until I wake up
-/// again." names hours despite its "again" (Reviewer-three's P2 on #4346).
-/// "from" and "until" are not: "Yes, from now on." answers the hello.
+/// greeting, not an hour: "Good evening, Lamp." names none.
 fn names_a_time(words: &[String]) -> bool {
-    const WHEN: [&str; 23] = [
+    const WHEN: [&str; 11] = [
         "night",
         "morning",
         "evening",
@@ -3431,18 +3439,6 @@ fn names_a_time(words: &[String]) -> bool {
         "midnight",
         "after",
         "before",
-        "one",
-        "two",
-        "three",
-        "four",
-        "five",
-        "six",
-        "seven",
-        "eight",
-        "nine",
-        "ten",
-        "eleven",
-        "twelve",
     ];
     words.iter().enumerate().any(|(at, word)| {
         let greeting = at > 0 && words[at - 1] == "good" && DAY_PARTS.contains(&word.as_str());
@@ -5848,22 +5844,37 @@ mod tests {
     }
 
     /// Reviewer-three's P2 on #4346: "again" makes a line no answer unless it
-    /// names a time, and an hour said as a word is one, so this line owes the
-    /// hello. "from" names no hours: "Yes, from now on." answers the hello.
+    /// names a time, and an hour said as a word is one for the quiet hours,
+    /// so this line owes the hello. "from" and an hour word name no hours for
+    /// the hello: "Yes, from now on." and "Yes, any time from seven." answer it
+    /// (Reviewer-three's P2s on #4384).
     #[test]
     fn number_word_hours_with_again_get_the_hello() {
-        let mut room = Room::new("number-word-hours");
-        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
-        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
-        report(&room.walk, "who_you_are", "done");
-        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
-        room.walk
-            .heard("Quiet from ten until I wake up again.", room.at);
-        room.walk.lamp_said();
-        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
-        room.walk.heard("Yes, from now on.", room.at);
-        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
-        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+        for (n, yes) in ["Yes, from now on.", "Yes, any time from seven."]
+            .into_iter()
+            .enumerate()
+        {
+            let mut room = Room::new(&format!("number-word-hours-{n}"));
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk
+                .heard("Quiet from ten until I wake up again.", room.at);
+            room.walk.lamp_said();
+            assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+            room.walk.heard(yes, room.at);
+            assert_eq!(
+                room.wait(S, Some(NEAR_MIDDLE)),
+                [skill::PREFERENCES_DONE],
+                "{yes}"
+            );
+            assert_eq!(
+                room.outcome(Step::Preferences),
+                Some(Outcome::Done),
+                "{yes}"
+            );
+        }
     }
 
     /// lamp-e82d (29 Oct, 8545, #3530): "No, please." to the quiet hours got
@@ -5912,6 +5923,8 @@ mod tests {
             "What did you say",
             "I didn't catch that.",
             "Sorry, can you repeat that",
+            "Can you say that one more time?",
+            "Say that last one again",
         ]
         .into_iter()
         .enumerate()
