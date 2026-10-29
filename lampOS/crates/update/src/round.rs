@@ -764,6 +764,16 @@ impl Run<'_, '_> {
                 Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
             };
         }
+        // The setup walk under way: nothing fetched or switched this round,
+        // at most `walk::MOST_HELD` rounds on a lamp (#3689, crate::walk).
+        if crate::walk::under_way(self.config)
+            && let Some(held) = crate::walk::hold(self.records.folder())
+        {
+            return Outcome::NotQuiet(format!(
+                "the setup walk is under way: held, round {held} of {}",
+                crate::walk::MOST_HELD
+            ));
+        }
         // A template is never active itself, and never restarted: only its
         // instances run.
         let units: Vec<String> = changes

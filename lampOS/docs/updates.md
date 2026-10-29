@@ -687,6 +687,27 @@ each under the quiet rule. A round
    does not clear earlier edges, and continued lines are joined.
    `Wants=`, `Requires=` and `PartOf=` do not themselves establish order.
    This orders restart calls, not service readiness or health (step 9).
+
+   **The setup walk under way (#3689, `walk.rs`):** a build with changes
+   is not fetched while the person is being walked through onboarding.
+   Under way means setup is done (`/var/lib/lampos-setup/done`) and the
+   voice's onboarding file (`/var/lib/lampOS/voice/onboarding/progress.json`)
+   has no outcome for one of `lamp_msgs::ONBOARDING_STEPS`, the voice's
+   nine step ids, the same since the 7071 image. A `later` step has an
+   outcome, so a walk left for later is over. No file, or one that isn't
+   the walk's, is no walk: the 7071 voice writes it at the first step's
+   end, and a lamp with onboarding off never does. The round then ends
+   `not switched: the setup walk is under way: held, round N of 8` (status
+   4), and the next round looks again. At most 8 rounds on a lamp, 2 hours
+   at `serve`'s 900 s: the count is kept in `walk-held` in the records and
+   never reset, so a walk left half done, or a redo later, never holds
+   updates for long. Counting rounds needs no clock, which a new lamp may
+   set only after its setup. A count that can't be read or kept holds
+   nothing. **Why:** the first customer lamps ship reset, and their first
+   update comes within the hour of their setup, while their first voice
+   leads the walk. The quiet gate (step 7) keeps a switch off a sentence,
+   but a walk waiting silently for the person reads as resting. A climb
+   (lamp-update's own switch) is not held: it restarts only lamp-update.
 5. **Room.** The disk `/opt/lampOS` is on must hold every file of every
    new folder, counted whole as if nothing could be linked, plus
    `--keep-free-mb` (256). Otherwise refused, before anything is written:

@@ -75,6 +75,22 @@ impl OnboardingPending {
     }
 }
 
+/// The setup walk's steps, by the names its file keeps each outcome under
+/// (`steps` in `/var/lib/lampOS/voice/onboarding/progress.json`): the
+/// voice's `Step::IDS`, and how lamp-update tells a walk under way (#3689).
+/// The same nine since the 7071 image; not walk order.
+pub const ONBOARDING_STEPS: [&str; 9] = [
+    "where_you_sit",
+    "who_you_are",
+    "how_you_sound",
+    "touch",
+    "privacy",
+    "giving_way",
+    "room_sounds",
+    "face_expressions",
+    "preferences",
+];
+
 pub fn onboarding_topics() -> Vec<(&'static str, Declaration)> {
     vec![(OnboardingPending::TOPIC, OnboardingPending::declaration())]
 }
