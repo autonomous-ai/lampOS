@@ -103,7 +103,7 @@ impl Class {
 #[derive(Debug, Default)]
 pub struct Rates {
     seen: HashMap<(String, Class), VecDeque<u64>>,
-    /// `--rates off`, a dev lamp's switch: every class lifted but those
+    /// `--rates off`, lamp-control's default: every class lifted but those
     /// [`Class::kept_when_off`].
     off: bool,
 }
