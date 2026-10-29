@@ -1028,6 +1028,16 @@ fn serve(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// How often a lease-freshness test tries again when the host stalled
+    /// past PRIVACY_FRESH_US (50 ms) before it could look: an attempt like
+    /// that says nothing either way. Twenty, a pause after each, so the
+    /// attempts span a busy host's stall of a few seconds rather than a
+    /// quarter of one; a whole-lib run on a loaded Mac stalled five back to
+    /// back (#1569, Reviewer-three's row, 30 Oct). A reader or watch that
+    /// never finds the lease still fails every attempt.
+    const STALLED_ATTEMPTS: usize = 20;
+    const AFTER_A_STALL: Duration = Duration::from_millis(100);
     use std::sync::atomic::AtomicU64;
 
     #[test]
@@ -1156,9 +1166,9 @@ pub(crate) mod tests {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         // The lease is fresh for PRIVACY_FRESH_US on the host's clock. An
         // attempt in which the host stalled that long between the publish and
-        // the read says nothing either way, so it is made again on a new bus,
-        // up to five times (#1569).
-        for _ in 0..5 {
+        // the read says nothing either way, so it is made again on a new bus
+        // ([`STALLED_ATTEMPTS`], #1569).
+        for _ in 0..STALLED_ATTEMPTS {
             let root = Root(PathBuf::from(format!(
                 "/tmp/vpb-{}-{}",
                 std::process::id(),
@@ -1201,8 +1211,11 @@ pub(crate) mod tests {
                 assert_eq!(read.unwrap(), Some(lease));
                 return;
             }
+            thread::sleep(AFTER_A_STALL);
         }
-        panic!("the host stalled past the lease's freshness in 5 of 5 attempts");
+        panic!(
+            "the host stalled past the lease's freshness in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts"
+        );
     }
 
     /// Third's note on #2244 (#1569 row 45): the muted ring's reader takes
@@ -1482,9 +1495,9 @@ pub(crate) mod tests {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         // The lease is fresh for PRIVACY_FRESH_US on the host's clock. An
         // attempt in which the host stalled that long before the watch found
-        // it says nothing either way, so it is made again on a new bus, up to
-        // five times (#1569).
-        for _ in 0..5 {
+        // it says nothing either way, so it is made again on a new bus
+        // ([`STALLED_ATTEMPTS`], #1569).
+        for _ in 0..STALLED_ATTEMPTS {
             let root = Root(PathBuf::from(format!(
                 "/tmp/vpw-{}-{}",
                 std::process::id(),
@@ -1539,6 +1552,7 @@ pub(crate) mod tests {
                 thread::sleep(Duration::from_millis(1));
             };
             if !found {
+                thread::sleep(AFTER_A_STALL);
                 continue;
             }
             let going = Arc::new(AtomicBool::new(true));
@@ -1574,6 +1588,8 @@ pub(crate) mod tests {
             assert!(watch.latest().is_err(), "for good");
             return;
         }
-        panic!("the host stalled past the lease's freshness in 5 of 5 attempts");
+        panic!(
+            "the host stalled past the lease's freshness in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts"
+        );
     }
 }
