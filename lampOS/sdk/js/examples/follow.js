@@ -16,7 +16,7 @@ for (;;) {
     await lamp.withLease(['body'], async (lease) => {
       while (here && lease.held) {
         await lamp.look('face');
-        await sleep(2); // motion: 1 every 2 s
+        await sleep(1); // motion: 1 a second
       }
     }, { why: 'looking at the person at the desk' });
   } catch (refused) {

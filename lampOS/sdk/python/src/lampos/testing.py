@@ -233,7 +233,8 @@ def _frames(frames: Any) -> bool:
 
 
 def _now() -> str:
-    return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    # As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class FakeLamp:

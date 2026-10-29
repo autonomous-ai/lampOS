@@ -263,10 +263,13 @@ test('greet a person who arrives', async () => {
   await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
     let greeted;
     const done = new Promise((resolve) => { greeted = resolve; });
-    await lamp.on('person.arrived', async () => { await lamp.gesture('greeting'); greeted(); });
+    let at;
+    await lamp.on('person.arrived', async (event) => { at = event.at; await lamp.gesture('greeting'); greeted(); });
     fake.emit('person.arrived', { count: 1, near: 0.3 });
     await done;
     assert.deepEqual(fake.asked('gesture'), [{ name: 'greeting' }]);
+    // `at` as lamp-control stamps it: UTC, to the second, ending Z.
+    assert.match(at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
   });
 });
 

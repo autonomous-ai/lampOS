@@ -22,7 +22,8 @@ import { WebSocketServer } from 'ws';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 
-const now = () => new Date().toISOString();
+// As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
+const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 // `express`'s feelings and their moves, as lamp-control's feelings.rs.
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
