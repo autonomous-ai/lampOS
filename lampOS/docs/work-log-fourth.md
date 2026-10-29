@@ -1,3 +1,17 @@
+## 2026-10-30 03:1x ICT — #4413 and #4425 landed; the notes' default-on case
+
+**#4413** landed in train 379: the stable notes list "Built but not on yet" in plain words. After-merge on `26ae8ce57`: `lampos-promote` 4/7/25/3, `onboarding` 217/0, `second_provider` 870/0.
+
+**#4425** landed in train 382 (Second's (a), Part of #3976): a Product unit cell of exactly `on (unset)` is on by its code's default and isn't listed, so `LAMP_FORGET_ASKED` (a privacy guard that's on) no longer reads "off on every lamp".
+- **How I got there:** I first planned to count it `on` in `switches.md`. Then I found 27 rows counted `until` while the product has them on: `until` means the check is still owed. So I dropped that change and gave Second two options.
+- **The tests:** on the real page, no other listed row may say "on … (unset)" in other words.
+- **Reads:** Second and Reviewer-three, with no findings.
+- **Left:** Second's (b), setting the switch explicitly in the product unit, is after the ship (a unit change restarts the voice on every lamp).
+
+**#4414**: carried my READ-OK to `10f3683ef5`, which takes my P3 (build 2's fetched folder is pruned). It landed in train 379.
+
+No device action. lamp-0c89 (#2836) still waits for access.
+
 ## 2026-10-30 00:4x ICT — #4413, the stable notes in plain words; #4414 read; #4158 still current
 
 **#4413** (Part of #3976, the first builder's 23:4x; NEXT TRAIN):
