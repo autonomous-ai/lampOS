@@ -540,9 +540,12 @@ fn each_step_says_what_to_do_what_if_it_didnt_work_and_that_it_worked() {
             Step::Preferences,
             "Are there hours when I should keep quiet?",
             "Sorry, could you say that again?",
-            "Got it, that's everything.",
+            // Its hello question and done line are the walk's own words.
+            "",
         ),
     ];
+    assert!(super::PREFERENCES_HELLO.contains("May I say hello when you sit down?"));
+    assert!(super::PREFERENCES_DONE.contains("Got it, that's everything."));
     for (step, todo, again, worked) in three {
         let lines = lines_of(step);
         for line in [todo, again, worked]

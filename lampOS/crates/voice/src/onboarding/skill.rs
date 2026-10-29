@@ -19,6 +19,16 @@ const FACE_CONSENT: &str = "only after a clear yes call remember_my_face";
 /// Room sounds and face expressions alike.
 const ROOM_SOUNDS_CONSENT: &str = "done only after a clear yes";
 
+/// "Preferences"' second question, the walk's own once the quiet hours are
+/// heard: the model, its answer to them given, often asked nothing more
+/// (lamp-29e7's 8545 re-test). Fixed words, not the file's: an older
+/// lamp-skills refuses a new key.
+pub(crate) const PREFERENCES_HELLO: &str =
+    "(Say only this, nothing before or after it: \"May I say hello when you sit down?\")";
+
+/// "Preferences"' done line, the walk's own once the step is done.
+pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time.\")";
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Definition {
