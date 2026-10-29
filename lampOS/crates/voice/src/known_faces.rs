@@ -1882,6 +1882,32 @@ pub fn still_known(socket: Option<&Path>, owner: &str) -> bool {
         .is_some_and(|names| names.iter().any(|name| name == owner))
 }
 
+/// How often [`keep_owner_fresh`] reads the owner mark and asks the eyes.
+pub const OWNER_EVERY: Duration = Duration::from_secs(2);
+
+/// The owner kept at setup (`onboarding::owner_of`) while the eyes still
+/// know them ([`still_known`]), refreshed into `owner` every [`OWNER_EVERY`]
+/// on a thread of its own, so no reply waits on the eyes (Reviewer-two's P3
+/// on #4290): a forgotten face is named for at most that long.
+pub fn keep_owner_fresh(
+    owner: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+    file: Option<PathBuf>,
+    socket: Option<PathBuf>,
+) {
+    std::thread::spawn(move || {
+        loop {
+            let now = file
+                .as_deref()
+                .and_then(crate::onboarding::owner_of)
+                .filter(|name| still_known(socket.as_deref(), name));
+            *owner
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = now;
+            std::thread::sleep(OWNER_EVERY);
+        }
+    });
+}
+
 /// The file the eyes keep the known person's name in while they are at the
 /// lamp: `known`, beside their request socket (`lamp-eyes --known-file`).
 pub fn known_file_of(socket: &Path) -> PathBuf {
@@ -2730,6 +2756,22 @@ mod tests {
             vec![serde_json::json!({"list": true}); 2]
         );
         assert!(!still_known(None, "Example Name"));
+    }
+
+    /// Reviewer-two's P3 on #4290: the owner is refreshed off the reply's
+    /// path, from the onboarding file's mark and the eyes' list.
+    #[test]
+    fn the_owner_is_kept_fresh_off_the_replys_path() {
+        let (socket, _asked) = eyes(vec![serde_json::json!({"people": ["Example Name"]})]);
+        let file = socket.with_file_name("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
+        let owner = std::sync::Arc::new(std::sync::Mutex::new(None));
+        keep_owner_fresh(owner.clone(), Some(file), Some(socket));
+        let until = Instant::now() + Duration::from_secs(2);
+        while owner.lock().unwrap().is_none() && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(owner.lock().unwrap().as_deref(), Some("Example Name"));
     }
 
     /// The eyes stand-in on a real socket: what each request sent, and the
