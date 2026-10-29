@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The four quality rows of docs/build-rows.md, scored from one repeatable played run on whatever build the lamp runs.
 
-usage: quality_rows.py run LABEL [--stops N]   (night.py, cutin.sh, the stop scene, then score; plays sound, ~70 min)
+usage: quality_rows.py run LABEL [--stops N]   (night.py, cutin.sh, the stop scene, then score; plays sound, ~70 min;
+       QUALITY_ONLY=cutin: cutin.sh only, ~15 min)
        quality_rows.py score LABEL             (scores the three outputs already in $PLAYED_OUT)
        quality_rows.py selftest                (the scorer on built-in fixtures: no lamp, nothing played)
        quality_rows.py level SRC DST           (one clip trimmed and levelled to -20 LUFS, as every clip of a run)
@@ -315,7 +316,9 @@ def main():
     env['LAMP_SSH'] = HERE + '/lamp_ssh'   # cutin.sh runs "$LAMP_SSH" as one program, never a command with options
     volume(45)
     # A failed part leaves its row "not measured"; the rest still run.
-    cmds = [[sys.executable, HERE + '/night.py', label + '-night']]
+    # QUALITY_ONLY=cutin: only cutin.sh (a short slot); night.py and the stop scene are left out, their rows not measured.
+    only = os.environ.get('QUALITY_ONLY')
+    cmds = [] if only == 'cutin' else [[sys.executable, HERE + '/night.py', label + '-night']]
     if os.path.exists(CUTIN_SCENE):
         cmds.append([HERE + '/cutin.sh', label + '-cutin', '1', '1'])
         env.update(CUTIN_SCENARIO=CUTIN_SCENE, CV_SCENARIO=HERE + '/scenario.py')
@@ -324,7 +327,7 @@ def main():
         rc = subprocess.run(cmd, env=env).returncode
         if rc: print(f'quality_rows.py: {os.path.basename(cmd[1] if cmd[0] == sys.executable else cmd[0])} exited {rc}', file=sys.stderr)
         volume(45)
-    stop_scene(label, n)
+    if only != 'cutin': stop_scene(label, n)
     score(label)
 
 
