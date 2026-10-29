@@ -769,14 +769,15 @@ each under the quiet rule. A round
    for up to the configured bound (3600 s by default). Compatibility is
    required in both directions; restart order does not make the round atomic.
 
-   **Controls before the voice:** startup order stops lamp-controls first,
-   so the old voice's run closes on an unreadable privacy switch and its
-   own stop comes about 0.5 s later. Before train 347 (lamp-voice
+   **Controls before the voice:** the round restarts lamp-controls before
+   the voice, so the old voice's run closes on an unreadable privacy switch
+   and its own stop comes about 0.5 s later. Before train 347 (lamp-voice
    `1c88f2dbd`, #4280) that stop left the restart guard's mute standing,
    and the lamp came back muted until a head tap (lamp-06c1, 8474's round,
    29 Oct). The release runs in the voice being stopped, the old one, so a
    lamp on a build before `1c88f2dbd` can still come back muted once from
-   the round that brings the fix. Later rounds don't. The round's order is
+   the round that brings the fix. Later rounds don't, by this route; a
+   voice can still start muted by others (#4332). The round's order is
    unchanged; the fix is the voice's ([controls.md](controls.md), "A switch
    unreadable, then the stop").
 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
