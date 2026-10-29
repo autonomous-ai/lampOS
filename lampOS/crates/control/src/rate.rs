@@ -96,11 +96,17 @@ impl Class {
 #[derive(Debug, Default)]
 pub struct Rates {
     seen: HashMap<(String, Class), VecDeque<u64>>,
+    /// `LAMP_CONTROL_RATES=off` (a dev lamp, tour build only): nothing is
+    /// rate-limited but the refused-actions guard.
+    off: bool,
 }
 
 impl Rates {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            off: std::env::var("LAMP_CONTROL_RATES").is_ok_and(|value| value == "off"),
+            ..Self::default()
+        }
     }
 
     /// Counts `client`'s action of `class` at `now_us`, or refuses it with
@@ -115,6 +121,9 @@ impl Rates {
     /// nothing: the door counts it once the part takes it, so a refused
     /// action isn't counted (harness-reviewer's P2 on #3778).
     pub fn check(&mut self, client: &str, class: Class, now_us: u64) -> Result<(), u64> {
+        if self.off && class != Class::Refused {
+            return Ok(());
+        }
         let seen = self.seen.entry((client.to_owned(), class)).or_default();
         let longest = class.longest();
         while seen.front().is_some_and(|at| at + longest <= now_us) {
