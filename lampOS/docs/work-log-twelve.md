@@ -539,3 +539,17 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - 29 Oct 07:0x–07:3x (+07): Ready for lamp-voice: no (#4258 opened, ARM64 starting). #4250 got READ-OKs from Reviewer-three and Thirteen, with ARM64 run 40788731518 and x86 clippy green; NEXT TRAIN was posted at 06:54. #4175's code is done; First runs its played check on lamp-4ace. First moved #4226 to me at 07:04. After Thirteen's hand-over I claimed it, and #4258 carries Thirteen's step (c) at 60c270868a unchanged: a carried sound with no name heard leaves the line dated from its own start. This changes the default for that kind of line. Mac gate green (lamp-voice 4052 + 275 + 6 + 4 + 1 passed, 0 failed; workspace build). On c0a4, Thirteen's run: 5 of 5. Reads and a lamp-4ace slot asked on #3997.
 - 29 Oct 07:4x–08:3x (+07): Ready for lamp-voice: no (#4226 under study). #4258 got READ-OKs from Reviewer-three and Fourth, with ARM64 run 40794275438 and x86 clippy green; NEXT TRAIN at 07:43, and the train landed it (193f88c862). On c0a4, an A/B of LAMP_SOFT_START (on, off, on, off, 5 each, busy_cook from the Mac, build 3c96e7cb): the hearings at the line's start were 939–1023 ms on against 654–723 ms off, a shift of 0.29 s. c11 was answered 20 of 20. One 1820 ms drop came from a split line. Posted on #4226. Next: judge the name's start from the usual start, not the soft lead, behind a switch. c0a4 is restored and released.
 - 29 Oct 08:4x–09:5x (+07): Ready for lamp-voice: no (#4286 opened, ARM64 starting). #4226's next piece is #4286 at e705b80ee7, LAMP_NAME_START_USUAL, off unless set: the name-at-the-start check is measured from the line's usual start, not soft start's lead. A sub-agent wrote it in a worktree, and I reviewed the code before committing. Mac gate green (lamp-voice 4063 + 275 + 6 + 4 + 1 passed, 0 failed; workspace build; voice-eval switches 2 passed). c0a4, a local build (2a5e4c66), switch on/off/on: c11 answered 15 of 15, soft lead 298–300 ms in the journal; the room was never busy, so the drop itself goes to Not verified. c0a4 restored and released. Reads asked on #3997.
+
+## 29 Oct, 12:4x: #4304 for #4226, and a busy-room check on lamp-c0a4
+
+- #4286 landed (`3561811b56`). Its three P3s are #4304 (`cc8d76e135`):
+  - the soft lead is held to its blocks;
+  - the line before's 1.3 s check gets a comment line and a test;
+  - `began_ordinarily` gets a comment line.
+
+  It has Reviewer-three's READ-OK, ARM64 and x86 clippy are green, and NEXT TRAIN is posted on #3997.
+- The first builder's lamp-4ace run for #4226, at about 15:00: the commands are on #4226.
+- lamp-c0a4 busy-room check, six rounds, four of them busy on two faces in view, with voices played from the Mac:
+  - #4175: 12/12 desk lines were left alone in the busy rounds;
+  - #4226: c11 was answered 3 of 4 times. The miss, right after a restart, was unheard by both lamp-name and speech-to-text.
+  - lamp-c0a4 was restored and the lock released.
