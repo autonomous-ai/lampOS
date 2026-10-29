@@ -15,9 +15,9 @@ use crate::{
     stop_words::Source,
     transport::{ReferenceChannels, WorkerChannels},
     wire::{
-        CaptureTiming, ClockPrimed, Control, MicrophoneFrame, ReferenceControl, ReferenceFault,
-        ReferenceFaultKind, ReferenceTiming, RenderPayload, RenderReference, SpeakerChunk,
-        WorkerEvent,
+        CaptureTiming, ClockPrimed, Control, MicrophoneFrame, PlaybackDiscardReason,
+        ReferenceControl, ReferenceFault, ReferenceFaultKind, ReferenceTiming, RenderPayload,
+        RenderReference, SpeakerChunk, WorkerEvent,
     },
 };
 use lamp_audio::{
@@ -1411,9 +1411,9 @@ fn speaker_loop(
                                 speaker,
                                 &mut output,
                                 &mut flush_count,
-                                speech.unfinished_owner().is_some(),
+                                speech.unfinished_owner(),
                                 &mut speech,
-                                &pending,
+                                &mut pending,
                                 recording,
                             )?;
                         } else if error
@@ -1529,9 +1529,9 @@ fn speaker_loop(
                     speaker,
                     &mut output,
                     &mut flush_count,
-                    speech.unfinished_owner().is_some(),
+                    speech.unfinished_owner(),
                     &mut speech,
-                    &pending,
+                    &mut pending,
                     recording,
                 )?;
                 stall_pass.done();
@@ -1695,9 +1695,9 @@ fn speaker_loop(
                         speaker,
                         &mut output,
                         &mut flush_count,
-                        speech.unfinished_owner().is_some(),
+                        speech.unfinished_owner(),
                         &mut speech,
-                        &pending,
+                        &mut pending,
                         recording,
                     )?;
                     stall_pass.done();
@@ -1767,9 +1767,9 @@ fn speaker_loop(
                     speaker,
                     &mut output,
                     &mut flush_count,
-                    speech.unfinished_owner().is_some(),
+                    speech.unfinished_owner(),
                     &mut speech,
-                    &pending,
+                    &mut pending,
                     recording,
                 )?,
                 Err(error) => return Err(error),
@@ -1789,7 +1789,9 @@ fn speaker_loop(
             let mut wrote_speech = false;
             if let Some(partial) = pending.as_mut() {
                 // Read before this write's reset report clears it (#3697).
-                let speaking = speech.unfinished_owner().is_some() || partial.offset > 0;
+                let speaking = speech
+                    .unfinished_owner()
+                    .or((partial.offset > 0).then(|| partial.chunk.permit.owner()));
                 let result = speaker.try_write(
                     partial.chunk.permit,
                     &partial.chunk.samples[partial.offset..],
@@ -1897,7 +1899,7 @@ fn speaker_loop(
                             &mut flush_count,
                             speaking,
                             &mut speech,
-                            &None,
+                            &mut pending,
                             recording,
                         )?;
                         stall_pass.done();
@@ -1925,9 +1927,9 @@ fn speaker_loop(
                             speaker,
                             &mut output,
                             &mut flush_count,
-                            speech.unfinished_owner().is_some(),
+                            speech.unfinished_owner(),
                             &mut speech,
-                            &pending,
+                            &mut pending,
                             recording,
                         )?;
                         stall_pass.done();
@@ -2086,6 +2088,16 @@ fn report_discard(
             observed_at_us: monotonic_us(),
         })?;
     }
+    // Speech an underrun dropped (#3697), named as a discard names it.
+    if let Some(underran) = speaker.take_underran() {
+        channels.control.send(WorkerEvent::PlaybackDiscarded {
+            owner: underran.owner,
+            reason: PlaybackDiscardReason::Underran,
+            queued_frames: underran.queued_frames,
+            other_owners: underran.other_owners,
+            observed_at_us: monotonic_us(),
+        })?;
+    }
     output.reset();
     Ok(true)
 }
@@ -2172,32 +2184,56 @@ fn underran(error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
 
 /// The speaker underran while it was held up (#3697): on lamp-52e6 0.39 s
 /// into a start, as the models loaded, it ended the voice, and the restart
-/// guard muted the next start. With only zeros queued `pcm` stopped the
-/// device and kept the guard, so, as after any reset, the discard is
-/// reported and the clock primed again through the barrier: a gap, never
-/// the voice. An answer already under way, or a chunk part-written, would
-/// lose what it was saying mid-word; that stays a fault, as before.
-/// `speaking` is read before any reset this tick reported clears it.
+/// guard muted the next start. `pcm` stopped the device and kept the guard,
+/// so, as after any reset, the discard is reported and the clock primed again
+/// through the barrier: a gap, never the voice.
+///
+/// An answer under way (`speaking`, read before any reset this tick
+/// reported clears it) loses what it was saying mid-word, as after a lapse
+/// (#1178): its queued speech is reported dropped (`Underran`), and its chunk
+/// waiting or part-written is refused as lapsed, so the coordinator cuts the
+/// answer and nothing is written again under its old permit. Another
+/// owner's waiting chunk, never begun, is kept for after the prime.
 #[allow(clippy::too_many_arguments)]
 fn underrun(
     channels: &mut WorkerChannels,
     speaker: &mut Speaker,
     output: &mut ReferenceOutput,
     flush_count: &mut u64,
-    speaking: bool,
+    speaking: Option<TurnOwner>,
     speech: &mut SpeechPlayback,
-    pending: &Option<PendingChunk>,
+    pending: &mut Option<PendingChunk>,
     recording: &mut Option<Recording>,
 ) -> Result<()> {
-    if speaking || pending.as_ref().is_some_and(|p| p.offset > 0) {
-        speaker.fault()?;
-        return Err(io::Error::other("the speaker underran with an answer under way").into());
-    }
+    let cut = speaking
+        .or(speaker.underran().map(|dropped| dropped.owner))
+        .or(pending
+            .as_ref()
+            .filter(|partial| partial.offset > 0)
+            .map(|partial| partial.chunk.permit.owner()));
     if report_discard(channels, speaker, output, flush_count, recording)? {
         report_speech_reset(channels, speech)?;
     }
+    let Some(cut) = cut else {
+        eprintln!(
+            "lamp-voice speaker: it underran while held up with only zeros queued; priming again"
+        );
+        return Ok(());
+    };
+    if pending
+        .as_ref()
+        .is_some_and(|partial| partial.offset > 0 || partial.chunk.permit.owner() == cut)
+        && let Some(partial) = pending.take()
+    {
+        channels.control.send(WorkerEvent::PlaybackRejected {
+            turn: partial.chunk.permit.owner().turn(),
+            sequence: partial.chunk.chunk_sequence,
+            reason: Underrun.to_string(),
+            lapsed: true,
+        })?;
+    }
     eprintln!(
-        "lamp-voice speaker: it underran while held up with only zeros queued; priming again"
+        "lamp-voice speaker: it underran while held up mid-answer; the answer is cut, priming again"
     );
     Ok(())
 }

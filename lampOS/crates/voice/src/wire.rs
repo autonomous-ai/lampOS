@@ -277,7 +277,8 @@ pub enum WorkerEvent {
         sequence: u64,
         reason: String,
         /// Refused because the speaker's authority lapsed while it was
-        /// held up (#1178): the answer is cut, not the voice.
+        /// held up (#1178), or it underran mid-answer (#3697): the answer is
+        /// cut, not the voice.
         lapsed: bool,
     },
     PlaybackDiscarded {
@@ -351,6 +352,9 @@ pub enum PlaybackDiscardReason {
     ClockRegression,
     Faulted,
     OtherAuthorityFailure,
+    /// The speaker underran mid-answer (#3697): what it had queued is gone,
+    /// as after a lapse (#1178). The answer is cut, never the voice.
+    Underran,
 }
 
 impl From<InteractionError> for PlaybackDiscardReason {

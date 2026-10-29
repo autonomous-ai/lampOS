@@ -428,3 +428,22 @@ fn zero_frames_cannot_mask_revoked_speech_and_privacy_is_checked_without_a_turn(
     publish(&mut controller, &mut guard, 2);
     assert_eq!(queued.check(t(2), &mut guard), Err(Error::PrivacyClosed));
 }
+
+/// #3697: an underrun names the oldest queued speech's owner, as an
+/// ownership failure does, and whether another owner's speech is mixed in.
+#[test]
+fn the_speech_owner_is_the_oldest_queued_speech_and_names_a_mixed_queue() {
+    let (mut controller, _guard, owner, _camera) = fixture();
+    let mut queued = PlaybackOwnership::new();
+    assert_eq!(queued.speech_owner(), None);
+    let first = speech(&mut controller, owner, None, 0, 100_000);
+    queued.push(first, 240).unwrap();
+    assert_eq!(queued.speech_owner(), Some((owner, false)));
+    let next = controller.admit(t(1), AdmittedInput::Interruption).unwrap();
+    controller.input_ended(t(1), next).unwrap();
+    let second = speech(&mut controller, next, None, 1, 100_000);
+    queued.push(second, 240).unwrap();
+    assert_eq!(queued.speech_owner(), Some((owner, true)));
+    queued.retire_to(240);
+    assert_eq!(queued.speech_owner(), Some((next, false)));
+}
