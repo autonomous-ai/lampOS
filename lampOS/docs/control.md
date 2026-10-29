@@ -152,13 +152,15 @@ a look goes to the body as `{"look":{"yaw":Y,"pitch":P}}` or
 `{"look":"ahead"}` on the lease connection the door holds for the computer,
 so it never outlives that lease, and only the holder's connection is read.
 - **Where:** degrees become counts (4,096 a turn). The base turns right with
-  fewer counts and the head looks up with fewer. They are cut to the base's
+  more counts, as every measured `--gaze` yaw has it, and the head looks up
+  with fewer. They are cut to the base's
   reach (`--reach`'s yaw, or the gaze's `--gaze-reach` if larger) and the head's
   (`--reach` up and down), and every pose's own bounds still hold.
 - **How:** eased to as the gaze's own look is, in its place while held, and
   held there while the lease is. When the lease ends or is let go, the head
-  goes back to the pose's own direction. A suspended lease (a conversation)
-  keeps the look for when it is held again.
+  goes back to the pose's own direction. A conversation cuts a look short at
+  once (`cut_short`, why `conversation`) but keeps its aim: when the talk ends
+  and the lease is held again, the head goes back to it, with no new `done`.
 - **Its end:** the body answers each look once, `there` when the head and
   base are within 6 counts of goals that have stopped moving for 10 steps
   (0.2 s), or `cut_short`. The door makes that the computer's `done`.
@@ -391,8 +393,9 @@ A reply comes when the action is taken. A long one also ends with
 `finished`, `cut_short`, `dropped`. Today `say` and `look` end with `done`.
 `say`'s is `finished` once it's spoken, or `dropped` with the voice's own word
 and why (`expired`, `refused: …`, `dropped: …`, or the voice not reached).
-`look`'s is `finished` once the head is there, with `yaw` and `pitch` as
-reached and `clamped` when the body held them inside its reach; or
+`look`'s is `finished` once the head is there, with `yaw` and `pitch` as the
+body applied them, after its reach and its joints' own bounds (the pitch
+window), and `clamped` when any of those cut the look; or
 `cut_short` (a conversation, the lease ending, another look, a hand or
 anything else holding the head for 5 s, `reconnected` or `released`), or
 `dropped` (the body not held, or its lease socket not reached). A look asked
