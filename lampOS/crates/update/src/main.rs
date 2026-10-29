@@ -20,6 +20,7 @@ use std::{
 };
 
 const USAGE: &str = "\
+[rehearsal G′ of #3689: a throwaway build, never merged, the test channel only]
 lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH] [--lamp NAME]
                              [--apply on|off] [--every-s N] [--quiet-wait-s N] [--watch-s N]
                              [--keep-free-mb N] [--root DIR] [--bus-root DIR]
