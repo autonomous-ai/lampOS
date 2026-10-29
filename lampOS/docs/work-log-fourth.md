@@ -1,3 +1,17 @@
+## 2026-10-29 17:1x ICT — #4345 and #4350 landed; #4350's P3s carried; El's P3s; reads
+
+**#4345** (Fixes #4338): a speech piece not started within 4 s is asked once more on a connection of its own (`net::fresh_client`, `Tts::speak_fresh`). One still not started is said with the next piece, so no sentence is silently dropped. READ-OKs from Tests, Reviewer-three, the Reviewer-lead and El. Landed in train 361 (`a0a6a87fb9`, `e34eee25eb`). El's two P3s (the journal overstated the fresh connection for Gemini and turnless speech; the docs lacked the joined piece's extra start time) are a follow-up PR on `fourth/speech-piece-p3s-4338`.
+
+**#4350** (Part of #4337): the voice is told it doesn't know the area near the person. It asks which area before searching, never picks one, and says where it looked. Train 361 landed its earlier head (`a44feab74b`), and its P3 commit `f01dbad6d7` was left out (Reviewer-three, 17:01). It cherry-picks cleanly onto `4688ab3d01` and is carried on `fourth/place-asks-p3s-4337`. With #4356 (`LAMP_OWNER_PLACE`), a kept place would have had the model told both "ask which area" and "answer for there". Mobile adds a kept-place line on #4356's side, and #4350 needs no change.
+
+**Reads:**
+- #4291 (HOLD for a 5 s lease over the 1 s bound, lifted on El's fix), #4295, #4300 (with a correction: I had missed the service's own 1100 ms deadline), #4301, #4304, #4309, #4311, #4312 (route reuse on "Re-run failed jobs", which had blocked the promote).
+- #4364 (Sixth, the by-default name rule): ask a's 8 s known-file read is right. On ask c, the voice polls the eyes' kept look every 100 ms with no `seq` check, so one look counts two or three times and one spurious 2-face look still makes two. That's a P2 without a HOLD, posted at 17:08.
+
+**#2836 item 6:** the lamp-0c89 drop-in (`LAMP_MESSAGES=on` for lamp-cloud and lamp-voice) is posted for Mobile. It waits for SSH access or Mobile.
+
+No device action.
+
 ## 2026-10-29 07:4x ICT — #4243 landed (carries #3640); train 337's breaker found; reads
 
 **#4243** (setup, carries the first builder's #3640, held since 27 Oct): a face `remember_my_face` saved before "who you are" is asked ends that step unasked when it comes up. The walk keeps a flag only, set by the save's mailbox line. No heard words count, as both HOLDs on #3640 asked. A successful `forget_my_face`, a "forget everything" that forgot the face (Reviewer-two's P3, hooked in tools.rs, not remember.rs), a redo of the walk or of the step, or a voice restart let it go. READ-OK from Reviewer-three, El and Reviewer-two. Landed in train 339 as `29320c63a`. Two person rows are on #1711 for the lead's list.
