@@ -2193,8 +2193,8 @@ pub fn serve(
     // The owner's name is the typed one; a lamp set up by voice has none,
     // and keeps the name who_you_are saved with their face as the owner in
     // the onboarding file (lamp-29e7, 29 Oct): named only while the eyes
-    // still know them, asked off the reply's path every
-    // `known_faces::OWNER_EVERY` (Reviewer-two's P3 on #4290).
+    // still know them, found off the reply's path
+    // (`known_faces::keep_owner_fresh`); a forget clears it at once.
     let owner_faces = tools.who.clone();
     let owner_file = tools.onboarding.clone();
     let by_default = crate::person::by_default_from_environment()
@@ -2214,15 +2214,10 @@ pub fn serve(
             );
             // The owner as the eyes still know them, refreshed in the
             // background, never waited on by a reply.
-            let owner = Arc::new(std::sync::Mutex::new(None::<String>));
             if typed.is_none() {
-                crate::known_faces::keep_owner_fresh(
-                    owner.clone(),
-                    owner_file.clone(),
-                    owner_faces.clone(),
-                );
+                crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
             }
-            (typed, bus, owner)
+            (typed, bus)
         });
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
@@ -2252,13 +2247,10 @@ pub fn serve(
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
             let named_by_default = by_default
                 .as_ref()
-                .and_then(|(typed, bus, owner)| {
+                .and_then(|(typed, bus)| {
                     let name = match typed {
                         Some(typed) => typed.clone(),
-                        None => owner
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .clone()?,
+                        None => crate::known_faces::owner_now()?,
                     };
                     Some((name, bus))
                 })
