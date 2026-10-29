@@ -8,7 +8,7 @@
 //! is what stops a stage seen before the yes being sent after it.
 //!
 //! One alert per stage of a round: `started`, `done`, `failed`, `refused`,
-//! `rolled-back`, and `self-switched` under its own name; and `not-switched`
+//! `rolled-back`, and `self-switched` and `self-confirmed` under their own names; and `not-switched`
 //! for a round that began (its `started` was told) and ended with nothing
 //! switched, so no start is left without an end. Each is built
 //! from `update/status` (`lamp_msgs::UpdateStatus`) and a fixed template,
@@ -54,10 +54,17 @@ pub const TYPE: &str = "ops";
 /// The file of what was told, in lamp-cloud's state folder.
 pub const FILE: &str = "update-alerts.json";
 
-/// The reason codes lamp-update may name in `last.reason`, once it does
-/// (a fixed list of names, never text). A code not in this list is not
-/// told. Empty until lamp-update's list is agreed and added here.
-pub const REASONS: &[&str] = &[];
+/// The reason names lamp-update may say in `last.reason`, as its
+/// `UpdateResult::REASONS` has them: the last phase a round said, or
+/// `models`. A name not in this list is not told.
+pub const REASONS: &[&str] = &[
+    "checking",
+    "fetching",
+    "switching",
+    "watching",
+    "restoring",
+    "models",
+];
 
 /// Where the alert goes: the backend's base as the account has it, with
 /// `/alert` after it. Unlike the ping, a trailing `/v1` stays: the alert
@@ -78,6 +85,8 @@ pub enum Stage {
     /// lamp-update switched itself; its new self confirms on its next
     /// round, so this is not a round's `done`.
     SelfSwitched,
+    /// lamp-update's new self confirmed the switch it was started by.
+    SelfConfirmed,
     /// A round whose start was told ended with nothing switched; its code
     /// is the outcome's own name from [`NOT_SWITCHED`].
     NotSwitched,
@@ -92,6 +101,7 @@ impl Stage {
             Self::Refused => "refused",
             Self::RolledBack => "rolled-back",
             Self::SelfSwitched => "self-switched",
+            Self::SelfConfirmed => "self-confirmed",
             Self::NotSwitched => "not-switched",
         }
     }
@@ -104,6 +114,7 @@ fn told_as(outcome: &str) -> Option<Stage> {
     match outcome {
         "switched" => Some(Stage::Done),
         "self-switched" => Some(Stage::SelfSwitched),
+        "self-confirmed" => Some(Stage::SelfConfirmed),
         "refused" => Some(Stage::Refused),
         "rolled-back" => Some(Stage::RolledBack),
         "failed" => Some(Stage::Failed),
@@ -671,6 +682,7 @@ mod tests {
         for (outcome, want) in [
             ("switched", Some(Stage::Done)),
             ("self-switched", Some(Stage::SelfSwitched)),
+            ("self-confirmed", Some(Stage::SelfConfirmed)),
             ("refused", Some(Stage::Refused)),
             ("rolled-back", Some(Stage::RolledBack)),
             ("failed", Some(Stage::Failed)),
@@ -715,8 +727,80 @@ mod tests {
             read(json!({"last": {"reason": "/etc/lampOS/x Alice", "started_at_unix_ms": "5"}})),
             none()
         );
-        // Until a list is agreed, no reason is told.
-        assert_eq!(Extras::of(&json!({"last": {"reason": "models"}})), none());
+        // The names lamp-update says, each passing as the code; others do not.
+        for name in REASONS {
+            let read = Extras::of(&json!({"last": {"reason": name}}));
+            assert_eq!(read.reason, Some(*name));
+            let alert = Alert {
+                stage: Stage::Refused,
+                from: None,
+                to: None,
+                code: read.reason,
+                took_s: None,
+                at_s: 1,
+            };
+            assert!(alert.message().ends_with(&format!("code: {name}")));
+        }
+        assert_eq!(REASONS.len(), 6);
+        for other in ["signature", "Fetching", "/etc/x", ""] {
+            assert_eq!(Extras::of(&json!({"last": {"reason": other}})), none());
+        }
+    }
+
+    /// `took` is the end minus the round's `checking`, in whole seconds,
+    /// and never negative or absurd.
+    #[test]
+    fn the_time_it_took_is_whole_seconds_from_checking_and_never_negative() {
+        let took = |began: u64, at: u64| {
+            let mut watcher = Watcher::new(None);
+            let old = Some(("up-to-date", Some(1), 1));
+            watcher.observe(&status("idle", 1, old), &none(), T0);
+            watcher.observe(&status("fetching", 1, old), &none(), T0 + 1);
+            let extras = Extras {
+                reason: None,
+                started_at_unix_ms: Some(began),
+            };
+            let ended = Some(("switched", Some(2), at));
+            watcher.observe(&status("idle", 2, ended), &extras, T0 + 2)[0].took_s
+        };
+        assert_eq!(took(T0, T0 + 95_900), Some(95));
+        assert_eq!(took(T0, T0), Some(0));
+        assert_eq!(took(T0 + 5_000, T0), None);
+        assert_eq!(took(T0, T0 + 90_000_000), None);
+    }
+
+    /// The confirmation of lamp-update's own switch is its own stage, told
+    /// once however often it is said, and it breaks a repeating streak.
+    #[test]
+    fn a_self_confirmation_is_told_once_and_breaks_a_streak() {
+        let mut watcher = Watcher::new(None);
+        let old = Some(("up-to-date", Some(8599), T0 - 1));
+        watcher.observe(&status("idle", 8599, old), &none(), T0);
+        watcher.observe(&status("fetching", 8599, old), &none(), T0 + 1_000);
+        let refused = Some(("refused", None, T0 + 5_000));
+        assert_eq!(
+            watcher
+                .observe(&status("idle", 8599, refused), &none(), T0 + 6_000)
+                .len(),
+            1
+        );
+        // The next refusal would be held; the confirmation is told, and
+        // the refusal after it is told again.
+        let confirmed = Some(("self-confirmed", Some(8600), T0 + 100_000));
+        let told = watcher.observe(&status("idle", 8599, confirmed), &none(), T0 + 101_000);
+        assert_eq!((told.len(), told[0].stage), (1, Stage::SelfConfirmed));
+        for minute in 1..4 {
+            let again = status("idle", 8599, confirmed);
+            assert!(
+                watcher
+                    .observe(&again, &none(), T0 + 101_000 + minute * 60_000)
+                    .is_empty()
+            );
+        }
+        watcher.observe(&status("fetching", 8599, confirmed), &none(), T0 + 400_000);
+        let refused = Some(("refused", None, T0 + 405_000));
+        let told = watcher.observe(&status("idle", 8599, refused), &none(), T0 + 406_000);
+        assert_eq!(told.len(), 1);
     }
 
     #[test]
