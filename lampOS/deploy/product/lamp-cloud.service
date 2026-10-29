@@ -54,6 +54,11 @@ Environment=LAMP_REPORTS=on
 Environment=LAMP_SKILLS_STORE=off
 EnvironmentFile=-/etc/lampOS/skills/store.env
 Environment=LAMP_APP_UPDATE=on
+# Restart and shutdown from the app (#2193, #3697): both asked of setup's change helper, which refuses
+# while an update installs and answers before the lamp goes down; the shutdown ends on the ring's
+# safe-to-unplug light. Without them `can` names neither, and the app shows neither button.
+Environment=LAMP_APP_RESTART=on
+Environment=LAMP_SHUTDOWN=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
