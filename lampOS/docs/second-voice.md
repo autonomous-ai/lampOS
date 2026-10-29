@@ -2630,6 +2630,25 @@ after a take-over, but now for every turn:
   the time stay for where the lamp is, never asked about (#4337: on
   lamp-3e83 on 29 Oct a district speech to text misheard was taken for
   another, said as fact, kept for the rest of the talk, and searched).
+  Neither is told while the owner's place from the app is kept
+  (`LAMP_OWNER_PLACE=on`, below).
+- **The owner's place from the app** (`LAMP_OWNER_PLACE=on`, #4333,
+  [owner-place.md](owner-place.md)): a spoken line whose words need a place
+  ("near me", nearby, the weather, opening hours:
+  `owner_place::asks_for_a_place`) is asked with a note beside its words,
+  as the staff note is (`Engine::noting_the_place`, `worker::place_noting`):
+  the area's name and its rounded position, read from
+  `/etc/lampOS/person/place` for each such line. No other line and no text
+  is told it; none kept, nothing is told and the model asks where. While one
+  is kept it stands for the lamp's place: `LAMP_PLACE` is not told beside
+  the time, nor `local_time::AREA_ASKED` (`worker::place_line` tells
+  `local_time::place_told_owner_kept` instead: where they are comes beside
+  a request that needs it; ask only when unsure of a place heard; say where
+  it looked when none was named),
+  the weather's function called with no place answers for its
+  position by its name, and its name's parts join the key terms speech to
+  text listens for (read every 10 s). The journal says `request N: its
+  words need a place; the model is told the owner's place`, never where.
 - **A line let out only as the conversation going on** (with
   `LAMP_SPOKEN_TO` and `not_for_me` offered, `LAMP_TOOLS=on`): no name,
   nobody turned to the lamp, not said close to it, no answer to its own

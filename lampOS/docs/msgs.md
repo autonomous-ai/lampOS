@@ -598,3 +598,17 @@ and are re-exported at the crate root; `reports_topics()` and
 Published by the voice's `reports_stop` (`reports/request`) and
 `lamp-cloud` (`reports/state`), only with `LAMP_REPORTS=on`; the voice's
 `reports_state` reads `reports/state`.
+
+## The owner's place (not a topic)
+
+`lamp_msgs::owner_place` (#4333, [owner-place.md](owner-place.md)) is no
+message on the bus: it is the one copy of the owner's place's rules, read by
+`lamp-cloud`, by `lamp-setup change` and by the voice. `Place` is
+`{name, lat, lon, set_at}`: `name` an area name (the neighbourhood, district
+or city as the phone's geocoder gives it, which the app builds from
+sub-locality and locality), never a street address, checked only for 1 to 64
+characters on one line, digits allowed ("District 1"); `lat`/`lon` already
+rounded to 2 decimals by the app. `fit` checks the app's `data` and rounds it
+(`rounded`: latitude to 0.01°, longitude to a step at least 1 km wide at the
+cell's edge nearest the pole); `read` reads `/etc/lampOS/person/place` and
+rounds again; `utc_time` keeps `set_at` as ISO 8601 UTC to the second.

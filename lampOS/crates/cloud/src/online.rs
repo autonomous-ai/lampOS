@@ -156,6 +156,7 @@ pub fn reply(
             if answered.is_ok()
                 && (crate::settings::KINDS.contains(&kind.as_str())
                     || crate::settings::KEYS_KINDS.contains(&kind.as_str())
+                    || crate::settings::PLACE_KINDS.contains(&kind.as_str())
                     || kind == crate::settings::WIFI_KIND)
             {
                 let mut starting = identity.starting(now, &kind);

@@ -43,9 +43,17 @@ pub fn known() -> Vec<String> {
 }
 
 /// What a stream listens for after the lamp's name: the unit's words
-/// (`fixed`), then the names the lamp knows ([`known`]), each once.
+/// (`fixed`), then the owner's place's names from the app, with
+/// `LAMP_OWNER_PLACE=on` (`crate::owner_place::terms`, #4333), then the
+/// names the lamp knows ([`known`]), each once.
 pub fn listening(fixed: &[String]) -> Vec<String> {
-    gather(fixed.iter().cloned().chain(known()))
+    gather(
+        fixed
+            .iter()
+            .cloned()
+            .chain(crate::owner_place::terms())
+            .chain(known()),
+    )
 }
 
 /// Whether the switch is on: `on`, and nothing else.

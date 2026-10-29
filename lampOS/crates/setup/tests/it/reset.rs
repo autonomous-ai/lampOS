@@ -722,7 +722,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 37] = [
+const PERSON_STORES: [&str; 38] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -788,6 +788,8 @@ const PERSON_STORES: [&str; 37] = [
     "/etc/lampOS/voice/own",
     "/etc/lampOS/policy/jev.key",
     "/etc/lampOS/person/name",
+    // The owner's place from the app, beside the name (#4333).
+    "/etc/lampOS/person/place",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf",
     "/var/lib/lampos-setup/done",
 ];

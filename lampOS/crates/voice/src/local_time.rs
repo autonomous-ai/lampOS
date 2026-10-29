@@ -288,6 +288,16 @@ pub fn place_told(place: Option<&str>) -> Option<String> {
 /// [`place_told`]'s rule for the area near the person (#4337).
 pub const AREA_ASKED: &str = "You don't know which part of town they are in: when they ask for something near them, or name a place you aren't sure you heard right, ask which area they mean before you search, and never pick one yourself. When you looked somewhere they didn't name, say where. The weather and the time are for where you are: never ask which area for those.";
 
+/// Told beside the time instead of [`place_told`] while the owner's place
+/// from the app is kept (#4333, `crate::owner_place`): that place is told
+/// beside a request that needs it, so here the model is told neither the
+/// unit's place nor that it knows none (#4337), only to ask when it is not
+/// sure it heard a place, and to say where it looked when nobody named it,
+/// never [`AREA_ASKED`]'s "ask before you search".
+pub fn place_told_owner_kept() -> String {
+    " Where they are is told beside a request that needs it. If you aren't sure you heard a place right, ask which area they mean; when you looked somewhere they didn't name, say where.".to_owned()
+}
+
 /// The place the lamp's own zone names ("Ho Chi Minh"), or `None` when it
 /// names none ([`own_place`]).
 pub fn zone_place_here() -> Option<String> {

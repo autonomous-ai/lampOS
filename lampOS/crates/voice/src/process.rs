@@ -1617,6 +1617,9 @@ fn second_route_worker_environment(
         crate::known_faces::ASKED_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
+        // The owner's place for a question that needs one, and cleared
+        // with the owner's forget everything (#4333).
+        crate::owner_place::ENVIRONMENT,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
     .into_iter()
@@ -2372,6 +2375,7 @@ mod tests {
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
+                    || name == crate::owner_place::ENVIRONMENT
                 {
                     "on"
                 } else if name == crate::remember::FORGET_ASKED_ENVIRONMENT {
@@ -2484,6 +2488,7 @@ mod tests {
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
+                    "LAMP_OWNER_PLACE=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_BY_DEFAULT=on",

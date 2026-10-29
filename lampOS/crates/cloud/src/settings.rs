@@ -18,6 +18,11 @@
 //! connected and kept until the broker has acknowledged them
 //! (`crate::online`). The password goes into the helper's line and nowhere
 //! else: never a reply, an error or a journal line.
+//!
+//! The owner's approximate place (`owner.place`, `owner.place.clear`,
+//! #4333, `docs/owner-place.md`) goes to the same helper as the names, with
+//! `LAMP_OWNER_PLACE=on` beside the switch above, rounded here first
+//! ([`place_line`]). Its clear needs only the helper ([`PLACE_CLEAR_KIND`]).
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
@@ -83,6 +88,21 @@ pub const KEYS_ENVIRONMENT: &str = "LAMP_OWN_KEYS";
 /// removed (`{"service"[, "request_id"]}`), or whose each service uses.
 pub const KEYS_KINDS: [&str; 3] = ["keys.set", "keys.remove", "keys.get"];
 
+/// `on`, beside [`ENVIRONMENT`] and `LAMP_CLOUD`, takes [`PLACE_KINDS`]: the
+/// owner's approximate place, for "near me" (#4333, `docs/owner-place.md`).
+pub const PLACE_ENVIRONMENT: &str = "LAMP_OWNER_PLACE";
+
+/// The owner's place set (`owner.place`, `{"name", "lat", "lon", "set_at"}` with
+/// `set_at` in ISO 8601 UTC, rounded to
+/// about a kilometre here and again by the helper) and cleared (`{}`), each
+/// answered `starting` and then its result, as the names are.
+pub const PLACE_KINDS: [&str; 2] = ["owner.place", PLACE_CLEAR_KIND];
+
+/// The owner's place cleared (`{}`): taken whenever root's helper is here,
+/// [`PLACE_ENVIRONMENT`] on or not, so a place kept while it was on is never
+/// left behind when it is turned off (#4356). Listed in `can` only with it.
+pub const PLACE_CLEAR_KIND: &str = "owner.place.clear";
+
 /// The keys helper's socket (`deploy/product/lamp-setup-keys.socket`).
 pub const KEYS_SOCKET: &str = "/run/lampos-setup-keys/keys.sock";
 
@@ -139,6 +159,35 @@ pub fn keys_on_from_environment() -> bool {
         std::env::var(ENVIRONMENT).ok().as_deref(),
         std::env::var(KEYS_ENVIRONMENT).ok().as_deref(),
     )
+}
+
+/// Whether [`PLACE_KINDS`] are taken: [`gates`] and `LAMP_OWNER_PLACE=on` too.
+pub fn place_gates(cloud: Option<&str>, change: Option<&str>, place: Option<&str>) -> bool {
+    gates(cloud, change) && place == Some("on")
+}
+
+/// [`place_gates`] as the environment says.
+pub fn place_on_from_environment() -> bool {
+    place_gates(
+        std::env::var("LAMP_CLOUD").ok().as_deref(),
+        std::env::var(ENVIRONMENT).ok().as_deref(),
+        std::env::var(PLACE_ENVIRONMENT).ok().as_deref(),
+    )
+}
+
+/// The helper's request line for one of [`PLACE_KINDS`] with the app's
+/// `data`, or why not: the place checked and rounded
+/// ([`lamp_msgs::owner_place::fit`]), so what leaves lamp-cloud is never
+/// finer than the grid; `null` clears it. No error holds a value.
+pub fn place_line(kind: &str, data: &Value) -> Result<String, String> {
+    match kind {
+        "owner.place" => {
+            let place = lamp_msgs::owner_place::fit(data)?;
+            Ok(json!({ "owner_place": place }).to_string())
+        }
+        "owner.place.clear" => Ok(json!({ "owner_place": null }).to_string()),
+        _ => Err(crate::wire::not_here(kind)),
+    }
 }
 
 /// The app's `request_id`, if it gave one: 1 to 64 printable characters.
@@ -654,6 +703,8 @@ pub struct Changes {
     wifi_link: Arc<WifiLink>,
     /// A keys request is under way: a second fails `busy` (#2094).
     keys_busy: Arc<AtomicBool>,
+    /// [`PLACE_KINDS`] are taken, with `LAMP_OWNER_PLACE=on` (#4333).
+    place: bool,
     done: Arc<Mutex<Vec<Outcome>>>,
     /// How long a failure with no join waits for the broker's ack before
     /// the link is made again: [`WIFI_RESULT_ACK_WAIT`], shorter only in
@@ -691,6 +742,7 @@ impl Changes {
             wifi_busy: Arc::default(),
             wifi_link: Arc::default(),
             keys_busy: Arc::default(),
+            place: false,
             done: Arc::default(),
             result_ack_wait: WIFI_RESULT_ACK_WAIT,
         })
@@ -720,6 +772,20 @@ impl Changes {
             wifi.then(|| (PathBuf::from(WIFI_SOCKET), WIFI_WAIT)),
             keys.then(|| (PathBuf::from(KEYS_SOCKET), KEYS_WAIT)),
         )
+    }
+
+    /// The same, taking [`PLACE_KINDS`] too when `on`. Only on changes just
+    /// made, before they are shared; shared ones are as they were.
+    pub fn taking_the_place(mut self: Arc<Self>, on: bool) -> Arc<Self> {
+        if let Some(changes) = Arc::get_mut(&mut self) {
+            changes.place = on;
+        }
+        self
+    }
+
+    /// Whether [`PLACE_KINDS`] are taken.
+    pub fn place_on(&self) -> bool {
+        self.place
     }
 
     /// Whether [`KEYS_KINDS`] are taken.
@@ -1379,6 +1445,195 @@ mod tests {
 
     /// An obvious fake, never a real password.
     const FAKE_PASSWORD: &str = "fake-pass-NEW-1234";
+
+    /// #4333: the owner's place needs its own switch beside the names'.
+    #[test]
+    fn the_owners_place_needs_its_own_switch_beside_the_names() {
+        assert!(place_gates(Some("on"), Some("on"), Some("on")));
+        for (cloud, change, place) in [
+            (Some("on"), Some("on"), None),
+            (Some("on"), None, Some("on")),
+            (None, Some("on"), Some("on")),
+            (Some("on"), Some("on"), Some("1")),
+        ] {
+            assert!(
+                !place_gates(cloud, change, place),
+                "{cloud:?} {change:?} {place:?}"
+            );
+        }
+    }
+
+    /// #4333, with the switch off (the names' switch on or not): setting
+    /// the place is a kind this lamp lacks, as before, `system.info` lists
+    /// neither kind, and nothing reaches the helper. Without the helper the
+    /// clear is refused the same way.
+    #[test]
+    fn off_the_owners_place_is_refused_as_a_kind_this_lamp_lacks() {
+        let data = json!({"name": "Ba Dinh", "lat": 21.03, "lon": 105.83, "set_at": "2026-10-29T08:30:00Z"});
+        for changes in [
+            None,
+            Some(Changes::new(socket("place-never"), WAIT)),
+            Some(Changes::new(socket("place-never"), WAIT).taking_the_place(false)),
+        ] {
+            let mut lamp = Fake {
+                changes: changes.clone(),
+                ..Fake::default()
+            };
+            let kinds: &[&str] = if changes.is_some() {
+                &["owner.place"]
+            } else {
+                &PLACE_KINDS
+            };
+            for &kind in kinds {
+                assert_eq!(
+                    answer(&mut lamp, kind, &data),
+                    Err(format!("not on this lamp: {kind}"))
+                );
+                let sent = format!(r#"{{"cmd":"data","kind":"{kind}","data":{data}}}"#);
+                let replied: Value = serde_json::from_str(
+                    &reply(&identity(), &mut lamp, sent.as_bytes(), "t").unwrap(),
+                )
+                .unwrap();
+                assert_eq!(replied["status"], "failure");
+            }
+            let info = answer(&mut lamp, "system.info", &Value::Null)
+                .unwrap()
+                .unwrap();
+            assert!(!info["can"].to_string().contains("owner.place"), "{info}");
+            if let Some(changes) = changes {
+                std::thread::sleep(Duration::from_millis(50));
+                assert!(changes.take().is_empty());
+            }
+        }
+    }
+
+    /// #4356: with the switch off, a place kept while it was on can still
+    /// be cleared from the app: acked at once, `null` to the helper, and its
+    /// result after, though `can` never lists it.
+    #[test]
+    fn off_the_owners_place_can_still_be_cleared_unlisted() {
+        let path = socket("place-off-clear");
+        let serving = helper(&path, Duration::ZERO, "{\"done\":{\"cleared\":true}}\n");
+        let changes = Changes::new(&path, Duration::from_secs(5));
+        assert!(!changes.place_on());
+        let mut lamp = Fake {
+            changes: Some(changes.clone()),
+            ..Fake::default()
+        };
+        let info = answer(&mut lamp, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert!(!info["can"].to_string().contains("owner.place"), "{info}");
+        let sent = br#"{"cmd":"data","kind":"owner.place.clear","data":{}}"#;
+        let acked: Value =
+            serde_json::from_str(&reply(&identity(), &mut lamp, sent, "t").unwrap()).unwrap();
+        assert_eq!(
+            (&acked["kind"], &acked["status"]),
+            (&json!("owner.place.clear"), &json!("starting"))
+        );
+        let (kind, result) = first(&changes);
+        assert_eq!(
+            (kind.as_str(), result),
+            ("owner.place.clear", Ok(Some(json!({"cleared": true}))))
+        );
+        assert_eq!(serving.join().unwrap(), "{\"owner_place\":null}\n");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// #4333: what leaves lamp-cloud is already on the grid, never finer
+    /// than the phone's; a clear is `null`; no refusal holds a value.
+    #[test]
+    fn the_owners_place_is_rounded_before_it_leaves_and_a_clear_is_null() {
+        assert_eq!(
+            place_line(
+                "owner.place",
+                &json!({"name": " Ba Dinh ", "lat": 21.035_123, "lon": 105.834_987,
+                        "set_at": "2026-10-29T08:30:00Z", "street": "12 Nowhere Street"})
+            ),
+            Ok(
+                r#"{"owner_place":{"lat":21.04,"lon":105.83,"name":"Ba Dinh","set_at":"2026-10-29T08:30:00Z"}}"#
+                    .to_owned()
+            )
+        );
+        assert_eq!(
+            place_line("owner.place.clear", &json!({})),
+            Ok(r#"{"owner_place":null}"#.to_owned())
+        );
+        for data in [
+            json!({"name": "Secret Lane", "lat": 91, "lon": 105.8, "set_at": "2026-10-29T08:30:00Z"}),
+            json!({"name": "Secret Lane", "lat": 21.0, "lon": "105.8", "set_at": "2026-10-29T08:30:00Z"}),
+            json!({"name": "Secret\nLane", "lat": 21.0, "lon": 105.8, "set_at": "2026-10-29T08:30:00Z"}),
+        ] {
+            let why = place_line("owner.place", &data).unwrap_err();
+            assert!(!why.contains("Secret") && !why.contains("105"), "{why}");
+        }
+    }
+
+    /// #4333: set and clear, acked at once and their result after, as the
+    /// names are; the helper takes the rounded place, and the result says
+    /// what was kept.
+    #[test]
+    fn the_owners_place_is_acked_at_once_and_its_result_follows() {
+        let path = socket("place");
+        let serving = helper(
+            &path,
+            Duration::from_millis(100),
+            "{\"done\":{\"name\":\"Ba Dinh\",\"lat\":21.04,\"lon\":105.83,\"set_at\":\"2026-10-29T08:30:00Z\"}}\n",
+        );
+        let changes = Changes::new(&path, Duration::from_secs(5)).taking_the_place(true);
+        assert!(changes.place_on());
+        let mut lamp = Fake {
+            changes: Some(changes.clone()),
+            ..Fake::default()
+        };
+        let info = answer(&mut lamp, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        for kind in PLACE_KINDS {
+            assert!(info["can"].as_array().unwrap().contains(&json!(kind)));
+        }
+        let sent = br#"{"cmd":"data","kind":"owner.place","data":{"name":"Ba Dinh","lat":21.035123,"lon":105.834987,"set_at":"2026-10-29T08:30:00Z"}}"#;
+        let acked: Value =
+            serde_json::from_str(&reply(&identity(), &mut lamp, sent, "t").unwrap()).unwrap();
+        assert_eq!(
+            (&acked["kind"], &acked["status"]),
+            (&json!("owner.place"), &json!("starting"))
+        );
+        let (kind, result) = first(&changes);
+        assert_eq!(kind, "owner.place");
+        let said = identity().data("t", &kind, &result);
+        assert_eq!(said["status"], "success");
+        assert_eq!(said["data"]["lat"], 21.04);
+        let took: Value = serde_json::from_str(&serving.join().unwrap()).unwrap();
+        assert_eq!(
+            took,
+            json!({"owner_place": {"name": "Ba Dinh", "lat": 21.04, "lon": 105.83, "set_at": "2026-10-29T08:30:00Z"}})
+        );
+        let _ = std::fs::remove_file(&path);
+        let serving = helper(&path, Duration::ZERO, "{\"done\":{\"cleared\":true}}\n");
+        let sent = br#"{"cmd":"data","kind":"owner.place.clear","data":{}}"#;
+        let acked: Value =
+            serde_json::from_str(&reply(&identity(), &mut lamp, sent, "t").unwrap()).unwrap();
+        assert_eq!(acked["status"], "starting");
+        let (kind, result) = first(&changes);
+        assert_eq!(
+            (kind.as_str(), result),
+            ("owner.place.clear", Ok(Some(json!({"cleared": true}))))
+        );
+        assert_eq!(serving.join().unwrap(), "{\"owner_place\":null}\n");
+        // A place that doesn't fit fails at once, and nothing is asked.
+        let sent = br#"{"cmd":"data","kind":"owner.place","data":{"name":"Ba Dinh","lat":95,"lon":105.8,"set_at":"2026-10-29T08:30:00Z"}}"#;
+        let failed: Value =
+            serde_json::from_str(&reply(&identity(), &mut lamp, sent, "t").unwrap()).unwrap();
+        assert_eq!(
+            (&failed["status"], &failed["error"]),
+            (
+                &json!("failure"),
+                &json!("lat must be a number from -90 to 90")
+            )
+        );
+        let _ = std::fs::remove_file(&path);
+    }
 
     #[test]
     fn the_wifi_needs_its_own_switch_beside_the_names() {

@@ -1484,7 +1484,9 @@ pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option
 /// call asks, for the place and the day asked, the lamp's own place
 /// (`here`) for a call that names none, its days told from that place's
 /// own date by `clock`. Nothing is fetched here and no task is started;
-/// with the switch off there is no weather at all.
+/// with the switch off there is no weather at all. With
+/// `LAMP_OWNER_PLACE=on`, the owner's place from the app goes over `here`
+/// while one is kept (#4333).
 fn weather_asked(
     switch: Option<&str>,
     here: Option<String>,
@@ -1492,7 +1494,14 @@ fn weather_asked(
     clock: crate::second_provider::net::weather::Clock,
 ) -> Option<Arc<crate::second_provider::net::weather::Weather>> {
     use crate::second_provider::net::weather;
-    weather::on(switch).then(|| Arc::new(weather::Weather::new(here, fetch, clock)))
+    weather::on(switch).then(|| {
+        let weather = weather::Weather::new(here, fetch, clock);
+        Arc::new(if crate::owner_place::on_from_environment() {
+            weather.with_owner_place(lamp_msgs::owner_place::FILE.into())
+        } else {
+            weather
+        })
+    })
 }
 
 /// The search's functions, then the weather's when it is on: what a spoken
@@ -1757,6 +1766,19 @@ fn noting_once(
     (note, heard)
 }
 
+/// What the model is told of where the lamp is, beside its time: with the
+/// owner's place kept (`owner_kept`, #4333), that it is told beside a
+/// request that needs it ([`crate::local_time::place_told_owner_kept`]),
+/// never the unit's `place` nor that the lamp knows no place (#4337);
+/// otherwise the unit's ([`crate::local_time::place_told`]).
+fn place_line(place: Option<&str>, owner_kept: bool) -> Option<String> {
+    if owner_kept {
+        Some(crate::local_time::place_told_owner_kept())
+    } else {
+        crate::local_time::place_told(place)
+    }
+}
+
 /// What the model is told of the time, with the lamp's place after it
 /// ([`crate::local_time::place_told`]); the place alone when the time is not
 /// known.
@@ -1850,6 +1872,8 @@ pub fn serve(
     // The names the lamp knows, listened for beside the unit's words, with
     // `LAMP_SECOND_KNOWN_NAMES=on` (#753): read beside the turns.
     crate::second_provider::net::key_terms::start_from_environment(files.tools.tasks.is_some());
+    // The owner's place's names too, with LAMP_OWNER_PLACE=on (#4333).
+    crate::owner_place::start_terms();
     let checked = checks_sounds(&files);
     let tools = files.tools;
     start_tasks(&tools);
@@ -2243,10 +2267,14 @@ pub fn serve(
             };
             // The lamp's own place, with `LAMP_PLACE`, beside its time
             // (#1712). The weather is never told here: it is the weather's
-            // function's to say, when asked (LAMP_SECOND_WEATHER).
+            // function's to say, when asked (LAMP_SECOND_WEATHER). Not while
+            // the owner's place from the app is kept (LAMP_OWNER_PLACE, #4333):
+            // that one stands for the lamp's place, told only beside a line
+            // that needs a place, so the model is never given two
+            // ([`place_line`]).
             let time = with_place(
                 crate::local_time::told_asked_here(clock, places),
-                crate::local_time::place_told(place.as_deref()),
+                place_line(place.as_deref(), crate::owner_place::kept_now().is_some()),
             );
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
             // The owner's name held back while someone else may be speaking:
@@ -2382,6 +2410,14 @@ pub fn serve(
         .clone()
         .filter(|_| files.staff_note)
         .map(staff_noting);
+    // The owner's place from the app, told only beside words that need a
+    // place, with LAMP_OWNER_PLACE=on (#4333).
+    let owner_place = crate::owner_place::on_from_environment().then(|| {
+        eprintln!(
+            "lamp-voice second: a spoken line that needs a place is told the owner's place from the app, when one is kept; no other line is (LAMP_OWNER_PLACE)"
+        );
+        place_noting(std::path::PathBuf::from(lamp_msgs::owner_place::FILE))
+    });
     let has_tasks = tools.tasks.is_some();
     // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
     // forced call goes to that one, and the journal says so (#1722).
@@ -2511,6 +2547,9 @@ pub fn serve(
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
+    }
+    if let Some(place) = owner_place {
+        engine = engine.noting_the_place(place);
     }
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
     // `LAMP_SECOND_MEMORY_HITS=on`, Days only): searched in the scope the
@@ -4213,6 +4252,20 @@ pub(crate) fn staff_noting(place: crate::agent_tasks::Place) -> super::StaffNote
             who.join(" and ")
         );
         Some(crate::staff_note::note(&who))
+    })
+}
+
+/// The note for a spoken request's words that need a place, with the
+/// owner's place kept at `file` (`LAMP_OWNER_PLACE=on`,
+/// `crate::owner_place`, #4333): read for each such line, and journalled
+/// without the place or the words.
+pub(crate) fn place_noting(file: std::path::PathBuf) -> super::StaffNote {
+    Arc::new(move |request, words| {
+        let note = crate::owner_place::note_for(&file, words)?;
+        eprintln!(
+            "lamp-voice second: request {request}: its words need a place; the model is told the owner's place"
+        );
+        Some(note)
     })
 }
 
@@ -22684,6 +22737,44 @@ mod tests {
             Some("It is noon.")
         );
         assert_eq!(super::with_place(None, None), None);
+    }
+
+    /// #4333 with #4337: while the owner's place is kept, the system message
+    /// names neither the unit's place nor that the lamp knows none, and never
+    /// says to ask which area before a search; without one, the unit's, as
+    /// before.
+    #[test]
+    fn a_kept_owners_place_stands_for_the_lamps_place_beside_its_time() {
+        let kept = super::with_place(
+            Some("It is noon.".into()),
+            super::place_line(Some("Hanoi"), true),
+        )
+        .unwrap();
+        assert!(
+            kept.starts_with("It is noon. Where they are is told beside a request that needs it."),
+            "{kept}"
+        );
+        assert!(!kept.contains("Hanoi"), "{kept}");
+        assert!(
+            !kept.contains("ask which area they mean before you search"),
+            "{kept}"
+        );
+        assert!(!kept.contains("beyond your time zone"), "{kept}");
+        assert_eq!(
+            super::place_line(Some("Hanoi"), false),
+            crate::local_time::place_told(Some("Hanoi"))
+        );
+        assert_eq!(
+            super::place_line(None, false),
+            crate::local_time::place_told(None)
+        );
+        assert!(super::place_line(None, true).is_some());
+        // #4337's rule is what is left out, and it is still told without one.
+        assert!(
+            super::place_line(None, false)
+                .unwrap()
+                .contains("ask which area they mean before you search")
+        );
     }
 
     /// #1712: the room this route keeps is told on the bus (`room/state`)
