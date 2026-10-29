@@ -116,8 +116,9 @@ pub struct Real {
 pub const RESTART_ENVIRONMENT: &str = "LAMP_APP_RESTART";
 
 /// The app's `system.shutdown` (#3697): setup's change helper's socket, and
-/// its yes once given, with when, so an app that asks again within
-/// [`YES_KEPT`] is answered the same and the helper is asked once.
+/// its yes once given, with the moment it lapses ([`YES_KEPT`] on), so an
+/// app that asks again before then is answered the same and the helper is
+/// asked once.
 #[derive(Debug, Default)]
 pub struct Shutdown {
     pub socket: PathBuf,
@@ -719,13 +720,13 @@ impl Lamp for Real {
             .shutdown
             .as_mut()
             .ok_or_else(|| crate::wire::not_here("system.shutdown"))?;
-        if let Some((accepted, at)) = &shutdown.accepted
-            && at.elapsed() < YES_KEPT
+        if let Some((accepted, until)) = &shutdown.accepted
+            && Instant::now() < *until
         {
             return Ok(accepted.clone());
         }
         let accepted = ask_power(&shutdown.socket, lamp_keeper::restart::SHUTDOWN_REQUEST)?;
-        shutdown.accepted = Some((accepted.clone(), Instant::now()));
+        shutdown.accepted = Some((accepted.clone(), Instant::now() + YES_KEPT));
         Ok(accepted)
     }
 

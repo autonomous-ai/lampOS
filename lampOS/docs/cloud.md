@@ -289,7 +289,8 @@ refused: …`), and the app has already heard `success`. `lamp-cloud` keeps
 the helper's yes for 60 s (`lamp::YES_KEPT`): an app that asks again before
 the lamp is down gets the same `success`, and the helper is asked once. A
 lamp still on after that wasn't turned off, so the helper is asked again
-and the app hears why. A refusal is not kept, so the app may ask again once
+and the app hears why. The runner's refusal never reaches `lamp-cloud`, so
+a tap within those 60 s still gets the kept `success`; 60 s is the bound. A refusal is not kept, so the app may ask again once
 the update is done.
 
 `system.info`'s `can` lists `system.reboot` and `system.shutdown` only while
