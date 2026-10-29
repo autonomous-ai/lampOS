@@ -365,10 +365,10 @@ def test_refusals_are_typed_and_say_when_to_try_again(tmp_path):
             async with await Lamp.connect(keyring=ring) as lamp:
                 with pytest.raises(errors.BY_CODE["no_grant"]):
                     await lamp.say("hello")
-                fake.refuse_next("gesture", "rate", "1 every 2 s", retry_ms=1500)
+                fake.refuse_next("gesture", "rate", "motion: 1 each second", retry_ms=500)
                 with pytest.raises(errors.BY_CODE["rate"]) as refused:
                     await lamp.gesture("nod")
-                assert refused.value.retry_ms == 1500
+                assert refused.value.retry_ms == 500
                 fake.refuse_next("gesture", "private", "the privacy switch is closed")
                 with pytest.raises(errors.BY_CODE["private"]):
                     await lamp.gesture("nod")

@@ -137,7 +137,7 @@ the `glad-lift` move, and the light breathing every 6 s for 12 s; `lively` is
 - **Not carried:** the skill's triggers, waits, caps and quiet hours, which are
   the lamp's unprompted life. Nor whether the owner turned the skill off: the
   owner's say here is the `body` and `light` grants. A computer asking is held to `express`'s rate,
-  1 a minute.
+  20 a minute.
 - **The answer** is `{"to":"body","move":"glad-lift","light":true}`, with
   `move` the one sent (`glad-lift-50` at 0.25, null under 0.0625) and `light`
   the reason when none was shown. No `done` follows, as with `gesture`.
@@ -201,7 +201,7 @@ lamp-control clients
 - **Off by default:** `serve` runs only with `LAMP_CONTROL=on`; otherwise it says so and exits 0. No product unit passes it yet.
 - **The parts it reaches:** `--mood-socket` (the body's gestures and moves), `--say-socket` (the voice), `--bus-root` (light requests out; events and state in) and `--boot-id` (the clock a light request names, `/proc/sys/kernel/random/boot_id` by default). A part not given is refused with "not reachable from lamp-control here".
 - **The body's lease:** with `--lease-socket` (lamp-body's, docs/body.md "Held by lamp-control"), while a computer holds `body` the door holds the body too, so the lamp's own life (the rest glance, Expression's offsets, a stand timing out) stands back. It holds for 30 s, renewed every 10 s, and lets go when no computer holds `body`. The body's own end of it (`lost` for a hand, privacy, a pause, a sleep, a slump or a lapse) ends the computer's `body` lease with that why, a lapse as `expired`; a why the door doesn't know, or a hold the body refuses, ends it as `released`, so a computer never thinks the lamp's own life stands back when it doesn't. A body that restarts is held again at the next 250 ms check, and a line from a connection the door has dropped is ignored. A body that can't be reached is journaled once, and the lamp's own life goes on.
-- **Following a hand:** a `look` at `hand` under the `body` lease has each hold say `"follow":"hand"` (`{"hold":{"for_ms":30000,"follow":"hand"}}`), said at once when it starts or stops, not at the next renewal; a hold without it follows nothing. lamp-body does the fast loop on the lamp from `humans/hands/tracked`, so the picture and the loop never leave it. It ends with the holder's `stop` (never rated), another look (rated as motion, one in 2 s), or the lease ending, and a new holder never starts out following. A body that doesn't know `follow` refuses the hold, which ends the lease as `released`, as any refused hold does.
+- **Following a hand:** a `look` at `hand` under the `body` lease has each hold say `"follow":"hand"` (`{"hold":{"for_ms":30000,"follow":"hand"}}`), said at once when it starts or stops, not at the next renewal; a hold without it follows nothing. lamp-body does the fast loop on the lamp from `humans/hands/tracked`, so the picture and the loop never leave it. It ends with the holder's `stop` (never rated), another look (rated as motion, one a second), or the lease ending, and a new holder never starts out following. A body that doesn't know `follow` refuses the hold, which ends the lease as `released`, as any refused hold does.
 - **The quiet hours:** `--quiet-hours HH:MM-HH:MM` (or `LAMP_CONTROL_QUIET`; the flag wins) is this lamp's window, 22:00-07:00 unless set, and `off` turns them off; it is read once at the start, and a bad value (a window whose ends are the same minute too) stops lamp-control there. The window is journaled at start and said in hello's `limits`. `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. A zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC.
 - **Skill push:** with `--manage-socket` (root's manage helper, `/run/lampos-skills-manage/manage.sock`), the skill ops are served and a pushed package is kept in `--state-dir`'s `push/` for the helper ("Skills pushed from a computer" below). Without it, each is refused with "skill push is not on this lamp".
 - **The certificate:** made on first start in `--state-dir` (`/var/lib/lampos-control`): P-256, valid to 2100, `cert.der` and `key.der`, the key 0600. Its pin, the certificate's SHA-256 in hex, is journaled at start and returned with every pairing code.
@@ -453,16 +453,30 @@ Rates a client is held to:
 
 | what | at most |
 |---|---|
-| `joints` | 20 a second |
-| `gesture`, `move`, `play`, `look` | 1 every 2 s |
+| `joints` | 40 a second |
+| `gesture`, `move`, `play`, `look` | 1 a second |
 | `light` | 5 a second |
 | `say`, `sound` | 6 a minute and 60 an hour |
-| `express` | 1 a minute |
+| `express` | 20 a minute |
 | `skill.push` | 1 every 10 s and 20 an hour, counted once at part 0 |
 | `skill.list`, `skill.remove` | 6 a minute; one at a time for a computer, and 4 with the helper at once on the lamp (`busy` past either) |
 | actions a part refused | 20 a second, then the connection closes |
 | registered phrases | 16 a computer, across all its connections; each of 64 characters at most and 8 letters at least, so no short word or pair ("is a"; "ok lamp" too, at 6 letters: "okay lamp" passes). The floor is friction, not a guard: what keeps `hear` narrow is the owner's grant, this cap, the rate on changing them, and that only the registered phrase leaves the lamp |
 | changing the phrases | 6 a minute; the same phrases again cost nothing |
+
+The rates bound how often a computer asks, never what a move may do. The
+body bounds every move itself, whatever the rate:
+- **Its own check:** reach, speed, length and starting at home (`lamp_body::moves::check`), run again by the body on every sent move (`moves::Sent::keep`).
+- **Its own pose rule:** may a move play now, from this pose (the anti-tip rule, `cog.rs`).
+- **Priority and caller caps:** with `--arbitration` and `--caller-caps`, it holds a computer to `skill` priority.
+
+A gesture or move asked while another plays is dropped by the body, not queued or replaced ("dropped: another gesture plays", or "dropped: busy, skill" with `--arbitration`). **The computer isn't told:** the door has already answered `{"to":"body"}` (#4209). At one motion a second, most gestures (2 to 10 s) and every `express` move (2.5 to 7 s) are still playing when the next is asked, so a computer waits for its last motion's length before asking for the next. At 20 `express` a minute, too, what bites first is the feeling's own move.
+
+`express` is counted only in its own class: not in motion, though it moves the body, and not in `light`, though it lights the ring. The ring's own arbitration and the light rate bound its light.
+
+`express` sends the same built-in move each time. The body plays the kept one again (`Sent::keep`) and never counts it against the 64 changed moves a run (`MOST_REPLACED`).
+
+The ring's one pulse a minute per asker (`lamp_msgs::arbitration` `PULSE_GAP_US`) is separate and stays.
 
 `gesture`, `move`, `play` and `look` share one class, `motion`. A refusal
 says `retry_ms`, the time until the oldest counted action leaves its window.
