@@ -54,7 +54,7 @@ pub struct Search {
 /// for news, results and prices (#1712: on lamp-4ace on 19 Oct "Who won the
 /// last Formula One race?" found last season's; the first builder: "try a
 /// dated query").
-pub(crate) const DESCRIPTION: &str = "Look something up on the web that you cannot know yourself: today's news, a score, opening hours, a price. One short query; for news, results and prices, put the month and year you were told in it, so it finds this month's, not last year's. Say what you found in a sentence or two. Never search a place you guessed: if a place they named doesn't sound real, or they said near them and you don't know where, ask which area first. If you searched near a place they didn't name, say which place you used.";
+pub(crate) const DESCRIPTION: &str = "Look something up on the web that you cannot know yourself: today's news, a score, opening hours, a price. One short query; for news, results and prices, put the month and year you were told in it, so it finds this month's, not last year's. Say what you found in a sentence or two. Never search a place you guessed: if you aren't sure you heard a place right, or they said near them and you don't know where, ask which area first. If you searched near a place they didn't name, say which place you used.";
 
 impl Search {
     /// DeepSeek's Search & Fetch API.
