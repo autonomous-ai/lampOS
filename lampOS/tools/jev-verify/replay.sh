@@ -138,6 +138,9 @@ ok "voice not muted"
 pc=$($L "sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline")
 [ -n "$pc" ] || abort "cannot read lamp-policy's MainPID cmdline"
 note "policy_cmdline=$pc"
+# The installed build is the baseline the scores belong to (a promote may change it overnight).
+b=$($L "sudo -n grep -o '\"build\":{[^}]*}' /var/lib/lampos-update/state.json 2>/dev/null; readlink /opt/lampOS/voice/current /opt/lampOS/policy/current 2>/dev/null | tr '\n' ' '")
+note "installed_build=${b//$'\n'/ }"
 case " $pc " in *" --act"*) abort "lamp-policy runs with --act (this kit only scores shadow): $pc" ;; esac
 ok "lamp-policy in shadow (no --act)"
 
