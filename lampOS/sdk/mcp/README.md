@@ -36,7 +36,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `yaw` | number | degrees, right positive, within the head's reach | 0 | | |
 | | `pitch` | number | degrees, up positive, within the head's reach | 0 | | |
 | `lamp_follow_hand` | `seconds` | number | 0 to 60; more follows 60. `look` at `hand` under a body lease of its own, with `hand` events heard meanwhile. It says how it ended (the hand gone, `seen: false`, after it was seen; time up; the lamp taking its body back; or `lamp_follow_stop` or `lamp_stop`), how many `hand` events told where it was, and where it last was (shares of the picture, never a picture). One at a time: a second while one runs is `busy`. A lamp that takes the look without saying it follows (before #4183) is `refused`, and its lease let go | 10 | body, look | yes, its own, listed on `lamp://lease` while it follows |
-| `lamp_follow_stop` | none | | ends a running `lamp_follow_hand`; "not following" when none runs | | body, look (listed with `lamp_follow_hand`) | lets go of its lease |
+| `lamp_follow_stop` | none | | ends a running `lamp_follow_hand`, or one still starting as soon as it has started; "not following" when none runs | | body, look (listed with `lamp_follow_hand`) | lets go of its lease |
 | `lamp_move` | `step_ms` | integer, required | 20 to 1000 | — | body | yes, 10 s |
 | | `frames` | list of lists of integers, required | each 5 joint offsets in counts (pitch, roll, yaw, shoulder, elbow), the first and last all 0; the body checks it | — | | |
 | `lamp_light` | `colour` | string, required | `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm` | — | light | no |
