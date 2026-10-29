@@ -1551,6 +1551,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
+        // The name at a line's start dated from its usual start (#4226).
+        crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
@@ -1696,6 +1698,7 @@ mod tests {
             crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
             crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
+            crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
             crate::second_config::OWN_KEYS_ENV,
@@ -2321,6 +2324,7 @@ mod tests {
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
+                    || name == crate::second_provider::NAME_START_USUAL_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
@@ -2476,6 +2480,7 @@ mod tests {
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_SAID_TO_A_PERSON=on",
                     "LAMP_NAME_SECOND_SIGN=on",
+                    "LAMP_NAME_START_USUAL=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
