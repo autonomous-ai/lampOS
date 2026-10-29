@@ -140,6 +140,12 @@ pub struct Config {
     /// is said at once, whatever this is. Tests pass less, so a test that
     /// reads the report waits a fraction of a second rather than one (#1806).
     pub report_every: Duration,
+    /// How long one request may take, from its accept to its answer:
+    /// [`REQUEST_DEADLINE`] on a lamp, after which it is answered
+    /// `uncertain`. A host test against this service on a loaded machine
+    /// passes more, since one durable commit can take past 1100 ms there
+    /// (lamp-voice's push runs on 29 Oct).
+    pub request_deadline: Duration,
 }
 
 #[derive(Clone)]
@@ -414,7 +420,12 @@ fn write_line(stream: &mut UnixStream, value: &Value, deadline: Instant) -> io::
     Ok(())
 }
 
-fn serve_client(mut stream: UnixStream, accepted: Instant, owner: &SyncSender<Work>) {
+fn serve_client(
+    mut stream: UnixStream,
+    accepted: Instant,
+    request_deadline: Duration,
+    owner: &SyncSender<Work>,
+) {
     // Darwin accepts inherit the listener's nonblocking flag. A socket timeout
     // alone does not clear it: fragmented valid lines would fail immediately.
     if stream.set_nonblocking(false).is_err() {
@@ -424,7 +435,7 @@ fn serve_client(mut stream: UnixStream, accepted: Instant, owner: &SyncSender<Wo
         Ok(line) => match Request::parse(&line) {
             Ok(request) => {
                 let (tx, rx) = mpsc::sync_channel(1);
-                let deadline = accepted + REQUEST_DEADLINE;
+                let deadline = accepted + request_deadline;
                 let queued = Work {
                     request,
                     deadline,
@@ -510,6 +521,7 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
     let clients_rx = Arc::new(Mutex::new(clients_rx));
     let rejected = Arc::new(AtomicU64::new(0));
     let mut workers = Vec::new();
+    let request_deadline = config.request_deadline;
     for number in 0..WORKERS {
         let incoming = clients_rx.clone();
         let writer = owner_tx.clone();
@@ -521,7 +533,7 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
                     while !stopped.load(Ordering::Acquire) {
                         let received = incoming.lock().ok().and_then(|r| r.try_recv().ok());
                         if let Some((client, accepted)) = received {
-                            serve_client(client, accepted, &writer);
+                            serve_client(client, accepted, request_deadline, &writer);
                         } else {
                             thread::sleep(Duration::from_millis(5));
                         }
@@ -738,6 +750,7 @@ mod tests {
             utc_offset_minutes: None,
             run_for: Some(Duration::from_secs(5)),
             report_every: REPORT_EVERY,
+            request_deadline: REQUEST_DEADLINE,
         };
         let result = thread::spawn(move || {
             BEFORE_OWNER_CHECK.with(|slot| *slot.borrow_mut() = Some(Box::new(hook)));

@@ -51,6 +51,7 @@ fn config(root: &Path) -> Config {
         // A report every 50 ms, not the lamp's second, so a test that reads
         // it waits a fraction of a second (#1806).
         report_every: Duration::from_millis(50),
+        request_deadline: lamp_schedule::runtime::REQUEST_DEADLINE,
     }
 }
 
