@@ -5,7 +5,7 @@ use super::SAME_SPEAKER_CARRIES_FOR;
 const MAX_CARRY_US: u64 = 40_000_000;
 const RECENT_ENDS: usize = 4;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct CarryWindow {
     first_request: Option<u64>,
     answer: Option<(u64, u64)>,

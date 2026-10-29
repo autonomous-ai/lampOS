@@ -1,6 +1,7 @@
 //! The engine against scripted services: no network.
 use super::*;
 
+mod decline_silent;
 mod held_consent;
 mod held_forget;
 mod music_current;
@@ -5845,7 +5846,7 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
             Did::Worked(_) => "worked",
             Did::Spoke(_) => "spoke",
             // The words' end, told with each packet: tested on its own.
-            Did::Said(..) | Did::Stopped => return,
+            Did::Said(..) | Did::Declined(_) | Did::Stopped => return,
         })
     }));
     for request in 1..=2 {

@@ -533,6 +533,11 @@ pub const NAMED_ALWAYS_ENVIRONMENT: &str = "LAMP_NAMED_ALWAYS";
 /// else.
 pub const NOT_FOR_ME_WORDS_ENVIRONMENT: &str = "LAMP_NOT_FOR_ME_WORDS";
 
+/// Where the worker reads whether a line the model declines is neither said
+/// nor kept as a conversation with the lamp ([`Engine::declining_silently`],
+/// `Heeding::declining_silently`, #3945): `on`, and nothing else.
+pub const DECLINE_SILENT_ENVIRONMENT: &str = "LAMP_DECLINE_SILENT";
+
 /// Where the worker reads whether the lamp's own answers to lines let out
 /// only as the conversation going on keep that conversation going: `on`, and
 /// nothing else, and they don't when another face than the caller's is
@@ -799,6 +804,11 @@ pub enum Did {
     /// answer began (#1712, the first builder at 19:21). The first field is
     /// the request its words answer (`LAMP_GOING_ON_NOT_OWN`).
     Said(u64, u64),
+    /// The model declined this request (`not_for_me`, called or written as
+    /// words) and no tool ran for it: with `LAMP_DECLINE_SILENT`, it is no
+    /// conversation with the lamp, and what its let-out began is undone
+    /// (#3945).
+    Declined(u64),
     /// A line began right after a stop (its Start's `after_stop`): what the
     /// lamp was saying was stopped, and a conversation carried for the one
     /// it answered is over (`LAMP_SAME_SPEAKER_CARRIES`).
@@ -916,6 +926,10 @@ struct Shared {
     /// `worker::CONVERSATION_ALONE` that opens with "not for me" is
     /// `not_for_me`.
     declines_in_words: bool,
+    /// [`Engine::declining_silently`]: on a spoken line that may not be for
+    /// the lamp, round 1's words wait for its end, and a decline says
+    /// nothing (#3945).
+    declines_silent: bool,
     /// [`Engine::speaking_tags`]: each piece of a reply is cut into what
     /// the voice is given and the lamp's words; `Some(true)` when the voice
     /// reads tags.
@@ -2386,6 +2400,7 @@ impl Engine {
                 walk_looks: false,
                 said_once: false,
                 declines_in_words: false,
+                declines_silent: false,
                 speech_tags: None,
                 short_done: false,
                 no_words_again: false,
@@ -3022,6 +3037,22 @@ impl Engine {
     pub fn declining_in_words(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.declines_in_words = on;
+        }
+        self
+    }
+
+    /// `LAMP_DECLINE_SILENT=on` ([`DECLINE_SILENT_ENVIRONMENT`], #3945): on a
+    /// spoken line told it may not be for the lamp (`worker::DECLINE_NOTE`
+    /// or `worker::CONVERSATION_ALONE`), round 1's words wait for the
+    /// round's end, when its calls are known: beside a `not_for_me` call,
+    /// or written as "not for me" ([`crate::not_speech::opens_not_for_me`]),
+    /// nothing of them is said; else they are said as one piece. The worker
+    /// is told the decline ([`Did::Declined`]). A line said by name, a
+    /// written turn, and every round after one that called something, wait
+    /// for nothing. Before any turn only.
+    pub fn declining_silently(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.declines_silent = on;
         }
         self
     }
@@ -8275,6 +8306,16 @@ async fn answer(
     let mut opening = (shared.declines_in_words
         && notes.iter().any(|note| note == worker::CONVERSATION_ALONE))
     .then(String::new);
+    // `LAMP_DECLINE_SILENT`: on a spoken line told it may not be for the
+    // lamp, round 1's words are held to its end, when its calls say whether
+    // it is declined (#3945: words streamed before a `not_for_me` call were
+    // said). A line told it was said by name holds nothing.
+    let mut decline_held = (shared.declines_silent
+        && heard
+        && notes
+            .iter()
+            .any(|note| note == worker::DECLINE_NOTE || note == worker::CONVERSATION_ALONE))
+    .then(String::new);
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
@@ -8641,6 +8682,14 @@ async fn answer(
                                 }
                             }
                         };
+                        // `LAMP_DECLINE_SILENT`: held to the round's end.
+                        let piece = match decline_held.as_mut() {
+                            None => piece,
+                            Some(held) => {
+                                held.push_str(&piece);
+                                continue;
+                            }
+                        };
                         let piece = match claim_held.as_mut() {
                             None => piece,
                             Some(held) => {
@@ -8692,6 +8741,10 @@ async fn answer(
                 }
             }
             if refused {
+                // What the refused round wrote is not said.
+                if let Some(held) = decline_held.as_mut() {
+                    held.clear();
+                }
                 round -= 1;
                 continue;
             }
@@ -8704,9 +8757,55 @@ async fn answer(
                     );
                     return Err(Stop::Declined);
                 }
-                for sentence in split.push(&held) {
-                    if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
-                        queue.push(sentence).await?;
+                match decline_held.as_mut() {
+                    Some(declined) => declined.push_str(&held),
+                    None => {
+                        for sentence in split.push(&held) {
+                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                                queue.push(sentence).await?;
+                            }
+                        }
+                    }
+                }
+            }
+            // `LAMP_DECLINE_SILENT`: round 1's words, held to its end. Beside
+            // a `not_for_me` call none is said, whether the decline is taken
+            // below or the model is asked once more; "not for me" written as
+            // the reply is the decline itself. Else they go on as streamed,
+            // now as one piece. Later rounds hold nothing.
+            if let Some(held) = decline_held.take() {
+                if calls.iter().any(|call| call.name == NOT_FOR_ME) {
+                    if held.chars().any(char::is_alphanumeric) {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its words before not_for_me are not said (LAMP_DECLINE_SILENT)"
+                        );
+                    }
+                } else if crate::not_speech::opens_not_for_me(&held, true) == Some(true) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: its reply is \"not for me\" on a line that may not be for the lamp: taken as not_for_me, nothing said (LAMP_DECLINE_SILENT)"
+                    );
+                    return Err(Stop::Declined);
+                } else {
+                    let piece = match claim_held.as_mut() {
+                        None => held,
+                        Some(claim) => {
+                            claim.push_str(&held);
+                            match crate::remember::claims_a_keep(claim, false) {
+                                Some(false) => claim_held.take().unwrap_or_default(),
+                                // Undecided, or a claim: judged below.
+                                _ => String::new(),
+                            }
+                        }
+                    };
+                    if piece.chars().any(char::is_alphanumeric)
+                        && !crate::not_speech::names_a_function(&text)
+                    {
+                        queue.announce().await?;
+                    }
+                    for sentence in split.push(&piece) {
+                        if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            queue.push(sentence).await?;
+                        }
                     }
                 }
             }
@@ -9583,6 +9682,14 @@ async fn answer(
                 && !ran.load(Ordering::Relaxed)
             {
                 told(request, lamp_msgs::TurnVerdict::HeldBack);
+            }
+            // `LAMP_DECLINE_SILENT`: nor is it a conversation with the lamp
+            // (#3945).
+            if shared.declines_silent
+                && !ran.load(Ordering::Relaxed)
+                && let Some(did) = &shared.did
+            {
+                did(Did::Declined(request));
             }
             ProviderOutput::TurnComplete {
                 request,
