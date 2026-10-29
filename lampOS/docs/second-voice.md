@@ -3727,11 +3727,19 @@ after a take-over, but now for every turn:
   kept (`remembered`). On lamp-29e7 (8474, 29 Oct) the owner, set up by voice,
   asked who they were and was told the lamp remembered no name: no name
   source reached the reply (#4118). While someone else may be speaking, the
-name is also taken out of the conversation's earlier lines the reply is
-given, the thread and the exchanges alike, each of its words said as
-"(their name)" (`person::without_name`): on lamp-52e6 (29 Oct, two faces in
-view) the rule held the name back 3 times, yet the lamp said it in 2 of
-the answers, from its own earlier ones. The faces are counted over the
+name is also taken out of the lamp's own earlier lines the reply is given
+(its "You:" lines in the thread and its side of each exchange; the
+person's words are theirs), said as "(their name)", and the reply is told
+that marks a name held back, never to be said (`person::without_name`,
+`person::HELD_BACK_NOTE`). Taken are the whole name, its words in order,
+NFC and case aside, for a name of more words, and one word of it alone only
+as written in the name, capitalised the same, where it can't be a
+sentence's own first word, so "I will" and "Will it rain?" stay for an
+owner named Will, and a Vietnamese name's syllables stay in everyday
+words. On lamp-52e6 (29 Oct, two faces in view) the rule held the name
+back 3 times, yet the lamp said it in 2 of the answers, from its own
+earlier ones. The memory note and a recall's answer are not taken from: a
+room fact naming the owner can still reach the reply. The faces are counted over the
 eyes' looks of the last 3 s (`known_faces::most_faces_lately`), not their
 newest look alone: in the same run, with two faces in 36 of 37 looks, one
 reply read a look with none and named the owner. Without a name, or off:

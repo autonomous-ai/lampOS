@@ -463,46 +463,80 @@ pub fn someone_else_now(
     }
 }
 
-/// `text` with each word of the owner's `name` (any case, of two letters or
-/// more) said as "(their name)": while someone else may be speaking
-/// ([`someone_else_now`]), the conversation's earlier lines, where the lamp
-/// named the owner, carry the name into no reply (#3884's two faces on
-/// lamp-52e6, 29 Oct: named in 2 of 3 answers from the lamp's own earlier
-/// "Ed."-style answers).
+/// What stands for a name held back ([`without_name`]), and what the model
+/// is told it means ([`HELD_BACK_NOTE`]).
+pub const HELD_BACK: &str = "(their name)";
+
+/// Told beside a reply's facts while the owner's name is held back, so the
+/// marker is never said (the Reviewer-lead's and Reviewer-three's P3 on
+/// #4308).
+pub const HELD_BACK_NOTE: &str = "(For you to know, not to answer: “(their name)” in what you said before stands for a name held back, since someone else may be here now. Never say it, and don't take the person speaking for anyone.)";
+
+/// The lamp's own line `text` with the owner's `name` said as
+/// [`HELD_BACK`], while someone else may be speaking ([`someone_else_now`]):
+/// the lamp's earlier answers carry the name into no reply (#3884's two
+/// faces on lamp-52e6, 29 Oct: named in 2 of 3 answers from its own earlier
+/// one-word answers). Only the lamp's lines: the person's words are theirs
+/// (the Reviewer-lead's P2 on #4308). Taken are the whole name, its words
+/// in order, NFC and case aside (as `remember::names_them` reads a name),
+/// for a name of more words, and one word of it alone only as written in the name, capitalised the
+/// same, where it can't be a sentence's own first word: not first, or
+/// followed by `.`, `,`, `!` or `?` ("Ed."), so "Will it rain?" and "I will"
+/// stay for an owner named Will (Reviewer-two's and Reviewer-three's P2).
+// ponytail: a sentence-first name followed by more words ("Ed, hi" is
+// taken; "Ed likes tea" is not) is kept; a reader of names by language if
+// that matters.
 pub fn without_name(text: &str, name: &str) -> String {
-    const SAID: &str = "(their name)";
-    let words: Vec<String> = name
-        .split_whitespace()
+    use unicode_normalization::UnicodeNormalization;
+    let text: String = text.nfc().collect();
+    let name: String = name.nfc().collect();
+    let name_words: Vec<&str> = name
+        .split(|c: char| !c.is_alphanumeric())
         .filter(|word| word.chars().count() > 1)
-        .map(str::to_lowercase)
         .collect();
-    if words.is_empty() {
-        return text.to_owned();
+    if name_words.is_empty() {
+        return text;
     }
-    let mut out = String::with_capacity(text.len());
-    let mut word = String::new();
-    let flush = |word: &mut String, out: &mut String| {
-        out.push_str(if words.contains(&word.to_lowercase()) {
-            SAID
-        } else {
-            word
-        });
-        word.clear();
-    };
-    for c in text.chars() {
-        if c.is_alphanumeric() {
-            word.push(c);
-        } else {
-            flush(&mut word, &mut out);
-            out.push(c);
+    let lower: Vec<String> = name_words.iter().map(|word| word.to_lowercase()).collect();
+    // The text's words with where each is.
+    let mut words: Vec<(usize, usize)> = Vec::new();
+    let mut start = None;
+    for (at, c) in text.char_indices().chain([(text.len(), ' ')]) {
+        match (c.is_alphanumeric() && at < text.len(), start) {
+            (true, None) => start = Some(at),
+            (false, Some(from)) => {
+                words.push((from, at));
+                start = None;
+            }
+            _ => {}
         }
     }
-    flush(&mut word, &mut out);
-    // A name of more words is said once.
-    let twice = format!("{SAID} {SAID}");
-    while out.contains(&twice) {
-        out = out.replace(&twice, SAID);
+    let word = |i: usize| &text[words[i].0..words[i].1];
+    let mut out = String::with_capacity(text.len());
+    let mut copied = 0;
+    let mut i = 0;
+    while i < words.len() {
+        // A name of one word is only ever taken as one written as a name.
+        let whole = lower.len() > 1
+            && i + lower.len() <= words.len()
+            && (0..lower.len()).all(|k| word(i + k).to_lowercase() == lower[k]);
+        let alone = !whole && name_words.contains(&word(i)) && {
+            let before = &text[if i == 0 { 0 } else { words[i - 1].1 }..words[i].0];
+            let first = i == 0 || before.contains(['.', '!', '?', '\n']);
+            let after = text[words[i].1..].chars().next();
+            !first || after.is_some_and(|c| matches!(c, '.' | ',' | '!' | '?'))
+        };
+        if whole || alone {
+            let last = if whole { i + lower.len() - 1 } else { i };
+            out.push_str(&text[copied..words[i].0]);
+            out.push_str(HELD_BACK);
+            copied = words[last].1;
+            i = last + 1;
+        } else {
+            i += 1;
+        }
     }
+    out.push_str(&text[copied..]);
     out
 }
 
@@ -579,18 +613,47 @@ mod tests {
     /// #3884, the first builder's call: the owner alone, looking away or
     /// seen, is named by default; a stranger's face, a known face that
     /// isn't theirs, two faces or another voice names no one.
+    /// The Reviewer-lead's, Reviewer-two's and Reviewer-three's P2 on #4308:
+    /// the whole name in any case, one word of it only as a name is written,
+    /// and everyday words stay. Made-up names.
     #[test]
-    fn the_owners_name_is_taken_out_of_earlier_lines_word_by_word() {
-        assert_eq!(without_name("Ed.", "Ed"), "(their name).");
+    fn the_owners_name_is_taken_out_of_the_lamps_lines_only_as_a_name() {
+        let held = |text, name| without_name(text, name);
+        // The 52e6 answer, and the whole name in any case, NFC aside.
+        assert_eq!(held("Ed.", "Ed"), "(their name).");
         assert_eq!(
-            without_name("Your name is robin example, Robin!", "Robin Example"),
-            "Your name is (their name), (their name)!"
+            held("You are robin example!", "Robin Example"),
+            "You are (their name)!"
         );
-        // Only whole words: a word that holds the name stays.
-        assert_eq!(without_name("Edward edited it.", "Ed"), "Edward edited it.");
-        assert_eq!(without_name("Ed's lamp", "Ed"), "(their name)'s lamp");
-        // A one-letter name or none takes nothing out.
-        assert_eq!(without_name("A lamp.", "A"), "A lamp.");
+        assert_eq!(
+            held("Ch\u{00e0}o Th\u{00f9}y.", "Thu\u{0300}y"),
+            "Chào (their name)."
+        );
+        assert_eq!(
+            held("Hi Anne-Marie, welcome.", "Anne-Marie"),
+            "Hi (their name), welcome."
+        );
+        // One word of it, written as the name, not a sentence's first word.
+        assert_eq!(
+            held("Your name is Robin.", "Robin Example"),
+            "Your name is (their name)."
+        );
+        assert_eq!(
+            held("Ed, nice to see you.", "Ed"),
+            "(their name), nice to see you."
+        );
+        // Everyday words stay: Will, May, a Vietnamese name's syllables.
+        for (text, name) in [
+            ("I will remind you, and you will hear it.", "Will"),
+            ("Will it rain today?", "Will"),
+            ("You may want tea. It may rain.", "May"),
+            ("Anh muốn uống gì? Em nghĩ anh nên nghỉ.", "Lan Anh"),
+            ("Đèn này an toàn, ở văn phòng.", "Trần Văn An"),
+            ("Edward edited it.", "Ed"),
+            ("A lamp.", "A"),
+        ] {
+            assert_eq!(held(text, name), text, "{name}");
+        }
     }
 
     #[test]
