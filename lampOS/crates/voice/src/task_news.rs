@@ -406,6 +406,42 @@ fn keep_asked(
         .ok()
 }
 
+/// The news `keys` of made skills a spoken yes has just put on: their
+/// question answered, they are kept as told in [`told_file`], and the
+/// tasks part in `directory` is told so on a thread of its own, so with
+/// `--close-told` each one's harness is closed. Otherwise news skipped once
+/// its skill is on (`made_skill::is_on`) is never told, and its harness on
+/// the person's computer stays open (Second's P3 on #4246). Never waits.
+pub fn answered(directory: &Path, keys: Vec<String>) {
+    let _ = answered_in(&told_file(), directory, keys);
+}
+
+/// [`answered`], with the told file given: only keys not kept as told
+/// already, each kept once. The thread, to join in a test.
+fn answered_in(
+    told_file: &Path,
+    directory: &Path,
+    keys: Vec<String>,
+) -> Option<std::thread::JoinHandle<()>> {
+    let told = read_told(told_file);
+    let keys: Vec<String> = keys.into_iter().filter(|key| !told.contains(key)).collect();
+    if keys.is_empty() {
+        return None;
+    }
+    for key in &keys {
+        keep_told(told_file, key);
+    }
+    let directory = directory.to_path_buf();
+    std::thread::Builder::new()
+        .name("lamp-voice-made-skill-told".into())
+        .spawn(move || {
+            for key in keys {
+                let _ = send_told(&directory, &key);
+            }
+        })
+        .ok()
+}
+
 /// A made skill's news heard whole, or given in a text, has just asked
 /// whether to put it on: what the person's yes is held to
 /// ([`crate::made_skill::asked`]).
@@ -3096,6 +3132,25 @@ mod tests {
         assert!(crate::made_skill::is_on(&keeping.directory, &news[0].key));
         let after = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
         assert!(after.is_empty(), "{after:?}");
+        // So its news is told once the yes put it on, kept as told once, so
+        // `--close-told` closes its harness (Second's P3 on #4246).
+        let on_keys = crate::made_skill::on_keys(&keeping.directory);
+        assert_eq!(on_keys, [news[0].key.clone()]);
+        let told_file = root.join("told");
+        let quiet = root.join("no-tasks-part");
+        answered_in(&told_file, &quiet, on_keys.clone())
+            .unwrap()
+            .join()
+            .unwrap();
+        assert!(read_told(&told_file).contains(&news[0].key));
+        assert!(
+            answered_in(&told_file, &quiet, on_keys).is_none(),
+            "told already: nothing kept twice"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&told_file).unwrap().lines().count(),
+            1
+        );
         // Without the switch, any task's news, its request quoted.
         let plain = read_once(&socket, &now(), &none, &none);
         assert!(

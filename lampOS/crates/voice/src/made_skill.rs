@@ -961,6 +961,16 @@ pub fn is_on(directory: &Path, key: &str) -> bool {
         .any(|entry| entry["from"] == key && entry["on"] == true)
 }
 
+/// The news keys of the made skills on the lamp: their questions answered
+/// by a yes, so their news is told (`task_news::answered`).
+pub fn on_keys(directory: &Path) -> Vec<String> {
+    index(directory)
+        .iter()
+        .filter(|entry| entry["on"] == true)
+        .filter_map(|entry| entry["from"].as_str().map(str::to_owned))
+        .collect()
+}
+
 /// The made skill the lamp asked about within [`PUT_ON_WITHIN`] before
 /// `now_unix_ms` and not yet on: its name and SHA-256. The newest ask
 /// alone: once it is on, or out of its time, none. lamp-skills' manage
