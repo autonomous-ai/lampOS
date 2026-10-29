@@ -50,6 +50,8 @@ struct Script {
     speech_ready: Option<mpsc::UnboundedSender<String>>,
     /// An empty successful stream, as speech skipped after bounded retries.
     skipped: Option<&'static str>,
+    /// A piece the voice could not start twice (`services::UNSAID`, #4338).
+    unsaid: Option<&'static str>,
     /// Speech of this sentence never ends.
     endless: Option<&'static str>,
     /// Held by every live stream: dropped streams let go of it.
@@ -234,6 +236,10 @@ impl Services for Script {
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
         if self.skipped == Some(text.as_str()) {
             return stream::empty().boxed();
+        }
+        if self.unsaid == Some(text.as_str()) {
+            return stream::once(async { Err(net::Error::Timeout(super::services::UNSAID)) })
+                .boxed();
         }
         let token = self.token.clone();
         if self.endless == Some(text.as_str()) {
@@ -15420,4 +15426,71 @@ async fn a_keep_its_own_round_doubts_is_not_run() {
             "{said}: {told}"
         );
     }
+}
+
+/// #4338 (lamp-3e83, 29 Oct: ElevenLabs' first sound timed out and one
+/// sentence of the answer was never said, with nothing to tell): a piece
+/// the voice could not start twice is said with the next piece, as one,
+/// in order; the turn ends as ever.
+#[tokio::test]
+async fn a_piece_not_started_twice_is_said_with_the_next_one() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                text("The first one is here. The second one is lost. The third one follows."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        unsaid: Some("The second one is lost."),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.announcing(false);
+    engine.submit(written(1, "Tell me three things."));
+    let joined = "The second one is lost. The third one follows.";
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1".to_owned(),
+            "said:The first one is here.".into(),
+            format!("audio:{}", "The first one is here.".len()),
+            "said: The second one is lost.".into(),
+            "said: The third one follows.".into(),
+            format!("audio:{}", joined.len()),
+            "generated".into(),
+            "complete".into(),
+        ]
+    );
+}
+
+/// #4338: the answer's last piece not started twice has nothing to go
+/// with; the turn ends as ever, and every piece before it was said.
+#[tokio::test]
+async fn a_last_piece_not_started_twice_ends_the_turn_as_ever() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                text("The first one is here. The last one is lost."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        unsaid: Some("The last one is lost."),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.announcing(false);
+    engine.submit(written(1, "Tell me two things."));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1".to_owned(),
+            "said:The first one is here.".into(),
+            format!("audio:{}", "The first one is here.".len()),
+            "said: The last one is lost.".into(),
+            "generated".into(),
+            "complete".into(),
+        ]
+    );
 }

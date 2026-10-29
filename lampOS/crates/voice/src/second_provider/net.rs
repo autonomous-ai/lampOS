@@ -127,6 +127,21 @@ fn chat_kept(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// [`http_client`] keeping no idle connection, so each request opens its
+/// own: a speech piece asked again after it failed to start is never sent on
+/// the connection that may have held it (#4338, lamp-3e83 on 29 Oct).
+pub(crate) fn fresh_client() -> Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .tls_backend_preconfigured(tls()?)
+        .https_only(!cfg!(test))
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(CONNECT)
+        .read_timeout(STALL)
+        .pool_max_idle_per_host(0)
+        .build()
+        .map_err(|_| Error::Transport("HTTPS client setup"))
+}
+
 /// [`http_client`], with `idle` as its pool's idle limit when given, and then
 /// at most one idle connection per host, so a warm still running when a chat
 /// goes can't leave two pooled (El's P3 on #3115).
