@@ -1162,7 +1162,9 @@ impl Onboarding {
             }
             _ => false,
         });
-        if !heard.is_empty() {
+        // A call caught only as text is a try too (#3923; Seventh's P3 3 on
+        // #4192).
+        if !heard.is_empty() || !said.is_empty() {
             self.mark_tried(Step::HowYouSound);
         }
         let (hearings, said_lines, levels, mut spoke, spoiled) = self.near.take_evidence();
@@ -1236,14 +1238,16 @@ impl Onboarding {
         self.near.named = Some(outcome);
         self.records.push(json!({"kind":"onboarding_near_call",
             "outcome":outcome,"at_us":now_us}));
-        self.owed = Some(
-            if outcome == Outcome::Done {
-                self.definition.words.near_done.as_str()
-            } else {
-                self.definition.words.near_failed.as_str()
-            }
-            .to_owned(),
-        );
+        // No call heard at all: a silent sentence part ends the step
+        // `later`, so the name part says nothing and the person hears only
+        // that one line, not a failure first (Seventh's P3 2 on #4192).
+        self.owed = if outcome == Outcome::Done {
+            Some(self.definition.words.near_done.clone())
+        } else if self.was_tried(Step::HowYouSound) {
+            Some(self.definition.words.near_failed.clone())
+        } else {
+            None
+        };
     }
 
     /// The step being led, with storage idle.
