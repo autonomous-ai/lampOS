@@ -54,17 +54,9 @@ pub const TYPE: &str = "ops";
 /// The file of what was told, in lamp-cloud's state folder.
 pub const FILE: &str = "update-alerts.json";
 
-/// The reason names lamp-update may say in `last.reason`, as its
-/// `UpdateResult::REASONS` has them: the last phase a round said, or
-/// `models`. A name not in this list is not told.
-pub const REASONS: &[&str] = &[
-    "checking",
-    "fetching",
-    "switching",
-    "watching",
-    "restoring",
-    "models",
-];
+/// The reason names lamp-update may say in `last.reason`: the last phase a
+/// round said, or `models`. A name not in this list is not told.
+pub const REASONS: &[&str] = &UpdateResult::REASONS;
 
 /// Where the alert goes: the backend's base as the account has it, with
 /// `/alert` after it. Unlike the ping, a trailing `/v1` stays: the alert
@@ -624,6 +616,8 @@ mod tests {
                 outcome: outcome.into(),
                 sequence,
                 at_unix_ms,
+                reason: None,
+                started_at_unix_ms: None,
             }),
         }
     }
@@ -1351,6 +1345,8 @@ mod tests {
                 outcome: outcome.into(),
                 sequence,
                 at_unix_ms,
+                reason: None,
+                started_at_unix_ms: None,
             }),
         };
         // Reason and start time as lamp-update may one day say them, with
