@@ -3726,7 +3726,12 @@ after a take-over, but now for every turn:
   too. Names match as the eyes match them, in any case. The name kept is the one the eyes
   kept (`remembered`). On lamp-29e7 (8474, 29 Oct) the owner, set up by voice,
   asked who they were and was told the lamp remembered no name: no name
-  source reached the reply (#4118). Without a name, or off: nothing. `the owner is not named by default: WHY` in the journal when a
+  source reached the reply (#4118). While someone else may be speaking, the
+name is also taken out of the conversation's earlier lines the reply is
+given, the thread and the exchanges alike, each of its words said as
+"(their name)" (`person::without_name`): on lamp-52e6 (29 Oct, two faces in
+view) the rule held the name back 3 times, yet the lamp said it in 2 of
+the answers, from its own earlier ones. Without a name, or off: nothing. `the owner is not named by default: WHY` in the journal when a
   sign holds.
 - **A line is a known person's only when their own face was seen speaking
   it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,
