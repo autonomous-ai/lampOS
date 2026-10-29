@@ -1417,6 +1417,9 @@ fn a_round_with_no_quiet_moment_starts_over_on_the_build_promoted_meanwhile() {
     assert_eq!(parts["lamp-body.service"], "body 3");
     assert_eq!(parts["lamp-controls.service"], "controls 3");
     assert_eq!(lamp.state()["installed"]["sequence"], 3);
+    // And nothing of build 2 is left behind: its folder fetched beside is
+    // pruned after the switch (Fourth's P3 on #4414).
+    assert!(!lamp.exists(&format!("/opt/lampOS/releases/{two}/lamp-voice")));
 }
 
 #[test]
