@@ -5164,6 +5164,13 @@ impl BeforeLetOut {
         self.carrying = false;
         self.carry_window.clear();
     }
+
+    /// The carry's window as it would be put back, while the carry stood at
+    /// the let-out: a held line or a remembered end after it counts in it
+    /// too (the Reviewers' P3s on #4417).
+    fn carry_window(&mut self) -> Option<&mut carry_window::CarryWindow> {
+        self.carrying.then_some(&mut self.carry_window)
+    }
 }
 
 /// How the room was as a line was judged, for a join on no sign of a
@@ -6818,6 +6825,13 @@ impl Heeding {
                 self.carries && count_colleague(&mut self.carry_others, &mut self.carrying, late);
             if stands {
                 self.carry_window.held(late);
+                if let Some(window) = self
+                    .before_let_out
+                    .as_mut()
+                    .and_then(BeforeLetOut::carry_window)
+                {
+                    window.held(late);
+                }
                 eprintln!(
                     "lamp-voice second: request {request}: request {late}'s voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)"
                 );
@@ -7147,6 +7161,13 @@ impl Heeding {
         self.hold_the_colleagues_print(request);
         if stands {
             self.carry_window.held(request);
+            if let Some(window) = self
+                .before_let_out
+                .as_mut()
+                .and_then(BeforeLetOut::carry_window)
+            {
+                window.held(request);
+            }
             eprintln!(
                 "lamp-voice second: request {request}: one line from someone else: the conversation's carry stands, and the line makes the room neither busy nor talked past (LAMP_SAME_SPEAKER_CARRIES)"
             );
@@ -7780,7 +7801,15 @@ impl Heeding {
                 .is_some_and(|ago| ago.saturating_sub(began_ago) <= SAME_SPEAKER_CARRIES_FOR)
                 || self.carry_window.extra_allows(began));
         if carry {
-            self.carry_window.remember(request, ended, monotonic_us());
+            let now = monotonic_us();
+            self.carry_window.remember(request, ended, now);
+            if let Some(window) = self
+                .before_let_out
+                .as_mut()
+                .and_then(BeforeLetOut::carry_window)
+            {
+                window.remember(request, ended, now);
+            }
         }
         // Every line begun while it stands is read for its signs, within
         // the 8 s too: an unsure print and a sure sign count the same either
@@ -22359,6 +22388,37 @@ mod tests {
         heeding.carry_window.remember(7, 201 * S, 300 * S);
         heeding.carry_window.held(7);
         assert!(heeding.carry_window.extra_allows(205 * S));
+    }
+
+    #[test]
+    fn a_colleagues_line_held_after_a_let_out_stays_in_the_restored_carry_window() {
+        use crate::second_provider::Did;
+        const S: u64 = 1_000_000;
+        let (mut heeding, signs, line) = declining(false);
+        heeding.carrying_the_same_speaker();
+        heeding.carrying = true;
+        heeding.carry_window.begin(5);
+        heeding.lamp_did(Did::Said(5, 100 * S));
+        assert_eq!(
+            heeding.judge(9, line, "Lamp, what time is it?", signs),
+            None
+        );
+        // A colleague's line ending at 130 s, after the let-out, is held
+        // with the carry standing: the window keeps its end.
+        heeding.carry_window.remember(10, 130 * S, 300 * S);
+        if let Some(window) = heeding
+            .before_let_out
+            .as_mut()
+            .and_then(super::BeforeLetOut::carry_window)
+        {
+            window.remember(10, 130 * S, 300 * S);
+        }
+        assert!(heeding.colleague_held(10));
+        heeding.lamp_did(Did::Declined(9));
+        assert!(heeding.carrying);
+        // The held line's end gives the window its extra time (to 140 s, the
+        // most after the answer); without it, no extra time at all.
+        assert!(heeding.carry_window.extra_allows(135 * S));
     }
 
     /// lamp-52e6, 24 Oct 15:33: over the lamp's story, "Sorry, can you say
