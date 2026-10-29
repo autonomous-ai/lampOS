@@ -72,13 +72,59 @@ changed):
 | Still for work | A face of at least 0.04 of the picture (about a fifth of it each way) whose middle has stayed within 0.05 of the picture for 5 s; held 30 s after (a head bent over work is often no face) | Nothing from this layer: the body moves plainly and little |
 | Falling asleep | 23:00 to 06:00 local time, the voice resting, the body free, and the eyes reporting nobody for 15 minutes | Over 4 s, everything else gives way to the sleeping pose: the head bowed 0.023 rad (15 counts, all lamp-4ace's down reach allows) |
 | Asleep | Until woken | Only a slow breath: the head lifts 0.015 rad (10 counts) over 9 s. No clip begins: a bang, talk in the room, the voice listening are not answered by Expression |
-| Waking | Its name; a tap, double tap or stroke (an enabled `controls/gesture` that is not a long press); a reminder newly due (`schedule/due`, once each); the voice thinking or speaking; outside the night, the first face seen | A stretch of 2.7 s: the head rises 0.065 rad by 0.9 s, tilts 0.04 and turns 0.03 by 1.5 s (the turn only where the body takes it, outside rest), and settles, while the bow and the rest of the plan cross back over |
+| Stirring | With `LAMP_REST_THROUGH_SOUNDS=on`, asleep for the night: its counted name (#4285, see below) | The head rises 0.04 rad (about 26 counts, 2.3 degrees) from its bow over 0.4 s, eased, from the next tick; held while its answer is awaited, 5 s from the last counted name, then back down over 2 s. Its answer begins a full wake from where the stir holds the head |
+| Waking | Its name (with `LAMP_REST_THROUGH_SOUNDS=on`, asleep for the night, a stir instead); a tap, double tap or stroke (an enabled `controls/gesture` that is not a long press); a reminder newly due (`schedule/due`, once each); the voice thinking or speaking (with `LAMP_REST_THROUGH_SOUNDS=on` in `lamp-expression`, asleep for the night, speaking only, #1672: see below); outside the night, the first face seen | A stretch of 2.7 s: the head rises 0.065 rad by 0.9 s, tilts 0.04 and turns 0.03 by 1.5 s (the turn only where the body takes it, outside rest), and settles, while the bow and the rest of the plan cross back over |
 | Energy | Always | One number, 0 to 1 (0.5 in the catalogue): the same moves 0.7 to 1.3 times as large and 1.25 to 0.75 times as long. Where Mood runs, its liveliness (`lamp_msgs::mood_liveliness`, -0.5 to 0.5: its breath's pace laid on that range, 0 when calm and awake) is added to the catalogue's, within 0 to 1: livelier with energy, quieter dozing and asleep, exactly where the breath is quicker or slower (#1670). The breath's period is the lamp's one breath, so it stays with the ring |
 
 Woken, it falls asleep again only after nobody again for the whole 15
-minutes. A long hold of the base is the mute today and will be Sleep when
+minutes.
+
+**Its own answer, not its thinking (#1672).** A line's end puts the voice
+in thinking while its words are written down, with no words heard too, and
+with words not said to the lamp, whose answer is held back. On lamp-06c1
+on 28 to 29 Oct that woke the night's sleep three times (00:43:38 and
+01:51:37 on lines of no words, 03:35:52 on three words not said to it),
+though talk in the room should not wake it. With
+`LAMP_REST_THROUGH_SOUNDS=on` in `lamp-expression` (off unless set, the
+same switch as `lamp-skills'`, [switches.md](switches.md)), asleep for the
+night, the built-in sleep or the rest of the skill that claims it, the
+voice thinking does not wake it: the voice speaking, its own answer, does,
+as it begins. A touch, a tap on the head and a reminder wake it as
+before; manual sleep, another skill's rest and an awake lamp are
+unchanged. Off, thinking wakes it, as before.
+
+**Stir at the name, wake on the answer (#4285, the first builder's call,
+30 Oct 03:5x).** With the same switch, asleep for the night, its counted
+name (heard with the person's speech where `name_requires_speech` asks
+it; an `ignored sleeping name` does nothing) no longer wakes it: it
+stirs. The head rises 0.04 rad from its bow over 0.4 s, eased, from the
+next tick, so it has risen within half a second of the name, as a sleeper
+lifts its head at a voice. The stir is held 5 s from the last counted
+name (`STIR_HOLD_US`); its answer in that time (the voice speaking)
+begins the full wake from where the stir holds the head. With no answer
+(a name held back, nobody going on, a TV) it settles back to its bow over
+2 s and the night's sleep is unbroken: still asleep, the skill's rest
+still held, no wake. A false name from a TV costs a stir, never a wake.
+`expression/state` names it `stirring`. The ring is not lifted: the
+voice's ring worker owns the ring at night and reads nothing of
+Expression's (`expression/light` has no reader), so a lift there would
+show nowhere; a ring half is the ring worker's, after a lamp look at the
+head's. Tests in `night_sleep.rs`:
+`with_the_switch_a_sound_of_no_words_ending_in_thinking_does_not_wake_the_lamp`,
+`with_the_switch_a_line_not_said_to_the_lamp_does_not_wake_it`,
+`with_the_switch_its_own_answer_wakes_it`,
+`with_the_switch_its_name_stirs_it_and_only_the_answer_wakes_it` and
+`with_the_switch_a_tap_or_a_reminder_wakes_it`; with thinking waking it,
+the first two fail, and with a counted name waking it, the fourth. In
+`alive.rs`:
+`with_the_switch_a_counted_name_stirs_within_half_a_second_and_does_not_wake`,
+`with_the_switch_a_name_with_no_answer_settles_back_and_the_sleep_is_unbroken`,
+`with_the_switch_the_answer_after_a_stir_wakes_it_from_the_stir` and
+`with_the_switch_an_ignored_sleeping_name_does_not_stir`, each red when
+its part is taken out. A long hold of the base is the mute today and will be Sleep when
 #711 makes it so; it does not wake the lamp. A face seen at night does not
-wake it either: only its name, a touch, a reminder or its own answer.
+wake it either: only its name (with the switch, a stir), a touch, a
+reminder or its own answer.
 
 With `alive.sleep.name_requires_speech: true` (#749), a sleeping name needs
 accepted `voice/activity` person speech within two seconds before or after
@@ -129,7 +175,8 @@ grant `sleep`, [skills.md](skills.md)).
 Expression holds the claimed skill's rest as it holds its own sleep: the
 voice listening (a night sound), a new voice turn, a privacy mute or the
 body held do not end it; its name with speech, a touch, a tap on the head, a
-reminder, a conversation, manual sleep or Expression off do. The first face out of the night wakes it, as it wakes the built-in
+reminder, a conversation (with `LAMP_REST_THROUGH_SOUNDS=on`, the lamp's
+own answer, not the voice thinking, and its name only a stir), manual sleep or Expression off do. The first face out of the night wakes it, as it wakes the built-in
 sleep. It begins on the built-in sleep's own conditions (a free body and a
 resting voice; a privacy mute does not keep it awake). Another skill's rest
 keeps the generic gate ([expression.md](expression.md#leased-skill-rest-requests)).

@@ -140,6 +140,15 @@ pub fn rest_requests_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// Asleep for the night, the voice thinking does not wake the lamp, only
+/// its own answer does (#1672), and its counted name stirs it rather than
+/// waking it (#4285); the same switch as lamp-skills'. Off unless set.
+pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
+
+pub fn rest_through_sounds_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
 /// A glance when someone in a busy room said something about the lamp and
 /// the voice said nothing (#4175). Off unless set.
 pub const REMARK_GLANCE_ENVIRONMENT: &str = "LAMP_REMARK_GLANCE";
@@ -659,6 +668,13 @@ impl Service {
         self.sleep_claim = Some((bus.clone(), None, None));
         self.engine = self.engine.with_rest_requests();
         Ok(self)
+    }
+
+    /// `LAMP_REST_THROUGH_SOUNDS=on` (#1672): asleep for the night, only the
+    /// voice speaking wakes the lamp, not its thinking; its name stirs it.
+    pub fn with_rest_through_sounds(mut self) -> Self {
+        self.engine = self.engine.with_rest_through_sounds();
+        self
     }
 
     /// Also read the head's requests and state from `--touch` Controls
