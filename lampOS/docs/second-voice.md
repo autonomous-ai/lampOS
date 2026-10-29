@@ -2909,8 +2909,11 @@ after a take-over, but now for every turn:
   known late as another's, the window over) stands, and another answer's
   words, a colleague's line held with the carry standing and a carried
   line's end count in the restored carry window too, while the live window
-  is still that conversation's: a new caller's let-out begins another, whose
-  lines stretch none before it (#4429). Not undone:
+  is still that conversation's, begun for the same request: a new caller's
+  let-out begins another, whose lines stretch none before it (#4429). An
+  answer leaves the request a window was begun for, as the live window
+  takes an answer to a line its let-out took off the chain that the copy
+  kept for the decline does not (#4435). Not undone:
   the room's count of talk past the lamp, which the call reset
   (`RoomTold::called`), and the held colleagues of the carry. Journal:
   `declined by the model: no conversation going on from it
@@ -2925,9 +2928,10 @@ after a take-over, but now for every turn:
   after a let out stays after its decline`, `another answer while
   carrying is kept in the restored carry window`, `a line carried after a
   let out keeps its end in the window its decline puts back`, `a late
-  print held after a let out stays in the window its decline puts back`
-  and `a new callers held line does not stretch the window its decline
-  puts back` (worker).
+  print held after a let out stays in the window its decline puts back`,
+  `a new callers held line does not stretch the window its decline puts
+  back` and `an answer to an earlier line after a let out keeps the window
+  its decline puts back` (worker).
 - **Said by name, or perhaps not for the lamp** (`worker::call_note`,
   `Engine::noting_whether_called`). Each spoken line gets one note beside
   its words. A line whose words or the lamp's name heard in its sound

@@ -5174,7 +5174,7 @@ impl BeforeLetOut {
         &mut self,
         live: &carry_window::CarryWindow,
     ) -> Option<&mut carry_window::CarryWindow> {
-        (self.carrying && self.carry_window.first_request() == live.first_request())
+        (self.carrying && self.carry_window.begun_for() == live.begun_for())
             .then_some(&mut self.carry_window)
     }
 }
@@ -13327,8 +13327,8 @@ mod tests {
         let before = desk.heeding.before_let_out.as_ref().unwrap();
         assert_eq!(before.request, caller);
         assert!(before.carrying);
-        assert_ne!(before.carry_window.first_request(), Some(caller));
-        assert_eq!(desk.heeding.carry_window.first_request(), Some(caller));
+        assert_ne!(before.carry_window.begun_for(), Some(caller));
+        assert_eq!(desk.heeding.carry_window.begun_for(), Some(caller));
         let colleague = (answer + 6_000_000, answer + 8_000_000);
         desk.heeding.signs_begun(caller + 1, colleague, colleague.0);
         assert!(desk.heeding.carried.is_some(), "carried");
@@ -13336,6 +13336,74 @@ mod tests {
         desk.heeding.lamp_did(Did::Declined(caller));
         assert!(desk.heeding.carrying);
         assert!(!desk.heeding.carry_window.extra_allows(answer + 25_000_000));
+    }
+
+    /// `LAMP_DECLINE_SILENT` (#3945), the Reviewer-lead's P3 on #4435:
+    /// another voice's line let out as the conversation going on is put on
+    /// the chain (`LAMP_GOING_ON_NOT_OWN`). The caller's reply to the
+    /// lamp's question, said to the lamp, is let out and clears it; the
+    /// chained line's answer, told after, renews the live window alone, the
+    /// copy kept for the decline still holding that line in its chain.
+    /// Still one conversation: a colleague's line held after it stretches
+    /// the window the caller's decline puts back, as it does the live one.
+    #[test]
+    fn an_answer_to_an_earlier_line_after_a_let_out_keeps_the_window_its_decline_puts_back() {
+        use crate::second_provider::Did;
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut desk = CarryDesk::new(true);
+        desk.heeding.not_counting_own_answers();
+        desk.heeding.declining_silently();
+        desk.answered(60);
+        let answer = desk.heeding.said_until_us.unwrap();
+        // Another voice, no face seen: let out only as the conversation
+        // going on, and chained.
+        assert_eq!(
+            desk.line_at(-1, "", "And what about tomorrow?", answer + 3_000_000),
+            None
+        );
+        let chained = desk.request;
+        assert_eq!(desk.heeding.chain, vec![chained]);
+        // Its answer, kept in the thread, asks; its words are told below.
+        let ago = |ms: u64| Instant::now() - Duration::from_millis(ms);
+        let mut thread = crate::thread::Thread::new();
+        thread.person("What time is it?", true, ago(64_000));
+        thread.lamp(desk.answered, "It's ten past six.", ago(62_000));
+        thread.person("And what about tomorrow?", true, ago(57_000));
+        thread.lamp(chained, "Rain after two. Shall I remind you?", ago(52_000));
+        *crate::thread::THREAD.lock().unwrap() = thread;
+        assert_eq!(
+            desk.line_at(1, "f1", "Yes, remind me at five.", answer + 12_000_000),
+            None
+        );
+        let owners = desk.request;
+        assert!(desk.heeding.chain.is_empty(), "said to the lamp");
+        let before = desk.heeding.before_let_out.as_ref().unwrap();
+        assert_eq!(before.request, owners);
+        assert!(before.carrying);
+        assert_eq!(before.chain, vec![chained]);
+        // The chained line's words, ended 10 s after the first answer's:
+        // the live window is answered for it, the kept one not. Both are
+        // still the one begun for the call.
+        desk.heeding
+            .lamp_did(Did::Said(chained, answer + 10_000_000));
+        assert_eq!(
+            desk.heeding
+                .before_let_out
+                .as_ref()
+                .unwrap()
+                .carry_window
+                .begun_for(),
+            desk.heeding.carry_window.begun_for()
+        );
+        let colleague = (answer + 14_000_000, answer + 16_000_000);
+        desk.heeding.signs_begun(owners + 1, colleague, colleague.0);
+        assert!(desk.heeding.carried.is_some(), "carried");
+        assert!(desk.heeding.colleague_held(owners + 1));
+        desk.heeding.lamp_did(Did::Declined(owners));
+        assert!(desk.heeding.carrying);
+        // From the held line's end, to 36 s after the first answer;
+        // without it, no extra time at all.
+        assert!(desk.heeding.carry_window.extra_allows(answer + 30_000_000));
     }
 
     /// The owner's P1 on Queue #3126 (lamp-4ace, 23 Oct 18:51): in a busy
