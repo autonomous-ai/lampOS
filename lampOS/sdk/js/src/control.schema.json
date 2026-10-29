@@ -991,6 +991,10 @@
       "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), the lease and say bounds, and this lamp's quiet hours.",
       "type": "object",
       "properties": {
+        "rates": {
+          "description": "Present only on a dev lamp run with `--rates off`: every rate lifted but `refused` and `phrases`, whose windows are then the only ones told.",
+          "const": "off"
+        },
         "quiet_hours": {
           "description": "This lamp's quiet hours (lamp-control's --quiet-hours, 22:00 to 07:00 local unless set): `say` and `sound` are refused inside them, local times from `from` up to `to`, across midnight when `to` comes first; or \"off\".",
           "anyOf": [
