@@ -1322,6 +1322,7 @@ mod tests {
             "/etc/lampOS/setup/serve.json",
             "/etc/lampOS/body/lamp.env",
             "/etc/lampOS/person/name",
+            "/etc/lampOS/person/place",
             "/etc/lampOS/controls/../update/key.pub",
             "/etc/lampOS/controls/.hidden",
             "/etc/lampOS/controls/",

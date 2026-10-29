@@ -2310,7 +2310,14 @@ then use that person's scope:
   (build 6963) the memory was forgotten, `people.json` kept the face and its
   name, and the lamp greeted the person by it when asked (the lead on #1711).
   The name typed at setup (`/etc/lampOS/person/name`) is the setup's, not the
-  face's, and only the 5 s reset clears it.
+  face's, and only the 5 s reset clears it. When the app set the owner's
+  place (#4333, [owner-place.md](owner-place.md)), the same marked forget said by
+  the owner (the line's person is the typed name's, or the owner the
+  onboarding kept), once their memory is emptied, removes the place the app
+  set too, and the model hears `place: "forgotten too"`, or that it could
+  not be (`everything: false`); another person's or the room's leaves it.
+  This holds with `LAMP_OWNER_PLACE` off too, so a place kept while it was
+  on never outlives "everything" (#4356).
 - **"Forget my face"** forgets the face only: what they said stays theirs,
   unless `LAMP_MEMORY_FORGET_ALL=on` (#2850). Then, on a line whose admitted
   scope is the known person's, once the eyes answer that their face is

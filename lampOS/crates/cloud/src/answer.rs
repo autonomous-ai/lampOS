@@ -204,7 +204,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 40] = [
+pub const KINDS: [(&str, Switch); 42] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -236,6 +236,8 @@ pub const KINDS: [(&str, Switch); 40] = [
     (crate::settings::KINDS[0], SETTINGS),
     (crate::settings::KINDS[1], SETTINGS),
     (crate::settings::KINDS[2], SETTINGS),
+    (crate::settings::PLACE_KINDS[0], PLACE),
+    (crate::settings::PLACE_KINDS[1], PLACE),
     ("faces.add_photo", |lamp| lamp.photos().is_some()),
     ("face.list", |lamp| lamp.faces().is_some()),
     ("face.remove", |lamp| lamp.faces().is_some()),
@@ -254,6 +256,7 @@ pub const KINDS: [(&str, Switch); 40] = [
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
 const KEYS: Switch = |lamp| lamp.changes().is_some_and(|c| c.keys_on());
 const SETTINGS: Switch = |lamp| lamp.changes().is_some();
+const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
 
 /// Whether this lamp answers `kind` now, by its row in [`KINDS`]: the one
 /// rule [`answer`] and `system.info`'s `can` both read (#2864), so the app
@@ -400,6 +403,21 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::settings::KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;
+            changes.start(kind, line);
+            Ok(None)
+        }
+        // The owner's approximate place (#4333), with LAMP_OWNER_PLACE=on
+        // too: rounded here, then to root's helper as the names go, which
+        // rounds it again and keeps it beside the person's name. Its clear
+        // is taken whenever the helper is here, the switch on or not, so a
+        // place kept while it was on never outlives it (#4356); `can` lists
+        // it only with the switch on.
+        kind if crate::settings::PLACE_KINDS.contains(&kind)
+            && (on(lamp, kind)
+                || (kind == crate::settings::PLACE_CLEAR_KIND && lamp.changes().is_some())) =>
+        {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            let line = crate::settings::place_line(kind, data)?;
             changes.start(kind, line);
             Ok(None)
         }
@@ -1049,6 +1067,20 @@ pub mod tests {
                     "keys.set",
                     "keys.remove",
                     "keys.get",
+                ],
+            ),
+            (
+                "owner place",
+                |f| {
+                    f.changes =
+                        changes_of(false, false).map(|changes| changes.taking_the_place(true))
+                },
+                &[
+                    "timezone.set",
+                    "person.name.set",
+                    "device.rename",
+                    "owner.place",
+                    "owner.place.clear",
                 ],
             ),
             (

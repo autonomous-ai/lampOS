@@ -111,6 +111,10 @@ pub use speaker_state::*;
 /// The memory's id for a person the eyes know, and the `known` file (#2176).
 pub mod known;
 
+/// The owner's approximate place from the app, rounded, and its file
+/// (#4333, `docs/owner-place.md`).
+pub mod owner_place;
+
 /// The safe shutdown's line (#3697, `docs/shutdown.md`): said by
 /// `lamp-setup shutdown-now` and rendered ahead into the voice's speech
 /// cache, which is keyed by these exact words, so both take them from here.

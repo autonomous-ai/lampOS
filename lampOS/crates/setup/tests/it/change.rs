@@ -109,6 +109,80 @@ fn the_persons_name_is_written_as_setup_writes_it_and_an_empty_one_removes_it() 
     assert_eq!(reply, json!({"done": {"name": ""}}));
 }
 
+/// #4333: the owner's place, rounded again here whatever was sent, is kept
+/// beside the person's name, root's 0600, and `null` clears it; a clear
+/// with none kept is no error. The journal says only that it changed, and
+/// a refusal holds neither the name nor where.
+#[test]
+fn the_owners_place_is_kept_rounded_beside_the_name_and_null_clears_it() {
+    let root = Root::new();
+    let config = root.config();
+    let place = lamp_msgs::owner_place::beside_name(&config.name);
+    assert_eq!(place, root.0.join("etc/person/place"));
+    let line = json!({"owner_place": {
+        "name": "Ba Dinh, Hanoi", "lat": 21.035_123, "lon": 105.834_987,
+        "set_at": "2026-10-29T08:30:00Z", "street": "12 Nowhere Street"
+    }})
+    .to_string();
+    let (reply, done) = answer(&line, &config, true);
+    let kept = json!({"name": "Ba Dinh, Hanoi", "lat": 21.04, "lon": 105.83, "set_at": "2026-10-29T08:30:00Z"});
+    assert_eq!(reply, json!({ "done": kept }));
+    assert_eq!(done.unwrap().said, "the owner's place was set");
+    let written = fs::read_to_string(&place).unwrap();
+    assert_eq!(serde_json::from_str::<Value>(&written).unwrap(), kept);
+    assert!(!written.contains("21.035") && !written.contains("Street"));
+    assert_eq!(mode(&place), 0o600);
+    // The voice reads it as kept.
+    assert_eq!(
+        lamp_msgs::owner_place::read(&place).map(|place| (place.lat, place.lon)),
+        Some((21.04, 105.83))
+    );
+    // Refused without echoing it, and nothing changed.
+    let before = root.files();
+    for (line, why) in [
+        (
+            json!({"owner_place": {"name": "Secret Lane", "lat": 95, "lon": 105.8, "set_at": "2026-10-29T08:30:00Z"}}),
+            "lat must be a number from -90 to 90",
+        ),
+        (
+            json!({"owner_place": {"name": "Secret\nLane", "lat": 21.0, "lon": 105.8}}),
+            "name must be 1 to 64 characters on one line",
+        ),
+        (
+            json!({"owner_place": "Secret Lane"}),
+            "lat must be a number from -90 to 90",
+        ),
+    ] {
+        let (reply, done) = answer(&line.to_string(), &config, true);
+        assert_eq!(reply, json!({ "refused": why }));
+        assert!(!reply.to_string().contains("Secret"));
+        assert!(done.is_none());
+    }
+    assert_eq!(root.files(), before);
+    let (reply, done) = answer(r#"{"owner_place": null}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"cleared": true}}));
+    assert_eq!(done.unwrap().said, "the owner's place was cleared");
+    assert!(!place.exists());
+    let (reply, _) = answer(r#"{"owner_place": null}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"cleared": true}}));
+    // The binary's journal: what changed, never the name or where.
+    let (reply, journal) = run(&config, true, &line);
+    assert_eq!(reply, json!({ "done": kept }));
+    assert_eq!(
+        journal.trim(),
+        "lamp-setup: change: the owner's place was set"
+    );
+    let (_, journal) = run(&config, true, r#"{"owner_place": null}"#);
+    assert_eq!(
+        journal.trim(),
+        "lamp-setup: change: the owner's place was cleared"
+    );
+    // Off, refused as every change is.
+    let (reply, _) = answer(&line, &config, false);
+    assert_eq!(reply, json!({"refused": "changes after setup are off"}));
+    assert!(!place.exists());
+}
+
 #[test]
 fn the_lamps_name_in_the_app_is_kept_readable_and_never_empty() {
     let root = Root::new();
@@ -529,8 +603,14 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     let wiped = |path: &str| plan["wipe"].as_array().unwrap().iter().any(|w| w == path);
     assert!(wiped("/etc/lampOS/setup/display-name"));
     assert!(wiped("/etc/lampOS/person/name"));
+    // The owner's place, beside the name (#4333).
+    assert!(wiped("/etc/lampOS/person/place"));
     let own: Config =
         serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        lamp_msgs::owner_place::beside_name(&own.name),
+        std::path::Path::new(lamp_msgs::owner_place::FILE)
+    );
     assert_eq!(
         own.display_name,
         std::path::Path::new("/etc/lampOS/setup/display-name")

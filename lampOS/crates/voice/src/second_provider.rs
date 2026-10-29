@@ -963,6 +963,9 @@ struct Shared {
     though_held: bool,
     /// With `LAMP_STAFF_NOTE=on`: the note for words that name the staff.
     staff: Option<StaffNote>,
+    /// With `LAMP_OWNER_PLACE=on`: the note for words that need a place
+    /// ([`Engine::noting_the_place`]).
+    place: Option<StaffNote>,
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
     remembered: Option<Remembered>,
@@ -2402,6 +2405,7 @@ impl Engine {
                 stop_untold: Mutex::new(None),
                 though_held: false,
                 staff: None,
+                place: None,
                 remembered: None,
                 event_turn: None,
                 event_withheld: None,
@@ -3193,6 +3197,18 @@ impl Engine {
     pub fn noting_staff(mut self, staff: StaffNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.staff = Some(staff);
+        }
+        self
+    }
+
+    /// A spoken request whose words need a place ("near me", the weather,
+    /// opening hours) is asked with the owner's place beside them, when the
+    /// app set one (`LAMP_OWNER_PLACE=on`, `crate::owner_place`, #4333).
+    /// Any other request, and every text, is told nothing of it. Before any
+    /// turn only.
+    pub fn noting_the_place(mut self, place: StaffNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.place = Some(place);
         }
         self
     }
@@ -6069,6 +6085,11 @@ async fn spoken(
         .staff
         .as_ref()
         .and_then(|staff| staff(request, &text));
+    // The owner's place, only for words that need a place (#4333).
+    let place = shared
+        .place
+        .as_ref()
+        .and_then(|place| place(request, &text));
     // What memory holds for these words: the prepared chat's, when it was
     // begun on them (so its round still stands), else asked now, off the
     // runtime's thread (Fourth's P3 on #2229).
@@ -6179,6 +6200,7 @@ async fn spoken(
         .chain(cut_in)
         .chain(misheard)
         .chain(staff)
+        .chain(place)
         .chain(remembered)
         .chain(named)
         .chain(wake)

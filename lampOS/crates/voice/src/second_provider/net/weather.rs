@@ -465,6 +465,9 @@ pub struct Answered {
 /// that place's midnight, at most [`MOST_PLACES`] of them.
 pub struct Weather {
     here: Option<String>,
+    /// The owner's place from the app (`LAMP_OWNER_PLACE=on`, #4333), read
+    /// at each call that names no place: kept, it goes over `here`.
+    owner_place: Option<std::path::PathBuf>,
     fetch: Fetch,
     clock: Clock,
     kept: Mutex<Vec<Kept>>,
@@ -478,11 +481,30 @@ impl Weather {
     pub fn new(here: Option<String>, fetch: Fetch, clock: Clock) -> Self {
         Self {
             here,
+            owner_place: None,
             fetch,
             clock,
             kept: Mutex::new(Vec::new()),
             found: Mutex::new(Vec::new()),
         }
+    }
+
+    /// The same, a call that names no place answered for the owner's
+    /// place kept at `file` while there is one: its rounded position, never
+    /// looked up by name, said by its name (#4333). None kept, `here`.
+    pub fn with_owner_place(mut self, file: std::path::PathBuf) -> Self {
+        self.owner_place = Some(file);
+        self
+    }
+
+    /// The owner's place now, as the weather looks it up.
+    fn owner_here(&self) -> Option<Place> {
+        let place = lamp_msgs::owner_place::read(self.owner_place.as_deref()?)?;
+        Some(Place {
+            name: place.name,
+            latitude: place.lat,
+            longitude: place.lon,
+        })
     }
 
     /// The lamp's own place, for a call that names none.
@@ -522,6 +544,12 @@ impl Weather {
 
     /// The call's answer, its days told from the place's own day at `now`.
     async fn looked_up(&self, place: Option<&str>, day: Day, now: i64) -> (Value, String) {
+        if place.is_none()
+            && let Some(owner) = self.owner_here()
+        {
+            let key = owner.name.to_lowercase();
+            return self.forecast_of(key, owner, true, day, now).await;
+        }
         let Some(name) = place.or(self.here.as_deref()) else {
             return (json!({"error": NO_HERE}), "no place, and none here".into());
         };
@@ -560,6 +588,20 @@ impl Weather {
                 place
             }
         };
+        self.forecast_of(key, place, known.is_some(), day, now)
+            .await
+    }
+
+    /// The forecast of `place`, found by the name `key`, from what was kept
+    /// or fetched; `known`, its place was known before this call.
+    async fn forecast_of(
+        &self,
+        key: String,
+        place: Place,
+        known: bool,
+        day: Day,
+        now: i64,
+    ) -> (Value, String) {
         if let Some((forecast, today)) = self.kept_by_place(&place, &key, now) {
             return (
                 answer_for(&place, &forecast, day, today),
@@ -590,7 +632,7 @@ impl Weather {
         };
         let answered = answer_for(&place, &forecast, day, today);
         self.keep(key, place, forecast, (today, now));
-        let how = if known.is_some() {
+        let how = if known {
             "fetched, its place known"
         } else {
             "fetched"
@@ -965,6 +1007,47 @@ mod tests {
             json!({"error": NO_HERE})
         );
         assert_eq!(nothing.count(), 0);
+    }
+
+    /// #4333: the owner's place from the app goes over the lamp's own for
+    /// a call that names none: its rounded position, never looked up by
+    /// name, said by its name. A place named is still that place; a clear
+    /// puts the lamp's own back.
+    #[tokio::test]
+    async fn the_weather_with_no_place_is_the_owners_place_while_one_is_kept() {
+        let dir = std::env::temp_dir().join(format!("lamp-weather-owner-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("place");
+        std::fs::write(
+            &file,
+            r#"{"name":"Thao Dien, Thu Duc","lat":10.8,"lon":106.74,"set_at":"2026-10-29T08:30:00Z"}"#,
+        )
+        .unwrap();
+        let (canned, fetch) = Canned::new();
+        let weather = Weather::new(
+            Some("Ho Chi Minh City, Vietnam".into()),
+            fetch,
+            tuesday_noon(),
+        )
+        .with_owner_place(file.clone());
+        let answered = weather.answer(&json!({})).await;
+        assert_eq!(answered.told["place"], "Thao Dien, Thu Duc");
+        assert!(
+            answered.told["weather"]
+                .as_str()
+                .unwrap()
+                .starts_with("In Thao Dien, Thu Duc now: 31°C"),
+            "{}",
+            answered.told
+        );
+        assert_eq!(canned.count(), 1);
+        assert!(canned.urls()[0].contains("latitude=10.8&longitude=106.74"));
+        let named = weather.answer(&json!({"place": "Hanoi"})).await;
+        assert_eq!(named.told["place"], "Hanoi, Vietnam");
+        std::fs::remove_file(&file).unwrap();
+        let own = weather.answer(&json!({})).await;
+        assert_eq!(own.told["place"], "Ho Chi Minh City, Vietnam");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// "Tomorrow" answers tomorrow alone, by its weekday; a weekday its
