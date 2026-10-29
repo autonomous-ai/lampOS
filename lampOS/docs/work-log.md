@@ -1,3 +1,17 @@
+## 30 October 2026, 01:40 +07 — the notes' fix carried, the promote's default-run pinned, four reads
+
+2c still waits on the first builder's answer (#3689, 20:2x), and the rehearsal waits on a 52e6 slot after #4305's run (about 02:30). No 2c code has gone up.
+
+Landed:
+- **#4404 (train 374):** #4400's cut fix carried. Train 372 had taken #4400 at its older head; Third caught it. The range-diff was `=`, so the reads carried.
+- **#4408 (train 376):** a test that the promotion's `cargo run` still runs the promoter through `default-run`. That step runs only at a promotion, so a lost `default-run` would pass every pull request's run and refuse the next promotion. Reviewer-three found the dependency.
+
+Reads:
+- **READ-OK on Fourth's #4413:** the notes' list in plain words, from a `## In plain words` table, with names and rows folded for developers. My P3 was a two-cell check for each row, and Fourth took it.
+- **READ-OK on Tests' #4414:** two-promotes rig tests, mutation-checked with the promote never landing. Both landed in train 379.
+- **READ-OK on blue's #4419:** the SDK debug log fails closed. CI ran the SDK tests, since this Mac has no `ws` or `pytest`.
+- **A starting point for Tests' audit:** a round reads the channel once (`round.rs:733`), and Tests confirmed it with hashes and rig tests.
+
 ## 29 October 2026, 22:00 +07 — the stable notes' "Built but not on yet", and NOTES.md beside the build
 
 Item 1's rehearsal won't run tonight (Tests, 21:56: 52e6 runs #4305 from 00:00). I asked the first builder on #3689 at 20:2x whether 2c may be built now as an unready draft, and there's no answer yet. Until there is, no 2c code goes up.
