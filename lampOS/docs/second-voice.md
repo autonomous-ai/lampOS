@@ -3687,8 +3687,14 @@ after a take-over, but now for every turn:
   recall and forget stay as the rule below decides. On lamp-29e7 (8250) the
   owner alone at the lamp right after setup asked "what's my name?" and was
   not answered: the camera read their mouth speaking on 2 of 18 lines, so no
-  rule needing a face seen speaking could carry it. Without a name, or off:
-  nothing. `the owner is not named by default: WHY` in the journal when a
+  rule needing a face seen speaking could carry it. A lamp set up by voice
+  has no typed name: who_you_are keeps the name only with the face it saves
+  in the eyes, so the owner's name is then the one person the eyes know
+  (`known_faces::owner_from_faces`, `{"list":true}` on their socket, asked
+  at most every 30 s; two or more known, nobody). On lamp-29e7 (8474, 29
+  Oct) the owner, set up by voice, asked who they were and was told the lamp
+  remembered no name: no name source reached the reply. Without a name, or
+  off: nothing. `the owner is not named by default: WHY` in the journal when a
   sign holds.
 - **A line is a known person's only when their own face was seen speaking
   it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,
