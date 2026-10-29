@@ -30,6 +30,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// How long a test against the real Schedule service waits for one reply.
+const REAL_WAIT: Duration = Duration::from_secs(10);
 const STORE: &str = "0123456789abcdef0123456789abcdef";
 const WALL: i64 = 1_791_964_800_000;
 struct NoMixer;
@@ -242,6 +244,19 @@ impl Schedule {
         }
     }
 }
+impl Schedule {
+    /// An adapter to this real service that waits up to [`REAL_WAIT`] for a
+    /// reply instead of [`DEADLINE`]. These tests check what a call does, and
+    /// a loaded host can hold one durable commit past 1250 ms (lamp-voice's
+    /// push runs on the Studio, 29 Oct). The deadline itself is pinned
+    /// against a scripted socket, in
+    /// `all_adapter_hops_share_one_deadline_and_uncertain_call_is_not_reissued`.
+    fn adapter(&self) -> Adapter {
+        Adapter::new(self.socket.clone())
+            .unwrap()
+            .with_deadline(REAL_WAIT)
+    }
+}
 impl Drop for Schedule {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Release);
@@ -253,7 +268,7 @@ impl Drop for Schedule {
 #[test]
 fn all_six_tools_reach_real_schedule_through_the_real_actions_server() {
     let schedule = Schedule::new();
-    let actions = Actions::new(Some(Adapter::new(schedule.socket.clone()).unwrap()));
+    let actions = Actions::new(Some(schedule.adapter()));
     let offered: Value =
         serde_json::from_slice(&fs::read(actions.root.path().join(CATALOG_FILE)).unwrap()).unwrap();
     let names: Vec<_> = offered["tools"]
@@ -756,7 +771,7 @@ fn real_engine_failure_before_or_after_snapshot_commit_is_never_confirmed() {
 #[test]
 fn host_first_and_repeated_actions_to_durable_schedule_receipts_are_measured() {
     let schedule = Schedule::new();
-    let actions = Actions::new(Some(Adapter::new(schedule.socket.clone()).unwrap()));
+    let actions = Actions::new(Some(schedule.adapter()));
     let mut durations = Vec::new();
     let mut failures = 0;
     for index in 0..21 {
@@ -810,7 +825,7 @@ fn host_first_and_repeated_actions_to_durable_schedule_receipts_are_measured() {
 #[test]
 fn a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_good() {
     let schedule = Schedule::new();
-    let actions = Actions::new(Some(Adapter::new(schedule.socket.clone()).unwrap()));
+    let actions = Actions::new(Some(schedule.adapter()));
     let timer = actions.call("set_timer", json!({"text":"Tea","seconds":120}));
     assert_eq!(timer["result"]["status"], "committed");
     let id = timer["result"]["id"].as_u64().unwrap();
@@ -853,7 +868,7 @@ fn a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_g
 #[test]
 fn cancel_my_timer_with_a_reminder_also_due_cancels_only_the_timer() {
     let schedule = Schedule::new();
-    let actions = Actions::new(Some(Adapter::new(schedule.socket.clone()).unwrap()));
+    let actions = Actions::new(Some(schedule.adapter()));
     let timer = actions.call("set_timer", json!({"text":"Pasta","seconds":60}));
     let reminder = actions.call(
         "set_reminder",
