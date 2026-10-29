@@ -1000,6 +1000,42 @@ transcript readers (openharness `cli/src/engines/devin/`). So `ps`, `show` and
   missing or `null` mode, or another, is taken; Devin's real receipt hasn't
   been seen. The other engines still need `auto` with a bypass that is
   there.
+- **Its task is typed in after it starts.** Harness starts Devin with no
+  first message ("Devin cannot start with a first message", Harness 0.5.6
+  on lamp-75c9 and the laptop, 29 Oct), so a `--task` fails the `new`
+  (`new_failed`). For `devin` alone, `lamp-tasks` sends `new` with no
+  `--task`. It then reads the harness with `show --machine <id> <agent>
+  --json`, every 0.5 s, until Harness says it is `idle`, or `needs-input`
+  with nothing asked, no answer and no tool used (`fresh`: how Harness 0.5.6
+  reads a Devin that has done nothing yet). Then it types the
+  task in with `harness reply --machine <id> <agent> --json -- <task>`
+  (openharness#2157, merged 29 Oct), as the person would. All of it fits
+  inside the one `launch_timeout` (60 s) the `new` has
+  (`EngineKind::typed_after`, `Cli::first_message`).
+  - **The person's switch.** Harness takes the reply only with the
+    person's `programs-reply` switch on (`harness settings`, off by
+    default).
+  - **Not typed in.** The harness is started either way, so a task not
+    typed in is uncertain, never sent again: `reply_off` (the switch is
+    off), `reply_not_idle`, `reply_not_running` or `reply_failed` (the
+    reply's refusal), `stopped_before_message`, or `never_idle` (no idle
+    `show` inside the bound), or a `show` that couldn't run, under its own
+    code (`cancelled`, `cleanup_incomplete`, a timeout), never retried. The
+    empty harness is left for the person: the dispatch keeps no agent id
+    when it is uncertain, so the lamp can't close it.
+  - **A fresh Devin on an older Harness.** Harness 0.5.6 (Devin CLI
+    v3000.11.228) reads a Devin just started, showing only its empty input
+    box, as `needs-input` (`needsPerson: true`). It is fresh, so the reply
+    is tried at once and that Harness refuses it (`reply_not_idle`) in
+    seconds, rather than a minute of looks holding the tasks worker (the
+    Reviewer-lead's P2 on #4374). A Devin that has asked something, or
+    worked, isn't fresh, and nothing is typed into it.
+  - **Shown on lamp-75c9 at 18:32 on 29 Oct** (#4374's first head, d0ba23d0cc), with Harness
+    0.5.6-dev.9ffe3054f (main with openharness#2157 and its fresh-Devin
+    fix) on the lamp and the laptop, and the person's `programs-reply` on.
+    A typed question was handed over: `dispatch accepted (exit 0, 14.1 s)`
+    for `new`, `show` until idle and `reply`. Devin answered in 39 s, and
+    the lamp told its news at 18:33:16, then closed the harness.
 - **It may ask before it writes.** With no auto mode, Devin works in its own
   default. An agent waiting for the person is told as now: "Devin is
   waiting for you on your computer".
@@ -1019,12 +1055,13 @@ transcript readers (openharness `cli/src/engines/devin/`). So `ps`, `show` and
   four are named in its list and the description must stay inside the
   service's 1,024 bytes.
 - **Tests:**
-  - `tests/harness.rs` `devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none` (sending `--mode` to Devin fails it);
+  - `tests/harness.rs` `devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none` (sending `--mode` or `--task` to Devin fails it), `devins_task_is_typed_in_with_reply_once_it_is_idle`, `a_devin_whose_task_is_not_typed_in_is_uncertain_with_the_reason` and `a_fresh_devin_read_as_needs_input_is_replied_to_at_once`;
   - `engine::tests::a_store_with_no_devin_task_is_written_as_schema_one` (writing 2 always fails it) and `a_store_with_a_devin_task_is_written_as_schema_two`;
   - `runtime::tests::targets_for_a_newer_build_are_told_apart_and_never_read` (Devin read as this build's);
   - the voice's `agent_tasks::tests::the_person_may_hand_work_to_devin_by_name`, `every_description_fits_the_service_whatever_the_switches` (now with four), and `task_news::tests::news_names_the_agent_each_engine_is`.
-- **Not yet shown:** a real hand-over to Devin. It needs a computer with
-  Devin signed in and the lamp on the same Harness account (#1854, step 3).
+- **Shown:** a real hand-over to Devin on lamp-75c9 (above), on a Harness
+  built from main. **Not yet shown:** the same on a released Harness, or
+  on lamp-a0ae.
 
 ## Devin Cloud (#1854, openharness#1444)
 
