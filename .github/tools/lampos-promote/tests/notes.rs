@@ -1,7 +1,8 @@
 //! The stable notes' "Built but not on yet" part (#3976): which rows are
 //! listed, from what the product turns on, and where the part goes.
 use lampos_promote::notes::{
-    self, DEVELOPERS, HEADING, Waiting, placed, section, turned_on, waiting,
+    self, DEVELOPERS, HEADING, PLAIN, PLAIN_MOST, Waiting, placed, plain_lines, section, turned_on,
+    waiting,
 };
 use std::{collections::BTreeMap, path::Path};
 
@@ -38,6 +39,13 @@ const PAGE: &str = "\
 |---|---|---|---|---|
 | LAMP_STORE | `on`; off. From a settings file | — | on | until |
 | LAMP_WAITS | `on`; off. The same switch again, listed once | — | — | until |
+
+## In plain words
+
+| Switch | What a person would notice |
+|---|---|
+| `LAMP_WAITS` | The lamp answers you when you wait for it. |
+| LAMP_IS_ON | On already, so never listed. |
 ";
 
 fn product() -> BTreeMap<String, String> {
@@ -125,13 +133,15 @@ fn the_part_says_how_many_and_folds_the_list_by_table() {
         "{HEADING}\n5 features are in this build but off on every lamp"
     )));
     assert!(part.contains("<details><summary>The 5, by part</summary>"));
+    // Once in the plain list and once in the developers' fold.
     assert_eq!(
         part.matches("**The voice: hearing, turns and the ring**")
             .count(),
-        1
+        2
     );
     assert!(part.contains("- `--flag-off`: Not passed."));
     assert!(part.trim_end().ends_with("</details>"));
+    assert_eq!(part.matches("<details>").count(), 2, "{part}");
     assert_eq!(
         section(&[]),
         format!("{HEADING}\nNothing: every feature waiting for a lamp check is on.\n")
@@ -144,6 +154,7 @@ fn the_part_replaces_its_own_or_goes_before_the_developers_and_nothing_else_move
         part: "The other parts",
         switch: "LAMP_X".to_owned(),
         words: "X.".to_owned(),
+        plain: None,
     }]);
     let hand = "## lampOS build 8652\n\nThe notes in plain words.\n";
     let developers = format!("{DEVELOPERS}\nMerged since 8600:\n- #1 one\n");
@@ -169,6 +180,36 @@ fn the_part_replaces_its_own_or_goes_before_the_developers_and_nothing_else_move
     // No developers part: at the end; an empty body: the part alone.
     assert_eq!(placed(hand, &part), format!("{hand}\n{part}"));
     assert_eq!(placed("", &part), part);
+}
+
+/// The first builder on #3976 (29 Oct 23:4x): the list says what a person
+/// would notice, from the page's plain-words table, with no switch name; the
+/// name and the row's words are folded under "For developers". A switch with
+/// no plain line is listed in its row's words.
+#[test]
+fn the_list_is_in_plain_words_and_the_names_and_rows_are_for_developers() {
+    assert_eq!(
+        plain_lines(PAGE).get("LAMP_WAITS").map(String::as_str),
+        Some("The lamp answers you when you wait for it.")
+    );
+    let found = waiting(PAGE, &turned_on(&product()));
+    assert_eq!(
+        found[0].plain.as_deref(),
+        Some("The lamp answers you when you wait for it.")
+    );
+    assert_eq!(found[1].plain, None, "LAMP_SOON has no plain line");
+    let part = section(&found);
+    let (people, developers) = part
+        .split_once("<details><summary>For developers")
+        .expect("a developers fold");
+    assert!(people.contains("- The lamp answers you when you wait for it.\n"));
+    assert!(!people.contains("LAMP_WAITS"), "no switch name for people");
+    assert!(
+        people.contains("- Proposed now.\n"),
+        "the row's words without one"
+    );
+    assert!(developers.contains("- `LAMP_WAITS`: Answers a person who waits.\n"));
+    assert!(developers.contains("- `LAMP_SOON`: Proposed now.\n"));
 }
 
 /// The real page and units: every switch listed is on in no product file,
@@ -206,4 +247,36 @@ fn on_this_repository_each_listed_switch_is_off_in_every_product_file() {
         }
     }
     assert!(!found.iter().any(|w| w.switch == "LAMP_ATTENTION"));
+}
+
+/// The real page: every switch the notes list has a plain line in its
+/// [`PLAIN`] table, one short sentence a person can read, with no switch
+/// name, flag or code (the first builder on #3976, 29 Oct 23:4x).
+#[test]
+fn on_this_repository_each_listed_switch_has_a_plain_line() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    assert!(page.contains(&format!("\n{PLAIN}\n")));
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let missing: Vec<String> = waiting(&page, &on)
+        .into_iter()
+        .filter_map(|w| match &w.plain {
+            None => Some(format!("{}: no plain line", w.switch)),
+            Some(line)
+                if line.chars().count() > PLAIN_MOST
+                    || !line.ends_with('.')
+                    || line.contains('`')
+                    || line.contains("LAMP_")
+                    || line.contains(" --") =>
+            {
+                Some(format!("{}: {line}", w.switch))
+            }
+            Some(_) => None,
+        })
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "add or fix in docs/switches.md's {PLAIN}:\n{}",
+        missing.join("\n")
+    );
 }

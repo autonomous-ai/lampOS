@@ -502,6 +502,197 @@ its lamp-4ace run is Monday's, with a person there.
 | LAMP_CONTROL | `on` only; off. `lamp-control serve` runs the lamp's programming door only with it: WebSocket over TLS on `--listen` (`0.0.0.0:7731`), the lamp's own pinned certificate, paired computers only, each action routed to the body, the ring and the voice at `skill` as `lamp-control` (docs/control.md); off, it says so and exits 0 | — | — | #3504 (Nine's lamp-control, parts 3 and 4) | a paired computer on the LAN pairs, says hello, nods the lamp, sets a light and has a line said, and is refused cleanly unpaired, over a rate, while private and with a hand on the head | off until that check and the owner's switch in the app | Developers' local door to the lamp, phase 1 of the programming protocol | until |
 | `LAMP_SHUTDOWN` (the ways a person asks to turn the lamp off: the app, a long press, a spoken yes) | `on` exactly; off unless set. Named by `lamp_setup::shutdown::SWITCH`. Read by `lamp-cloud` (`lamp::SHUTDOWN_ENVIRONMENT`) for the app's `system.shutdown`: asked of setup's change helper on `lamp-setup-change.socket`, which refuses while an update installs, else answers first and starts `lamp-setup shutdown`; without it, `not on this lamp: system.shutdown` and the kind is not in `can` (cloud.md, "The lamp turned off from the app"). The press and the voice come with later changes of #3697. The runner they start, `lamp-setup shutdown` / `shutdown-now [--dry-run]`, is not behind it: pause and rest, every part stopped, the body let go, the ring's safe-to-unplug light, sync, poweroff (shutdown.md) | — | — | #3697 | From the app and from the press: the lamp rests, lets go, shows its light and powers off, and boots clean with no filesystem repair; not shown | off until that check | Today the only way off is pulling the plug, which can corrupt the SD card | until |
 
+
+## In plain words
+
+What a person would notice with each switch on, one plain line per switch counted `until` or `now`. The stable notes' "Built but not on yet" list prints these lines instead of the rows' own words, which go under "For developers" there (`lampos-promote`'s notes, the first builder on #3976). A switch the notes list needs a line here (`on_this_repository_each_listed_switch_has_a_plain_line`): one sentence of at most 110 characters, with no switch names, flags or code. A switch that changes nothing a person would notice says so.
+
+| Switch | What a person would notice |
+|---|---|
+| `LAMP_ADDRESSED` | The lamp checks whether each request was said to it from close by. |
+| `LAMP_APP_SCHEDULE` | The app lists the timers and reminders you set by voice, and can cancel them. |
+| `LAMP_ATTENTION_NEAR_CALIBRATED` | In a busy room, the lamp knows how loud you sound from your own chair, measured at setup. |
+| `LAMP_SECOND_SPEECH_SOCKET` | Nothing you'd notice: opens the speech connection early to try to start talking sooner. |
+| `LAMP_SECOND_SPEECH_SOCKET_MODEL` | Nothing you'd notice: picks the voice engine for the early speech connection, keeping one voice per answer. |
+| `LAMP_CUT_IN_KEEPS_LISTENING` | The lamp still stops if you keep talking over it, even after two earlier pauses came to nothing. |
+| `LAMP_CUT_IN_COUNTS_REAL` | Two side remarks while the lamp talks no longer stop it hearing a third line said to it. |
+| `LAMP_CUT_IN_NEAR_ASKER` | While answering you, the lamp no longer stops for quieter talk from farther back in the room. |
+| `LAMP_BACKCHANNEL_HOLDS` | A short "mm-hm" or "yeah" while the lamp talks no longer stops its answer; it keeps going. |
+| `LAMP_BACKCHANNEL_DEBUG` | Nothing you'd notice: for debugging, it logs short replies like "yeah" said while the lamp talks. |
+| `LAMP_ASIDES_HOLD` | Short asides like "wow" or "hmm, interesting" while the lamp talks no longer stop its story. |
+| `LAMP_CLOUD_TLS` | Nothing you'd notice: the lamp's connection to the app's server is encrypted. |
+| `LAMP_SAID_AS_HEARD` | When you cut the lamp off, it remembers only what it said aloud, so "go on" picks up from there. |
+| `LAMP_CUT_INS_NOT_TALK` | Lines said over the lamp's answer and left unanswered no longer count toward a busy room. |
+| `LAMP_FACE_GAP_HOLD` | If you turn away briefly mid-chat, the lamp keeps the conversation as yours for up to 12 seconds. |
+| `LAMP_FAINT_FLOOR_MAX_DB` | The level below which the lamp ignores faint sound can adjust to the room, up to a set limit. |
+| `LAMP_FOLLOWS_ON` | Outside a busy room, a line said within 20 seconds of the lamp finishing can be taken as a follow-up. |
+| `LAMP_GOING_ON_NOT_OWN` | Other people's talk after the lamp answers you no longer keeps the lamp joining in, line after line. |
+| `LAMP_GOING_ON_ASKS` | In a busy room, the lamp takes up to 2 seconds to decide if an unnamed follow-up is meant for it. |
+| `LAMP_GOING_ON_SAME_ONE` | In a busy room, unnamed follow-ups are ignored unless they answer the lamp or come in the same voice. |
+| `LAMP_NAME_OR_FOLLOW_UP` | In a busy room, facing the lamp isn't enough: say its name, unless you follow up within 8 seconds. |
+| `LAMP_HOLDING_ANSWER` | If the lamp only says a short "let me check", it comes back once with the real answer. |
+| `LAMP_LISTEN_GAPS` | The lamp leaves a short pause between sentences so a "stop" said over it can be heard. |
+| `LAMP_LIVE_SCOPED_SESSION` | When another known person speaks, the lamp starts a fresh chat for them, though their first line may be lost. |
+| `LAMP_MISHEARD_HUM` | If the lamp mishears you cutting in, it gives a quick "hm?" and listens instead of asking "Sorry?". |
+| `LAMP_NAME_NOTE_HEARD_AS` | The lamp knows its name can sound like "Mom", "man" or "ma'am", so such calls may still reach it. |
+| `LAMP_OTHERS_ANSWER` | A "yes" said over the lamp's answer, not to its question, is taken as someone else's and not answered. |
+| `LAMP_OUTPUT_CAPS` | Night-time limits on the light and volume stay in force, even after a restart. |
+| `LAMP_REACH_PROBE` | When only the lamp's service is down but the internet works, the lamp no longer says it's offline. |
+| `--reach-idle` | The lamp notices a lost internet connection within about 30 seconds, even when nobody is talking. |
+| `LAMP_REMARKS` | In a busy room, the lamp ignores remarks to others like "She said it might rain" that ask it nothing. |
+| `LAMP_RESEND_LOST_LINE` | If the connection drops just after you speak, the lamp sends your request once more instead of losing it. |
+| `LAMP_ROOM_FILE` | After a quick restart, the lamp remembers whether the room was quiet or busy instead of starting unsure. |
+| `LAMP_SERVICE_DOWN_LINE` | When the lamp's service is down but the internet works, the lamp says so once instead of going silent. |
+| `LAMP_PRIVACY_GAP_RIDE` | A split-second glitch reading the privacy switch no longer ends your conversation. |
+| `LAMP_REMINDER_PULSE` | While the microphones are off, the lamp's light pulses softly once a minute when a reminder is due. |
+| `LAMP_BODY_ASK` | When the lamp's arm needs a hand, the lamp says so aloud once, and again when you call its name. |
+| `LAMP_SECOND_REFUSED_HOLD` | When the voice service refuses the lamp, it says so once and retries each minute instead of going silent. |
+| `LAMP_SECOND_SPEECH` | Everything the lamp says, reminders and skills included, comes in one chosen voice. |
+| `LAMP_SECOND_GEMINI_BASE_URL` | Nothing you'd notice: sets the server address one of the speech services is reached through. |
+| `LAMP_SECOND_DEEPSEEK_BASE_URL` | Nothing you'd notice: sends the lamp's chat through the company's server, so no separate key is needed. |
+| `LAMP_SECOND_SPEECH_BASE_URL` | Nothing you'd notice: sets the server address the lamp's speech goes through. |
+| `LAMP_SECOND_LISTENING_BASE_URL` | Nothing you'd notice: sets the server address used to turn your speech into words. |
+| `LAMP_SECOND_KEY_TERMS` | The lamp listens out for chosen words, like a city name, so it hears them right. |
+| `LAMP_SECOND_FIRST_WORDS` | The lamp can start speaking an answer after its first few words, rather than waiting for a full phrase. |
+| `LAMP_SECOND_FLUX` | Nothing you'd notice: the lamp tries a newer service for turning your English speech into words. |
+| `LAMP_SECOND_FACE_NAME` | When the lamp knows your face, it knows your name too and can say it back when you ask. |
+| `LAMP_SECOND_MEMORY_HITS` | The lamp checks what it remembers against each thing you say, so its answers can use those memories. |
+| `LAMP_SECOND_QUIET_HELD` | Nothing you'd notice: the lamp holds back silence after you pause instead of sending it off. |
+| `LAMP_SECOND_PREPARED` | The lamp starts working on its answer as you finish speaking, so it can reply sooner; nothing is said early. |
+| `LAMP_NAME_SAID_TO_A_PERSON` | The lamp no longer takes "Ma'am," or "Dad," at a line's start as its name, unless you face or talk with it. |
+| `LAMP_NAME_START_USUAL` | Nothing you'd notice: makes sure the lamp's name said first in a line is still caught as a call. |
+| `LAMP_SECOND_FEW_TOOLS` | Nothing you'd notice: answers start with fewer abilities loaded; remembering takes one extra step. |
+| `LAMP_NAMED_ALWAYS` | In a busy room, the lamp answers anyone who starts with "Lamp," while someone faces it. |
+| `LAMP_SAME_SPEAKER_CARRIES` | In a busy room, the lamp keeps talking with the same person by face and voice, and lets others' lines pass. |
+| `LAMP_BUSY_CALLED_STRICT` | In a busy room with nobody facing it, the lamp ignores words that only sound like its name, like "Mom". |
+| `LAMP_REMARK_ABOUT_IT` | In a busy room, the lamp stays quiet when people talk about it, like "that lamp is cute," rather than to it. |
+| `LAMP_REMARK_GLANCE` | When people talk about the lamp in a busy room, it gives them one quick glance, at most once a minute. |
+| `LAMP_SECOND_SKILL_LOOK` | When a skill asks it to look for something, the lamp says "Let me look." and looks right away. |
+| `LAMP_SECOND_LOOK_NOTE` | While searching for something, the lamp is prompted to try the next spot if a look found nothing. |
+| `LAMP_SECOND_LOOK_WALK` | While searching for something you asked for, the lamp checks up to five spots itself, then kindly gives up. |
+| `LAMP_SECOND_WRITTEN_WAIT` | The lamp waits up to 7 seconds, not 3, to start its own news or reminders instead of dropping them. |
+| `LAMP_SECOND_KNOWN_NAMES` | The lamp better hears the name given at setup and the helpers it hands work to, so they're misheard less. |
+| `LAMP_SECOND_CUE_AFTER_MS` | The lamp's little waiting sound can come later, so it doesn't "hmm" just before an answer begins. |
+| `LAMP_QUIET_GOING_ON_SAME_ONE` | In a quiet room mid-conversation, the lamp ignores a line it can tell, by voice or face, is someone else's. |
+| `LAMP_USE_SKILL` | The lamp can use all your installed skills, even past the point where extra skills would stop working. |
+| `LAMP_CONTROLS_WAIT` | Nothing you'd notice: the lamp does less busy work while idle, and touches and presses still stop it at once. |
+| `LAMP_CAPTURE_WAIT` | Nothing you'd notice: the lamp's microphone handling does less busy work while it waits for sound. |
+| `LAMP_STOP_HEARD` | A dedicated listener for "Stop" pauses the lamp's reply the moment you say it. |
+| `LAMP_STOP_WORDS_HOLD` | The lamp no longer stops itself when it says the word "stop" in its own reply. |
+| `LAMP_STOP_WORDS_KEYTERM` | The lamp listens harder for stop words like "Stop," "Wait" and "Hold on" while it speaks. |
+| `LAMP_STOP_WORDS_GAIN_DB` | The lamp turns up what it hears of your voice while it speaks, to catch a quiet "Stop" better. |
+| `LAMP_TRANSCRIPTION_LANGUAGE` | Nothing you'd notice: tells the lamp which language you speak, to help it write down what it hears. |
+| `LAMP_TURNED_AWAY` | In a busy room mid-conversation, the lamp ignores lines meant for others, like "Mom" or "pass me that". |
+| `LAMP_TURNED_SPEAKING` | In a busy room, someone facing the lamp but not speaking no longer counts as talking to it. |
+| `LAMP_TURNED_FACE_SPEAKS` | Someone facing the lamp but silent while others talk isn't taken as talking to it; the room counts as busy. |
+| `LAMP_TWO_FACES_HELD` | A second face seen just once, like a passer-by or a photo, no longer makes the lamp treat the room as busy. |
+| `LAMP_WORKER_SCHEDULING` | Nothing you'd notice: shares the lamp's processor more fairly between its voice and its other parts. |
+| `LAMP_UNCLEAR_HUM` | When the lamp can't make out what you said, it gives a quick "hm?" and a listening look instead of silence. |
+| `LAMP_VAD_INPUT` | The lamp listens differently for your voice while it talks, to catch a "Stop" said over it. |
+| `LAMP_OWN_LINE_KEEPS` | Room noise no longer cancels the lamp's own hellos, reminders or news before they start; its name still does. |
+| `LAMP_OWN_LINE_OVER_TALK` | In a busy room, chatter no longer stops the lamp's own news or reminders; its name or a tap still does. |
+| `LAMP_MOTION_KEEPS_ANSWER` | The sound of the lamp's own motors while it thinks no longer interrupts its answer. |
+| `LAMP_MOTION_VOICE` | The lamp tries to tell your voice from its motor noise when you speak while it moves. |
+| `LAMP_SAME_VOICE_CALLER_ONLY` | The lamp learns a conversation's voice only from the person who called it, so others' lines don't take over. |
+| `LAMP_SAME_VOICE_MODEL` | The lamp checks a line is in the voice of the person it's talking with; another voice ends the chat. |
+| `LAMP_VOICE_TONE` | The lamp senses how calm, excited, glad or down you sound, keeping only numbers, never your words or voice. |
+| `LAMP_NO_WORDS_AGAIN` | When you call the lamp by name and it comes up empty, it tries again or asks you to repeat, never silent. |
+| `LAMP_REQUESTED_AUDIO` | When you ask for a sound by voice, the lamp can play one of its own checked recordings after confirming. |
+| `LAMP_SECOND_SEEMS` | When it sees you smiling, the lamp answers in a warmer tone, without ever mentioning how you look. |
+| `LAMP_HEALTH_FACTS` | Asked how it is, the lamp can say which of its parts aren't working, and keeps quiet about it otherwise. |
+| `LAMP_LIGHT_KEEP` | After a restart, the lamp comes back with the light you last set instead of a default level. |
+| `LAMP_SKILL_LIGHT_SPEAKING` | While the lamp speaks, the ring takes on the colour of a light a skill has set, like a warm welcome-back glow. |
+| `LAMP_LIGHT_WHILE_MUTED` | You can still change the light from the app while the lamp is muted or its privacy switch is closed. |
+| `LAMP_LOOK_FULL_SIDE` | Nothing you'd notice: lets the lamp take larger still pictures, meant for reading handwriting. |
+| `LAMP_MAKE_SKILL` | You can ask the lamp to have your computer's agent make a new skill, and it asks before putting it on. |
+| `LAMP_APP_MAKE_SKILL` | You can ask for a new skill in the app; the lamp tells you when it's made, and only a spoken yes adds it. |
+| `LAMP_MEMORY_EARLY_WORDS` | If the lamp recognises you partway through a talk, what you said earlier in it is remembered as yours. |
+| `LAMP_MEMORY_FOLLOWS_FACE` | When you save your face mid-conversation, what you said just before is remembered as yours, not the room's. |
+| `LAMP_MEMORY_STABLE_ID` | If you change your name with the lamp, it keeps everything it remembered about you under the new name. |
+| `LAMP_FORGET_ASKED` | The lamp forgets things only when you ask it to, and checks with you before forgetting everything. |
+| `LAMP_MEMORY_FORGET_ABOUT` | Asking the lamp to forget what you said about something forgets just those things and nothing else. |
+| `LAMP_MEMORY_LINK_USED` | Forgetting one thing no longer takes unrelated talk from the same conversation with it. |
+| `LAMP_MEMORY_RECALL_V2` | You can ask the lamp what you talked about on a certain day or last week, and its recall is more precise. |
+| `LAMP_MEMORY_KEEP_HEARD` | When you ask the lamp to remember something, it keeps your own words rather than its rewording. |
+| `LAMP_MEMORY_REPLACES` | When you correct something the lamp remembered, it keeps the new version in place of the old one. |
+| `LAMP_MEMORY_REOPEN_QUIET` | After a quiet spell of ten minutes or more, the lamp can follow up on something you told it earlier. |
+| `LAMP_MEMORY_ROOM_AFTER_FORGET` | After you say forget everything, the lamp holds back shared notes about people from you for the day. |
+| `LAMP_MEMORY_ROOM_SPEAKER` | When you say forget everything, the lamp also forgets what it saw you say to the whole room. |
+| `LAMP_SECOND_REMEMBER_ASKED` | Asking the lamp to remember your face while giving your name saves them straight away. |
+| `LAMP_ONBOARDING_NUDGE` | During setup, the lamp moves through the steps more reliably, catching your name and where you sit. |
+| `LAMP_FACE_EXPRESSIONS_ASK` | During setup, the lamp asks once if it may notice whether people look happy or upset, to answer more warmly. |
+| `LAMP_PLACE` | Set for one lamp, it knows the town it's in, so weather and nearby questions are answered for there. |
+| `LAMP_PERSON_NAME_OWNER_ONLY` | The lamp uses the owner's name only when it sees the owner alone, so visitors aren't called by it. |
+| `LAMP_POLICY_HOLDS_ACTIONS` | The lamp skips a request it judges was meant for someone else; changes may take up to 2 seconds longer. |
+| `LAMP_FOLLOWS_RUN` | Right after the lamp speaks, a follow-up without its name can still change the light or the volume. |
+| `LAMP_PROGRESS_NEWS` | While a longer task runs, the lamp may say a short sentence about how it's going. |
+| `LAMP_PROVIDER_WRITES` | Nothing you'd notice: keeps the voice from dropping on a slow network, though answers may come a bit later. |
+| `LAMP_SHORT_DONE` | After you ask it to change the light or volume, the lamp answers in a word or two, like Brighter. |
+| `LAMP_TASKS_ACCOUNTS` | Questions about your calendar or email go to your computer's agent instead of the lamp's own reminders. |
+| `LAMP_TASKS_QUESTIONS` | A question about one of your computer's agents is passed to that agent to answer, not guessed by the lamp. |
+| `LAMP_TASKS_SIGN_IN` | You can sign the lamp in to your computer agents by voice: it reads out a code to type and checks your email. |
+| `LAMP_TASKS_MACHINE_NAMES` | The lamp calls your computers by their own names when telling you which one has your task. |
+| `LAMP_TASKS_NAMED_ASK` | Asking one of your computer's agents by name to do something hands the task straight to that agent. |
+| `LAMP_TASKS_CORRECT` | After the lamp reads back a task, you can say no, I said, and correct it before saying yes. |
+| `LAMP_UNPLUG` | You can ask the lamp to fold up for unplugging; it says when it's done, and "never mind" undoes it. |
+| `LAMP_UNPLUG_STAY_MIN` | If nobody unplugs the folded lamp within 10 minutes, it says it's still plugged in and gets back up. |
+| `--overload` | The arm's motors let go when straining hard for a while, then take hold again two minutes later. |
+| `LAMP_BODY_OWN_RANGES` | The arm stays within its own calibrated limits and won't move a joint past them. |
+| `--steady-rate` | The lamp checks a still face half as often, saving effort but correcting its gaze a little slower. |
+| `--look-on-change` | Nothing you'd notice: with nobody around, the camera skips face checks while the view hasn't changed. |
+| `--change-persist` | Nothing you'd notice: a brief flicker in a dark room no longer counts as a change, saving more effort. |
+| `--leave-still-faces` | The lamp ignores small, faint face-like shapes that never move, which are not real people. |
+| `LAMP_EYES_SPEAKING_DROP_OUTLIER` | The lamp still notices who is talking when one camera frame of their face is misread. |
+| `LAMP_EYES_SPEAKING_ALL_FACES` | The lamp can tell whether other faces in view are talking, not only the nearest one. |
+| `LAMP_TURN_TO_ANSWERED` | As it answers, the lamp turns its head to the one person it saw talking just before. |
+| `--visits` | The lamp keeps a rough sense of how often remembered people visit, never when, and tells them it does. |
+| `--photo-dir` | Someone can add a face from a photo; the lamp keeps it unconfirmed until that person says yes at the lamp. |
+| `LAMP_PHOTO_FACES` | When a person added from a photo is at the lamp, it asks them once whether it may remember them. |
+| `LAMP_REMEMBER_SPEAKER` | When asked to remember someone, the lamp learns only the face of the person who introduced themselves. |
+| `LAMP_PHOTO_SPEAKER` | The lamp keeps a photo-added face only if the yes comes from that same person, not someone in their place. |
+| `LAMP_FACES_PAGE` | The app lists the faces the lamp knows and can remove a person, along with what the lamp remembers of them. |
+| `LAMP_MEMORY_FORGET_SOCKET` | Removing a person in the app also erases the lamp's memories of them, without the app ever reading them. |
+| `LAMP_SEEMS_BROW_LOW` | The lamp reads lowered brows without a smile as someone feeling low, catching long faces it misses now. |
+| `LAMP_FACE_FULL_CROP` | The lamp recognises remembered faces more steadily and keeps their name through a brief miss. |
+| `--seems-log` | Nothing you'd notice: keeps a short-lived log of expression reads, never whose face, to measure accuracy. |
+| `LAMP_PRESENCE` | Nothing you'd notice: the lamp tracks whether anyone is at the desk, for features like the light going out. |
+| `LAMP_PRESENCE_VOICE` | Chatter near the lamp no longer counts as someone at the desk; only speech said to the lamp does. |
+| `LAMP_PRESENCE_FAR` | A still face far from the lamp, like someone behind or a picture, no longer counts as someone at the desk. |
+| `LAMP_WHO_WAS_HERE_KNOWN` | Asking who was here can tell you that someone the lamp knows came by, without saying who. |
+| `LAMP_WHO_WAS_HERE_NAMES` | Asking who was here names visitors who agreed to be named; others stay unnamed. |
+| `LAMP_EYES_YAWN` | The lamp counts your yawns while you sit, only with your okay for face expressions, keeping just the count. |
+| `--mouth-on-heard` | Nothing you'd notice: the lamp studies mouths closely only while it hears speech, saving effort. |
+| `--mouth-runtime` | Nothing you'd notice: the lamp reads mouth shapes with a different, faster engine. |
+| `--not-while-speaking` | The lamp no longer mistakes its own voice for someone calling its name while it talks. |
+| `--quiet-below` | Nothing you'd notice: the lamp rests its name listener in a silent room, saving effort, and hears the same. |
+| `--rescue-model` | On test lamps only: a second listener helps the lamp hear its name more often. |
+| `--stop-least` | Nothing you'd notice: the lamp also listens for the word stop, ready for a feature that uses it. |
+| `--offline-face` | When the lamp is offline, its light no longer shows it's ready to listen. |
+| `--set-up-later` | Handing work to your computers can be set up after install, and the lamp says why it's off until then. |
+| `--targets-from-machines` | Once signed in, the lamp learns your computers by itself so it can hand work to them. |
+| `--sign-in-by-code` | You can sign the lamp in by voice, with a code it reads out, so it can hand work to your computers. |
+| `--folder-missing` | If handed-off work can't start because its folder isn't on that computer, the lamp says so plainly. |
+| `--engines-ready` | Before handing off work, the lamp checks the computer's assistant is signed in and says if it isn't. |
+| `LAMP_CONTROLS_STRIP` | The touch strip on the lamp's base responds to touches and strokes. |
+| `LAMP_HEAD_PET` | Petting the lamp's head gets a response and a little wiggle instead of putting it to sleep. |
+| `LAMP_EARS_CLASSES` | Nothing you'd notice: with your okay, the lamp tells speech, music and laughter apart, keeping no audio. |
+| `LAMP_MOOD` | The lamp has a mood: its light and head breathe quicker when lively and slower when dozing. |
+| `LAMP_MOOD_TONE` | How your words sound nudges the lamp's mood, seen only in its breathing and liveliness; nothing is kept. |
+| `LAMP_MESSAGES` | You can text the lamp from the app and it texts back, and it can send you news of tasks unasked. |
+| `LAMP_SKILLS_STORE` | You can install skills from the Skills Store with the app's Add button, each checked before it goes on. |
+| `LAMP_APP_RESTART` | You can restart the lamp from the app; it waits for a pause in talk and never restarts during an update. |
+| `LAMP_GUARD_FROM_APP` | You can turn guard mode on and off from the app, not only by voice. |
+| `LAMP_GUARD_SOUNDS` | In guard mode, a door or footsteps followed by a face or speech counts as someone arriving. |
+| `LAMP_GUARD_NAMES` | Guard mode's texts name a visitor the lamp knows if they agreed to be named. |
+| `LAMP_GUARD_WORDS_V2` | Saying you're back or that it can stop watching turns guard mode off, instead of on. |
+| `LAMP_REST_THROUGH_SOUNDS` | At night, room sounds without words no longer keep the lamp awake; words, its name or a touch still do. |
+| `LAMP_YAWN_SOONER` | Once the lamp has seen you yawn, your stretch break comes at 30 minutes instead of 50. |
+| `LAMP_SETTINGS_WIFI` | You can change the lamp's Wi-Fi from the app; if the new one fails, it goes back to the old one. |
+| `LAMP_WIFI_RECOVERY` | If the lamp can't reach its Wi-Fi, it opens setup and asks you to set its Wi-Fi again in the app. |
+| `LAMP_OWNER_PLACE` | The app can give the lamp your rough area, so "near me" and weather questions are answered for it. |
+| `LAMP_CONTROL` | Nothing you'd notice: lets paired computers on your network control the lamp, for developers. |
+| `LAMP_SHUTDOWN` | You can turn the lamp off from the app; it rests, shows a safe-to-unplug light and powers down. |
+
 ## What the census found
 
 Gaps between the docs, the units and the code, for whoever owns each:
