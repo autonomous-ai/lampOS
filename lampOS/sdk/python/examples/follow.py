@@ -23,7 +23,7 @@ async def main():
                 async with lamp.lease("body", why="looking at the person at the desk") as lease:
                     while here.is_set() and lease.held:
                         await lamp.look("face")
-                        await asyncio.sleep(2)  # motion: 1 every 2 s
+                        await asyncio.sleep(2)  # look again now and then, not on and on
             except LampError as refused:
                 print(f"not now: {refused}")
                 await asyncio.sleep(10)
