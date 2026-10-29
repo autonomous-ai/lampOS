@@ -449,6 +449,45 @@ mod tests {
         assert!(read.muted);
     }
 
+    /// Records as the 7071 image (`aa9ec9e27a`, 26 Oct) writes them, the
+    /// build the first customer lamps left on, whose first update jumps
+    /// straight to this one (#3689). Each reads as it was, with no note, on
+    /// the same boot and after a reboot: one this build refused would read
+    /// as muted for privacy, and a lamp the person left listening would come
+    /// back deaf until a hold.
+    #[test]
+    fn records_the_7071_image_kept_read_as_they_were() {
+        let root = Root::new();
+        let path = root.0.join("mute.json");
+        for (bytes, muted, asleep) in [
+            (
+                &br#"{"version":1,"clock_id":"boot-a","muted":false,"through_us":5}"#[..],
+                false,
+                false,
+            ),
+            (
+                br#"{"version":1,"clock_id":"boot-a","muted":true,"through_us":5}"#,
+                true,
+                false,
+            ),
+            (
+                br#"{"version":1,"clock_id":"boot-a","muted":true,"through_us":5,"reason":"sleep"}"#,
+                true,
+                true,
+            ),
+        ] {
+            for clock_id in ["boot-a", "boot-b"] {
+                fs::write(&path, bytes).unwrap();
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+                let (read, note) = MuteRecord::load_noting(&path, clock_id, 30).unwrap();
+                let case = (String::from_utf8_lossy(bytes), clock_id);
+                assert_eq!(note, None, "{case:?}");
+                assert_eq!((read.muted, read.asleep()), (muted, asleep), "{case:?}");
+                assert_eq!(read.clock_id, clock_id, "{case:?}");
+            }
+        }
+    }
+
     /// A clear cut at each point of its save: the next load never fails, and
     /// a save after it works, so the voice starts and a person's hold can
     /// still clear the mute. Cut before the rename, the old muted record
