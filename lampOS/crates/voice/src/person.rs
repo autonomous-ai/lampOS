@@ -463,6 +463,49 @@ pub fn someone_else_now(
     }
 }
 
+/// `text` with each word of the owner's `name` (any case, of two letters or
+/// more) said as "(their name)": while someone else may be speaking
+/// ([`someone_else_now`]), the conversation's earlier lines, where the lamp
+/// named the owner, carry the name into no reply (#3884's two faces on
+/// lamp-52e6, 29 Oct: named in 2 of 3 answers from the lamp's own earlier
+/// "Ed."-style answers).
+pub fn without_name(text: &str, name: &str) -> String {
+    const SAID: &str = "(their name)";
+    let words: Vec<String> = name
+        .split_whitespace()
+        .filter(|word| word.chars().count() > 1)
+        .map(str::to_lowercase)
+        .collect();
+    if words.is_empty() {
+        return text.to_owned();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut word = String::new();
+    let flush = |word: &mut String, out: &mut String| {
+        out.push_str(if words.contains(&word.to_lowercase()) {
+            SAID
+        } else {
+            word
+        });
+        word.clear();
+    };
+    for c in text.chars() {
+        if c.is_alphanumeric() {
+            word.push(c);
+        } else {
+            flush(&mut word, &mut out);
+            out.push(c);
+        }
+    }
+    flush(&mut word, &mut out);
+    // A name of more words is said once.
+    let twice = format!("{SAID} {SAID}");
+    while out.contains(&twice) {
+        out = out.replace(&twice, SAID);
+    }
+    out
+}
+
 /// What a reply is told when the owner `name` may be named by default
 /// ([`someone_else_now`]).
 pub fn by_default(name: &str) -> String {
@@ -536,6 +579,20 @@ mod tests {
     /// #3884, the first builder's call: the owner alone, looking away or
     /// seen, is named by default; a stranger's face, a known face that
     /// isn't theirs, two faces or another voice names no one.
+    #[test]
+    fn the_owners_name_is_taken_out_of_earlier_lines_word_by_word() {
+        assert_eq!(without_name("Ed.", "Ed"), "(their name).");
+        assert_eq!(
+            without_name("Your name is robin example, Robin!", "Robin Example"),
+            "Your name is (their name), (their name)!"
+        );
+        // Only whole words: a word that holds the name stays.
+        assert_eq!(without_name("Edward edited it.", "Ed"), "Edward edited it.");
+        assert_eq!(without_name("Ed's lamp", "Ed"), "(their name)'s lamp");
+        // A one-letter name or none takes nothing out.
+        assert_eq!(without_name("A lamp.", "A"), "A lamp.");
+    }
+
     #[test]
     fn the_owner_is_named_by_default_unless_someone_else_is_there() {
         let owner = "Example Name";

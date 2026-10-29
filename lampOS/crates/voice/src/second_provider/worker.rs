@@ -2245,6 +2245,10 @@ pub fn serve(
                 crate::local_time::place_told(place.as_deref()),
             );
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
+            // The owner's name held back while someone else may be speaking:
+            // taken out of the conversation's earlier lines too
+            // (`person::without_name`).
+            let mut withheld: Option<String> = None;
             let named_by_default = by_default
                 .as_ref()
                 .and_then(|(typed, bus)| {
@@ -2263,8 +2267,9 @@ pub fn serve(
                     {
                         Some(why) => {
                             eprintln!(
-                                "lamp-voice second: the owner is not named by default: {why} (LAMP_PERSON_NAME_BY_DEFAULT)"
+                                "lamp-voice second: the owner is not named by default: {why}; their name is taken out of the conversation's earlier lines (LAMP_PERSON_NAME_BY_DEFAULT)"
                             );
+                            withheld = Some(name.to_owned());
                             String::new()
                         }
                         None => format!("\n\n{}", crate::person::by_default(name)),
@@ -2300,19 +2305,21 @@ pub fn serve(
                 )
             };
             if steady_first {
-                steady_first_message(
+                steady_first_message_withheld(
                     told(format!("{character}{skills}")),
                     &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
                     file.as_deref(),
                     person.as_deref(),
+                    withheld.as_deref(),
                 )
             } else {
-                system_message(
+                system_message_withheld(
                     &told(character.clone()),
                     time.as_deref(),
                     &(memory + &facts + &skills),
                     file.as_deref(),
                     person.as_deref(),
+                    withheld.as_deref(),
                 )
             }
         },
@@ -9632,8 +9639,21 @@ pub(crate) fn system_message(
     file: Option<&Path>,
     whose: Option<&str>,
 ) -> Told {
+    system_message_withheld(character, time, memory, file, whose, None)
+}
+
+/// [`system_message`] with the owner's name `withheld` from the
+/// conversation's earlier lines ([`crate::person::without_name`]).
+pub(crate) fn system_message_withheld(
+    character: &str,
+    time: Option<&str>,
+    memory: &str,
+    file: Option<&Path>,
+    whose: Option<&str>,
+    withheld: Option<&str>,
+) -> Told {
     let told = format!("{character}{}{memory}", time.unwrap_or_default());
-    let (thread, history) = thread_and_history(told.len(), file, whose);
+    let (thread, history) = thread_and_history(told.len(), file, whose, withheld);
     Told {
         text: told + &thread,
         after: None,
@@ -9648,13 +9668,27 @@ pub(crate) fn system_message(
 /// thread, after the exchanges ([`Told::after`]). A service's prompt cache
 /// then holds the character, the tools and the exchanges from one request
 /// to the next; the time alone changes every minute.
+#[cfg(test)]
 pub(crate) fn steady_first_message(
     steady: String,
     changing: &str,
     file: Option<&Path>,
     whose: Option<&str>,
 ) -> Told {
-    let (thread, history) = thread_and_history(steady.len() + changing.len(), file, whose);
+    steady_first_message_withheld(steady, changing, file, whose, None)
+}
+
+/// [`steady_first_message`] with the owner's name `withheld` from the
+/// conversation's earlier lines ([`crate::person::without_name`]).
+pub(crate) fn steady_first_message_withheld(
+    steady: String,
+    changing: &str,
+    file: Option<&Path>,
+    whose: Option<&str>,
+    withheld: Option<&str>,
+) -> Told {
+    let (thread, history) =
+        thread_and_history(steady.len() + changing.len(), file, whose, withheld);
     let after = format!("{changing}{thread}").trim_start().to_owned();
     Told {
         text: steady,
@@ -9665,11 +9699,13 @@ pub(crate) fn steady_first_message(
 
 /// The thread in the room `used` bytes of the system message leave it,
 /// and the exchanges as messages, both `whose` alone (a person's memory id,
-/// or none for the room), under the thread's one lock.
+/// or none for the room), under the thread's one lock; with a name
+/// `withheld`, said in neither.
 fn thread_and_history(
     used: usize,
     file: Option<&Path>,
     whose: Option<&str>,
+    withheld: Option<&str>,
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
@@ -9680,9 +9716,21 @@ fn thread_and_history(
         )
     })
     .unwrap_or_default();
+    let said = |text: String| match withheld {
+        Some(name) => crate::person::without_name(&text, name),
+        None => text,
+    };
     (
-        thread.unwrap_or_default(),
-        recent.into_iter().flat_map(messages).collect(),
+        said(thread.unwrap_or_default()),
+        recent
+            .into_iter()
+            .map(|exchange| crate::thread::Recent {
+                written: exchange.written.map(said),
+                person: said(exchange.person),
+                lamp: said(exchange.lamp),
+            })
+            .flat_map(messages)
+            .collect(),
     )
 }
 
@@ -17782,6 +17830,44 @@ mod tests {
         assert!(after.contains("- coffee black\n") && after.contains(" It is noon."));
         assert!(after.contains("Person: What should I drink?\nYou: Try some tea. It is calm.\n"));
         assert_eq!(steady.history, told.history);
+        // A name held back while someone else may be speaking (#3884's two
+        // faces) is said in neither the thread nor the exchanges: here the
+        // lamp's own word, standing in for a name it said earlier.
+        let held =
+            system_message_withheld("You are a lamp.", None, "", Some(&file), None, Some("Tea"));
+        assert_eq!(
+            held.history,
+            [
+                Message::user("What should I drink?"),
+                Message::assistant("Try some (their name). It is calm.")
+            ]
+        );
+        assert!(
+            held.text
+                .contains("You: Try some (their name). It is calm.\n")
+                && !held.text.to_lowercase().contains("tea"),
+            "{}",
+            held.text
+        );
+        let held = steady_first_message_withheld(
+            "You are a lamp.".into(),
+            "",
+            Some(&file),
+            None,
+            Some("Tea"),
+        );
+        assert!(
+            !held
+                .after
+                .unwrap_or_default()
+                .to_lowercase()
+                .contains("tea")
+        );
+        assert!(
+            !format!("{:?}", held.history).to_lowercase().contains("tea"),
+            "{:?}",
+            held.history
+        );
         // Forgotten, then another person's turn, then back: nothing of it
         // is told or given again (first builder's reviewer on #778).
         crate::thread::THREAD.lock().unwrap().forget();
