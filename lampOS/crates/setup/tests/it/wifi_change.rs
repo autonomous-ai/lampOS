@@ -59,6 +59,9 @@ struct Fake {
     holds_failing: u32,
     /// When each hold was asked.
     hold_at_ms: Vec<u64>,
+    /// "New Home" refuses its right key once before it joins: one
+    /// `auth_failures=1` line until it is up.
+    rejected_once: bool,
 }
 
 fn hex(text: &str) -> String {
@@ -92,6 +95,7 @@ impl Fake {
             holds: 0,
             holds_failing: 0,
             hold_at_ms: Vec::new(),
+            rejected_once: false,
         };
         fake.start_radio();
         fake.stations = 0;
@@ -169,7 +173,16 @@ impl Host for Fake {
         .into()
     }
     fn wpa_events(&mut self) -> Vec<String> {
-        if self.wrong_key {
+        let joining_new = self
+            .joined
+            .as_ref()
+            .is_some_and(|(name, _)| name == "New Home");
+        if self.rejected_once && joining_new && self.up().is_none() {
+            vec![
+                "wlan0: Trying to associate with aa (SSID='New Home')".into(),
+                "wlan0: CTRL-EVENT-SSID-TEMP-DISABLED id=0 ssid=\"New Home\" auth_failures=1 duration=10 reason=WRONG_KEY".into(),
+            ]
+        } else if self.wrong_key {
             vec![
                 "wlan0: Trying to associate with aa (SSID='New Home')".into(),
                 "wlan0: CTRL-EVENT-SSID-TEMP-DISABLED id=0 ssid=\"New Home\" auth_failures=2 duration=30 reason=WRONG_KEY".into(),
@@ -397,6 +410,52 @@ fn a_wrong_password_goes_back_to_the_old_network_and_fails() {
         "{}",
         fake.now_ms
     );
+}
+
+#[test]
+fn one_rejected_key_keeps_the_change_waiting_and_a_later_join_is_kept() {
+    // A router can refuse the first handshake of a right password: one
+    // rejection is not the early stop, after setup as at setup.
+    let mut fake = Fake::new(&[
+        ("Old Home", OLD),
+        (
+            "New Home",
+            Network {
+                after_ms: 20_000,
+                ..GOOD
+            },
+        ),
+    ]);
+    fake.rejected_once = true;
+    assert_eq!(change(&mut fake, "VN", &asked("New Home")), Changed::Joined);
+    let conf = String::from_utf8(fake.conf.clone().unwrap()).unwrap();
+    assert!(conf.contains(&format!("psk=\"{FAKE_PASSWORD}\"")));
+    assert_eq!(fake.stations, 1);
+    assert_eq!(fake.hotspots, 0);
+    // Joined at 20 s, and the app's confirmation 2 s later.
+    assert_eq!(fake.now_ms, 22_000);
+
+    // Never joined: the whole bound, then the one rejection names the
+    // password and the old network comes back.
+    let mut fake = Fake::new(&[
+        ("Old Home", OLD),
+        (
+            "New Home",
+            Network {
+                after_ms: u64::MAX,
+                ..GOOD
+            },
+        ),
+    ]);
+    fake.rejected_once = true;
+    let changed = change(&mut fake, "VN", &asked("New Home"));
+    let Changed::Back { why } = changed else {
+        panic!("{changed:?}");
+    };
+    assert!(why.starts_with("wrong WiFi password"), "{why}");
+    assert!(fake.now_ms >= JOIN_WAIT.as_millis() as u64);
+    assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
+    assert_eq!(fake.hotspots, 0, "never the hotspot after setup");
 }
 
 #[test]
