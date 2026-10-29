@@ -323,6 +323,53 @@ fn repo_skill_with(dir: &Path, name: &str, from: &str, to: &str) -> PathBuf {
     skill
 }
 
+/// Head pat wiggle's move (#3997, #4133): passes the body's own check, turns
+/// the base alone, at most half the farthest and fastest a move may, in
+/// 3.075 s, three quick swings and a softer sway, eased in and out, played
+/// as each pet ends and still going as head pat's line begins.
+#[test]
+fn head_pat_wiggle_is_small_quick_and_the_bases_alone() {
+    use lamp_body::moves::{FARTHEST, FASTEST, check, read};
+    let skill = skills_root().join("head-pat-wiggle");
+    assert_eq!(load(&skill).unwrap().kind, SkillKind::Installable);
+    let wiggle = read(&skill.join("moves/pat-wiggle.json")).unwrap();
+    // The body's own check, as lamp-skills makes it at load and the body
+    // again on the mood socket.
+    check(&wiggle).unwrap();
+    // The base (yaw, joint 2) alone: the head stays still under the hand.
+    for frame in &wiggle.frames {
+        assert_eq!(
+            [frame[0], frame[1], frame[3], frame[4]],
+            [0; 4],
+            "{frame:?}"
+        );
+    }
+    // At most half the farthest a move may turn the base, and half its speed.
+    let yaw: Vec<i16> = wiggle.frames.iter().map(|frame| frame[2]).collect();
+    let farthest = yaw.iter().map(|count| count.unsigned_abs()).max().unwrap();
+    assert!(farthest * 2 <= FARTHEST[2].unsigned_abs(), "{farthest}");
+    let step = f32::from(wiggle.step_ms) / 1_000.0;
+    let fastest = yaw
+        .windows(2)
+        .map(|pair| f32::from(pair[1] - pair[0]).abs() / step)
+        .fold(0.0, f32::max);
+    assert!(fastest * 2.0 <= FASTEST[2], "{fastest}");
+    // About 3 s: the line's first sound comes about 2.5 s after the pet
+    // (the lamp check, #4133), so the wiggle is still going as it begins.
+    let lasts_ms = (wiggle.frames.len() - 1) * usize::from(wiggle.step_ms);
+    assert_eq!(lasts_ms, 3_075);
+    // Three quick swings (left, right, left), then a softer sway right and
+    // left, eased in and out: small first and last steps.
+    let turns = yaw
+        .windows(2)
+        .filter(|pair| pair[0] != 0 && pair[1] != 0 && pair[0].signum() != pair[1].signum())
+        .count();
+    assert_eq!(turns, 3, "{yaw:?}");
+    for edge in [yaw[1], yaw[yaw.len() - 2]] {
+        assert!(edge.unsigned_abs() * 4 <= farthest, "{yaw:?}");
+    }
+}
+
 /// Head pat's response is chosen in its `skill.toml` (#3997, #4133): its
 /// seven lines, one picked each run, said as written; or, by editing that
 /// file alone, a purr with light. A list of lines is 2 to 16 different ones.
@@ -488,6 +535,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "desk-tutor-marks",
             "guard-mode",
             "head-pat",
+            "head-pat-wiggle",
             "look-for-things",
             "meal-check",
             "sit-back",
