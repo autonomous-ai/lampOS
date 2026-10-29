@@ -64,6 +64,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|minutes| minutes.trim().parse().ok()),
         run_for,
         report_every: lamp_schedule::runtime::REPORT_EVERY,
+        request_deadline: lamp_schedule::runtime::REQUEST_DEADLINE,
     };
     let clock = SystemClock::new(boot_id.as_deref(), trust_clock)?.with_kernel_clock(kernel_clock);
     let stop = Arc::new(AtomicBool::new(false));

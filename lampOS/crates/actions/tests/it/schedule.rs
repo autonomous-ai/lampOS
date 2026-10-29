@@ -229,6 +229,7 @@ impl Schedule {
             utc_offset_minutes: None,
             run_for: None,
             report_every: lamp_schedule::runtime::REPORT_EVERY,
+            request_deadline: REAL_WAIT,
         };
         let worker = {
             let (clock, stop) = (clock.clone(), stop.clone());
