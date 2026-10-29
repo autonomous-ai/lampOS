@@ -1,3 +1,26 @@
+## 30 October 2026, 04:50 +07 — the round stops the voice first, so the ten 7071 lamps don't come back muted
+
+**What Tests found (02:22):** a lamp on the 7071 image updates straight to stable 8670 by climbing first. 7071's updater (level 5) installs and switches to 8670's (level 8), which runs the round. But from the code, it most likely came back muted once. The round restarted lamp-controls before the voice, and 7071's voice, without #4280's release, kept its restart guard. That would have been the ten customer lamps' first home update, about 5 Nov.
+
+**My correction (02:3x):** on 29 Oct I said an update-side order change would have the voice fix's gap. That's wrong after a climb, because the round is run by the new updater. So an order change reaches these lamps, and the voice-side release doesn't. Tests then traced 7071's own stop path: a stop with Controls still up is clean, and releases the guard (#960).
+
+**#4431 (train 386),** with the first builder's yes at 02:5x:
+- When a running part before the voice restarts, the round checks quiet, stops the voice with Controls up, restarts the rest, and starts the voice last.
+- The voice is marked restarted at its stop, so a failed part puts the old voice back.
+- **The trade, said on the PR:** a sentence begun during a prerequisite's restart reaches no voice for those seconds.
+- **Tests:**
+  - a fake old voice replayed over the calls: the order before mutes it, and this one doesn't;
+  - the put-back case;
+  - the product voice's real prerequisites;
+  - `restart_quiet`'s two tests rewritten for the new behaviour.
+- Mutation-checked.
+- READ-OKs from Tests, Reviewer-two and Reviewer-three.
+- **Still owed:** a real 7071 lamp before the promote that carries it, by 3 Nov.
+
+**#4440:** the P3s. A test of a cut just after the voice's stop, which recovery brings back on the old voice, plus Fourth's docs line that the stop applies only when the voice changes.
+
+Also: #4425 (Fourth, my (a): `on (unset)` isn't listed) and #4414 and #4413 landed, with my reads. READ-OK on #4419.
+
 ## 30 October 2026, 01:40 +07 — the notes' fix carried, the promote's default-run pinned, four reads
 
 2c still waits on the first builder's answer (#3689, 20:2x), and the rehearsal waits on a 52e6 slot after #4305's run (about 02:30). No 2c code has gone up.
