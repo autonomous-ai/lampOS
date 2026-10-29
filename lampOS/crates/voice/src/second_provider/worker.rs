@@ -22684,6 +22684,21 @@ mod tests {
             Some("It is noon.")
         );
         assert_eq!(super::with_place(None, None), None);
+        // #4337: a lamp with no place set, every product lamp, is still told
+        // that it doesn't know where it is, and to ask which area, after its
+        // time or alone.
+        let unknown = crate::local_time::place_told(None);
+        let told = super::with_place(Some("It is noon.".into()), unknown.clone()).unwrap();
+        assert!(
+            told.starts_with("It is noon. You don't know where you are beyond your time zone."),
+            "{told}"
+        );
+        assert!(told.ends_with(crate::local_time::AREA_ASKED), "{told}");
+        assert!(
+            super::with_place(None, unknown)
+                .unwrap()
+                .starts_with("You don't know where you are")
+        );
     }
 
     /// #1712: the room this route keeps is told on the bus (`room/state`)
