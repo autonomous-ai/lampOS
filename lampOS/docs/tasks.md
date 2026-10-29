@@ -1546,7 +1546,13 @@ used only to say it.
   with `told_before: true` and asks the model to say it is the one it
   mentioned, giving a gist only if it gave none then, not to tell it again
   as new (#757). A long one asks for the gist in one line first, then where
-  the rest is.
+  the rest is. One still working is answered from its latest step (#4342):
+  the tasks part's `get_progress` line (`ps`'s `about`, read on the watch's
+  schedule with `serve --progress`), cut to 160 characters as `step`,
+  quoted from the agent and marked untrusted, and the model says how it is
+  going from it, never word for word, and that the agent has been quiet
+  when it was last active 3 or more minutes ago. With no line yet (not
+  read, or no `--progress`) it says only that the agent is still working.
 - **Progress** is #732: `show` is empty while an agent works (measured
   2026-10-15, 00:05), so the progress signal is `ps --machine`, put on the
   bus as typed state, with Jev deciding whether a step is worth telling
