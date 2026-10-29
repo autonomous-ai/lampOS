@@ -2956,6 +2956,14 @@ fn a_new_updater_that_confirms_keeps_its_switch() {
 
     assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
     assert!(lamp.pending().is_none());
+    // A round's end, so `update/status` says it when the new updater
+    // starts telling (#1683's update alerts), with the build the dry round
+    // found the lamp on.
+    let told = lamp_update::status::last_in_records(&lamp.records()).unwrap();
+    assert_eq!(
+        (told.outcome.as_str(), told.sequence),
+        ("self-confirmed", Some(2))
+    );
     // Neither a failure later nor the deadline puts back a confirmed one.
     assert_eq!(
         lamp.back(update_unit("failed", "failed"), u64::MAX),
