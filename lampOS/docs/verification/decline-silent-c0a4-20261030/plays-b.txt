@@ -1,0 +1,7 @@
+17:31:15.055 on B n=0 voice=aura-2-orion-en call
+17:32:02.103 on B n=0 voice=aura-2-orion-en remark1
+17:32:17.656 on B n=0 voice=aura-2-orion-en remark2
+17:33:20.937 on B n=1 voice=aura-2-luna-en call
+17:34:08.229 on B n=1 voice=aura-2-luna-en remark1
+17:34:22.752 on B n=1 voice=aura-2-luna-en remark2
+17:35:25 on B PLAY-DONE vol=60
