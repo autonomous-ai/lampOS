@@ -10,7 +10,7 @@
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
-use lamp_cloud::{beat, online, ping, reports, skills};
+use lamp_cloud::{beat, online, ping, reports, skills, update_alerts};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -166,6 +166,9 @@ fn main() -> ExitCode {
         .clone()
         .map(|shared| (shared, reports::Lamp::new(bus.clone())));
     let report_build = reports::Build::of(&build);
+    let shared_for_alerts = shared.clone();
+    let alerts_bus = bus.clone();
+    let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     let mut lamp = Real {
         places: Places::default(),
         bus,
@@ -224,6 +227,17 @@ fn main() -> ExitCode {
         }
     };
     let (accounts_tx, accounts) = watch::channel(Some(account));
+    // Software update alerts: the same three gates as reports, so only
+    // where `Shared` exists, and the person's yes is read at each send.
+    let alerting = shared_for_alerts.map(|shared| {
+        (
+            shared,
+            alerts_bus,
+            accounts_tx.subscribe(),
+            key.clone(),
+            alerts_state,
+        )
+    });
     let (identity_tx, me) = watch::channel(identity(&lamp));
     let looking = Real {
         places: lamp.places.clone(),
@@ -282,7 +296,17 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
+        let mut said_alerts = |line: &str| say(line);
+        let alerting = async move {
+            match alerting {
+                Some((shared, bus, accounts, key, state)) => {
+                    update_alerts::run(shared, bus, accounts, key, state, &mut said_alerts).await
+                }
+                None => std::future::pending().await,
+            }
+        };
         tokio::select! {
+            () = alerting => {}
             () = pinging => {}
             () = staying => {}
             () = looks => {}

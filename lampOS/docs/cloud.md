@@ -1193,6 +1193,61 @@ Core dumps and backtraces are never sent; step 2's panic hook
 (`{file, line}` only) comes after step 1 has run
 a week.
 
+### Software update alerts
+
+When the lamp updates itself, the company is told at each stage, so a
+refused or rolled-back update is seen without asking the person. It is not
+a report kind: `lamp-cloud` posts to the backend's alert endpoint, the
+base of the account's `llm_base_url` with `/alert` after it (a trailing
+`/v1` stays), with the voice's key as the bearer and the body
+`{"device_id", "type": "ops", "message", "ts", "alert_id"}`
+(`crates/cloud/src/update_alerts.rs`). Health and crash reports are
+untouched.
+
+**Off unless set,** by the same three gates as the reports: `LAMP_CLOUD=on`,
+`LAMP_REPORTS=on`, and the person's yes, read at each send through the
+reports' own reading. A stage seen while any gate is closed is dropped, not
+kept for later.
+
+**One alert per stage of a round,** from `update/status`: `started` (the
+first phase after `idle` that goes on to fetch; a round that only checks
+says nothing), then `done` (`switched`), `failed`, `refused`, `rolled-back`
+or `self-switched` (lamp-update switched itself; its new self confirms on
+its next round). `up-to-date`, `unreachable`, `nothing-published`,
+`not-quiet` and `would` are not alerts. The message is a fixed template:
+
+```
+Software update lamp - done
+from: 3309+4a39f04
+to: 3310
+took: 95 s
+```
+
+`from` is the build the lamp ran when the round began (digits, hex digits
+and `+`), `to` the build the round was about. A `code:` line (a fixed
+reason name) and the `took` time come from lamp-update's `last.reason` and
+`last.started_at_unix_ms` when it says them; absent, the lines are left
+out. A reason that is not on `update_alerts::REASONS` is not told, and
+that list is empty until lamp-update's names are agreed. Every value is
+typed so that no text that came in can reach an alert (the part, a build,
+a stage, a number); a canary test plants secrets in every input.
+
+**Once, across restarts.** `update/status` says the last result every
+minute and again whenever lamp-update or lamp-cloud starts, and a round
+restarts lamp-cloud when it changed it. `update-alerts.json` in
+lamp-cloud's state folder (0600) keeps the last end told, keyed on outcome,
+build and time, and the round whose start was told, so neither goes twice
+and a start from the old lamp-cloud and the end from the new one are joined.
+With no such file the result found is taken as told. A factory reset empties
+the folder with the rest.
+
+**Best effort:** a 10 s timeout, one try, a failure said in the journal
+(`an update alert was dropped: …`) and dropped; never queued or retried.
+
+**The first build that carries alerts cannot send its own rollback:** a lamp
+put back from it runs the previous `lamp-cloud`, which has none. A
+`rolled-back` is seen from the second such build onward.
+
 ### The person's choice
 
 - **At setup**, `"share_reports": true` in the setup request; only the
