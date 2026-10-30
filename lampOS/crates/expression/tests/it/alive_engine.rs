@@ -703,6 +703,24 @@ fn its_name_wakes_it_with_a_stretch_and_no_leap() {
     assert!(lamp.now - woken > 2_700_000);
 }
 
+/// The night's sleep says itself in `expression/state`, the one value the
+/// ring's asleep face reads (#3748, `lamp-voice`'s `ring_night`): asleep
+/// while it sleeps, and no longer from the tick its name wakes it.
+#[test]
+fn the_nights_sleep_says_asleep_for_the_rings_face_until_it_wakes() {
+    let mut lamp = Lamp::new(drowsy()).at_night();
+    assert_eq!(lamp.last(TICK).state.asleep, Some(false));
+    assert!(lamp.sleep_within(2 * MINUTE));
+    lamp.run(10 * SECOND, |output, _| {
+        assert_eq!(output.state.asleep, Some(true));
+    });
+    lamp.name();
+    lamp.voice(Voice::Listening);
+    lamp.run(4 * SECOND, |output, _| {
+        assert_eq!(output.state.asleep, Some(false));
+    });
+}
+
 #[test]
 fn a_tap_a_stroke_a_reminder_or_its_own_answer_wake_it() {
     let wakes = |act: &dyn Fn(&mut Lamp)| {

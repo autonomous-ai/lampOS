@@ -125,6 +125,7 @@ pub mod ring_face;
 pub mod ring_head;
 pub mod ring_light;
 pub mod ring_mood;
+pub mod ring_night;
 pub mod ring_requests;
 pub mod ring_sight;
 pub mod ring_unplug;
