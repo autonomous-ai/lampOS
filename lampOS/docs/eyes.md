@@ -770,7 +770,14 @@ this room" until someone asks to be recognised.
   At most every two seconds, or at every look while someone is being
   remembered, and at the first look after someone is remembered at the
   lamp, so the known file names them within one look, not two seconds
-  later (#3108; `who::recognise_due`). A face from a photo is not: it is
+  later (#3108; `who::recognise_due`). With `LAMP_FACE_REFOUND=on` (off
+  unless set, #4486) a check is also due at once when the near face's
+  passing id is not the one at the last check that read a print, so a face
+  turned away and back, which comes back with a new id, is known in its
+  first look; while no print is read for it (turned, or too small) it is
+  asked at every look, and once one is, every two seconds again
+  (`who::recognise_due_near`). It needs a passing id, so `LAMP_EYES_SPEAKING`;
+  off, the two seconds stand as before. A face from a photo is not: it is
   named only on its person's yes. The camera gives 320 by 240, so a face at the desk is 35 to
   65 pixels tall. Whether that is enough is to be measured with people
   (the camera can give 640 by 480 if not). With `LAMP_FACE_FULL_CROP=on`
