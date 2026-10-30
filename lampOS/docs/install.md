@@ -120,8 +120,10 @@ name's models, all from `deploy/product/models.json`, which install fetches
 private `provider.json` and `second.json`, which install writes and keeps
 up to date while they are its own. Beside its binaries, a build's signed
 manifest carries the rest of `deploy/product/` (the publish's `--deploy`):
-the product units, the reset plan, and Expression's catalogue, the
-controls' two files and `records.json` as settings, which
+the product units, the reset plan, and as settings Expression's
+catalogue, the controls' two files, `records.json`, the tmpfiles conf
+`/etc/tmpfiles.d/lampos.conf` and the Store's key
+`/var/lib/lampOS/skills/store-key.pub`, which
 `lamp-update-apply` writes at a round's switch (`LAMP_UPDATE_APPLY=on` in
 the product; [updates.md](updates.md), "Settings and tmpfiles").
 
