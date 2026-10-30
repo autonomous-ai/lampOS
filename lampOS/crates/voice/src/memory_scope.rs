@@ -468,6 +468,10 @@ struct RequestContext {
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
+    /// Carried as a person's conversation going on, no face seen speaking
+    /// it (#4339, [`ScopeLease::carry_conversation`]): that person's scope
+    /// held ([`ScopeSnapshot::held`]) from then on, unless narrowed.
+    carried: OnceLock<ScopeSnapshot>,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -523,6 +527,7 @@ impl RequestScope {
             context: Arc::new(RequestContext {
                 key,
                 scope,
+                carried: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -567,6 +572,7 @@ impl RequestScope {
             context: Arc::new(RequestContext {
                 key,
                 scope,
+                carried: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -610,6 +616,8 @@ impl ScopeLease {
         self.is_current().then(|| {
             if self.context.narrowed.load(Ordering::Acquire) {
                 &self.context.room
+            } else if let Some(carried) = self.context.carried.get() {
+                carried
             } else {
                 &self.context.scope
             }
@@ -621,6 +629,36 @@ impl ScopeLease {
     /// scope again.
     pub fn narrow_to_room(&self) {
         self.context.narrowed.store(true, Ordering::Release);
+    }
+
+    /// A line no face was seen speaking, with nothing to say it was anyone
+    /// else's, in the conversation `person` (a memory id) is in (#4339): told
+    /// from that conversation as it stood, as a line held by a face's gap is
+    /// ([`ScopeSnapshot::held`]). On lamp-3e83 one such line of the owner's
+    /// dropped to the room's and the chat lost the talk and asked its
+    /// question again; on lamp-06c1 (29 Oct) 13 of 68 turns with the person
+    /// in view throughout were not theirs, 5 of them admitted as the room's
+    /// with no face named at all. So a line admitted as `person`'s, or as the
+    /// room's, may be carried; one admitted as someone else's may not. Held,
+    /// it is their thread and the exchanges before it, and never memory's
+    /// reads, a keep, a forget or a yes, and never journalled: no memory
+    /// authority is widened, only the conversation it is told. `false`, and
+    /// nothing changed, for a revoked or narrowed line, one admitted as
+    /// another person's, or one already carried for another; a later
+    /// [`Self::narrow_to_room`] still narrows it.
+    pub fn carry_conversation(&self, person: &str) -> bool {
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.person().is_some_and(|own| own != person)
+        {
+            return false;
+        }
+        let held = ScopeSnapshot {
+            person: Some(Arc::from(person)),
+            held: true,
+        };
+        let carried = self.context.carried.get_or_init(|| held);
+        carried.person() == Some(person)
     }
 
     /// A line narrowed to the room whose admitted person's face was alone in
@@ -810,6 +848,42 @@ impl ScopeLease {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    /// #4339: a line carried as a person's conversation reads their scope
+    /// held ([`ScopeSnapshot::held`]): their thread, never memory's reads.
+    /// A person's own line or a room's line may be carried; one admitted as
+    /// someone else's, a narrowed or a revoked line may not, and a narrow
+    /// still narrows a carried one.
+    #[test]
+    fn a_carried_line_reads_their_scope_held_and_still_narrows() {
+        let (a, b) = (ScopeSnapshot::of("A"), ScopeSnapshot::of("B"));
+        let a_id = a.person().unwrap().to_owned();
+        let own = RequestScope::new(key(1), a.clone());
+        let lease = own.lease();
+        assert!(lease.carry_conversation(&a_id));
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::held_of("A")));
+        lease.narrow_to_room();
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        // A room's line, in A's conversation going on (06c1: no face named).
+        let room = RequestScope::new(key(2), ScopeSnapshot::room());
+        assert!(room.lease().carry_conversation(&a_id));
+        assert_eq!(room.lease().scope(), Some(&ScopeSnapshot::held_of("A")));
+        assert!(
+            !room.lease().carry_conversation(b.person().unwrap()),
+            "carried once"
+        );
+        let theirs = RequestScope::new(key(3), b);
+        assert!(!theirs.lease().carry_conversation(&a_id), "someone else's");
+        assert_eq!(theirs.lease().scope(), Some(&ScopeSnapshot::of("B")));
+        let narrowed = RequestScope::new(key(4), a.clone());
+        narrowed.lease().narrow_to_room();
+        assert!(!narrowed.lease().carry_conversation(&a_id), "never widened");
+        assert_eq!(narrowed.lease().scope(), Some(&ScopeSnapshot::room()));
+        let revoked = RequestScope::new(key(5), a);
+        let lease = revoked.lease();
+        revoked.revoke();
+        assert!(!lease.carry_conversation(&a_id), "revoked");
+    }
     fn key(worker: u8) -> RequestKey {
         RequestKey {
             worker: BootId::new([worker; 16]).unwrap(),

@@ -1335,6 +1335,105 @@ async fn not_for_me_ends_the_turn_in_silence() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// lamp-06c1, 30 Oct: 13 replies opened "Calling not_for_me." or
+/// "Calling recall about X.", 8 with no call in their round, and each was
+/// said and kept as the lamp's line. The narration is never said, nor
+/// given to the next round: alone it is the decline it names, or asked
+/// once more for the call; beside a call or other words, those go on.
+#[tokio::test]
+async fn a_call_narrated_as_words_is_never_said() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let cases: Vec<(Chats, Vec<&str>, usize)> = vec![
+        // Alone, in two pieces: the decline, in silence.
+        (
+            vec![vec![
+                text("Calling not_"),
+                text("for_me."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec![],
+            1,
+        ),
+        // Beside the real call: the decline.
+        (
+            vec![vec![
+                text("Calling not_for_me."),
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    NOT_FOR_ME,
+                    json!({}),
+                )])),
+                Ok(ChatEvent::Done),
+            ]],
+            vec![],
+            1,
+        ),
+        // With the answer after it: the answer alone.
+        (
+            vec![vec![
+                text("Calling recall about Lily. "),
+                text("She's coming on Sunday."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec!["said:She's coming on Sunday."],
+            1,
+        ),
+        // Alone, another function: asked once more, and that is said.
+        (
+            vec![
+                vec![
+                    text("Calling recall about what we played."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A capitals quiz."), Ok(ChatEvent::Done)],
+            ],
+            vec!["said:A capitals quiz."],
+            2,
+        ),
+        // Ordinary words that begin so are said.
+        (
+            vec![vec![
+                text("Calling your sister first is a good idea."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec!["said:Calling your sister first is a good idea."],
+            1,
+        ),
+    ];
+    for (chats, said_expected, rounds) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("The lunch is not finishing.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&str> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(String::as_str)
+            .collect();
+        assert_eq!(said, said_expected, "{labels:?}");
+        assert!(
+            !labels
+                .iter()
+                .any(|label| label.contains("Calling not") || label.contains("Calling recall")),
+            "{labels:?}"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), rounds, "{labels:?}");
+        // The round asked again is told why, and never given the narration.
+        if rounds == 2 {
+            let again = format!("{:?}", asked[1]);
+            assert!(again.contains("only described a function call"), "{again}");
+            assert!(!again.contains("Calling recall"), "{again}");
+        }
+    }
+}
+
 /// #2191, `LAMP_NAMED_ALWAYS=on`: in a turn the hook says began with the
 /// lamp's name, said to a face turned to the lamp, the model's `not_for_me`
 /// is not taken: it is asked once more, told it was called, and its answer is

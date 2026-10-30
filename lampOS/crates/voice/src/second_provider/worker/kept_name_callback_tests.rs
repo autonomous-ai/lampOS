@@ -693,7 +693,7 @@ fn review_an_invalid_resume_read_never_returns_the_forgotten_cached_note() {
 
 fn evict_name(person: Option<&str>) {
     let now = Instant::now();
-    let start = now - Duration::from_secs(368);
+    let start = now - Duration::from_secs(700);
     let mut thread = crate::thread::Thread::new();
     thread.at_lamp(person.map(str::to_owned));
     thread.person(NEW, true, start);
@@ -704,7 +704,7 @@ fn evict_name(person: Option<&str>) {
             .unwrap()
             .contains(NEW)
     );
-    for request in 2..=9 {
+    for request in 2..=15 {
         let at = start + Duration::from_secs((request - 1) * 46);
         thread.person("A synthetic follow-up.", true, at);
         thread.lamp(request, "A synthetic answer.", at);
