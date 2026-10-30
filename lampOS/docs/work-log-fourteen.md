@@ -13,6 +13,8 @@ lamp.
 | Id | Proposal | Answer |
 |----|----------|--------|
 | fourteen-P1 | Should a Lamp 2 get the app's V1 Enroll (My Voice/My Face) screen? Face is already done lampOS's own way (`eyes::who`, spoken consent); voice has no by-name equivalent at all (`same-voice` is turn-continuity, not identity); `face.enroll` has no lamp-side kind. Proposed instead, if anything: a read-only "who the lamp remembers" row with removal only, adding stays spoken. | — |
+| fourteen-P13 | A skill an owner made (#2813/#2814) can be sent to the Store, so other owners can add it: the lamp's `skills.share {name}` packs a made skill that's on and hands it to the Store's upload (Seventh); the Store holds it for review as #2802 does, signs and lists it only once approved (Backend3); the app's "Share to the Store" row with a plain warning first, then waiting, listed or refused (Fourteen). Owner's act from the app only, never by voice. Open for the lead: whether and when, who reviews, whether the author is shown. Posted on the Queue 30 Oct 12:1x; Fourteen leads it on its owner's word. | — |
+| fourteen-P14 | A check that skills *work* on a lamp, not only install and load: a reminder to drink water is spoken on time (`reminders`); `sip-of-water` speaks after 90 min at the desk; the Store's voice-called skills act when asked (`look-for-things` looks and speaks, `who-was-here` answers); a made skill acts with the light and head only, never speech. On lamp-9adf with a person at the desk, after the office's 12:00–14:00 quiet. | — |
 
 ## Found, not mine
 
@@ -1023,3 +1025,22 @@ been in since 20 Oct)
   exists, rather than silently complying with a request built on an
   outdated premise — this team's pace means last night's own status
   updates don't always reach everyone's next check.
+
+## 30 Oct — two proposals: made skills in the Store, and skills that work
+
+- **fourteen-P13** (above): my owner asked whether a made skill can go
+  to the Store for other owners. Nothing carries one there today: the
+  Store takes and reviews sent packages (#2802), but neither lamp-cloud
+  nor the app sends a made skill. Posted the proposal on the Queue
+  (#3997, 12:1x), then, on my owner's word that Fourteen leads it,
+  asked the first builder for its issue and labels, Seventh for the
+  lamp's `skills.share` contract and Backend3 for the Store's side.
+  Each post says plainly that this is my owner's word and not the
+  lead's yes.
+- **fourteen-P14** (above): the Store check on #3692 showed the six
+  skills install and load, not that they act. Found while planning it:
+  a made skill may use the light and the head only, never speech
+  (`make-skill.sh`), so "remind me to drink water, out loud" is the
+  core `sip-of-water` or a spoken reminder, not a made skill. The
+  played kit's stand-in Harness always makes one fixed skill
+  (stand-up-nudge), not the typed words.
