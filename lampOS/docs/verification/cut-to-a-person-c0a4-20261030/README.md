@@ -1,4 +1,4 @@
-# #3945, cut words answered in a held line's place, from the Mac on lamp-c0a4 (30 Oct, 04:48–05:10Z)
+# #3945, cut words answered in a held line's place, from the Mac on lamp-c0a4 (30 Oct, 04:48–05:29Z)
 
 No person was at the lamp. Every line was a synthetic voice played from the
 Mac, which sits close to the lamp.
@@ -35,8 +35,19 @@ verdict. "Sir, …" was held as "said to someone it calls by name" (requests 4,
 30, 33), as "a reply to someone the room had just called" (21), or as "nobody
 spoke to the lamp" (12, 26, 51), and the salt line was answered or held on its
 own. Whether the cut comes in time depends on how fast the answer starts,
-which a played clip can't set. So the new let-go is shown by its unit tests,
-not on the lamp.
+which a played clip can't set. The 8 more rounds below reached it once.
+
+**On, 8 more rounds (`journal-on-2.txt`, `plays-on-2.txt`, 05:19–05:29Z,
+G = 0.9 s).** The case was reached once, in the second round. Request 10
+("you pass me the salt, please?") was let out as a conversation going on,
+then "ended before its answer: a newer line began". Request 11 ("Sir, what
+time is this?") was held as said to someone it calls by name. The lamp
+wrote "10's words, cut short, are let go: they or request 11 open with
+"sir", said to a person (LAMP_NAME_SAID_TO_A_PERSON)", and nothing was
+answered in request 11's place. This build is `550c8ee069`, before the two
+read fixes on the PR (cut words that call the lamp are kept; the let-go
+words' unplayed answers leave the thread). Their journal line is the
+older one.
 
 **Seen as well, outside this change:** inside a conversation, "Sir, what time
 is this?" and the salt line were let out and answered as "a conversation with
