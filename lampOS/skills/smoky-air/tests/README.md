@@ -7,7 +7,8 @@ written by a script in the format `lamp-bus record` writes, as Stuffy air's
 later cases were: `air/state` every 5 s, as the sensor gives it, PM2.5 joined
 by straight lines between the points each case names (PM1 0.8, PM4 1.05 and
 PM10 1.1 times it; CO2 700 ppm, humidity 50 %, temperature 38 °C; a null
-reading has every PM null), and `voice/state` resting from the start. The
+reading has every PM null, and every PM stops at the sensor's 1,000), and
+`voice/state` resting from the start. The
 script is a scratch tool, not kept in the repository. Each `expect.toml`
 says what its case holds, and sets the local time of its first message
 (`clock`).
@@ -26,6 +27,8 @@ lamp-skills`, which runs every skill's cases).
 | `rearms-after-ten-minutes-under-150` | The rise; 400 to 1,500 s; under 150 for 11.5 minutes; a second sharp rise | Pass: twice, at 360 and 2,300 s |
 | `a-second-spell-within-the-cooldown-is-silent` | The rise; under 150 for 12 minutes; a second sharp rise 23 minutes after the line | Pass: once (the 30-minute cooldown) |
 | `a-short-dip-does-not-rearm` | The rise; under 150 for 7 minutes; slowly back to 300; a rise to 450 past the cooldown | Pass: once (not 10 minutes under 150) |
+| `pm-at-its-cap-still-alerts` | **Synthetic**: 40, then up to 1,000 (the sensor's cap, `AirState::check`) in 30 s (300 to 330 s), held capped to 2,700 s, past the cooldown | Pass: once at 335 s; nothing more while capped (no 10 minutes under 150, no new rise) |
+| `steam-humidity-jump-with-pm-rise` | **Synthetic; documents today's behaviour; the humidity guard is not decided (#1684)**: humidity 55 % to 95 % and PM2.5 80 to 300 in the same minute (300 to 360 s), held to 900 s | Pass: once at 360 s: the rule reads no humidity, so steam that fools the optical sensor speaks today |
 | `kettle-steam` | **Placeholder**: no recording | Counted, not run |
 | `toast` | **Placeholder**: no recording | Counted, not run |
 | `candle-blown-out` | **Placeholder**: no recording | Counted, not run |
@@ -33,7 +36,12 @@ lamp-skills`, which runs every skill's cases).
 
 Changed by hand, the cases catch each number: a 10-minute cooldown, a
 rearm of 4 or 12 minutes, a hold of 10 s, a rise of 30, a window of 6
-minutes or a level of 400 each fails one of them.
+minutes or a level of 400 each fails one of them. The two synthetic cases
+(`pm-at-its-cap-still-alerts`, `steam-humidity-jump-with-pm-rise`, made by
+the same scratch script) fail with a level of 1,000.5 or a rise of 1,000;
+the first's "nothing more" holds by the rule's shape (a steady capped
+reading gives no new rise), so no one number fails it. The steam case is
+not a verdict: if a humidity guard is decided, its expectation changes.
 
 **The four placeholders** are to be replaced by the real recording (#1684,
 §6; the first builder, 12:56: "Record real traces: a kettle beside the
