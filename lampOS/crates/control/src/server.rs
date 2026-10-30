@@ -510,6 +510,25 @@ pub fn acceptor(identity: &Identity) -> std::io::Result<tokio_rustls::TlsAccepto
 
 /// Serves the door on `listener` until the task is dropped, and checks the
 /// leases every [`LEASE_TICK`].
+/// Whether `ip` is on the lamp's own network: loopback, a private IPv4
+/// range (10/8, 172.16/12, 192.168/16), link-local, or IPv6's unique-local
+/// (fc00::/7) and link-local (fe80::/10), and an IPv4 address carried in
+/// IPv6 by the same rule. Anything else is the internet, refused: the door
+/// is for computers on the lamp's own network only (docs/control.md, "The
+/// wire").
+pub fn is_local(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        std::net::IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return is_local(std::net::IpAddr::V4(v4));
+            }
+            let first = v6.segments()[0];
+            v6.is_loopback() || (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+        }
+    }
+}
+
 pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
     let ticking = shared.clone();
     tokio::spawn(async move {
@@ -533,6 +552,16 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
                 continue;
             }
         };
+        // Only the lamp's own network: anyone else is closed before TLS,
+        // and said once in the journal.
+        if !is_local(peer.ip()) {
+            eprintln!(
+                "lamp-control: refused a connection from {}: not on the lamp's own network",
+                peer.ip()
+            );
+            drop(stream);
+            continue;
+        }
         // Over the bound: closed at once, holding nothing.
         let Some(slot) = shared.admit(peer.ip()) else {
             drop(stream);
@@ -898,6 +927,36 @@ pub fn rfc3339_utc(at: std::time::SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_lamps_own_network_may_connect() {
+        let local = |text: &str| is_local(text.parse().unwrap());
+        for near in [
+            "127.0.0.1",
+            "10.0.0.7",
+            "172.16.4.2",
+            "172.31.255.1",
+            "192.168.1.20",
+            "169.254.3.3",
+            "::1",
+            "fd12:3456::1",
+            "fe80::1",
+            "::ffff:192.168.1.20",
+        ] {
+            assert!(local(near), "{near}");
+        }
+        for far in [
+            "8.8.8.8",
+            "172.32.0.1",
+            "100.64.0.1",
+            "203.0.113.5",
+            "2001:db8::1",
+            "2606:4700::1111",
+            "::ffff:8.8.8.8",
+        ] {
+            assert!(!local(far), "{far}");
+        }
+    }
 
     #[test]
     fn times_are_rfc3339_in_utc() {
