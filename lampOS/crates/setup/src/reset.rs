@@ -752,12 +752,14 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
 /// memory with its file wiped, so the lamp is off it before setup's hotspot
 /// takes the radio; then the journal, which a reboot emptied (it is a RAM
 /// disk on the product) and which names the networks joined, is rotated and
-/// emptied. The start's own line is written after it.
+/// emptied. The start's own line is written after it. Absolute, as the
+/// plan's own commands are (Reviewer-two's P3 on #4513): Debian 12's
+/// merged `/usr`, so a unit's `PATH` is never asked.
 pub const FORGET: [&[&str]; 4] = [
-    &["wpa_cli", "-i", "wlan0", "disconnect"],
-    &["wpa_cli", "-i", "wlan0", "remove_network", "all"],
-    &["journalctl", "--rotate"],
-    &["journalctl", "--vacuum-time=1s"],
+    &["/usr/sbin/wpa_cli", "-i", "wlan0", "disconnect"],
+    &["/usr/sbin/wpa_cli", "-i", "wlan0", "remove_network", "all"],
+    &["/usr/bin/journalctl", "--rotate"],
+    &["/usr/bin/journalctl", "--vacuum-time=1s"],
 ];
 
 /// The lamp back into setup without a reboot (#4500): what the reset stopped

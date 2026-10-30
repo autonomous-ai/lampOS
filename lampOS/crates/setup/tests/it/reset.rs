@@ -143,7 +143,8 @@ impl Effects for Fake {
         if (self.fail_stop && argv[1] == "stop")
             || (self.fail_reboot && argv[1] == "reboot")
             || (self.fail_start && argv[1] == "start")
-            || (self.fail_forget && (argv[0] == "wpa_cli" || argv[0] == "journalctl"))
+            || (self.fail_forget
+                && (argv[0] == "/usr/sbin/wpa_cli" || argv[0] == "/usr/bin/journalctl"))
         {
             return Err(io::Error::other("refused"));
         }
