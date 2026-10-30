@@ -626,6 +626,13 @@ pub const PERSON_SCOPE_SEEN_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_SEEN";
 /// room's.
 pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a carried line may save into
+/// the conversation's own scope: its `remember` runs as the carried person's
+/// and its exchange is journalled as theirs ([`Engine::saving_carried`],
+/// `ScopeLease::save_carried`). Reads, forgets and a yes stay refused. `on`,
+/// and nothing else; off, a carried line keeps nothing, as before.
+pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_SAVES";
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
@@ -1171,6 +1178,9 @@ struct Shared {
     /// the known person (a memory id) whose conversation is going on as
     /// request `request` is heard; none, off.
     carries: Option<GoingOnWith>,
+    /// A carried line may save into the conversation's scope
+    /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
+    carried_saves: bool,
 }
 
 /// [`Shared::carries`]: the known person whose conversation is going on as a
@@ -1886,7 +1896,7 @@ fn reaches_memory(
     name: &str,
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> bool {
-    let held = held_by_gap(scope) && MEMORY_CALLS.contains(&name);
+    let held = memory_refused(scope, name);
     let unavailable = shared.scoped_tools.is_some() && scope.is_none();
     !held && !unavailable
 }
@@ -2513,6 +2523,7 @@ impl Engine {
                 enrollment_sight: None,
                 scope_seen: false,
                 carries: None,
+                carried_saves: false,
             }),
             output,
             urgent: VecDeque::new(),
@@ -2764,6 +2775,18 @@ impl Engine {
                     .and_then(|thread| thread.going_on_with(request, std::time::Instant::now()))
             })
         }))
+    }
+
+    /// With [`Self::carrying_conversations`], a carried line's `remember`
+    /// and its journalled exchange go to the conversation's own scope, the
+    /// carried person's (`LAMP_CONVERSATION_CARRIED_SAVES=on`,
+    /// `ScopeLease::save_carried`). Its recall, note, hits, forgets and a
+    /// yes stay refused, and a line admitted held only by a face's gap
+    /// saves nothing.
+    pub fn saving_carried(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.carried_saves = on;
+        self
     }
 
     /// [`Self::carrying_conversations`] with `going_on` naming whose
@@ -5474,6 +5497,17 @@ async fn spoken(
             }
         }
     }
+    // Carried, by either rule above, with `LAMP_CONVERSATION_CARRIED_SAVES`:
+    // its keep is held for the carried person's yes, their face seen saying
+    // it, never written at once (the first builder's call on #4508).
+    if shared.carried_saves
+        && let Some(lease) = scope.as_ref()
+        && lease.save_carried()
+    {
+        eprintln!(
+            "lamp-voice second: request {request}: carried: a keep waits for their yes, their face seen saying it; no reads, forgets or yes (LAMP_CONVERSATION_CARRIED_SAVES)"
+        );
+    }
     // A late look's keeper (#2807): the known face named by the line's end
     // (looked for from `finishing`, above), waiting at most `KEEPER_WAIT`
     // past it, and only if no other face was seen speaking it (the same
@@ -7907,6 +7941,22 @@ const MEMORY_CALLS: &[&str] = &[
     crate::photo_faces::YES,
 ];
 
+/// [`MEMORY_CALLS`] but `remember`: what a carried line that saves
+/// (`LAMP_CONVERSATION_CARRIED_SAVES`, `ScopeLease::saves_carried`) is still
+/// refused. Only a keep of its own words: no read, forget, rule, face or yes.
+const MEMORY_CALLS_BUT_REMEMBER: &[&str] = &[
+    crate::remember::RECALL,
+    crate::remember::FORGET,
+    crate::remember::FORGET_EVERYTHING,
+    crate::rules::KEEP_RULE,
+    crate::rules::FORGET_RULE,
+    crate::rules::LIST_RULES,
+    crate::known_faces::REMEMBER,
+    crate::known_faces::FORGET,
+    crate::known_faces::TELL,
+    crate::photo_faces::YES,
+];
+
 /// The eyes' functions a line held only by a gap may still call: refusals,
 /// which grant nothing ([`MEMORY_CALLS`]).
 #[cfg(test)]
@@ -7957,20 +8007,80 @@ fn chat_for(
     scope: Option<&crate::memory_scope::ScopeLease>,
     messages: Vec<Message>,
 ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
-    if held_by_gap(scope) {
-        shared.services.chat_without(messages, MEMORY_CALLS)
-    } else {
-        shared.services.chat(messages)
+    match withheld(scope) {
+        [] => shared.services.chat(messages),
+        without => shared.services.chat_without(messages, without),
     }
 }
 
-/// The functions [`chat_for`] leaves out for this scope.
+/// The functions [`chat_for`] leaves out for this scope: every memory call
+/// for a held line, but `remember` for a carried one that saves
+/// (`LAMP_CONVERSATION_CARRIED_SAVES`), whose keep [`answer`] holds for the
+/// carried person's yes ([`hold_carried_keep`]) and no runner ever writes.
 fn withheld(scope: Option<&crate::memory_scope::ScopeLease>) -> &'static [&'static str] {
-    if held_by_gap(scope) {
-        MEMORY_CALLS
-    } else {
+    if !held_by_gap(scope) {
         &[]
+    } else if scope.is_some_and(|lease| lease.saves_carried().is_some()) {
+        MEMORY_CALLS_BUT_REMEMBER
+    } else {
+        MEMORY_CALLS
     }
+}
+
+/// Whether a memory call `name` is refused on this scope, by every runner
+/// ([`run_tool`] and [`answer`]'s): every memory call on a held line, the
+/// `remember` of a carried one that saves among them, which is held for a
+/// yes before it gets here, never written from a held scope.
+fn memory_refused(scope: Option<&crate::memory_scope::ScopeLease>, name: &str) -> bool {
+    held_by_gap(scope) && MEMORY_CALLS.contains(&name)
+}
+
+/// A carried line's `remember` (`LAMP_CONVERSATION_CARRIED_SAVES`,
+/// `ScopeLease::saves_carried`), held for the carried person's own yes, in
+/// memory only, never written or journalled while it waits (the first
+/// builder's call on #4508, with Reviewer-three's 14:46: their face in view
+/// is not enough, as it is in view while a guest speaks off camera). Held
+/// as a forget is ([`hold_forget`]), so the same rules let it go: only a
+/// plain yes on the next spoken turn, from the same session's person,
+/// within `remember::HELD_FORGET_FOR`, with their face seen saying it and
+/// no other ([`take_held_forget`]); the conversation's end, a forget,
+/// another face or anything else drops it. Only where the eyes read
+/// speaking: without them nothing is held. What the model is told.
+fn hold_carried_keep(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    call: &net::ToolCall,
+    scope: &crate::memory_scope::ScopeLease,
+    person: &str,
+) -> Value {
+    let holding = (heard && shared.forget_sight.is_some()).then(|| {
+        hold_forget(
+            shared,
+            request,
+            call,
+            (scope.key().session, person.to_owned()),
+            (shared.clock)(),
+        )
+    });
+    match holding {
+        Some(Holding::Held) => crate::remember::held_keep_told(),
+        _ => {
+            eprintln!(
+                "lamp-voice second: request {request}: a carried line's keep is not held: nothing kept (LAMP_CONVERSATION_CARRIED_SAVES)"
+            );
+            serde_json::json!({"remembered": false, "error": crate::remember::HELD_KEEP_REFUSED})
+        }
+    }
+}
+
+/// The same-voice check's hook (#4339's follow-up): whether the voice of
+/// `request`'s line is the held keep's person's, from their last line seen
+/// speaking. It would let their yes release a carried line's held keep
+/// ([`take_held_forget`]) when the eyes did not see them say it. Not built
+/// yet: never.
+fn same_voice_releases(_held: &HeldForget, _request: u64) -> bool {
+    false
 }
 
 /// Whom a turn's forget is held for, or whose yes runs one: the admitted
@@ -8036,10 +8146,15 @@ fn take_held_forget(
         Some("not the same person")
     } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
         Some("too late")
+    } else if held.call.name == crate::remember::REMEMBER && shared.forget_sight.is_none() {
+        // A carried line's keep is let go only on a yes their face is seen
+        // saying ([`hold_carried_keep`]).
+        Some("the eyes don't read who speaks")
     } else if shared.forget_sight.is_some()
         && !sight.is_some_and(|(seen, speakers, known)| {
             seen == request && crate::speaking_faces::seen_saying(&speakers, &held.asker.1, known)
         })
+        && !(held.call.name == crate::remember::REMEMBER && same_voice_releases(&held, request))
     {
         eprintln!(
             "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): their face was not seen saying the yes",
@@ -8124,7 +8239,13 @@ fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
         return;
     };
     let why = match answer {
-        Some(answer) if crate::remember::asks_about_forgetting(answer, &held.call.name) => {
+        Some(answer)
+            if if held.call.name == crate::remember::REMEMBER {
+                crate::remember::asks_about_keeping(answer)
+            } else {
+                crate::remember::asks_about_forgetting(answer, &held.call.name)
+            } =>
+        {
             held.asked = true;
             return;
         }
@@ -8195,7 +8316,7 @@ async fn run_tool(
 ) -> Value {
     // A memory call on a line held only by a gap runs for no one, however
     // it was asked: not declared to it, and refused if written anyway.
-    if held_by_gap(scope) && MEMORY_CALLS.contains(&call.name.as_str()) {
+    if memory_refused(scope, &call.name) {
         eprintln!(
             "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
         );
@@ -8598,10 +8719,16 @@ async fn answer(
                     "lamp-voice second: request {request}: ran a held forget ({})",
                     call.name
                 );
-                messages.push(Message::system(format!(
-                    "(For you to know: they said yes, so the {} you asked them about has run, with this result: {result}. Say in a few words that it is done, and do not call it again.)",
-                    call.name
-                )));
+                messages.push(Message::system(if call.name == crate::remember::REMEMBER {
+                    format!(
+                        "(For you to know: they said yes, so what you asked to keep for them is kept now, with this result: {result}. Say in a few words that it is kept, and do not call remember again for it.)"
+                    )
+                } else {
+                    format!(
+                        "(For you to know: they said yes, so the {} you asked them about has run, with this result: {result}. Say in a few words that it is done, and do not call it again.)",
+                        call.name
+                    )
+                }));
                 held_forget_ran = true;
             }
         }
@@ -9464,11 +9591,22 @@ async fn answer(
                         call.name
                     );
                 }
+                // A carried line's keep (`LAMP_CONVERSATION_CARRIED_SAVES`)
+                // waits for the carried person's yes, their face seen saying
+                // it, and is never written now ([`hold_carried_keep`]).
+                if call.name == crate::remember::REMEMBER
+                    && let Some(lease) = scope.as_ref()
+                    && let Some(person) = lease.saves_carried()
+                {
+                    let told = hold_carried_keep(shared, request, heard, call, lease, person);
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 // A memory call on a line held only by a gap runs for no one,
                 // by either runner: refused here, before the requested-audio
                 // runner too, which never reaches `run_tool`'s own refusal
                 // (Reviewer-two, 03:38 on #3614).
-                if held_by_gap(scope.as_ref()) && MEMORY_CALLS.contains(&call.name.as_str()) {
+                if memory_refused(scope.as_ref(), &call.name) {
                     eprintln!(
                         "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
                     );

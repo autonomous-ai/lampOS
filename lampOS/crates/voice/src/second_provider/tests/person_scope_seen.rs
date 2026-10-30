@@ -127,6 +127,8 @@ struct Outcome {
     /// Whether the line's lease ends held, told from the conversation as
     /// it stood ([`crate::memory_scope::ScopeSnapshot::held`]).
     held: bool,
+    /// Every chat round, as asked.
+    rounds: Vec<Vec<Message>>,
 }
 
 async fn one_line(
@@ -179,10 +181,67 @@ async fn one_line_with(
     going_on: Option<bool>,
     named: bool,
 ) -> Outcome {
+    one_line_saving(
+        what, words, chats, in_view, boot, seen, eyes_up, early, going_on, named, false,
+    )
+    .await
+}
+
+/// [`one_line_with`] with `saves` as `LAMP_CONVERSATION_CARRIED_SAVES`
+/// ([`Engine::saving_carried`]).
+#[allow(clippy::too_many_arguments)]
+async fn one_line_saving(
+    what: &str,
+    words: &str,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    in_view: Vec<(&'static str, bool)>,
+    boot: &'static str,
+    seen: bool,
+    eyes_up: bool,
+    early: Option<&str>,
+    going_on: Option<bool>,
+    named: bool,
+    saves: bool,
+) -> Outcome {
+    lines_saving(
+        what,
+        vec![(words.to_owned(), in_view, 0)],
+        chats,
+        boot,
+        seen,
+        eyes_up,
+        early,
+        going_on,
+        named,
+        saves,
+    )
+    .await
+}
+
+/// One line said: its words, the faces in the eyes' looks while it is said
+/// ([`feed_faces`]), and the seconds since the line before.
+type Line = (String, Vec<(&'static str, bool)>, u64);
+
+/// [`one_line_saving`] over `lines`, said one after another, requests 1,
+/// 2, … With `saves` the eyes also judge a held call's yes
+/// ([`Engine::confirming_forgets_by_sight`]), as on the lamp.
+#[allow(clippy::too_many_arguments)]
+async fn lines_saving(
+    what: &str,
+    lines: Vec<Line>,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    boot: &'static str,
+    seen: bool,
+    eyes_up: bool,
+    early: Option<&str>,
+    going_on: Option<bool>,
+    named: bool,
+    saves: bool,
+) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
     let script = Arc::new(Script {
-        heard: Mutex::new([Ok(words.to_owned())].into()),
+        heard: Mutex::new(lines.iter().map(|(words, ..)| Ok(words.clone())).collect()),
         chats: Mutex::new(chats.into()),
         early: Mutex::new(
             early
@@ -192,7 +251,7 @@ async fn one_line_with(
         ),
         ..Script::default()
     });
-    let (engine, _, _) = scripted(script.clone());
+    let (engine, _, now) = scripted(script.clone());
     // `LAMP_SECOND_PREPARED`, with early words to prepare on.
     let engine = engine.preparing(early.is_some());
     let noted: Arc<Mutex<Vec<Noted>>> = Arc::default();
@@ -234,6 +293,10 @@ async fn one_line_with(
             Arc::new(move |_| going_on.then(|| a.clone()))
         },
     ));
+    let mut engine = engine.saving_carried(saves);
+    if saves {
+        engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
+    }
     let mut engine = engine
         .remembering(Arc::new(
             move |_, words: &str, lease: Option<&ScopeLease>| {
@@ -255,15 +318,24 @@ async fn one_line_with(
             crate::known_faces::FaceObservation::read(&path),
         );
     }
-    let done = Arc::new(AtomicBool::new(false));
-    let feeder = feed_faces(eyes, in_view, boot, done.clone());
-    engine.submit(start(1));
-    engine.submit(audio(1, 1));
-    tokio::time::sleep(Duration::from_millis(40)).await;
-    engine.submit(end(1));
-    let labels = turn(&mut engine).await;
-    done.store(true, Ordering::Release);
-    feeder.join().unwrap();
+    let mut labels = Vec::new();
+    for (at, (_, in_view, after)) in lines.into_iter().enumerate() {
+        let request = at as u64 + 1;
+        // The line before is over; the last stays current, for its lease.
+        if request > 1 {
+            engine.retire_through(request - 1);
+        }
+        *now.lock().unwrap() += Duration::from_secs(after);
+        let done = Arc::new(AtomicBool::new(false));
+        let feeder = feed_faces(eyes.clone(), in_view, boot, done.clone());
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        engine.submit(end(request));
+        labels.extend(turn(&mut engine).await);
+        done.store(true, Ordering::Release);
+        feeder.join().unwrap();
+    }
     clean(&path);
     // The line's lease: as its context was told, else as memory was asked.
     let first = told_leases
@@ -281,13 +353,8 @@ async fn one_line_with(
         .as_ref()
         .and_then(ScopeLease::scope)
         .is_some_and(crate::memory_scope::ScopeSnapshot::held);
-    let asked: Vec<Message> = script
-        .asked
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|chat| chat[0].clone())
-        .collect();
+    let rounds = script.asked.lock().unwrap().clone();
+    let asked: Vec<Message> = rounds.iter().map(|chat| chat[0].clone()).collect();
     Outcome {
         calls: calls.lock().unwrap().clone(),
         lease,
@@ -296,6 +363,7 @@ async fn one_line_with(
         asked,
         labels,
         held,
+        rounds,
     }
 }
 
@@ -826,5 +894,302 @@ async fn a_rooms_line_in_their_conversation_going_on_is_carried_as_it() {
             assert_eq!(got.lease, None, "{what}: the room's");
             assert!(!got.held, "{what}");
         }
+    }
+}
+
+/// A `remember` of "We booked the Pine Hill Hotel" and its answer.
+fn keep_the_hotel() -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "k1",
+                crate::remember::REMEMBER,
+                json!({"text": "They booked the Pine Hill Hotel."}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Got it."), Ok(ChatEvent::Done)],
+    ]
+}
+
+const THE_HOTEL: &str = "We booked the Pine Hill Hotel.";
+
+/// #4339, approved 30 Oct (`LAMP_CONVERSATION_CARRIED_SAVES`), with the
+/// first builder's call on #4508: A's line no face was seen speaking, in
+/// A's conversation going on, keeps nothing at once, its own line or one
+/// admitted as the room's alike, the scope still held. With the switch its
+/// keep is held for A's yes, and the model is told it is not kept yet and
+/// to ask; off, it runs for no one, as before.
+#[tokio::test]
+async fn a_carried_lines_keep_is_held_never_written_at_once() {
+    let a = crate::remember::person_id("A");
+    for (what, named, saves) in [
+        ("save-own", true, true),
+        ("save-room", false, true),
+        ("save-own-off", true, false),
+        ("save-room-off", false, false),
+    ] {
+        let got = one_line_saving(
+            what,
+            THE_HOTEL,
+            keep_the_hotel(),
+            vec![("f1", false)],
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            named,
+            saves,
+        )
+        .await;
+        assert_eq!(got.calls, [], "{what}: nothing written");
+        assert_eq!(got.lease, Some(a.clone()), "{what}: A's conversation");
+        assert!(got.held, "{what}: still held, no reads");
+        assert!(
+            got.noted.is_empty(),
+            "{what}: no note read: {:?}",
+            got.noted
+        );
+        let told = if saves {
+            crate::remember::held_keep_told().to_string()
+        } else {
+            json!({ "error": HELD_MEMORY_CALL }).to_string()
+        };
+        assert!(
+            got.rounds[1].contains(&Message::tool("k1".to_owned(), told)),
+            "{what}: {:?}",
+            got.rounds[1]
+        );
+    }
+}
+
+/// A held keep's case: its name, its lines, whether the lamp asks, and
+/// the scopes the keep is written in.
+type HeldCase = (&'static str, Vec<Line>, bool, Vec<Option<String>>);
+
+/// A carried `remember` and the lamp asking about it.
+fn keep_the_hotel_asking() -> Vec<Vec<net::Result<ChatEvent>>> {
+    let mut chats = keep_the_hotel();
+    chats[1] = vec![text("Want me to keep that for you?"), Ok(ChatEvent::Done)];
+    chats
+}
+
+/// The first builder's call on #4508, with Reviewer-three's 14:46: a
+/// carried line's held keep is written in A's scope only on A's plain yes,
+/// their face seen saying it, and only after the lamp asked. A's face in
+/// view and silent through the line, then through a yes (a guest's off
+/// camera), keeps nothing; so does a yes after the conversation ended
+/// (past `HELD_FORGET_FOR`), another face seen saying it, a forget between,
+/// or a reply that never asked. Never another scope.
+#[tokio::test]
+async fn a_held_carried_keep_is_written_only_on_their_seen_yes() {
+    let a = crate::remember::person_id("A");
+    let quiet = || vec![("f1", false)];
+    let yes = |in_view, after| ("Yes.".to_owned(), in_view, after);
+    let hotel = || (THE_HOTEL.to_owned(), vec![("f1", false)], 0);
+    let okay = || vec![text("Okay."), Ok(ChatEvent::Done)];
+    let cases: Vec<HeldCase> = vec![
+        (
+            "held-seen-yes",
+            vec![hotel(), yes(vec![("f1", true)], 5)],
+            true,
+            vec![Some(a.clone())],
+        ),
+        (
+            "held-quiet-yes",
+            vec![hotel(), yes(quiet(), 5)],
+            true,
+            vec![],
+        ),
+        (
+            "held-too-late",
+            vec![hotel(), yes(vec![("f1", true)], 61)],
+            true,
+            vec![],
+        ),
+        (
+            "held-other-speaks",
+            vec![hotel(), yes(vec![("f1", false), ("f2", true)], 5)],
+            true,
+            vec![],
+        ),
+        (
+            "held-forget-between",
+            vec![
+                hotel(),
+                ("Forget it.".to_owned(), vec![("f1", true)], 5),
+                yes(vec![("f1", true)], 5),
+            ],
+            true,
+            vec![],
+        ),
+        (
+            "held-never-asked",
+            vec![hotel(), yes(vec![("f1", true)], 5)],
+            false,
+            vec![],
+        ),
+    ];
+    for (what, lines, asks, expected) in cases {
+        let mut chats = if asks {
+            keep_the_hotel_asking()
+        } else {
+            keep_the_hotel()
+        };
+        for _ in 1..lines.len() {
+            chats.push(okay());
+        }
+        let got = lines_saving(
+            what,
+            lines,
+            chats,
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            true,
+            true,
+        )
+        .await;
+        assert_eq!(got.calls, expected, "{what}");
+    }
+}
+
+/// #4339 with `LAMP_CONVERSATION_CARRIED_SAVES`: a carried line still
+/// cannot forget, one thing or everything; only `remember` runs.
+#[tokio::test]
+async fn a_carried_line_that_saves_still_cannot_forget() {
+    let forget_one = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "f1",
+                crate::remember::FORGET,
+                json!({"text": "the hotel"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Done."), Ok(ChatEvent::Done)],
+    ];
+    for (what, words, chats) in [
+        ("saves-forget-all", FORGET_ME, forget_everything()),
+        ("saves-forget-one", "Forget the hotel.", forget_one),
+    ] {
+        let got = one_line_saving(
+            what,
+            words,
+            chats,
+            vec![("f1", false)],
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            true,
+            true,
+        )
+        .await;
+        assert!(
+            got.calls.is_empty(),
+            "{what}: no forget runs: {:?}",
+            got.calls
+        );
+        assert!(got.held, "{what}");
+    }
+}
+
+/// #4339 with `LAMP_CONVERSATION_CARRIED_SAVES`: a line not carried keeps
+/// as before, never in A's scope: another face in view, another face seen
+/// speaking it, no conversation going on, or no face of A's in view through
+/// it or within `CARRY_UNSEEN_WITHIN` before it (an empty view from the
+/// start), and it is the room's.
+#[tokio::test]
+async fn a_line_not_carried_never_saves_into_their_scope() {
+    for (what, in_view, going_on) in [
+        ("saves-empty-from-start", vec![], Some(true)),
+        ("saves-other-face", vec![("f2", false)], Some(true)),
+        (
+            "saves-two-faces",
+            vec![("f1", false), ("f2", false)],
+            Some(true),
+        ),
+        (
+            "saves-other-speaks",
+            vec![("f1", false), ("f2", true)],
+            Some(true),
+        ),
+        ("saves-quiet", vec![("f1", false)], Some(false)),
+    ] {
+        let got = one_line_saving(
+            what,
+            THE_HOTEL,
+            keep_the_hotel(),
+            in_view,
+            BOOT,
+            true,
+            true,
+            None,
+            going_on,
+            true,
+            true,
+        )
+        .await;
+        assert_eq!(got.calls, [None], "{what}: the room's keep, never A's");
+        assert_eq!(got.lease, None, "{what}");
+        assert!(!got.held, "{what}");
+    }
+}
+
+/// #4339 with `LAMP_CONVERSATION_CARRIED_SAVES` and the first builder's
+/// call on #4508: a carried line is kept out of the journal whether or not
+/// it may save, so nothing said off camera is journalled as the carried
+/// person's; only a keep they say yes to, seen, is written. Its scope stays
+/// held, so its exchange is marked held in the thread (#4479's
+/// `Thread::held_for`) and never given to the summary or a talk note.
+#[test]
+fn a_carried_line_is_kept_out_of_the_journal_whether_or_not_it_saves() {
+    use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+    // A person of this test's own: the thread is shared by the crate's tests.
+    let a = crate::remember::person_id("Carried Saves A");
+    for (request, saves) in [(4_339_101_u64, true), (4_339_102, false)] {
+        let scope = RequestScope::new(
+            RequestKey {
+                worker: lamp_turn_owner::BootId::new([43; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            ScopeSnapshot::room(),
+        );
+        let lease = scope.lease();
+        assert!(lease.carry_conversation(&a));
+        if saves {
+            assert!(lease.save_carried());
+        }
+        assert_eq!(lease.saves_carried(), saves.then_some(a.as_str()));
+        super::super::worker::keep_admitted(
+            &ProviderOutput::HoldingAnswer {
+                request,
+                session: 1,
+            },
+            &lease,
+        );
+        assert!(crate::remember::kept_out(request), "{request}");
+        assert!(lease.scope().unwrap().held(), "{request}: still held");
+        super::super::worker::keep_admitted(
+            &ProviderOutput::Transcript {
+                request: Some(request),
+                text: "Got it, the Pine Hill Hotel.".to_owned(),
+                finished: true,
+            },
+            &lease,
+        );
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        let later = Instant::now() + Duration::from_secs(1);
+        let given = thread.summary_rest(Some(&a), later);
+        assert!(
+            given.iter().all(|(given, ..)| *given != request),
+            "{request}: never in a talk note: {given:?}"
+        );
     }
 }

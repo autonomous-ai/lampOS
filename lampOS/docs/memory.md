@@ -510,6 +510,35 @@ conversation beyond its exchanges, and for how long:
   folded into a running note or a talk note.
 - **The journal** has counts and sizes only, never a note's words.
 
+**A carried line's keep waits for their yes**
+(`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, a privacy-rule change approved
+on 30 Oct, with the first builder's call on #4508): carried, a line kept
+nothing, so "We booked the Pine Hill Hotel" said with the face slipped got "I
+can't save that just now". With the switch, a carried line's `remember`
+(`ScopeLease::save_carried`) is declared but not written: it is held in RAM,
+never journalled, for the carried person's own yes, as a held forget is
+(`hold_carried_keep`, `take_held_forget`). The model is told "Not kept yet"
+(`remember::held_keep_told`) and asks once, "Want me to keep that for you?";
+the hold stands only if the reply said whole asks it
+(`remember::asks_about_keeping`). Their plain yes on the next spoken line,
+within `HELD_FORGET_FOR` (60 s), with their own face seen saying it and no
+other (`LAMP_EYES_SPEAKING`, `speaking_faces::seen_saying`), writes it in
+their scope, and the reply says it is kept. Their face merely in view is not
+enough: it is in view while a guest speaks off camera (Reviewer-three, 14:46).
+Anything else drops it, writing nothing anywhere: no yes, a yes not seen (the
+model is told it did not count), another face seen saying it, a forget, the
+conversation ending, or a minute passing. Without the eyes reading speaking
+nothing is held, and the keep is refused ("Not kept"). The carried line's
+exchange stays out of the journal, so no statement in it becomes their
+observed fact. Its scope stays held for everything else: no recall, note or
+hits, no `forget`, `forget_everything`, rule, face or yes. A line admitted
+held only by a face's gap (`LAMP_FACE_GAP_HOLD`) holds nothing, and a
+narrowed line (another face seen speaking it) is the room's. The rolling
+summary and talk notes leave carried lines out. Risk, left: their own seen
+yes confirms a keep whose words someone else may have said; they hear it
+asked first. A same-voice check (`same_voice_releases`, a hook, never true
+yet) is the follow-up.
+
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:

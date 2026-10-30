@@ -2741,6 +2741,17 @@ pub fn serve(
             "lamp-voice second: a known person's line no face was seen speaking, in their conversation going on with no other face in view, is told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)"
         );
         engine = engine.carrying_conversations(true);
+        // A carried line's keep is held for the carried person's yes, their
+        // face seen saying it (approved 30 Oct, the first builder's call on
+        // #4508): never a read, forget or yes of its own.
+        if std::env::var(crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a carried line's keep waits for that person's yes, their face seen saying it (LAMP_CONVERSATION_CARRIED_SAVES)"
+            );
+            engine = engine.saving_carried(true);
+        }
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
@@ -10374,6 +10385,10 @@ fn keep_scoped(
     // out before its words reach the thread or its end hands anything on
     // (the reviewer's P2 on #2616). Its exchange stays in the spoken thread,
     // so the conversation as it stood carries on when they look back.
+    // A carried line that may save (`LAMP_CONVERSATION_CARRIED_SAVES`) is
+    // kept out too: nothing said off camera is journalled as theirs; only a
+    // keep their own face is seen saying yes to is written (the first
+    // builder's call on #4508).
     if let Some(lease) = lease
         && lease
             .scope()
