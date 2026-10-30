@@ -20,6 +20,12 @@ Wants=network-online.target
 # A publisher not yet up at start is waited for with the microphones closed, never an exit.
 After=lamp-controls.service
 Wants=lamp-controls.service
+# The waking face (#2848, lampOS/docs/ring-choreography.md, "The waking face"): every start of the voice, at
+# power-on, the app's Restart, an update round or a crash restart, starts it again, so the ring opens like an
+# eye until the voice asks for it. A face still up isn't started twice. It's no part of lampos.target, so a
+# stop of the voice leaves it alone.
+Wants=lamp-waking.service
+After=lamp-waking.service
 StartLimitIntervalSec=600
 StartLimitBurst=10
 

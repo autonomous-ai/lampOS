@@ -1276,6 +1276,33 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
     assert!(page.contains(&format!("`{condition}`")));
 }
 
+/// #2848: every start of the voice starts the waking face again, so a
+/// restart from the app, an update round or a crash opens the ring like an
+/// eye before the voice takes it, as power-on does. The face is wanted and
+/// ordered before the voice, and stays outside the target and unrestarted,
+/// so a stop of the voice or a restart of the target leaves it alone.
+#[test]
+fn every_start_of_the_voice_starts_the_waking_face() {
+    let unit = |wanted: &str| {
+        PRODUCT
+            .iter()
+            .find(|(name, _)| *name == wanted)
+            .map(|(_, text)| *text)
+            .unwrap()
+    };
+    let voice = section(unit("lamp-voice.service"), "Unit");
+    assert!(voice.contains(&"Wants=lamp-waking.service"), "{voice:?}");
+    assert!(voice.contains(&"After=lamp-waking.service"), "{voice:?}");
+    let waking = unit("lamp-waking.service");
+    assert!(
+        !section(waking, "Unit")
+            .iter()
+            .any(|line| line.starts_with("PartOf="))
+    );
+    assert!(section(waking, "Service").contains(&"Restart=no"));
+    assert!(section(waking, "Service").contains(&"Environment=LAMP_WAKING_FACE=on"));
+}
+
 /// #3710: each product unit that runs as root has the sandbox its work
 /// needs: a read-only system but for the exact paths it writes, no home,
 /// its own /tmp and no privileges gained. One row a unit, each line once.
