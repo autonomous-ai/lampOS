@@ -225,6 +225,9 @@ struct Script {
     /// The second route's requests, by the count ended, in which speech to
     /// text heard no words: told idle at End, no chat asked.
     second_unheard: &'static [usize],
+    /// The second route's requests, by the count ended, that fail only
+    /// slow: no answer in time, no refusal of the service's.
+    second_slow: &'static [usize],
     /// The recorded failure lines, an offline and a voice service one
     /// among them (`FailureNotices::synthetic_offline`); none without.
     notices: bool,
@@ -324,6 +327,7 @@ impl Script {
             second_fails_first: None,
             speak_at: &[],
             second_unheard: &[],
+            second_slow: &[],
             notices: false,
             ignores_stop: None,
             limit: LIMIT,
@@ -1216,6 +1220,16 @@ impl Peers {
                             .push_back(ProviderOutput::TurnComplete {
                                 request,
                                 idle: true,
+                            });
+                        continue;
+                    }
+                    if !live && self.script.second_slow.contains(&self.ended.len()) {
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::TurnFailed {
+                                request,
+                                stage: FailedStage::AwaitingResponse,
+                                reason: Fault::ResponseTimeout,
                             });
                         continue;
                     }
@@ -6472,6 +6486,53 @@ fn a_refusals_try_spent_on_a_line_with_no_words_still_sends_the_ask_after_it() {
         started.len(),
         4,
         "the refused line, the unheard one and both asks: {started:?}\n{}",
+        run.summary()
+    );
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 2, "{answered:?}\n{}", run.summary());
+}
+
+/// #4265 (the Reviewer-lead's P3 on #4483): past the minute, a line is
+/// sent and its turn fails only slow, no answer in time. A slow turn is no
+/// refusal: it tries nothing and holds nothing, so the ask a few seconds
+/// after it is sent too, the service answers it, and the refusal ends.
+#[test]
+fn a_refusals_line_past_its_minute_that_fails_only_slow_holds_nothing_and_the_next_is_sent() {
+    let _one = super::pilot_faults::one_session();
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        // Past the minute: a line sent that fails slow (75 s), then the
+        // person's ask (80 s), then another (90 s).
+        speak_at: &[7_500, 8_000, 9_000],
+        second_slow: &[2],
+        mute_at_frame: Some(10_000),
+        limit: Duration::from_secs(110),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    run.assert_clean();
+    let started: Vec<u64> = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        started.len(),
+        4,
+        "the refused line, the slow one and both asks: {started:?}\n{}",
         run.summary()
     );
     let answered = run
