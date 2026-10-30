@@ -61,6 +61,9 @@ fn default_language() -> PathBuf {
 fn default_own_keys() -> PathBuf {
     crate::keys::FOLDER.into()
 }
+fn default_control_dropin() -> PathBuf {
+    crate::change::CONTROL_DROPIN.into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,6 +135,11 @@ pub struct Config {
     /// 0600, loaded whole by the voice's unit. The reset's plan removes it.
     #[serde(default = "default_own_keys")]
     pub own_keys: PathBuf,
+    /// lamp-control's drop-in, the owner's developer setting from the app
+    /// (`control.set`, `crate::change`): `LAMP_CONTROL=on` while it is
+    /// there, root's, 0644. The reset's plan removes it.
+    #[serde(default = "default_control_dropin")]
+    pub control_dropin: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -153,7 +161,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 22] = [
+pub const FIELDS: [&str; 23] = [
     "listen",
     "marker",
     "credential",
@@ -172,6 +180,7 @@ pub const FIELDS: [&str; 22] = [
     "display_name",
     "language",
     "own_keys",
+    "control_dropin",
     "web_start",
     "web_stop",
     "free_port",
@@ -208,6 +217,7 @@ impl Config {
             &self.display_name,
             &self.language,
             &self.own_keys,
+            &self.control_dropin,
         ] {
             if !path.is_absolute() {
                 return Err(format!("{} is not absolute", path.display()));
@@ -871,6 +881,13 @@ impl Files<'_> {
     pub fn display_name(&mut self, name: &str) -> io::Result<()> {
         let temporary = stage(&self.0.display_name, format!("{name}\n").as_bytes(), 0o644)?;
         put_in_place(&temporary, &self.0.display_name)
+    }
+
+    /// lamp-control's drop-in (`control.set`), 0644 as systemd's own files
+    /// are, written beside and renamed into place, its folder made first.
+    pub fn control_dropin(&mut self, bytes: &[u8]) -> io::Result<()> {
+        let temporary = stage(&self.0.control_dropin, bytes, 0o644)?;
+        put_in_place(&temporary, &self.0.control_dropin)
     }
 }
 

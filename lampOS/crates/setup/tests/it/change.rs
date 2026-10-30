@@ -113,6 +113,99 @@ fn the_owners_place_is_kept_rounded_beside_the_name_and_null_clears_it() {
     assert!(!place.exists());
 }
 
+/// The owner's developer setting (`control.set`): on writes lamp-control's
+/// drop-in, folder and all, 0644; off removes it; only a change asks for
+/// lamp-control's restart, and an off with none there is no error.
+#[test]
+fn the_developer_setting_writes_or_removes_lamp_controls_drop_in() {
+    let root = Root::new();
+    let config = root.config();
+    let dropin = &config.control_dropin;
+    assert!(!dropin.parent().unwrap().exists());
+    // Off with nothing there: no error, nothing to restart.
+    let (reply, done) = answer(r#"{"control": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    let done = done.unwrap();
+    assert!(!done.restart_control && !done.restart_schedule);
+    assert_eq!(done.said, "developer access is off already");
+    assert!(!dropin.exists());
+    // On: written whole, readable by systemd.
+    let (reply, done) = answer(r#"{"control": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    let done = done.unwrap();
+    assert!(done.restart_control && !done.restart_schedule);
+    assert_eq!(done.said, "developer access is on");
+    assert_eq!(
+        fs::read_to_string(dropin).unwrap(),
+        "[Service]\nEnvironment=LAMP_CONTROL=on\n"
+    );
+    assert_eq!(
+        change::CONTROL_DROPIN_TEXT,
+        "[Service]\nEnvironment=LAMP_CONTROL=on\n"
+    );
+    assert_eq!(mode(dropin), 0o644);
+    // No temporary left beside it.
+    assert_eq!(fs::read_dir(dropin.parent().unwrap()).unwrap().count(), 1);
+    // On again: nothing changed, nothing to restart.
+    let (_, done) = answer(r#"{"control": true}"#, &config, true);
+    assert!(!done.unwrap().restart_control);
+    // A drop-in that says something else is written over.
+    fs::write(dropin, "[Service]\nEnvironment=LAMP_CONTROL=off\n").unwrap();
+    let (_, done) = answer(r#"{"control": true}"#, &config, true);
+    assert!(done.unwrap().restart_control);
+    assert_eq!(
+        fs::read_to_string(dropin).unwrap(),
+        change::CONTROL_DROPIN_TEXT
+    );
+    // Off: removed, and lamp-control restarted to close the door.
+    let (reply, done) = answer(r#"{"control": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    let done = done.unwrap();
+    assert!(done.restart_control);
+    assert_eq!(done.said, "developer access is off");
+    assert!(!dropin.exists());
+    // Anything but one boolean is refused, and nothing is written.
+    for line in [
+        r#"{"control": "on"}"#,
+        r#"{"control": 1}"#,
+        r#"{"control": null}"#,
+    ] {
+        let (reply, done) = answer(line, &config, true);
+        assert_eq!(
+            reply,
+            json!({"refused": "control must be true or false"}),
+            "{line}"
+        );
+        assert!(done.is_none());
+    }
+    let (reply, _) = answer(r#"{"control": true, "x": 1}"#, &config, true);
+    assert_eq!(reply, json!({"refused": "the request holds one change"}));
+    assert_eq!(
+        parse(r#"{"control": true}"#, &config),
+        Ok(Change::Control(true))
+    );
+    // Off, refused as every change is.
+    let (reply, _) = answer(r#"{"control": true}"#, &config, false);
+    assert_eq!(reply, json!({"refused": "changes after setup are off"}));
+    assert!(!dropin.exists());
+    // The product's path, and the reset forgets the setting.
+    let own: Config =
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.control_dropin,
+        std::path::Path::new("/etc/systemd/system/lamp-control.service.d/developer.conf")
+    );
+    let plan: Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    assert!(
+        plan["wipe"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w == change::CONTROL_DROPIN)
+    );
+}
+
 #[test]
 fn the_lamps_name_in_the_app_is_kept_readable_and_never_empty() {
     let root = Root::new();
