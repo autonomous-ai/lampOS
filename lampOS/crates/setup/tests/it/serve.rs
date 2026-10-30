@@ -1632,3 +1632,28 @@ fn write_a_reports_answer_fixture() {
     bytes.push(b'\n');
     std::fs::write(target, bytes).unwrap();
 }
+
+/// #2094, Fourth's and Tests' P3 on #4471: what the status says at the
+/// hotspot's start, before any setup, which is what the app reads first.
+/// As the setup says, and never in a recovery, which saves the network only.
+#[test]
+fn the_status_says_own_keys_from_the_hotspots_start_but_never_in_a_recovery() {
+    use lamp_setup::{keys::Verdict, serve::takes_own_keys_at_start};
+    for (on, recovering, said) in [
+        (true, false, true),
+        (false, false, false),
+        (true, true, false),
+        (false, true, false),
+    ] {
+        let owning = Owning {
+            saved: Saved::default(),
+            on,
+            verdict: Verdict::Works,
+        };
+        assert_eq!(
+            takes_own_keys_at_start(&owning, recovering),
+            said,
+            "{on} {recovering}"
+        );
+    }
+}
