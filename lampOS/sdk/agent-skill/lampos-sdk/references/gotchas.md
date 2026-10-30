@@ -36,6 +36,13 @@ Each of these cost someone a run on a real lamp.
 - **A move must start and end at home** (all five joints 0) and last 1.5 to
   10 s, within each joint's reach and speed. The body's words say which
   frame was wrong.
+- **A move's cells are whole counts** (integers). A value like `"0100"` or
+  `1.5` from a form is refused by the SDK before sending (`bad_request`),
+  so it never reaches the lamp and the lamp's journal has nothing. Validate
+  and convert what a person typed before you call `move`.
+- **A body lease you hold keeps the lamp's own life standing back** (its rest
+  glance, its feelings' small moves). A program that looks now and then
+  should let the lease go when idle, not hold it for hours.
 
 ## Voice
 
@@ -60,6 +67,14 @@ Each of these cost someone a run on a real lamp.
 
 - **The lamp restarts on every update:** the connection closes
   (`wait_closed()` returns, a call fails `closed`). Reconnect with backoff.
+  A reconnect is a new session: it loses every subscription (subscribe
+  again), every lease (take again, only when you need it) and a camera
+  stream (start it again). See "A program that runs for days" in
+  [patterns.md](patterns.md).
+- **`get` with several states fails as a whole** when one of them isn't
+  known to this lamp (a newer state on an older lamp): `bad_request`, and
+  you get none. A program for many lamps should `get` them one at a time, or
+  catch `bad_request` and show "not on this lamp".
 - **A connection that only listens is kept open by pings** the SDK sends;
   don't add your own keepalive.
 - **Grants are read at hello:** after the owner changes them, reconnect.

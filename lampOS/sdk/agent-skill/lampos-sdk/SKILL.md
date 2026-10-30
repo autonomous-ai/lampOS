@@ -37,8 +37,23 @@ don't route yet, as they do. In tests, use `lampos.testing.FakeLamp` (JS:
 
 ## Pair with a real lamp
 
-The owner makes a code in the lamp's app: an 8-digit code and the
-certificate's pin (64 hex). Then, on the computer:
+The owner makes a code in the lamp's app: an 8-digit code, the
+certificate's pin (64 hex), and the grants this computer gets. Ask the
+owner for the grants your program needs, by what it does:
+
+| your program | grants |
+|---|---|
+| lights the ring | `light` |
+| speaks or plays sounds | `speak` |
+| moves (gestures, feelings, looks, moves) | `body` (a feeling needs `light` too) |
+| knows who's there, follows a hand | `look` |
+| hears a phrase or its name | `hear` |
+| hears music, laughter, the door, footsteps | `sound` |
+| puts skills of its own on the lamp | `skills` |
+| sees pictures, hears audio (arriving) | `camera`, `microphone` |
+
+`air` and `device` come with #4525. **A grant added later needs a new
+pairing code:** the owner can't widen a pairing. Then, on the computer:
 
 ```sh
 lamp pair CODE --pin PIN --host lamp-xxxx.local --name my-laptop
@@ -48,6 +63,11 @@ python scripts/check_pairing.py   # this skill's check: grants, limits, what eac
 
 The pairing (a key and the lamp's pin) is kept in `~/.config/lampos`, or
 `LAMPOS_HOME`.
+
+**A pairing holding a grant a lamp's build doesn't know** stops an older
+lamp-control at its start (fixed from #4525 on). If you pair with a new
+grant on a lamp that tries a newer build, revoke that pairing before the
+lamp goes back to an older build.
 
 ## Reaching the lamp from off its network
 
@@ -138,13 +158,16 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
 - What each carries, and its grant: [references/api.md](references/api.md#events-and-state).
 - Never readable, by any grant: pictures, audio, transcripts, face prints,
   names. A hand's or face's place is a share of the picture.
-- **Coming:** camera, microphone, `body.state` and routed `joints` are being
-  built; this skill gains them as they land.
+- **The camera** (arriving, the `camera` grant): a snapshot, or a stream of
+  frames; never while private, never off the lamp's own network:
+  [references/camera.md](references/camera.md). The microphone, `body.state`
+  and routed `joints` come next; this skill gains them as they land.
 
 ## Patterns
 
 Ready to adapt, each in Python and JS: react to presence, a CI light, a
-pomodoro, an agent's progress shown on the lamp, a chat alert:
+pomodoro, an agent's progress shown on the lamp, a chat alert, a program
+that runs for days, and a web app on the SDK:
 [references/patterns.md](references/patterns.md).
 
 ## Gotchas we hit
