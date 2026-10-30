@@ -8478,7 +8478,21 @@ impl Heeding {
     fn judged_verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
         self.marking_the_line(request, seen);
         let someone_else = self.someone_else(seen);
+        // #3945: whether only one person is at the lamp (no other voice, no
+        // face speaking it but the caller's, at most one face in view), read
+        // only for a line opening with a set-off name that is also a word
+        // ("May, what would you do?"), so the eyes are read for no other.
+        let one_person = crate::attention::opens_with_a_name_also_a_word(&seen.heard)
+            && !seen.other_voice
+            && !someone_else
+            && seen.speakers.len() <= 1
+            && self
+                .bus
+                .as_ref()
+                .and_then(|(bus, _)| crate::bus_out::faces_in_view(bus))
+                .is_none_or(|faces| faces <= 1);
         let attention = &mut self.attention;
+        attention.one_person_present(one_person);
         let (heard, busy, lamp_asked, turned) =
             (seen.heard.as_str(), seen.busy, seen.lamp_asked, seen.turned);
         let mut verdict =
