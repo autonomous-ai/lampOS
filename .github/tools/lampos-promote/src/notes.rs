@@ -311,7 +311,11 @@ pub fn placed(body: &str, part: &str) -> String {
 }
 
 /// The product's files a switch can be turned on in: every unit and
-/// drop-in in `deploy/product`, and its settings' `.env` files.
+/// drop-in in `deploy/product` that `lamp-update install` places, and its
+/// settings' `.env` files. A file there that install never places is on no
+/// lamp, so nothing in it is on: `own-keys-voice.conf` goes on a test lamp
+/// by hand, and the keeper's restart and the own keys' helpers wait for
+/// their lamp checks (install's left-out list).
 pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
     let mut files = BTreeMap::new();
     let product = lamp_os.join("deploy/product");
@@ -327,11 +331,26 @@ pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
                 .iter()
                 .any(|end| name.ends_with(end));
             if path.is_file() && (unit || name.ends_with(".env")) {
-                files.insert(name, fs::read_to_string(&path)?);
+                let text = fs::read_to_string(&path)?;
+                if installed(&text) {
+                    files.insert(name, text);
+                }
             }
         }
     }
     Ok(files)
+}
+
+/// Whether `lamp-update install` places a file with this text, as this
+/// build carries it.
+fn installed(text: &str) -> bool {
+    use lamp_update::install::{EXIT_NOTE, PRODUCT, SETTINGS, STORE_SETTINGS, TMPFILES};
+    PRODUCT
+        .iter()
+        .chain(SETTINGS)
+        .chain(STORE_SETTINGS)
+        .any(|(_, placed)| *placed == text)
+        || [EXIT_NOTE, TMPFILES].contains(&text)
 }
 
 /// One `gh` call's standard output, or why not.

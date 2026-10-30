@@ -2709,14 +2709,20 @@ mod tests {
     }
 
     fn schedule_directory(name: &str) -> PathBuf {
+        // A count of its own beside the time: the two `scoped_audio` tests
+        // both ask for "audio-scope", and on a Mac, whose wall clock reads
+        // in whole microseconds, two that started together got one name and
+        // the second `create_dir` failed `AlreadyExists` (#1569).
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let base = if Path::new("/private/tmp").is_dir() {
             PathBuf::from("/private/tmp")
         } else {
             std::env::temp_dir()
         };
         let path = base.join(format!(
-            "lvs-{name}-{}-{:x}",
+            "lvs-{name}-{}-{}-{:x}",
             std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()

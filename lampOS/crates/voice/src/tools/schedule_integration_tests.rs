@@ -439,7 +439,9 @@ fn voice_actions_boundary_rejects_malformed_model_arguments_without_schedule_ipc
 /// #4527's P2 through the voice's own route: each line's caller is its
 /// scope's, so two people each asking "my reminders" hear their own, an
 /// unknown face hears none, and a guest's cancel by the other's id is
-/// refused as no longer active.
+/// refused as no longer active. A short timer set by nobody is every
+/// line's (option 1 on #4656's after-merge P2): the room's line hears and
+/// cancels the one it set.
 #[test]
 fn voice_lines_hear_and_cancel_only_their_own_reminders() {
     use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
@@ -458,15 +460,17 @@ fn voice_lines_hear_and_cancel_only_their_own_reminders() {
     let ann = line(ScopeSnapshot::of("Ann"), 1);
     let bo = line(ScopeSnapshot::of("Bo"), 2);
     let unknown = line(ScopeSnapshot::room(), 3);
+    // Reminders, at 08:10, 600 s after `WALL`: a short timer set by nobody
+    // is every line's.
     let set = actions.call_on(
-        "set_timer",
-        json!({"text":"Ann's pills","seconds":600}),
+        "set_reminder",
+        json!({"text":"Ann's pills","time":"08:10"}),
         &ann.lease(),
     );
     assert_eq!(set["status"], "committed", "{set}");
     let set = actions.call_on(
-        "set_timer",
-        json!({"text":"Bo's call","seconds":600}),
+        "set_reminder",
+        json!({"text":"Bo's call","time":"08:10"}),
         &bo.lease(),
     );
     assert_eq!(set["status"], "committed", "{set}");
@@ -493,5 +497,20 @@ fn voice_lines_hear_and_cancel_only_their_own_reminders() {
         "{refused}"
     );
     let cancelled = actions.call_on("cancel_reminder", json!({"id":1}), &ann.lease());
+    assert_eq!(cancelled["cancelled"], true, "{cancelled}");
+    // At the stove, no face seen: the room's line finds the timer it set,
+    // and cancels it, and still hears none of the reminders.
+    let set = actions.call_on(
+        "set_timer",
+        json!({"text":"Pasta","seconds":600}),
+        &unknown.lease(),
+    );
+    assert_eq!(set["status"], "committed", "{set}");
+    assert_eq!(
+        texts(actions.call_on("list_reminders", json!({}), &unknown.lease())),
+        ["Pasta"]
+    );
+    let pasta = set["id"].as_u64().unwrap();
+    let cancelled = actions.call_on("cancel_reminder", json!({"id":pasta}), &unknown.lease());
     assert_eq!(cancelled["cancelled"], true, "{cancelled}");
 }

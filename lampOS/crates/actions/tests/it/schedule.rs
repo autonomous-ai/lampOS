@@ -1153,7 +1153,10 @@ fn texts(list: &Value) -> Vec<String> {
 /// people each asking "my reminders" hear their own; an unknown face hears
 /// none; the owner hears theirs and the ones set with nobody sure; a
 /// guest's cancel or snooze by the owner's id is refused as not found; a
-/// call without its caller is nobody's.
+/// call without its caller is nobody's. A short timer set by nobody is
+/// every line's (option 1 on #4656's after-merge P2): the unknown face
+/// hears and cancels the one it set, and never a relative reminder set
+/// three weeks out (Reviewer-three's P1 on #4668).
 #[test]
 fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_server() {
     let schedule = Schedule::new();
@@ -1161,8 +1164,14 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
     let owner = caller(Some(ANN), true);
     let bo = caller(Some(BO), false);
     let unknown = caller(None, false);
+    // Reminders, due at 08:10, 600 s after `WALL`: a short timer set by
+    // nobody is every line's.
     let set = |text: &str, who: &Value| {
-        let told = actions.call_as("set_timer", json!({"text":text,"seconds":600}), who.clone());
+        let told = actions.call_as(
+            "set_reminder",
+            json!({"text":text,"time":"08:10"}),
+            who.clone(),
+        );
         assert_eq!(told["result"]["status"], "committed", "{told}");
         told["result"]["id"].as_u64().unwrap()
     };
@@ -1205,6 +1214,24 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
     assert_eq!(snoozed["result"]["status"], "committed", "{snoozed}");
     let cancelled = actions.call_as("cancel_reminder", json!({"id":plant}), owner.clone());
     assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+    // At the stove, no face seen: the timer it sets it hears and cancels,
+    // and never the relative reminder three weeks out, or a reminder.
+    let pasta = actions.call_as(
+        "set_timer",
+        json!({"text":"Pasta","seconds":600}),
+        unknown.clone(),
+    );
+    let pasta = pasta["result"]["id"].as_u64().unwrap();
+    let weeks = actions.call_as(
+        "set_timer",
+        json!({"text":"Renew the visa","seconds":21 * 86_400}),
+        unknown.clone(),
+    );
+    assert_eq!(weeks["result"]["status"], "committed", "{weeks}");
+    assert_eq!(texts(&list(&unknown)), ["Pasta"]);
+    let cancelled = actions.call_as("cancel_reminder", json!({"id":pasta}), unknown.clone());
+    assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+    assert!(texts(&list(&unknown)).is_empty());
 }
 
 /// "Forget everything about me": the voice's own op cancels every reminder

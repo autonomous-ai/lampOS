@@ -114,11 +114,38 @@ impl Item {
     fn effective(&self) -> &Deadline {
         self.snooze.as_ref().unwrap_or(&self.deadline)
     }
+
+    /// A timer: a duration from now (`set_timer`'s `After`), the only kind
+    /// whose deadline keeps an elapsed clock. A snooze never changes the
+    /// original deadline, so a snoozed timer stays a timer (#1595).
+    fn timer(&self) -> bool {
+        self.deadline.elapsed.is_some()
+    }
+
+    /// A timer the room hears ([`visible`]): set with nobody sure, for at
+    /// most [`ROOM_TIMER_MS`] from when it was set.
+    fn rooms(&self) -> bool {
+        self.person.is_none()
+            && self.timer()
+            && self.deadline.unix_ms.saturating_sub(self.created_unix_ms) <= ROOM_TIMER_MS
+    }
 }
 
-/// Whether `asker`, if any, may see `item`: no asker sees everything.
+/// The longest a timer set with nobody sure may run and still be the room's:
+/// a kitchen timer is minutes, a roast's an hour or two. `set_timer` also
+/// sets relative reminders, up to a year out ("in three weeks, renew my
+/// prescription", Reviewer-three's P1 and Third's line on #4668), and a
+/// longer one is kept as a reminder is.
+const ROOM_TIMER_MS: i64 = 2 * 3_600_000;
+
+/// Whether `asker`, if any, may see `item`: no asker sees everything, and
+/// every line sees the room's timers. A timer set with nobody sure, for two
+/// hours at most, is the room's (option 1 on #4656's after-merge P2): asked
+/// after from the stove with no face in view, and said aloud to whoever is
+/// there when it's due. A timer a person set stays theirs, as their
+/// relative reminders do, and their forget cancels it.
 fn visible(asker: Option<&Asker>, item: &Item) -> bool {
-    asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
+    item.rooms() || asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
 }
 
 /// A setter's person id as memory makes them: `p-` and 16 hex digits.
@@ -756,9 +783,7 @@ impl<P: Persistence> Engine<P> {
         let (late, late_by_ms) = self.late(item, now);
         json!({
             "id": item.id, "delivery": item.delivery, "text": item.text,
-            // Only set_timer's duration from now keeps an elapsed clock, and
-            // a snooze never changes the original deadline (#1595).
-            "kind": if item.deadline.elapsed.is_some() { "timer" } else { "reminder" },
+            "kind": if item.timer() { "timer" } else { "reminder" },
             "request_id": item.request_id,
             "state": if item.pending.is_some() { "pending" } else if remaining.is_none() { "waiting_for_clock" } else { "scheduled" },
             "due_unix_ms": Self::shown(item, now).unix_ms, "local": Self::shown(item, now).local,
