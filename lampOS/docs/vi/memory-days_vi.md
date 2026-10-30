@@ -391,3 +391,51 @@ và ghi chú cuộc trò chuyện vẫn bỏ qua câu được giữ. Rủi ro c
 được thấy của chính họ xác nhận một điều mà người khác có thể đã nói; họ được
 hỏi trước. Việc kiểm tra cùng giọng (`same_voice_releases`, một điểm móc, hiện
 chưa bao giờ đúng) là phần làm sau.
+## Một câu của họ không thấy mặt nói, khi chỉ có mặt họ trong khung hình
+
+Với `LAMP_PERSON_SCOPE_ONE_FACE=on` (bật trong bản sản phẩm; mục 1 của nhóm
+thử nghiệm ra mắt trên #3997): trên lamp-220c ngày 30/10, mặt chủ đèn có trong
+17 lần nhìn của một câu nhưng không lần nào đọc là đang nói, nên với
+`LAMP_PERSON_SCOPE_SEEN` mọi câu đều thuộc về căn phòng và ký ức riêng của họ
+gần như trống. Giờ đây, với một câu được nhận là của người quen, không thấy mặt
+ai nói, khi các lần nhìn qua câu ấy thấy khuôn mặt quen của họ trong ít nhất 3
+lần và không thấy mặt nào khác trong bất kỳ lần nào
+(`SpeakingFaces::one_face_in_view`; một lần nhìn không có ai không tính là mặt
+khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **chỉ việc ghi nhớ**
+(`remember`) là của họ: điều đó được lưu vào phạm vi của họ
+(`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`). **Mọi việc
+đọc vẫn là của căn phòng**: không `recall` hay gợi ý từ ký ức của họ, không
+ghi chú ký ức của họ, không ngữ cảnh của người ấy, không chuỗi hội thoại hay
+bản tóm tắt của họ; câu được nói và đọc như của căn phòng, như khi không có
+công tắc. Lý do (P1 của Reviewer-three trên #4584, phương án 2): «không có
+giọng khác» được so với giọng của cuộc trò chuyện, không phải giọng của họ,
+nên một vị khách ngoài khung hình mở đầu cuộc trò chuyện trong khi họ ngồi im
+là mặt duy nhất trông y hệt; một lần ghi nhầm nằm trong ký ức của chính họ, nơi
+họ có thể quên nó, còn một lần đọc nhầm đưa ký ức của họ cho người khác. Việc
+đọc ký ức của họ cần một dấu hiệu nói (thấy mặt họ nói) hoặc một cuộc trò
+chuyện được giữ (#4479); khi đó cách ấy thắng, như hôm nay. Bằng chứng «giọng
+khác» là ghi nhận của chính quy tắc trên tuyến thứ hai
+(`worker::Heeding::another_person`): một câu có dấu giọng khác với giọng của
+cuộc trò chuyện (`same_voice::DIFFERENT_BELOW`) hoặc thấy hai mặt cùng nói một
+câu, kể từ khi cuộc trò chuyện bắt đầu. Nó được đọc khi câu được nhận và đọc
+lại khi câu đã được xét, nên giọng khác nghe thấy ngay trong câu ấy khiến cả
+việc ghi nhớ cũng thuộc về căn phòng. Một câu được nhận là của căn phòng mà mắt
+gọi tên họ muộn (#2807) cũng vậy: chỉ việc ghi nhớ là của họ. Chỉ có tác dụng
+cùng `LAMP_PERSON_SCOPE_SEEN` và khi quy tắc giữ phòng của từng câu
+(`LAMP_JOIN_CUT_WORDS` hoặc `LAMP_SECOND_NAME_CARRIES`)
+(`worker::one_face_not_acted`); thiếu một trong hai thì lý do được ghi lúc khởi
+động và công tắc không làm gì. Công tắc không chờ việc kiểm tra cùng giọng
+(phương án 1 của người xây dựng đầu tiên trên #3997): không khởi động được bộ
+lấy dấu giọng, hoặc là tuyến dự phòng bên cạnh Live, thì không câu nào được nhận
+là giọng khác, chỉ thấy mặt thứ hai nói mới cho biết có người khác; vì chỉ việc
+ghi nhớ là của họ, cái giá là lời được lưu, không bao giờ bị đọc. Có mặt thứ hai, mặt lạ,
+không có mặt nào, hoặc có giọng khác, thì như trước. Một câu được nhận là của
+căn phòng vì không nhận ra ai thì không đổi, nên giọng chưa nhận ra vẫn không
+chạm được ký ức của ai (#4196, #4207). **Việc quên không đổi:** `forget` và
+`forget_everything` trên câu như vậy chạy trong phạm vi của căn phòng, và **một
+lời «có» nói trên câu như vậy không bao giờ chạy một lệnh quên đang giữ**
+(`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói. Rủi ro còn lại:
+một giọng ngoài khung hình khi họ ngồi một mình trong khung, không có dấu giọng
+để phân biệt, có thể được lưu vào ký ức của họ (không bao giờ được đọc lại cho
+giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
+hình có thể chứa lời người khác nói ngoài khung hình.

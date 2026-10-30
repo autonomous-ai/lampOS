@@ -1710,6 +1710,7 @@ fn second_route_worker_environment(
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
         crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+        crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
         crate::person::BY_DEFAULT_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
@@ -1871,6 +1872,7 @@ mod tests {
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+            crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -2522,6 +2524,7 @@ mod tests {
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
+                    || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
@@ -2657,6 +2660,7 @@ mod tests {
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_BY_DEFAULT=on",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
+                    "LAMP_PERSON_SCOPE_ONE_FACE=on",
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
