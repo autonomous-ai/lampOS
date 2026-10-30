@@ -34,8 +34,9 @@ pub const SCHEMA: u32 = 1;
 /// 6: ordinary product service units carried under [`PRODUCT_LAMP`].
 /// 7: a part's templates, sockets and timers under it too
 /// (crate::companion). 8: a product unit the lamp lacks added
-/// (crate::added).
-pub const UPDATER: u64 = 8;
+/// (crate::added). 9: a round stops the voice first and starts it last
+/// (#4431), which every product build asks for ([`ORDER_UPDATER`]).
+pub const UPDATER: u64 = 9;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
@@ -47,6 +48,13 @@ pub const COMPANIONS_UPDATER: u64 = 7;
 /// lacks: an older updater takes only the units a lamp has, so it climbs
 /// first. A round adds only from a build that asks for this level.
 pub const ADDS_UPDATER: u64 = 8;
+/// The level every product build asks for (second-P1): an updater below it
+/// restarts lamp-controls before the voice, and a lamp on a build from
+/// 28 Oct 17:16 to 29 Oct 09:59 (8237 to 8498) also keeps the old voice's
+/// restart-guard mute through that. Asked for, such an updater takes only
+/// the lamp-update the build carries, and that one, in the same `serve`,
+/// runs the switch in its own order.
+pub const ORDER_UPDATER: u64 = 9;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
