@@ -1,7 +1,7 @@
 # lampOS changes after setup (#1959, lampOS/docs/setup.md, "Changed after setup"): one request from
 # lamp-cloud on lamp-setup-change.socket, as standard input and output. It writes with setup's own
 # writers, answers, and after a zone change restarts lamp-schedule once the lamp is quiet (45 s,
-# an update's rule), waiting at most 30 minutes. The app's restart and shutdown too (#2193, #3697):
+# an update's rule) and no update is at work (holding lamp-update's lock), waiting at most 30 minutes. The app's restart and shutdown too (#2193, #3697):
 # answered first, then lampos.target restarted (this instance is not part of it) or lamp-setup
 # shutdown started.
 [Unit]

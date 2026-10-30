@@ -299,6 +299,45 @@ pub fn wait_for_quiet(ears: &mut impl Ears, most: Duration) -> Result<(), String
     wait_for_rest(ears, QUIET, most)
 }
 
+/// How long [`quiet_and_unlocked`] waits before it looks for lamp-update's
+/// lock again while an update holds it.
+pub const UPDATE_LOOK_EVERY: Duration = Duration::from_secs(10);
+
+/// [`wait_for_quiet`], and then lamp-update's lock, for the caller to hold
+/// through a restart of its own: a round restarts and watches the lamp's
+/// units, and puts its build back when one it restarted changes process
+/// within its watch (`updates.md` step 9, `MainPID`), so a zone's
+/// `lamp-schedule` restart or a voice restart for new keys must never fall
+/// in it. While an update holds the lock, the quiet is waited for again
+/// [`UPDATE_LOOK_EVERY`] later. At most `most` in all; why not.
+pub fn quiet_and_unlocked(
+    ears: &mut impl Ears,
+    records: &lamp_update::records::Records,
+    most: Duration,
+) -> Result<lamp_update::records::Lock, String> {
+    let started = ears.now_ms();
+    let mut installing = false;
+    loop {
+        let spent = Duration::from_millis(ears.now_ms().saturating_sub(started));
+        if let Err(why) = wait_for_quiet(ears, most.saturating_sub(spent)) {
+            return Err(if installing {
+                format!("an update was installing, and then {why}")
+            } else {
+                why
+            });
+        }
+        match records.lock() {
+            Ok(lock) => return Ok(lock),
+            Err(why) if why.kind() == io::ErrorKind::WouldBlock => installing = true,
+            Err(why) => return Err(format!("the update's state could not be checked: {why}")),
+        }
+        if ears.now_ms().saturating_sub(started) >= most.as_millis() as u64 {
+            return Err("an update was installing all along".into());
+        }
+        ears.listen(UPDATE_LOOK_EVERY);
+    }
+}
+
 /// Wait until the voice has rested, nobody heard and nothing said, for
 /// `long`. At most `most`; why not, when it never did.
 pub fn wait_for_rest(ears: &mut impl Ears, long: Duration, most: Duration) -> Result<(), String> {
