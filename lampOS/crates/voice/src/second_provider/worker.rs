@@ -2776,6 +2776,19 @@ pub fn serve(
     // A known person's line no face was seen speaking, in their conversation
     // going on with no other face in view, is carried as theirs (#4339,
     // `LAMP_CONVERSATION_CARRIES=on`): only beside the scoping by sight above.
+    // A person's turn is also told the room's lines of the same conversation,
+    // marked as the room's (#4339, `LAMP_CONVERSATION_ROOM_LINES_TOLD=on`):
+    // room to person only, beside the scoping by sight that splits them.
+    if std::env::var(crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT)
+        .is_ok_and(|value| value == "on")
+        && std::env::var(crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+    {
+        eprintln!(
+            "lamp-voice second: a person's turn is also told the room's lines of the same conversation, marked as said in the room; never the reverse, never another person's (LAMP_CONVERSATION_ROOM_LINES_TOLD)"
+        );
+        ROOM_LINES_TOLD.store(true, std::sync::atomic::Ordering::Release);
+    }
     if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
         .is_ok_and(|value| value == "on")
     {
@@ -3706,6 +3719,26 @@ pub fn serve(
                     }
                 }),
                 Arc::new(move |request| asked.lock().ok()?.unclear(request)),
+            );
+        }
+        // With the carry, a silent face doesn't count
+        // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT=on`, #4339, lamp-3e83 on
+        // 30 Oct): no other face seen speaking a line and no other voice in
+        // the conversation, the rule's own sign of another person kept for
+        // the cut words' join (`Heeding::another_person`), stand for no
+        // other face in view. Only where the rule keeps that sign and the
+        // same-voice check runs (`hears`, the Reviewer-lead's P2 on #4610):
+        // without either, nothing would show another voice, so the carry
+        // stays as it is.
+        if crate::second_provider::carries_past_silent_from_environment() {
+            let keeps = heeding
+                .lock()
+                .is_ok_and(|heeding| heeding.keeps_line_rooms_now());
+            let another = another_voice.clone();
+            engine = engine.carrying_past_silent_where_heard(
+                keeps,
+                hears,
+                Arc::new(move || another.load(std::sync::atomic::Ordering::Acquire)),
             );
         }
         remarked_by = Some(heeding.clone());
@@ -6137,6 +6170,12 @@ impl Heeding {
     /// second person ([`Self::same_speaker`]).
     pub(crate) fn keeping_line_rooms(&mut self) {
         self.rooms = Some(std::collections::VecDeque::new());
+    }
+
+    /// Whether [`Self::keeping_line_rooms`] was asked, so
+    /// [`Self::another_person`] is kept for each line judged.
+    pub(crate) fn keeps_line_rooms_now(&self) -> bool {
+        self.rooms.is_some()
     }
 
     /// `LAMP_FIRST_SECONDS_QUIET` (#3711): a line kept for a join
@@ -10346,6 +10385,40 @@ fn thread_and_history(
     whose: Option<&str>,
     withheld: Option<&str>,
 ) -> (String, Vec<Message>) {
+    thread_and_history_told(
+        used,
+        file,
+        whose,
+        withheld,
+        ROOM_LINES_TOLD.load(std::sync::atomic::Ordering::Acquire),
+    )
+}
+
+/// `LAMP_CONVERSATION_ROOM_LINES_TOLD=on` (#4339), set once as the worker
+/// starts ([`serve`]): a person's turn is also given the room's exchanges of
+/// the same conversation, marked as the room's
+/// ([`crate::thread::Thread::recent_with_room_lines`]).
+pub(crate) static ROOM_LINES_TOLD: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// What marks a room's exchange given to a person's turn
+/// ([`ROOM_LINES_TOLD`]): what was said in the room, not known to be
+/// theirs.
+pub(crate) const SAID_IN_THE_ROOM: &str = "(said in the room)";
+
+/// [`thread_and_history`] with `room_lines` as [`ROOM_LINES_TOLD`]: a
+/// person's history (`whose` some) then takes the room's exchanges of the
+/// same conversation too, marked; the thread's text and the running
+/// summary stay the scope's own, and a turn of the room's is told only
+/// the room's, as ever. In memory, under the thread's one lock: no new
+/// read on the reply's path.
+fn thread_and_history_told(
+    used: usize,
+    file: Option<&Path>,
+    whose: Option<&str>,
+    withheld: Option<&str>,
+    room_lines: bool,
+) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     // The scope's own running summary first, within the room, never
@@ -10360,7 +10433,12 @@ fn thread_and_history(
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
             thread.recall_for(whose, now, room),
-            thread.recent_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
+            match whose {
+                Some(person) if room_lines => {
+                    thread.recent_with_room_lines(person, now, HISTORY_WITHIN, HISTORY_EXCHANGES)
+                }
+                _ => thread.recent_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
+            },
         )
     })
     .unwrap_or_default();
@@ -10525,6 +10603,9 @@ pub(super) fn keep_heard(
 /// One exchange as chat messages. A request the lamp was given in writing
 /// goes as a system note, never as words a person said; nothing is sent
 /// for a person who said nothing.
+/// A room's exchange given to a person's turn (`LAMP_CONVERSATION_ROOM_LINES_TOLD`)
+/// has its words marked [`SAID_IN_THE_ROOM`], or with none, a note before
+/// the lamp's.
 fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
     let mut messages = Vec::with_capacity(3);
     if let Some(written) = exchange.written {
@@ -10533,7 +10614,13 @@ fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
         )));
     }
     if !exchange.person.is_empty() {
-        messages.push(Message::user(exchange.person));
+        messages.push(Message::user(if exchange.room {
+            format!("{SAID_IN_THE_ROOM} {}", exchange.person)
+        } else {
+            exchange.person
+        }));
+    } else if exchange.room {
+        messages.push(Message::system(SAID_IN_THE_ROOM.to_owned()));
     }
     messages.push(Message::assistant(exchange.lamp));
     messages
@@ -17976,6 +18063,7 @@ mod tests {
             written: Some("Say ORCHID.".into()),
             person: String::new(),
             lamp: "ORCHID.".into(),
+            room: false,
         });
         assert_eq!(
             written,
@@ -17990,8 +18078,104 @@ mod tests {
             written: None,
             person: "Hi.".into(),
             lamp: "Hello.".into(),
+            room: false,
         });
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
+    }
+
+    /// #4339 (`LAMP_CONVERSATION_ROOM_LINES_TOLD`): a room's exchange told to
+    /// a person's turn is marked as said in the room, words or none.
+    #[test]
+    fn a_rooms_exchange_told_to_a_person_is_marked_as_said_in_the_room() {
+        let said = messages(crate::thread::Recent {
+            person: "Look it up.".into(),
+            lamp: "Found it.".into(),
+            room: true,
+            ..crate::thread::Recent::default()
+        });
+        assert_eq!(
+            said,
+            [
+                Message::user(format!("{SAID_IN_THE_ROOM} Look it up.")),
+                Message::assistant("Found it.")
+            ]
+        );
+        let unheard = messages(crate::thread::Recent {
+            lamp: "Found it.".into(),
+            room: true,
+            ..crate::thread::Recent::default()
+        });
+        assert_eq!(
+            unheard,
+            [
+                Message::system(SAID_IN_THE_ROOM),
+                Message::assistant("Found it.")
+            ]
+        );
+    }
+
+    /// #4339, lamp-3e83 on 30 Oct (`LAMP_CONVERSATION_ROOM_LINES_TOLD`): a
+    /// search answered in the room's thread, then A's own question about
+    /// it. A's turn is told the room's exchange among A's, marked; the
+    /// room's turn is told only the room's, never A's; B's turn neither.
+    /// The running summary and thread text stay each scope's own. Off, A's
+    /// turn is told A's alone, as before. After a forget, nothing.
+    #[test]
+    fn a_persons_turn_is_told_the_rooms_lines_of_their_conversation_never_the_reverse() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person("Is the lamp sold anywhere?", true, now);
+            thread.lamp_for(1, "Is it the desk lamp?", now, Some(&a));
+            thread.person("Can you look it up?", true, now);
+            thread.lamp_for(2, "Found it: about 699.", now, None);
+            thread.person("Are you that one?", true, now);
+            thread.lamp_for(3, "That could be me.", now, Some(&a));
+        }
+        let users = |history: &[Message]| -> Vec<Message> {
+            history
+                .iter()
+                .filter(|message| message.role == "user" || message.role == "system")
+                .cloned()
+                .collect()
+        };
+        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true);
+        assert_eq!(
+            users(&theirs),
+            [
+                Message::user("Is the lamp sold anywhere?"),
+                Message::user(format!("{SAID_IN_THE_ROOM} Can you look it up?")),
+                Message::user("Are you that one?"),
+            ],
+            "A's turn: the room's line among A's, marked"
+        );
+        let (_, rooms) = thread_and_history_told(0, None, None, None, true);
+        assert_eq!(
+            users(&rooms),
+            [Message::user("Can you look it up?")],
+            "the room's turn: never A's"
+        );
+        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true);
+        assert!(
+            others.is_empty(),
+            "B's turn: neither A's nor A's conversation's"
+        );
+        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false);
+        assert_eq!(
+            users(&off),
+            [
+                Message::user("Is the lamp sold anywhere?"),
+                Message::user("Are you that one?"),
+            ],
+            "off: A's alone"
+        );
+        crate::thread::THREAD.lock().unwrap().forget();
+        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true);
+        assert!(forgotten.is_empty(), "a forget drops the room's lines too");
     }
 
     /// The reviewer-lead on #2675: an add-on's quoted line, and the lamp's

@@ -633,6 +633,34 @@ pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 /// and nothing else; off, a carried line keeps nothing, as before.
 pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_SAVES";
 
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a silent face doesn't count
+/// (#4339, lamp-3e83, 30 Oct: the known face in all 30 looks of a line and
+/// none with it alone, so 4 lines carried of a conversation split in two):
+/// "no other face in view through it" becomes "no other face seen speaking
+/// it, and no other voice in the conversation"
+/// ([`Engine::carrying_past_silent`]). `on`, and nothing else; off, any
+/// other face in view keeps the line the room's, as before.
+pub const CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT: &str =
+    "LAMP_CONVERSATION_CARRIES_PAST_SILENT";
+
+/// With [`PERSON_SCOPE_SEEN_ENVIRONMENT`], a person's turn is also told the
+/// room's exchanges of the same conversation, marked as said in the room
+/// (#4339, `worker::ROOM_LINES_TOLD`,
+/// `thread::Thread::recent_with_room_lines`): room to person only, never
+/// another person's, never into the scope's running summary or talk note.
+/// `on`, and nothing else; off, each turn is told its own scope's, as
+/// before.
+pub const CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT: &str = "LAMP_CONVERSATION_ROOM_LINES_TOLD";
+
+/// [`CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT`] on, with the carry and
+/// the scope by sight it acts beside.
+pub(crate) fn carries_past_silent_from_environment() -> bool {
+    let on = |name: &str| std::env::var(name).is_ok_and(|value| value == "on");
+    on(PERSON_SCOPE_SEEN_ENVIRONMENT)
+        && on(CONVERSATION_CARRIES_ENVIRONMENT)
+        && on(CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT)
+}
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
@@ -1184,11 +1212,87 @@ struct Shared {
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
+    /// With [`Self::carries`], a silent face doesn't count
+    /// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`,
+    /// [`Engine::carrying_past_silent`]): whether the conversation has
+    /// shown another voice; none, any other face in view keeps a line the
+    /// room's.
+    past_silent: Option<AnotherVoice>,
 }
+
+/// [`Shared::past_silent`]: whether the conversation going on has shown
+/// another person by voice (the rule's `Heeding::another_person`: another
+/// voice than the conversation's, a print under
+/// [`crate::same_voice::DIFFERENT_BELOW`] against it, or two faces seen
+/// speaking a line), read without waiting.
+pub(crate) type AnotherVoice = Arc<dyn Fn() -> bool + Send + Sync>;
 
 /// [`Shared::carries`]: the known person whose conversation is going on as a
 /// request is heard ([`crate::thread::Thread::going_on_with`]).
 pub(crate) type GoingOnWith = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+
+/// A carry's sign that nobody else is in the talk, beside no face seen
+/// speaking the line (#4339): with [`Shared::past_silent`]
+/// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`), the eyes looked through it and
+/// the conversation has shown no other voice, whatever silent faces were in
+/// view; without it, no face but `face` in any look through it
+/// ([`crate::speaking_faces::SpeakingFaces::no_other_face_in_view`]).
+fn no_other_shown(
+    shared: &Shared,
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    face: Option<&str>,
+    begun: Instant,
+    finishing: Instant,
+) -> bool {
+    match &shared.past_silent {
+        Some(another) => eyes.looked_between(begun, finishing) && !another(),
+        None => eyes.no_other_face_in_view(face, begun, finishing),
+    }
+}
+
+/// Why [`Engine::carrying_past_silent_where_heard`] leaves the switch
+/// inactive; none, it acts.
+fn past_silent_inactive(keeps: bool, hears: bool) -> Option<&'static str> {
+    match (keeps, hears) {
+        (true, true) => None,
+        (false, _) => Some(
+            "the rule keeps no sign of another voice here (LAMP_JOIN_CUT_WORDS or LAMP_SECOND_NAME_CARRIES keep it)",
+        ),
+        (true, false) => Some(
+            "the same-voice check is not running here (no printer started, a standby beside Live, or none of LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE, LAMP_GOING_ON_NOT_OWN, LAMP_MEMORY_FOLLOWS_FACE on)",
+        ),
+    }
+}
+
+/// [`spoken`]'s second look at a line carried past a silent face, once the
+/// rule has had it: why it is the room's after all; none, still carried.
+/// `heed_set`, the route has a rule; `heed_ran`, the rule judged this very
+/// line. A rule that skipped it (held, empty, or its own echo) left the
+/// sign of another voice as the line before set it, so this line's voice is
+/// unknown and it is not carried (the Reviewer-lead's P3 on #4610); with no
+/// rule at all, `another` alone answers.
+fn carried_past_silent_undone(
+    heed_set: bool,
+    heed_ran: bool,
+    another: &AnotherVoice,
+) -> Option<&'static str> {
+    if heed_set && !heed_ran {
+        Some("the rule never heard its voice, so whether another voice spoke is unknown")
+    } else if another() {
+        Some("another voice shown in the conversation")
+    } else {
+        None
+    }
+}
+
+/// The journal's words for the carry's sign ([`no_other_shown`]).
+fn carried_as(shared: &Shared) -> &'static str {
+    if shared.past_silent.is_some() {
+        "no other face seen speaking it and no other voice in the conversation (LAMP_CONVERSATION_CARRIES_PAST_SILENT)"
+    } else {
+        "no other face in view"
+    }
+}
 
 /// Who the eyes saw speaking a line from `begun` to `finishing`, and the
 /// known person with their face, as `speaking_faces::not_theirs` reads
@@ -2530,6 +2634,7 @@ impl Engine {
                 scope_seen: false,
                 carries: None,
                 carried_saves: false,
+                past_silent: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -2793,6 +2898,54 @@ impl Engine {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.carried_saves = on;
         self
+    }
+
+    /// With [`Self::carrying_conversations`], a silent face doesn't count
+    /// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT=on`, #4339): a line is
+    /// carried with other faces in view, so long as no face was seen
+    /// speaking it, the eyes looked through it, and `another` says the
+    /// conversation has shown no other voice, both as the line is heard and
+    /// again once the rule has judged it (its own print against the
+    /// conversation's). The rest stands: nobody else named, their exchange
+    /// within 45 s, their face in view through it or within
+    /// [`CARRY_UNSEEN_WITHIN`] before it. Accepted risk (the lamp-memory
+    /// owner, 30 Oct): a silent guest sitting by hears the person's thread
+    /// on a carried line; never their saved memory.
+    pub(crate) fn carrying_past_silent(mut self, another: AnotherVoice) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.past_silent = Some(another);
+        self
+    }
+
+    /// [`Self::carrying_past_silent`] only where another voice can show:
+    /// `keeps`, the rule keeps its sign of another person
+    /// (`Heeding::keeps_line_rooms_now`), and `hears`, the same-voice check
+    /// runs for this route (its printer started, the lamp's only voice, one
+    /// of its switches on). Without either, `another` would never be set by
+    /// a voice, so "no other voice" would always hold and a guest whose
+    /// mouth isn't read would be carried (the Reviewer-lead's P2 on #4610):
+    /// the carry stays as before the switch, any other face in view keeping
+    /// a line the room's, said once at start with why.
+    pub(crate) fn carrying_past_silent_where_heard(
+        self,
+        keeps: bool,
+        hears: bool,
+        another: AnotherVoice,
+    ) -> Self {
+        match past_silent_inactive(keeps, hears) {
+            None => {
+                eprintln!(
+                    "lamp-voice second: a carried line counts no silent face: no other face seen speaking it and no other voice in the conversation is enough (LAMP_CONVERSATION_CARRIES_PAST_SILENT)"
+                );
+                self.carrying_past_silent(another)
+            }
+            Some(why) => {
+                eprintln!(
+                    "lamp-voice second: LAMP_CONVERSATION_CARRIES_PAST_SILENT is inactive: {why}; any other face in view keeps a line the room's"
+                );
+                self
+            }
+        }
     }
 
     /// [`Self::carrying_conversations`] with `going_on` naming whose
@@ -5385,6 +5538,10 @@ async fn spoken(
     // With `LAMP_PERSON_SCOPE_SEEN`, no eyes to read is no face seen
     // speaking it: the room's (reviewer-two's P2 on #3437).
     let mut named = false;
+    // Carried by the rule a silent face doesn't count in
+    // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): judged again by the voice
+    // once the rule has heard it.
+    let mut carried_past_silent = false;
     if let Some(scope) = scope.as_ref()
         && let Some(person) = scope
             .scope()
@@ -5411,7 +5568,7 @@ async fn spoken(
                     .map(|(_, face)| face.as_str());
                 let carried = shared.scope_seen
                     && speakers.is_empty()
-                    && eyes.no_other_face_in_view(own_face, begun, finishing)
+                    && no_other_shown(&shared, eyes, own_face, begun, finishing)
                     && eyes.face_seen_between(
                         own_face,
                         begun.checked_sub(CARRY_UNSEEN_WITHIN).unwrap_or(begun),
@@ -5424,8 +5581,10 @@ async fn spoken(
                         .is_some_and(|going_on| going_on == person)
                     && scope.carry_conversation(&person);
                 if carried {
+                    carried_past_silent = shared.past_silent.is_some();
                     eprintln!(
-                        "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, no other face in view: told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)"
+                        "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, {}: told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)",
+                        carried_as(&shared)
                     );
                 }
                 let theirs = carried
@@ -5499,7 +5658,7 @@ async fn spoken(
             .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
             .map(|(_, face)| face.as_str());
         if speakers.is_empty()
-            && eyes.no_other_face_in_view(face, begun, finishing)
+            && no_other_shown(&shared, eyes, face, begun, finishing)
             && eyes.face_seen_between(
                 face,
                 begun.checked_sub(CARRY_UNSEEN_WITHIN).unwrap_or(begun),
@@ -5507,8 +5666,10 @@ async fn spoken(
             )
             && lease.carry_conversation(&person)
         {
+            carried_past_silent = shared.past_silent.is_some();
             eprintln!(
-                "lamp-voice second: request {request}: admitted as the room's, no face seen speaking it, in a known person's conversation going on, no other face in view: told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)"
+                "lamp-voice second: request {request}: admitted as the room's, no face seen speaking it, in a known person's conversation going on, {}: told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)",
+                carried_as(&shared)
             );
             if prepared.take().is_some() {
                 eprintln!(
@@ -5906,6 +6067,8 @@ async fn spoken(
             (false, Some(kept))
         }
     };
+    // The rule judges this very line (`carried_past_silent_undone`).
+    let heed_ran = shared.heed.is_some() && !echoed && !empty && !held;
     let mut heeded = match &shared.heed {
         _ if echoed => Some(OWN_ECHO_HELD),
         Some(heed) if !empty && !held => {
@@ -5946,6 +6109,25 @@ async fn spoken(
                 _ => break None,
             }
         };
+    }
+    // Carried with a silent face in view (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`):
+    // the rule has now heard this line's own voice against the
+    // conversation's. Another voice shown, or the rule never heard this
+    // line, and it is the room's after all, before anything is told or kept
+    // with it.
+    if carried_past_silent
+        && let (Some(lease), Some(another)) = (scope.as_ref(), shared.past_silent.as_ref())
+        && let Some(why) = carried_past_silent_undone(shared.heed.is_some(), heed_ran, another)
+    {
+        lease.narrow_to_room();
+        eprintln!(
+            "lamp-voice second: request {request}: carried, then {why}: told and kept as the room's (LAMP_CONVERSATION_CARRIES_PAST_SILENT)"
+        );
+        if prepared.take().is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+            );
+        }
     }
     // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
     // heard as "Stop them." was asked of the model, which said "Stop who?",

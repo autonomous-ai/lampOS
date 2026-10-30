@@ -487,6 +487,62 @@ talk note (below). Risk, accepted: someone off camera, with no other sign,
 within those 5 s, is answered inside the conversation going on and hears
 what was said in it and its running summary.
 
+**A silent face doesn't count** (`LAMP_CONVERSATION_CARRIES_PAST_SILENT=on`,
+#4339, the lamp-memory owner's decision on 30 Oct): on lamp-3e83 on 30 Oct
+(build 8899) the known face was in view on the dropped lines but almost
+never alone (30 looks, none with one face, the known face in all 30), so
+the carry above held on 4 lines and one conversation went line by line to
+the person's thread or the room's. With this switch, "no other face in
+view through it" becomes **no other face seen speaking it, and no other
+voice in the conversation**: the eyes still must have looked through the
+line (`SpeakingFaces::looked_between`), and the other voice is the rule's
+own sign of another person, the one the cut words' join keeps
+(`Heeding::another_person`: a line in another voice than the
+conversation's, a print under `same_voice::DIFFERENT_BELOW` against it, or
+two faces seen speaking one line; cleared when a line is judged with no
+conversation going on). It is read as the line is heard and once more after
+the rule has judged the line's own voice; shown by then, the line is the
+room's before anything is told. A line the rule skipped (held as a short
+sound, empty, or the lamp's own echo) has no voice of its own judged, so the
+sign is the line before's: such a line is not carried, the room's before
+anything is told or kept. Only where the rule keeps that sign
+(`LAMP_JOIN_CUT_WORDS` or `LAMP_SECOND_NAME_CARRIES`, both on in the
+product) and the same-voice check runs (its printer started, the lamp's
+only voice, and one of `LAMP_SPOKEN_TO`, `LAMP_QUIET_GOING_ON_SAME_ONE`,
+`LAMP_GOING_ON_NOT_OWN`, `LAMP_MEMORY_FOLLOWS_FACE` on): without either,
+nothing could show another voice, so the switch does nothing, any other
+face in view keeps a line the room's as before, and the journal says once
+at start which is missing (`Engine::carrying_past_silent_where_heard`). The
+rest stands: nobody else named, their exchange within 45 s, their face in
+view through it or within 5 s before it. A second face seen speaking it,
+or another voice, keeps it the room's. Risk, accepted by the lamp-memory
+owner: **a silent guest sitting by hears the person's thread on a carried
+line** (its exchanges and running summary, never their saved memory).
+
+**The room's lines of the same conversation** (`LAMP_CONVERSATION_ROOM_LINES_TOLD=on`,
+#4339): a line still split off to the room's thread was unknown to the
+person's next turn (lamp-3e83, 30 Oct: a web search answered in the room's
+thread, then "I've lost the thread" to their own question about it). With
+this switch, a known person's turn is given the room's exchanges of the
+same conversation among its own, each person's line marked
+`(said in the room)` (`worker::SAID_IN_THE_ROOM`;
+`Thread::recent_with_room_lines`). The same conversation: back from now over
+their exchanges and the room's only, each within 45 s of the next
+(`GOING_ON_FOR`), another person's exchange ending it, and only the room's at
+or after their own first exchange in it; within the chat's window
+(`HISTORY_EXCHANGES`, 12, and `HISTORY_WITHIN`, 600 s). One way only: a
+turn of the room's, or an unplaced voice's (#4196/#4207), is never given a
+person's lines, and a person's turn is never given another person's. The
+thread text, the running summary and talk notes stay each scope's own: the
+room's lines are never folded into the person's. Any forget drops them with
+the rest (`Thread::forget`). Built in memory under the thread's one lock, in
+the same read as before: no new I/O on the reply's path. Part of the "said
+aloud" risk, accepted: a line narrowed to the room's because another voice
+spoke it (`Heeding::another_person`, or the second look after the rule)
+still reaches the person's turn, marked `(said in the room)`: a guest's
+words, said aloud beside them, are told to the person's turn; never into
+their running summary, talk note or saved memory.
+
 ### Talk notes and the running summary
 
 With `LAMP_CONVERSATION_SUMMARY=on` (on in the product, the lamp-memory

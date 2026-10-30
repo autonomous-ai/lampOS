@@ -321,6 +321,17 @@ Environment=LAMP_CONVERSATION_CARRIES=on
 # it. Still no recall, note or hits on it, no forget and no yes, never another person's scope, and a line held only by
 # a face's gap holds nothing.
 Environment=LAMP_CONVERSATION_CARRIED_SAVES=on
+# And a silent face doesn't count (#4339, lamp-3e83 on 30 Oct: the known face in all 30 looks of a line, none with it
+# alone, so 4 lines carried while one conversation split in two): with no other face seen speaking a line and no other
+# voice in the conversation (the rule's sign of another person, kept for the cut words' join), other faces in view
+# no longer keep it the room's; a second face seen speaking, or another voice, still does. Accepted risk, approved by
+# the memory's owner on 30 Oct: a silent guest sitting by hears the person's thread on a carried line.
+Environment=LAMP_CONVERSATION_CARRIES_PAST_SILENT=on
+# And a person's turn is also told the room's lines of the same conversation (#4339: a search answered in the room's
+# thread was unknown to their next turn), marked as said in the room, within the chat's 12 exchanges and 10 minutes
+# and the conversation's 45 s chain. Room to person only: a room's or unplaced turn is never told a person's, and
+# another person's never; never into a person's running summary or talk note; gone at any forget.
+Environment=LAMP_CONVERSATION_ROOM_LINES_TOLD=on
 # The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things
 # worth keeping, each checked by the store and linked to the words it came from (OBSERVE); a dated one keeps its
 # day (EVENTS); the next session with that person asks after one open thread, once, at most one a day (THREADS);

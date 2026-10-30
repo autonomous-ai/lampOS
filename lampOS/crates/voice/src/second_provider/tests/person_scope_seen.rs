@@ -238,6 +238,30 @@ async fn lines_saving(
     named: bool,
     saves: bool,
 ) -> Outcome {
+    lines_past_silent(
+        what, lines, chats, boot, seen, eyes_up, early, going_on, named, saves, None,
+    )
+    .await
+}
+
+/// [`lines_saving`] with `past_silent` as `LAMP_CONVERSATION_CARRIES_PAST_SILENT`
+/// ([`Engine::carrying_past_silent_where_heard`], the rule keeping its sign):
+/// whether the same-voice check runs, and whether the conversation has shown
+/// another voice, asked each time; none, the switch off.
+#[allow(clippy::too_many_arguments)]
+async fn lines_past_silent(
+    what: &str,
+    lines: Vec<Line>,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    boot: &'static str,
+    seen: bool,
+    eyes_up: bool,
+    early: Option<&str>,
+    going_on: Option<bool>,
+    named: bool,
+    saves: bool,
+    past_silent: Option<(bool, crate::second_provider::AnotherVoice)>,
+) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
     let script = Arc::new(Script {
@@ -294,6 +318,9 @@ async fn lines_saving(
         },
     ));
     let mut engine = engine.saving_carried(saves);
+    if let Some((hears, another)) = past_silent {
+        engine = engine.carrying_past_silent_where_heard(true, hears, another);
+    }
     if saves {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
@@ -895,6 +922,238 @@ async fn a_rooms_line_in_their_conversation_going_on_is_carried_as_it() {
             assert!(!got.held, "{what}");
         }
     }
+}
+
+/// One line of A's conversation going on, the faces `in_view`, with
+/// `LAMP_CONVERSATION_CARRIES_PAST_SILENT` and `another` as the
+/// conversation's sign of another voice, the same-voice check running.
+async fn past_silent_line(
+    what: &str,
+    in_view: Vec<(&'static str, bool)>,
+    named: bool,
+    another: crate::second_provider::AnotherVoice,
+) -> Outcome {
+    past_silent_line_hearing(what, in_view, named, true, another).await
+}
+
+/// [`past_silent_line`] with `hears` as whether the same-voice check runs.
+async fn past_silent_line_hearing(
+    what: &str,
+    in_view: Vec<(&'static str, bool)>,
+    named: bool,
+    hears: bool,
+    another: crate::second_provider::AnotherVoice,
+) -> Outcome {
+    lines_past_silent(
+        what,
+        vec![("The floral one, I think.".to_owned(), in_view, 0)],
+        vec![vec![text("Floral, then."), Ok(ChatEvent::Done)]],
+        BOOT,
+        true,
+        true,
+        None,
+        Some(true),
+        named,
+        false,
+        Some((hears, another)),
+    )
+    .await
+}
+
+/// #4339, lamp-3e83 on 30 Oct (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): the
+/// known face in all 30 looks of a line and none with it alone, so a line no
+/// face was seen speaking went to the room's. A silent second face doesn't
+/// count: carried as A's conversation, held, whether admitted as A's or the
+/// room's. A second face seen speaking it, another voice in the
+/// conversation, or no face of A's in view from the start, and it is the
+/// room's, as before.
+#[tokio::test]
+async fn a_silent_second_face_does_not_keep_their_conversations_line_the_rooms() {
+    let a = crate::remember::person_id("A");
+    let quiet: crate::second_provider::AnotherVoice = Arc::new(|| false);
+    let voice: crate::second_provider::AnotherVoice = Arc::new(|| true);
+    for (what, in_view, named, another, carried) in [
+        (
+            "silent-guest",
+            vec![("f1", false), ("f2", false)],
+            true,
+            &quiet,
+            true,
+        ),
+        (
+            "silent-guests",
+            vec![("f1", false), ("f2", false), ("f3", false)],
+            true,
+            &quiet,
+            true,
+        ),
+        (
+            "silent-guest-room",
+            vec![("f1", false), ("f2", false)],
+            false,
+            &quiet,
+            true,
+        ),
+        ("alone", vec![("f1", false)], true, &quiet, true),
+        (
+            "guest-speaks",
+            vec![("f1", false), ("f2", true)],
+            true,
+            &quiet,
+            false,
+        ),
+        (
+            "guest-speaks-room",
+            vec![("f1", false), ("f2", true)],
+            false,
+            &quiet,
+            false,
+        ),
+        (
+            "another-voice",
+            vec![("f1", false), ("f2", false)],
+            true,
+            &voice,
+            false,
+        ),
+        (
+            "another-voice-alone",
+            vec![("f1", false)],
+            true,
+            &voice,
+            false,
+        ),
+        (
+            "another-voice-room",
+            vec![("f1", false)],
+            false,
+            &voice,
+            false,
+        ),
+        ("guest-only", vec![("f2", false)], true, &quiet, false),
+        ("empty-from-start", vec![], true, &quiet, false),
+    ] {
+        let got = past_silent_line(what, in_view, named, another.clone()).await;
+        if carried {
+            assert_eq!(got.lease, Some(a.clone()), "{what}: A's conversation");
+            assert!(got.held, "{what}: held, never memory's");
+        } else {
+            assert_eq!(got.lease, None, "{what}: the room's");
+            assert!(!got.held, "{what}");
+            assert_eq!(got.told, Message::system("for None"), "{what}");
+        }
+    }
+}
+
+/// #4339 (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): a line carried past a
+/// silent face is judged again once the rule has heard its voice; another
+/// voice shown by then, and it is the room's before anything is told.
+#[tokio::test]
+async fn a_line_carried_past_a_silent_face_is_the_rooms_once_another_voice_shows() {
+    let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = asked.clone();
+    // No other voice as the line is heard; one once the rule has judged it.
+    let another: crate::second_provider::AnotherVoice =
+        Arc::new(move || counted.fetch_add(1, Ordering::AcqRel) > 0);
+    let got = past_silent_line(
+        "late-voice",
+        vec![("f1", false), ("f2", false)],
+        true,
+        another,
+    )
+    .await;
+    assert!(
+        asked.load(Ordering::Acquire) >= 2,
+        "asked again after the rule"
+    );
+    assert_eq!(got.lease, None, "the room's");
+    assert_eq!(got.told, Message::system("for None"));
+}
+
+/// The Reviewer-lead's P2 on #4610: with the switch on but the same-voice
+/// check not running (no printer started, a standby beside Live, none of
+/// its switches on), nothing could show another voice, so a silent second
+/// face still keeps the line the room's, as before the switch; alone, the
+/// line is carried as before. The rule keeping no sign is the same.
+#[tokio::test]
+async fn without_the_same_voice_check_a_silent_second_face_still_blocks_the_carry() {
+    let a = crate::remember::person_id("A");
+    let quiet: crate::second_provider::AnotherVoice = Arc::new(|| false);
+    let got = past_silent_line_hearing(
+        "silent-guest-unheard",
+        vec![("f1", false), ("f2", false)],
+        true,
+        false,
+        quiet.clone(),
+    )
+    .await;
+    assert_eq!(got.lease, None, "the room's");
+    assert!(!got.held);
+    assert_eq!(got.told, Message::system("for None"));
+    let got =
+        past_silent_line_hearing("alone-unheard", vec![("f1", false)], true, false, quiet).await;
+    assert_eq!(got.lease, Some(a), "carried as before the switch");
+    assert!(got.held);
+    assert!(crate::second_provider::past_silent_inactive(true, false).is_some());
+    assert!(crate::second_provider::past_silent_inactive(false, true).is_some());
+    assert!(crate::second_provider::past_silent_inactive(false, false).is_some());
+    assert!(crate::second_provider::past_silent_inactive(true, true).is_none());
+}
+
+/// The Reviewer-lead's P3 on #4610: a line the rule skipped (held, empty,
+/// its own echo) is judged again on its own result, not on the sign the
+/// line before left: unknown, so not carried, and the stale sign never
+/// asked. A line the rule judged reads the sign; no rule, the sign alone.
+#[test]
+fn a_line_the_rule_skipped_is_not_carried_on_the_line_befores_sign() {
+    let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = asked.clone();
+    let quiet: crate::second_provider::AnotherVoice = Arc::new(move || {
+        counted.fetch_add(1, Ordering::AcqRel);
+        false
+    });
+    let voice: crate::second_provider::AnotherVoice = Arc::new(|| true);
+    let undone = crate::second_provider::carried_past_silent_undone;
+    assert!(undone(true, false, &quiet).is_some(), "skipped: the room's");
+    assert_eq!(
+        asked.load(Ordering::Acquire),
+        0,
+        "the stale sign never read"
+    );
+    assert!(
+        undone(true, true, &quiet).is_none(),
+        "judged, no voice: carried"
+    );
+    assert!(
+        undone(true, true, &voice).is_some(),
+        "judged, another voice"
+    );
+    assert!(
+        undone(false, false, &quiet).is_none(),
+        "no rule: the sign alone"
+    );
+    assert!(undone(false, false, &voice).is_some());
+}
+
+/// #4339 with the new switch off: a silent second face keeps the line the
+/// room's, as #4479 shipped it.
+#[tokio::test]
+async fn without_past_silent_a_silent_second_face_keeps_the_line_the_rooms() {
+    let got = one_line_with(
+        "silent-guest-off",
+        "The floral one, I think.",
+        vec![vec![text("Okay."), Ok(ChatEvent::Done)]],
+        vec![("f1", false), ("f2", false)],
+        BOOT,
+        true,
+        true,
+        None,
+        Some(true),
+        true,
+    )
+    .await;
+    assert_eq!(got.lease, None, "the room's");
+    assert!(!got.held);
 }
 
 /// A `remember` of "We booked the Pine Hill Hotel" and its answer.

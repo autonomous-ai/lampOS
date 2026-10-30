@@ -192,13 +192,16 @@ struct Kept {
 }
 
 /// One exchange as [`Thread::recent`] gives it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Recent {
     /// The note of a request the lamp was given in writing, if it was one.
     pub written: Option<String>,
     /// What the person said; empty for none.
     pub person: String,
     pub lamp: String,
+    /// The room's, told to a person's turn as said in the room
+    /// ([`Thread::recent_with_room_lines`]); never for a turn of the room's.
+    pub room: bool,
 }
 
 /// A scope's exchanges due for its running summary ([`Thread::summary_due`]).
@@ -1193,6 +1196,70 @@ impl Thread {
                 written: exchange.written.clone(),
                 person: exchange.person.trim().to_owned(),
                 lamp: exchange.lamp.trim().to_owned(),
+                room: false,
+            })
+            .collect();
+        recent.reverse();
+        recent
+    }
+
+    /// [`Self::recent_for`] `person` (a memory id), with the room's exchanges
+    /// of the same conversation among them, each marked as the room's
+    /// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339: on lamp-3e83 on 30 Oct one
+    /// conversation went line by line to the person's thread or the room's,
+    /// on whether the mouth was read speaking, so a search answered in the
+    /// room's was unknown to their next turn). The same conversation: back
+    /// from `now`, over their exchanges and the room's only, each within
+    /// [`GOING_ON_FOR`] of the one after it; another person's exchange or a
+    /// longer quiet ends it, and only the room's at or after their own first
+    /// exchange in it are told. Within the same `within` and `most`, the
+    /// newest of both, oldest first. One way only: a turn of the room's, or
+    /// another person's, is never told theirs ([`Self::recent_for`]). A
+    /// forget drops the room's with the rest ([`Self::forget`]). A room's
+    /// line narrowed because another voice spoke it is told too: said
+    /// aloud beside them, the accepted risk (`docs/memory.md`).
+    pub fn recent_with_room_lines(
+        &self,
+        person: &str,
+        now: Instant,
+        within: Duration,
+        most: usize,
+    ) -> Vec<Recent> {
+        let mut later = now;
+        let mut start = self.exchanges.len();
+        for (index, exchange) in self.exchanges.iter().enumerate().rev() {
+            if exchange
+                .whose
+                .as_deref()
+                .is_some_and(|whose| whose != person)
+                || later.saturating_duration_since(exchange.at) > GOING_ON_FOR
+            {
+                break;
+            }
+            later = exchange.at;
+            start = index;
+        }
+        let first_theirs = (start..self.exchanges.len())
+            .find(|&index| self.exchanges[index].whose.as_deref() == Some(person));
+        let mut recent: Vec<Recent> = self
+            .exchanges
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|(index, exchange)| {
+                let theirs = exchange.whose.as_deref() == Some(person);
+                let rooms =
+                    exchange.whose.is_none() && first_theirs.is_some_and(|first| *index >= first);
+                (theirs || rooms)
+                    && now.saturating_duration_since(exchange.at) <= within
+                    && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+            })
+            .take(most)
+            .map(|(_, exchange)| Recent {
+                written: exchange.written.clone(),
+                person: exchange.person.trim().to_owned(),
+                lamp: exchange.lamp.trim().to_owned(),
+                room: exchange.whose.is_none(),
             })
             .collect();
         recent.reverse();
@@ -2277,6 +2344,7 @@ mod tests {
             written: written.map(str::to_owned),
             person: person.to_owned(),
             lamp: lamp.to_owned(),
+            room: false,
         };
         for (day, text) in kept {
             // Read a minute after its newest exchange, within the ten
@@ -3005,6 +3073,97 @@ mod tests {
     /// exchange before the line in hand is A's and began within
     /// [`GOING_ON_FOR`]; someone else's in between, a quiet, or only the
     /// line's own exchange, and they are not.
+    /// #4339 (`LAMP_CONVERSATION_ROOM_LINES_TOLD`): the room's exchanges
+    /// told to A's turn are those of A's conversation only: from A's first
+    /// exchange in it, each within the conversation's 45 s of the next, no
+    /// other person's between, within the chat's window; marked as the
+    /// room's. B's exchanges never, and nothing for the room's turn.
+    #[test]
+    fn room_lines_told_to_a_person_are_their_conversations_only() {
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let t0 = Instant::now();
+        let at = |seconds: u64| t0 + Duration::from_secs(seconds);
+        let lamps = |recent: &[Recent]| -> Vec<(String, bool)> {
+            recent
+                .iter()
+                .map(|said| (said.lamp.clone(), said.room))
+                .collect()
+        };
+        let mut thread = Thread::new();
+        // An earlier conversation of the room's, then a quiet past 45 s.
+        thread.lamp_for(1, "Old room talk.", at(0), None);
+        // A's conversation: the room's before A's first is not A's.
+        thread.lamp_for(2, "Room before A.", at(100), None);
+        thread.lamp_for(3, "A one.", at(110), Some(&a));
+        thread.lamp_for(4, "Room in A's.", at(120), None);
+        thread.lamp_for(5, "A two.", at(130), Some(&a));
+        let told = thread.recent_with_room_lines(&a, at(140), REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(
+            lamps(&told),
+            [
+                ("A one.".to_owned(), false),
+                ("Room in A's.".to_owned(), true),
+                ("A two.".to_owned(), false),
+            ]
+        );
+        // Within the most asked: the newest.
+        let two = thread.recent_with_room_lines(&a, at(140), REMEMBERED_FOR, 2);
+        assert_eq!(
+            lamps(&two),
+            [
+                ("Room in A's.".to_owned(), true),
+                ("A two.".to_owned(), false)
+            ]
+        );
+        // Outside the window: none of it.
+        assert!(
+            thread
+                .recent_with_room_lines(&a, at(140), Duration::from_secs(5), EXCHANGES)
+                .is_empty()
+        );
+        // B's turn is told neither A's nor A's conversation's room lines.
+        assert!(
+            thread
+                .recent_with_room_lines(&b, at(140), REMEMBERED_FOR, EXCHANGES)
+                .is_empty()
+        );
+        // The room's turn is told the room's alone, never A's.
+        assert!(
+            thread
+                .recent_for(None, at(140), REMEMBERED_FOR, EXCHANGES)
+                .iter()
+                .all(|said| !said.lamp.starts_with('A'))
+        );
+        // A quiet past 45 s: a new conversation, the room's line after it
+        // not A's.
+        thread.lamp_for(6, "Room later.", at(200), None);
+        let later = thread.recent_with_room_lines(&a, at(205), REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(
+            lamps(&later),
+            [("A one.".to_owned(), false), ("A two.".to_owned(), false)],
+            "another conversation's room line is not told"
+        );
+        // Another person's exchange between ends A's conversation.
+        thread.lamp_for(7, "A three.", at(210), Some(&a));
+        thread.lamp_for(8, "B one.", at(215), Some(&b));
+        thread.lamp_for(9, "Room after B.", at(220), None);
+        thread.lamp_for(10, "A four.", at(225), Some(&a));
+        let after_b = thread.recent_with_room_lines(&a, at(230), REMEMBERED_FOR, EXCHANGES);
+        assert!(
+            after_b.iter().all(|said| !said.room),
+            "a room line after another person's is not A's conversation's: {after_b:?}"
+        );
+        assert!(after_b.iter().all(|said| said.lamp != "B one."));
+        // A forget drops the room's lines too.
+        thread.forget();
+        assert!(
+            thread
+                .recent_with_room_lines(&a, at(230), REMEMBERED_FOR, EXCHANGES)
+                .is_empty()
+        );
+    }
+
     #[test]
     fn going_on_with_needs_their_own_newest_exchange_within_the_conversation() {
         let now = Instant::now();
@@ -3185,6 +3344,7 @@ mod tests {
                 written: Some("Tell them the code word is ORCHID.".into()),
                 person: String::new(),
                 lamp: "The code word is ORCHID.".into(),
+                room: false,
             }]
         );
         // The note is the written turn's alone: a spoken one after it has none.

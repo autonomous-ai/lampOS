@@ -203,6 +203,24 @@ id is not read back. Forgetting still drops every thread. With nobody ever
 known everything is the room's and nothing here changes
 (`thread::tests::with_nobody_ever_known_nothing_changes`).
 
+With `LAMP_CONVERSATION_ROOM_LINES_TOLD=on` (#4339, the second route), a
+known person's turn is also given the room's exchanges of the same
+conversation, marked as said in the room (`(said in the room)` before the
+words, or a system note when there are none): one conversation split line by
+line into the person's thread and the room's, on whether the mouth was read
+speaking, no longer leaves each answer half of it. The same conversation is
+walked back from now over the person's exchanges and the room's, each within
+45 s (`GOING_ON_FOR`) of the next; another person's exchange or a longer
+quiet ends it, and only the room's from the person's first exchange in it
+count. Within the chat's 12 exchanges and 600 s
+(`thread::Thread::recent_with_room_lines`,
+`thread::tests::room_lines_told_to_a_person_are_their_conversations_only`).
+Never the reverse and never another person's; the thread text and the
+running note stay the scope's own ([memory.md](memory.md)). Part of the
+"said aloud" risk, accepted: a room's line narrowed because another voice
+spoke it is told to the person's turn too, marked, since it was said aloud
+beside them; it never enters their running note or saved memory.
+
 ## A line soon after the lamp's words (`LAMP_FOLLOWS_ON`)
 
 Off unless `LAMP_FOLLOWS_ON=on` in the voice's environment (#829, the
