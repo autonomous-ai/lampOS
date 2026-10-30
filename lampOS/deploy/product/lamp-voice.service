@@ -175,6 +175,9 @@ Environment=LAMP_SECOND_WEATHER=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
 Environment=LAMP_SECOND_CHAT_KEPT=on
+# The model service refusing every turn (#4265; lamp-52e6 30 Oct, the lead's call on #1711): said once and held,
+# a line sent each minute to find it back; a skill's fixed words are said meanwhile, a note the model words waits.
+Environment=LAMP_SECOND_REFUSED_HOLD=on
 Environment=LAMP_VOICE_LINK=on
 # The eyes' camera permitted with the microphone, without which every turn is the room's (#2233): per-person memory on
 # a product lamp. Run on lamp-52e6 on 21 Oct (#2402). A name told before the lamp knows the face is the room's

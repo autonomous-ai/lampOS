@@ -11521,7 +11521,16 @@ fn conversation_with_gate_inner(
                     )
                     && playback_mask.available(say_now_us)))
             && let Some(provider_session) = unasked_session(&cloud, paused)
-            && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
+            // The model service refusing (#4265, the lead's call on #1711):
+            // while turns are held, a skill's fixed words are said as they
+            // are, and a note the model must word waits for the minute's
+            // try, as a spoken line does, or for its own expiry.
+            && let Some((turn, priority, ticket, quoted)) =
+                if refused_hold && model_refusing.holds(say_now_us) {
+                    says.take_while_refused(say_now_us)
+                } else {
+                    says.take(say_now_us)
+                }
         {
             if ticket.last_words() {
                 submission_draining |= cut_for_last_words(

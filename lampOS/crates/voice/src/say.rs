@@ -1031,12 +1031,22 @@ impl Says {
         note: &str,
         priority: u8,
     ) -> (Self, mpsc::Receiver<Answer>) {
+        Self::words_for_test(skill, Words::Note(note.into()), priority)
+    }
+
+    /// [`Self::note_for_test`] for any `words`.
+    #[cfg(test)]
+    pub(crate) fn words_for_test(
+        skill: &str,
+        words: Words,
+        priority: u8,
+    ) -> (Self, mpsc::Receiver<Answer>) {
         let (mut says, ask) = Self::by_hand();
         let (answer, answered) = mpsc::channel();
         ask.send(Asked {
             request: Request {
                 skill: skill.into(),
-                words: Words::Note(note.into()),
+                words,
                 priority,
                 expires_in_ms: 60_000,
                 start_before_us: None,
@@ -1195,9 +1205,30 @@ impl Says {
     /// answered `expired` first, so that none begins after it (the reviewer
     /// on #954).
     pub fn take(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
+        self.take_of(now_us, false)
+    }
+
+    /// [`Self::take`] while the model service refuses and turns are held
+    /// (#4265, the lead's call on #1711): only a `text`, whose words are
+    /// fixed, is taken, as the lamp's own line said as it is with no chat
+    /// asked. A note or a quoted line needs the model to word it: it waits
+    /// for the service, or for its own expiry.
+    pub fn take_while_refused(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
+        self.take_of(now_us, true)
+    }
+
+    fn take_of(&mut self, now_us: u64, refused: bool) -> Option<(String, u8, Ticket, bool)> {
         self.expire(now_us);
         let waiting = loop {
-            let waiting = self.waiting.remove(self.next_index()?);
+            let next = if refused {
+                self.next_of(|request| match &request.words {
+                    Words::Text(text) => crate::onboarding::said_as_is(text).is_some(),
+                    _ => false,
+                })
+            } else {
+                self.next_index()
+            };
+            let waiting = self.waiting.remove(next?);
             if waiting
                 .guard
                 .as_ref()
@@ -1211,8 +1242,12 @@ impl Says {
         };
         let quoted = matches!(waiting.request.words, Words::Quoted(_));
         let who = waiting.request.who;
+        let turn = match &waiting.request.words {
+            Words::Text(text) if refused => crate::onboarding::said_as_is(text),
+            words => words.turn(),
+        };
         Some((
-            waiting.request.words.turn()?,
+            turn?,
             waiting.request.priority,
             Ticket {
                 skill: waiting.request.skill,
