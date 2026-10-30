@@ -1706,11 +1706,12 @@ fn watch_requests_taken(
     (started.get(), logged.into_inner())
 }
 
+// The shutdown watcher's cases, two at most a test (#1806): each runs the
+// real watcher for its 600 ms, so seven in one test took 4.5 s on ARM64.
 #[test]
-fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
+fn the_watcher_starts_the_shutdown_once_for_two_valid_requests() {
     use lamp_msgs::ShutdownSource::Button;
     let at = 50_000_000;
-    // Two valid requests: the shutdown is started once.
     let (started, log) = watch_requests(
         true,
         true,
@@ -1724,7 +1725,12 @@ fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
         log.iter().any(|line| line.contains("already turning off")),
         "{log:?}"
     );
-    // Off, or without --enable: logged, never started.
+}
+
+#[test]
+fn the_watcher_only_logs_a_request_with_the_switch_off_or_without_enable() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
     let (started, log) = watch_requests(false, true, vec![("controls", request(at, Button))]);
     assert_eq!(started, 0);
     assert!(
@@ -1736,7 +1742,12 @@ fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
         watch_requests(true, false, vec![("controls", request(at, Button))]).0,
         0
     );
-    // Stale, from another boot, or not from its source's publisher.
+}
+
+#[test]
+fn the_watcher_starts_no_shutdown_for_a_stale_request_or_one_from_another_boot() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
     let (started, log) = watch_requests(
         true,
         true,
@@ -1751,6 +1762,12 @@ fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
     let mut foreign = request(at, Button);
     foreign.stamp.clock_id = "another-boot".into();
     assert_eq!(watch_requests(true, true, vec![("controls", foreign)]).0, 0);
+}
+
+#[test]
+fn the_watcher_starts_no_shutdown_for_a_request_not_from_its_sources_publisher() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
     let (started, log) = watch_requests(true, true, vec![("cloud", request(at, Button))]);
     assert_eq!(started, 0);
     assert!(
