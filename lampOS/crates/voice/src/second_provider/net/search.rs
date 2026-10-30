@@ -39,6 +39,11 @@ const OWN_SITE: &str = "www.autonomous.ai";
 /// The most of an own product page read: the ErgoChair Pro's was 410 KB on
 /// 30 Oct.
 const OWN_PAGE_MOST_BYTES: usize = 2 * 1024 * 1024;
+/// The most redirects followed on our own site, each staying on it. On 30
+/// Oct `office-chairs/ergonomic-chair/` answered 308 and an old product name,
+/// `office-chairs/ergochair-pro`, 301, both to the page (Reviewer-two's P3
+/// on #4593).
+const OWN_REDIRECTS: usize = 2;
 /// The most of an answer read.
 const MOST_BYTES: usize = 512 * 1024;
 
@@ -274,7 +279,30 @@ fn own_page(url: &str) -> Option<String> {
 /// The price an Autonomous product page at `url` shows, read from its own
 /// schema.org data ([`price_of`]); `None` when it can't be read or has none.
 async fn own_price(client: &reqwest::Client, url: &str) -> Option<Value> {
-    let mut response = client.get(url).send().await.ok()?;
+    own_price_by(client, url, own_redirect).await
+}
+
+/// [`own_price`], each redirect's next address from `next` (the page's and
+/// its `Location`), or none to stop.
+async fn own_price_by(
+    client: &reqwest::Client,
+    url: &str,
+    next: impl Fn(&str, &str) -> Option<String>,
+) -> Option<Value> {
+    let mut url = url.to_owned();
+    let mut response = client.get(&url).send().await.ok()?;
+    for _ in 0..OWN_REDIRECTS {
+        if !response.status().is_redirection() {
+            break;
+        }
+        let location = response
+            .headers()
+            .get(reqwest::header::LOCATION)?
+            .to_str()
+            .ok()?;
+        url = next(&url, location)?;
+        response = client.get(&url).send().await.ok()?;
+    }
     if !response.status().is_success() {
         return None;
     }
@@ -286,6 +314,13 @@ async fn own_price(client: &reqwest::Client, url: &str) -> Option<Value> {
         }
     }
     price_of(&String::from_utf8_lossy(&bytes))
+}
+
+/// Where a redirect from our own page at `from` to `location` goes, resolved
+/// against `from`, only while it stays on our own site ([`own_page`]).
+fn own_redirect(from: &str, location: &str) -> Option<String> {
+    let next = reqwest::Url::parse(from).ok()?.join(location).ok()?;
+    own_page(next.as_str())
 }
 
 /// The price a product page's schema.org data (`application/ld+json`) gives
@@ -404,8 +439,9 @@ fn offers(data: &Value, prices: &mut Vec<f64>, currencies: &mut Vec<String>) {
     }
 }
 
-/// Whether `text` speaks of a price: the word, or an amount with a currency
-/// sign or code beside it.
+/// Whether `text` speaks of a price: the word (Vietnamese's `giá` and `bao
+/// nhiêu` too, Thirteen's P3 on #4593), or an amount with a currency sign or
+/// code beside it.
 fn speaks_of_price(text: &str) -> bool {
     let lower = text.to_lowercase();
     let words: Vec<&str> = lower
@@ -415,9 +451,10 @@ fn speaks_of_price(text: &str) -> bool {
     if words.iter().any(|word| {
         matches!(
             *word,
-            "price" | "prices" | "priced" | "cost" | "costs" | "usd" | "vnd" | "dollars"
+            "price" | "prices" | "priced" | "cost" | "costs" | "usd" | "vnd" | "dollars" | "giá"
         )
     }) || lower.contains("how much")
+        || lower.contains("bao nhiêu")
     {
         return true;
     }
@@ -575,6 +612,8 @@ mod tests {
             "Giá 12.990.000₫",
             "499€ in Germany",
             "about 500 USD",
+            "giá đèn bao nhiêu",
+            "ErgoChair Pro bao nhiêu tiền",
         ] {
             assert!(speaks_of_price(priced), "{priced}");
         }
@@ -711,6 +750,118 @@ mod tests {
                 .starts_with("get /office-chairs/ergonomic-chair http/1.1"),
             "{request}"
         );
+    }
+
+    /// Our own site's redirects: relative or absolute, followed only while
+    /// they stay on it, and rebuilt as `OWN_SITE` over https.
+    #[test]
+    fn own_redirects_stay_on_our_own_site() {
+        let from = "https://www.autonomous.ai/office-chairs/ergochair-pro";
+        for (location, next) in [
+            (
+                "https://www.autonomous.ai/office-chairs/ergonomic-chair",
+                Some("https://www.autonomous.ai/office-chairs/ergonomic-chair"),
+            ),
+            (
+                "/office-chairs/ergonomic-chair",
+                Some("https://www.autonomous.ai/office-chairs/ergonomic-chair"),
+            ),
+            (
+                "http://autonomous.ai/office-chairs/ergonomic-chair",
+                Some("https://www.autonomous.ai/office-chairs/ergonomic-chair"),
+            ),
+            ("https://shop.example.invalid/chair", None),
+            ("https://campaign-api.autonomous.ai/api", None),
+            ("https://www.autonomous.ai:8443/chair", None),
+        ] {
+            assert_eq!(own_redirect(from, location).as_deref(), next, "{location}");
+        }
+    }
+
+    /// Answers each of `answers` (whole HTTP responses) to one connection in
+    /// turn, and gives back the requests' first lines.
+    async fn served_in_turn(
+        answers: Vec<String>,
+    ) -> (String, tokio::task::JoinHandle<Vec<String>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            let mut asked = Vec::new();
+            for answer in answers {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0; 4096];
+                while !String::from_utf8_lossy(&request).contains("\r\n\r\n") {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    request.extend_from_slice(&buffer[..n]);
+                }
+                let text = String::from_utf8_lossy(&request);
+                asked.push(text.lines().next().unwrap_or("").to_owned());
+                socket.write_all(answer.as_bytes()).await.unwrap();
+            }
+            asked
+        });
+        (format!("http://{address}"), task)
+    }
+
+    /// A redirect is followed to the page and its price read; past
+    /// `OWN_REDIRECTS`, or to an address `next` refuses, no price.
+    #[tokio::test]
+    async fn an_own_page_is_read_through_its_redirects() {
+        let moved = |to: &str| {
+            format!(
+                "HTTP/1.1 308 Permanent Redirect\r\nlocation: {to}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+            )
+        };
+        let page = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{OWN_PAGE}",
+            OWN_PAGE.len()
+        );
+        let client = http_client().unwrap();
+        // The tests' own server stands in for our site: any address on it is
+        // followed.
+        let same = |from: &str, location: &str| {
+            Some(
+                reqwest::Url::parse(from)
+                    .ok()?
+                    .join(location)
+                    .ok()?
+                    .to_string(),
+            )
+        };
+        let (base, server) =
+            served_in_turn(vec![moved("/office-chairs/ergonomic-chair"), page.clone()]).await;
+        let price = own_price_by(
+            &client,
+            &format!("{base}/office-chairs/ergochair-pro"),
+            same,
+        )
+        .await;
+        assert_eq!(
+            price,
+            Some(json!({"product": "ErgoChair Pro", "currency": "USD", "from": 499, "to": 549}))
+        );
+        assert_eq!(
+            server.await.unwrap(),
+            [
+                "GET /office-chairs/ergochair-pro HTTP/1.1",
+                "GET /office-chairs/ergonomic-chair HTTP/1.1"
+            ]
+        );
+        // Three redirects in a row: given up after two.
+        let (base, server) = served_in_turn(vec![moved("/a"), moved("/b"), moved("/c")]).await;
+        assert_eq!(
+            own_price_by(&client, &format!("{base}/x"), same).await,
+            None
+        );
+        assert_eq!(server.await.unwrap().len(), 3);
+        // A redirect off the site: not followed.
+        let (base, server) = served_in_turn(vec![moved("https://shop.example.invalid/")]).await;
+        assert_eq!(
+            own_price_by(&client, &format!("{base}/x"), own_redirect).await,
+            None
+        );
+        assert_eq!(server.await.unwrap().len(), 1);
     }
 
     fn body_of(request: &str) -> Value {
