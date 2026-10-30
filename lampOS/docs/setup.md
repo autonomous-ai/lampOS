@@ -97,7 +97,7 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 | Update trust | `/etc/lampOS/update/key.pub` | Nothing: a trust root belongs in the image, not on a page anyone near the lamp can open. |
 | Time zone | Schedule takes `--zone Asia/Ho_Chi_Minh`; Memory, Expression and the policy take `--utc-offset-minutes 420` | `/etc/localtime` and `/etc/timezone`, and `/etc/lampOS/zone.env` again (#820). The product's memory and Expression take `--zone system`, which follows `/etc/localtime` across daylight saving and without a restart; schedule (`LAMP_ZONE`) and skills (`LAMP_UTC_OFFSET_MINUTES`) read `zone.env`. A zone the parts' own zone data lacks leaves `zone.env` as install wrote it, since schedule would not start on it. The voice reads `/etc/localtime` itself. |
 | The person's name | Read by the voice with `LAMP_PERSON_NAME` (the product unit sets it, #806): told to the model after its character, and the hello's name when no face is known (`crates/voice/src/person.rs`). The instruction says the lamp belongs to the person who set it up and gives that name as the answer to "who owns this lamp?" when the name is available to the turn. If the file is absent, the character tells the model to say it cannot verify the owner rather than claiming it has none. With `LAMP_PERSON_NAME_OWNER_ONLY=on` (#2602, off unless set) it is not in the character: a line is told it only when it is the owner's own known face (the face kept under the typed name, alone in view); never nobody in view, an unknown face, another known face or two faces. Just after setup no face is kept yet, so the owner facing the lamp is an unknown face and is not told their own name until they ask the lamp to remember their face, under the name they typed | A private file, one line: `/etc/lampOS/person/name`. |
-| The owner's language (#4473) | Read by the voice at each start with `LAMP_LANGUAGE_FILE` (the product unit sets it): `en`, `vi`, `ja`, `zh` or `ko`; no file, empty, `en` or unknown is English, as before ([second-voice.md](second-voice.md), "The owner's language"). Neither setup nor the app writes it yet: its contract is agreed on #4473 and #4474 | `/etc/lampOS/setup/language`, one line. |
+| The owner's language (#4473) | Read by the voice at each start with `LAMP_LANGUAGE_FILE` (the product unit sets it): `en`, `vi`, `ja`, `zh` or `ko`; no file, empty, `en` or unknown is English, as before ([second-voice.md](second-voice.md), "The owner's language"). Written by setup when the request names one (below) and by the app's `language.set` ("Changed after setup"); `lamp-cloud` reads it back as `system.info`'s `host.language` | `/etc/lampOS/setup/language` (`language` in the settings), one line, root's, 0644. A reset keeps it, as the zone. |
 | The backend's link | `lamp-cloud`, on in the product (`LAMP_CLOUD=on` in its unit, #1418, #1815) | `/etc/lampOS/setup/backend.json` (`backend` in the settings), root's, 0600, written after the zone and before the key. It holds the fields above when the request carries a whole link: an endpoint, a port (a number, or digits), both channels, each field at most 512 bytes with no space or control character (the password may hold spaces). A missing or broken link writes nothing; when the request named one (an `mqtt_endpoint`) the journal gets one line naming the fields that were missing or not valid, never their values. The device's id, the endpoint, the port and both channels are needed; the base, the username and the password may be empty. Neither a broken link nor one that cannot be written fails setup: the lamp joins the Wi-Fi and talks, and only its place in the app waits. The password never appears in a debug line, and a crashed write's temporary file is removed at start. |
 | The person's answer on health and crash reports | `lamp-cloud`, with `LAMP_REPORTS=on` (#1683, `cloud.md`, "Health and crash reports") | `/etc/lampOS/setup/reports.json` (`reports` in the settings), root's, **0644** so `lamp-cloud` (as `lampos`) reads it where it is: `{"share": bool, "asked": 1, "at": "<RFC 3339 UTC>"}`, written after the backend's link and before the key, at every setup, a no included. `share` is true only for the JSON `true` in the request's `share_reports`; absent, `false`, `null`, `"true"`, `1` or anything else is no, so V1's page, this crate's own page and an app that doesn't ask all mean no. `asked` is the question's wording, so a later wording asking for more starts at no. Best effort: a write that fails is a no and never a failed setup. |
 
@@ -402,7 +402,7 @@ on it. The routes:
 |---|---|
 | `GET /api/device/setup/status` | V1's `phase` (`idle`/`connecting`/`connected`/`failed`), `lan_ip`, `error`, `mac` (the kernel's host name, `lamp-xxxx`, which avahi announces), `run`, `set_up_completed`, `runtime_phase`; V2's own `generation`, `share_reports`, `takes_own_keys` and, when keys were given, `own_keys`. |
 | `GET /api/network` | `iw dev wlan0 scan`, parsed as V1 does, in V1's `domain.Network` fields. |
-| `POST /api/device/setup` | V1's `SetupRequest`; its other fields are accepted and ignored. Checked before anything is touched: the network's name and password as for the join; `llm_api_key`, the user's voice key (at most 512 printable characters; none keeps the key already there, as on a lamp that ran V1, but a lamp missing either key file is refused with "the lamp needs its voice key", since it would have Wi-Fi and no voice); V2's own `name` (up to 64 characters) and `timezone` (an IANA name whose file, links followed, is a `TZif` zone file inside the zone data; one the lamp lacks is skipped, not a reason to refuse setup). Replies at once, then, 2 s later as in V1, joins; one run at a time; refused once the lamp is set up. |
+| `POST /api/device/setup` | V1's `SetupRequest`; its other fields are accepted and ignored. Checked before anything is touched: the network's name and password as for the join; `llm_api_key`, the user's voice key (at most 512 printable characters; none keeps the key already there, as on a lamp that ran V1, but a lamp missing either key file is refused with "the lamp needs its voice key", since it would have Wi-Fi and no voice); V2's own `name` (up to 64 characters) and `timezone` (an IANA name whose file, links followed, is a `TZif` zone file inside the zone data; one the lamp lacks is skipped, not a reason to refuse setup); the optional `language` (#4473: exactly `en`, `vi`, `ja`, `zh` or `ko`, trimmed, as `language.set` checks it; absent writes nothing, which is English, and any other value is skipped with a journal line, not a reason to refuse setup, as an unknown zone). Replies at once, then, 2 s later as in V1, joins; one run at a time; refused once the lamp is set up. |
 
 While joining it reads the station address every second and publishes it as
 `lan_ip`, V1's fix for the page that lost the lamp, and once more when the join
@@ -410,7 +410,7 @@ is done. That watcher ends the moment the join does, so the save and "set up"
 never wait out its second. A new run clears the last run's address at once, so V1's page cannot
 follow an old one. Once joined, it saves the name, the time zone
 (`/etc/localtime` linked to the zone, `/etc/timezone` naming it, as V1's
-`timezone.go`, and `/etc/lampOS/zone.env` for schedule and skills, #820) and then the user's key (to the voice's credential and the
+`timezone.go`, and `/etc/lampOS/zone.env` for schedule and skills, #820), the owner's language when the request named one (`/etc/lampOS/setup/language`, 644, #4473) and then the user's key (to the voice's credential and the
 Policy's `jev.key`, both written before either is renamed into place, never
 logged, never in a reply), each private and synced, and only then the
 marker; the keeper starts the lamp. If anything cannot be saved, there is no
@@ -570,8 +570,8 @@ setup the app changes them through root's keys helper,
 
 ## Changed after setup (#1959, on for the product)
 
-The person changes their name, the lamp's name in the app or the time zone
-from the app, without a reset. The app's side is `lamp-cloud`'s
+The person changes their name, the lamp's name in the app, the time zone or
+the owner's language from the app, without a reset. The app's side is `lamp-cloud`'s
 (`LAMP_SETTINGS_CHANGE=on`, `cloud.md`, "Changed after setup"); the writing is
 here, in root's helper `lamp-setup change` (`src/change.rs`), so the files are
 left as a setup with the new value leaves them. Wi-Fi is #1959's second piece.
@@ -582,8 +582,9 @@ left as a setup with the new value leaves them. Wi-Fi is #1959's second piece.
 each connection (`lamp-setup-change@.service`), with the connection as its
 standard input and output. It reads one line (at most 4 KiB), answers
 `{"done": …}` or `{"refused": why}` on one line, and exits, unless a zone
-changed (below). It checks every request itself, whoever connects: exactly
-one of `{"person_name": s}`, `{"display_name": s}` or `{"timezone": s}`.
+or the language changed (below). It checks every request itself, whoever
+connects: exactly one of `{"person_name": s}`, `{"display_name": s}`,
+`{"timezone": s}` or `{"language": s}`.
 Without `--enable` every request is refused, "changes after setup are off",
 and nothing is written. **Only `lamp-cloud` may ask:** the socket's group lets
 a `lampos` process connect, and the helper then takes its peer's credentials
@@ -617,17 +618,20 @@ own switches' (`LAMP_APP_RESTART`, `LAMP_SHUTDOWN`; cloud.md).
 | The person's name | trimmed, at most 64 characters, no control character, line or paragraph separator or direction mark (the voice's own rule); `""` removes it | `/etc/lampOS/person/name`, 600 root, as setup writes it; removed for `""` | the voice reads it again at each hello and each new session: nothing restarts. A session already open keeps the old name until it ends |
 | The lamp's name in the app | the same, and not empty | `/etc/lampOS/setup/display-name`, 644 root (`display_name` in the settings), one line | `lamp-cloud` reads it at each `system.info` as `host.device_name`. **It never changes what the lamp answers to: the wake word stays "Lamp"** |
 | The time zone | an IANA name the lamp's zone data has (`zone_known`, as setup) **and** the parts' bundled zone data has, else refused, so `zone.env` and `/etc/localtime` never disagree | `/etc/localtime`, `/etc/timezone` and `/etc/lampOS/zone.env`, as setup writes them | the voice, memory, Expression and skills follow `/etc/localtime` at each reading. `lamp-schedule` takes `LAMP_ZONE` at start, so after a zone that changed `zone.env` the helper waits for the lamp to be quiet, as an update does before it restarts the voice (`lamp_update::quiet`: resting, nobody heard and nothing said for 45 s), then for no update at work, taking lamp-update's lock and holding it through `systemctl try-restart lamp-schedule.service` (`change::quiet_and_unlocked`): a round puts its build back when a unit it restarted changes process in its watch (`updates.md` step 9), so the zone's restart never falls in one; while an update holds the lock it looks again 10 s later, after the quiet again. The zone's files are written before the wait, so a round running then reads the new `zone.env` at its own restart of `lamp-schedule`, which is the person's zone, with no extra restart in its watch; and a round `serve` starts while the helper holds the lock (a few seconds, as for the app's restart and shutdown) ends "another lamp-update is at work", shown on `update/status` until `serve`'s next round, though nothing failed (Second's and Reviewer-two's P3s on #4490). It waits at most 30 minutes in all; then schedule keeps the old zone until it next starts, and the journal says so. Reminders already set keep the zone they were set in (`schedule.md`) |
+| The owner's language (#4473, `language.set`) | exactly `en`, `vi`, `ja`, `zh` or `ko`, else refused, "language must be one of en, vi, ja, zh, ko", with the file untouched. lamp-update's lock is taken first, as the app's restart takes it: held by an update, refused with the restart's words ("an update is being installed: try again once it is done") and nothing written, so no round's watch sees the voice restart; otherwise held through the write and the voice's restart, and let go at once when the language is the same | `/etc/lampOS/setup/language`, 644 root, one line, staged and renamed into place as setup writes it, before the answer, so `host.language` reads it at once | the voice reads it at start (`LAMP_LANGUAGE_FILE`), so after a language that changed the file the helper waits for the voice to rest between turns (5 s resting, nobody heard, nothing said; at most 45 s, then all the same, as the app's restart) and runs `systemctl try-restart lamp-voice.service`. The same language again restarts nothing. `lamp-cloud` keeps running, so `system.info`, `mic.get` and the link stay answered through it |
 | The owner's place (#4333, [owner-place.md](owner-place.md); a set sent by `lamp-cloud` only with `LAMP_OWNER_PLACE=on`, a clear whatever it is, #4356) | `{"owner_place": {"name", "lat", "lon", "set_at"}}`: rounded again here to about a kilometre (`lamp_msgs::owner_place::fit`), the name as the person's name's rule, `set_at` ISO 8601 UTC; `{"owner_place": null}` clears it | `/etc/lampOS/person/place`, beside the name, 600 root, one JSON line; removed for `null`, and a clear with none kept is no error. The journal says only that it was set or cleared | the voice reads it again for each line that needs a place: nothing restarts |
 
 Tests (`crates/setup/tests/it/change.rs`): each change's files, modes and reply;
-a name removed; a rename to nothing refused; a zone either zone data lacks,
+a name removed; a rename to nothing refused; each language written and a
+bad one refused with the file untouched, the same one restarting nothing,
+and the voice's restart after the 5 s rest; a zone either zone data lacks,
 or a path, refused with nothing changed; the same zone again restarting
 nothing; the switch off, nothing written; requests that are not exactly one
 change, refused without echoing them; the quiet wait (45 s resting, 45 s after
 a turn, a conversation that never ends and a voice that says nothing given up
 at the bound); the binary on standard input and output with a journal line
-holding no name; the product's reset wiping the lamp's name and the units
-running the helper. Not run on a lamp.
+holding no name; the product's reset wiping the lamp's name and keeping
+the language and the zone, and the units running the helper. Not run on a lamp.
 
 ## The Wi-Fi changed after setup (#1959, built, off unless set)
 
@@ -1039,12 +1043,13 @@ readlink /etc/localtime
 | `/etc/localtime` | a link to the phone's zone under `/usr/share/zoneinfo`, **when the request carried a zone the lamp's zone data has**; else as install left it | kept (decided on #806, 17 Oct 23:39) |
 | `/etc/timezone` | the phone's zone, on the same condition | kept |
 | `/etc/lampOS/zone.env` | `LAMP_ZONE` and today's offset, 644, on the same condition and only for a zone the parts' own zone data has too; else as install wrote it | kept |
+| `/etc/lampOS/setup/language` (the owner's language, #4473) | one code, 644 root, when the request named one the lamp speaks; else absent (English) | kept, as the zone, and with it the voice's `/var/lib/lampOS/voice/language-said`, so the first start after a reset announces no change |
 | `/etc/lampOS/setup/backend.json` (the app's link) | 600 root, **only when the app's request carried a whole link** | wiped |
 | `/etc/lampOS/setup/reports.json` (the answer on reports, #1683) | 644 root, at every setup, a no included, unless the write failed | wiped |
 | `/etc/lampOS/setup/display-name` (the lamp's name in the app, #1959) | not written by setup; 644 root after a `device.rename` from the app | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
 
-Setup saves them in this order: the name, the zone, the backend's link, the
+Setup saves them in this order: the name, the zone, the language, the backend's link, the
 answer on reports, the key, then the marker. So a marker means all the others were written, but
 the backend's link and the answer on reports: those are best effort, and a marker with no
 `backend.json` is what a failed write leaves (its journal line is below). The

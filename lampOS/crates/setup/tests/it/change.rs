@@ -51,6 +51,7 @@ impl Root {
             "backend": self.0.join("etc/backend.json"),
             "reports": self.0.join("etc/reports.json"),
             "display_name": self.0.join("etc/display-name"),
+            "language": self.0.join("etc/setup/language"),
         }))
         .unwrap()
     }
@@ -238,6 +239,47 @@ fn a_zone_is_written_as_setup_writes_it_and_only_a_new_one_restarts_schedule() {
             .unwrap()
             .contains("LAMP_ZONE=Asia/Ho_Chi_Minh\n")
     );
+}
+
+/// #4473: each language the lamp speaks is written as setup writes it,
+/// one line, 0644, and only a new one restarts the voice. Anything else is
+/// refused with the app's words and the file is left as it was.
+#[test]
+fn a_language_is_written_and_only_a_new_one_restarts_the_voice() {
+    let root = Root::new();
+    let config = root.config();
+    for code in ["vi", "ja", "zh", "ko", "en"] {
+        let (reply, done) = answer(&json!({"language": code}).to_string(), &config, true);
+        assert_eq!(reply, json!({"done": {"language": code}}));
+        let done = done.unwrap();
+        assert!(done.restart_voice && !done.restart_schedule, "{code}");
+        assert_eq!(done.said, format!("the language is now {code}"));
+        assert_eq!(
+            fs::read_to_string(&config.language).unwrap(),
+            format!("{code}\n")
+        );
+        assert_eq!(mode(&config.language), 0o644);
+    }
+    // The same language again: nothing for the voice to take up.
+    let (_, done) = answer(r#"{"language": "en"}"#, &config, true);
+    assert!(!done.unwrap().restart_voice);
+    for bad in [
+        json!("fr"),
+        json!("EN"),
+        json!(" ja"),
+        json!(""),
+        json!(1),
+        json!(null),
+    ] {
+        let (reply, done) = answer(&json!({ "language": bad }).to_string(), &config, true);
+        assert_eq!(
+            reply,
+            json!({"refused": "language must be one of en, vi, ja, zh, ko"}),
+            "{bad}"
+        );
+        assert!(done.is_none());
+        assert_eq!(fs::read_to_string(&config.language).unwrap(), "en\n");
+    }
 }
 
 #[test]
@@ -491,6 +533,50 @@ fn a_restart_or_shutdown_is_answered_first_and_refused_under_an_update() {
     let _ = fs::remove_dir_all(folder);
 }
 
+/// Fourth's P2 on #4485: a language takes lamp-update's lock before it is
+/// written. Under an update it is refused with the restart's words and the
+/// file is untouched; otherwise the lock is held for the voice's restart and
+/// let go after it, and the same language again holds none.
+#[test]
+fn a_language_takes_the_update_lock_before_it_is_written() {
+    use lamp_keeper::restart::INSTALLING;
+    let root = Root::new();
+    let config = root.config();
+    let records = lamp_update::records::Records::new(root.0.join("update"));
+    let held = records.lock().unwrap();
+    let (reply, done, lock) =
+        change::answer_holding(r#"{"language": "ja"}"#, &config, true, &records);
+    assert_eq!(reply, json!({ "refused": INSTALLING }));
+    assert!(done.is_none() && lock.is_none());
+    assert!(!config.language.exists(), "nothing written");
+    // Other changes don't wait on it.
+    let (reply, _, lock) =
+        change::answer_holding(r#"{"person_name": "Lan"}"#, &config, true, &records);
+    assert_eq!(reply, json!({"done": {"name": "Lan"}}));
+    assert!(lock.is_none());
+    drop(held);
+    let (reply, done, lock) =
+        change::answer_holding(r#"{"language": "ja"}"#, &config, true, &records);
+    assert_eq!(reply, json!({"done": {"language": "ja"}}));
+    assert!(done.unwrap().restart_voice);
+    assert!(lock.is_some(), "held through the restart");
+    assert!(records.lock().is_err(), "no update starts meanwhile");
+    drop(lock);
+    assert!(records.lock().is_ok(), "let go after the restart");
+    let (_, done, lock) = change::answer_holding(r#"{"language": "ja"}"#, &config, true, &records);
+    assert!(!done.unwrap().restart_voice);
+    assert!(lock.is_none());
+    assert!(records.lock().is_ok(), "the same language holds nothing");
+    // A bad language under no update: refused, nothing held.
+    let (reply, _, lock) = change::answer_holding(r#"{"language": "fr"}"#, &config, true, &records);
+    assert_eq!(
+        reply,
+        json!({"refused": "language must be one of en, vi, ja, zh, ko"})
+    );
+    assert!(lock.is_none());
+    assert_eq!(fs::read_to_string(&config.language).unwrap(), "ja\n");
+}
+
 /// A restart from the app waits for the voice to rest between turns (5 s),
 /// never cutting a turn, and restarts all the same after 45 s.
 #[test]
@@ -529,6 +615,14 @@ fn a_restart_from_the_app_waits_for_the_voice_to_rest() {
         said.ends_with("; lampos.target could not be restarted: exit status: 1"),
         "{said}"
     );
+    // A new language restarts the voice after the same wait (#4473).
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| vec![Heard::State(Voice::Resting)]),
+    };
+    let said = change::when_rested(&mut ears, "lamp-voice.service", || Ok(()));
+    assert_eq!(ears.now, 5 * S);
+    assert_eq!(said, "the voice rested; lamp-voice.service restarted");
 }
 
 /// The binary as its unit runs it: one line in on standard input, one
@@ -662,6 +756,25 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     assert!(wiped("/etc/lampOS/person/name"));
     // The owner's place, beside the name (#4333).
     assert!(wiped("/etc/lampOS/person/place"));
+    // The owner's language is kept, as the zone is (#4473), and with it the
+    // voice's record of the language it last announced, so the first start
+    // after a reset announces no change it did not make.
+    for kept in [
+        "/etc/lampOS/setup/language",
+        "/var/lib/lampOS/voice/language-said",
+        "/etc/timezone",
+        "/etc/localtime",
+        "/etc/lampOS/zone.env",
+    ] {
+        assert!(
+            !plan["wipe"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| std::path::Path::new(kept).starts_with(w.as_str().unwrap())),
+            "{kept} is wiped"
+        );
+    }
     let own: Config =
         serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
     assert_eq!(
@@ -671,6 +784,15 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     assert_eq!(
         own.display_name,
         std::path::Path::new("/etc/lampOS/setup/display-name")
+    );
+    // Where the voice's unit reads it.
+    assert_eq!(
+        own.language,
+        std::path::Path::new("/etc/lampOS/setup/language")
+    );
+    assert!(
+        include_str!("../../../../deploy/product/lamp-voice.service")
+            .contains("Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language\n")
     );
     let unit = include_str!("../../../../deploy/product/lamp-setup-change@.service");
     assert!(unit.contains(
