@@ -540,6 +540,87 @@ pub fn is_local(ip: std::net::IpAddr) -> bool {
     }
 }
 
+/// The subnets the lamp reaches directly, by its routes with no gateway:
+/// its own network, whatever addresses it uses. lamp-75c9's office LAN is
+/// 172.168.20.0/23 (30 Oct), which is none of the private ranges.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct OnLink {
+    v4: Vec<(u32, u32)>,
+    v6: Vec<(u128, u8)>,
+}
+
+impl OnLink {
+    /// Read now from `/proc/net/route` and `/proc/net/ipv6_route`; none if
+    /// they can't be read.
+    pub fn read() -> Self {
+        let text = |path| std::fs::read_to_string(path).unwrap_or_default();
+        Self::parse(&text("/proc/net/route"), &text("/proc/net/ipv6_route"))
+    }
+
+    /// From the two tables' text: an IPv4 route with no gateway and a mask,
+    /// an IPv6 route with no next hop and a prefix, neither on `lo`.
+    pub fn parse(v4: &str, v6: &str) -> Self {
+        let hex32 = |word: &str| u32::from_str_radix(word, 16).ok();
+        let v4 = v4
+            .lines()
+            .skip(1)
+            .filter_map(|line| {
+                let fields: Vec<&str> = line.split_whitespace().collect();
+                let (iface, destination, gateway, mask) = (
+                    fields.first()?,
+                    fields.get(1)?,
+                    fields.get(2)?,
+                    fields.get(7)?,
+                );
+                // Each is the address's bytes in network order, printed as
+                // the host's own number: on a little-endian lamp, read back.
+                let address = |word: &str| hex32(word).map(|n| u32::from_be_bytes(n.to_ne_bytes()));
+                let (destination, gateway, mask) =
+                    (address(destination)?, hex32(gateway)?, address(mask)?);
+                (*iface != "lo" && gateway == 0 && mask != 0).then_some((destination, mask))
+            })
+            .collect();
+        let v6 = v6
+            .lines()
+            .filter_map(|line| {
+                let fields: Vec<&str> = line.split_whitespace().collect();
+                let (destination, length, next_hop, iface) = (
+                    fields.first()?,
+                    fields.get(1)?,
+                    fields.get(4)?,
+                    fields.get(9)?,
+                );
+                let destination = u128::from_str_radix(destination, 16).ok()?;
+                let length = u8::from_str_radix(length, 16).ok()?;
+                let next_hop = u128::from_str_radix(next_hop, 16).ok()?;
+                (*iface != "lo" && next_hop == 0 && (1..=128).contains(&length))
+                    .then_some((destination, length))
+            })
+            .collect();
+        Self { v4, v6 }
+    }
+
+    /// Whether `ip` is in one of the subnets.
+    pub fn holds(&self, ip: std::net::IpAddr) -> bool {
+        match ip {
+            std::net::IpAddr::V4(v4) => {
+                let ip = u32::from(v4);
+                self.v4.iter().any(|(net, mask)| ip & mask == net & mask)
+            }
+            std::net::IpAddr::V6(v6) => {
+                if let Some(v4) = v6.to_ipv4_mapped() {
+                    return self.holds(std::net::IpAddr::V4(v4));
+                }
+                let ip = u128::from(v6);
+                self.v6.iter().any(|(net, length)| {
+                    let mask = u128::MAX << (128 - u32::from(*length));
+                    ip & mask == net & mask
+                })
+            }
+        }
+    }
+}
+
 pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
     let ticking = shared.clone();
     tokio::spawn(async move {
@@ -565,7 +646,7 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
         };
         // Only the lamp's own network, unless `--remote on`: anyone else is
         // closed before TLS, and said once in the journal.
-        let remote = !is_local(peer.ip());
+        let remote = !is_local(peer.ip()) && !OnLink::read().holds(peer.ip());
         if remote && !shared.remote.load(Ordering::Relaxed) {
             eprintln!(
                 "lamp-control: refused a connection from {}: not on the lamp's own network",
@@ -984,6 +1065,26 @@ mod tests {
         ] {
             assert!(!local(far), "{far}");
         }
+    }
+
+    #[test]
+    fn the_lamps_own_subnets_are_its_network_whatever_their_addresses() {
+        // lamp-75c9, 30 Oct: 172.168.20.0/23 on wlan0, a default route.
+        let v4 = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                  wlan0\t00000000\t0114A8AC\t0003\t0\t0\t3006\t00000000\t0\t0\t0\n\
+                  wlan0\t0014A8AC\t00000000\t0001\t0\t0\t3006\t00FEFFFF\t0\t0\t0\n";
+        let v6 = "fd001234000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000001 00000000 00000001 wlan0\n\
+                  00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 ffffffff 00000001 00000000 00200200       lo\n";
+        let on_link = OnLink::parse(v4, v6);
+        let holds = |text: &str| on_link.holds(text.parse().unwrap());
+        assert!(holds("172.168.21.8"), "the laptop beside 75c9");
+        assert!(holds("172.168.20.1"));
+        assert!(!holds("172.168.22.1"), "the next /23");
+        assert!(!holds("8.8.8.8"), "the default route is no subnet");
+        assert!(holds("fd00:1234::7"));
+        assert!(!holds("fd00:1235::7"));
+        assert!(!holds("::1"), "lo is left out; loopback is local by itself");
+        assert_eq!(OnLink::parse("", ""), OnLink::default());
     }
 
     #[test]
