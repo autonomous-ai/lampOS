@@ -1334,6 +1334,14 @@ pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look:
 /// both, as examples, in one line.
 pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember something, call remember: saying you will is not keeping it. When they ask you to forget something they told you, such as \"please forget that\" or \"forget what I just told you\", call forget; \"forget it, it doesn't matter\" or \"never mind\" about the conversation is not that. For something from an earlier conversation, call recall.";
 
+/// Told after [`MEMORY_CALLS_NOTE`] (#4339's third long run on lamp-06c1,
+/// 30 Oct: 3 recalls in 96 turns; "I don't have anything" four times about
+/// the person's own life while it was kept, observed or in a talk note, and
+/// "what did we talk about earlier?" never recalled). Only for their own
+/// life, so a joke, a fact or the time asks nothing first; and what recall
+/// finds answers the question, never more (rule 8).
+pub(crate) const RECALL_BEFORE_NOT_KNOWING: &str = " Before you say you don't know or don't remember something about their own life (their plans, the people in it, their work, or what you talked about earlier), call recall first, and say you don't remember only if it finds nothing. Use what it finds only to answer what they asked.";
+
 /// Whether a hearing of the name at `at_us` with `score` is one since
 /// `from_us`, as the rule takes a hearing for a line.
 fn name_counts(score: f32, at_us: u64, from_us: u64) -> bool {
@@ -1361,8 +1369,12 @@ pub(crate) fn call_note(by_name: bool) -> &'static str {
 /// when the model looks by a call.
 pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool) -> String {
     let look = if look_by_call { LOOK_CALL_NOTE } else { "" };
-    let memory = if memory { MEMORY_CALLS_NOTE } else { "" };
-    format!("{character}{SPOKEN_NOTE}{look}{memory}")
+    let (memory, before) = if memory {
+        (MEMORY_CALLS_NOTE, RECALL_BEFORE_NOT_KNOWING)
+    } else {
+        ("", "")
+    };
+    format!("{character}{SPOKEN_NOTE}{look}{memory}{before}")
 }
 
 /// The look's function (#1712): a spoken turn with a full look looks by it.
@@ -23129,7 +23141,21 @@ mod tests {
         // forget and recall are named; without one, none is.
         assert!(!told.contains("call remember"));
         let remembers = super::spoken_character("CHARACTER", false, true);
-        assert!(remembers.ends_with(super::MEMORY_CALLS_NOTE));
+        assert!(remembers.ends_with(&format!(
+            "{}{}",
+            super::MEMORY_CALLS_NOTE,
+            super::RECALL_BEFORE_NOT_KNOWING
+        )));
+        // #4339: recall before "I don't know" about their own life, talk
+        // included, and what it finds is never told unasked.
+        for words in [
+            "call recall first",
+            "what you talked about earlier",
+            "only if it finds nothing",
+            "only to answer what they asked",
+        ] {
+            assert!(super::RECALL_BEFORE_NOT_KNOWING.contains(words), "{words}");
+        }
         for call in [
             "call remember",
             "call forget",

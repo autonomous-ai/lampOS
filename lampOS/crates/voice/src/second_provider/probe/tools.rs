@@ -281,7 +281,14 @@ fn deepseek_route(
     Ok((base, key))
 }
 
-pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io::Result<()> {
+/// With `recall_only`, only [`super::recall_first`]'s lines are asked
+/// (`--recall`, #4339).
+pub async fn run(
+    provider_config: &Path,
+    second_config: &Path,
+    runs: u32,
+    recall_only: bool,
+) -> io::Result<()> {
     // `remember` declared and answered as the unit's environment has it
     // (#2510): `replaces` only with `LAMP_MEMORY_REPLACES=on`.
     crate::remember::switch_replaces(
@@ -311,6 +318,28 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     let schedule_declared = heeding_declared
         .iter()
         .any(|tool| tool.name == "set_reminder");
+    if recall_only {
+        let chat = |arm| {
+            let tools = super::recall_first::declared(declared.clone(), arm);
+            let declare: net::Declare = Arc::new(move || tools.clone());
+            Chat::deepseek_at(&base, model, key.expose(), declare, false).map_err(io::Error::other)
+        };
+        let (before, now) = (
+            chat(super::recall_first::Arm::Before)?,
+            chat(super::recall_first::Arm::Now)?,
+        );
+        println!(
+            "tools: recall before \"I don't know\" (#4339), DeepSeek's {model} {}, thinking off, {count} functions, {} lines, {runs} runs of each arm",
+            super::super::worker::deepseek_where(&config.hosted),
+            super::recall_first::LINES.len()
+        );
+        for line in super::recall_first::verdict(
+            &super::recall_first::ask([&before, &now], &character, runs).await,
+        ) {
+            println!("{line}");
+        }
+        return Ok(());
+    }
     let declare: net::Declare = Arc::new(move || declared.clone());
     let today = Chat::deepseek_at(&base, model, key.expose(), declare.clone(), false)
         .map_err(io::Error::other)?;

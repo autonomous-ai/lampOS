@@ -234,6 +234,31 @@ phòng:
   được dẫn các bản ghi; voice bỏ một đề xuất không có từ nào trong lời người
   đó nói ở các bản ghi được dẫn mà lại có trong ghi chú.
 
+## Gọi `recall` trước khi nói không biết
+
+Mô tả `recall` của voice bảo mô hình gọi nó trước khi nói không nhớ một sở
+thích của chính người đó, như đồ uống yêu thích, trừ khi câu trả lời đã có
+trong cuộc trò chuyện (`remember::RECALL_OWN_PREFERENCE`; lamp-06c1, 26/10:
+P09 đáp «tôi không biết» mà không gọi, P40 gọi và nói cà phê đen). Từ #4339
+(lần chạy dài thứ ba trên lamp-06c1, 30/10: 3 lần `recall` trong 96 lượt, bốn
+câu «tôi không có gì» về đời sống của chính người đó trong khi điều ấy đã được
+giữ, quan sát hay nằm trong một ghi chú cuộc trò chuyện), cùng câu đó phủ cả
+đời sống của họ: kế hoạch, những người trong đời họ, công việc và những gì đã
+nói với nhau. `recall` nay «không dành cho những gì bạn còn thấy của cuộc
+trò chuyện này» (`remember::RECALL_NOT_FOR`); trước đây là «không dành cho
+cuộc trò chuyện này», khiến mô hình không hỏi phần đầu của một cuộc trò
+chuyện dài, nay đã nằm trong ghi chú cuộc trò chuyện. Lượt nói cũng nói điều
+đó, sau các lệnh của bộ nhớ (`worker::RECALL_BEFORE_NOT_KNOWING`): trước khi
+nói không biết hay không nhớ điều gì về đời sống của họ, gọi `recall` trước,
+chỉ nói «tôi không nhớ» khi nó không tìm thấy gì, và chỉ dùng những gì tìm
+được để trả lời điều họ hỏi (không bao giờ kể ra khi không được hỏi). Một câu
+đùa, một sự thật, giờ giấc hay chuyện phiếm không hỏi gì trước, nên một lượt
+bình thường không có vòng `recall` trước âm thanh đầu tiên. Đó là lời cho mô
+hình, không phải một bảo đảm; memory vẫn chỉ tìm trong phạm vi của người hỏi.
+Ghi chú cuộc trò chuyện vẫn chỉ đến qua `recall`: không ghi chú nào được hiện
+khi một phiên bắt đầu. `probe-tools ... --recall` đo quy tắc này so với lời
+trước nó trên mô hình thật ([second-voice.md](../second-voice.md)).
+
 ## Người hỏi chưa nhận ra được, hỏi về chính mình
 
 Khi đèn không nhận ra người hỏi (không thấy mặt quen, không biết tên),

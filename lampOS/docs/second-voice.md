@@ -2643,7 +2643,12 @@ after a take-over, but now for every turn:
   wrong forget deletes what they asked the lamp to keep). Worded only
   against "forget it", the note left "Hey Lamp, please forget that." in
   words on lamp-4ace, nothing forgotten (the first builder at 02:05). For
-  an earlier conversation, call `recall`. The memory note
+  an earlier conversation, call `recall`. Then
+  `worker::RECALL_BEFORE_NOT_KNOWING` (#4339, lamp-06c1's third long run on
+  30 Oct: 3 recalls in 96 turns): before saying it doesn't know or remember
+  something about their own life (plans, people, work, what they talked
+  about earlier), call `recall` first, say it doesn't remember only if
+  that finds nothing, and use what it finds only to answer the question. The memory note
   itself names only `recall`, and on lamp-4ace on 20 Oct DeepSeek answered
   "remember …" and "forget that" in words (#1722, 00:34).
 - **The time, as it is asked** (`local_time::told_asked_here`, spoken
@@ -5361,6 +5366,20 @@ systemd-run --pty --wait \
   /opt/lampOS/voice/current/lamp-voice probe-tools \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10
 ```
+
+With `--recall` last (`probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+--recall`, `second_provider/probe/recall_first.rs`, #4339) it asks only
+whether a line calls `recall` first, each line a fresh session as
+`quality-today` asks it, in two arms: `before`, the spoken turn without
+`worker::RECALL_BEFORE_NOT_KNOWING` and recall described as it was ("Not
+for this conversation", the preference-only line); `now`, as the route
+tells it. Five `own-*` lines ask about the person's own life with the
+answer only in memory (a train time, what they talked about earlier, a
+hotel, a project, a dinner): right only as `recall`. Five `plain-*` lines
+(a joke, a capital, the time, small talk, a quiz answer) are right with
+any first call but `recall`, since one there would put a round before the
+first audio. It prints each arm's line counts, then `own recalled=N/M
+plain without recall=N/M`.
 
 Its first line says which way it asks, through the relay or on DeepSeek's
 own API, as the voice's start line does: never the URL. The probe only asks the model and
