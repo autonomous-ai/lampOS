@@ -816,6 +816,7 @@ pub mod tests {
                     &state,
                     lock_wait,
                     None,
+                    None,
                     &stream,
                     &stream,
                 );
@@ -1659,6 +1660,7 @@ pub mod tests {
                     &folder.join("no-state"),
                     lamp_skills::package::ASKED_LOCK_WAIT,
                     Some(store),
+                    None,
                     &stream,
                     &stream,
                 );

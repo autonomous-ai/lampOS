@@ -694,6 +694,11 @@ on the lamp that run on their own".
 ← {"re":11,"ok":true}
 ```
 
+- **The reset** (the 5 s pinhole, setup's product plan) wipes
+  `/var/lib/lampOS/skills-dev`: every pushed skill and the owner's yes to
+  any that sees the picture (`.yes.json`) go with the owner, and the next
+  owner's lamp has neither (Reviewer-three's P2 on #4514). The pairings
+  themselves are lamp-control's to wipe.
 - **Parts:** `data` is at most 48 KiB of base64 (36 KiB of the package),
   so a frame stays under 64 KiB; at most 32 parts, in order from 0. One push
   in flight on the lamp: a second, from any computer, is `busy` until the
