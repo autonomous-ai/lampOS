@@ -69,18 +69,19 @@ impl<'de> Deserialize<'de> for Control {
     }
 }
 
-/// A microphone that failed to open at start, and opened while it was waited
+/// A device that failed to open at start, and opened while it was waited
 /// for: off USB (`gone`) or still held by another (busy), for how long since
-/// the first failed open, and on which try it opened.
+/// the first failed open, and on which try it opened. The microphone and the
+/// speaker (#4332) both report their open wait with it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct MicWaited {
+pub struct OpenWaited {
     pub gone: bool,
     pub waited_ms: u64,
     pub opened_on_try: u32,
 }
 
-impl MicWaited {
+impl OpenWaited {
     /// For a person: the journal, the session's events and the lamp's health.
     pub fn plain(&self) -> String {
         let seconds = self.waited_ms as f64 / 1000.0;
@@ -181,7 +182,7 @@ pub enum WorkerEvent {
         prepared_at_us: u64,
         /// The microphone failed to open at first and was waited for (#1178).
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        waited: Option<MicWaited>,
+        waited: Option<OpenWaited>,
     },
     CaptureStarted {
         epoch: u64,

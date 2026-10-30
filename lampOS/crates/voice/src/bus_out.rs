@@ -585,7 +585,7 @@ pub fn health(
     link_up: bool,
     down_for_us: u64,
     refusal: Option<crate::provider_worker::Fault>,
-    mic_at_start: Option<crate::wire::MicWaited>,
+    mic_at_start: Option<crate::wire::OpenWaited>,
 ) -> lamp_msgs::Diagnostic {
     use crate::provider_worker::Fault;
     use lamp_msgs::{Diagnostic, Level};
@@ -1204,7 +1204,7 @@ impl BusOut {
         link_up: bool,
         refusal: Option<crate::provider_worker::Fault>,
         now_us: u64,
-        mic_at_start: Option<crate::wire::MicWaited>,
+        mic_at_start: Option<crate::wire::OpenWaited>,
     ) {
         self.reported_at_us = None;
         self.report(link_up, refusal, now_us, mic_at_start);
@@ -1218,7 +1218,7 @@ impl BusOut {
         link_up: bool,
         refusal: Option<crate::provider_worker::Fault>,
         now_us: u64,
-        mic_at_start: Option<crate::wire::MicWaited>,
+        mic_at_start: Option<crate::wire::OpenWaited>,
     ) {
         if link_up {
             self.down_since_us = None;
@@ -1998,7 +1998,7 @@ mod tests {
         );
         // A voice mic waited for at start (#1178): the message while well,
         // and after the warning's, so `lamp-health` names it either way.
-        let waited = Some(crate::wire::MicWaited {
+        let waited = Some(crate::wire::OpenWaited {
             gone: true,
             waited_ms: 4_300,
             opened_on_try: 18,
