@@ -61,6 +61,9 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `path` | string, required | a WAV file on this computer: 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS. Each computer keeps up to 64 clips and 20 MB on the lamp; revoking it deletes them | — | | |
 | `lamp_sounds` | none | | | | speak | no |
 | `lamp_remove_sound` | `name` | string, required | one of this computer's clips | — | speak | no |
+| `lamp_volume` | `to` | integer | 0 to 100 of what the lamp allows; 0 is muted. Exactly one of `to`, `step` or `mute`. The person's own volume, the same they set by voice or in the app; it returns the level it left, `{level, muted}` | none | speak | no |
+| | `step` | string | `up` or `down`: the lamp's own step, within its floor and ceiling | none | | |
+| | `mute` | boolean | `true` mutes; `false` brings it back to where it was | none | | |
 | `lamp_start_turn` | `prompt` | string | words the lamp says first, 300 characters at most. Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. What the person says never comes back, only how the turn ended (`turn finished`, or `turn dropped: …` with the voice's why); refused in quiet hours, as `lamp_say` | none | speak, hear | no |
 | | `wait` | boolean | return when the turn ends, 120 s at most | false | | |
 | `lamp_end_turn` | none | | ends the turn this computer started, never another's; with none, `busy: not this computer's turn` | | speak | no |
@@ -106,6 +109,7 @@ All JSON, read when asked; none takes a parameter.
 | `lamp://state/light` | its light | none |
 | `lamp://state/mood` | its mood | none |
 | `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
+| `lamp://state/volume` | its speaker's volume: `level` 0 to 100 and `muted` | speak (listed only with it) |
 | `lamp://lease` | the leases this server holds now | none |
 | `lamp://events/recent` | the last 50 events `lamp_wait_for` heard, newest last; never a transcript: `phrase.heard` says only which registered phrase it was | none |
 | `lamp://events` | the events stream: every event the grants let this computer hear but `phrase.heard`, the last 200, newest last, each with its `seq`, and `latest`. Subscribable: a subscribed client gets `notifications/resources/updated` for each new event, and for `lamp://state/presence` or `lamp://state/lamp` when one changes it | none (each event needs its own grant) |

@@ -64,7 +64,8 @@
         "button",
         "time",
         "lamp.changed",
-        "air.changed"
+        "air.changed",
+        "volume.changed"
       ]
     },
     "state_name": {
@@ -74,7 +75,8 @@
         "mood",
         "lamp",
         "air",
-        "device"
+        "device",
+        "volume"
       ]
     },
     "colour": {
@@ -202,6 +204,9 @@
         },
         {
           "$ref": "#/$defs/sound.remove"
+        },
+        {
+          "$ref": "#/$defs/volume"
         },
         {
           "$ref": "#/$defs/stop"
@@ -2324,6 +2329,32 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "volume.changed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "0 to 100 of what the lamp allows."
+              },
+              "muted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "level",
+              "muted"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "camera.frame"
               }
             }
@@ -2473,6 +2504,57 @@
           "description": "Each temperature the board reports, by its sensor's name, in degrees Celsius."
         }
       },
+      "additionalProperties": false
+    },
+    "volume": {
+      "description": "The speaker's volume, the person's own (the same the voice and the app set, through lamp-actions): exactly one of a level, a step or a mute. Needs the speak grant; no rate. The reply is the level it left, {level, muted}.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "volume"
+        },
+        "to": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "A level, 0 to 100 of what the lamp allows; 0 is muted."
+        },
+        "step": {
+          "enum": [
+            "up",
+            "down"
+          ],
+          "description": "The voice's own step, within the lamp's floor and ceiling."
+        },
+        "mute": {
+          "type": "boolean",
+          "description": "true mutes; false brings it back to where it was."
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "to"
+          ]
+        },
+        {
+          "required": [
+            "step"
+          ]
+        },
+        {
+          "required": [
+            "mute"
+          ]
+        }
+      ],
       "additionalProperties": false
     },
     "camera.snapshot": {

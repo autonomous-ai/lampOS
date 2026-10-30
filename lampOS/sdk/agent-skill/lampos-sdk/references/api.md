@@ -46,6 +46,7 @@ naming every public call, tool, event and error code they have.
 | `touch` | `kind`: `tap` or `pet` | a tap or a pet |
 | `button` | `press`: `long_press` | the button is held |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` | one of them changes |
+| `volume.changed` (speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
 | `air.changed` (air) | `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`); a value the sensor doesn't know is left out | the first reading, then a value moves by its step (particles 5, CO2 50 ppm, humidity 3, temperature 0.5 °C) or `feel` changes; at most every 5 s |
 | `time` | your schedule | accepted, not produced yet |
 | `lease` (unasked) | `lease`, `state` (`held`, `suspended`, `lost`), `why` | the lamp takes your lease back, or gives it again |
@@ -56,9 +57,10 @@ naming every public call, tool, event and error code they have.
 draws now), `mood` (`energy`, `warmth`, `awake`, `asleep`), `lamp`
 (`talking`, `paused`, `private`, `asleep`), `air` (the newest reading as
 `air.changed` gives it; needs air), `device` (`cpu_load`, `memory_used`,
-`disk_free`, `uptime_s`, `temperature_c`; needs device). `light` and `mood`
-are `null` until the lamp has heard them; `air` and `device` are
-`{"known": false}` with no reading in 15 s.
+`disk_free`, `uptime_s`, `temperature_c`; needs device), `volume`
+(`level`, `muted`; needs speak). `light`, `mood` and `volume` are `null`
+until the lamp has heard them; `air` and `device` are `{"known": false}`
+with no reading in 15 s.
 
 ## Leases
 
@@ -90,6 +92,7 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | keep a clip on the lamp | `await lamp.upload_sound(name, "chime.wav")` | `lamp.uploadSound(name, bytes)` | `lamp_upload_sound(name, path)` | speak |
 | your clips | `await lamp.sounds()` | `lamp.sounds()` | `lamp_sounds()` | speak |
 | delete a clip | `await lamp.remove_sound(name)` | `lamp.removeSound(name)` | `lamp_remove_sound(name)` | speak |
+| the speaker's volume, the person's own (one of `to` 0–100, `step` `up`/`down`, `mute`) | `await lamp.volume(to=30)`, `volume(step="down")`, `volume(mute=True)` | `lamp.volume({ to: 30 })` | `lamp_volume(to, step, mute)`, `lamp://state/volume` | speak |
 | start a turn (the lamp asks, the person answers) | `await lamp.start_turn("Shall we start?", wait=True)` | `lamp.startTurn('Shall we start?', { wait: true })` | `lamp_start_turn(prompt, wait)` | speak and hear |
 | end the turn you started | `await lamp.end_turn()` | `lamp.endTurn()` | `lamp_end_turn()` | speak |
 | your mute on, off | `await lamp.set_listening(False)`, `set_listening(True)` | `lamp.setListening(false)` | `lamp_set_listening(on)` | hear |

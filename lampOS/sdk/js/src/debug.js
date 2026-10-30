@@ -35,6 +35,8 @@ export const SHOWN = new Set([
   'part_max_chars', 'parts_max', 'clips_max', 'store_max_bytes',
   // `light`'s own colours (the ring, pixel by pixel) and hello's ring.
   'brightness', 'fade_ms', 'pixels', 'rgb', 'ring',
+  // The `volume` op and `volume.changed`.
+  'muted', 'step',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',
