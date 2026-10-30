@@ -68,6 +68,7 @@ impl Root {
             display_name: self.0.join("etc/display-name"),
             language: self.0.join("etc/setup/language"),
             own_keys: self.0.join("etc/own"),
+            control_dropin: self.0.join("etc/lamp-control.service.d/developer.conf"),
             web_start: vec![],
             web_stop: vec![],
             free_port: vec![],

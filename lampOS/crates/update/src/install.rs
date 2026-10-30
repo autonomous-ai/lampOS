@@ -637,6 +637,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "fa963c7f7e338734ee8e0bee6fd6e47b5f5a7fe9493cd957def3c68200c21c19", // the owner's developer setting (lamp-control's drop-in) forgotten on reset
     "af538415909f6e577ac58d9a1cac26fed42949bc44c375581139b587d67a2445", // lamp-control's state (paired computers) forgotten on reset
     "812762927c5c43b518d7ce8018487a28bdf8e1b776d61ffd21ec31628ca465f6", // #5358: the last two boots' kept journal too
     "fb16d6a194804098c318b1b1b9e2d8e75445c35a598502971d224dd5ab9a7132", // #5144: a first-time setup's kept journal
