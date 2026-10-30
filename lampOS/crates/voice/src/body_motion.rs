@@ -351,42 +351,72 @@ mod tests {
                 let _ = std::fs::remove_dir_all(&self.0);
             }
         }
-        let root = Root(std::path::PathBuf::from(format!(
-            "/tmp/vbm-{}-{}",
-            std::process::id(),
-            crate::privacy_bus::wall_ms()
-        )));
-        std::fs::create_dir(&root.0).unwrap();
-        let mut joints = MotionIn::on(&root.0).unwrap();
-        let mut body = lamp_bus::Bus::new(&root.0)
-            .unwrap()
-            .publisher_declared(
-                lamp_msgs::JointState::TOPIC,
-                &lamp_msgs::JointState::declaration(),
-                "body",
-            )
-            .unwrap();
-        for (i, count) in [1995.0, 1995.0, 1985.0].into_iter().enumerate() {
-            let state = lamp_msgs::JointState {
-                name: vec!["elbow".into()],
-                position: vec![count * COUNT],
-                velocity: Vec::new(),
-                effort: Vec::new(),
-                commanded: vec![count * COUNT],
-            };
-            // The body's own clock, from its start: not the voice's.
-            body.publish_json(i as u64 * EVERY, &state).unwrap();
-            std::thread::sleep(Duration::from_millis(80));
+        // A move is kept only between messages at most `COMPARED_WITHIN_US`
+        // apart by their bus stamps, so a host that stretched the 80 ms
+        // before the last message past that leaves nothing to find
+        // (Reviewer-three's loaded whole run, #1569): that try is the host's,
+        // said and run again. The line's window is set from the last
+        // message's own publish, not from a later `now`.
+        for attempt in 1..=TRIES {
+            let root = Root(std::path::PathBuf::from(format!(
+                "/tmp/vbm-{}-{}-{attempt}",
+                std::process::id(),
+                crate::privacy_bus::wall_ms()
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            let mut joints = MotionIn::on(&root.0).unwrap();
+            let mut body = lamp_bus::Bus::new(&root.0)
+                .unwrap()
+                .publisher_declared(
+                    lamp_msgs::JointState::TOPIC,
+                    &lamp_msgs::JointState::declaration(),
+                    "body",
+                )
+                .unwrap();
+            // Each message's publish, by the voice's clock and the wall's,
+            // read just before the bus stamps it.
+            let mut sent = Vec::new();
+            for (i, count) in [1995.0, 1995.0, 1985.0].into_iter().enumerate() {
+                if i > 0 {
+                    std::thread::sleep(Duration::from_millis(80));
+                }
+                let state = lamp_msgs::JointState {
+                    name: vec!["elbow".into()],
+                    position: vec![count * COUNT],
+                    velocity: Vec::new(),
+                    effort: Vec::new(),
+                    commanded: vec![count * COUNT],
+                };
+                sent.push((lamp_ipc::monotonic_us(), crate::privacy_bus::wall_ms()));
+                // The body's own clock, from its start: not the voice's.
+                body.publish_json(i as u64 * EVERY, &state).unwrap();
+            }
+            let apart_ms = sent[2].1.saturating_sub(sent[1].1);
+            if apart_ms + 2 >= COMPARED_WITHIN_US / 1_000 && attempt < TRIES {
+                eprintln!(
+                    "body motion, try {attempt}: the host put {apart_ms} ms between the last two messages; run again"
+                );
+                continue;
+            }
+            let last = sent[2].0;
+            let now = lamp_ipc::monotonic_us();
+            let judged = joints.judge(
+                last - 70_000,
+                last - 20_000,
+                now,
+                crate::privacy_bus::wall_ms(),
+                now,
+            );
+            assert!(
+                matches!(judged, Judged::Moved { .. }),
+                "{judged:?}; the last two messages {apart_ms} ms apart"
+            );
+            assert_eq!(joints.motion.moves.len(), 1);
+            return;
         }
-        let now = lamp_ipc::monotonic_us();
-        let judged = joints.judge(
-            now - 150_000,
-            now - 100_000,
-            now,
-            crate::privacy_bus::wall_ms(),
-            now,
-        );
-        assert!(matches!(judged, Judged::Moved { .. }), "{judged:?}");
-        assert_eq!(joints.motion.moves.len(), 1);
     }
+
+    /// How often the dated-and-found test runs again when the host stretched
+    /// its messages past `COMPARED_WITHIN_US`.
+    const TRIES: u32 = 5;
 }
