@@ -36,7 +36,7 @@ use std::{
         mpsc::{self, Receiver as ChannelReceiver, SyncSender, TryRecvError, TrySendError},
     },
     thread::{self, JoinHandle},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime},
 };
 // The clock the coordinator's loop polls with: in its stepped tests the
 // scenario clock, which is the host's for every unscoped test.
@@ -2174,14 +2174,6 @@ fn earlier(value: &mut Option<u64>, next: u64) {
     *value = Some(value.map_or(next, |previous| previous.min(next)));
 }
 
-fn wall_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| {
-            duration.as_millis().min(u128::from(u64::MAX)) as u64
-        })
-}
-
 /// What one subscription carries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Topic {
@@ -2192,7 +2184,10 @@ enum Topic {
     Touch,
 }
 
-fn parse(message: Message, topic: Topic, now_unix_ms: u64) -> io::Result<Input> {
+/// `now` is the subscriber's clocks ([`lamp_bus::Subscriber::now`]): a
+/// header that says this boot's monotonic clock is judged by `at_us`, one
+/// that says none by the wall clock, as the bus judges it.
+fn parse(message: Message, topic: Topic, now: &lamp_bus::Now<'_>) -> io::Result<Input> {
     let header = &message.header;
     let state = topic == Topic::State;
     let (name, type_name, kind, ttl) = match topic {
@@ -2227,8 +2222,8 @@ fn parse(message: Message, topic: Topic, now_unix_ms: u64) -> io::Result<Input> 
         || !header.boot.bytes().all(|byte| byte.is_ascii_hexdigit())
         || header.expires_ms != Some(ttl)
         || message.expired
-        || header.expired_at(now_unix_ms)
-        || header.at_unix_ms > now_unix_ms.saturating_add(lamp_bus::EXPIRY_GRACE_MS)
+        || header.expired_by(now)
+        || header.ahead_of(now)
     {
         return Err(invalid("invalid or expired hand controls envelope"));
     }
@@ -2442,7 +2437,7 @@ fn read_one(
             add(&shared.lost, message.gap);
             shared.fence();
         }
-        match parse(message, topic, wall_ms()) {
+        match parse(message, topic, &subscriber.now()) {
             Ok(Input::Pet(event)) if event.intent != ControlIntent::Pet => {}
             Ok(input) => {
                 add(&shared.received, 1);

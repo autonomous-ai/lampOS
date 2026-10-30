@@ -16,6 +16,9 @@ path = "src/main.rs"
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+# CLOCK_MONOTONIC, the clock a stamp with a `clock` is judged by: the same
+# call and version as lamp-ipc's, so no new package.
+rustix = { version = "1.1", features = ["time"] }
 
 [lints]
 workspace = true

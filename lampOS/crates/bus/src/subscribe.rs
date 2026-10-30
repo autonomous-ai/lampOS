@@ -99,6 +99,38 @@ struct Counts {
     age_sum_ms: u64,
 }
 
+/// When a message says it was sent, by the clock it is judged by.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Sent {
+    /// This boot's CLOCK_MONOTONIC, in microseconds: the header said so.
+    Monotonic(u64),
+    /// The wall clock, in milliseconds since 1970: the header said nothing.
+    Wall(u64),
+}
+
+impl Sent {
+    fn of(header: &wire::Header, now: &wire::Now<'_>) -> Self {
+        match header.stamp_clock(now) {
+            wire::StampClock::Monotonic => Self::Monotonic(header.at_us),
+            _ => Self::Wall(header.at_unix_ms),
+        }
+    }
+
+    /// Whether more than `limit_ms` passed between `before` and this. Two
+    /// stamps of different clocks, as a round of updates that mixes builds
+    /// sends, are not measured against each other: the subscriber's own
+    /// clock still says a silence it saw (`overdue`).
+    fn after_more_than(self, before: Self, limit_ms: u64) -> bool {
+        match (before, self) {
+            (Self::Monotonic(before), Self::Monotonic(at)) => {
+                at.saturating_sub(before) > limit_ms.saturating_mul(1_000)
+            }
+            (Self::Wall(before), Self::Wall(at)) => at.saturating_sub(before) > limit_ms,
+            _ => false,
+        }
+    }
+}
+
 /// The last message had from one publisher.
 struct Heard {
     source: String,
@@ -144,7 +176,7 @@ pub struct Subscriber {
     /// When a datagram that was handed over was last taken, and when its
     /// publisher says it sent it.
     arrived: Option<Instant>,
-    sent_ms: Option<u64>,
+    sent: Option<Sent>,
     /// Since when the topic's period has been known: no silence before
     /// that was late.
     timed_from: Instant,
@@ -154,6 +186,8 @@ pub struct Subscriber {
     sought: Option<Instant>,
     found: bool,
     notices: VecDeque<Notice>,
+    /// The bus's clocks: what has expired, and the gap between two sends.
+    clocks: crate::clock::Clocks,
 }
 
 /// The subscriber's socket, for a caller that waits on several at once
@@ -273,13 +307,14 @@ impl Subscriber {
                 began: now,
                 spoke: None,
                 arrived: None,
-                sent_ms: None,
+                sent: None,
                 timed_from: now,
                 gone: false,
                 late: false,
                 sought: None,
                 found: false,
                 notices: VecDeque::new(),
+                clocks: bus.clocks.clone(),
             });
         }
         Err(io::Error::new(
@@ -359,6 +394,12 @@ impl Subscriber {
     /// that has not.
     pub fn sources(&self) -> io::Result<Vec<Source>> {
         live::list(&self.pubs, self.lease)
+    }
+
+    /// What this subscriber's clocks say now: to judge a header by as
+    /// `recv` judges it ([`wire::Header::expired_by`]).
+    pub fn now(&self) -> wire::Now<'_> {
+        self.clocks.now()
     }
 
     /// What has changed about the topic since this was last asked: its
@@ -527,12 +568,21 @@ impl Subscriber {
     /// now, and only that has a time of arrival.
     fn admit(&mut self, mut message: Message, sent: bool) -> Option<Message> {
         let now = Instant::now();
-        let wall = wire::unix_ms();
+        // By the clock the header calls for: a this-boot monotonic stamp
+        // by `at_us`, which a time server's step does not move, and only a
+        // header that says no clock by the wall's.
+        let (wall, expired, stamp) = {
+            let clocks = self.clocks.now();
+            (
+                clocks.unix_ms,
+                message.header.expired_by(&clocks),
+                Sent::of(&message.header, &clocks),
+            )
+        };
         if sent {
             self.heard_from(now);
         }
         let other = self.other_type(&message.header);
-        let expired = message.header.expired_at(wall);
         let heard = self
             .heard
             .iter_mut()
@@ -559,15 +609,15 @@ impl Subscriber {
         let age = wall.saturating_sub(message.header.at_unix_ms);
         self.counts.age_sum_ms = self.counts.age_sum_ms.saturating_add(age);
         if sent {
-            self.came(now, message.header.at_unix_ms);
+            self.came(now, stamp);
         }
         Some(message)
     }
 
     /// A datagram that is handed over was taken at `now` and sent at
-    /// `sent_ms`: its distance from the one before, and the end of a
-    /// silence that was too long.
-    fn came(&mut self, now: Instant, sent_ms: u64) {
+    /// `sent`: its distance from the one before, and the end of a silence
+    /// that was too long.
+    fn came(&mut self, now: Instant, sent: Sent) {
         self.counts.datagrams += 1;
         if let Some(before) = self.arrived {
             let interval = now.saturating_duration_since(before);
@@ -579,11 +629,13 @@ impl Subscriber {
         // its end, so that each is said once whenever the caller looks. It
         // is measured between the times the two messages were sent: when
         // this one was read says how busy the reader was, not how quiet
-        // the topic.
+        // the topic. By `at_us` when both say they are this boot's monotonic
+        // clock: a wall clock stepped forward between them is no silence.
         let period = self.declared.as_ref().and_then(|known| known.period_ms);
-        let hole = self.sent_ms.zip(period).is_some_and(|(before, period)| {
-            sent_ms.saturating_sub(before) > period.saturating_mul(2)
-        });
+        let hole = self
+            .sent
+            .zip(period)
+            .is_some_and(|(before, period)| sent.after_more_than(before, period.saturating_mul(2)));
         if !self.late && hole {
             self.late = true;
             self.notice(Notice::Late);
@@ -593,14 +645,19 @@ impl Subscriber {
             self.notice(Notice::OnTime);
         }
         self.arrived = Some(now);
-        self.sent_ms = Some(sent_ms);
+        self.sent = Some(sent);
     }
 
     /// The next message, waiting at most `timeout` for one. What is not a
     /// message of this topic is counted and passed over, and so is a message
     /// that has outlived the `expires_ms` in its header by more than 50 ms
-    /// of this process's wall clock (`expired`), and one whose header names
-    /// another type than this subscriber asked for (`wrong_type`).
+    /// (`expired`), and one whose header names another type than this
+    /// subscriber asked for (`wrong_type`). The time is the clock the header
+    /// calls for ([`wire::Header::expired_by`]): this boot's monotonic clock
+    /// for a header whose `clock` is this boot, and then also a stamp more
+    /// than 50 ms ahead is passed over as expired; none for one of another
+    /// boot, which has always expired; and the wall clock for one that says
+    /// no clock.
     ///
     /// With nothing waiting, a topic's `latest` file is looked at, at most
     /// once in the time a publisher takes to notice a new subscriber, and
@@ -704,7 +761,7 @@ impl Subscriber {
             return Ok(None);
         };
         let other = self.other_type(&header);
-        let expired = header.expired_at(wire::unix_ms());
+        let expired = header.expired_by(&self.clocks.now());
         if !self.kept_is_news(&header) {
             return Ok((!other).then_some(Message {
                 header,

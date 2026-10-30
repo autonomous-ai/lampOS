@@ -67,6 +67,16 @@ sequence and reader identity. Hand faults do not become microphone permission.
 The selected publishers and subscribers rescan Bus registrations and retained
 state every 5 ms; the ordinary 200 ms discovery interval exceeds this route's
 50 ms freshness limit. Unselected services retain their existing cadence.
+The state's header lifespan (300 ms) and its refusal of a stamp from ahead
+are judged by the clock the header names: Controls says its `clock`, the
+kernel boot id, whenever its stamp clock is this boot's, and then the bus
+and the worker judge both by `at_us` (CLOCK_MONOTONIC), so chrony stepping
+the wall clock neither expires a state in flight, nor makes a silence, nor
+keeps an old state live longer. A header of another clock has expired. A
+state without `clock`, from a Controls build before it, is still read by
+the wall clock and is said once in the journal (`lamp-voice: privacy: the
+Controls state of publisher … says no clock`), not refused, since an update
+round can mix builds (queue #3997, C; [bus.md](bus.md)).
 Invalid types, publisher or reader changes, future/stale evidence, reordered
 messages, skipped Bus publications and receive overflow end this worker,
 with one allowance: until Controls' publisher finds the worker's new socket

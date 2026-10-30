@@ -1065,6 +1065,7 @@ fn envelope(state_topic: bool, payload: impl serde::Serialize) -> Message {
             at_us: 123, // Deliberately not the shared monotonic clock.
             at_unix_ms: 10_000,
             expires_ms: Some(if state_topic { 300 } else { 500 }),
+            clock: None,
         },
         payload: serde_json::to_vec(&payload).unwrap(),
         gap: 0,
@@ -1073,10 +1074,70 @@ fn envelope(state_topic: bool, payload: impl serde::Serialize) -> Message {
     }
 }
 
+const THIS_BOOT: &str = "6a1c2b3d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+
+/// A reader at wall time `unix_ms` and monotonic time `monotonic_us`.
+fn read_at(unix_ms: u64, monotonic_us: u64) -> lamp_bus::Now<'static> {
+    lamp_bus::Now {
+        unix_ms,
+        monotonic_us,
+        boot_id: Some(THIS_BOOT),
+    }
+}
+
+/// A reader at wall time `unix_ms`, for a header that says no clock.
+fn wall(unix_ms: u64) -> lamp_bus::Now<'static> {
+    read_at(unix_ms, 0)
+}
+
+#[test]
+fn a_wall_step_neither_expires_nor_refuses_a_controls_envelope_stamped_by_this_boot() {
+    // Controls' state and gestures, stamped with this boot's monotonic
+    // clock, sent at wall 100 000 and read a moment later across a step of
+    // 20 s either way (chrony on lamp-06c1, queue #3997, C).
+    for (state_topic, topic, lasting) in [(true, Topic::State, 300), (false, Topic::Gesture, 500)] {
+        let make = || {
+            let mut m = if state_topic {
+                envelope(true, state(1, START, None))
+            } else {
+                envelope(false, gesture(ControlIntent::Pet, 1, 2_000_000))
+            };
+            m.header.at_us = 5_000_000;
+            m.header.at_unix_ms = 100_000;
+            m.header.clock = Some(THIS_BOOT.into());
+            m
+        };
+        for step in [100_000 + 20_000, 100_000 - 20_000] {
+            assert!(
+                parse(make(), topic, &read_at(step, 5_000_001)).is_ok(),
+                "{step}"
+            );
+            // Its own lifespan and the grace, by `at_us`, whatever the wall.
+            let last = 5_000_000 + (lasting + 50) * 1_000;
+            assert!(parse(make(), topic, &read_at(step, last)).is_ok());
+            assert!(parse(make(), topic, &read_at(step, last + 1)).is_err());
+            // Ahead of the clock by more than the grace is refused.
+            assert!(parse(make(), topic, &read_at(step, 4_950_000)).is_ok());
+            assert!(parse(make(), topic, &read_at(step, 4_949_999)).is_err());
+        }
+        // Of another boot: expired.
+        let mut other = make();
+        other.header.clock = Some("0f1e2d3c-4b5a-4968-8776-655443322110".into());
+        assert!(parse(other, topic, &read_at(100_000, 5_000_001)).is_err());
+        // Without a clock the wall still judges, as before: a step forward
+        // expires it, and after one back it is stamped ahead and refused.
+        let mut plain = make();
+        plain.header.clock = None;
+        assert!(parse(plain.clone(), topic, &wall(100_000)).is_ok());
+        assert!(parse(plain.clone(), topic, &wall(120_000)).is_err());
+        assert!(parse(plain, topic, &wall(80_000)).is_err());
+    }
+}
+
 #[test]
 fn envelopes_require_exact_source_type_kind_expiry_and_state_owner() {
     let good = envelope(true, state(1, START, None));
-    assert!(parse(good.clone(), Topic::State, 10_000).is_ok());
+    assert!(parse(good.clone(), Topic::State, &wall(10_000)).is_ok());
     let corruptions: &[fn(&mut Message)] = &[
         |m| m.header.topic = "controls/gesture".into(),
         |m| m.header.source = "replay".into(),
@@ -1095,13 +1156,13 @@ fn envelopes_require_exact_source_type_kind_expiry_and_state_owner() {
     for corrupt in corruptions {
         let mut bad = good.clone();
         corrupt(&mut bad);
-        assert!(parse(bad, Topic::State, 10_000).is_err());
+        assert!(parse(bad, Topic::State, &wall(10_000)).is_err());
     }
-    assert!(parse(good, Topic::State, 10_351).is_err());
+    assert!(parse(good, Topic::State, &wall(10_351)).is_err());
     let mut pet = envelope(false, gesture(ControlIntent::Pet, 1, 2_000_000));
     // The event publisher has its own boot; payload session still names state.
     pet.header.boot = "fedcba9876543210".into();
-    assert!(parse(pet, Topic::Gesture, 10_000).is_ok());
+    assert!(parse(pet, Topic::Gesture, &wall(10_000)).is_ok());
 }
 
 fn head_touch() -> (TouchState, Vec<TouchEvent>) {
@@ -2558,7 +2619,7 @@ mod live_bus {
         old_state.event_sequence = 2;
         old_state.check().unwrap();
         old_message.header.seq += 1;
-        old_message.header.at_unix_ms = wall_ms();
+        old_message.header.at_unix_ms = crate::privacy_bus::wall_ms();
         old_message.payload = serde_json::to_vec(&old_state).unwrap();
         let mut datagram = serde_json::to_vec(&old_message.header).unwrap();
         datagram.push(b'\n');
