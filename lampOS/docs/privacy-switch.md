@@ -218,6 +218,16 @@ gone or late, ends the worker as before. A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
 voice exits and the restart guard counts it.
 
+The coordinator keeps renewing every worker's authority through its startup
+prologue too, from its last start-up pulse to its loop's first publish, at
+least every 50 ms between its setup steps (#4332); the lease and its expiry
+are unchanged, so one setup step held past 250 ms still lapses it, and the
+privacy worker then ends closed unless it rides that lapse as above. The
+privacy worker's observations queue up through that prologue, so the voice's
+one second of waiting past one read stale before the microphone is first
+allowed (`PRIVACY_START_STALE_US`) counts from its loop's start, after the
+prologue, with the gate closed until then.
+
 Ears also holds Voice to its latch: once a `voice/privacy` session has reported
 the switch closed, Ears refuses any later permit from that session, and only a
 new worker's session can reopen MIC1.
