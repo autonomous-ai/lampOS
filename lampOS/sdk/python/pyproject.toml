@@ -34,7 +34,7 @@ test = ["pytest>=8", "jsonschema>=4.20", "tomli>=2; python_version < '3.11'"]
 lamp = "lampos.cli:main"
 
 [tool.setuptools.package-data]
-lampos = ["control.schema.json", "skill-format.schema.json"]
+lampos = ["control.schema.json", "lamp.hardware.json", "lamp.model.json", "skill-format.schema.json"]
 
 [project.urls]
 Homepage = "https://github.com/autonomous-ai/lampOS"
