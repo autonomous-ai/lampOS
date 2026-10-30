@@ -24,6 +24,10 @@ pub(super) struct FailureNotices {
     /// The recovery hotspot's line (#3743, #3020): played only when
     /// `lamp-setup recover` asks for it through the say service.
     wifi_recovering: std::result::Result<Arc<Recording>, Missing>,
+    /// "Going to sleep. Tap my head to wake me." (#3748): said by a hand's
+    /// hold on the head in place of the falling breath, only with
+    /// `LAMP_SLEEP_LINE=on` ([`Self::going_to_sleep`]).
+    going_to_sleep: std::result::Result<Arc<Recording>, Missing>,
     /// With a notices folder configured, what a failed line plays when its
     /// recording can't be loaded (#2943 part 3): the lamp's own sigh, made
     /// here, so a lamp whose files are missing never meets a question it
@@ -74,6 +78,7 @@ impl FailureNotices {
             service_down: get(NoticeKind::VoiceServiceUnreachable),
             wifi_lost: get(NoticeKind::WifiLost),
             wifi_recovering: get(NoticeKind::WifiRecovering),
+            going_to_sleep: get(NoticeKind::GoingToSleep),
             fallback: Some(Arc::new(Recording {
                 info: None,
                 samples: crate::head_cue::breath(FALLBACK_DBFS).into_boxed_slice(),
@@ -89,6 +94,7 @@ impl FailureNotices {
             service_down: Err(Missing::NoDirectory),
             wifi_lost: Err(Missing::NoDirectory),
             wifi_recovering: Err(Missing::NoDirectory),
+            going_to_sleep: Err(Missing::NoDirectory),
             fallback: None,
             language: None,
         }
@@ -115,6 +121,7 @@ impl FailureNotices {
             capability["service_down"] = state(&self.service_down);
             capability["wifi_lost"] = state(&self.wifi_lost);
             capability["wifi_recovering"] = state(&self.wifi_recovering);
+            capability["going_to_sleep"] = state(&self.going_to_sleep);
         }
         capability
     }
@@ -135,6 +142,14 @@ impl FailureNotices {
         crate::say::Recordings::none()
             .with("wifi_lost", loaded(&self.wifi_lost))
             .with("wifi_recovering", loaded(&self.wifi_recovering))
+    }
+    /// The hold's sleep line's samples (#3748), if it loaded: none stands
+    /// in for it here; the caller keeps the breath.
+    pub(super) fn going_to_sleep(&self) -> Option<Vec<i16>> {
+        self.going_to_sleep
+            .as_ref()
+            .ok()
+            .map(|recording| recording.samples.to_vec())
     }
 }
 
@@ -553,6 +568,16 @@ impl FailureNotices {
         catalog
     }
 
+    /// No catalog but the hold's sleep line (#3748): `samples`.
+    pub(super) fn with_sleep_line(samples: Vec<i16>) -> Self {
+        let mut catalog = Self::none();
+        catalog.going_to_sleep = Ok(Arc::new(Recording {
+            info: None,
+            samples: samples.into_boxed_slice(),
+        }));
+        catalog
+    }
+
     /// A folder configured that isn't there (#2943 part 3): every line
     /// missing, the lamp's own sigh to stand in.
     pub(super) fn missing_with_sigh() -> Self {
@@ -586,6 +611,7 @@ impl FailureNotices {
             service_down: Err(Missing::NotProvisioned),
             wifi_lost: Err(Missing::NotProvisioned),
             wifi_recovering: Err(Missing::NotProvisioned),
+            going_to_sleep: Err(Missing::NotProvisioned),
             // The other tests' catalog stays silent on a missing line.
             fallback: None,
             language: Some("en-US".into()),
@@ -714,6 +740,18 @@ mod loading_tests {
             catalog.recordings().samples("wifi_lost"),
             Ok(vec![99_i16; 7_200])
         );
+        // The hold's sleep line is its own too, never the say service's
+        // (#3748).
+        assert_eq!(
+            only_turn_lost.capability()["going_to_sleep"]["missing"],
+            "not_provisioned"
+        );
+        assert!(only_turn_lost.going_to_sleep().is_none());
+        assert_eq!(
+            FailureNotices::with_sleep_line(vec![55_i16; 7_200]).going_to_sleep(),
+            Some(vec![55_i16; 7_200])
+        );
+        assert!(catalog.recordings().samples("going_to_sleep").is_err());
     }
     #[test]
     fn production_never_accepts_test_pcm_or_unknown_language() {

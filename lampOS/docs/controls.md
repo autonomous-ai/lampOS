@@ -203,6 +203,29 @@ mute), since a tap on the head is how it wakes: without it the function is
 not declared at all, and the journal says so once. A held line's call is
 refused, as every action's is.
 
+**The hold says the line (#3748 part 1, `LAMP_SLEEP_LINE=on`, off unless
+on).** At the hold's 2 s mark the voice plays the recorded line "Going to
+sleep. Tap my head to wake me." (the failure notice `going_to_sleep`,
+`failure-notices.md`) in place of the falling breath, as the same sound turn
+of its own. If the recording isn't there, the breath plays as without the
+switch. Either way the sleep now waits for that cue: the 3 s Hold no longer
+mutes at once, it makes the sleep owed (`HandControls::land_owed_sleep`),
+and the mute, the microphones closing and the asleep face come once the
+cue has played whole, or 6 s after the Hold if it still sounds
+(`SLEEP_OWED_CAP_US`). The coordinator says before each poll whether the
+cue still sounds (`HandControls::sleep_cue_sounding`); a poll it doesn't
+say so lands the owed sleep, so a hold seen between conversations, or with
+no cue played, sleeps at once. Letting go before the Hold, before 3 s, cuts
+the cue at once, as a head touch cuts speech (`head_stop`), and no sleep
+follows. Letting go after the Hold changes nothing: the sleep is decided.
+A tap or new speech while it is owed doesn't cancel it either: it still
+lands when the cue's turn ends, which the tap's own stop may end early. Not
+while onboarding is under way, as above, and a pet asks no Hold
+(`LAMP_HEAD_PET`). The journal says when the line starts (ms after the
+hold's 2 s), when the owed sleep lands (ms after the cue ended, or at the
+cap) and when a letting go cuts it. With the switch off, the hold sleeps at
+3 s and cuts the breath, as before.
+
 Sleep and Wake are separate, idempotent requested transitions. They never
 toggle microphone mute. First's 18:23 decision in
 [#711](https://github.com/autonomous-ai/lampOS/issues/711) makes Voice close
