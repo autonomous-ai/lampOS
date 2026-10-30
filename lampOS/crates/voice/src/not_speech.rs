@@ -582,7 +582,12 @@ pub const UNCLEAR: &str = "sorry";
 pub const UNCLEAR_FLAG: &str = "--ask-unclear";
 
 /// The provider worker's argument for asking again, from the environment.
+/// Never with a language other than English (#4473): another script is
+/// then the conversation's own.
 pub fn unclear_arguments_from_environment() -> Vec<String> {
+    if crate::language::from_environment().is_some() {
+        return Vec::new();
+    }
     unclear_arguments(std::env::var(UNCLEAR_ENVIRONMENT).ok().as_deref())
 }
 

@@ -63,8 +63,12 @@ pub fn where_heard(config: &SecondConfig) -> String {
     }
 }
 
-/// What the voice's environment asks for.
+/// What the voice's environment asks for. Nothing with a language other
+/// than English (#4473): the stop words and backchannels are English's.
 pub fn listen() -> Listen {
+    if crate::language::from_environment().is_some() {
+        return Listen::Off;
+    }
     listen_for(std::env::var(ENVIRONMENT).ok().as_deref())
 }
 

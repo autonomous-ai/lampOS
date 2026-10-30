@@ -1548,6 +1548,8 @@ fn second_route_worker_environment(
         crate::second_config::LISTENING_BASE_URL_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
+        // The owner's language (#4473): the worker's speech and character.
+        crate::language::FILE_ENVIRONMENT,
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
@@ -2307,6 +2309,8 @@ mod tests {
                     "6-7"
                 } else if name == crate::person::ENVIRONMENT {
                     "/etc/lampOS/person/name"
+                } else if name == crate::language::FILE_ENVIRONMENT {
+                    "/etc/lampOS/setup/language"
                 } else if name == crate::task_news::TOLD_ENVIRONMENT {
                     "/var/lib/lampOS/voice/tasks-told"
                 } else if name == crate::second_config::CREDENTIALS_ENV {
@@ -2464,6 +2468,7 @@ mod tests {
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KERNEL_CLOCK=on",
+                    "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FOLLOWS_FACE=on",
