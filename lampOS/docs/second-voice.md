@@ -2653,9 +2653,16 @@ after a take-over, but now for every turn:
     poem…", "… ask Codex to write a haiku…") lost "Hey Lamp" to the lamp's
     own voice and were held as no conversation, "it was last heard saying
     words, to their end, 0 s ago" (the first builder at 01:50 and 02:04 on
-    #1712). The journal's "no conversation going on" line says when the
-    lamp was "last heard saying words, to their end," and adds ", in a busy
-    room, where it goes on 15 s".
+    #1712). The thread's 45 s, the 20 s after the words and a call's 15 s
+    are measured to when the line began, not to its judging after it ended,
+    so a line begun inside them goes on however long it runs: on lamp-3e83
+    on 30 Oct a follow-up begun 9 s after the lamp's words and spoken for
+    13 s was held, judged 22 s after them (Migrate's launch finding 2 on
+    #3997). A busy room's 15 s after the words is still counted to the
+    judging. The journal's "no conversation going on" line says how long
+    the line ran ("the line ran N s"), when the lamp was "last heard
+    saying words, to their end," and adds ", in a busy room, where it goes
+    on 15 s".
   - **the journal names the sign that let a line out** (#1712, the first
     builder at 17:49). With `--spoken-to`, the rule's first reason can be
     one that lets nothing out by itself, the session trusted or the room

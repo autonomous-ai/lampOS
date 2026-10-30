@@ -5688,6 +5688,7 @@ fn went_on_told(
     called_ago: Option<Duration>,
     left_alone: Option<usize>,
     thread_or_call: bool,
+    ran_for: Duration,
 ) -> Signs {
     let busy = signs.room == crate::room_told::Room::Busy;
     if busy {
@@ -5702,7 +5703,8 @@ fn went_on_told(
             })
         };
         eprintln!(
-            "lamp-voice second: request {request}: no conversation going on: {}, {}{}{}",
+            "lamp-voice second: request {request}: no conversation going on: the line ran {} s, {}, {}{}{}",
+            ran_for.as_secs(),
             ago(said_ago, "heard saying words, to their end,"),
             ago(called_ago, "called"),
             left_alone.map_or(String::new(), |left| format!(
@@ -5727,7 +5729,9 @@ pub(crate) const AFTER_THE_LAMPS_WORDS: Duration =
 /// Whether a conversation with the lamp is going on: the thread's, 45 s from
 /// an answer's start ([`crate::thread::GOING_ON_FOR`]); or within
 /// [`AFTER_THE_LAMPS_WORDS`] of the end of the lamp's words (`said_ago`); or
-/// [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). A story told
+/// [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). Each is
+/// measured to when the line began, however long it then went on
+/// (`signs_begun`, Migrate's launch finding 2 on #3997). A story told
 /// for 40 s or more outlives the thread's window while it is told: on
 /// lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said as stories
 /// ended ("Hey Lamp, ask Claude Code to write a two-line poem…", "… ask
@@ -7973,7 +7977,16 @@ impl Heeding {
                 )
             })
             .unwrap_or_default();
-        let said_going_on = said_ago.is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        // How long the line ran, from its first speech to its end. Every
+        // window below is measured to its start, not to its judging after it
+        // ended: a follow-up begun 9 s after the lamp's words and spoken for
+        // 13 s was held as no conversation going on (lamp-3e83 on 30 Oct,
+        // Jarvis and Migrate's launch finding 2 on #3997). The moment from
+        // its end to its judging is left in, so a window ends no later.
+        let ran_for = Duration::from_micros(ended.saturating_sub(onset_us));
+        let at_start = |ago: Option<Duration>| ago.map(|ago| ago.saturating_sub(ran_for));
+        let said_going_on =
+            at_start(said_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
         let said_until_us = if but {
             eprintln!(
                 "lamp-voice second: request {request}: the lamp's answers to {} requests (the newest {:?}), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)",
@@ -8017,9 +8030,9 @@ impl Heeding {
             (Some(said), Some(held)) => Some(said.min(held)),
             (said, held) => said.or(held),
         };
-        let said_going_on =
-            said_going_on || held_ago.is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
-        let going_on = going_on_from(said_going_on, said_ago, called_ago);
+        let said_going_on = said_going_on
+            || at_start(held_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        let going_on = going_on_from(said_going_on, at_start(said_ago), at_start(called_ago));
         // `LAMP_NAME_OR_FOLLOW_UP`: whether the line is a follow-up begun
         // while the lamp's words played or soon after them, or its call,
         // however long it went on; in a busy room such a line, and only
@@ -8028,7 +8041,8 @@ impl Heeding {
         let followed_up = !self.name_or_follow_up || follows_up(said_ago, called_ago, began_ago);
         // What a busy room goes on by: the thread's window or the call,
         // never the quiet room's 20 s after the words (`went_on_told`).
-        let thread_or_call = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
+        let thread_or_call =
+            said_going_on || at_start(called_ago).is_some_and(|ago| ago <= CALL_CARRIES_FOR);
         let mut left_alone = None;
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
@@ -8154,6 +8168,7 @@ impl Heeding {
                 called_ago,
                 left_alone,
                 thread_or_call,
+                ran_for,
             )
         };
         let Some((bus, names)) = &mut self.bus else {
@@ -11448,8 +11463,8 @@ mod tests {
             continues_from: None,
             soft_lead_us: 0,
         };
-        assert!(went_on_told(5, busy(), said_ago, None, None, true).going_on);
-        assert!(!went_on_told(5, busy(), Some(s(18)), None, None, true).going_on);
+        assert!(went_on_told(5, busy(), said_ago, None, None, true, Duration::ZERO).going_on);
+        assert!(!went_on_told(5, busy(), Some(s(18)), None, None, true, Duration::ZERO).going_on);
         // No words in the thread: none, whatever was played.
         assert_eq!(to_the_end(None, Some(s(1))), None);
         assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
@@ -11489,7 +11504,16 @@ mod tests {
         };
         let s = Duration::from_secs;
         let went = |room, said: u64, called: Option<u64>| {
-            super::went_on_told(1, signs(room), Some(s(said)), called.map(s), None, true).going_on
+            super::went_on_told(
+                1,
+                signs(room),
+                Some(s(said)),
+                called.map(s),
+                None,
+                true,
+                Duration::ZERO,
+            )
+            .going_on
         };
         assert!(went(Room::Busy, 10, None));
         assert!(!went(Room::Busy, 20, None));
@@ -11503,8 +11527,18 @@ mod tests {
         // The first builder's agent on #2032 (03:09): after a 40 s answer
         // the thread's window has passed, and 10 s after the words the
         // quiet room's 20 s count; a busy room's don't.
-        let after_words =
-            |room| super::went_on_told(1, signs(room), Some(s(10)), None, None, false).going_on;
+        let after_words = |room| {
+            super::went_on_told(
+                1,
+                signs(room),
+                Some(s(10)),
+                None,
+                None,
+                false,
+                Duration::ZERO,
+            )
+            .going_on
+        };
         assert!(!after_words(Room::Busy));
         assert!(after_words(Room::Quiet));
         assert!(after_words(Room::Unknown));
@@ -11803,6 +11837,48 @@ mod tests {
                 "begun 12 s after, {in_thread}"
             );
         }
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    }
+
+    /// Migrate's launch finding 2 on #3997 (Jarvis, lamp-3e83 on 30 Oct,
+    /// request 130): in a quiet room, a follow-up begun 9 s after the lamp's
+    /// words ended and spoken for 13 s was judged 22 s after them and held
+    /// as no conversation going on. The windows are measured to the line's
+    /// start: it goes on however long it runs; one begun 21 s after the
+    /// words doesn't, however short; and the thread's 45 s from the answer's
+    /// start is read the same way.
+    #[test]
+    fn a_long_follow_up_begun_inside_the_window_is_in_the_conversation() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let s = Duration::from_secs;
+        let judged = |answer_began_s: u64, ended_s: i64, began_s: u64| {
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            let mut thread = crate::thread::Thread::new();
+            let answered = Instant::now() - s(answer_began_s);
+            thread.person("Lamp, what's the weather today?", true, answered);
+            thread.lamp(1, "Sunny and warm today.", answered);
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            let now_us = monotonic_us();
+            let until = now_us.saturating_add_signed(-ended_s * 1_000_000);
+            heeding.lamp_did(crate::second_provider::Did::Said(1, until));
+            let said = (now_us - began_s * 1_000_000, now_us);
+            heeding.heed(
+                2,
+                said,
+                "And what about the rest of the week, will it rain on the weekend?",
+                None,
+            )
+        };
+        // The answer began 60 s ago, past the thread's 45 s, so only the
+        // 20 s after the lamp's words is left.
+        assert_eq!(judged(60, 22, 13), None, "begun 9 s after, 13 s long");
+        assert_eq!(judged(60, 35, 16), None, "begun 19 s after, 16 s long");
+        assert!(judged(60, 22, 1).is_some(), "begun 21 s after, 1 s long");
+        // The thread's own window: the answer began 50 s ago, the line 40 s
+        // into it, and its words (no end known) 50 s ago.
+        assert_eq!(judged(50, 50, 10), None, "begun 40 s into the thread");
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     }
 
@@ -15086,6 +15162,7 @@ mod tests {
             None,
             None,
             true,
+            Duration::ZERO,
         );
         assert!(window.going_on, "inside the busy room's 15 s");
         let said = (10_000_000, 11_000_000);
