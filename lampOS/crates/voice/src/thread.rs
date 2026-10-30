@@ -114,6 +114,10 @@ struct Exchange {
     /// part is [`crate::said_as_heard::CUT`], and the exchange is still told,
     /// so the person's words are (the reviewer's P2 on #2145).
     unheard: bool,
+    /// Cut while it played and kept as heard ([`Thread::heard_only`]); read
+    /// back from the file, an answer that ends in
+    /// [`crate::said_as_heard::CUT`]. Not kept in the file (#1505).
+    cut: bool,
     /// The memory id of the known person it was with; `None`: the room's.
     whose: Option<String>,
     /// The note the lamp was given in writing for it, when it began the
@@ -202,6 +206,10 @@ pub struct Recent {
     /// The room's, told to a person's turn as said in the room
     /// ([`Thread::recent_with_room_lines`]); never for a turn of the room's.
     pub room: bool,
+    /// The lamp's answer was cut while it played and is kept as heard
+    /// (`LAMP_SAID_AS_HEARD`, [`Thread::heard_only`]): `lamp` is only what
+    /// was played.
+    pub cut: bool,
 }
 
 /// A scope's exchanges due for its running summary ([`Thread::summary_due`]).
@@ -561,6 +569,7 @@ impl Thread {
                 at,
                 person,
                 unheard: lamp.trim() == crate::said_as_heard::CUT,
+                cut: lamp.trim_end().ends_with(crate::said_as_heard::CUT),
                 tail: lamp.clone(),
                 lamp,
                 // The process that wrote the file handed it on.
@@ -788,6 +797,7 @@ impl Thread {
                 summarized: false,
                 held: false,
                 unheard: false,
+                cut: false,
                 whose,
                 written,
             });
@@ -878,6 +888,7 @@ impl Thread {
             return;
         };
         exchange.unheard = !said.chars().any(char::is_alphanumeric);
+        exchange.cut = true;
         let said = if exchange.unheard {
             crate::said_as_heard::CUT
         } else {
@@ -1236,6 +1247,7 @@ impl Thread {
                 person: exchange.person.trim().to_owned(),
                 lamp: exchange.lamp.trim().to_owned(),
                 room: false,
+                cut: exchange.cut,
             })
             .collect();
         recent.reverse();
@@ -1299,6 +1311,7 @@ impl Thread {
                 person: exchange.person.trim().to_owned(),
                 lamp: exchange.lamp.trim().to_owned(),
                 room: exchange.whose.is_none(),
+                cut: exchange.cut,
             })
             .collect();
         recent.reverse();
@@ -2280,6 +2293,8 @@ mod tests {
         let recent = thread.recent(at(7), within, 6);
         assert_eq!(recent.len(), 2);
         assert_eq!(recent[1].lamp, "A keeper named Tom. He was kind.");
+        // Marked cut for "go on" (#3997's cut-in proposal); the whole one not.
+        assert!(recent[0].cut && !recent[1].cut);
         // Nothing played of it: the person's words are still told, the
         // lamp's part a dash (the reviewer's P2 on #2145), and handed on.
         thread.heard_only(2, "");
@@ -2314,6 +2329,7 @@ mod tests {
             (recent[1].person.as_str(), recent[1].lamp.as_str()),
             ("Who was he?", "—")
         );
+        assert!(recent[0].cut && recent[1].cut, "read back by its dash");
         let recalled = read.recall(at(7), ROOM).unwrap();
         assert!(recalled.contains("Person: Who was he?"), "{recalled}");
     }
@@ -2406,6 +2422,7 @@ mod tests {
             person: person.to_owned(),
             lamp: lamp.to_owned(),
             room: false,
+            cut: false,
         };
         for (day, text) in kept {
             // Read a minute after its newest exchange, within the ten
@@ -3406,6 +3423,7 @@ mod tests {
                 person: String::new(),
                 lamp: "The code word is ORCHID.".into(),
                 room: false,
+                cut: false,
             }]
         );
         // The note is the written turn's alone: a spoken one after it has none.
