@@ -60,7 +60,7 @@ STATE_OF_EVENT = {
     "lamp.changed": "lamp",
     "air.changed": "air",
 }
-STATES = ("presence", "light", "mood", "lamp", "air", "device", "volume")
+STATES = ("presence", "light", "mood", "lamp", "air", "device", "volume", "body")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
 # here needs none.
@@ -362,6 +362,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "air": "the air at its sensor (particles, carbon dioxide, humidity, temperature, and how it feels)",
         "device": "its own computer (processor load, memory, disk free, temperatures)",
         "volume": "its speaker's volume (0 to 100, and whether muted)",
+        "body": "what its body may do, joint by joint (degrees from home, bounds, poses, speed, load and heat limits), and where each joint is",
     }
 
     @server.tool(
@@ -370,7 +371,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         + f". `which` is some of {', '.join(states)}; by default all of them."
     )
     async def lamp_state(
-        which: list[Literal["presence", "light", "mood", "lamp", "air", "device", "volume"]] | None = None,
+        which: list[Literal["presence", "light", "mood", "lamp", "air", "device", "volume", "body"]] | None = None,
     ) -> dict:
         ungranted = [state for state in which or [] if state not in states]
         if ungranted:

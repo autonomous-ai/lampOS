@@ -498,6 +498,12 @@ export class Lamp {
   // `disk_free`, `uptime_s`, `temperature_c`, and `known`.
   async device() { return (await this.get('device')).device; }
 
+  /** What the body may do, joint by joint, and where each joint is now:
+   * `get('body')`'s `body` (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`, each
+   * with `deg` from its home, `min_deg`, `max_deg` and its counts; the speed,
+   * load and heat limits). */
+  async bodyInfo() { return (await this.get('body')).body ?? {}; }
+
   // `const lease = await lamp.lease('body').take()` ... `await lease.release()`,
   // or `await lamp.withLease(['body'], async (lease) => ...)`.
   lease(...parts) { return new Lease(this, parts, 30_000, undefined); }
