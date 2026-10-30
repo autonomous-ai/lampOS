@@ -22,6 +22,8 @@ serde_json.workspace = true
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.5", features = ["fs", "termios", "event", "process"] }
 nix = { version = "=0.29.0", default-features = false, features = ["signal", "user"] }
+# The local day of the strain guard's daily peaks (#4501).
+lamp-local-time = { path = "../local-time" }
 
 [lints]
 workspace = true

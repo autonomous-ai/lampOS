@@ -333,6 +333,91 @@ pub fn own_ranges_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501): a long strain sits the arm
+/// down, a fast warming is said, and a second hot or strained sit-down
+/// within an hour keeps the lamp seated until a person or a health check
+/// lets it stand (`Limits::strain_guard`). Off: the body as before.
+pub const STRAIN_GUARD: &str = "LAMP_BODY_STRAIN_GUARD";
+
+/// Whether a value of [`STRAIN_GUARD`] turns the guard on.
+pub fn strain_guard_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The strain guard's bounds (`LAMP_BODY_STRAIN_GUARD`, #4501): an arm
+/// joint over `load` for `seconds` while standing sits the lamp down.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct StrainGuard {
+    pub load: u16,
+    pub seconds: u16,
+}
+
+impl StrainGuard {
+    /// `--arm-strain-load` and `--arm-strain-seconds` unless given: a
+    /// healthy elbow stands at 100 to 220 (lamp-4ace's new servo, lamp-cb94),
+    /// the faulty one sat at 557 to 586.
+    pub const LOAD: u16 = 450;
+    pub const SECONDS: u16 = 30;
+    /// The second hot or strained sit-down within this seats the lamp.
+    pub const SEAT_WINDOW: Duration = Duration::from_secs(60 * 60);
+    pub const SEAT_AFTER: usize = 2;
+    /// A joint rising this many degrees within [`Self::CLIMB_WINDOW`], while
+    /// still under `bus_out::WARM`, is said to warm fast. Looked at every
+    /// [`Self::CLIMB_EVERY`].
+    pub const CLIMB: u8 = 8;
+    pub const CLIMB_WINDOW: Duration = Duration::from_secs(5 * 60);
+    pub const CLIMB_EVERY: Duration = Duration::from_secs(10);
+}
+
+/// Each joint's temperature every [`StrainGuard::CLIMB_EVERY`] over the last
+/// [`StrainGuard::CLIMB_WINDOW`] (#4501): a joint warming fast is said
+/// before it is warm. It never moves the body.
+#[derive(Debug, Default)]
+pub struct Climb {
+    seen: std::collections::VecDeque<(Duration, [u8; 5])>,
+}
+
+impl Climb {
+    /// `temperatures` in servo order at `now`: the joint that rose the most,
+    /// by [`StrainGuard::CLIMB`] or more, within the window and is still
+    /// under `bus_out::WARM`, with its lowest reading there and now's.
+    pub fn observe(
+        &mut self,
+        now: Duration,
+        temperatures: [u8; 5],
+    ) -> Option<(&'static str, u8, u8)> {
+        if self
+            .seen
+            .back()
+            .is_none_or(|(at, _)| now.saturating_sub(*at) >= StrainGuard::CLIMB_EVERY)
+        {
+            self.seen.push_back((now, temperatures));
+            while self
+                .seen
+                .front()
+                .is_some_and(|(at, _)| now.saturating_sub(*at) > StrainGuard::CLIMB_WINDOW)
+            {
+                self.seen.pop_front();
+            }
+        }
+        Joint::ALL
+            .into_iter()
+            .filter_map(|joint| {
+                let is = temperatures[joint.index()];
+                // A 0 is no reading, not a cold joint.
+                let low = self
+                    .seen
+                    .iter()
+                    .map(|(_, seen)| seen[joint.index()])
+                    .filter(|seen| *seen > 0)
+                    .min()?;
+                (is < crate::bus_out::WARM && is >= low.saturating_add(StrainGuard::CLIMB))
+                    .then_some((joint.name(), low, is))
+            })
+            .max_by_key(|(_, low, is)| is - low)
+    }
+}
+
 /// How far inside a joint's own stored limits a head or base goal stays
 /// (#3558): under two degrees, so a goal is never one the servo would
 /// refuse and leave the joint short of.
@@ -539,6 +624,10 @@ pub struct Asked {
     /// direction, as the gaze's own look is, already inside the reach the
     /// holder was given. Taken only while `held`, in place of the gaze's.
     pub aim: Option<[f32; 2]>,
+    /// Under `Limits::strain_guard` (#4501): a person held the head or a
+    /// button a second, or a health check started, since the lamp was
+    /// seated. It may stand again.
+    pub unseat: bool,
 }
 
 impl Asked {
@@ -560,6 +649,7 @@ impl Asked {
         held_by_test: false,
         held: false,
         aim: None,
+        unseat: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -581,6 +671,7 @@ impl Asked {
         held_by_test: false,
         held: false,
         aim: None,
+        unseat: false,
     };
 }
 
@@ -891,6 +982,10 @@ pub struct Limits {
     /// limits are not read, as before.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub own_ranges: bool,
+    /// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501), with its bounds; `None`
+    /// is the body as before.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strain_guard: Option<StrainGuard>,
     /// A load above this on `load_steps` steps in a row makes the joint give
     /// way, and ends the run if it stays or comes back too often.
     pub load: [u16; 3],
@@ -1023,6 +1118,7 @@ impl Limits {
         arbitration: false,
         gesture_pause: false,
         own_ranges: false,
+        strain_guard: None,
     };
 }
 
@@ -1131,6 +1227,17 @@ pub struct Glimpse {
     /// [`Standing::UNLIFTED_LONG_RESTS`] long rests' worth of tries: it stays
     /// folded until started again (#4390). `None` while it may stand.
     pub cannot_lift: Option<&'static str>,
+    /// Under `Limits::strain_guard` (#4390, #4501): the arm joint whose
+    /// stand first pushed at its load bound without lifting, said once and
+    /// kept until the lamp is let stand again; the joint and its load that
+    /// sat it down for a long strain, while it rests from that; a joint
+    /// warming fast, its lowest reading in the window and now's; and the
+    /// joint and why (`hot` or `strained`) that seated it until a person or
+    /// a health check lets it stand. `None` otherwise.
+    pub unlifted: Option<&'static str>,
+    pub strained: Option<(&'static str, u16)>,
+    pub warming: Option<(&'static str, u8, u8)>,
+    pub seated: Option<(&'static str, &'static str)>,
     /// Under `Limits::refused_let_go`: the lamp is let go because a joint
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
@@ -3751,6 +3858,7 @@ pub(crate) fn run_looking(
         held_by_test: false,
         held: false,
         aim: None,
+        unseat: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -4886,6 +4994,16 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut unlifted_long_rests = 0u8;
     let mut cannot_lift: Option<&'static str> = None;
     let mut release_due = false;
+    // #4501, under `Limits::strain_guard`: since when each arm joint has been
+    // over the guard's load while standing; the hot or strained sit-downs
+    // inside `StrainGuard::SEAT_WINDOW`; what `Glimpse` says of them; and
+    // each joint's temperatures, for a fast warming.
+    let mut strain_since: [Option<Duration>; 2] = [None; 2];
+    let mut seat_retreats: std::collections::VecDeque<Duration> = std::collections::VecDeque::new();
+    let mut unlifted_said: Option<&'static str> = None;
+    let mut strained_by: Option<(&'static str, u16)> = None;
+    let mut seated: Option<(&'static str, &'static str)> = None;
+    let mut climb = Climb::default();
     let mut arm_over = [0u8; 2];
     let mut arm_off = [0u8; 2];
     let mut arm_hot = [0u8; 2];
@@ -5145,6 +5263,17 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
+        // A person or a health check lets a seated lamp stand (#4501).
+        if asked_now.unseat
+            && let Some((joint, why)) = seated.take()
+        {
+            seat_retreats.clear();
+            unlifted_said = None;
+            eprintln!(
+                "lamp-body: step {}: seated for its {joint} ({why}) until now: let stand again",
+                report.steps
+            );
+        }
         // A hand from the test input (`--hold-from`) holds through anything
         // that replaces what is asked, as a real hand would.
         let test_held = asked_now.held_by_test;
@@ -5447,13 +5576,17 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             let tired = tired_until.is_some_and(|until| now < until);
             let awake = awake_until.is_some_and(|until| now < until);
-            let wanted =
-                if leaving.is_none() && awake && !tired && !unplug_latched && cannot_lift.is_none()
-                {
-                    up.share
-                } else {
-                    0.0
-                };
+            let wanted = if leaving.is_none()
+                && awake
+                && !tired
+                && !unplug_latched
+                && cannot_lift.is_none()
+                && seated.is_none()
+            {
+                up.share
+            } else {
+                0.0
+            };
             let was_folded = stand <= 0.0;
             awake_now = wanted > 0.0;
             if !blind {
@@ -6596,6 +6729,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             resting_s: match tired_until {
                 Some(until)
                     if until > now
+                        && limits.strain_guard.is_none()
                         && retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED) =>
                 {
                     // Rounded up, so the last part second still says it rests.
@@ -6606,6 +6740,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 _ => 0,
             },
             cannot_lift,
+            unlifted: unlifted_said,
+            strained: strained_by.filter(|_| tired_until.is_some_and(|until| now < until)),
+            warming: limits
+                .strain_guard
+                .and_then(|_| climb.observe(now, samples.map(|sample| sample.temperature))),
+            seated,
             waiting: None,
         };
         if !unplug_latched {
@@ -6719,6 +6859,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 } else {
                     0
                 };
+                // Over the strain guard's load for its seconds, standing (#4501).
+                let strained_long = match limits.strain_guard {
+                    Some(guard) if stand > 0.0 && is.load > guard.load => {
+                        let since = *strain_since[index].get_or_insert(now);
+                        now.saturating_sub(since) >= Duration::from_secs(guard.seconds.into())
+                    }
+                    _ => {
+                        strain_since[index] = None;
+                        false
+                    }
+                };
+                let hot = arm_hot[index] >= limits.temperature_steps.max(1);
                 let why = if arm_over[index] >= limits.load_steps.max(1) {
                     Some(format!("{joint} load {}", is.load))
                 } else if arm_off[index] >= Standing::TRACKING_STEPS {
@@ -6726,8 +6878,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         "{joint} at {} for goal {}",
                         is.position, arm_written[index]
                     ))
-                } else if arm_hot[index] >= limits.temperature_steps.max(1) {
+                } else if hot {
                     Some(format!("{joint} at {} degrees", is.temperature))
+                } else if strained_long {
+                    Some(format!("{joint} strained: load {} too long", is.load))
                 } else {
                     None
                 };
@@ -6746,6 +6900,41 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 if unlifted && stand > 0.0 {
                     release_due = true;
                 }
+                // #4390, #4501: an unlifted stand is said once; a hot or
+                // strained sit-down counts toward the seat, and the second
+                // within the hour seats the lamp, its arm let go once down.
+                if limits.strain_guard.is_some() && !tired && stand > 0.0 {
+                    if unlifted && unlifted_said.is_none() {
+                        unlifted_said = Some(joint.name());
+                        eprintln!(
+                            "lamp-body: step {}: {joint} pushed as hard as it may and did not move: sat down, its arm to be let go",
+                            report.steps
+                        );
+                    }
+                    if strained_long {
+                        strained_by = Some((joint.name(), is.load));
+                    }
+                    let kind = if hot {
+                        Some("hot")
+                    } else if strained_long || unlifted {
+                        Some("strained")
+                    } else {
+                        None
+                    };
+                    if let Some(kind) = kind {
+                        seat_retreats
+                            .retain(|at| now.saturating_sub(*at) < StrainGuard::SEAT_WINDOW);
+                        seat_retreats.push_back(now);
+                        if seat_retreats.len() >= StrainGuard::SEAT_AFTER && seated.is_none() {
+                            seated = Some((joint.name(), kind));
+                            release_due = true;
+                            eprintln!(
+                                "lamp-body: step {}: {joint} sat down {kind} for the second time in an hour: seated, its arm let go, until a person holds its head a second, a health check starts or it is started again",
+                                report.steps
+                            );
+                        }
+                    }
+                }
                 if !tired && stand > 0.0 {
                     retreats = retreats.saturating_add(1);
                     retreated_at.retain(|at| now.saturating_sub(*at) < Standing::RETREAT_WINDOW);
@@ -6758,7 +6947,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
                 // A third retreat inside the window rests it long, and while
                 // still strained the rest is never shortened.
-                let long = retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED);
+                // Under the strain guard the seat takes the long rest's place.
+                let long = limits.strain_guard.is_none()
+                    && retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED);
                 let rest = if long {
                     Standing::LONG_REST
                 } else {

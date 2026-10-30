@@ -930,6 +930,55 @@ started again, and the arm may need looking at" (`Glimpse::cannot_lift`).
 The voice doesn't say this line; it shows on the lamp's health. A sit-down
 of an arm that did lift is as before: nothing let go, no count.
 
+### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
+
+Off unless the unit sets `LAMP_BODY_STRAIN_GUARD=on`; off, nothing above
+changes. On (`Limits::strain_guard`):
+
+- **A long strain sits it down.** A standing shoulder or elbow over
+  `--arm-strain-load` (450) for `--arm-strain-seconds` (30) in a row sends
+  the lamp back down as the load bound does, its retreat
+  `elbow_pitch strained: load 500 too long`. Healthy servos stand at 100 to
+  220 (lamp-4ace's new elbow, lamp-cb94); the faulty one sat at 557 to 586,
+  under the 600 cap that the load bound sits just below. While it rests from
+  it, its health says `the elbow strained: it read a load of 500 too long
+  while standing, and the lamp sat down to rest` (`Glimpse::strained`).
+- **A stand that never lifted is said at once.** The first sit-down of the
+  kind above (#4390) is said in the journal once and on its health, `the
+  elbow pushed as hard as it may and didn't move` (`Glimpse::unlifted`),
+  without waiting for two long rests. Its folded arm is let go as above.
+- **Heat caught early.** A joint 8 °C warmer within 5 min
+  (`StrainGuard::CLIMB`, `CLIMB_WINDOW`; looked at every 10 s), while
+  still under 55, is a warning, `elbow is warming fast: from 42 to 50
+  within 5 min, and it is said warm at 55` (`Glimpse::warming`). It moves
+  nothing; at 55 the warm warning takes over.
+- **Seated, not looping.** A second hot or strained sit-down within an hour
+  (`StrainGuard::SEAT_WINDOW`; a strained one is a long strain or one that
+  never lifted, not the load bound's quick one) seats the lamp: it stands
+  for nothing, its folded arm is let go once down, the journal says so once,
+  and its health holds one warning, `seated: the elbow retreated twice in an
+  hour (strained); hold its head a second, or run a health check, to let it
+  stand again` (`Glimpse::seated`). A head pad or a button held a second
+  (read from `controls/state` as the first stand's yes is,
+  `first_stand::Touches`), a self-test started since it was seated
+  (`lamp/selftest`'s `started`), or a restart lets it stand again
+  (`src/unseat_in.rs`). This takes the place of the three-in-half-an-hour
+  long rest and of the two long rests' give-up, which do not happen with
+  the guard on.
+- **The day's peaks are kept.** Each joint's highest load and temperature
+  in each local day go to `/var/lib/lampos-body/peaks/YYYY-MM-DD.json`
+  (`{"day":…,"joints":{"elbow":{"load":…,"temperature":…},…}}`,
+  `src/peaks.rs`), written whole at most every 5 min and only when a peak
+  rose; a body started again the same day goes on from the file. Files past
+  30 days are removed. The product unit has `StateDirectory=lampos-body`. A
+  failure to write is said once in the journal, and the body goes on.
+
+Shown by tests only (`a_long_strain_twice_in_an_hour_seats_the_lamp_until_a_person_lets_it_stand`,
+`without_the_strain_guard_a_load_under_the_bound_never_sits_it_down`,
+`under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on_the_second_try`,
+`a_joint_warming_eight_degrees_in_five_minutes_is_said_before_it_is_warm`,
+the peaks' and the unseat reader's own); not yet on a lamp.
+
 The pose lamp-4ace is given is the old runtime's idle pose
 (`hal/recordings/idle.csv`, first frame): head pitch 1,772, shoulder 2,657,
 elbow 2,602, with this lamp's own roll and yaw. Its folded arm reads 2,048
@@ -2023,6 +2072,8 @@ four rows, "Without it" is what `off` leaves.
 | `--stand-seconds N` | fastest the whole way is travelled | 5 | 2 to 20 |
 | `--awake-seconds N` | how long it stays up after the last mood that was not rest | 90 | 5 to 3,600 |
 | `--arm-load S,E` | load that sends it back down | 950,950, or 40 under `--force-limit` when that is given | 50 to 1,000, and under `--force-limit` |
+| `--arm-strain-load N` | with `LAMP_BODY_STRAIN_GUARD=on`, a standing shoulder or elbow over this for `--arm-strain-seconds` sits it down (see "The strain guard") | 450 | 50 to 1,000 |
+| `--arm-strain-seconds N` | how long over `--arm-strain-load` is a strain | 30 | 1 to 3,600 |
 | `--force-limit N` | the most force the base's turn and, for a lamp that may stand, the shoulder and the elbow may push with, of 1,000 | not written: each servo keeps what it holds | 300 to 1,000 |
 | `--give-way return\|stay\|off` (default return) | what a joint does after it gave way, and a joint that pushes without moving told to stop (below, "Giving way to a hand") | `off`: as before the option: no stall rule, a joint that gave way always comes back | return, stay or off |
 | `--limp on\|off` (default on while giving way) | a hand forcing a joint past V1's contact floor lets go of the head and base, the arm still holding (below) | `off`: gives way without the slump | on or off; on needs `--give-way` |
@@ -2352,6 +2403,12 @@ The report is `ok` with no message, or a warning:
 | Level | Message | When |
 | --- | --- | --- |
 | `warn` | `shoulder is warm: it reads 55, and the body stops at 62` | Any of the five joints reads 55 or more. The body ends its run, or sends the arm down, at 62 |
+| `warn` | `seated: the elbow retreated twice in an hour (strained); hold its head a second, or run a health check, to let it stand again` | With the strain guard, until a person or a self-test lets it stand (above, "The strain guard") |
+| `warn` | `its elbow pushed as hard as it may and did not move, in two long rests' tries: …` | Without the strain guard, after two long rests begun by a stand that never lifted (#4390) |
+| `warn` | `the elbow strained: it read a load of 500 too long while standing, and the lamp sat down to rest` | With the strain guard, while it rests from a long strain |
+| `warn` | `the elbow pushed as hard as it may and didn't move` | With the strain guard, from a stand that never lifted until it is let stand again |
+| `warn` | `elbow is warming fast: from 42 to 50 within 5 min, and it is said warm at 55` | With the strain guard, a joint 8 °C warmer within 5 min while under 55 |
+| `warn` | `its arm sat down for a strain three times in half an hour: it rests folded and may rise again in N min` | Without the strain guard, during the long rest |
 | `warn` | `a joint met resistance and stopped pushing, 2 times in the last minute` | A commanded joint gave way within the last minute |
 | `warn` | `stopped, as it was asked to` | Its last word after SIGINT or SIGTERM |
 | `error` | `stopped: head_pitch was pushed against (load 260)`, and one such sentence for each other reason in "When it stops" | Its last word when it stopped itself or would not start |
