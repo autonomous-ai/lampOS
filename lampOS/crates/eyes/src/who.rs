@@ -1755,7 +1755,8 @@ pub fn hold_on(full_crop: bool, known_hold: bool) -> bool {
     full_crop || known_hold
 }
 
-/// With [`FULL_CROP_ENVIRONMENT`] on, a known person stays known through
+/// With the hold on ([`FULL_CROP_ENVIRONMENT`] or [`KNOWN_HOLD_ENVIRONMENT`]),
+/// a known person stays known through
 /// checks that find nobody for this long after they last matched: one
 /// missed check (they come every [`RECOGNISE_EVERY`]) keeps them, a second
 /// lets them go. On lamp-4ace the same face scored either side of

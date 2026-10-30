@@ -1854,8 +1854,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 eprintln!("lamp-eyes: camera closed: not permitted");
                 tell(Seen { face: None });
             }
-            // With `LAMP_FACE_FULL_CROP=on`, the camera closed lets the one
-            // known go at once: nothing is held while it cannot see.
+            // With the hold on (`LAMP_FACE_FULL_CROP` or `LAMP_FACE_KNOWN_HOLD`),
+            // the camera closed lets the one known go at once: nothing is
+            // held while it cannot see.
             if let Some(who) = who.as_mut().filter(|who| who.held.on())
                 && who.known.take().is_some()
             {
@@ -2568,7 +2569,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         .as_ref()
                                         .and_then(|unconfirmed| unconfirmed.here(&print));
                                 }
-                                // With `LAMP_FACE_FULL_CROP=on`, a miss within
+                                // With the hold on (`LAMP_FACE_FULL_CROP` or
+                                // `LAMP_FACE_KNOWN_HOLD`), a miss within
                                 // the hold keeps the one known, as they were,
                                 // only while the face still looks like them
                                 // (`who::Held::keeps_print`): a stranger's
@@ -2640,7 +2642,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 )
                             {
                                 // No print, within the hold
-                                // (`LAMP_FACE_FULL_CROP=on`): the one known
+                                // (`LAMP_FACE_FULL_CROP` or
+                                // `LAMP_FACE_KNOWN_HOLD` on): the one known
                                 // stays, as they were, only if nobody is near
                                 // or the near face has their passing id
                                 // (`who::Held::keeps_unprinted`, #3285).
