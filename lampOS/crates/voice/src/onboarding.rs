@@ -4063,6 +4063,24 @@ pub fn owner_of(file: &Path) -> Option<String> {
     serde_json::from_slice::<Progress>(&bytes).ok()?.owner
 }
 
+/// Whether a face saved now is saved at onboarding: the onboarding file at
+/// `file` is there and its walk has not yet ended "who you are", which has
+/// no outcome at all, so this save ends it. Read before [`face_saved`]
+/// posts: the runner commits the step some seconds later. Any outcome,
+/// `done`, `skipped`, `failed`, `later` or `not_available`, means the walk
+/// is past it, and the file stays after the walk: a face saved then, by
+/// anyone, is not (the Reviewer-lead's P3 on #4530). No file, or one that
+/// can't be read, is not either: nothing is kept on a guess.
+pub fn who_you_are_open(file: &Path) -> bool {
+    let Ok(bytes) = std::fs::read(file) else {
+        return false;
+    };
+    let Ok(progress) = serde_json::from_slice::<Value>(&bytes) else {
+        return false;
+    };
+    progress["steps"].is_object() && progress["steps"].get(Step::WhoYouAre.name()).is_none()
+}
+
 /// A face `forget_my_face` forgot: a face saved before "who you are" was
 /// asked no longer ends it (#3640).
 pub fn face_forgotten(file: &Path) {
@@ -5538,6 +5556,53 @@ mod tests {
         early.wait(20 * S, Some(NEAR_MIDDLE));
         assert_eq!(early.outcome(Step::WhoYouAre), Some(Outcome::Done));
         assert_eq!(early.walk.desired.owner.as_deref(), Some("Example Name"));
+    }
+
+    /// The onboarding forgets report (30 Oct), fix C: a face saved while
+    /// the walk has not yet ended "who you are" is saved at onboarding; once
+    /// the step has any outcome (the walk past it, the file kept after it),
+    /// or with no file or an unreadable one, it is not (the Reviewer-lead's
+    /// P3 on #4530: a later save by anyone kept "Their name is X.").
+    #[test]
+    fn a_face_is_saved_at_onboarding_only_while_who_you_are_is_running() {
+        let dir = std::env::temp_dir().join(format!("lamp-who-open-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("progress.json");
+        assert!(!who_you_are_open(&file), "no file");
+        std::fs::write(&file, "not json").unwrap();
+        assert!(!who_you_are_open(&file), "unreadable");
+        for (steps, open) in [
+            (json!({}), true),
+            (json!({"sitting":{"outcome":"done","at_unix_s":1}}), true),
+            (
+                json!({"where_you_sit":{"outcome":"failed","at_unix_s":1}}),
+                true,
+            ),
+        ]
+        .into_iter()
+        .chain(
+            ["done", "skipped", "failed", "later", "not_available"].map(|outcome| {
+                (
+                    json!({"who_you_are":{"outcome":outcome,"at_unix_s":1}}),
+                    false,
+                )
+            }),
+        )
+        .chain([(
+            // The whole walk over, the file kept after it.
+            json!({
+                "where_you_sit":{"outcome":"done","at_unix_s":1},
+                "who_you_are":{"outcome":"done","at_unix_s":2},
+                "how_you_sound":{"outcome":"done","at_unix_s":3},
+                "touch":{"outcome":"later","at_unix_s":4},
+            }),
+            false,
+        )]) {
+            std::fs::write(&file, json!({"steps": steps}).to_string()).unwrap();
+            assert_eq!(who_you_are_open(&file), open, "{steps}");
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// A face `remember_my_face` saved while "who you are" is led ends it

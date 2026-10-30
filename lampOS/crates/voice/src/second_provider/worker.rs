@@ -2311,7 +2311,10 @@ pub fn serve(
     // and keeps the name who_you_are saved with their face as the owner in
     // the onboarding file (lamp-29e7, 29 Oct): named only while the eyes
     // still know them, found off the reply's path
-    // (`known_faces::keep_owner_fresh`); a forget clears it at once.
+    // (`known_faces::keep_owner_fresh`); a forget clears it at once. With
+    // both, a face known under either is the owner's
+    // (`person::by_default_owner`): a typed "A B" and a spoken "A" are one
+    // person (the onboarding forgets report, 30 Oct).
     let owner_faces = tools.who.clone();
     let owner_file = tools.onboarding.clone();
     let by_default = crate::person::by_default_from_environment()
@@ -2328,26 +2331,25 @@ pub fn serve(
             eprintln!(
                 "lamp-voice second: a reply is told the person speaking is most likely the one who set the lamp up, unless someone else is seen or heard now; nothing personal is kept on it (LAMP_PERSON_NAME_BY_DEFAULT; their name {})",
                 if typed.is_some() {
-                    "typed at setup"
+                    "typed at setup; a face kept under it, or under the name who_you_are saved with it, is theirs"
                 } else {
                     "kept as the owner when who_you_are saved their face"
                 }
             );
             // The owner as the eyes still know them, refreshed in the
-            // background, never waited on by a reply.
-            if typed.is_none() {
-                crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
-            }
+            // background, never waited on by a reply; with a typed name
+            // too, as a second name their face may be kept under.
+            crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
             (typed, bus)
         });
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
-    let told_for = memory_context(
+    let told_for = memory_context_carried(
         sessions,
         socket,
         who.clone(),
         days,
-        move |now, person, line: Option<Option<String>>, memory| {
+        move |now, person, line: Option<Option<String>>, memory, carried: Option<String>| {
             let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
                 .unwrap_or_default();
             let room = room_bus.as_ref().map(crate::bus_out::room_now);
@@ -2377,20 +2379,26 @@ pub fn serve(
             let named_by_default = by_default
                 .as_ref()
                 .and_then(|(typed, bus)| {
-                    let name = match typed {
-                        Some(typed) => typed.clone(),
-                        None => crate::known_faces::owner_now()?,
-                    };
-                    Some((name, bus))
+                    let (name, owners) = crate::person::by_default_owner(
+                        typed.clone(),
+                        crate::known_faces::owner_now(),
+                    )?;
+                    Some((name, owners, bus))
                 })
-                .map(|(name, bus)| {
+                .map(|(name, owners, bus)| {
                     let name = name.as_str();
                     let faces = bus
                         .as_ref()
                         .and_then(|_| crate::known_faces::most_faces_lately());
                     let known_now = who.as_deref().and_then(crate::known_faces::known_lately);
                     let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
-                    match crate::person::someone_else_now(name, faces, known_now.as_deref(), another)
+                    match crate::person::someone_else_now(
+                        &owners,
+                        faces,
+                        known_now.as_deref(),
+                        another,
+                        carried.as_deref(),
+                    )
                     {
                         Some(why) => {
                             eprintln!(
@@ -9111,6 +9119,7 @@ fn spoken_by_the_caller_alone(
 /// The worker's memory-bearing context callback, shared with its integration
 /// tests. Selection and composition run inside the same post-wait/post-read
 /// scope guard as the production callback; retries keep the parent's policy.
+#[cfg(test)]
 fn memory_context(
     sessions: Arc<Mutex<Sessions>>,
     socket: Option<PathBuf>,
@@ -9118,9 +9127,31 @@ fn memory_context(
     days: bool,
     tell: impl Fn(Instant, Option<String>, Option<Option<String>>, String) -> Told + Send + Sync,
 ) -> impl Fn(Option<&crate::memory_scope::ScopeLease>, Chosen) -> Told + Send + Sync {
+    memory_context_carried(
+        sessions,
+        socket,
+        who,
+        days,
+        move |now, person, line, memory, _| tell(now, person, line, memory),
+    )
+}
+
+/// [`memory_context`] with `tell` also given the person the line is
+/// carried for as their conversation going on (`ScopeLease::carried_for`,
+/// #4339), for the by-default name alone (`person::someone_else_now`).
+fn memory_context_carried(
+    sessions: Arc<Mutex<Sessions>>,
+    socket: Option<PathBuf>,
+    who: Option<PathBuf>,
+    days: bool,
+    tell: impl Fn(Instant, Option<String>, Option<Option<String>>, String, Option<String>) -> Told
+    + Send
+    + Sync,
+) -> impl Fn(Option<&crate::memory_scope::ScopeLease>, Chosen) -> Told + Send + Sync {
     let compose = move |sessions: &mut Sessions,
                         scope: Option<&crate::memory_scope::ScopeSnapshot>,
-                        line: Option<Option<String>>| {
+                        line: Option<Option<String>>,
+                        carried: Option<String>| {
         let now = Instant::now();
         // Counted at every ask, before anything can return early: a turn's
         // second ask (its prepared chat, then its rounds) is never quiet.
@@ -9157,7 +9188,7 @@ fn memory_context(
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
             None => crate::remember::told(),
         };
-        tell(now, person, line, memory)
+        tell(now, person, line, memory, carried)
     };
     move |lease, chosen| match chosen {
         Chosen::ByLease => told_while_scope_holds(&sessions, lease, |sessions, scope| {
@@ -9167,7 +9198,10 @@ fn memory_context(
                     .or(lease.and_then(crate::memory_scope::ScopeLease::named_for_reply))
                     .map(str::to_owned)
             });
-            compose(sessions, scope, line)
+            let carried = lease
+                .and_then(crate::memory_scope::ScopeLease::carried_for)
+                .map(str::to_owned);
+            compose(sessions, scope, line, carried)
         }),
         // Whose the turn is as before; the line's own person, read once
         // here, only for the typed name.
@@ -9175,7 +9209,12 @@ fn memory_context(
             let line = lease
                 .and_then(crate::memory_scope::ScopeLease::scope)
                 .map(|scope| scope.person().map(str::to_owned));
-            told_while_scope_holds(&sessions, None, |sessions, _| compose(sessions, None, line))
+            let carried = lease
+                .and_then(crate::memory_scope::ScopeLease::carried_for)
+                .map(str::to_owned);
+            told_while_scope_holds(&sessions, None, |sessions, _| {
+                compose(sessions, None, line, carried)
+            })
         }
     }
 }

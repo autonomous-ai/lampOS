@@ -435,28 +435,63 @@ pub fn by_default_from_environment() -> bool {
     std::env::var(BY_DEFAULT_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// Why the owner `name` is not told by default now, or `None` when they
-/// may be ([`BY_DEFAULT_ENVIRONMENT`], #3884): another voice in the
-/// conversation (`another_voice`, the second route's own sign), more than
-/// one face in view, one face the eyes don't know as the owner (an unknown
-/// face, or a known face that isn't theirs), or the eyes knowing someone
-/// else. No face in view, or no look at all, is no sign: the owner looking
-/// away is still the owner.
+/// The owner for [`BY_DEFAULT_ENVIRONMENT`]: the name a reply is told, the
+/// typed one (`typed`, `LAMP_PERSON_NAME`) else the one who_you_are saved
+/// with their face (`kept`, `known_faces::owner_now`), and every name the
+/// owner goes by, both when both are there. An app user who types "Minh
+/// Nguyen" and says "Minh" at "What should I call you?" has their face
+/// kept under "Minh": with the typed name alone, every turn the eyes knew
+/// them read as "a known face that isn't theirs", and the name was held
+/// back and taken out of the lamp's lines on each one (the onboarding
+/// forgets report, 30 Oct). Neither: no owner.
+pub fn by_default_owner(
+    typed: Option<String>,
+    kept: Option<String>,
+) -> Option<(String, Vec<String>)> {
+    let told = typed.clone().or_else(|| kept.clone())?;
+    Some((told, typed.into_iter().chain(kept).collect()))
+}
+
+/// Why the owner is not told by default now, or `None` when they may be
+/// ([`BY_DEFAULT_ENVIRONMENT`], #3884): another voice in the conversation
+/// (`another_voice`, the second route's own sign), more than one face in
+/// view, one face the eyes don't know as the owner (an unknown face, or a
+/// known face that isn't theirs), or the eyes knowing someone else. The
+/// owner is any of `owners` ([`by_default_owner`]), matched by memory
+/// person id (`known_faces::memory_person`), as the eyes' face and memory
+/// are keyed. No face in view, or no look at all, is no sign: the owner
+/// looking away is still the owner.
+///
+/// `carried` is the person (a memory id) the line is carried for as their
+/// conversation going on (`ScopeLease::carried_for`, #4339: no face seen
+/// speaking it, no other face in any look through it, their face in view
+/// through it or within `CARRY_UNSEEN_WITHIN` before it, their own last
+/// exchange within the conversation). When that is the owner, one face the
+/// eyes don't name just now is no sign: a recognition slip mid-talk (a
+/// missed check, a track found again) unnamed the owner and took the name
+/// out of the lamp's own lines (the onboarding forgets report, 30 Oct).
+/// Another voice, two faces, or a known face that isn't theirs still is.
 pub fn someone_else_now(
-    name: &str,
+    owners: &[String],
     faces: Option<usize>,
     known_now: Option<&str>,
     another_voice: bool,
+    carried: Option<&str>,
 ) -> Option<&'static str> {
-    let owner = crate::known_faces::memory_person(name);
-    let theirs = known_now.map(|known| crate::known_faces::memory_person(known) == owner);
+    let owner_id = |id: &str| {
+        owners
+            .iter()
+            .any(|owner| crate::known_faces::memory_person(owner) == id)
+    };
+    let theirs = known_now.map(|known| owner_id(&crate::known_faces::memory_person(known)));
+    let carried = carried.is_some_and(owner_id);
     if another_voice {
         Some("another voice in the conversation")
     } else if faces.is_some_and(|faces| faces > 1) {
         Some("more than one face in view")
     } else if theirs == Some(false) {
         Some("a known face that isn't theirs")
-    } else if faces == Some(1) && theirs.is_none() {
+    } else if faces == Some(1) && theirs.is_none() && !carried {
         Some("an unknown face in view")
     } else {
         None
@@ -676,7 +711,10 @@ mod tests {
     #[test]
     fn the_owner_is_named_by_default_unless_someone_else_is_there() {
         let owner = "Example Name";
-        let at = |faces, known: Option<&str>, voice| someone_else_now(owner, faces, known, voice);
+        let owners = [owner.to_owned()];
+        let at = |faces, known: Option<&str>, voice| {
+            someone_else_now(&owners, faces, known, voice, None)
+        };
         // Alone, the face turned away or out of view, or no look at all.
         assert_eq!(at(Some(0), None, false), None);
         assert_eq!(at(None, None, false), None);
@@ -708,6 +746,90 @@ mod tests {
             );
         }
         assert!(by_default(owner).contains("“Example Name”"));
+    }
+
+    /// The onboarding forgets report (30 Oct): a typed name that isn't the
+    /// one their face was saved under still names the owner whose face the
+    /// eyes know; a different known person, or an unknown face, still
+    /// doesn't. No typed name: the one who_you_are kept. Made-up names.
+    #[test]
+    fn the_owners_face_is_theirs_under_the_typed_or_the_onboarding_name() {
+        let kept = || Some("Robin".to_owned());
+        // Typed differs from the name said at who_you_are.
+        let (told, owners) = by_default_owner(Some("Robin Example".to_owned()), kept()).unwrap();
+        assert_eq!(told, "Robin Example");
+        let at = |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, None);
+        assert_eq!(at(Some("Robin")), None);
+        assert_eq!(at(Some("robin ")), None);
+        assert_eq!(at(Some("Robin Example")), None);
+        assert_eq!(
+            at(Some("Sam Example")),
+            Some("a known face that isn't theirs")
+        );
+        assert_eq!(at(None), Some("an unknown face in view"));
+        // No setup file: the onboarding owner, still matched.
+        let (told, owners) = by_default_owner(None, kept()).unwrap();
+        assert_eq!(told, "Robin");
+        assert_eq!(
+            someone_else_now(&owners, Some(1), Some("Robin"), false, None),
+            None
+        );
+        assert_eq!(
+            someone_else_now(&owners, Some(1), Some("Sam Example"), false, None),
+            Some("a known face that isn't theirs")
+        );
+        // Typed only (no face saved at who_you_are), and both the same: as before.
+        for kept in [None, Some("Robin Example".to_owned())] {
+            let (told, owners) = by_default_owner(Some("Robin Example".to_owned()), kept).unwrap();
+            assert_eq!(told, "Robin Example");
+            let at = |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, None);
+            assert_eq!(at(Some("Robin Example")), None);
+            assert_eq!(at(Some("Robin")), Some("a known face that isn't theirs"));
+            assert_eq!(at(None), Some("an unknown face in view"));
+        }
+        assert_eq!(by_default_owner(None, None), None);
+    }
+
+    /// The onboarding forgets report (30 Oct), fix B: a line carried as the
+    /// owner's conversation going on keeps the name through a face the eyes
+    /// don't name just now; a second face, another voice or a known face
+    /// that isn't theirs still holds it back, and so does a slip on a line
+    /// not carried, or carried for someone else. Made-up names.
+    #[test]
+    fn a_carried_owners_line_keeps_the_name_through_a_face_slip_only() {
+        let (_, owners) =
+            by_default_owner(Some("Robin Example".to_owned()), Some("Robin".to_owned())).unwrap();
+        let owner = crate::known_faces::memory_person("Robin");
+        let guest = crate::known_faces::memory_person("Sam Example");
+        let at = |faces, known: Option<&str>, voice, carried: Option<&str>| {
+            someone_else_now(&owners, faces, known, voice, carried)
+        };
+        // Carried for the owner: an unnamed face is a slip.
+        assert_eq!(at(Some(1), None, false, Some(&owner)), None);
+        // The typed name's id is theirs too.
+        let typed = crate::known_faces::memory_person("Robin Example");
+        assert_eq!(at(Some(1), None, false, Some(&typed)), None);
+        // Still held back while carried.
+        assert_eq!(
+            at(Some(2), None, false, Some(&owner)),
+            Some("more than one face in view")
+        );
+        assert_eq!(
+            at(Some(1), None, true, Some(&owner)),
+            Some("another voice in the conversation")
+        );
+        assert_eq!(
+            at(Some(1), Some("Sam Example"), false, Some(&owner)),
+            Some("a known face that isn't theirs")
+        );
+        // Not carried, or carried for someone else: as before.
+        for carried in [None, Some(guest.as_str())] {
+            assert_eq!(
+                at(Some(1), None, false, carried),
+                Some("an unknown face in view"),
+                "{carried:?}"
+            );
+        }
     }
 
     #[test]
