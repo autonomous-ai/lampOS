@@ -585,3 +585,4 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - lamp-c0a4, local build, a face on the Mac's screen at night: `say_now` by the model in 1401 ms, "Hello."; then `greeted_recently`; past 20 minutes, `greeted_person`. Put back at 21:25, speaker 40%.
 - READ ASK on #3997 (c6525333016). Not verified: the afternoon wording aloud, a known face's hour (lamp-4ace).
 - #4175: 4ACE RUN queued by the first builder tonight on 8999 (busy_day, switches on then off).
+- 22:3x: #4625 at `e96717e0a3`: the first builder's READ (the hello by the hard rules alone, never Jev's answer, #4305) as `lamp-policy --hello-by-rule` on the product, template and 4ace units, the judge in shadow only; the Reviewer-lead's HOLD: 4ace's known file, ask-shaped ids, product policy `--zone system`; two P3s kept with reasons. Reply on #4625 (c6526441356).
