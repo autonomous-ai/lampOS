@@ -468,6 +468,16 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// six forty-four and change.", 2 of the last 4 runs).
 pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 
+/// Where the worker reads whether the model is asked to say its few words
+/// in the same reply as a call that changes something (the light, the
+/// voice's loudness, a timer or reminder, a keep), so they are heard at the
+/// first round's pace (`worker::SAY_WITH_CALL_NOTE`): `on`, and nothing
+/// else, and only with [`SAID_ONCE_ENVIRONMENT`], which tells the next round
+/// they were heard. On lamp-4ace on 30 Oct (8999) these calls said nothing
+/// until their second chat round: 2.4 to 3.3 s to the first sound, against
+/// 1.54 to 1.62 s for plain answers (#2135).
+pub const SAY_WITH_CALL_ENVIRONMENT: &str = "LAMP_SECOND_SAY_WITH_CALL";
+
 /// Where the worker reads whether the chat is told a few emotion tags its
 /// voice may read ([`speech_tags`], [`Engine::speaking_tags`]): `on`, and
 /// nothing else (#2901; the lead's proposal on #1711, 22 Oct 12:4x).
