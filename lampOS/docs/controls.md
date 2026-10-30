@@ -203,6 +203,17 @@ mute), since a tap on the head is how it wakes: without it the function is
 not declared at all, and the journal says so once. A held line's call is
 refused, as every action's is.
 
+**Without `go_to_sleep`** (the switch off, or no head sleep), the model is
+told it cannot put itself to sleep because someone asks: asked to sleep, or
+to rest until the person comes back, it does not agree or say good night as
+if it will (a launch lamp said "Rest well, … I'll keep the light warm till
+you're back" and stayed awake), and says that a hand rested on its head for
+three seconds puts it to sleep and a tap wakes it. With it the rule that it
+never agrees to something it has no function for (`lamp-voice`'s
+`without_a_tool`, #4595).
+On the Live route it follows the session's functions, on the second route
+the flag; with `go_to_sleep` declared it is not told.
+
 **The hold says the line (#3748 part 1, `LAMP_SLEEP_LINE=on`, off unless
 on).** At the hold's 2 s mark the voice plays the line "Going to sleep. Tap
 my head to wake me." (`lamp_msgs::SLEEP_LINE`, the same words as the

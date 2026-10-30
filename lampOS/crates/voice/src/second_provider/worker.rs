@@ -2365,13 +2365,16 @@ pub fn serve(
             let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
                 .unwrap_or_default();
             let room = room_bus.as_ref().map(crate::bus_out::room_now);
-            let skills = if skills_told.use_skill {
-                crate::use_skill::section(crate::use_skill::offered(&crate::tools::skill_tools(
-                    &skills_told,
-                )))
+            // The skills' catalogs read once for the turn: for `use_skill`'s
+            // lines, and whether `prepare_to_unplug` is offered; without it,
+            // or without `go_to_sleep`, how instead (#4595).
+            let offered = crate::tools::skill_tools(&skills_told);
+            let mut skills = if skills_told.use_skill {
+                crate::use_skill::section(crate::use_skill::offered(&offered))
             } else {
                 String::new()
             };
+            skills.push_str(&crate::without_a_tool::for_turn(&skills_told, &offered));
             // The lamp's own place, with `LAMP_PLACE`, beside its time
             // (#1712). The weather is never told here: it is the weather's
             // function's to say, when asked (LAMP_SECOND_WEATHER). Not while

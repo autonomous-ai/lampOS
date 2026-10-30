@@ -1735,27 +1735,33 @@ mod tests {
             section.contains("- dance: When asked to dance."),
             "{section}"
         );
+        // Neither `go_to_sleep` nor `prepare_to_unplug` is declared: how
+        // instead is told after the skills (#4595).
+        let none = crate::without_a_tool::told(false, false, false);
         let recalling = Recalling::new(config.clone()).tools(settings.clone());
         let equipped = recalling.equipped(config.clone());
         assert_eq!(
             equipped.instruction_text(),
-            format!("You are a lamp.{section}")
+            format!("You are a lamp.{section}{none}")
         );
         let opened = recalling.opened(|keep| {
-            assert_eq!(keep, section.len());
+            assert_eq!(keep, section.len() + none.len());
             None
         });
         assert_eq!(
             opened.instruction_text(),
-            format!("You are a lamp.{section}")
+            format!("You are a lamp.{section}{none}")
         );
-        // Without the switch: dance is its own function, and nothing is
-        // told after the instruction.
+        // Without the switch: dance is its own function, and nothing of
+        // the skills is told after the instruction.
         let off = Recalling::new(config.clone()).tools(crate::tools::Settings {
             use_skill: false,
             ..settings
         });
-        assert_eq!(off.equipped(config).instruction_text(), "You are a lamp.");
+        assert_eq!(
+            off.equipped(config).instruction_text(),
+            format!("You are a lamp.{none}")
+        );
         let _ = std::fs::remove_dir_all(&folder);
     }
 
@@ -1798,24 +1804,30 @@ mod tests {
                 .instruction_text()
                 .to_owned()
         };
+        // Neither `go_to_sleep` nor `prepare_to_unplug` is declared: how
+        // instead is told after it (#4595).
+        let none = crate::without_a_tool::told(false, false, false);
         catalog(&["volume_up"]);
         assert_eq!(
             told(&recalling),
-            format!("You are a lamp.{}", crate::session_tools::NO_LIGHT)
+            format!("You are a lamp.{}{none}", crate::session_tools::NO_LIGHT)
         );
         assert!(told(&recalling).contains("Never say you changed it."));
         // The catalog gone (lamp-actions down): told it can't change its
         // light or its voice either (the first builder's lamp run on #1513:
         // "I've turned my voice down" with no function at all).
         std::fs::remove_file(folder.join(crate::tools::CATALOG_FILE)).unwrap();
-        assert!(told(&recalling).ends_with(
+        assert!(told(&recalling).ends_with(&format!(
             "You cannot change your light or change how loud your voice is right now: \
              they are not ready. If someone asks for any of them, say so in a few words \
-             of your own, not the same way twice. Never say you did it."
-        ));
+             of your own, not the same way twice. Never say you did it.{none}"
+        )));
         catalog(&["volume_up", "light_colour"]);
-        assert_eq!(told(&recalling), "You are a lamp.");
-        assert_eq!(told(&Recalling::new(config)), "You are a lamp.");
+        assert_eq!(told(&recalling), format!("You are a lamp.{none}"));
+        assert_eq!(
+            told(&Recalling::new(config)),
+            format!("You are a lamp.{none}")
+        );
         // The thread leaves it room. With an instruction that leaves a
         // little less than the line and the thread together, the thread is
         // not recalled and the line is; without the room kept, the thread
@@ -1827,7 +1839,11 @@ mod tests {
         thread.lamp(3, "Nice to meet you, Sam.", now);
         let recall = thread.recall(now, usize::MAX).unwrap().len();
         let long = "x".repeat(
-            lamp_gemini::MAX_INSTRUCTION_BYTES - crate::session_tools::NO_LIGHT.len() - recall + 20,
+            lamp_gemini::MAX_INSTRUCTION_BYTES
+                - crate::session_tools::NO_LIGHT.len()
+                - none.len()
+                - recall
+                + 20,
         );
         let near_full = Recalling::new(recalling.config.clone().instruction(&long).unwrap()).tools(
             crate::tools::Settings {
@@ -1839,7 +1855,7 @@ mod tests {
         let open = |recalling: &Recalling| {
             recalling.opened(|keep| {
                 assert!(
-                    keep == 0 || keep == crate::session_tools::NO_LIGHT.len(),
+                    keep == none.len() || keep == crate::session_tools::NO_LIGHT.len() + none.len(),
                     "{keep}"
                 );
                 Some(recalling.recalled_keeping(&thread, now, None, keep))
@@ -1847,13 +1863,13 @@ mod tests {
         };
         assert_eq!(
             open(&near_full).instruction_text(),
-            format!("{long}{}", crate::session_tools::NO_LIGHT)
+            format!("{long}{}{none}", crate::session_tools::NO_LIGHT)
         );
         // The catalog gone: the longer line's room is kept, and it fits too
         // (the reviewer on #1549).
         std::fs::remove_file(folder.join(crate::tools::CATALOG_FILE)).unwrap();
-        let line = crate::session_tools::not_ready(&[], &near_full.tools).unwrap();
-        assert!(line.len() > crate::session_tools::NO_LIGHT.len());
+        let line = crate::session_tools::told_after(&[], &near_full.tools).unwrap();
+        assert!(line.len() > crate::session_tools::NO_LIGHT.len() + none.len());
         let longer = "x".repeat(lamp_gemini::MAX_INSTRUCTION_BYTES - line.len() - recall + 20);
         let near_full_longer = Recalling::new(
             recalling.config.clone().instruction(&longer).unwrap(),
@@ -1871,14 +1887,14 @@ mod tests {
                 .instruction_text(),
             format!("{longer}{line}")
         );
-        // With the light, nothing is kept: its recall has all its room.
+        // With the light, only the how-to is kept: its recall has the rest.
         catalog(&["volume_up", "light_colour"]);
         let whole = open(&near_full);
         assert!(whole.instruction_text().contains("My name is Sam"));
         assert!(
             !whole
                 .instruction_text()
-                .ends_with(crate::session_tools::NO_LIGHT)
+                .contains(crate::session_tools::NO_LIGHT)
         );
         let _ = std::fs::remove_dir_all(&folder);
     }
@@ -1960,7 +1976,13 @@ mod tests {
         // Opened in the gap: no light, and told so.
         catalog(&["volume_up"]);
         let mut thread = Thread::new();
-        assert!(open(&recalling, &thread).ends_with(crate::session_tools::NO_LIGHT));
+        // Then how instead of a sleep or an unplug it has no function for
+        // (#4595).
+        assert!(open(&recalling, &thread).ends_with(&format!(
+            "{}{}",
+            crate::session_tools::NO_LIGHT,
+            crate::without_a_tool::told(false, false, false)
+        )));
         assert!(!has_light());
         // Asked, and the lamp said it can't.
         thread.person("Make your light orange.", true, now);

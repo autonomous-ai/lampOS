@@ -62,7 +62,8 @@ comes with a later change. The runner itself is not behind it: it is only ever s
 one of those, or by hand.
 For the button it is set on three units: Controls
 (`lamp-controls.service`), the voice (`lamp-voice.service`, which hands it to
-its ring worker only) and setup's watcher (`lamp-setup-reset.service`).
+its ring worker, and to its provider worker so a model with no
+`prepare_to_unplug` says to turn it off from the app first, #4595, unplug.md) and setup's watcher (`lamp-setup-reset.service`).
 
 ## The request
 
