@@ -12,9 +12,6 @@ After=lamp-controls.service
 Type=simple
 # Root: the person's stores belong to several parts; stopping the lamp; starting setup again, or a reboot.
 User=root
-# It also turns the lamp off on a lamp/shutdown_request from Controls' button (#3697, docs/shutdown.md),
-# handing it to `lamp-setup shutdown`. Set with lamp-cloud, Controls and Voice.
-Environment=LAMP_SHUTDOWN=on
 ExecStart=/opt/lampOS/setup/current/lamp-setup watch-reset --plan /etc/lampOS/setup/reset-plan.json --bus-root /run/lampos-bus --enable
 # Its sandbox (#3710): it writes only its subscriber's socket under the bus, and hands the reset itself to a
 # unit of its own through systemd-run (the plan's `detach`), which wipes, stops the lamp and starts setup again outside

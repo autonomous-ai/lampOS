@@ -34,9 +34,6 @@ Environment=LAMP_PRIVACY_CONTROLS=on
 # A pet on the head (#3997, Part of #4133): said on controls/pet, and a petted contact asks no sleep. On in the
 # product since #4133's design owner's yes (29 Oct), with the head-pat and head-pat-wiggle skills (switches.md).
 Environment=LAMP_HEAD_PET=on
-# The primary button released after 5 to 15 s asks to turn the lamp off (#3697, docs/shutdown.md): a
-# lamp/shutdown_request that lamp-setup-reset acts on. Set with lamp-cloud, Voice and lamp-setup-reset.
-Environment=LAMP_SHUTDOWN=on
 ExecStart=/opt/lampOS/controls/current/lamp-controls serve --touch --config /etc/lampOS/controls/controls.json --pins /etc/lampOS/controls/controls-pins.json --bus-root /run/lampos-bus --enable
 Restart=on-failure
 RestartSec=5s
