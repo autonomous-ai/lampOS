@@ -2494,7 +2494,12 @@ pub fn serve(
                 // the owner alone, through the typed name (the readers'
                 // HOLDs on #4158: a silent known guest's nod would name an
                 // off-camera caller's answer).
-                + &known_name_told(known_name, who.as_deref(), person.as_deref());
+                + &known_name_told(
+                    known_name,
+                    who.as_deref(),
+                    person.as_deref(),
+                    carried.as_deref(),
+                );
             // Beside the character, where the instruction had it: told after
             // the exchanges, the model used it for the owner a third as
             // often (EN, the #2602 probe).
@@ -4659,8 +4664,17 @@ pub(crate) fn lamp_just_asked(thread: &crate::thread::Thread, request: u64, now:
 /// as the Live route tells it (`known_faces::note`): when the face the eyes
 /// know now, in `who`, is this turn's own person. A room's turn, a line
 /// narrowed to the room, or another person's has none; nor does a face gone.
-pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>) -> String {
-    if !on {
+/// Nor does a line `carried` in a person's conversation
+/// (`LAMP_CONVERSATION_CARRIES`, #4339): its scope is theirs, but no face was
+/// seen speaking it, and only a face seen speaking its own line is named
+/// this way (the readers' HOLDs on #4158).
+pub(crate) fn known_name_told(
+    on: bool,
+    who: Option<&Path>,
+    person: Option<&str>,
+    carried: Option<&str>,
+) -> String {
+    if !on || carried.is_some() {
         return String::new();
     }
     let Some(name) = who.and_then(crate::known_faces::known_now) else {
@@ -19452,7 +19466,7 @@ mod tests {
         let known = dir.join("known");
         std::fs::write(&known, "Pippa").unwrap();
         let pippa = crate::known_faces::memory_person("Pippa");
-        let told = known_name_told(true, Some(&known), Some(&pippa));
+        let told = known_name_told(true, Some(&known), Some(&pippa), None);
         assert_eq!(
             told,
             "\n\n(The person at the lamp now is Pippa: you know their face.)"
@@ -19485,14 +19499,20 @@ mod tests {
             (true, None, Some(pippa.as_str())),
         ] {
             assert_eq!(
-                known_name_told(on, who, person),
+                known_name_told(on, who, person, None),
                 "",
                 "{on} {who:?} {person:?}"
             );
         }
+        // A line carried in Pippa's conversation (#4339): its scope is theirs,
+        // but no face was seen speaking it, so nobody is named.
+        assert_eq!(
+            known_name_told(true, Some(&known), Some(&pippa), Some(&pippa)),
+            ""
+        );
         // The face gone: no known file.
         std::fs::remove_file(&known).unwrap();
-        assert_eq!(known_name_told(true, Some(&known), Some(&pippa)), "");
+        assert_eq!(known_name_told(true, Some(&known), Some(&pippa), None), "");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

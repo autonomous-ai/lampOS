@@ -352,7 +352,8 @@ Environment=LAMP_CONVERSATION_ROOM_LINES_TOLD=on
 # remember_my_face was recognised and never said back). Only with LAMP_PERSON_SCOPE_SEEN above: a turn is theirs
 # only when their own face alone was seen speaking it, so a silent face in view names no off-camera caller
 # (reviewer-two on #3371). A face only alone in view, not seen speaking, is never named this way: the owner alone is
-# named through the typed name (#4090, #4132), nobody else (the readers' HOLDs on #4158).
+# named through the typed name (#4090, #4132), nobody else (the readers' HOLDs on #4158). Nor is a line carried in
+# their conversation (LAMP_CONVERSATION_CARRIES above): no face was seen speaking it.
 Environment=LAMP_SECOND_FACE_NAME=on
 # The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things
 # worth keeping, each checked by the store and linked to the words it came from (OBSERVE); a dated one keeps its
