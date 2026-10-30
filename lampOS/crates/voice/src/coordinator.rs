@@ -6012,6 +6012,8 @@ fn conversation_with_gate_inner(
     #[cfg(not(test))]
     if let Some(says) = says.as_ref() {
         crate::body_ask::start_from_environment(says.own_asks());
+        // A language changed since the last start, said once (#4473).
+        crate::language::announce(says.own_asks());
     }
     // A skill typed in the app, handed over and told aloud as the voice's
     // own (#2813, `LAMP_APP_MAKE_SKILL=on`): a socket for lamp-cloud.

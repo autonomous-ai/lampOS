@@ -3104,4 +3104,27 @@ mod tests {
         assert_eq!(stream.finish(1).await.unwrap(), "hello lamp");
         assert_eq!(server.await.unwrap(), 8);
     }
+
+    /// The owner's language (#4473) asks Nova-3 for it; English asks what
+    /// it always did, `language=en`.
+    #[test]
+    fn the_owners_language_is_the_streams() {
+        let asked = |language: Option<&str>| {
+            let url = url(None, language, &[], false).unwrap();
+            url.query_pairs()
+                .find(|(name, _)| name == "language")
+                .map(|(_, value)| value.into_owned())
+        };
+        assert_eq!(asked(None).as_deref(), Some("en"));
+        for code in ["vi", "ja", "zh", "ko"] {
+            let language = crate::language::Language::parse(code).unwrap().unwrap();
+            assert_eq!(asked(Some(language.stt())).as_deref(), Some(code));
+            assert!(
+                url(None, Some(code), &[], false)
+                    .unwrap()
+                    .as_str()
+                    .contains("model=nova-3-general")
+            );
+        }
+    }
 }
