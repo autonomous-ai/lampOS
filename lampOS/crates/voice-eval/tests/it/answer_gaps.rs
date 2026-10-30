@@ -19,6 +19,22 @@ impl Drop for Input {
     }
 }
 
+/// A directory made for one test and removed after it.
+struct Directory(PathBuf);
+impl Directory {
+    fn new(name: &str) -> Self {
+        let path =
+            std::env::temp_dir().join(format!("lamp-answer-gaps-{name}-{}", std::process::id()));
+        fs::create_dir(&path).unwrap();
+        Self(path)
+    }
+}
+impl Drop for Directory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir(&self.0);
+    }
+}
+
 fn run(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_lamp-voice-eval"))
         .arg("answer-gaps")
@@ -95,7 +111,12 @@ fn answer_gaps_cli_reports_bad_and_incomplete_evidence_without_words() {
 #[test]
 fn answer_gaps_cli_rejects_directories_links_empty_and_oversized_inputs() {
     let empty = Input::new("empty", "");
-    let directory = empty.0.parent().unwrap();
+    // A directory of the test's own: the temporary folder itself can be a
+    // symlink (`TMPDIR=/tmp/` on macOS, where `/tmp` links to
+    // `/private/tmp`), and the CLI refuses a symlink at `open`, before it
+    // could tell a directory.
+    let directory = Directory::new("directory");
+    let directory = &directory.0;
     let link = Input::new("link", "");
     fs::remove_file(&link.0).unwrap();
     std::os::unix::fs::symlink(&empty.0, &link.0).unwrap();
