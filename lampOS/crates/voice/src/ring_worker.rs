@@ -68,6 +68,9 @@ pub struct Senses {
     /// The lamp's inner state, for the eye's pace at rest
     /// ([`crate::ring_mood`]).
     pub mood: Option<crate::ring_mood::RingMood>,
+    /// A stir at its name in the night's sleep, for the face's lift
+    /// (`LAMP_REST_THROUGH_SOUNDS=on`, [`crate::ring_stir`]).
+    pub stir: Option<crate::ring_stir::RingStir>,
     pub unplug: Option<crate::ring_unplug::RingUnplug>,
 }
 
@@ -248,6 +251,18 @@ pub fn run_continuous(
             None
         }
     });
+    // `LAMP_REST_THROUGH_SOUNDS=on`: a stir at its name lifts the face
+    // (#1672). Off, Expression's state is not read.
+    let stir = bus_root.and_then(|root| {
+        let switch = std::env::var(crate::ring_stir::SWITCH).ok();
+        match crate::ring_stir::RingStir::switched(root, switch.as_deref()) {
+            Ok(stir) => stir,
+            Err(error) => {
+                eprintln!("lamp-voice ring: a stir at its name cannot be read: {error}");
+                None
+            }
+        }
+    });
     let unplug = bus_root
         .filter(|_| lamp_body::unplug::enabled())
         .map(crate::ring_unplug::RingUnplug::on)
@@ -261,6 +276,7 @@ pub fn run_continuous(
         sight,
         head,
         mood,
+        stir,
     };
     let resting = match resting.map(ChannelCeiling::new).transpose() {
         Ok(resting) => resting,
@@ -550,6 +566,7 @@ fn service(
         mut sight,
         mut head,
         mut mood,
+        mut stir,
         mut unplug,
     } = senses;
     let mut light = light.map(|(light, begins)| {
@@ -736,6 +753,9 @@ fn service(
         }
         if let Some(mood) = mood.as_mut() {
             face.breath(mood.tick(at));
+        }
+        if let Some(stir) = stir.as_mut() {
+            face.stir(stir.tick(at));
         }
         if let Some(ceiling) = resting
             && pending.is_none()

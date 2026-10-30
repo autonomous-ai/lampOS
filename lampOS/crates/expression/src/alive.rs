@@ -477,6 +477,10 @@ pub const STIR_IN_US: u64 = 400_000;
 /// [`STIR_OUT_US`], and the night's sleep is unbroken.
 pub const STIR_HOLD_US: u64 = 5_000_000;
 pub const STIR_OUT_US: u64 = 2_000_000;
+/// Named in `expression/state` beside `stirring` while the stir settles
+/// back: the voice's ring worker lifts the ring while `stirring` alone is
+/// named and eases it back with the head from here (#1672).
+pub const STIR_SETTLING: &str = "stir_settling";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Phase {
@@ -1470,6 +1474,11 @@ impl Life {
                 planned.offsets = add(offsets, self.stirred(), 1.0);
                 if self.stir > 0.0 {
                     planned.names.push("stirring");
+                    // Its answer no longer awaited: the voice's ring eases
+                    // its lift back as the head settles (#1672).
+                    if self.stir_until.is_none() {
+                        planned.names.push(STIR_SETTLING);
+                    }
                 }
                 planned.keep = 1.0 - settled;
                 planned.asleep = true;
@@ -2334,6 +2343,28 @@ mod routine_tests {
         life.person_speech(at, at);
         let names = life.step(at + FRAME, &listening_free()).names;
         assert!(names.contains(&"stirring") && !names.contains(&"waking"));
+    }
+
+    /// The voice's ring follows the stir by its names: `stirring` alone
+    /// while the answer is awaited, `stir_settling` beside it only once it
+    /// settles back, and neither once it has.
+    #[test]
+    fn with_the_switch_a_stir_says_when_it_settles_back() {
+        let (mut life, now) = stir_night(true, false);
+        life.name(now, now, 0);
+        let seen = frames(&mut life, now, now + 8 * SECOND, &resting());
+        let named = |at: u64, name: &str| {
+            seen.iter()
+                .find(|(when, _, _)| *when == at)
+                .is_some_and(|(_, _, names)| names.contains(&name))
+        };
+        for at in [now + FRAME, now + SECOND, now + STIR_HOLD_US - FRAME] {
+            assert!(named(at, "stirring") && !named(at, STIR_SETTLING), "{at}");
+        }
+        let out = now + STIR_HOLD_US + SECOND;
+        assert!(named(out, "stirring") && named(out, STIR_SETTLING));
+        let after = now + STIR_HOLD_US + STIR_OUT_US + SECOND;
+        assert!(!named(after, "stirring") && !named(after, STIR_SETTLING));
     }
 
     fn take_notices_empty(life: &mut Life) -> bool {
