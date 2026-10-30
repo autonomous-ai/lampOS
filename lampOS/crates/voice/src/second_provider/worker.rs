@@ -2486,7 +2486,13 @@ pub fn serve(
     .saying_when_down(route.down_line)
     .doing_though_held(though_held)
     .announcing(!route.only_voice)
-    .saying_reminders(reminders);
+    .saying_reminders(reminders)
+    // Words cut short in talk between people are never answered in a held
+    // line's place (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
+    .letting_go_cut_words_said_to_a_person(
+        std::env::var(crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT)
+            .is_ok_and(|value| value == "on"),
+    );
     if let Some(ahead) = note_ahead {
         engine = engine.asking_the_note_ahead(ahead.told_as());
     }
