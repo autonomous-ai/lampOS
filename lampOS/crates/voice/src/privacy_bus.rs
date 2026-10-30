@@ -1035,7 +1035,10 @@ pub(crate) mod tests {
     /// attempts span a busy host's stall of a few seconds rather than a
     /// quarter of one; a whole-lib run on a loaded Mac stalled five back to
     /// back (#1569, Reviewer-three's row, 30 Oct). A reader or watch that
-    /// never finds the lease still fails every attempt.
+    /// never finds the lease still fails every attempt. The two
+    /// first-second resync tests take the same: with ten tries back to back,
+    /// a whole-lib run on this Mac failed the kept-lease one in 2 of 2 runs
+    /// (#1569, 30 Oct).
     const STALLED_ATTEMPTS: usize = 20;
     const AFTER_A_STALL: Duration = Duration::from_millis(100);
     use std::sync::atomic::AtomicU64;
@@ -1245,7 +1248,8 @@ pub(crate) mod tests {
         };
         // A lease still lives 50 ms. An attempt in which the host stalled
         // past envelope or payload freshness says nothing about resync,
-        // so it is made again on a new bus, up to ten times (#1569). The
+        // so it is made again on a new bus, up to [`STALLED_ATTEMPTS`] times
+        // with [`AFTER_A_STALL`] after each (#1569). The
         // fixture's separate publication period does not extend those
         // bounds or turn an expired lease into permission.
         let stalled = |error: &io::Error| {
@@ -1323,7 +1327,11 @@ pub(crate) mod tests {
                     Err(error) => {
                         assert!(stalled(&error), "{error}");
                         tries += 1;
-                        assert!(tries < 10, "the host stalled in 10 of 10 attempts: {error}");
+                        assert!(
+                            tries < STALLED_ATTEMPTS,
+                            "the host stalled in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts: {error}"
+                        );
+                        thread::sleep(AFTER_A_STALL);
                     }
                 }
             }
@@ -1435,7 +1443,11 @@ pub(crate) mod tests {
         while let Err(error) = attempt() {
             assert!(stalled(&error), "{error}");
             tries += 1;
-            assert!(tries < 10, "the host stalled in 10 of 10 attempts: {error}");
+            assert!(
+                tries < STALLED_ATTEMPTS,
+                "the host stalled in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts: {error}"
+            );
+            thread::sleep(AFTER_A_STALL);
         }
     }
 
