@@ -1435,6 +1435,44 @@ fn the_product_keeps_a_repeated_thing_once() {
     }
 }
 
+/// Within a conversation going on, a known person's line no face was seen
+/// speaking stays theirs to be told from (`LAMP_CONVERSATION_CARRIES`, #4339),
+/// beside the scope by sight it acts with: on lamp-3e83 on 29 Oct one such
+/// line dropped to the room's and the lamp asked its question again.
+#[test]
+fn the_product_carries_a_conversation_through_an_unseen_line() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_CARRIES=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A long conversation keeps its rules and score past the thread's view
+/// (`LAMP_CONVERSATION_SUMMARY`, #1693's long-conversation plan, step 3): on
+/// lamp-06c1 on 29 Oct, 11 exchanges after a quiz's rules the lamp said
+/// there was no quiz.
+#[test]
+fn the_product_summarises_a_long_conversation() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_CONVERSATION_SUMMARY=on"),
+        "the voice lacks LAMP_CONVERSATION_SUMMARY=on"
+    );
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

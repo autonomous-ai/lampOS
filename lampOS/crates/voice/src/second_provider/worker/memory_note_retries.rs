@@ -477,20 +477,20 @@ fn a_kept_name_recovers_after_a_failed_refresh_without_another_keep() {
         "no I/O before retry eligibility"
     );
 
-    // Six minutes of continued talk, without a new remember or person.
-    // The original name has left the 300 s/six-exchange history and the
-    // eight-exchange thread note; neither can hide a broken snapshot retry.
+    // Eleven minutes of continued talk, without a new remember or person.
+    // The original name has left the 600 s/twelve-exchange history and the
+    // twelve-exchange thread note; neither can hide a broken snapshot retry.
     let mut thread = crate::thread::Thread::new();
     thread.person("My name is Pippa", true, start);
     thread.lamp(1, "All right.", start);
-    for request in 2..=9 {
+    for request in 2..=15 {
         let at = start + Duration::from_secs((request - 1) * 45);
         thread.person("And then?", true, at);
         thread.lamp(request, "Another thing.", at);
     }
-    let later = start + Duration::from_secs(360);
+    let later = start + Duration::from_secs(660);
     let recent = thread.recent_for(None, later, super::HISTORY_WITHIN, super::HISTORY_EXCHANGES);
-    assert_eq!(recent.len(), 6);
+    assert_eq!(recent.len(), super::HISTORY_EXCHANGES);
     assert!(!format!("{recent:?}").contains("Pippa"));
     assert!(
         !thread

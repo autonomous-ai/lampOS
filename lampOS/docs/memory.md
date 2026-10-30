@@ -209,7 +209,12 @@ the app (lamp-cloud's `faces.rs`) and one asked by voice
   told on the bus (memory/forgot)", and the publisher is made again at the
   next forget. Without `--bus-root`, nothing is told.
 - **Its readers:** the voice's tone baselines ([voice-tone.md](voice-tone.md)),
-  with `LAMP_VOICE_TONE=on`.
+  with `LAMP_VOICE_TONE=on`; and, with `LAMP_CONVERSATION_SUMMARY=on`, the
+  second route's conversation thread and running notes
+  ([Talk notes](#talk-notes-and-the-running-summary)): a forget of a person,
+  the room's or every person's drops them all and any note being made, as a
+  voice-tool forget does, looked at every half second off any turn's path
+  (`conversation_summary::memory_forgot`, the reviewer-lead's P2 on #4479).
 - **Tests:** `tests/forgot.rs` (the real server with a bus: a person's
   forget, every person's, and four that aren't told, one of them an id
   memory doesn't make), and each protocol's
@@ -441,6 +446,69 @@ tell who is asking. Before, on lamp-4ace's 8327 round, an unplaced "how do
 I take my coffee?" was told "someone here said you take it green tea",
 another scene's room note (#4196). This is words for the model in the note,
 and a hard stop in `recall`.
+
+**A line of theirs no face was seen speaking, in their conversation going
+on** (`LAMP_CONVERSATION_CARRIES=on`, #4339): with `LAMP_PERSON_SCOPE_SEEN`
+such a line was the room's, so one turn of a known person's talk lost it
+(lamp-3e83, 29 Oct: the chat saw 16, then 4, then 16 messages, and the lamp
+asked its question again). It now stays that conversation's when the newest
+exchange before it is theirs and began within 45 s, and the eyes saw through
+it with no face but theirs in view, and their face was in view through it
+or within 5 s before it began (`CARRY_UNSEEN_WITHIN`; an empty view from the
+start, or their face gone longer, and it is the room's, as before #4339: the
+lamp-memory owner's decision on #4479). It is read as a gap-held scope
+(`ScopeSnapshot::held`): their thread and exchanges as they stood, no memory
+note, hits, recall, keep, forget or yes, and it is never journalled. So the
+rule above still holds: an asker nobody placed reaches none of anyone's saved
+memory. A face seen speaking it, another face in view, a 45 s quiet, another
+person's exchange between, or no look through it, and it is the room's as
+before. A line admitted as the room's, nobody named for it (lamp-06c1, 29
+Oct: 5 of 68 turns with the person in view throughout), is carried into the
+known person's conversation going on by the same rule. A carried line's
+exchange is told in the thread but never given to the running summary or a
+talk note (below). Risk, accepted: someone off camera, with no other sign,
+within those 5 s, is answered inside the conversation going on and hears
+what was said in it and its running summary.
+
+### Talk notes and the running summary
+
+With `LAMP_CONVERSATION_SUMMARY=on` (on in the product, the lamp-memory
+owner's decision on #4479; the second route only), this is what is kept of a
+conversation beyond its exchanges, and for how long:
+
+- **The running summary** of a long conversation: the exchanges about to
+  leave the chat's view are folded, after the reply and off its path, into
+  one note a scope (a person's memory id, or the room's): what is going on
+  now, then the facts said. **RAM only**, never on disk; told only to that
+  scope's own turns as background; gone after 10 minutes with no exchange
+  of its scope, and at any forget, by voice (`forget`,
+  `forget_everything`) or from the app (`memory/forgot`, above): a note
+  being made then is never kept.
+- **The talk note:** at each conversation's end, that scope's running note
+  (the rest of the conversation folded in) is **kept on disk** in the lamp's
+  memory as the conversation's talk note, in the same scope: a known
+  person's in theirs, the room's in the room's. A conversation too short to
+  have a running note keeps none.
+- **How long:** **until it is forgotten. Talk notes never expire**, not even
+  after their own exchanges age out at 30 days (the lamp-memory owner's
+  decision 1a).
+- **Who finds it:** only a `recall` finds it (never a session's note, a hit
+  or the observation pass's previous): the asker's own, marked theirs, and
+  the room's, told as the room's. **The room's talk note can be found by
+  anyone in the room, an unplaced voice included**; that is intended
+  ([switches.md](switches.md)). Another person's is never told.
+- **What removes it:** `forget_everything` (and the app's forget of the
+  person, `forget_person`/`forget_all`); a targeted forget of one of its
+  source exchanges, or of a kept thing or an observation from the same
+  exchanges, even after those exchanges expired (their ids are kept,
+  [memory-days.md](memory-days.md)); and, for a room's note, room lines
+  adopted by someone known take it.
+- **Not kept:** under `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on` (in the product),
+  **a room conversation keeps no talk note**, since a conversation nobody
+  known was seen in keeps nothing (reviewer-three's P1 on #4479). A line
+  answered in a held scope (a face's gap, or carried as above) is never
+  folded into a running note or a talk note.
+- **The journal** has counts and sizes only, never a note's words.
 
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
@@ -1674,7 +1742,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
 
 - **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
   with the Days client, on the second route only; off unless set).
-  - **When:** at each conversation's end (45 s idle, or another person),
+  - **When:** at each conversation's end (45 s idle, or another person,
+    or, in a talk with no quiet gap, every 64 exchanges: the part said so
+    far is observed as its own piece and the talk goes on, never skipped,
+    #1693 step 2, [memory-days.md](memory-days.md#opt-in-voice-client-task-29)),
     the voice's Days writer asks for the memory's frozen job
     (`conversation_end` without `submit`, its answer read up to 48 KiB) and
     hands it to one observation thread, never on a turn's path.
@@ -1711,7 +1782,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     - **The copy:** it copies the store (with its `-wal` and `-shm`) into
       `NEW_DIR/store`, never opening the given one for writing.
     - **The conversations:** it cuts the journal as the voice does (45 s
-      apart, another person, or 64 sources). Each goes through the lamp's own
+      apart, another person, or 64 sources, as the voice's pieces are).
+      Each goes through the lamp's own
       path: the store's `conversation_end`, the pass's prompt and DeepSeek
       client (`second_provider::worker::observer_at`), and the store's
       `tidy_apply`, which keeps or refuses as on the lamp. A `replaces` the

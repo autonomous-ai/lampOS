@@ -300,6 +300,13 @@ Environment=LAMP_SCHEDULE_ASKED=on
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
 Environment=LAMP_PERSON_SCOPE_SEEN=on
+# But within a conversation going on, a line of theirs no face was seen speaking (or one with nobody named), with no
+# other face in view and no 45 s quiet since their last exchange, stays in that conversation (#4339, lamp-3e83: one such line dropped to the
+# room's, the chat lost the talk and asked its question again), when their face was in view through it or within
+# 5 s before it began (an empty view from the start, or the face gone longer, is the room's: the lamp-memory
+# owner's decision on #4479). It is told from the conversation as it stood (its thread and running summary), never
+# from memory's reads, keeps, forgets or a yes, and never summarised or kept in a talk note.
+Environment=LAMP_CONVERSATION_CARRIES=on
 # The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things
 # worth keeping, each checked by the store and linked to the words it came from (OBSERVE); a dated one keeps its
 # day (EVENTS); the next session with that person asks after one open thread, once, at most one a day (THREADS);
@@ -314,6 +321,17 @@ Environment=LAMP_MEMORY_FORGET_ALL=on
 # pass above saw nothing more until the voice restarted (lamp-06c1, 27 Oct, Friday's N13 on #3504). The next
 # session opened fresh, with no resumption, starts the journal again and so the next conversation's pass.
 Environment=LAMP_MEMORY_JOURNAL_RESUMES=on
+# A long conversation's exchanges about to leave the chat's view are folded, after the reply and off its path, by
+# the same DeepSeek model into a RAM-only running note per person or room: what is going on first (a game's rules,
+# where it stands, the score), then the facts said; told to that scope's next turns as background never read out,
+# gone at any forget (by voice or from the app) or after 10 quiet minutes. And each conversation's note is kept on
+# disk, in the lamp's memory, as its talk note, in its own scope: never expired, kept until forgotten (a forget of
+# the person, of everything, or of its source exchanges or a fact from them), found only by a recall; the room's
+# can be found by anyone in the room, an unplaced voice included; a room conversation keeps none under
+# LAMP_MEMORY_PERSONAL_NEEDS_FACE, and a held or carried line is never summarised (the lamp-memory owner's decisions
+# on #4479). On lamp-06c1 on 29 Oct, without it, 11 exchanges after a quiz's rules the lamp said there was no quiz
+# (#1693's long-conversation plan, step 3).
+Environment=LAMP_CONVERSATION_SUMMARY=on
 # A thing the person already keeps, said again, is that kept thing, not a second one: on lamp-06c1 on 28 Oct
 # (build 8163, the product unit) "remember the meeting room is called orange" said again kept it twice (Friday's
 # run on #3504). A correction (`replaces`) always writes, and the room's scope is told as a first keep (#2176).

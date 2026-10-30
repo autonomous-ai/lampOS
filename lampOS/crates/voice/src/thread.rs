@@ -49,7 +49,7 @@ use std::{
 
 /// Exchanges kept for each person (and for the room), and the most of each
 /// side of one that is kept.
-const EXCHANGES: usize = 8;
+const EXCHANGES: usize = 12;
 /// Whose threads are kept at once, the room's among them: past this the
 /// oldest exchanges go, whoever's they were.
 const PEOPLE: usize = 4;
@@ -100,6 +100,16 @@ struct Exchange {
     tail: String,
     /// Handed on to the lamp's memory, or not for it to have.
     journalled: bool,
+    /// Given to the conversation's running summary
+    /// ([`crate::conversation_summary`]); never kept in the file.
+    summarized: bool,
+    /// Its line was answered in a scope held only by a face's gap or
+    /// carried as a person's conversation going on
+    /// ([`crate::memory_scope::ScopeSnapshot::held`]): told in the thread
+    /// as ever, never given to the running summary, so none of it reaches
+    /// a talk note (the reviewer-lead's P2 on #4479). Never kept in the
+    /// file.
+    held: bool,
     /// Cut before any of the lamp's answer played (`LAMP_SAID_AS_HEARD`): its
     /// part is [`crate::said_as_heard::CUT`], and the exchange is still told,
     /// so the person's words are (the reviewer's P2 on #2145).
@@ -189,6 +199,15 @@ pub struct Recent {
     /// What the person said; empty for none.
     pub person: String,
     pub lamp: String,
+}
+
+/// A scope's exchanges due for its running summary ([`Thread::summary_due`]).
+#[derive(Debug, PartialEq, Eq)]
+pub struct SummaryDue {
+    /// A person's memory id; `None`: the room's.
+    pub whose: Option<String>,
+    /// (request, what the person said, what the lamp said), oldest first.
+    pub exchanges: Vec<(u64, String, String)>,
 }
 
 /// A written request's note waiting for the answer to it.
@@ -414,7 +433,31 @@ impl Thread {
             self.note.take(),
         );
         let (count_only, quoted) = (self.count_only, self.quoted);
+        let marks: Vec<_> = self
+            .exchanges
+            .iter()
+            .filter(|exchange| exchange.held || exchange.summarized)
+            .map(|exchange| {
+                (
+                    exchange.whose.clone(),
+                    exchange.person.clone(),
+                    exchange.lamp.clone(),
+                    exchange.held,
+                    exchange.summarized,
+                )
+            })
+            .collect();
         *self = read;
+        // The file keeps no mark of a held or summarised exchange: the same
+        // exchange read back keeps this process's.
+        for exchange in &mut self.exchanges {
+            if let Some((.., held, summarized)) = marks.iter().find(|(whose, person, lamp, ..)| {
+                *whose == exchange.whose && *person == exchange.person && *lamp == exchange.lamp
+            }) {
+                exchange.held |= held;
+                exchange.summarized |= summarized;
+            }
+        }
         self.whose = whose;
         self.named = named;
         self.opened_for = opened_for;
@@ -519,6 +562,8 @@ impl Thread {
                 lamp,
                 // The process that wrote the file handed it on.
                 journalled: true,
+                summarized: false,
+                held: false,
                 whose: kept.whose,
                 written: kept.written.map(|text| {
                     let mut written = String::new();
@@ -716,8 +761,8 @@ impl Thread {
             self.heard.clear();
             self.heard_at = None;
             self.heard_done = false;
-            // Each person's last eight; with nobody ever known, the room's
-            // eight are all there is. The person the eyes name now; nobody
+            // Each person's last EXCHANGES; with nobody ever known, the
+            // room's are all there is. The person the eyes name now; nobody
             // named, the one counted; nobody known while a person's session
             // goes on: theirs.
             let whose = scope.map(str::to_owned);
@@ -737,6 +782,8 @@ impl Thread {
                 lamp: String::new(),
                 tail: String::new(),
                 journalled: false,
+                summarized: false,
+                held: false,
                 unheard: false,
                 whose,
                 written,
@@ -845,6 +892,7 @@ impl Thread {
     /// Drop everything: a person has had something forgotten, and what was
     /// said about it is not to be told to the next session.
     pub fn forget(&mut self) {
+        crate::conversation_summary::forget_all();
         self.exchanges.clear();
         self.lines.clear();
         self.note = None;
@@ -942,6 +990,21 @@ impl Thread {
             .min()
     }
 
+    /// The known person (a memory id) whose conversation is going on as
+    /// `request` is heard: the newest exchange before it, one with words from
+    /// the lamp or cut unheard, began within [`GOING_ON_FOR`] of `now` and is
+    /// theirs (#4339). `None` for the room's, a quiet, or no exchange: an
+    /// exchange of anyone else's after theirs ends it.
+    pub fn going_on_with(&self, request: u64, now: Instant) -> Option<String> {
+        self.exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+            .filter(|exchange| now.saturating_duration_since(exchange.at) <= GOING_ON_FOR)
+            .and_then(|exchange| exchange.whose.clone())
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
@@ -972,6 +1035,132 @@ impl Thread {
                 .map(|exchange| (exchange.person.clone(), exchange.lamp.clone()))
                 .collect(),
         }
+    }
+
+    /// How many exchanges a scope keeps ([`EXCHANGES`]), so the summary's
+    /// tests hold at any window.
+    #[cfg(test)]
+    pub(crate) const KEPT_A_SCOPE: usize = EXCHANGES;
+
+    /// With `LAMP_CONVERSATION_SUMMARY` ([`crate::conversation_summary`]):
+    /// each scope's exchanges older than its newest `keep`, with words, not
+    /// yet summarised and not held ([`Self::held_for`]), once they are about to leave what a turn is told:
+    /// [`EXCHANGES`] less `keep` less one of them, before the thread drops
+    /// the oldest, or the oldest of them three quarters of
+    /// [`REMEMBERED_FOR`] old. Each is marked as given, oldest first, as
+    /// (request, what the person said, what the lamp said).
+    pub fn summary_due(&mut self, keep: usize, now: Instant) -> Vec<SummaryDue> {
+        // A window of `keep` or fewer would drop an exchange never given:
+        // at least the oldest is given before the scope is full.
+        let keep = keep.min(EXCHANGES.saturating_sub(1));
+        let batch = EXCHANGES.saturating_sub(keep).saturating_sub(1).max(1);
+        let ageing = REMEMBERED_FOR * 3 / 4;
+        let mut scopes: Vec<Option<String>> = Vec::new();
+        for exchange in &self.exchanges {
+            if !scopes.contains(&exchange.whose) {
+                scopes.push(exchange.whose.clone());
+            }
+        }
+        let mut due = Vec::new();
+        for whose in scopes {
+            let theirs: Vec<usize> = (0..self.exchanges.len())
+                .filter(|&index| self.exchanges[index].whose == whose)
+                .collect();
+            let older = theirs.len().saturating_sub(keep);
+            let waiting: Vec<usize> = theirs[..older]
+                .iter()
+                .copied()
+                .filter(|&index| {
+                    let exchange = &self.exchanges[index];
+                    !exchange.summarized
+                        && (exchange.lamp.chars().any(char::is_alphanumeric)
+                            || !exchange.person.trim().is_empty())
+                })
+                .collect();
+            let old = waiting.first().is_some_and(|&index| {
+                now.saturating_duration_since(self.exchanges[index].at) >= ageing
+            });
+            if waiting.is_empty() || (waiting.len() < batch && !old) {
+                continue;
+            }
+            // A held exchange counts toward the batch, so the others are
+            // given before they leave, but is marked and never given.
+            let exchanges: Vec<_> = waiting
+                .iter()
+                .filter_map(|&index| {
+                    let exchange = &mut self.exchanges[index];
+                    exchange.summarized = true;
+                    (!exchange.held).then(|| {
+                        (
+                            exchange.request,
+                            exchange.person.trim().to_owned(),
+                            exchange.lamp.trim().to_owned(),
+                        )
+                    })
+                })
+                .collect();
+            if !exchanges.is_empty() {
+                due.push(SummaryDue { whose, exchanges });
+            }
+        }
+        due
+    }
+
+    /// A conversation's end (`LAMP_CONVERSATION_SUMMARY`): the exchanges of
+    /// scope `whose`, made by `until`, with words, not yet summarised and
+    /// not held ([`Self::held_for`]), each marked as given, oldest first; for its talk note.
+    pub fn summary_rest(
+        &mut self,
+        whose: Option<&str>,
+        until: Instant,
+    ) -> Vec<(u64, String, String)> {
+        self.exchanges
+            .iter_mut()
+            .filter(|exchange| {
+                exchange.whose.as_deref() == whose
+                    && exchange.at <= until
+                    && !exchange.summarized
+                    && !exchange.held
+                    && (exchange.lamp.chars().any(char::is_alphanumeric)
+                        || !exchange.person.trim().is_empty())
+            })
+            .map(|exchange| {
+                exchange.summarized = true;
+                (
+                    exchange.request,
+                    exchange.person.trim().to_owned(),
+                    exchange.lamp.trim().to_owned(),
+                )
+            })
+            .collect()
+    }
+
+    /// Request `request`'s line was answered in a held scope
+    /// ([`crate::memory_scope::ScopeSnapshot::held`]): its exchange is
+    /// never given to the running summary ([`Self::summary_due`],
+    /// [`Self::summary_rest`]).
+    pub fn held_for(&mut self, request: u64) {
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+        {
+            exchange.held = true;
+        }
+    }
+
+    /// The scopes with an exchange of the last `within`.
+    pub fn scopes_since(&self, now: Instant, within: Duration) -> Vec<Option<String>> {
+        let mut scopes: Vec<Option<String>> = Vec::new();
+        for exchange in &self.exchanges {
+            if now.saturating_duration_since(exchange.at) <= within
+                && !scopes.contains(&exchange.whose)
+            {
+                scopes.push(exchange.whose.clone());
+            }
+        }
+        scopes
     }
 
     /// The person's exchanges ([`Self::opening`]) of the last `within`,
@@ -2360,20 +2549,21 @@ mod tests {
         assert!(!thread.recall(at(31), ROOM).unwrap().contains("What time"));
         // Ten minutes on, nothing of it is told.
         assert_eq!(thread.recall(at(30 + 601), ROOM), None);
-        // Only the last eight exchanges, each side cut to its length.
-        for request in 10..22u64 {
+        // Only the last EXCHANGES, each side cut to its length.
+        for request in 10..26u64 {
             thread.person(&"word ".repeat(200), true, at(700 + request));
             thread.lamp(request, &"answer ".repeat(200), at(701 + request));
         }
-        let recalled = thread.recall(at(730), ROOM).unwrap();
-        assert_eq!(recalled.matches("Person: ").count(), 8);
-        assert_eq!(recalled.matches("You: ").count(), 8);
-        assert!(recalled.len() < 8 * (PERSON_BYTES + LAMP_BYTES + 20) + 400);
+        // Unbounded room: twelve at their longest are past ROOM.
+        let recalled = thread.recall(at(730), usize::MAX).unwrap();
+        assert_eq!(recalled.matches("Person: ").count(), EXCHANGES);
+        assert_eq!(recalled.matches("You: ").count(), EXCHANGES);
+        assert!(recalled.len() < EXCHANGES * (PERSON_BYTES + LAMP_BYTES + 20) + 400);
         assert!(!recalled.contains('\0') && !recalled.contains("  "));
         // With less room, the latest that fit, still in order; with none, nothing.
         let whole = recalled.len();
         let fewer = thread.recall(at(730), whole - 1).unwrap();
-        assert_eq!(fewer.matches("You: ").count(), 7);
+        assert_eq!(fewer.matches("You: ").count(), EXCHANGES - 1);
         assert!(recalled.ends_with(&fewer[GOING_ON.len()..]));
         assert_eq!(thread.recall(at(730), GOING_ON.len() + 10), None);
     }
@@ -2777,6 +2967,65 @@ mod tests {
         assert_eq!(thread.opened_for(), Some(a.as_str()));
     }
 
+    /// The reviewer-lead's P2 on #4479, and #4508 (carried lines may be
+    /// journalled): a held or carried exchange is never given to the running
+    /// summary, journalled or not, at a batch or at the conversation's end;
+    /// the skip is keyed on the held scope, never on what is journalled.
+    #[test]
+    fn a_held_exchange_journalled_or_not_is_never_given_to_the_summary() {
+        let start = Instant::now();
+        let a = crate::remember::person_id("A");
+        let mut thread = Thread::new();
+        for request in 1..=EXCHANGES as u64 {
+            thread.person(&format!("line {request}"), true, start);
+            thread.lamp_for(request, "Mm.", start, Some(&a));
+            if request % 3 == 0 {
+                thread.held_for(request);
+            }
+        }
+        // Journalled, as a carried line's exchange is under #4508's switch.
+        assert!(!thread.finished(EXCHANGES as u64, start).is_empty());
+        let given: Vec<u64> = thread
+            .summary_due(4, start + Duration::from_secs(1))
+            .into_iter()
+            .flat_map(|due| due.exchanges.into_iter().map(|(request, ..)| request))
+            .chain(
+                thread
+                    .summary_rest(Some(&a), start + Duration::from_secs(2))
+                    .into_iter()
+                    .map(|(request, ..)| request),
+            )
+            .collect();
+        assert!(!given.is_empty());
+        assert!(given.iter().all(|request| request % 3 != 0), "{given:?}");
+        assert_eq!(given.len(), EXCHANGES - EXCHANGES / 3, "{given:?}");
+    }
+
+    /// #4339: A is in a conversation going on only while the newest
+    /// exchange before the line in hand is A's and began within
+    /// [`GOING_ON_FOR`]; someone else's in between, a quiet, or only the
+    /// line's own exchange, and they are not.
+    #[test]
+    fn going_on_with_needs_their_own_newest_exchange_within_the_conversation() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let mut thread = Thread::new();
+        assert_eq!(thread.going_on_with(2, now), None, "no exchange yet");
+        thread.lamp_for(1, "Floral or woody?", now, Some(&a));
+        let soon = now + Duration::from_secs(10);
+        assert_eq!(thread.going_on_with(2, soon), Some(a.clone()));
+        assert_eq!(
+            thread.going_on_with(2, now + GOING_ON_FOR + Duration::from_secs(1)),
+            None,
+            "a quiet past the conversation's 45 s"
+        );
+        // The line's own exchange, once begun, is not the one before it.
+        assert_eq!(thread.going_on_with(1, now), None);
+        // The room's exchange came after A's: someone else's in between.
+        thread.lamp_for(2, "Hello there.", now + Duration::from_secs(5), None);
+        assert_eq!(thread.going_on_with(3, soon), None);
+    }
+
     #[test]
     fn scoped_answer_keeps_its_admitted_person_after_the_face_changes() {
         let now = Instant::now();
@@ -3106,14 +3355,14 @@ mod tests {
     }
 
     /// With nobody ever known, a thread is what it always was: the room's,
-    /// never switched, saved as before, eight exchanges.
+    /// never switched, saved as before, EXCHANGES exchanges.
     #[test]
     fn with_nobody_ever_known_nothing_changes() {
         let mut thread = Thread::new();
         let start = Instant::now();
         assert!(!thread.switch_due(start) && !thread.switch_now(false, false, start));
         assert!(!thread.opening(start));
-        for request in 0..12u64 {
+        for request in 0..(EXCHANGES as u64 + 4) {
             thread.person("hello", true, start);
             thread.lamp(request, "hi", start);
         }
@@ -3132,7 +3381,7 @@ mod tests {
         for person in 0..6 {
             let whose = format!("p-{person}");
             thread.at_lamp(Some(whose.clone()));
-            for _ in 0..10 {
+            for _ in 0..EXCHANGES + 2 {
                 request += 1;
                 thread.lamp(request, "hi", start);
             }

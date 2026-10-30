@@ -145,6 +145,29 @@ enum Extra {
         job: String,
         observations: Vec<tidy::Proposal>,
     },
+    /// A conversation's talk note (`Days::talk_note`, #1693's
+    /// long-conversation plan, step 3).
+    TalkNote {
+        #[serde(default)]
+        person: Who,
+        text: String,
+        source_ids: Vec<u64>,
+    },
+    /// The scope's talk notes (`Days::talk_notes`), for a recall.
+    TalkNotes {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        query: Option<String>,
+        #[serde(default)]
+        day_from: Option<String>,
+        #[serde(default)]
+        day_to: Option<String>,
+        #[serde(default)]
+        limit: Option<usize>,
+        #[serde(default)]
+        max_bytes: Option<usize>,
+    },
     /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
     Adopt {
         #[serde(default)]
@@ -590,6 +613,56 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         } => {
             json!({"ok":true,"ids":store.tidy_apply(&one(person)?,&job,&tidy::Output{observations})?})
         }
+        Extra::TalkNote {
+            person,
+            text,
+            source_ids,
+        } => {
+            json!({"ok":true,"id":store.talk_note(&one(person)?,&text,&source_ids)?})
+        }
+        Extra::TalkNotes {
+            person,
+            query,
+            day_from,
+            day_to,
+            limit,
+            max_bytes,
+        } => {
+            let days = match (day_from, day_to) {
+                (None, None) => None,
+                (Some(from), Some(to)) => {
+                    let bad = || {
+                        Error::new(
+                            "bad_day",
+                            "day_from and day_to are YYYY-MM-DD, oldest first",
+                        )
+                    };
+                    let (from, to) = (
+                        Day::parse(&from).ok_or_else(bad)?,
+                        Day::parse(&to).ok_or_else(bad)?,
+                    );
+                    if from > to {
+                        return Err(bad());
+                    }
+                    Some((from, to))
+                }
+                _ => {
+                    return Err(Error::new("bad_day", "day_from and day_to come together"));
+                }
+            };
+            let (notes, more) = store.talk_notes(
+                &one(person)?,
+                query.as_deref(),
+                days,
+                limit.unwrap_or(crate::days::TALK_NOTES_MOST),
+                max_bytes.unwrap_or(crate::days::TALK_NOTES_BYTES),
+            )?;
+            let notes: Vec<Value> = notes
+                .into_iter()
+                .map(|(id, day, text)| json!({"id":id,"day":day,"text":text}))
+                .collect();
+            json!({"ok":true,"talk_notes":notes,"more":more})
+        }
         Extra::Adopt { person, to, ids } => {
             let to = one(Who::Id(to))?;
             let moved = store.adopt(&one(person)?, &to, &ids)?;
@@ -625,6 +698,8 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "tidy_apply",
             "adopt",
             "forget_said",
+            "talk_note",
+            "talk_notes",
         ];
         const OLD: &[&str] = &[
             "append",
@@ -669,8 +744,11 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
     let done = result.is_ok();
     let (response, outcome, storage_fault, wrote) = match result {
         Ok(response) => {
+            // A `talk_notes` answer's are its notes: counted as `entries`
+            // said 0 for each lookup on lamp-06c1 (30 Oct), found or not.
             let count = response
                 .get("entries")
+                .or_else(|| response.get("talk_notes"))
                 .and_then(Value::as_array)
                 .map_or(0, Vec::len);
             let outcome = format!("ok entries={count}");
@@ -1353,6 +1431,42 @@ mod tests {
                 .0,
             json!({"ok":true,"id":2,"existing":true})
         );
+    }
+
+    /// #1693, step 2: an end whose evidence is over the pass's input bound
+    /// (`tidy::MAX_INPUT_BYTES`) is refused with its own message, for the
+    /// voice to count, and leaves no job behind.
+    #[test]
+    fn a_conversation_end_over_the_input_bound_is_refused_as_too_large() {
+        let (_scratch, mut store) = Scratch::new("end-too-large");
+        let words = "synthetic ".repeat(50);
+        let mut ids = Vec::new();
+        for _ in 0..64 {
+            let line = json!({"op":"append","at_unix_ms":NOW,"heard":words,"said":words});
+            let wrote: Value =
+                serde_json::from_str(&answer(&mut store, line.to_string().as_bytes(), NOW).line)
+                    .unwrap();
+            ids.push(wrote["id"].as_u64().unwrap());
+        }
+        let request = json!({"op":"conversation_end","conversation":"long","source_ids":ids});
+        let refused: Value =
+            serde_json::from_str(&answer(&mut store, request.to_string().as_bytes(), NOW).line)
+                .unwrap();
+        assert_eq!(refused["ok"], false, "{refused}");
+        assert_eq!(refused["error"], "bad_request");
+        assert!(
+            refused["message"]
+                .as_str()
+                .unwrap()
+                .contains("exceeds 32 KiB"),
+            "{refused}"
+        );
+        // Half of it fits, and is prepared as any end is.
+        let request = json!({"op":"conversation_end","conversation":"half","source_ids":ids[..16]});
+        let prepared: Value =
+            serde_json::from_str(&answer(&mut store, request.to_string().as_bytes(), NOW).line)
+                .unwrap();
+        assert!(prepared["input"]["job"].is_string(), "{prepared}");
     }
 
     /// #2176 row 13 (the first builder, 18:20): a conversation's end that
