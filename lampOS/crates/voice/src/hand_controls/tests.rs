@@ -1323,6 +1323,108 @@ fn a_hand_kept_on_a_sleeping_lamp_wakes_it_at_the_stroke_once_saved() {
     assert_eq!(owner.take_woken(woke_at), None, "once");
 }
 
+/// #3748 (the reviewer's P1 on #4478): with `LAMP_SLEEP_LINE=on`, a hand
+/// kept on a sleeping lamp wakes it at the stroke, and the same hand kept
+/// past three seconds owes a sleep the receiver refuses: a hand that woke
+/// the lamp cannot send it back, however late its owed sleep lands.
+#[test]
+fn with_the_sleep_line_a_hand_that_woke_the_lamp_cannot_send_it_back() {
+    let directory = Directory::new();
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    assert!(record.request_sleep(START / 2));
+    record.save(&directory.file()).unwrap();
+    let (mut owner, sender) = from_record(head_options(Some(&directory)), record, START);
+    owner.set_sleep_line(true);
+    let mut head = TestHead::new(CLOCK, START);
+    feed(&mut owner, &sender, head.run(START + 500_000, false), true);
+    // A hand from 1.51 s, kept 3.5 s: its stroke at 2.51 s, its hold at
+    // 4.51 s; then a second without it, for the owed sleep to land.
+    let mut ticks = head.run(START + 4_000_000, true);
+    ticks.extend(head.run(START + 5_500_000, false));
+    let kept = feed(&mut owner, &sender, ticks, true);
+    let stroke = START + 510_000 + 1_000_000;
+    let (woke_at, _, _) = kept
+        .iter()
+        .find(|(_, _, allowed)| *allowed)
+        .copied()
+        .expect("the kept hand wakes it");
+    assert_eq!(woke_at, stroke);
+    assert!(
+        owner.hold_owed.is_none(),
+        "the hold's sleep was owed and asked"
+    );
+    assert!(
+        kept.iter()
+            .filter(|(at, _, _)| *at >= stroke)
+            .all(|(_, seen, _)| !seen.muted && !seen.asleep && !seen.mute_changed),
+        "awake from the stroke on: {kept:?}"
+    );
+    assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_OPEN);
+    let saved = MuteRecord::load(&directory.file(), CLOCK, START + 5_600_000).unwrap();
+    assert!(!saved.muted && saved.reason.is_none());
+}
+
+/// #3748 (the reviewer's P2 on #4478): with `LAMP_SLEEP_LINE=on`, the Hold
+/// and the letting go read in one poll: the cue is not cut as lifted, and
+/// the owed sleep lands once it is no longer sounding. A let go after the
+/// Hold changes nothing.
+#[test]
+fn with_the_sleep_line_a_hold_and_its_letting_go_in_one_poll_still_sleep() {
+    let directory = Directory::new();
+    let (mut owner, sender) = fixture(head_options(Some(&directory)));
+    owner.set_sleep_line(true);
+    // Pads with short gaps of 50 ms, so the hand is seen gone while its
+    // Hold is still fresh.
+    let mut head = TestHead::with_gap(CLOCK, START, Some(50));
+    feed(&mut owner, &sender, head.run(START + 500_000, false), false);
+    // A hand from 1.51 s, its Hold at 4.51 s, let go at once: read
+    // through the first state that says it has left.
+    let hold_at = START + 510_000 + 3_000_000;
+    let mut ticks = head.run(hold_at, true);
+    let off = head.run(hold_at + 500_000, false);
+    let left = off
+        .iter()
+        .position(|(_, state, _)| head_lifted(state))
+        .expect("the hand is seen gone");
+    ticks.extend(off.into_iter().take(left + 1));
+    let (before, together): (Vec<_>, Vec<_>) =
+        ticks.into_iter().partition(|(at, _, _)| *at < hold_at);
+    let seen = feed(&mut owner, &sender, before, false);
+    assert!(
+        seen.iter()
+            .all(|(_, seen, _)| !seen.muted && !seen.head_lifted)
+    );
+    // One poll: the newest state only, the hand gone, then the events, as
+    // a pump that keeps only the newest state would give them.
+    let (at, state, _) = together.last().cloned().unwrap();
+    assert!(head_lifted(&state), "the hand has left in the newest state");
+    let events: Vec<TouchEvent> = together
+        .iter()
+        .flat_map(|(_, _, events)| events.clone())
+        .collect();
+    assert!(
+        events
+            .iter()
+            .any(|event| event.gesture == TouchGesture::Hold),
+        "the Hold is in the same poll"
+    );
+    send(&owner, &sender, Input::TouchState(Box::new(state)));
+    for event in events {
+        send(&owner, &sender, Input::Touch(Box::new(event)));
+    }
+    owner.sleep_cue_sounding(at);
+    let seen = owner.poll_at(at).unwrap();
+    assert!(
+        owner.hold_owed.is_some(),
+        "the Hold is taken, its sleep owed"
+    );
+    assert!(!seen.head_lifted, "the Hold came first: the cue is not cut");
+    assert!(!seen.muted, "owed while its cue sounds");
+    // The cue no longer said to be sounding: the owed sleep lands.
+    let seen = owner.poll_at(at + 10_000).unwrap();
+    assert!(seen.mute_changed && seen.asleep, "{seen:?}");
+}
+
 /// #960, `LAMP_RESTORED_MUTE=on`: a lamp brought up muted by its restart
 /// guard after a crash wakes by a head tap, as sleep does; a person's own
 /// mute does not, and without the switch neither does the guard's.
