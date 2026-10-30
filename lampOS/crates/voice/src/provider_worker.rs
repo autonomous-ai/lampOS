@@ -10879,6 +10879,7 @@ pub(crate) mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                short_confirm: false,
                 sign_in: false,
             }),
             ..Default::default()
@@ -11028,6 +11029,7 @@ pub(crate) mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                short_confirm: false,
                 sign_in: false,
             }),
             ..Default::default()

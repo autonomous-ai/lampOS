@@ -2573,6 +2573,7 @@ mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                short_confirm: false,
                 sign_in: false,
             }),
             schedule_tools: true,
@@ -2850,6 +2851,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         assert_eq!(
@@ -3900,6 +3902,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            short_confirm: false,
             sign_in: false,
         };
         let with = Settings {
