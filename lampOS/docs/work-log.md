@@ -1,3 +1,27 @@
+## 30 October 2026, 17:57 +07: every product build asks for updater 9 (second-P1, #4582)
+
+**Why:**
+- The lead said at 16:42 that the ten customer lamps didn't ship on 7071: each took the day's stable at the factory. So their first home update is "shipped build → stable", run by the shipped build's own updater, unless the build asks for a newer one.
+- Builds **8237–8498** are updater 8, from before #4431's voice-first order, with a voice from before its own guard release (`1c88f2dbd`). Their next switch restarts lamp-controls first, and the old voice keeps the restart guard's mute: the 8474 → lamp-06c1 case of 29 Oct. lamp-52e6's move from 8811 doesn't show this, since 8811 already had #4431.
+
+**What:**
+- `UPDATER` is 9, and `publish::make_with` makes every product build ask for it (`ORDER_UPDATER`).
+- An older updater climbs: it takes only the carried `lamp-update`, which confirms itself and then switches the parts in its own order, in the same `serve`.
+- A round test shows a level-8 lamp ending `Climbs { needed: 9 }` with nothing touched, then `Switched`. With the build asking for 8, the old updater switches the parts itself, and the test fails.
+- Read by Tests and Reviewer-two; the first builder said yes; it's for the next promote. #4503 (Harness) moves to level 10 (Eighth).
+
+**What I got wrong today, and how it was caught:**
+- **#4561's run sheet:** I read the climb's refusal text as a climb that worked. Reviewer-two and Third both caught it.
+- **My first #4370 answer:** I said a 7071 lamp's first update sends no alert; it sends `done`. I also said a lamp on 8899 taking 8925 ends `done`; it ends `self-switched`. I found both myself, by reading `observe_deferred` and `Outcome::kind`, and posted corrections.
+- **"There's no updater fix":** wrong too, and corrected the same hour.
+- **The lesson:** say what a line or an alert *is* from the code that prints it, not from the outcome's name.
+
+**Also:**
+- #4576 says the lead's correction at the top of the run sheet.
+- READ-OK on #4573 and #4591 (`self-switched` in `cloud.md`) and on #4574 (lamp-peek stopped by a reset in place).
+- An update-path note on #4514's reset plan.
+- **Owed:** `cloud.md`'s line that the first update after #4582 ends `done`.
+
 ## 30 October 2026, 16:10 +07: the 7071 lamps' first home update, still unrun on a lamp
 
 - **What I found:** stable went to 8899 at 15:21. The ten customer lamps are on 7071, and their first home update (the climb to 8899's updater, then 8899's round) has never run on a real lamp. The first builder asked the hardware team for it on 29 Oct (#3530), and that issue was closed without a result. The first builder has now made it the lead's top item (#1711).
