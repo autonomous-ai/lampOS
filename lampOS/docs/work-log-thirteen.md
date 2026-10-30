@@ -316,3 +316,13 @@ Ready for lamp-voice: yes (#4470, behind `LAMP_DECLINE_SILENT`, off; Part of #39
 - Reviewer-three's P3s: the round-one hold is kept with each request (the last eight), and the doc says a quiet room's decline after words still undoes the call and carry.
 - One test, failing under the old last-only record.
 - Gate on 580112a2e1: voice lib 4158/3, the three being known timed motor tests (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean.
+
+### #3945, cut words answered in a held line's place (#4507)
+
+Ready for lamp-voice: yes (#4507, behind `LAMP_NAME_SAID_TO_A_PERSON`, off; Part of #3945)
+
+- #4460 and #4470 merged in trains 398 and 397.
+- From #3945's c0a4 run 2 (29 Oct): words cut short are not answered in a held line's place when they or the held line open with a word said to a person ("Ma'am, could …", "Sir, what time is this?").
+- Two engine tests; with the let-go removed, the first fails and the second still passes.
+- Gate on 550c8ee069: voice lib 4170/3, the three being known timed motor tests (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean. After a clean rebase: fmt, clippy and the focused tests clean.
+- c0a4 from the Mac: off reproduced it (1 of 3 rounds); on, the cut-before-its-answer case wasn't reached in 12 rounds, so the let-go on a lamp is in Not verified.
