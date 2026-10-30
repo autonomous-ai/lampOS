@@ -1789,6 +1789,7 @@ mod routine_tests {
             &VoiceMute {
                 muted: true,
                 reason: None,
+                muted_by: None,
             },
         );
         assert!(!life.wake_routine(START + SECOND, &resting()));
@@ -1877,6 +1878,7 @@ mod routine_tests {
                 &VoiceMute {
                     muted: true,
                     reason: Some(MuteReason::Sleep),
+                    muted_by: None,
                 },
             );
             assert!(!life.routine_owned());

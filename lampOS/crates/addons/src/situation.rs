@@ -415,6 +415,7 @@ mod tests {
         let mute = |muted: bool| VoiceMute {
             muted,
             reason: None,
+            muted_by: None,
         };
         watcher.mute(&mute(false), 1_000_000);
         assert!(!watcher.situation(1_000_000).asleep.unwrap().value);
@@ -453,6 +454,7 @@ mod tests {
             &VoiceMute {
                 muted: false,
                 reason: None,
+                muted_by: None,
             },
             5_000_000,
         );
@@ -475,6 +477,7 @@ mod tests {
             &VoiceMute {
                 muted: false,
                 reason: None,
+                muted_by: None,
             },
             1_000_000,
         );
@@ -509,6 +512,7 @@ mod tests {
                 &VoiceMute {
                     muted: true,
                     reason: Some(lamp_msgs::MuteReason::Sleep),
+                    muted_by: None,
                 },
                 2_000_000,
             );
@@ -552,6 +556,7 @@ mod tests {
                 &VoiceMute {
                     muted: false,
                     reason: None,
+                    muted_by: None,
                 },
                 1_000_000,
             );

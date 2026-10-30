@@ -23,7 +23,7 @@ use lamp_controls::{
     touch_receiver::{LateSleep, TouchReceiver},
 };
 use lamp_msgs::{
-    ControlGesture, ControlIntent, ControlsState, MuteReason, TouchEvent, TouchGesture,
+    ControlGesture, ControlIntent, ControlsState, MuteReason, MutedBy, TouchEvent, TouchGesture,
     TouchSource, TouchState, VoiceMute,
 };
 use std::{
@@ -268,20 +268,34 @@ const LATCH_NONE: u8 = 0;
 const LATCH_OPEN: u8 = 1;
 const LATCH_MUTED: u8 = 2;
 const LATCH_ASLEEP: u8 = 3;
+/// Muted by the restart guard after a fault ([`HandControls::restored_after_fault`]).
+const LATCH_GUARD: u8 = 4;
+/// Muted because the record could not be trusted ([`HandControls::unreadable`]).
+const LATCH_UNREADABLE: u8 = 5;
 
+/// What the pump says on `voice/mute` for a latch, with who or what muted
+/// it (`muted_by`, #4332): the mute it always said is the person's hold.
 fn latch_message(latch: u8) -> Option<VoiceMute> {
+    let muted = |muted_by| {
+        Some(VoiceMute {
+            muted: true,
+            reason: None,
+            muted_by: Some(muted_by),
+        })
+    };
     match latch {
         LATCH_OPEN => Some(VoiceMute {
             muted: false,
             reason: None,
+            muted_by: None,
         }),
-        LATCH_MUTED => Some(VoiceMute {
-            muted: true,
-            reason: None,
-        }),
+        LATCH_MUTED => muted(MutedBy::Button),
+        LATCH_GUARD => muted(MutedBy::RestartGuard),
+        LATCH_UNREADABLE => muted(MutedBy::Unreadable),
         LATCH_ASLEEP => Some(VoiceMute {
             muted: true,
             reason: Some(MuteReason::Sleep),
+            muted_by: Some(MutedBy::Sleep),
         }),
         _ => None,
     }
@@ -422,6 +436,10 @@ pub struct HandControls {
     could_not_start: u32,
     /// The record was muted by the restart guard, not by the person.
     restored_after_fault: bool,
+    /// The record could not be trusted at the start and was read as muted
+    /// (#1505's newer build, #4378's unfinished write): `load_noting`'s
+    /// note, kept to be said as `muted_by` (#4332).
+    restored_unreadable: bool,
     /// The last run closed, its cleanup verified, on a privacy switch that
     /// could not be read ([`Self::closed_on_unreadable_switch`]).
     closed_unreadable: bool,
@@ -795,6 +813,7 @@ impl HandControls {
                 record: MuteRecord::new(&clock_id)?,
                 stored: None,
                 late_sleep: None,
+                unreadable: false,
             },
         };
         let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
@@ -880,6 +899,8 @@ impl HandControls {
             controls.allow_late_sleep(window);
         }
         controls.restore_guard_marker(restored.stored);
+        controls.restored_unreadable = restored.unreadable;
+        controls.share_latch();
         Ok(controls)
     }
 
@@ -916,6 +937,7 @@ impl HandControls {
             never_listened: false,
             could_not_start: 0,
             restored_after_fault: false,
+            restored_unreadable: false,
             closed_unreadable: false,
             late_sleep: None,
             sleep_asked: false,
@@ -944,6 +966,10 @@ impl HandControls {
             LATCH_OPEN
         } else if self.asleep() {
             LATCH_ASLEEP
+        } else if self.restored_after_fault() {
+            LATCH_GUARD
+        } else if self.unreadable() {
+            LATCH_UNREADABLE
         } else {
             LATCH_MUTED
         };
@@ -1024,6 +1050,13 @@ impl HandControls {
         self.restored_after_fault && self.muted()
     }
 
+    /// The live mute is the one read from a record the voice could not
+    /// trust at its start (#1505, #4378), and the person has neither chosen
+    /// a mute since nor cleared it: cleared where the guard's is.
+    pub fn unreadable(&self) -> bool {
+        self.restored_unreadable && self.muted()
+    }
+
     fn guard_marker(&self) -> Option<PathBuf> {
         let path = self.options.mute_record.as_ref()?;
         let mut name = path.file_name()?.to_owned();
@@ -1070,6 +1103,7 @@ impl HandControls {
     fn set_guard_marker(&mut self, present: bool) {
         if !present {
             self.restored_after_fault = false;
+            self.restored_unreadable = false;
         }
         let Some(marker) = self.guard_marker() else {
             return;
@@ -1092,6 +1126,7 @@ impl HandControls {
     /// as a failed save is: nothing opens until recovery.
     fn drop_guard_marker(&mut self) -> io::Result<()> {
         self.restored_after_fault = false;
+        self.restored_unreadable = false;
         let Some(marker) = self.guard_marker() else {
             return Ok(());
         };
@@ -1809,6 +1844,8 @@ fn restored_record(path: &Path, clock_id: &str, now_us: u64) -> io::Result<Resto
     // A record this build cannot read never stops the voice: it reads as
     // muted, and that is said once (#1505).
     let (record, note) = MuteRecord::load_noting(path, clock_id, now_us)?;
+    // Kept as a flag, for `voice/mute` to say why it is muted (#4332).
+    let unreadable = note.is_some();
     if let Some(note) = note {
         eprintln!("lamp-voice: {note}");
     }
@@ -1830,6 +1867,7 @@ fn restored_record(path: &Path, clock_id: &str, now_us: u64) -> io::Result<Resto
         record,
         stored,
         late_sleep,
+        unreadable,
     })
 }
 
@@ -1892,6 +1930,8 @@ struct Restored {
     /// The record's `clock_id` and `through_us` as stored, before a rebase.
     stored: Option<(String, u64)>,
     late_sleep: Option<LateSleep>,
+    /// `load_noting` could not trust the record and read it as muted.
+    unreadable: bool,
 }
 
 /// When `path` was last written, on the monotonic clock of `now_us`: its

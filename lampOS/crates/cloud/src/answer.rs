@@ -3,7 +3,7 @@
 //! refused plainly, in V1's shape, so the app shows it.
 use crate::light;
 use crate::wire::not_here;
-use lamp_msgs::Light;
+use lamp_msgs::{Light, MutedBy};
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -19,12 +19,17 @@ pub struct Volume {
 
 /// The microphones as V1's app shows them (`mic.get`): `muted` is the
 /// lamp's own mute, `hw_switch_muted` the privacy switch (`None` where
-/// there is none), `available` whether the voice is running.
+/// there is none), `available` whether the voice is running. `muted_by`
+/// (#4332), only while muted, says who or what muted it, so a setup screen
+/// can tell the restart guard's mute after a fault from one the person
+/// chose; absent from a voice that does not say it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Mic {
     pub muted: bool,
     pub hw_switch_muted: Option<bool>,
     pub available: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub muted_by: Option<MutedBy>,
 }
 
 /// What the answers read from and ask of the lamp.
@@ -602,6 +607,7 @@ pub mod tests {
                 muted: true,
                 hw_switch_muted: Some(true),
                 available: true,
+                muted_by: Some(MutedBy::Button),
             })
         }
         fn health(&mut self) -> Result<Value, String> {
@@ -760,7 +766,9 @@ pub mod tests {
         assert_eq!(lamp.set, [50]);
         assert_eq!(
             answer(&mut lamp, "mic.get", &Value::Null).unwrap(),
-            Some(json!({"muted": true, "hw_switch_muted": true, "available": true}))
+            Some(
+                json!({"muted": true, "hw_switch_muted": true, "available": true, "muted_by": "button"})
+            )
         );
         assert_eq!(
             answer(&mut lamp, "lamp.health", &Value::Null).unwrap(),

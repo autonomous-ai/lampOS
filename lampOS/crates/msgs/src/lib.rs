@@ -1361,6 +1361,25 @@ pub enum MuteReason {
     Sleep,
 }
 
+/// Who or what muted the voice, for the app to tell them apart (`mic.get`'s
+/// `muted_by`, #4332): a mute the restart guard put on after a fault is not
+/// one the person chose. Carried beside [`MuteReason`], not in it: a reason
+/// an older reader of `voice/mute` does not know would fail its parse, and a
+/// field it does not know is skipped.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MutedBy {
+    /// A hand held on the head put the lamp to sleep ([`MuteReason::Sleep`]).
+    Sleep,
+    /// The person's own hold of the button or the base.
+    Button,
+    /// The restart guard, after a fault (#960): not the person's choice.
+    RestartGuard,
+    /// A mute record the voice could not trust, read as muted: one written
+    /// by a newer build (#1505) or a write a cut left unfinished (#4378).
+    Unreadable,
+}
+
 /// The voice's software mute (`voice/mute`, #711): whether its microphones
 /// are switched off, and why. With `LAMP_HEAD_TOUCH=on` and
 /// `--controls-mute`, the voice says it when it changes and every second, in
@@ -1372,6 +1391,10 @@ pub struct VoiceMute {
     /// Only while muted; absent is the mute's present meaning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<MuteReason>,
+    /// Only while muted: who or what muted it (#4332). Absent from a voice
+    /// before it; a reader that does not know the field skips it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub muted_by: Option<MutedBy>,
 }
 
 impl VoiceMute {
@@ -1387,8 +1410,13 @@ impl VoiceMute {
 
     /// A reason belongs only to a mute.
     pub fn check(&self) -> Result<(), Invalid> {
-        if !self.muted && self.reason.is_some() {
+        if !self.muted && (self.reason.is_some() || self.muted_by.is_some()) {
             return Err(Invalid("an unmuted voice has no mute reason".into()));
+        }
+        if self.muted_by.is_some()
+            && (self.reason == Some(MuteReason::Sleep)) != (self.muted_by == Some(MutedBy::Sleep))
+        {
+            return Err(Invalid("a sleep's mute is muted by sleep".into()));
         }
         Ok(())
     }
@@ -2586,6 +2614,7 @@ mod tests {
         let asleep = VoiceMute {
             muted: true,
             reason: Some(MuteReason::Sleep),
+            muted_by: None,
         };
         round_trip(&asleep, "{\"muted\":true,\"reason\":\"sleep\"}");
         assert!(asleep.check().is_ok() && asleep.asleep());
@@ -2593,6 +2622,7 @@ mod tests {
         let muted = VoiceMute {
             muted: true,
             reason: None,
+            muted_by: None,
         };
         round_trip(&muted, "{\"muted\":true}");
         assert!(muted.check().is_ok() && !muted.asleep());
@@ -2600,6 +2630,7 @@ mod tests {
         let wrong = VoiceMute {
             muted: false,
             reason: Some(MuteReason::Sleep),
+            muted_by: None,
         };
         assert!(wrong.check().is_err() && !wrong.asleep());
         assert!(serde_json::from_str::<VoiceMute>("{\"muted\":true,\"reason\":\"nap\"}").is_err());
@@ -2617,6 +2648,77 @@ mod tests {
             ),
             (VoiceMute::TYPE, Kind::Latest, Some(1_000))
         );
+    }
+
+    /// `muted_by` (#4332) is said in snake_case, only while muted, and
+    /// agrees with a sleep's reason. A voice before it, without the field,
+    /// still parses, and a reader that knows only `muted` and `reason`
+    /// (every reader of `voice/mute` before it) skips the field.
+    #[test]
+    fn the_voice_mute_says_who_muted_it_and_old_readers_skip_it() {
+        for (by, word) in [
+            (MutedBy::Button, "button"),
+            (MutedBy::RestartGuard, "restart_guard"),
+            (MutedBy::Unreadable, "unreadable"),
+        ] {
+            let said = VoiceMute {
+                muted: true,
+                reason: None,
+                muted_by: Some(by),
+            };
+            round_trip(
+                &said,
+                &format!("{{\"muted\":true,\"muted_by\":\"{word}\"}}"),
+            );
+            assert!(said.check().is_ok() && !said.asleep());
+        }
+        let asleep = VoiceMute {
+            muted: true,
+            reason: Some(MuteReason::Sleep),
+            muted_by: Some(MutedBy::Sleep),
+        };
+        round_trip(
+            &asleep,
+            "{\"muted\":true,\"reason\":\"sleep\",\"muted_by\":\"sleep\"}",
+        );
+        assert!(asleep.check().is_ok() && asleep.asleep());
+        for wrong in [
+            VoiceMute {
+                muted: false,
+                reason: None,
+                muted_by: Some(MutedBy::Button),
+            },
+            VoiceMute {
+                muted: true,
+                reason: Some(MuteReason::Sleep),
+                muted_by: Some(MutedBy::Button),
+            },
+            VoiceMute {
+                muted: true,
+                reason: None,
+                muted_by: Some(MutedBy::Sleep),
+            },
+        ] {
+            assert!(wrong.check().is_err(), "{wrong:?}");
+        }
+        // The old shape, from a voice before the field.
+        let old: VoiceMute = serde_json::from_str("{\"muted\":true}").unwrap();
+        assert_eq!(old.muted_by, None);
+        assert!(old.check().is_ok());
+        // An older reader: `VoiceMute` as it was, with no `muted_by`.
+        #[derive(Deserialize)]
+        struct Before {
+            muted: bool,
+            reason: Option<MuteReason>,
+        }
+        for new in [
+            "{\"muted\":true,\"muted_by\":\"restart_guard\"}",
+            "{\"muted\":true,\"reason\":\"sleep\",\"muted_by\":\"sleep\"}",
+        ] {
+            let read: Before = serde_json::from_str(new).unwrap();
+            assert!(read.muted, "{new}");
+            assert_eq!(read.reason.is_some(), new.contains("\"reason\""), "{new}");
+        }
     }
 
     #[test]
