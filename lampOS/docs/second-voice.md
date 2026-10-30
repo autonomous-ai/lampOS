@@ -3130,7 +3130,11 @@ after a take-over, but now for every turn:
   or the rule), its turn answers the words cut short in its place, within
   30 s (`CARRY_WITHIN`): `request M is held, so request N's words, cut
   short by it, are answered in its place`. If it is let out, it is answered
-  itself and they are let go. On lamp-4ace on 19 Oct at 15:56 the weather
+  itself and they are let go. With `LAMP_NAME_SAID_TO_A_PERSON=on` they are
+  let go, not answered in a held line's place, when they open with a word
+  said to a person ("Ma'am, could …") or the held line does ("Sir, what time
+  is this?") and they don't call the lamp; their unplayed answers leave the
+  thread as a joined line's do (#3945, attention.md). On lamp-4ace on 19 Oct at 15:56 the weather
   and a race result were searched, then ended by the owner's next line,
   which was held, and were never said. Words answered again may still be
   searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
