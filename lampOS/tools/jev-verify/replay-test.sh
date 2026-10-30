@@ -28,7 +28,8 @@ case $a in
   *"/cmdline"*) [ "$f" = act ] && echo "/opt/lamp-policy --shadow --act hello" || echo "/opt/lamp-policy --shadow" ;;
   *"ls -l /var/lib/lampos-policy"*) echo "-rw-r----- 1 lamp lamp 812 Oct 29 06:00 decisions-2026-10-29.jsonl"; echo READABLE ;;
   *"for f in room/state voice/state"*) case $f in bus) echo plain ;; sudobus) echo sudo; echo sudo ;; *) echo plain; echo plain ;; esac ;;
-  *"room/state/latest"*) # busy while the colleagues' talk is among the last 3 clips played
+  *"room/state/latest"*) # the header, then busy while the colleagues' talk is among the last 3 clips played
+    echo '{"seq":7,"at_us":1,"at_unix_ms":1761700000000,"enc":"json"}'
     [ "$f" != roomnotbusy ] && tail -3 "$DRY_PLAYLOG" 2>/dev/null | grep -q t02 && echo '"busy"' || echo '"quiet"' ;;
   *"heard [1-9]"*) echo 0 ;;
   *"a face in"*) case $f in face) echo 2 ;; noeyes) ;; *) echo 0 ;; esac ;;
@@ -64,7 +65,7 @@ grep -q 'preflight only, no labelled line played' "$T/stub.log" || { echo "FAIL 
 
 : > "$T/stub.log"; o=$(export FAIL=; PASSES=1 r run "$T/r"); want run-ok 'pulled: 42 lines played' "$o"
 grep -q 'done (42 lines played)' "$T/stub.log" || { echo "FAIL run loans done line"; fails=$((fails+1)); }
-[ "$(head -1 "$T/r/plays.tsv")" = "$(printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol\troom_read')" ] || { echo "FAIL plays.tsv header"; fails=$((fails+1)); }
+[ "$(head -1 "$T/r/plays.tsv")" = "$(printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol\troom_read\troom_at_ms')" ] || { echo "FAIL plays.tsv header"; fails=$((fails+1)); }
 [ "$(awk -F'\t' 'NR>1 && $1==1 && $5=="played" && $6==45' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 42 ] || { echo "FAIL plays.tsv rows"; fails=$((fails+1)); }
 # Each follow-up right after its parent, and every busy-block line read room/state busy before it.
 for pf in q02:f01 q04:f02 q06:f03 b04:f04 b02:f05; do
@@ -72,6 +73,8 @@ for pf in q02:f01 q04:f02 q06:f03 b04:f04 b02:f05; do
     { echo "FAIL $pf: the follow-up is not right after its parent"; fails=$((fails+1)); }; done
 [ "$(awk -F'\t' 'NR>1 && ($2 ~ /^b/ || $2 == "f04" || $2 == "f05") && $7 != "busy"' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 0 ] ||
   { echo "FAIL a busy line's room_read is not busy"; fails=$((fails+1)); }
+[ "$(awk -F'\t' 'NR>1 && $8 != "1761700000000"' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 0 ] ||
+  { echo "FAIL a play's room_at_ms is not the header's at_unix_ms"; fails=$((fails+1)); }
 o=$(export FAIL=; PASSES=1 DEADLINE=1 r run "$T/dl"); want deadline '^ABORT the deadline has passed already; nothing ran' "$o"
 grep -q 'aborted, nothing ran' "$T/stub.log" || { echo "FAIL deadline abort loans line"; fails=$((fails+1)); }
 o=$(export FAIL=sudobus; r preflight "$T/sb"); want sudo-bus '^ok room/state=quiet from /run/lampos-bus/room/state/latest \(with sudo\)' "$o"; want sudo-bus-done 'preflight done' "$o"

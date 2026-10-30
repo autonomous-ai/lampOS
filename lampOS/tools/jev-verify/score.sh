@@ -7,10 +7,10 @@
 # request, else the first verdict in [start, end + 25 s] not for an earlier utterance's request, else
 # what replay.sh saw. `failed` in the log is a kind (timed_out, ...), not a boolean. Taking the turn: Jev answer|look_up, voice played; correct = takes iff label is lamp.
 # A missing or failed Jev decision is always wrong, on "not" lines too.
-# plays.tsv: `pass id lamp_start_ms lamp_end_ms voice_seen macvol [room_read]` (or the old `id ...` 4
+# plays.tsv: `pass id lamp_start_ms lamp_end_ms voice_seen macvol [room_read [room_at_ms]]` (or the old `id ...` 4
 # columns, pass 1). Each (pass, id) is one trial. Busy-room lines are scored as "background talk", in
-# whatever room the lamp read: under LAMP_SPOKEN_TO=on held-back talk never makes room/state busy
-# (crates/voice/src/room_told.rs). A trial is clean unless a quiet-room line's context.room is not quiet,
+# whatever room the lamp read: busy is not certain (the 30/10 run never read it, the 31/10 run on 8999 did,
+# crates/voice/src/room_told.rs). A trial is clean unless a quiet-room line's context.room is not quiet,
 # or its decision was in_conversation (the lamp spoke within 20 s) on a line that is not a follow_up (a
 # follow_up is in conversation by design).
 # --split filters the class, latency, consistency and per-line tables (default all; the per-line table,
@@ -90,7 +90,7 @@ def flips(f): group_by(.id) | map(select(length > 1)) | "\(map(select(map(f) | u
 "| split | trials | n | Jev correct | voice correct | Jev failed | desk talk: Jev answer | desk talk: Jev answer+look_up | desk talk: voice played | desk talk n |",
 "|---|---|---|---|---|---|---|---|---|---|",
 ($all | (["held", "all"] + (if $split == "tune" then ["tune"] else [] end))[] as $n | totals($n; "all"), totals($n; "clean")),
-"", "In conversation (lamp spoke within 20 s): \($all | cnt(.conv == true)) trials. Room seen not the label room: \($all | cnt(.room_seen != null and .room_seen != .room)) trials. Clean: \($all | cnt(.clean))/\($all | length). Background talk: the room as the lamp read it (busy never reached under LAMP_SPOKEN_TO=on); read busy before \($busyread) of them. Trials with 2+ attention decisions (the line heard in parts; the first is scored): \($all | cnt(.ndec > 1)).",
+"", "In conversation (lamp spoke within 20 s): \($all | cnt(.conv == true)) trials. Room seen not the label room: \($all | cnt(.room_seen != null and .room_seen != .room)) trials. Clean: \($all | cnt(.clean))/\($all | length). Background talk: the room as the lamp read it; read busy before \($busyread) of them. Trials with 2+ attention decisions (the line heard in parts; the first is scored): \($all | cnt(.ndec > 1)).",
 "", "Consistency across passes (ids played 2+ times, split \($split)): Jev take flipped on \($R | flips(.jt)) ids, voice on \($R | flips(.vt)) ids.",
 "", "### Latency (ms)", "",
 "| measure | median | p90 | max | n |", "|---|---|---|---|---|",

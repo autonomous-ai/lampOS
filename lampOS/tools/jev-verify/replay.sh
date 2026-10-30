@@ -83,6 +83,9 @@ standing() { local s; s=$($L "sudo -n journalctl -u lamp-body --since -35s --no-
 # the files need it, set at the preflight; a polling loop runs under one sudo, not one per read.
 BR=/run/lampos-bus SU=
 room() { $L "${SU}tail -n +2 $BR/room/state/latest 2>/dev/null" | grep -oE 'quiet|busy|unknown' | head -1; }
+# room_at: "STATE AT_MS", the room and its header's at_unix_ms (when the voice last said it), in one read.
+room_at() { local o; o=$($L "${SU}cat $BR/room/state/latest 2>/dev/null")
+  echo "$(printf '%s\n' "$o" | tail -n +2 | grep -oE 'quiet|busy|unknown' | head -1) $(printf '%s\n' "$o" | head -1 | grep -oE '"at_unix_ms":[0-9]+' | grep -oE '[0-9]+$')"; }
 # sig: what the scores belong to: units and their MainPIDs, lamp-policy's cmdline, the build, the mute.
 # Taken after the preflight; any change at a pass start aborts the run.
 sig() { $L "systemctl is-active lamp-voice lamp-policy lamp-body lamp-eyes; systemctl show -p MainPID --value lamp-voice lamp-policy; sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline; echo; sudo -n grep -o '\"build\":{[^}]*}' /var/lib/lampos-update/state.json; readlink /opt/lampOS/voice/current /opt/lampOS/policy/current; true" | tr '\n' ' '
@@ -282,15 +285,15 @@ rest played quiet   # the wake's answer: GAP s before the first line
 
 # ---- passes
 # trial ID: one play: the face check, room/state read just before, the clip, the voice's verdict (in VD).
-trial() { local id=$1 s c a b rr
+trial() { local id=$1 s c a b rr ra
   due && abort "deadline reached before $id (pass $pass)"
   case "$(face)" in "a face"*|"no eyes report") abort "before $id (pass $pass): a face seen, or no eyes report, in 15 s" ;; esac
-  rr=$(room); s=$(( $(lamp_ms) / 1000 )); c=$(nv "$s")
+  read -r rr ra <<<"$(room_at)"; s=$(( $(lamp_ms) / 1000 )); c=$(nv "$s")
   a=$(( $(now_ms) + off )); play "$id"; b=$(( $(now_ms) + off ))
   VD=$(verdict "$s" "${c:-0}"); PLAYED=$((PLAYED + 1))
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pass" "$id" "$a" "$b" "$VD" "$MACVOL" "${rr:-none}" >> "$OUT/plays.tsv"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pass" "$id" "$a" "$b" "$VD" "$MACVOL" "${rr:-none}" "${ra:-none}" >> "$OUT/plays.tsv"
   echo "$(date +%H:%M:%S) pass $pass $id voice=$VD room=${rr:-none}"; }
-printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol\troom_read\n' > "$OUT/plays.tsv"
+printf 'pass\tid\tlamp_start_ms\tlamp_end_ms\tvoice_seen\tmacvol\troom_read\troom_at_ms\n' > "$OUT/plays.tsv"
 for pass in $(seq 1 "$PASSES"); do
   s1=$(sig); [ "$s1" = "$SIG0" ] || abort "the lamp changed since preflight (pass $pass start): now $s1"
   for blk in quiet busy; do
@@ -316,7 +319,7 @@ for pass in $(seq 1 "$PASSES"); do
   done
   # The gate (#4306): quiet on >=70/72 lines not said to the lamp. Once Jev was not quiet on more than
   # GATE_MISS of them, no later pass can change the verdict: stop, and give the lamp back.
-  if [ "$pass" -lt "$PASSES" ]; then pull >/dev/null
+  if [ "$pass" -lt "$PASSES" ]; then pull >/dev/null; PULLED=   # a later abort still pulls the whole run
     k=$(bash score.sh "$OUT" | awk -F'|' '$5 ~ /^ *not *$/ && $4 ~ /[0-9]/ { k += $4 - $8 } END { print k + 0 }')
     [ "$k" -gt "${GATE_MISS:-2}" ] && { note "stopped after pass $pass: Jev not quiet on $k lines not said to the lamp (gate allows ${GATE_MISS:-2}); the verdict is in"; break; }
   fi
