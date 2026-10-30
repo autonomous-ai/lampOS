@@ -151,8 +151,10 @@ process with the same UID.
 
 When provisioning, First must register this private data directory in the
 personal-data reset manifest and arrange owner shutdown before its removal.
-The store contains personal reminder text. No deployment, reset manifest, or
-reset-owner code is changed by this task.
+The store contains personal reminder text, each person's own: every item
+keeps who set it, and a voice line hears only its own ("Whose reminders a
+line hears" below). No deployment, reset manifest, or reset-owner code is
+changed by this task.
 
 A new database is prepared as `.schedule.sqlite3.init`, synced, and published
 without replacing an existing database. An interrupted, unpublished empty
@@ -577,9 +579,9 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `set_timer` | `text`, `seconds` | none | `Set` with `After` |
 | `set_reminder` | `text`, `time` | `day`, `zone`, `fold` | `Set` with `At` |
 | `repeat_reminder` | `text`, `time`, `every` | `weekday` (required for weekly), `zone` | `Set` with `Daily` or `Weekly` |
-| `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `List`, at most eight source items per page |
-| `cancel_reminder` | `id` | none | `Cancel` of the selected whole item/series |
-| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery |
+| `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own |
+| `cancel_reminder` | `id` | none | `Cancel` of the selected whole item/series, only the line's own |
+| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, only the line's own |
 
 Text is 1–300 UTF-8 bytes, nonblank and without controls. Seconds are whole
 integers from 1 through 31,536,000. `time` is exact `HH:MM`; `day` is `today`,
@@ -649,6 +651,82 @@ and `kept::each_kept_state_reads_with_its_items` (`crates/schedule/tests/it`),
 `list_reminders_is_described_for_questions_about_reminders`
 (`crates/actions/tests/it/schedule.rs`). The wording is measured with
 `lamp-voice probe-reminders` ([second-voice.md](second-voice.md)).
+
+**Whose reminders a line hears (Reviewer-three's after-merge P2 on #4527,
+the first builder's (a), 31 Oct).** After #4527 sent every question about
+"my" reminders to this list, a colleague at the desk asking "what did I ask
+you to remind me about?" would have heard the owner's "take my pills". So
+each reminder now keeps who set it, as the person's memory id (`p-` and 16
+hex digits, as the hello does in #4625), never a name: the stored item's
+optional `person`, written by `Set`'s optional `person`. It is optional
+stored metadata, so there is no `schema` bump: a store from before loads
+with every item set by no one, and an older build reads a newer store,
+dropping the field (its items then are no one's, which only narrows).
+
+- **The setter** is the person a keep in that line would be written for
+  at that moment, under memory's scope rules (`memory_scope`): the line's
+  own person; for a line read as the room's, the face the eyes named by
+  its end (`keeper_within`) or the one-face keep (`kept_by_one_face`,
+  #4584). A line held only by a face's gap, or carried as a conversation,
+  keeps nothing at once, so what it sets is no one's. No sure person is
+  none (`crates/voice/src/tools/schedule_whose.rs`).
+- **The reader** is the line's person as memory's reads take it
+  (`ScopeLease::scope`): a one-face line reads the room's, so it is not
+  "theirs" for listing; a held gap reads nothing of theirs.
+- **A line hears only its own.** `list_set` with an `asker`
+  (`protocol::Asker`, `{person, owner}`) lists only the items it may see
+  (`Asker::may_see`): a person's own; one set by no one only on the
+  **owner's line**, the line whose reader is one of the owner's memory ids
+  (`person::owner_ids`: the typed setup name's and the face who_you_are
+  kept), as #4476 tells the typed name only there. An unknown face or the
+  room hears none of anyone's. Its `not_yet_due` is the line's own count,
+  told beside a `pending_only` list in place of `Status`' whole-store one.
+- **`cancel_reminder` and `snooze_reminder` by id** act only on an item the
+  line may see: `Cancel` and `Snooze` with an `asker` answer someone else's
+  as `not_found`, never as someone else's, and a snooze says that before
+  "not due". A guest can't cancel the owner's reminder by its id.
+- **The voice sends its line's caller.** Beside each schedule call on the
+  executive's socket the voice adds `caller`
+  (`{"asker":{"person","owner"},"setter"}`, `lamp_actions::schedule::Caller`);
+  a call without one is nobody's: it hears and changes none of anyone's,
+  and what it sets is no one's.
+- **The app is the owner's view.** `schedule.list` and `schedule.cancel`
+  (`Adapter::call_plain`, `Adapter::call`) send no asker and see every
+  item, as before: the app is the owner's, over the lamp's own account
+  channel.
+- **A forget takes them too.** A person's "forget everything about me"
+  that emptied their memory cancels every reminder they set
+  (`Request::Forget`, the executive's own `schedule_forget` op, which no
+  model call can name), and the answer says `reminders: {"cancelled": n}`,
+  or that they could not go. The app's `face.remove` with `entirely`
+  cancels them for each of the memory ids it forgets, with the schedule
+  given to lamp-cloud (`LAMP_APP_SCHEDULE=on`); without it they stay and
+  the answer is as before, with no `reminders`. The reminders are cancelled, not kept as no
+  one's: kept, they would turn up on the owner's line. A factory reset
+  already wipes the store.
+- **An older Schedule** refuses an `asker` or a `person` as `bad_request`:
+  the list is then the owner's line's alone (every item there is no
+  one's), and a set, cancel or snooze is unavailable. The voice, actions
+  and schedule ship together.
+- **A due reminder is said as before**, to whoever is there: it is due, so
+  it is said. The delivery ledger's `list` and `get` are unchanged.
+- **No switch:** it only narrows who hears what.
+
+A room line's reminder (nobody known) is then heard and cancelled only on
+the owner's line: on a lamp where nobody is known by face or typed name,
+no line is the owner's, and such a reminder is said when due but can't be
+listed or cancelled by voice, only from the app. Tests:
+`each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_person_ones`,
+`a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing`,
+`a_persons_forget_cancels_every_reminder_they_set_and_survives_a_reopen`
+and
+`a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_setter_on_reopen`
+(`crates/schedule/tests/it/engine.rs`);
+`each_person_hears_and_changes_only_their_own_reminders_through_the_real_server`
+and `a_persons_forget_cancels_their_reminders_only_through_the_voices_own_op`
+(`crates/actions/tests/it/schedule.rs`); `tools::schedule_whose`'s three
+(`crates/voice`); `face_remove_entirely_cancels_the_persons_reminders`
+(`crates/cloud`).
 
 The declarations use Gemini's small `parameters` schema subset, omitting
 `additionalProperties`, `maxLength`, and regex patterns. Runtime validation

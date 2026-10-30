@@ -114,8 +114,13 @@ impl Actions {
             worker: Some(worker),
         }
     }
+    /// A call from the owner's own line, nobody sure who set it: it hears
+    /// and changes the reminders set with no person (#4527's P2).
     fn call(&self, name: &str, args: Value) -> Value {
-        self.raw(json!({"op":"call","name":name,"args":args}))
+        self.call_as(name, args, json!({"asker":{"owner":true}}))
+    }
+    fn call_as(&self, name: &str, args: Value, caller: Value) -> Value {
+        self.raw(json!({"op":"call","name":name,"args":args,"caller":caller}))
     }
     fn raw(&self, value: Value) -> Value {
         ask(&self.root.path().join(CALL_SOCKET), value)
@@ -1126,5 +1131,116 @@ fn list_reminders_is_described_for_questions_about_reminders() {
         listing.description.len() <= 1_024,
         "{}",
         listing.description.len()
+    );
+}
+
+const ANN: &str = "p-0123456789abcdef";
+const BO: &str = "p-fedcba9876543210";
+
+fn caller(person: Option<&str>, owner: bool) -> Value {
+    json!({"asker":{"person":person,"owner":owner},"setter":person})
+}
+fn texts(list: &Value) -> Vec<String> {
+    list["result"]["items"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{list}"))
+        .iter()
+        .map(|i| i["text"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// Reviewer-three's after-merge P2 on #4527, the first builder's (a): two
+/// people each asking "my reminders" hear their own; an unknown face hears
+/// none; the owner hears theirs and the ones set with nobody sure; a
+/// guest's cancel or snooze by the owner's id is refused as not found; a
+/// call without its caller is nobody's.
+#[test]
+fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_server() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let owner = caller(Some(ANN), true);
+    let bo = caller(Some(BO), false);
+    let unknown = caller(None, false);
+    let set = |text: &str, who: &Value| {
+        let told = actions.call_as("set_timer", json!({"text":text,"seconds":600}), who.clone());
+        assert_eq!(told["result"]["status"], "committed", "{told}");
+        told["result"]["id"].as_u64().unwrap()
+    };
+    let pills = set("Ann's pills", &owner);
+    set("Bo's call", &bo);
+    let plant = set("Water the plant", &unknown);
+    let list = |who: &Value| actions.call_as("list_reminders", json!({}), who.clone());
+    assert_eq!(texts(&list(&owner)), ["Ann's pills", "Water the plant"]);
+    assert_eq!(texts(&list(&bo)), ["Bo's call"]);
+    assert!(texts(&list(&unknown)).is_empty());
+    // Not due yet, the line's own count: Bo is told of his one only.
+    let due = actions.call_as("list_reminders", json!({"pending_only":true}), bo.clone());
+    assert_eq!(due["result"]["not_yet_due"], 1, "{due}");
+    // A call without its caller is nobody's.
+    let bare = actions.raw(json!({"op":"call","name":"list_reminders","args":{}}));
+    assert!(texts(&bare).is_empty());
+    for (id, who) in [(pills, &bo), (pills, &unknown), (plant, &bo)] {
+        let refused = actions.call_as("cancel_reminder", json!({"id":id}), who.clone());
+        assert_eq!(refused["code"], "not_found", "{refused}");
+    }
+    *schedule.clock.0.lock().unwrap() = sample(601_000);
+    let refused = actions.call_as(
+        "snooze_reminder",
+        json!({"id":pills,"seconds":60}),
+        bo.clone(),
+    );
+    assert_eq!(refused["code"], "not_found", "{refused}");
+    // The app's view, the owner's, is every item.
+    assert_eq!(
+        texts(
+            &json!({"result":schedule.adapter().call_plain("list_reminders", &json!({}))["result"]})
+        ),
+        ["Ann's pills", "Bo's call", "Water the plant"]
+    );
+    let snoozed = actions.call_as(
+        "snooze_reminder",
+        json!({"id":pills,"seconds":60}),
+        owner.clone(),
+    );
+    assert_eq!(snoozed["result"]["status"], "committed", "{snoozed}");
+    let cancelled = actions.call_as("cancel_reminder", json!({"id":plant}), owner.clone());
+    assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+}
+
+/// "Forget everything about me": the voice's own op cancels every reminder
+/// the person set, and nobody else's. A model can't name it: it is no tool.
+#[test]
+fn a_persons_forget_cancels_their_reminders_only_through_the_voices_own_op() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    for (text, who) in [("Ann's pills", ANN), ("Ann's call", ANN), ("Bo's call", BO)] {
+        let told = actions.call_as(
+            "set_timer",
+            json!({"text":text,"seconds":600}),
+            caller(Some(who), false),
+        );
+        assert_eq!(told["result"]["status"], "committed", "{told}");
+    }
+    let forgot = actions.raw(json!({"op":"schedule_forget","person":ANN}));
+    assert_eq!(forgot["result"]["forgotten"], 2, "{forgot}");
+    assert_eq!(
+        texts(
+            &json!({"result":schedule.adapter().call_plain("list_reminders", &json!({}))["result"]})
+        ),
+        ["Bo's call"]
+    );
+    let refused = actions.raw(json!({"op":"schedule_forget","person":"Ann"}));
+    assert_eq!(refused["code"], "bad_arguments", "{refused}");
+    let model = actions.call_as(
+        "schedule_forget",
+        json!({"person":BO}),
+        caller(Some(BO), false),
+    );
+    assert_ne!(model["ok"], true, "{model}");
+    assert_eq!(
+        texts(
+            &json!({"result":schedule.adapter().call_plain("list_reminders", &json!({}))["result"]})
+        ),
+        ["Bo's call"]
     );
 }

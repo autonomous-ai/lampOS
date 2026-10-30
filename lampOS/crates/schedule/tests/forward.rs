@@ -45,6 +45,7 @@ fn guard<P: Persistence>(engine: &Engine<P>) -> Guard {
 
 fn set<P: Persistence>(engine: &Engine<P>, when: When) -> Request {
     Request::Set {
+        person: None,
         guard: guard(engine),
         text: "Check the timer".into(),
         when,
@@ -75,6 +76,7 @@ fn today_and_additive_fields_keep_items_pending_snooze_and_exact_receipt() {
     let mut engine = Engine::open(disk.clone(), "Etc/UTC", &now(60_000), FRESH).unwrap();
     engine.tick(&now(60_000)).unwrap();
     let request = Request::Snooze {
+        asker: None,
         guard: guard(&engine),
         id: 1,
         delivery: 1,

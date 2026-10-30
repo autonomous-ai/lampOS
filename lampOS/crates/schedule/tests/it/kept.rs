@@ -49,6 +49,7 @@ fn guard<P: Persistence>(engine: &Engine<P>) -> Guard {
 
 fn set<P: Persistence>(engine: &mut Engine<P>, text: &str, when: When, at: u64) -> Value {
     let request = Request::Set {
+        person: None,
         guard: guard(engine),
         text: text.into(),
         when,
@@ -103,6 +104,7 @@ fn write_a_state_fixture() {
     );
     engine.tick(&now(60_000)).unwrap();
     let snooze = Request::Snooze {
+        asker: None,
         guard: guard(&engine),
         id: 1,
         delivery: 1,
@@ -214,6 +216,7 @@ fn each_kept_state_reads_with_its_items() {
             let set = engine
                 .answer(
                     Request::ListSet {
+                        asker: None,
                         after_id: 0,
                         limit: 8,
                         pending_only: false,

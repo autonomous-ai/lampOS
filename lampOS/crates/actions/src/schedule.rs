@@ -3,7 +3,7 @@
 use crate::Function;
 use lamp_schedule::{
     client,
-    protocol::{Guard, Request},
+    protocol::{Asker, Guard, Request},
     time::{Deadline, Fold, MAX_AFTER_SECONDS, Repeat, Weekday, When, validate_zone},
 };
 use serde::Deserialize;
@@ -111,6 +111,24 @@ pub fn catalog() -> Vec<Function> {
     ]
 }
 
+/// Who a voice line's schedule call is for (Reviewer-three's after-merge P2
+/// on #4527, the first builder's (a)): whose reminders it hears, cancels and
+/// snoozes ([`Asker`]), and who a reminder it sets is kept as. Sent by the
+/// voice beside each call on the executive's socket; a call without one is
+/// nobody's: it hears and changes none of anyone's, and what it sets is the
+/// owner's line's. The app's own calls ([`Adapter::call`],
+/// [`Adapter::call_plain`]) take none and see every item, as the owner's.
+#[derive(Clone, Debug, Default, Deserialize, serde::Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Caller {
+    #[serde(default)]
+    pub asker: Asker,
+    /// The memory person id a keep in this line would be written for; none
+    /// when nobody is sure.
+    #[serde(default)]
+    pub setter: Option<String>,
+}
+
 #[derive(Clone, Debug)]
 pub struct Adapter {
     socket: PathBuf,
@@ -166,19 +184,65 @@ impl Adapter {
     /// Voice's separate model-result budget. Failure sentences are fixed and
     /// never contain the caller's reminder text or an owner's arbitrary error.
     pub fn call(&self, name: &str, args: &Value) -> Value {
-        self.call_with(name, args, true)
+        self.call_with(name, args, true, None)
+    }
+
+    /// [`Self::call`] for a voice line: only `caller`'s reminders are
+    /// listed, cancelled or snoozed, and one it sets is kept as its setter's.
+    pub fn call_for(&self, name: &str, args: &Value, caller: &Caller) -> Value {
+        self.call_with(name, args, true, Some(caller))
+    }
+
+    /// Every reminder and timer `person` (a memory person id) set,
+    /// cancelled: their "forget everything about me", or the app removing
+    /// them entirely. `{"ok":true,"result":{"forgotten":n}}`, or a fixed
+    /// failure, as [`Self::call`] gives one.
+    pub fn forget_person(&self, person: &str) -> Value {
+        let deadline = Instant::now() + self.deadline;
+        let forgot = (|| {
+            if !lamp_msgs::known::is_person_id(person) {
+                return Err(Failure::BadArguments);
+            }
+            let before = self.ask(&Request::Status {}, deadline)?;
+            let (store_id, revision) = identity(&before)?;
+            let request = Request::Forget {
+                guard: guard(store_id, revision)?,
+                person: person.to_owned(),
+            };
+            let reply = self.ask(&request, deadline)?;
+            let (store, after) = identity(&reply).map_err(|_| Failure::Uncertain)?;
+            let forgotten = reply["forgotten"].as_u64();
+            match (request.guard(), forgotten) {
+                (Some(guard), Some(forgotten))
+                    if store == guard.store_id && guard.revision.checked_add(1) == Some(after) =>
+                {
+                    Ok(json!({"forgotten":forgotten}))
+                }
+                _ => Err(Failure::Uncertain),
+            }
+        })();
+        match forgot {
+            Ok(result) => json!({"ok":true,"result":result}),
+            Err(why) => failure(why),
+        }
     }
 
     /// [`Self::call`] with `list_reminders` asked as a plain `list`, its
     /// items without when they were set: the app's `schedule.list`, whose
     /// contract is unchanged. Only Voice's tool asks `list_set`.
     pub fn call_plain(&self, name: &str, args: &Value) -> Value {
-        self.call_with(name, args, false)
+        self.call_with(name, args, false, None)
     }
 
-    fn call_with(&self, name: &str, args: &Value, set_times: bool) -> Value {
+    fn call_with(
+        &self,
+        name: &str,
+        args: &Value,
+        set_times: bool,
+        caller: Option<&Caller>,
+    ) -> Value {
         let deadline = Instant::now() + self.deadline;
-        match parse(name, args).and_then(|call| self.perform(call, set_times, deadline)) {
+        match parse(name, args).and_then(|call| self.perform(call, set_times, caller, deadline)) {
             Ok(result) if result.to_string().len() <= MAX_RESULT_BYTES => {
                 json!({"ok":true,"result":result})
             }
@@ -218,7 +282,14 @@ impl Adapter {
         }
     }
 
-    fn perform(&self, call: Call, set_times: bool, deadline: Instant) -> Result<Value, Failure> {
+    fn perform(
+        &self,
+        call: Call,
+        set_times: bool,
+        caller: Option<&Caller>,
+        deadline: Instant,
+    ) -> Result<Value, Failure> {
+        let asker = caller.map(|caller| caller.asker.clone());
         if let Call::List {
             after_id,
             pending_only,
@@ -241,10 +312,22 @@ impl Adapter {
                         after_id,
                         limit: 8,
                         pending_only,
+                        asker: asker.clone(),
                     },
                     deadline,
                 )? {
                     Ok(reply) => reply,
+                    // An older Schedule keeps no setters: every item is
+                    // no one's, the owner's line's alone (#4527's P2).
+                    Err(refusal)
+                        if refusal["error"] == "bad_request"
+                            && asker.as_ref().is_some_and(|asker| !asker.owner) =>
+                    {
+                        let mut none = self.ask(&Request::Status {}, deadline)?;
+                        none["items"] = json!([]);
+                        none["next_after_id"] = Value::Null;
+                        none
+                    }
                     Err(refusal) if refusal["error"] == "bad_request" => {
                         self.ask(&plain, deadline)?
                     }
@@ -252,7 +335,18 @@ impl Adapter {
                 }
             };
             let mut listed = page(&reply, after_id, pending_only, set_times)?;
-            if pending_only {
+            // A line's own count of what is set and not yet due, from the
+            // same reply, never the whole store's (#4527's P2).
+            // An older Schedule's reply has none: the owner's line, the only
+            // one it lists for, is counted from `Status` as before.
+            let own_waiting = reply["not_yet_due"].as_u64().filter(|_| asker.is_some());
+            let counts_all = asker.as_ref().is_none_or(|asker| asker.owner);
+            if let Some(waiting) = own_waiting {
+                if pending_only && waiting > 0 {
+                    listed["not_yet_due"] = json!(waiting);
+                    listed["next"] = json!(NOT_YET_DUE);
+                }
+            } else if pending_only && counts_all {
                 // #1595: a list of what is due leaves out what is set and not
                 // yet due, and "nothing due" read as "nothing set" let a timer
                 // the person asked to cancel ring. Said as a count, best
@@ -282,22 +376,23 @@ impl Adapter {
             _ => self.ask(&Request::Status {}, deadline)?,
         };
         let (store_id, revision) = identity(&before)?;
-        let mut random = [0u8; 16];
-        getrandom::fill(&mut random).map_err(|_| Failure::Unavailable)?;
-        let guard = Guard {
-            store_id: store_id.into(),
-            revision,
-            request_id: random.iter().map(|b| format!("{b:02x}")).collect(),
-        };
+        let guard = guard(store_id, revision)?;
         let request = match call {
-            Call::Set { text, when } => Request::Set { guard, text, when },
-            Call::Cancel { id } => Request::Cancel { guard, id },
+            Call::Set { text, when } => Request::Set {
+                guard,
+                text,
+                when,
+                person: caller.and_then(|caller| caller.setter.clone()),
+            },
+            Call::Cancel { id } => Request::Cancel { guard, id, asker },
             Call::Snooze { id, seconds } => {
                 let item = item(&before["item"]).map_err(|_| Failure::Unavailable)?;
                 if item.id != id {
                     return Err(Failure::Unavailable);
                 }
-                if item.state != "pending" {
+                // For a line, Schedule says first whether it is theirs at
+                // all: someone else's is not found, never "not due".
+                if item.state != "pending" && asker.is_none() {
                     return Err(Failure::NotPending);
                 }
                 Request::Snooze {
@@ -305,6 +400,7 @@ impl Adapter {
                     id,
                     delivery: item.delivery,
                     seconds,
+                    asker,
                 }
             }
             Call::List { .. } => unreachable!("list returned before mutation"),
@@ -312,6 +408,17 @@ impl Adapter {
         let response = self.ask(&request, deadline)?;
         committed(&request, &response)
     }
+}
+
+/// A fresh compare-and-set guard on the store's identity and revision.
+fn guard(store_id: &str, revision: u64) -> Result<Guard, Failure> {
+    let mut random = [0u8; 16];
+    getrandom::fill(&mut random).map_err(|_| Failure::Unavailable)?;
+    Ok(Guard {
+        store_id: store_id.into(),
+        revision,
+        request_id: random.iter().map(|b| format!("{b:02x}")).collect(),
+    })
 }
 
 #[derive(Clone, Copy, Debug)]

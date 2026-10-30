@@ -111,6 +111,7 @@ fn set(engine: &mut Engine<Disk>, at: u64, when: When) -> u64 {
     let response = engine
         .answer(
             Request::Set {
+                person: None,
                 guard: guard(engine, &format!("create-{}", engine.revision())),
                 text: PRIVATE_TEXT.into(),
                 when,
@@ -540,6 +541,7 @@ fn snooze_advancement_is_superseded_and_old_completion_cannot_ack_next_token() {
     schedule
         .answer(
             Request::Snooze {
+                asker: None,
                 guard: guard(&schedule, "snooze"),
                 id: pending.key().id,
                 delivery: 1,
@@ -669,6 +671,7 @@ fn list_absence_requires_exact_unfiltered_page_and_valid_cursor() {
     schedule
         .answer(
             Request::Cancel {
+                asker: None,
                 guard: guard(&schedule, "cancel"),
                 id: pending.key().id,
             },
@@ -795,6 +798,7 @@ fn full_unresolved_ledger_never_evicts_and_only_durable_resolution_frees_capacit
     schedule
         .answer(
             Request::Cancel {
+                asker: None,
                 guard: guard(&schedule, "cancel-first"),
                 id: 1,
             },

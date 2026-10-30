@@ -91,9 +91,18 @@ honest failure when called. It does not disable unrelated volume/light calls.
 | `set_timer` | `text`, whole `seconds` | Set with an elapsed `After` deadline |
 | `set_reminder` | `text`, exact `time` in `HH:MM`; optional `day`, `zone`, `fold` | Set one civil `At` deadline |
 | `repeat_reminder` | `text`, `time`, `every` (`daily` or `weekly`); `weekday` required only for weekly; optional `zone` | Set a local daily/weekly recurrence |
-| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page; each item says when it was set (`set_day`, `set_clock`), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
-| `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series |
-| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it |
+| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own; each item says when it was set (`set_day`, `set_clock`), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
+| `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series, only the line's own |
+| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own |
+
+Each schedule call on the socket may carry a fourth key, `caller`
+(`lamp_actions::schedule::Caller`, `{"asker":{"person","owner"},"setter"}`),
+which the voice adds for its line: whose reminders it hears and changes, and
+who a reminder it sets is kept as. A call without it is nobody's. The
+voice's own `{"op":"schedule_forget","person":"p-…"}` cancels every reminder
+that person set, after their "forget everything about me"; it is an op, not
+a tool, so no model call can name it ([schedule.md](schedule.md), "Whose
+reminders a line hears", #4527's P2).
 
 The catalog directs relative requests to `set_timer`, even when the person
 says "remind me": "in two minutes" uses the requested label and `seconds:120`,

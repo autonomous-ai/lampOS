@@ -97,6 +97,7 @@ impl Schedule {
         engine
             .answer(
                 Request::Set {
+                    person: None,
                     guard: Guard {
                         store_id: STORE_ID.into(),
                         revision: 0,
@@ -339,6 +340,7 @@ impl RoundtripFixture {
         let cancelled = exchange(
             socket,
             &Request::Cancel {
+                asker: None,
                 guard: Guard {
                     store_id: STORE_ID.into(),
                     revision,
