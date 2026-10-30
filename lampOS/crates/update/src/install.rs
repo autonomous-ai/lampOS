@@ -707,8 +707,8 @@ pub fn product_settings() -> Vec<manifest::Setting> {
 
 /// Where the repository keeps the Skills Store's public key a build ships
 /// (#3692), under `lamp-update manifest`'s `--deploy` (`lampOS/deploy`).
-/// Not in the repository until the Store's keeper gives its key; a build
-/// made without it carries none and leaves a lamp's key as it is.
+/// The production key has been in the repository since 28 Oct (#3692); a
+/// build made without it carries none and leaves a lamp's key as it is.
 pub const STORE_KEY_SOURCE: &str = "product/settings/var/lib/lampOS/skills/store-key.pub";
 /// Where a build writes it: lamp-skills' `package::BUILD_STORE_KEY` in the
 /// product's skills folder, a place a settings writer from build 7071 on
@@ -3180,6 +3180,58 @@ mod tests {
                 "{socket} is not enabled"
             );
         }
+    }
+
+    /// `deploy/product/README.md` names every file in the folder, so one
+    /// added here is said where a reader of the folder looks (six units and
+    /// `models.json` had gone unsaid), and gives the exit notes' count as
+    /// [`EXIT_NOTE_UNITS`] has it. A part's own unit, `PartOf=` and
+    /// `WantedBy=lampos.target`, is the table's `lamp-<part>.service` row;
+    /// a file under `settings/` is named by its path there.
+    #[test]
+    fn the_deploy_product_readme_names_every_file_and_the_exit_notes_count() {
+        let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+        let readme = fs::read_to_string(folder.join("README.md")).unwrap();
+        let named = |name: &str| readme.contains(&format!("`{name}`"));
+        let mut unnamed = Vec::new();
+        for entry in fs::read_dir(&folder).unwrap() {
+            let entry = entry.unwrap();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name == "README.md" || entry.file_type().unwrap().is_dir() {
+                continue;
+            }
+            let text = fs::read_to_string(entry.path()).unwrap();
+            let part = name.starts_with("lamp-")
+                && name.ends_with(".service")
+                && text.lines().any(|line| line == "PartOf=lampos.target")
+                && text
+                    .lines()
+                    .any(|line| line.starts_with("WantedBy=") && line.contains("lampos.target"));
+            if !part && !named(&name) {
+                unnamed.push(name);
+            }
+        }
+        let settings = folder.join("settings");
+        let mut folders = vec![settings.clone()];
+        while let Some(at) = folders.pop() {
+            for entry in fs::read_dir(&at).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    folders.push(path);
+                    continue;
+                }
+                let inside = path.strip_prefix(&settings).unwrap().to_string_lossy();
+                if !named(&inside) && !named(&format!("settings/{inside}")) {
+                    unnamed.push(format!("settings/{inside}"));
+                }
+            }
+        }
+        assert!(
+            unnamed.is_empty(),
+            "deploy/product/README.md does not name {unnamed:?}"
+        );
+        let count = format!("for the {} fixed reporting services", EXIT_NOTE_UNITS.len());
+        assert!(readme.contains(&count), "README.md does not say {count:?}");
     }
 
     /// #2892: the eyes' camera helper is installed, its socket enabled and
