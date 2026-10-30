@@ -148,6 +148,9 @@ Environment=LAMP_NAME_SECOND_SIGN=on
 # A hearing of the name inside one line's sound stays with that line: on lamp-4ace on 26 Oct (6919) a hearing in
 # "Can you pass me the charger? The white one." counted for the desk line begun 0.7 s after it, which was answered.
 Environment=LAMP_NAME_STAYS_IN_ITS_LINE=on
+# The conversation's windows measured to when a line began (#4594): on lamp-4ace on 31 Oct (9063) off then on, talk
+# answered 41/43 against 42/43 and desk lines left alone 0/4 against 2/4 (the first builder on #4604).
+Environment=LAMP_WINDOW_FROM_START=on
 # The line's end: a 0.5 s line is a line, a short one gets the end-of-turn model's verdict, an unsure one waits.
 Environment=LAMP_ENDPOINT_LEAST_SPEECH_MS=500
 Environment=LAMP_ENDPOINT_SHORT_VERDICT=on
