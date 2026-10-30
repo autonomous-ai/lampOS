@@ -1457,6 +1457,7 @@ impl Policy<'_> {
                     .with("hello_said", totals.said)
                     .with("hello_held_talking", totals.held_talking)
                     .with("hello_held_recent", totals.held_recent)
+                    .with("hello_held_person", totals.held_person)
                     .with("hello_late", totals.late);
                 // Only with `--rules`.
                 let report = if hello.obeys_rules() {

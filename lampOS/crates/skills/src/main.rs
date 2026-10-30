@@ -962,9 +962,14 @@ fn serve(
     // The Policy's gate (#958): asks out on `skills/ask`, its answers in on
     // `policy/decisions`, by the ask's number. The ask's wire is #958's
     // `lamp_msgs::SkillAsk`, written here as JSON until it is on lamp-voice.
+    // With LAMP_SKILLS_ASK=skip too: a skill whose [ask] is the Policy's
+    // `hello` is asked still (`lamp_skills::asks_anyway`, the first builder,
+    // 30 Oct, on the launch testers' findings).
     let mut gate = None;
     if ask_policy {
         engine = engine.asking_the_policy();
+    }
+    if ask_policy || skip_ask {
         gate = Some((
             bus.publisher_declared(
                 "skills/ask",
@@ -1063,7 +1068,7 @@ fn serve(
         "lamp-skills: skills from {}, the Policy's ask {}, a skill's light {}",
         dir.display(),
         if skip_ask {
-            "skipped"
+            "skipped, but for the hello, asked on skills/ask"
         } else if ask_policy {
             "asked on skills/ask"
         } else {
@@ -1459,7 +1464,21 @@ fn dispatch(
         for event in std::mem::take(&mut run.events) {
             publish(out, event);
         }
-        if let (Some(question), Some((asks, _))) = (run.ask.take(), &mut asking.gate) {
+        if let (Some(mut question), Some((asks, _))) = (run.ask.take(), &mut asking.gate) {
+            // A hello is asked for whom it is, as the memory knows them, so
+            // that the Policy holds one an hour to each person (the first
+            // builder, 30 Oct): a known face's id, read now from the eyes'
+            // known file, never its name; none for a face not known.
+            if question["act"] == lamp_skills::HELLO
+                && let Some(person) = runner
+                    .watching
+                    .borrow()
+                    .known_file
+                    .as_deref()
+                    .and_then(|path| lamp_skills::known::person_in(path, KNOWN_FRESH))
+            {
+                question["person"] = json!(person);
+            }
             ask_policy_for(
                 question,
                 run,

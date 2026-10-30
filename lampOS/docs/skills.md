@@ -106,7 +106,7 @@ policy = "hello"
 [[do]]
 body = { look_at = "face" }
 light = "warm_glow"
-say = "They are back at their desk. Greet them in one short line, by name if you know it."
+say = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else."
 ```
 
 The numbers are in the data, never in prose. The runtime applies them.
@@ -481,7 +481,20 @@ skills".)
     lamp-skills then does not greet: the answer came after 2.5 s, the
     person had gone, or the skill's last run was still under way. Until
     lamp-skills tells the Policy, such a hello is lost for those 20 minutes.
-  - `skip`: yes without asking.
+  - `skip`: yes without asking, but for a skill whose `[ask] policy` is
+    `hello` (Welcome back), which is asked of the Policy's gate still, as
+    with `policy`, and acts only on its `say_now`; unanswered within the
+    2.5 s, nothing is done (`lamp_skills::asks_anyway`; the first builder,
+    30 Oct, on the launch testers' findings: the Policy's hard rules, one
+    hello an hour to each person among them, hold on every lamp). Its ask
+    carries `person`, the memory's id of the known face at the lamp, read
+    from the eyes' known file as it asks (`--known-file`, the id on the
+    file's second line, else the id of the name; never the name), and none
+    for a face not known. The product's `lamp-policy` runs with `--hello
+    --act hello --gate` to answer it. Every other skill acts at once, as
+    before. Tests: `skipping_the_ask_a_hello_is_still_asked_of_the_policy`,
+    `skipping_the_ask_any_other_skill_acts_at_once`,
+    `known::tests::the_person_a_hello_is_for_is_the_memorys_id_never_the_name`.
   - unset: no, and nothing is done.
 
   `answered` says which, and with the Policy its choice, the decision's
@@ -710,7 +723,11 @@ and, for someone Mood calls `regular` or `close`, to greet them one beat
 warmer (`person::at_the_lamp`), by its `who = true` permission, which no
 other skill has, so Guard mode and Who was here never name anyone; the
 voice refuses `who` on anything but a note; the typed name is
-in the model's instruction. The voice's one hello an hour for someone
+in the model's instruction. The note is also told, last, the part of the
+day from the lamp's own time (none at night or when the time is not known)
+and to say only a hello and the name, with no weather, day, time, question
+or offer (`local_time::hello_told`; the first builder, 30 Oct, on the
+launch testers' findings, after a hello said "Evening" at 15:42). The voice's one hello an hour for someone
 `close` (#1670) was not carried: `lamp-skills` has no cooldown by
 familiarity, and the 20 minutes hold for everyone.
 

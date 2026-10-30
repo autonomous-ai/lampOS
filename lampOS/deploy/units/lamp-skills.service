@@ -1,7 +1,10 @@
 # lampOS skills: physical skills, each a folder in /var/lib/lampOS/skills (lampOS/docs/skills.md).
 # Template: replace every @NAME@ (README.md here). Off unless installed and enabled.
-# LAMP_SKILLS_ASK=skip acts without asking the Policy, whose gate is not built yet (#939);
-# without it every skill is asked about and refused, and nothing is done.
+# LAMP_SKILLS_ASK=skip acts without asking the Policy, but for Welcome back's hello: a skill whose
+# [ask] is the Policy's hello is asked still, on skills/ask (lamp-policy --hello --act hello --gate),
+# for its hard rules, one hello an hour to each person among them (the first builder, 30 Oct, on the
+# launch testers' findings); unanswered, it is not said. Without LAMP_SKILLS_ASK every skill is asked
+# about and refused, and nothing is done.
 # Type=simple until it calls the keeper's helper.
 [Unit]
 Description=lampOS skills (lamp-skills)

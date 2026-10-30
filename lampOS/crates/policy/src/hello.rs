@@ -12,6 +12,10 @@
 //! within twenty minutes of the last, the voice's own limit. While either
 //! holds the answer is `wait`, by the rule, and no model is asked: the voice
 //! is waiting, and a question not answered would leave it to its rule.
+//! A skill's ask has a third beside them: no hello to the same person within
+//! an hour ([`ONCE_PER_PERSON`]), by the ask's `person`, every ask with none
+//! sharing one ([`SOMEONE`]) (the first builder, 30 Oct, on the launch
+//! testers' findings).
 //! With `lamp-policy --rules` a third holds as they do: a rule the people
 //! at the lamp kept about it speaking first, by its `hello` limits
 //! ([`crate::rules`], #813).
@@ -28,7 +32,7 @@ use lamp_msgs::{Decision, Rules, TurnVerdict, Voice, VoiceArrival};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     io,
     sync::{Arc, mpsc},
     thread,
@@ -42,6 +46,13 @@ pub const SAY_FROM: f32 = 0.5;
 /// No hello within this long of the last: the voice's own limit
 /// (`speak_up`, twenty minutes).
 pub const AT_MOST_EVERY: Duration = Duration::from_secs(20 * 60);
+/// No hello to the same person within this long of their last (the first
+/// builder, 30 Oct, on the launch testers' findings: a hello every time a
+/// face came back after five minutes away, 15:13 and 15:41 on one lamp).
+/// By a skill's ask's `person`; asks without one share [`SOMEONE`].
+pub const ONCE_PER_PERSON: Duration = Duration::from_secs(60 * 60);
+/// The one key every ask without a `person` (a face not known) shares.
+pub const SOMEONE: &str = "someone";
 /// Nobody is talking to the lamp: the same quiet as the progress question.
 pub const QUIET_FOR: Duration = Duration::from_secs(15);
 /// A turn of the lamp's that began with nobody listened to in this long
@@ -99,6 +110,9 @@ struct Waiting {
     arrival: VoiceArrival,
     received: Instant,
     skill_ask: bool,
+    /// Whom a skill's ask is for, by [`ONCE_PER_PERSON`]'s key; none for
+    /// the voice's arrivals.
+    person: Option<String>,
 }
 
 /// The question out, and when the one it is about was received.
@@ -107,6 +121,7 @@ struct Asking {
     context: Context,
     sent: Instant,
     received: Instant,
+    person: Option<String>,
 }
 /// What the rule gives when no model answers. Authored, not measured.
 pub const RULE_YES: f32 = 0.6;
@@ -124,6 +139,8 @@ pub struct Options {
     /// test.
     pub quiet_for: Duration,
     pub at_most_every: Duration,
+    /// [`ONCE_PER_PERSON`]; shorter only in a test.
+    pub once_per_person: Duration,
     /// The decisions act (`--act hello`): published with `shadow: false`,
     /// and the voice says hello or not as they say. Off unless set.
     pub act: bool,
@@ -155,6 +172,7 @@ impl Options {
             local,
             quiet_for: QUIET_FOR,
             at_most_every: AT_MOST_EVERY,
+            once_per_person: ONCE_PER_PERSON,
             act: false,
             gate: false,
             addons: false,
@@ -172,6 +190,9 @@ pub enum Hold {
     Talking,
     /// The lamp said hello less than twenty minutes ago.
     GreetedRecently,
+    /// The lamp said hello to the same person less than an hour ago
+    /// ([`ONCE_PER_PERSON`]).
+    GreetedPerson,
     /// A rule the people at the lamp kept holds it (`--rules`).
     KeptRule,
 }
@@ -181,6 +202,7 @@ impl Hold {
         match self {
             Self::Talking => "talking",
             Self::GreetedRecently => "greeted_recently",
+            Self::GreetedPerson => "greeted_person",
             Self::KeptRule => "kept_rule",
         }
     }
@@ -376,6 +398,7 @@ pub struct Totals {
     /// Arrivals answered `wait` by each hard rule.
     pub held_talking: u64,
     pub held_recent: u64,
+    pub held_person: u64,
     /// With `--rules`.
     pub held_rule: u64,
     /// Arrivals not decided before the voice stopped waiting for them.
@@ -409,6 +432,9 @@ pub struct Hello {
     /// The turn the lamp began itself, while it lasts.
     own_turn: Option<OwnTurn>,
     greeted: Option<Instant>,
+    /// The last hello acted on for each person a skill asked for, by
+    /// [`ONCE_PER_PERSON`]'s key; kept for that long.
+    greeted_people: HashMap<String, Instant>,
     /// When it started: the quiet a skill's ask is shown is counted from
     /// here if nothing has been said since.
     started: Instant,
@@ -479,6 +505,7 @@ impl Hello {
             notes: VecDeque::new(),
             own_turn: None,
             greeted: None,
+            greeted_people: HashMap::new(),
             started: Instant::now(),
             moment: None,
             rules: Kept::default(),
@@ -653,7 +680,8 @@ impl Hello {
                 u32::try_from(now.saturating_duration_since(at).as_secs() / 60).unwrap_or(u32::MAX)
             }),
         };
-        self.wait(arrival, now, true);
+        let person = ask.person.clone().unwrap_or_else(|| SOMEONE.to_owned());
+        self.wait(arrival, now, Some(person));
     }
 
     /// Whether a question is out or an arrival waits, here or in the moment
@@ -671,10 +699,11 @@ impl Hello {
     /// A hello is due: it waits to be decided. One that fails its check is
     /// passed over; past [`MOST_WAITING`] the oldest is let go.
     pub fn arrival(&mut self, arrival: VoiceArrival, now: Instant) {
-        self.wait(arrival, now, false);
+        self.wait(arrival, now, None);
     }
 
-    fn wait(&mut self, arrival: VoiceArrival, now: Instant, skill_ask: bool) {
+    /// `person`: a skill's ask, for whom; none, a voice's arrival.
+    fn wait(&mut self, arrival: VoiceArrival, now: Instant, person: Option<String>) {
         if arrival.check().is_err() {
             return;
         }
@@ -685,7 +714,8 @@ impl Hello {
         self.waiting.push_back(Waiting {
             arrival,
             received: now,
-            skill_ask,
+            skill_ask: person.is_some(),
+            person,
         });
     }
 
@@ -919,6 +949,29 @@ impl Hello {
         }
     }
 
+    /// [`Self::hold`], and for a skill's ask for `person` the hello to the
+    /// same person within [`Options::once_per_person`], after the talk and
+    /// the twenty minutes and before a kept rule.
+    fn hold_for(
+        &self,
+        arrival: &VoiceArrival,
+        person: Option<&str>,
+        (now, unix_ms, room): (Instant, u64, Room),
+    ) -> Option<Hold> {
+        let held = self.hold(arrival, now, unix_ms, room);
+        if matches!(held, Some(Hold::Talking | Hold::GreetedRecently)) {
+            return held;
+        }
+        let greeted = person
+            .and_then(|person| self.greeted_people.get(person))
+            .is_some_and(|at| now.saturating_duration_since(*at) < self.options.once_per_person);
+        if greeted {
+            Some(Hold::GreetedPerson)
+        } else {
+            held
+        }
+    }
+
     /// Take up an answer if one has come; else decide the next arrival, by
     /// a hard rule or by putting the question. At most one decision a turn.
     pub fn turn(
@@ -936,6 +989,9 @@ impl Hello {
                 queue.pop_front();
             }
         }
+        let once = self.options.once_per_person;
+        self.greeted_people
+            .retain(|_, at| now.saturating_duration_since(*at) < once);
         if self.asking.is_some() {
             let answer = match self.answers.try_recv() {
                 Ok((answer, took)) => Some((Some(answer), took)),
@@ -957,7 +1013,13 @@ impl Hello {
                 Some(_) => answer.1,
                 None => now.saturating_duration_since(asking.sent),
             };
-            return Some(self.decide(asking.context, answer.0, None, took, (now, unix_ms, room)));
+            return Some(self.decide(
+                (asking.context, asking.person),
+                answer.0,
+                None,
+                took,
+                (now, unix_ms, room),
+            ));
         }
         // One the voice has stopped waiting for is let go undecided.
         while self
@@ -972,6 +1034,7 @@ impl Hello {
             arrival,
             received,
             skill_ask,
+            person,
         } = self.waiting.pop_front()?;
         let context = Context {
             arrival: arrival.arrival,
@@ -1002,14 +1065,15 @@ impl Hello {
                 .map(|local| local.hour_of_day(unix_ms)),
             skill_ask,
         };
-        if let Some(hold) = self.hold(&arrival, now, unix_ms, room) {
+        if let Some(hold) = self.hold_for(&arrival, person.as_deref(), (now, unix_ms, room)) {
             match hold {
                 Hold::Talking => self.totals.held_talking += 1,
                 Hold::GreetedRecently => self.totals.held_recent += 1,
+                Hold::GreetedPerson => self.totals.held_person += 1,
                 Hold::KeptRule => self.totals.held_rule += 1,
             }
             return Some(self.decide(
-                context,
+                (context, person),
                 None,
                 Some(hold),
                 Duration::ZERO,
@@ -1017,7 +1081,13 @@ impl Hello {
             ));
         }
         if self.asker_gone {
-            return Some(self.decide(context, None, None, Duration::ZERO, (now, unix_ms, room)));
+            return Some(self.decide(
+                (context, person),
+                None,
+                None,
+                Duration::ZERO,
+                (now, unix_ms, room),
+            ));
         }
         // The model is given only what is left of the wait; with nothing
         // left, the rule answers now.
@@ -1029,7 +1099,13 @@ impl Hello {
         );
         if deadline.is_zero() {
             let failed = Some(Err(Failed::TimedOut));
-            return Some(self.decide(context, failed, None, Duration::ZERO, (now, unix_ms, room)));
+            return Some(self.decide(
+                (context, person),
+                failed,
+                None,
+                Duration::ZERO,
+                (now, unix_ms, room),
+            ));
         }
         match self.states.try_send((state_text(&context), deadline)) {
             Ok(()) => {
@@ -1037,21 +1113,29 @@ impl Hello {
                     context,
                     sent: now,
                     received,
+                    person,
                 });
                 None
             }
             Err(_) => {
                 self.asker_gone = true;
-                Some(self.decide(context, None, None, Duration::ZERO, (now, unix_ms, room)))
+                Some(self.decide(
+                    (context, person),
+                    None,
+                    None,
+                    Duration::ZERO,
+                    (now, unix_ms, room),
+                ))
             }
         }
     }
 
     /// Decide from the model's answers, by a hard rule (`held`), or by the
-    /// rule when there are no answers to use.
+    /// rule when there are no answers to use. `person`: whom a skill's ask
+    /// is for ([`ONCE_PER_PERSON`]).
     fn decide(
         &mut self,
-        context: Context,
+        (context, person): (Context, Option<String>),
         answer: Option<Result<Asked, Failed>>,
         held: Option<Hold>,
         took: Duration,
@@ -1116,12 +1200,13 @@ impl Hello {
                     quiet_s: context.quiet_s,
                     since_hello_min: context.since_hello_min,
                 };
-                self.hold(&arrival, now, unix_ms, room)
+                self.hold_for(&arrival, person.as_deref(), (now, unix_ms, room))
             })
             .flatten();
         match late {
             Some(Hold::Talking) => self.totals.held_talking += 1,
             Some(Hold::GreetedRecently) => self.totals.held_recent += 1,
+            Some(Hold::GreetedPerson) => self.totals.held_person += 1,
             Some(Hold::KeptRule) => self.totals.held_rule += 1,
             None => {}
         }
@@ -1134,6 +1219,9 @@ impl Hello {
             self.totals.said += 1;
             if self.options.act {
                 self.greeted = Some(now);
+                if let Some(person) = person {
+                    self.greeted_people.insert(person, now);
+                }
             }
         }
         self.totals.decided += 1;
@@ -1817,6 +1905,119 @@ mod tests {
 
     /// The decision for `arrival` made at `now`, by the rule (the model
     /// never answers), waited for on the clock the test gives.
+    /// The first builder, 30 Oct, on the launch testers' findings: at most
+    /// one hello an hour to the same person. Acted on, a hello to Alpha
+    /// holds the next ask for Alpha within the hour by the rule, without a
+    /// model, while one for Beta is decided; asks without a person share
+    /// one key; past the hour Alpha is decided again.
+    #[test]
+    fn one_hello_an_hour_to_the_same_person_and_asks_without_one_share_a_key() {
+        const ALPHA: &str = "p-0123456789abcdef";
+        const BETA: &str = "p-fedcba9876543210";
+        let options = Options {
+            act: true,
+            gate: true,
+            // The twenty minutes out of the way: the person's hour alone.
+            at_most_every: Duration::from_secs(60),
+            ..Options::new(Duration::from_millis(50), None)
+        };
+        let mut hello = Hello::start(Never, options).unwrap();
+        let ask = |number: u64, person: Option<&str>| lamp_msgs::SkillAsk {
+            ask: number,
+            skill: "welcome-back".into(),
+            act: "hello".into(),
+            person: person.map(str::to_owned),
+            away_min: Some(42),
+            there_s: Some(3),
+        };
+        let decide = |hello: &mut Hello, number: u64, person: Option<&str>, at: Instant| {
+            hello.asked(&ask(number, person), at);
+            for _ in 0..500 {
+                if let Some(decided) = hello.turn(at, 1_000_000, Room::Quiet, (Some(true), None)) {
+                    return decided;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            panic!("no decision");
+        };
+        let minutes = |n: u64| Duration::from_secs(n * 60);
+        let t = Instant::now();
+        let first = decide(&mut hello, 1, Some(ALPHA), t);
+        assert_eq!(
+            (first.decision.choice.as_str(), first.line.guard),
+            ("say_now", None)
+        );
+        // Alpha again, 40 minutes on: the twenty minutes are past, the
+        // hour is not.
+        let again = decide(&mut hello, 2, Some(ALPHA), t + minutes(40));
+        assert_eq!(
+            (
+                again.decision.choice.as_str(),
+                again.decision.by.as_str(),
+                again.line.guard
+            ),
+            ("wait", crate::policy::RULE, Some(Hold::GreetedPerson))
+        );
+        assert_eq!(Hold::GreetedPerson.as_str(), "greeted_person");
+        // Beta, 42 minutes on: decided.
+        let beta = decide(&mut hello, 3, Some(BETA), t + minutes(42));
+        assert_eq!(
+            (beta.decision.choice.as_str(), beta.line.guard),
+            ("say_now", None)
+        );
+        // A face not known, then another: one key.
+        let someone = decide(&mut hello, 4, None, t + minutes(44));
+        assert_eq!(someone.decision.choice, "say_now");
+        let another = decide(&mut hello, 5, None, t + minutes(46));
+        assert_eq!(another.line.guard, Some(Hold::GreetedPerson));
+        // Alpha past the hour: decided again.
+        let later = decide(&mut hello, 6, Some(ALPHA), t + minutes(61));
+        assert_eq!(
+            (later.decision.choice.as_str(), later.line.guard),
+            ("say_now", None)
+        );
+        assert_eq!(hello.totals().held_person, 2);
+    }
+
+    /// In shadow nothing was said: the person's hour starts only from a
+    /// hello acted on, as the twenty minutes do.
+    #[test]
+    fn a_hello_in_shadow_starts_no_persons_hour() {
+        let options = Options {
+            gate: true,
+            at_most_every: Duration::from_secs(60),
+            ..Options::new(Duration::from_millis(50), None)
+        };
+        let mut hello = Hello::start(Never, options).unwrap();
+        let t = Instant::now();
+        for (number, at) in [(1, t), (2, t + Duration::from_secs(300))] {
+            hello.asked(
+                &lamp_msgs::SkillAsk {
+                    ask: number,
+                    skill: "welcome-back".into(),
+                    act: "hello".into(),
+                    person: Some("p-0123456789abcdef".into()),
+                    away_min: Some(42),
+                    there_s: Some(3),
+                },
+                at,
+            );
+            let decided = (0..500)
+                .find_map(|_| {
+                    let decided = hello.turn(at, 1_000_000, Room::Quiet, (Some(true), None));
+                    if decided.is_none() {
+                        std::thread::sleep(Duration::from_millis(2));
+                    }
+                    decided
+                })
+                .expect("decided");
+            assert_eq!(
+                (decided.decision.choice.as_str(), decided.line.guard),
+                ("say_now", None)
+            );
+        }
+    }
+
     fn decided(hello: &mut Hello, arrival: u64, now: Instant) -> Decided {
         hello.arrival(
             VoiceArrival {

@@ -11567,6 +11567,14 @@ fn conversation_with_gate_inner(
                     json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session,"told_who":told_who,"familiar":familiar}),
                 )?;
                 let turn = crate::person::told_who(turn, ticket.told_who(), here);
+                // And the part of the day from the lamp's own time, and a
+                // hello and the name only (the first builder, 30 Oct, on the
+                // launch testers' findings: "Evening" at 15:42).
+                let turn = crate::person::told_hello(
+                    turn,
+                    ticket.told_who(),
+                    crate::local_time::hello_told_here,
+                );
                 snapshot = commit_written_turn(
                     owner,
                     reply,

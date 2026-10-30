@@ -592,7 +592,7 @@ pub fn by_default(name: &str) -> String {
 pub const OFTEN: &str = "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)";
 
 /// What a skill's note is told about the person at the lamp now (#2825), so
-/// that Welcome back's "by name if you know it" greets a known face by name
+/// that Welcome back's "their name if you know it" greets a known face by name
 /// and someone who comes by often one beat warmer, as the voice's own hello
 /// did: the known face's name (`known_faces::note`), and [`OFTEN`] for a
 /// remembered person Mood calls `regular` or `close`. Nothing for nobody
@@ -626,6 +626,16 @@ pub fn told_who(
         Some((known, familiar)) if who => turn + &at_the_lamp(known.as_deref(), familiar),
         _ => turn,
     }
+}
+
+/// A say's turn, told after [`told_who`] the part of the day and to say a
+/// hello and the name only (`hello`, [`crate::local_time::hello_told`])
+/// when its skill asked (`who`: Welcome back alone), whether or not anyone
+/// is at the lamp; the first builder, 30 Oct, on the launch testers'
+/// findings. Any other skill's note: the turn as it came, and `hello` is
+/// never worked out.
+pub fn told_hello(turn: String, who: bool, hello: impl FnOnce() -> String) -> String {
+    if who { turn + &hello() } else { turn }
 }
 
 /// What a say's `skill_says` record keeps of [`told_who`] (#2831): whether
@@ -883,6 +893,22 @@ mod tests {
             "Watch the room."
         );
         assert_eq!(told_who("Greet them.".into(), true, None), "Greet them.");
+    }
+
+    /// The first builder, 30 Oct: a hello's note is told the part of the
+    /// day and to say a hello and the name only; another skill's note is
+    /// the turn byte for byte, its hello never worked out.
+    #[test]
+    fn only_a_note_that_asked_is_told_the_part_of_the_day() {
+        let hello = || "\n\n(It is the afternoon here now.)".to_owned();
+        assert_eq!(
+            told_hello("Greet them.".into(), true, hello),
+            "Greet them.\n\n(It is the afternoon here now.)"
+        );
+        assert_eq!(
+            told_hello("Watch the room.".into(), false, || unreachable!()),
+            "Watch the room."
+        );
     }
 
     fn file(name: &str, text: &[u8]) -> std::path::PathBuf {
