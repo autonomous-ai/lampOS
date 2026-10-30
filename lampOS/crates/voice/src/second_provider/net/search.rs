@@ -79,6 +79,10 @@ pub(crate) const OWN_PRICE_NOTE: &str = "This is Autonomous's own product page, 
 /// Told with an Autonomous page whose price could not be read.
 pub(crate) const OWN_PRICE_UNREAD_NOTE: &str = "No price could be read from Autonomous's own page just now: give none from a search or another site; they can see it on autonomous.ai.";
 
+/// Told with a search's results and the price the lamp read on the
+/// Autonomous product page among them.
+pub(crate) const SEARCHED_OWN_PRICE_NOTE: &str = "The price here is the one Autonomous's own product page shows, read just now: give it for that product, never a price in the results. A price for anything else found by a search may be out of date: if you give one, say it may have changed. If they are looking at the page and see another price, believe them and never argue.";
+
 impl Search {
     /// DeepSeek's Search & Fetch API.
     pub fn deepseek(key: &str) -> Result<Self> {
@@ -181,7 +185,14 @@ impl Search {
         };
         let (url, header, body) = self.search_request(query);
         match tokio::time::timeout(WITHIN, self.ask(&url, header, &body)).await {
-            Ok(Ok(answer)) => results(&answer, query),
+            Ok(Ok(answer)) => {
+                let told = results(&answer, query);
+                with_own_price(
+                    told,
+                    |own| async move { own_price(&self.client, &own).await },
+                )
+                .await
+            }
             Ok(Err(error)) => json!({"error": format!("the search failed: {error}")}),
             Err(_) => json!({"error": "the search did not answer in time"}),
         }
@@ -259,10 +270,52 @@ fn fetch_told(fetched: std::result::Result<Result<Value>, tokio::time::error::El
     }
 }
 
+/// A search speaking of a price (`results` gave it the note) with a result
+/// on our own site carries that page's price, read by `read` at once,
+/// within [`WITHIN`], so the model needn't fetch the page to give it. On
+/// lamp-4ace on 31 Oct (build 9063) "How much is the Autonomous ErgoChair
+/// Pro?" was answered "449 euro on Autonomous's own page" from a search's
+/// text, with no `fetch_page`; the page said $499.
+async fn with_own_price<F>(mut told: Value, read: impl FnOnce(String) -> F) -> Value
+where
+    F: std::future::Future<Output = Option<Value>>,
+{
+    if told.get("note").is_none() {
+        return told;
+    }
+    let Some(own) = told["results"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find_map(|result| result["url"].as_str().and_then(own_page))
+    else {
+        return told;
+    };
+    match tokio::time::timeout(WITHIN, read(own)).await {
+        Ok(Some(price)) => {
+            told["price"] = price;
+            told["note"] = SEARCHED_OWN_PRICE_NOTE.into();
+        }
+        _ => told["note"] = format!("{SEARCHED_PRICE_NOTE} {OWN_PRICE_UNREAD_NOTE}").into(),
+    }
+    told
+}
+
 /// The address the lamp reads an Autonomous page at itself: https on
 /// `OWN_SITE` (the bare `autonomous.ai` moved there, as it redirects),
-/// with its path and query; `None` for any other site, a relay's included.
+/// with its path, less a locale's segment, and query; `None` for any other
+/// site, a relay's included.
 fn own_page(url: &str) -> Option<String> {
+    own_address(url, true)
+}
+
+/// [`own_page`], keeping a locale's segment when `drop_locale` is false.
+/// Our site's locale pages (`/de-DE/…`, `/en-GB/…`) give their own
+/// currency's price, 534.31 EUR and 466.8 GBP for the ErgoChair Pro on 31
+/// Oct against the default page's 499 USD, so a page found or asked for is
+/// read at its default address. A redirect our site sends is followed as
+/// it is (`own_redirect`).
+fn own_address(url: &str, drop_locale: bool) -> Option<String> {
     let url = reqwest::Url::parse(url).ok()?;
     if !matches!(url.scheme(), "http" | "https")
         || !matches!(url.host_str(), Some("autonomous.ai" | OWN_SITE))
@@ -274,7 +327,22 @@ fn own_page(url: &str) -> Option<String> {
         .query()
         .map(|query| format!("?{query}"))
         .unwrap_or_default();
-    Some(format!("https://{OWN_SITE}{}{query}", url.path()))
+    let mut path = url.path();
+    if drop_locale
+        && let Some((locale, rest)) = path.trim_start_matches('/').split_once('/')
+        && is_locale(locale)
+    {
+        path = &path[path.len() - rest.len() - 1..];
+    }
+    Some(format!("https://{OWN_SITE}{path}{query}"))
+}
+
+/// A locale's path segment on our site: two letters, a dash, two letters.
+fn is_locale(segment: &str) -> bool {
+    let bytes = segment.as_bytes();
+    bytes.len() == 5
+        && bytes[2] == b'-'
+        && [0, 1, 3, 4].iter().all(|&i| bytes[i].is_ascii_alphabetic())
 }
 
 /// The price an Autonomous product page at `url` shows, read from its own
@@ -321,7 +389,7 @@ async fn own_price_by(
 /// against `from`, only while it stays on our own site ([`own_page`]).
 fn own_redirect(from: &str, location: &str) -> Option<String> {
     let next = reqwest::Url::parse(from).ok()?.join(location).ok()?;
-    own_page(next.as_str())
+    own_address(next.as_str(), false)
 }
 
 /// The price a product page's schema.org data (`application/ld+json`) gives
@@ -551,6 +619,29 @@ mod tests {
                 "http://autonomous.ai/standing-desks/smartdesk-pro?color=white",
                 Some("https://www.autonomous.ai/standing-desks/smartdesk-pro?color=white"),
             ),
+            // A locale's page is read at the default page, its price in the
+            // default page's currency (lamp-4ace, 31 Oct: 449 euro said).
+            (
+                "https://www.autonomous.ai/de-DE/office-chairs/ergonomic-chair",
+                Some("https://www.autonomous.ai/office-chairs/ergonomic-chair"),
+            ),
+            (
+                "https://www.autonomous.ai/en-GB/standing-desks/smartdesk-pro?color=white",
+                Some("https://www.autonomous.ai/standing-desks/smartdesk-pro?color=white"),
+            ),
+            (
+                "https://www.autonomous.ai/de-DE/",
+                Some("https://www.autonomous.ai/"),
+            ),
+            // Not a locale: five characters without the dash, or a page alone.
+            (
+                "https://www.autonomous.ai/desks/smartdesk",
+                Some("https://www.autonomous.ai/desks/smartdesk"),
+            ),
+            (
+                "https://www.autonomous.ai/de-DE",
+                Some("https://www.autonomous.ai/de-DE"),
+            ),
             ("https://campaign-api.autonomous.ai/api/v1/ai", None),
             ("https://autonomous.ai.example.invalid/chair", None),
             ("https://notautonomous.ai/chair", None),
@@ -648,6 +739,79 @@ mod tests {
         assert_eq!(
             results(&plain, "how much is a SmartDesk")["note"],
             SEARCHED_PRICE_NOTE
+        );
+    }
+
+    /// A search speaking of a price with a result on our own site carries
+    /// that page's price, read at its default address (lamp-4ace on 31 Oct:
+    /// "449 euro on Autonomous's own page" from a search's text, with no
+    /// `fetch_page`); with no price read it says to give none from the
+    /// results; a search not about a price, or with no own page, reads none.
+    #[tokio::test]
+    async fn a_priced_search_reads_our_own_pages_price_itself() {
+        let answer = json!({"results": [
+            {"title": "ErgoChair Pro - Autonomous", "summary": "Now €449.", "url": "https://www.autonomous.ai/de-DE/office-chairs/ergonomic-chair"},
+            {"title": "Review", "summary": "A good chair.", "url": "https://reviews.invalid/chair"},
+        ]});
+        let read = std::sync::Mutex::new(Vec::new());
+        let price = json!({"product": "ErgoChair Pro", "currency": "USD", "price": 499});
+        let told = with_own_price(results(&answer, "how much is the ErgoChair Pro"), |own| {
+            read.lock().unwrap().push(own);
+            std::future::ready(Some(price.clone()))
+        })
+        .await;
+        assert_eq!(
+            *read.lock().unwrap(),
+            ["https://www.autonomous.ai/office-chairs/ergonomic-chair"]
+        );
+        assert_eq!(told["price"], price);
+        assert_eq!(told["note"], SEARCHED_OWN_PRICE_NOTE);
+        assert_eq!(told["results"].as_array().unwrap().len(), 2);
+        // Not read: the note says to give none from the search.
+        let told = with_own_price(results(&answer, "how much is the ErgoChair Pro"), |_| {
+            std::future::ready(None)
+        })
+        .await;
+        assert!(told.get("price").is_none());
+        assert_eq!(
+            told["note"],
+            format!("{SEARCHED_PRICE_NOTE} {OWN_PRICE_UNREAD_NOTE}")
+        );
+        // Not about a price, or no page of ours: nothing is read.
+        let plain = json!({"results": [{"title": "Autonomous", "summary": "Makers of desks.", "url": "https://www.autonomous.ai/about"}]});
+        let untouched = results(&plain, "who makes the SmartDesk");
+        assert_eq!(
+            with_own_price(
+                untouched.clone(),
+                |_| -> std::future::Ready<Option<Value>> { panic!("read") }
+            )
+            .await,
+            untouched
+        );
+        let elsewhere = json!({"results": [{"title": "Aeron", "summary": "$1,895.", "url": "https://store.invalid/aeron"}]});
+        let priced = results(&elsewhere, "how much is an Aeron");
+        assert_eq!(
+            with_own_price(priced.clone(), |_| -> std::future::Ready<Option<Value>> {
+                panic!("read")
+            })
+            .await,
+            priced
+        );
+    }
+
+    /// A read that doesn't come within `WITHIN` is no price.
+    #[tokio::test(start_paused = true)]
+    async fn an_own_price_slower_than_the_bound_is_none() {
+        let answer = json!({"results": [{"title": "SmartDesk", "summary": "$399", "url": "https://www.autonomous.ai/standing-desks/smartdesk-pro"}]});
+        let told = with_own_price(results(&answer, "SmartDesk price"), |_| async {
+            tokio::time::sleep(WITHIN + Duration::from_millis(1)).await;
+            Some(json!({"product": "SmartDesk", "currency": "USD", "price": 399}))
+        })
+        .await;
+        assert!(told.get("price").is_none());
+        assert_eq!(
+            told["note"],
+            format!("{SEARCHED_PRICE_NOTE} {OWN_PRICE_UNREAD_NOTE}")
         );
     }
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -770,6 +934,12 @@ mod tests {
             (
                 "http://autonomous.ai/office-chairs/ergonomic-chair",
                 Some("https://www.autonomous.ai/office-chairs/ergonomic-chair"),
+            ),
+            // A redirect our site sends is followed as it is, a locale's too,
+            // so it can't be sent back to where it came from.
+            (
+                "/de-DE/office-chairs/ergonomic-chair",
+                Some("https://www.autonomous.ai/de-DE/office-chairs/ergonomic-chair"),
             ),
             ("https://shop.example.invalid/chair", None),
             ("https://campaign-api.autonomous.ai/api", None),
