@@ -337,3 +337,14 @@ Ready for lamp-voice: yes (#4604, behind `LAMP_WINDOW_FROM_START`, off; Part of 
 - Reviewer-two's HOLD (no switch) answered with the switch; the census and promote `notes` tests caught two missing pieces (process.rs pass list, the plain line).
 - Gate on 798bbec50f: voice lib 4274/4 before the census fix (3 known motor flakes, #1569, and the census test, then 45/0 on `process::`); lamp-update lib 352/0; clippy, fmt, workspace build clean. Merged in train 423.
 - Played check (owner, companion, busy_day, off against on) asked as `4ACE RUN #4604`.
+
+### #4595, the lamp never agrees to what it has no tool for (#4629, #4638)
+
+Ready for lamp-voice: yes (#4629 and #4638, no new switch; Part of #4595)
+
+- Launch lamps said "Rest well" with no `go_to_sleep` and "OK" to "I'm unplugging you" with no `prepare_to_unplug`.
+- Without each function, the session is told never to agree, and what to say: a hand 3 s on the head for sleep; for unplugging, the app's off button with `LAMP_SHUTDOWN=on`, otherwise that pulling the plug is the only way for now.
+- Live via `session_tools`, the second route's spoken turns, and (#4638) its texts; `LAMP_SHUTDOWN` reaches the provider worker as `--shutdown-from-app`.
+- Train 424 merged #4629's first commit only; the texts fix came as #4638 by cherry-pick, merged in train 426.
+- Gate on f40871a154: the focused voice lib tests 992/0; earlier on #4629: voice lib 4281/3 (known motor flakes, #1569), lamp-update 352/0, clippy, fmt, workspace build clean.
+- Played lines for each case asked as `4ACE RUN #4638`.
