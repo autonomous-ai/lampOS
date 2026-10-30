@@ -173,9 +173,10 @@ fn said_words(source: &str, at: usize) -> Option<String> {
 
 /// Every line a round says with words of its own (`Round::say` in
 /// `round.rs`) has a row in `docs/updates.md`'s "Every line a round says":
-/// the row holds its longest fixed piece, the words between its
-/// placeholders. Run sheets grep these lines on lamps (#4672, #4680), and on
-/// 31 Oct 34 of the round's 41 had no row.
+/// one row holds each of its fixed pieces, the words between its
+/// placeholders, in order (Fourth's P3 on #4688: the longest alone was a
+/// common word for five lines). Run sheets grep these lines on lamps
+/// (#4672, #4680), and on 31 Oct 34 of the round's 41 had no row.
 #[test]
 fn every_line_a_round_says_has_a_row_in_updates_md() {
     let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -192,13 +193,27 @@ fn every_line_a_round_says_has_a_row_in_updates_md() {
             continue;
         };
         lines += 1;
-        let piece = words
+        let pieces: Vec<&str> = words
             .split(['{', '}'])
             .step_by(2)
             .map(|piece| piece.trim_matches(|c: char| c.is_whitespace() || ",;:".contains(c)))
-            .max_by_key(|piece| piece.len())
-            .unwrap_or_default();
-        if !table.contains(piece) {
+            .filter(|piece| piece.len() >= 3)
+            .collect();
+        let in_order = |row: &str| {
+            let mut from = 0;
+            pieces.iter().all(|piece| match row[from..].find(piece) {
+                Some(at) => {
+                    from += at + piece.len();
+                    true
+                }
+                None => false,
+            })
+        };
+        if !table
+            .lines()
+            .filter(|row| row.starts_with('|'))
+            .any(in_order)
+        {
             unnamed.push(words);
         }
     }
