@@ -1409,11 +1409,15 @@ struct LedgerSpeaker {
 
 impl LedgerSpeaker {
     fn new(owner: &mut Controller) -> Self {
-        let mut guard =
-            lamp_turn_owner::BoundaryGuard::new(owner.snapshot(now()).unwrap().boot(), now());
-        guard
-            .install(now(), owner.snapshot(now()).unwrap())
-            .unwrap();
+        let boot = owner.snapshot(now()).unwrap().boot();
+        // One reading for the snapshot and its install: the install's own
+        // `now()`, read first, could be a microsecond before the snapshot's,
+        // and the guard refuses a snapshot issued after the install's time
+        // (`FutureState`, 2 of 11 runs on a Mac, and #4607's ARM64;
+        // Seventh's 19:01 on #3997).
+        let at = now();
+        let mut guard = lamp_turn_owner::BoundaryGuard::new(boot, at);
+        guard.install(at, owner.snapshot(at).unwrap()).unwrap();
         Self {
             guard,
             ledger: lamp_audio::ownership::PlaybackOwnership::new(),
