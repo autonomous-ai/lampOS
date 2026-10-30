@@ -140,7 +140,7 @@ Harness service `install` set up, #934; Nine on #1016), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
 16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
 name (`/etc/lampOS/person/name`), the owner's place from the app
-(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
+(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`) and the owner's developer setting, its drop-in (`/etc/systemd/system/lamp-control.service.d/developer.conf`, `control.set`), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
 the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts (the servos' daily load and temperature peaks in
@@ -635,9 +635,10 @@ left as a setup with the new value leaves them. Wi-Fi is #1959's second piece.
 each connection (`lamp-setup-change@.service`), with the connection as its
 standard input and output. It reads one line (at most 4 KiB), answers
 `{"done": …}` or `{"refused": why}` on one line, and exits, unless a zone
-or the language changed (below). It checks every request itself, whoever
-connects: exactly one of `{"person_name": s}`, `{"display_name": s}`,
-`{"timezone": s}`, `{"language": s}` or `{"owner_place": …}` (the table below).
+or the language changed, or developer access (below). It checks every
+request itself, whoever connects: exactly one of `{"person_name": s}`,
+`{"display_name": s}`, `{"timezone": s}`, `{"language": s}`,
+`{"owner_place": …}` or `{"control": bool}` (the table below).
 Without `--enable` every request is refused, "changes after setup are off",
 and nothing is written. **Only `lamp-cloud` may ask:** the socket's group lets
 a `lampos` process connect, and the helper then takes its peer's credentials
@@ -673,6 +674,7 @@ own switches' (`LAMP_APP_RESTART`, `LAMP_SHUTDOWN`; cloud.md).
 | The time zone | an IANA name the lamp's zone data has (`zone_known`, as setup) **and** the parts' bundled zone data has, else refused, so `zone.env` and `/etc/localtime` never disagree | `/etc/localtime`, `/etc/timezone` and `/etc/lampOS/zone.env`, as setup writes them | the voice, memory, Expression and skills follow `/etc/localtime` at each reading. `lamp-schedule` takes `LAMP_ZONE` at start, so after a zone that changed `zone.env` the helper waits for the lamp to be quiet, as an update does before it restarts the voice (`lamp_update::quiet`: resting, nobody heard and nothing said for 45 s), then for no update at work, taking lamp-update's lock and holding it through `systemctl try-restart lamp-schedule.service` (`change::quiet_and_unlocked`): a round puts its build back when a unit it restarted changes process in its watch (`updates.md` step 9), so the zone's restart never falls in one; while an update holds the lock it looks again 10 s later, after the quiet again. The zone's files are written before the wait, so a round running then reads the new `zone.env` at its own restart of `lamp-schedule`, which is the person's zone, with no extra restart in its watch; and a round `serve` starts while the helper holds the lock (a few seconds, as for the app's restart and shutdown) ends `not-quiet` ("another lamp-update is at work"), as after no quiet moment, so neither the app's update page nor an update alert says it failed, and the next round tries again (Second's and Reviewer-two's P3s on #4490; `updates.md`). It waits at most 30 minutes in all; then schedule keeps the old zone until it next starts, and the journal says so. Reminders already set keep the zone they were set in (`schedule.md`) |
 | The owner's language (#4473, `language.set`) | exactly `en`, `vi`, `ja`, `zh` or `ko`, else refused, "language must be one of en, vi, ja, zh, ko", with the file untouched. lamp-update's lock is taken first, as the app's restart takes it: held by an update, refused with the restart's words ("an update is being installed: try again once it is done") and nothing written, so no round's watch sees the voice restart; otherwise held through the write and the voice's restart, and let go at once when the language is the same | `/etc/lampOS/setup/language`, 644 root, one line, staged and renamed into place as setup writes it, before the answer, so `host.language` reads it at once | the voice reads it at start (`LAMP_LANGUAGE_FILE`), so after a language that changed the file the helper waits for the voice to rest between turns (5 s resting, nobody heard, nothing said; at most 45 s, then all the same, as the app's restart) and runs `systemctl try-restart lamp-voice.service`. The same language again restarts nothing. `lamp-cloud` keeps running, so `system.info`, `mic.get` and the link stay answered through it |
 | The owner's place (#4333, [owner-place.md](owner-place.md); a set sent by `lamp-cloud` only with `LAMP_OWNER_PLACE=on`, a clear whatever it is, #4356) | `{"owner_place": {"name", "lat", "lon", "set_at"}}`: rounded again here to about a kilometre (`lamp_msgs::owner_place::fit`), the name as the person's name's rule, `set_at` ISO 8601 UTC; `{"owner_place": null}` clears it | `/etc/lampOS/person/place`, beside the name, 600 root, one JSON line; removed for `null`, and a clear with none kept is no error. The journal says only that it was set or cleared | the voice reads it again for each line that needs a place: nothing restarts |
+| The owner's developer setting (`control.set`, [control.md](control.md)) | `{"control": bool}`, a boolean only | on: `/etc/systemd/system/lamp-control.service.d/developer.conf` (`control_dropin` in the settings), 644 root, exactly `[Service]` and `Environment=LAMP_CONTROL=on`, written beside and renamed into place, its folder made; off: removed, and none there is no error. Only a change asks for a restart; the journal says "developer access is on" or "off" (with "already" when nothing changed) | never waits for quiet (lamp-control's restart makes no sound), only for lamp-update's lock (`change::unlocked`). **On:** written and answered, then the lock (looked for every 10 s, at most 30 minutes, else lamp-control follows at its next start) held through `systemctl daemon-reload` and `systemctl restart lamp-control.service` (restart, so an enabled unit that exited off starts): the door opens within moments after `success`, or once an update finishes (`change::restart_control_when_unlocked`). **Off with the drop-in there:** closed before the answer (`change::close_before_answer`): the lock first (every 1 s, at most 8 s, under lamp-cloud's 10 s wait; else refused, "an update is installing: try again in a few minutes", the drop-in kept), then, holding it, the drop-in removed, `systemctl daemon-reload` and `systemctl stop lamp-control.service`, and only then `{"done": {"on": false, "closed": true}}`; a stop that fails answers `"closed": false` with a note that the door may stay open until the lamp next restarts. **Off with none there:** a plain `{"done": {"on": false}}`, no systemctl. A reset wipes the drop-in |
 
 Tests (`crates/setup/tests/it/change.rs`): each change's files, modes and reply;
 a name removed; a rename to nothing refused; each language written and a
@@ -684,9 +686,12 @@ change, refused without echoing them; the quiet wait (45 s resting, 45 s after
 a turn, a conversation that never ends and a voice that says nothing given up
 at the bound); the binary on standard input and output with a journal line
 holding no name; the product's reset wiping the lamp's name and keeping
-the language and the zone, and the units running the helper. The three
-tests under lamp-update's lock (the zone's restart, the app's restart and
-shutdown, and a new language) are in `crates/setup/tests/update_lock.rs`, a
+the language and the zone, and the units running the helper; the developer
+setting's drop-in written, removed and refused. The tests under
+lamp-update's lock (the zone's restart, the app's restart and shutdown, a
+new language, and the developer setting's lock wait, close before the
+answer, refusal under an update and restart once unlocked) are in
+`crates/setup/tests/update_lock.rs`, a
 binary of their own: they let go of the lock and take it again at once, and
 on macOS a non-blocking `flock` on a lock nobody held was turned down now and
 then while the `it` binary's other tests were busy with files (#1569). Not run
@@ -1155,6 +1160,7 @@ readlink /etc/localtime
 | `/etc/lampOS/setup/reports.json` (the answer on reports, #1683) | 644 root, at every setup, a no included, unless the write failed | wiped |
 | `/etc/lampOS/setup/display-name` (the lamp's name in the app, #1959) | not written by setup; 644 root after a `device.rename` from the app | wiped |
 | `/etc/lampOS/voice/own` (the person's own keys, #2094) | absent; with `LAMP_OWN_KEYS=on` (off in the product), a 700 root folder with each key that worked when checked, 600 | wiped |
+| `/etc/systemd/system/lamp-control.service.d/developer.conf` (the owner's developer setting, `control.set`, docs/control.md) | absent; 644 root while developer access is on in the app | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
 
 Setup saves them in this order: the name, the zone, the language, the backend's link, the

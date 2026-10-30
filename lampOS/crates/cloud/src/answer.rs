@@ -266,7 +266,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 58] = [
+pub const KINDS: [(&str, Switch); 59] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -299,6 +299,7 @@ pub const KINDS: [(&str, Switch); 58] = [
     (crate::settings::KINDS[1], SETTINGS),
     (crate::settings::KINDS[2], SETTINGS),
     (crate::settings::KINDS[3], SETTINGS),
+    (crate::settings::KINDS[4], SETTINGS),
     (crate::settings::PLACE_KINDS[0], PLACE),
     (crate::settings::PLACE_KINDS[1], PLACE),
     ("faces.add_photo", |lamp| lamp.photos().is_some()),
@@ -1207,6 +1208,7 @@ pub mod tests {
         for kind in [
             "device.soft_reset",
             "device.rename",
+            "control.set",
             "add_channel",
             "skills.install_store",
             "face.enroll",
@@ -1313,6 +1315,7 @@ pub mod tests {
                     "person.name.set",
                     "device.rename",
                     "language.set",
+                    "control.set",
                     "wifi.set",
                     "wifi.confirm",
                 ],
@@ -1325,6 +1328,7 @@ pub mod tests {
                     "person.name.set",
                     "device.rename",
                     "language.set",
+                    "control.set",
                     "keys.set",
                     "keys.remove",
                     "keys.get",
@@ -1341,6 +1345,7 @@ pub mod tests {
                     "person.name.set",
                     "device.rename",
                     "language.set",
+                    "control.set",
                     "owner.place",
                     "owner.place.clear",
                 ],

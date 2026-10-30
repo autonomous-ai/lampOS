@@ -633,8 +633,21 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             }
         };
     }
-    // A new language holds lamp-update's lock through the voice's restart.
-    let (reply, done, _lock) = change::answer_holding(&line, &config, enabled, &records);
+    // Developer access turned off with its drop-in there: the door is closed
+    // (lamp-update's lock, the drop-in removed, reload, stop) before the
+    // reply is written. Every other change is answered first, and a new
+    // language holds lamp-update's lock through the voice's restart.
+    let (reply, done, _lock) = match change::close_before_answer(
+        &line,
+        &config,
+        enabled,
+        &records,
+        &mut change::Clock::default(),
+        &mut change::Systemctl,
+    ) {
+        Some((reply, done)) => (reply, done, None),
+        None => change::answer_holding(&line, &config, enabled, &records),
+    };
     {
         let mut out = io::stdout().lock();
         writeln!(out, "{reply}")?;
@@ -647,6 +660,16 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             eprintln!("lamp-setup: change refused: {}", why.as_str().unwrap_or(""))
         }
         _ => {}
+    }
+    // lamp-control first: no quiet, only no update at work, since its
+    // restart makes no sound.
+    if done.as_ref().is_some_and(|done| done.restart_control) {
+        let said = change::restart_control_when_unlocked(
+            &mut change::Clock::default(),
+            &records,
+            &mut change::Systemctl,
+        );
+        eprintln!("lamp-setup: change: {said}");
     }
     let Some(done) = done.filter(|done| done.restart_schedule || done.restart_voice) else {
         return Ok(true);

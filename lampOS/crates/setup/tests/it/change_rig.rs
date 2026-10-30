@@ -50,6 +50,7 @@ impl Root {
             "reports": self.0.join("etc/reports.json"),
             "display_name": self.0.join("etc/display-name"),
             "language": self.0.join("etc/setup/language"),
+            "control_dropin": self.0.join("etc/systemd/system/lamp-control.service.d/developer.conf"),
         }))
         .unwrap()
     }
