@@ -46,6 +46,7 @@ fn round_muted(lamp: &mut Lamp, mute: Option<VoiceMute>) -> Outcome {
             ears: &mut ears,
             disk: &disk,
             clock: &clock,
+            harness: &mut lamp.harness,
             say: &mut |line| lamp.said.push(line.to_owned()),
             phase: &mut |phase| lamp.phases.push(phase),
         },

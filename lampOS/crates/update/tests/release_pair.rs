@@ -383,6 +383,7 @@ impl Fixture {
             settings,
             image: Vec::new(),
             reset_plan: None,
+            harness: false,
         };
         write(
             &payload.join("channel/lampos-manifest.json"),

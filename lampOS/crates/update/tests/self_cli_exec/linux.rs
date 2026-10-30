@@ -195,6 +195,7 @@ impl Fixture {
             settings: Vec::new(),
             image: Vec::new(),
             reset_plan: None,
+            harness: false,
         };
         fs::write(
             channel.join(manifest::ENVELOPE),

@@ -15,7 +15,7 @@ use lamp_update::{
     own,
     quiet::Heard,
     round, unit,
-    world::{self, Clock, Disk, Ears, Systemd},
+    world::{self, Clock, Disk, Ears, Harness, Systemd},
 };
 use ring::{
     rand::SystemRandom,
@@ -50,6 +50,8 @@ mod head_touch;
 #[path = "round/asleep_quiet.rs"]
 mod asleep_quiet;
 
+#[path = "round/harness.rs"]
+mod harness;
 #[path = "round/product_adds.rs"]
 mod product_adds;
 #[path = "round/product_carrier.rs"]
@@ -421,6 +423,54 @@ impl Systemd for FakeSystemd {
     }
 }
 
+/// Harness as a round sees it (#3693): each step it was asked for, said
+/// in the lamp's calls too, and switches to make a step fail or to have
+/// Harness there already.
+#[derive(Default)]
+struct FakeHarness {
+    calls: Rc<RefCell<Vec<String>>>,
+    asked: Vec<&'static str>,
+    present: bool,
+    fetch_fails: bool,
+    link_fails: bool,
+}
+
+impl FakeHarness {
+    fn ask(&mut self, step: &'static str) {
+        self.asked.push(step);
+        self.calls.borrow_mut().push(format!("harness {step}"));
+    }
+}
+
+impl Harness for FakeHarness {
+    fn present(&self) -> bool {
+        self.present
+    }
+
+    fn fetch(&mut self) -> Result<(), String> {
+        self.ask("fetch");
+        if self.fetch_fails {
+            return Err("curl: (6) Could not resolve host".into());
+        }
+        Ok(())
+    }
+
+    fn link(&mut self) -> Result<(), String> {
+        self.ask("link");
+        if self.link_fails {
+            return Err("harness service install failed".into());
+        }
+        self.present = true;
+        Ok(())
+    }
+
+    fn off(&mut self) -> Result<(), String> {
+        self.ask("off");
+        self.present = false;
+        Ok(())
+    }
+}
+
 struct FakeDisk(u64);
 
 impl Disk for FakeDisk {
@@ -494,6 +544,7 @@ struct Lamp {
     key: Ed25519KeyPair,
     channel: FakeChannel,
     systemd: FakeSystemd,
+    harness: FakeHarness,
     calls: Rc<RefCell<Vec<String>>>,
     now: Rc<Cell<u64>>,
     talking: Option<Talk>,
@@ -618,6 +669,10 @@ impl Lamp {
             key,
             channel: FakeChannel::default(),
             systemd,
+            harness: FakeHarness {
+                calls: Rc::clone(&calls),
+                ..FakeHarness::default()
+            },
             calls,
             now,
             talking: None,
@@ -690,6 +745,7 @@ impl Lamp {
             settings: Vec::new(),
             image: Vec::new(),
             reset_plan: None,
+            harness: false,
         }
     }
 
@@ -722,6 +778,7 @@ impl Lamp {
             ears: &mut ears,
             disk: &disk,
             clock: &clock,
+            harness: &mut self.harness,
             say: &mut say,
             phase: &mut phase,
         };
@@ -3190,6 +3247,7 @@ impl Lamp {
             ears: &mut ears,
             disk: &disk,
             clock: &clock,
+            harness: &mut self.harness,
             say: &mut say,
             phase: &mut |_| {},
         };

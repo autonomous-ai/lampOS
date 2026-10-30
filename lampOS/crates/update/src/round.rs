@@ -30,7 +30,7 @@
 use crate::{
     added, apply, companion,
     fetch::{Channel, Fetch},
-    image,
+    image, install,
     judge::{Before, UnitState, Watch, part_of},
     manifest::{self, Manifest, Model, Opened, TooOld},
     models::{self, ModelBack, Need},
@@ -43,7 +43,7 @@ use crate::{
         sync_folder, sync_parent, write_whole,
     },
     unit::{self, Program},
-    world::{Clock, Disk, Ears, Systemd},
+    world::{Clock, Disk, Ears, Harness, Systemd},
 };
 use ring::digest;
 use std::{
@@ -131,6 +131,8 @@ pub struct World<'a> {
     pub ears: &'a mut dyn Ears,
     pub disk: &'a dyn Disk,
     pub clock: &'a dyn Clock,
+    /// Harness, for a build that turns it on (#3693).
+    pub harness: &'a mut dyn Harness,
     /// One line for a person: the journal.
     pub say: &'a mut dyn FnMut(&str),
     /// Where the round is, one of `lamp_msgs::UpdateStatus::NOW`, for
@@ -425,6 +427,8 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         rollback_order: None,
         held: None,
         apply_failed: false,
+        harness_to_link: false,
+        harness_linked: false,
     };
     if !config.apply {
         let state = run.records.peek_state();
@@ -544,6 +548,12 @@ struct Run<'r, 'w> {
     /// This round's `apply` of the build's settings failed: a writer not yet
     /// proved is put back after the apply's own undo (crate::writer_swap).
     apply_failed: bool,
+    /// The build turns Harness on, and its installer ran this round with
+    /// none at `install::HARNESS` before (#3693): the switch links it.
+    harness_to_link: bool,
+    /// The switch may have linked Harness (#3693), as its journal says: a
+    /// put-back undoes it.
+    harness_linked: bool,
 }
 
 /// A unit as it is to be put back.
@@ -795,13 +805,78 @@ impl Run<'_, '_> {
         if let Err(outcome) = self.skills_still_load(&manifest, &changes, placing.as_ref()) {
             return outcome;
         }
+        let alone =
+            changes.is_empty() && self.placings.is_empty() && self.setting_writes.is_empty();
+        // Harness alone never makes a switch: a build that places only
+        // skills leaves it for a later build to bring (#3693).
+        if !alone {
+            self.fetch_harness(&manifest);
+        }
         (self.world.phase)("switching");
-        if changes.is_empty() && self.placings.is_empty() && self.setting_writes.is_empty() {
+        if alone {
             // Only the product skills change: lamp-skills reloads its
             // folder by itself, so nothing is restarted.
             return self.place_alone(&mut state, build, placing);
         }
         self.switch(&mut state, build, changes, placing)
+    }
+
+    /// Harness's own installer run for a build that turns it on, while the
+    /// build is fetched (#3693), when none is at `install::HARNESS`: one
+    /// already there is kept as it is. Nothing is linked yet. One that
+    /// cannot be fetched is said, and the build goes on without it: its
+    /// own switch is not refused for Harness.
+    fn fetch_harness(&mut self, manifest: &Manifest) {
+        if !manifest.harness || self.world.harness.present() {
+            return;
+        }
+        match self.world.harness.fetch() {
+            Ok(()) => self.harness_to_link = true,
+            Err(why) => self.say(&format!(
+                "Harness could not be fetched for this build: {why}; the build goes on without it"
+            )),
+        }
+    }
+
+    /// Harness linked and set to start at boot at the switch (#3693), with
+    /// install's record of it (`install::HARNESS_DONE`), so `harness-off`
+    /// undoes it as it undoes install's.
+    fn link_harness(&mut self) -> Result<(), String> {
+        self.world.harness.link()?;
+        let done = self.records.folder().join(install::HARNESS_DONE);
+        if !done.exists() {
+            write_whole(&done, install::harness_done_text().as_bytes(), 0o644)
+                .map_err(|error| format!("{}: {error}", done.display()))?;
+        }
+        self.say(&format!(
+            "Harness is linked at {} and starts at boot as {}",
+            install::HARNESS,
+            install::USER
+        ));
+        Ok(())
+    }
+
+    /// What the switch did for Harness undone on a put-back (#3693): the
+    /// tasks part stopped (it could not run before, with no Harness), then
+    /// Harness at boot and its link, and install's record of it. What fails
+    /// is said, and the rest of the put-back goes on.
+    fn harness_back(&mut self) {
+        if !std::mem::take(&mut self.harness_linked) {
+            return;
+        }
+        if let Err(why) = self.world.systemd.stop(install::TASKS_UNIT) {
+            self.say(&format!("{} cannot be stopped: {why}", install::TASKS_UNIT));
+        }
+        if let Err(why) = self.world.harness.off() {
+            self.say(&format!("Harness could not be turned off again: {why}"));
+        }
+        let done = self.records.folder().join(install::HARNESS_DONE);
+        match fs::remove_file(&done) {
+            Err(error) if error.kind() != io::ErrorKind::NotFound => {
+                self.say(&format!("{}: {error}", done.display()));
+            }
+            _ => {}
+        }
     }
 
     /// Each core skill's file put back over what the lamp did to it, said
@@ -2325,6 +2400,7 @@ impl Run<'_, '_> {
             models: self.model_backs.clone(),
             settings: !self.setting_writes.is_empty(),
             skills: skills.clone(),
+            harness: self.harness_to_link,
         };
         if let Err(error) = self
             .records
@@ -2333,6 +2409,7 @@ impl Run<'_, '_> {
         {
             return Outcome::Failed(format!("the journal cannot be written: {error}"));
         }
+        self.harness_linked = self.harness_to_link;
         // Head pins depend on the candidate units; other settings retain
         // their established apply-before-units ordering.
         let head_pins = changes.iter().any(|change| {
@@ -2395,6 +2472,14 @@ impl Run<'_, '_> {
                 return Outcome::Failed(format!("the units could not be put back: {error}"));
             }
             return Outcome::NotQuiet(format!("someone spoke as the switch began: {why}"));
+        }
+        // Harness linked once the units are written and it is still quiet,
+        // before any part restarts (#3693).
+        if self.harness_to_link
+            && let Err(why) = self.link_harness()
+        {
+            let why = format!("Harness could not be turned on: {why}");
+            return self.put_back(state, &build, &backs, None, why, String::new());
         }
         // The build's product skills, before any part is restarted: the new
         // lamp-skills starts on them, and a put-back restores them.
@@ -2471,6 +2556,24 @@ impl Run<'_, '_> {
                 return self.put_back(state, &build, &backs, Some(&unit), why, told);
             }
             watches.push(Watch::new(&back.unit, &back.part, back.before.clone()));
+        }
+        // The tasks part could not start without Harness: started now and
+        // watched with the rest, whether or not it was running (#3693).
+        if self.harness_to_link
+            && !watches
+                .iter()
+                .any(|watch| watch.unit == install::TASKS_UNIT)
+        {
+            let part = part_of(install::TASKS_UNIT.trim_end_matches(".service")).to_owned();
+            if let Err(why) = self.world.systemd.restart(install::TASKS_UNIT) {
+                let told = self.told(install::TASKS_UNIT);
+                return self.put_back(state, &build, &backs, Some(install::TASKS_UNIT), why, told);
+            }
+            watches.push(Watch::new(
+                install::TASKS_UNIT,
+                &part,
+                Before::of(&part, health.as_ref()),
+            ));
         }
         (self.world.phase)("watching");
         if let Err((unit, why, judged)) = self.watch(&mut watches) {
@@ -2580,6 +2683,7 @@ impl Run<'_, '_> {
             "putting build {} back: {why}{told}",
             build.sequence
         ));
+        self.harness_back();
         let (after, old, files_back) = self.restore(backs, failed);
         self.settings_now(state);
         if !files_back {
@@ -2775,6 +2879,7 @@ impl Run<'_, '_> {
         ));
         self.model_backs = journal.models.clone();
         self.applying = journal.settings.then_some(journal.build.sequence);
+        self.harness_linked = journal.harness;
         let mut backs = Vec::new();
         for switching in &journal.units {
             // A unit the switch added is put back by removing it, with what
@@ -2915,6 +3020,7 @@ impl Run<'_, '_> {
             settings: Vec::new(),
             image: Vec::new(),
             reset_plan: None,
+            harness: false,
         };
         match self.own_switch(&only_the_updater) {
             Ok(Some(Outcome::SelfSwitched { from, to, .. })) => Some(Outcome::Climbs {

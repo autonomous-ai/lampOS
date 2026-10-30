@@ -34,8 +34,8 @@ pub const SCHEMA: u32 = 1;
 /// 6: ordinary product service units carried under [`PRODUCT_LAMP`].
 /// 7: a part's templates, sockets and timers under it too
 /// (crate::companion). 8: a product unit the lamp lacks added
-/// (crate::added).
-pub const UPDATER: u64 = 8;
+/// (crate::added). 9: Harness turned on in the round (#3693).
+pub const UPDATER: u64 = 9;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
@@ -47,6 +47,9 @@ pub const COMPANIONS_UPDATER: u64 = 7;
 /// lacks: an older updater takes only the units a lamp has, so it climbs
 /// first. A round adds only from a build that asks for this level.
 pub const ADDS_UPDATER: u64 = 8;
+/// The level a build that turns Harness on needs (#3693): an older updater
+/// would take the build and leave Harness off, so it climbs first.
+pub const HARNESS_UPDATER: u64 = 9;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
@@ -226,6 +229,13 @@ pub struct Manifest {
     /// Boxed, so a manifest stays small beside [`TooOld`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reset_plan: Option<Box<Setting>>,
+    /// Harness turned on in the round, as `lamp-update harness-on` does
+    /// (#3693): its own installer run while the build is fetched, and its
+    /// link and Harness at boot at the switch, all undone on a put-back.
+    /// One already at `install::HARNESS` is kept as it is. Left out when
+    /// false, and not written.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub harness: bool,
 }
 
 /// One of the image's own files, for one variant of the lamp
@@ -863,6 +873,11 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
         check_hash_and_size(&unit.file_name(), &unit.sha256, unit.size, MOST_UNIT_BYTES)?;
     }
     check_models(manifest)?;
+    if manifest.harness && manifest.min_updater.unwrap_or(1) < HARNESS_UPDATER {
+        return Err(refused(format!(
+            "a build that turns Harness on needs min_updater {HARNESS_UPDATER} or more"
+        )));
+    }
     if !manifest.settings.is_empty() && manifest.min_updater.unwrap_or(1) < SETTINGS_UPDATER {
         return Err(refused(format!(
             "a build with settings needs min_updater {SETTINGS_UPDATER} or more"
@@ -1106,6 +1121,7 @@ mod tests {
             settings: Vec::new(),
             image: Vec::new(),
             reset_plan: None,
+            harness: false,
         }
     }
 
@@ -1169,6 +1185,38 @@ mod tests {
             .unwrap_err()
             .0;
         assert!(why.contains("needs updater 7"), "{why}");
+    }
+
+    /// #3693: a build that turns Harness on asks for updater 9, which an
+    /// older one climbs to first; left out, the field is not written.
+    #[test]
+    fn a_build_that_turns_harness_on_needs_the_harness_updater() {
+        let key = throwaway();
+        let mut build = manifest();
+        assert!(
+            !String::from_utf8(serde_json::to_vec(&build).unwrap())
+                .unwrap()
+                .contains("harness")
+        );
+        build.harness = true;
+        for level in [None, Some(ADDS_UPDATER)] {
+            build.min_updater = level;
+            let why = parse(&serde_json::to_vec(&build).unwrap()).unwrap_err().0;
+            assert!(
+                why.contains("a build that turns Harness on needs min_updater 9 or more"),
+                "{why}"
+            );
+            // Signed all the same, the lamp refuses it before any fetch.
+            let envelope = seal_unchecked(&serde_json::to_vec(&build).unwrap(), &key).unwrap();
+            assert!(open(&envelope, &public(&key)).is_err());
+        }
+        build.min_updater = Some(HARNESS_UPDATER);
+        assert_eq!(parse(&serde_json::to_vec(&build).unwrap()).unwrap(), build);
+        let envelope = seal(&serde_json::to_vec(&build).unwrap(), &key).unwrap();
+        let why = open_as(&envelope, &public(&key), HARNESS_UPDATER - 1)
+            .unwrap_err()
+            .0;
+        assert!(why.contains("needs updater 9"), "{why}");
     }
 
     #[test]

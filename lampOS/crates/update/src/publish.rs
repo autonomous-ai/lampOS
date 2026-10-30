@@ -232,6 +232,7 @@ pub fn make_with(
         settings,
         image,
         reset_plan: reset_plan.map(Box::new),
+        harness: false,
     };
     let mut bytes = serde_json::to_vec_pretty(&made).map_err(io::Error::other)?;
     bytes.push(b'\n');
