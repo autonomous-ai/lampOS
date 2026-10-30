@@ -435,11 +435,16 @@ class Lamp:
 
     # Requests.
 
-    async def request(self, op: str, **fields: Any) -> dict:
-        """Send one request and await its reply; a refusal raises its error."""
+    async def request(self, op: str, *, on_id: Callable[[int], None] | None = None, **fields: Any) -> dict:
+        """Send one request and await its reply; a refusal raises its error.
+        `on_id(id)` is told the request's id before it is sent, so a caller can
+        match a `done` (or any event naming it) that comes before the reply is
+        read."""
         _check(op, fields)
         id_ = self._next_id
         self._next_id += 1
+        if on_id is not None:
+            on_id(id_)
         future = asyncio.get_running_loop().create_future()
         self._waiting[id_] = future
         try:
