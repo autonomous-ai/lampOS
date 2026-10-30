@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-30 11:04 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-30 22:02 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 90.8% over 76 rows. Quality 68.4% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 91.9% over 76 rows. Quality 68.4% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -27,7 +27,7 @@ Written by the first builder from the team's review page at 2026-10-30 11:04 (+0
 | Sleep, and waking on its name | 1.00 | #749 #714 | fourth, second |  |
 | Reminders, timers, memory across days | 1.00 | #748 #743 | — |  |
 | Setup for a home, 5 s reset | 0.95 | #806 #1209 #2861 #3579 | first, el | 26 Oct 20:3x, up from 0.85: shown on lamp-52e6 with build 7071 (the lead’s agent, 20:10–20:28). |
-| A safe shutdown from the app and a long press | 0.70 | #3697 #3698 #3713 #3735 | fifth, mobile | 29 Oct 07:0x, up from 0.5: the app’s path through setup’s helper landed (#3735, train 324, stable in 8389: answered first, refused during an update), and the voice restarted under a shutdown is fixed (#3982, closed). |
+| A safe shutdown from the app and a long press | 0.85 | #3697 #3698 #3713 #3735 | fifth, mobile | 30 Oct 22:0x, up from 0.7: the app’s Turn off button meets its done-when on product lamp-0c89 (three taps, each a clean off and a boot that listens; |
 | Touch strip and head pads | 0.95 | #711 #1362 #2445 #2460 #2857 | first, fifth | 27 Oct 15:1x: found on the tester’s 7071 lamps: a hand kept 3 s put the lamp to sleep unsaid, in onboarding’s touch and giving-way steps, and they reset it (#3747, #3749). |
 | Two people at the lamp | 1.00 | #829 #1158 #1278 | fourth | All merged: day and night bars (#1158, 11:49) and a follow-up within 20 s told it may follow on (#1278, 13:57). |
 | “Stop” over its own voice | 1.00 | #828 #1047 #1264 | fourth | Built: stop words heard over its voice (#1047, 09:11) and listening gaps in its pauses (#1264, 11:52), both off until measured. |
@@ -44,9 +44,9 @@ Written by the first builder from the team's review page at 2026-10-30 11:04 (+0
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, fourth, first, backend, third | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
 | A person brings their own DeepSeek and Deepgram keys, in setup or the app | 0.90 | #2094 #2845 #2846 | el, fourteen | 22 Oct 18:0x, up from 0.8: setup’s own-keys step passed on a freshly reset lamp-06c1 (El, #2845 closed). |
 | Lamp 2 in the Autonomous app | 1.00 | #1396 | mobile, backend | 20 Oct 11:4x, built: the app's Skills page and name and time zone (ecm-sds-mobile#8, #9) merged into the app's v3 after their tries on lamp-0c89. |
-| Speaks English, Japanese, Chinese or Korean, the owner’s choice in setup or the app | 0.00 | #3975 #4473 #4474 | seventh, mobile | 30 Oct 09:4x, new, from the lead’s proposal (#3975), approved today: the owner picks the language in setup or the app at any time, and the voice, onboarding, fixed lines and skills follow it. |
-| Talks with you naturally: turns, answers, web answers, the time | 0.92 | #694 | second, nine | 24 Oct 06:1x, up from 0.9: the two-turn fault’s fix is merged behind LAMP_SAME_SPEAKER_CARRIES, off (#3296, Sixth, train 62, df6830381). |
-| Hears its name, a bare “Lamp” too | 1.00 | #694 #725 | second, nine | Built; |
+| Speaks English, Japanese, Chinese or Korean, the owner’s choice in setup or the app | 0.70 | #3975 #4473 #4474 | seventh, mobile | 30 Oct 22:0x, up from 0: the lamp side is on lamp-voice (the voice, the fixed lines, onboarding’s walk, the name and the wait words in the owner’s language; |
+| Talks with you naturally: turns, answers, web answers, the time | 0.92 | #694 | nine | 24 Oct 06:1x, up from 0.9: the two-turn fault’s fix is merged behind LAMP_SAME_SPEAKER_CARRIES, off (#3296, Sixth, train 62, df6830381). |
+| Hears its name, a bare “Lamp” too | 1.00 | #694 #725 | nine | Built; |
 | Eye contact: turns to you and to its name, looks away to think, nods | 1.00 | #715 | fifth | Built |
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
 | Moves with its words while it speaks | 1.00 | #933 #1067 #1365 #2030 | thirteen | 20 Oct 09:4x, built: #1759 (with #1067’s sway) merged into lamp-voice after its try on lamp-52e6 with the lead, so every lamp nods and sways while it speaks, sparse as the lead chose. |
