@@ -8291,16 +8291,23 @@ async fn answer(
     // chat has not begun in time, its exact words are said as they are
     // rather than the walk's line left unsaid (lamp-52e6, 28 Oct 16:42).
     // Never a person's line, a reminder, a look or an add-on's quoted line.
-    let mut fixed = matches!(
+    let written = matches!(
         asked,
         Asker::Written {
             looking: false,
             search: false,
             quoted: false
         }
-    )
-    .then(|| crate::onboarding::fixed_words(&said).map(str::to_owned))
-    .flatten();
+    );
+    let mut fixed = written
+        .then(|| crate::onboarding::fixed_words(&said).map(str::to_owned))
+        .flatten();
+    // One the walk says itself (#3769, lamp-52e6 30 Oct 08:22: the model
+    // said its own small talk in place of the sentence prompt): its words,
+    // and no chat at all.
+    let own = written
+        .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
+        .flatten();
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
     // round 1.
@@ -8351,6 +8358,14 @@ async fn answer(
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
+        }
+        if let Some(words) = own {
+            eprintln!(
+                "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
+            );
+            shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
+            queue.push(words).await?;
+            return Ok(());
         }
         // The memory's note asked as the line began, waited for here, never
         // on the loop: building the context below reads nothing.
