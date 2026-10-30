@@ -80,7 +80,8 @@ These you can run on their own:
   voice answers "Yes, go ahead." (made, asked, that SHA-256 installed only
   after the yes, enabled, loaded, removed) or "No, not now." (nothing
   installed). `LAMP_MAKE_SKILL=on` rides on the stand-in's `/run` drop-ins,
-  removed on exit with any skill it put on. The voice's made skills and told
+  removed on exit with any skill it put on; a product unit already sets it
+  on (fourteen-P15), and the run takes it as it is. The voice's made skills and told
   news are saved in `/usr/local/lib/played-make-skill-saved` (made as
   `….part` and renamed once whole) and put back on exit with lamp-voice
   stopped (nothing put back unless the stop worked and lamp-voice then
