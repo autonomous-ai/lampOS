@@ -67,6 +67,16 @@ const GUARD_MARKER_SUFFIX: &str = ".restart-guard";
 /// control input in flight, does not leave the lamp muted (#1567, B), and a
 /// fault raised after the stop's signal is the stop's (A).
 pub const NEVER_LISTENED_ENVIRONMENT: &str = "LAMP_GUARD_NEVER_LISTENED";
+/// Off unless `on` (#3748): a hand's hold on the head says the recorded
+/// line "Going to sleep. Tap my head to wake me." in place of the falling
+/// breath, and its sleep waits for that cue: the Hold at 3 s makes the sleep
+/// owed, and the mute comes once the cue has played whole
+/// ([`Self::sleep_cue_sounding`]), or at [`SLEEP_OWED_CAP_US`]. A hand let go
+/// before the Hold cuts the cue ([`Observation::head_lifted`]).
+pub const SLEEP_LINE_ENVIRONMENT: &str = "LAMP_SLEEP_LINE";
+/// The latest a hold's owed sleep waits for its cue, from the Hold: the
+/// line runs about 2.5 s from the hold's 2 s mark.
+pub const SLEEP_OWED_CAP_US: u64 = 6_000_000;
 /// Beside the mute record: how many runs in a row have failed before they
 /// heard anything, for the health to say (#1567).
 const NEVER_LISTENED_SUFFIX: &str = ".never-listened";
@@ -171,6 +181,12 @@ pub struct Observation {
     /// `held_us`), for the breath in a hold's last second (#1362). None
     /// with no hand, or one Controls gives no time.
     pub head_held: Option<(u64, u64)>,
+    /// With `LAMP_SLEEP_LINE=on` and no sleep owed once this poll's events
+    /// are taken, a Hold among them included (#3748): the newest touch
+    /// state taken in this poll says the hand has left the head (its contact
+    /// ended, past the pads' short gaps), so a sleep cue still sounding is
+    /// cut. Always false with the switch off.
+    pub head_lifted: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -314,6 +330,25 @@ fn head_held(state: &TouchState) -> Option<(u64, u64)> {
     }
 }
 
+/// A hold's owed sleep (#3748): when it was taken, and when its contact
+/// began.
+#[derive(Clone, Copy, Debug)]
+struct OwedHold {
+    held_at: u64,
+    began_us: u64,
+}
+
+/// The hand has left the head in a touch state: the head read, and no
+/// contact on it, past the pads' short gaps (#3748).
+fn head_lifted(state: &TouchState) -> bool {
+    state.sources.iter().any(|source| {
+        source.source == TouchSource::Head
+            && source.ready
+            && source.active == Some(false)
+            && source.contact_id.is_none()
+    })
+}
+
 fn add(counter: &AtomicU64, amount: u64) {
     let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
         Some(value.saturating_add(amount))
@@ -448,6 +483,17 @@ pub struct HandControls {
     late_sleep: Option<LateSleep>,
     /// A sleep asked aloud, for the next poll ([`Self::ask_sleep`]).
     sleep_asked: bool,
+    /// `LAMP_SLEEP_LINE=on` ([`SLEEP_LINE_ENVIRONMENT`], #3748).
+    sleep_line: bool,
+    /// A hold's sleep owed until its cue has played: when the Hold was
+    /// taken, on the poll's clock, and when its contact began, so the
+    /// receiver's fence still refuses a hand that woke the lamp. Only with [`Self::sleep_line`].
+    hold_owed: Option<OwedHold>,
+    /// The coordinator said, before this poll, that the hold's cue is
+    /// sounding ([`Self::sleep_cue_sounding`]); each poll takes it.
+    cue_sounding: bool,
+    /// When the cue was last said to be sounding: its end, for the journal.
+    cue_seen_us: Option<u64>,
     /// When the conversation last read the press queue ([`Self::poll`]), on
     /// the wall clock: a clean stop's floor for the next start's late sleep
     /// ([`Self::disarm_after_clean_stop`]).
@@ -893,6 +939,7 @@ impl HandControls {
         controls.mark_guard = mark_guard;
         controls.never_listened =
             std::env::var(NEVER_LISTENED_ENVIRONMENT).ok().as_deref() == Some("on");
+        controls.sleep_line = std::env::var(SLEEP_LINE_ENVIRONMENT).ok().as_deref() == Some("on");
         controls.load_could_not_start();
         // A hand held on the head while no voice ran is still taken (#1607).
         if let Some(window) = restored.late_sleep {
@@ -941,6 +988,10 @@ impl HandControls {
             closed_unreadable: false,
             late_sleep: None,
             sleep_asked: false,
+            sleep_line: false,
+            hold_owed: None,
+            cue_sounding: false,
+            cue_seen_us: None,
             polled_at: None,
             #[cfg(test)]
             while_held: None,
@@ -1022,6 +1073,27 @@ impl HandControls {
     /// does, unless onboarding is under way.
     pub fn ask_sleep(&mut self) {
         self.sleep_asked = true;
+    }
+
+    /// `LAMP_SLEEP_LINE=on` (#3748): a hand's hold says the recorded sleep
+    /// line, and its sleep waits for the cue.
+    pub fn sleep_line(&self) -> bool {
+        self.sleep_line
+    }
+
+    /// A loop test's `LAMP_SLEEP_LINE`, without the process environment.
+    #[cfg(test)]
+    pub(crate) fn set_sleep_line(&mut self, on: bool) {
+        self.sleep_line = on;
+    }
+
+    /// The hold's sleep cue (the line or the breath) is sounding now, at
+    /// `now_us` (#3748): said by the coordinator before each poll while it
+    /// is, so an owed sleep waits for it. A poll it was not said before
+    /// takes the cue as over.
+    pub fn sleep_cue_sounding(&mut self, now_us: u64) {
+        self.cue_sounding = true;
+        self.cue_seen_us = Some(now_us);
     }
 
     /// What [`Self::set_onboarding`] last said.
@@ -1190,6 +1262,7 @@ impl HandControls {
             self.seen_generation = generation;
         }
         let mut consumed = 0;
+        let mut lifted = false;
         for _ in 0..POLL_LIMIT {
             let queued = match self.input.try_recv() {
                 Ok(queued) => queued,
@@ -1249,6 +1322,7 @@ impl HandControls {
                     match accepted {
                         Some(Ok(events)) => {
                             observation.head_held = head_held(&state);
+                            lifted = head_lifted(&state);
                             events
                                 .iter()
                                 .for_each(|event| self.head_event(now_us, event, &mut observation));
@@ -1290,6 +1364,11 @@ impl HandControls {
                 Err(_) => add(&self.shared.rejected, 1),
             }
         }
+        // After this poll's events: a Hold taken in it, even with the
+        // letting go in the same poll, owes its sleep and never cuts its cue
+        // (the reviewer's P2 on #4478).
+        observation.head_lifted = self.sleep_line && self.hold_owed.is_none() && lifted;
+        self.land_owed_sleep(now_us, &mut observation);
         observation.muted = self.muted();
         observation.asleep = self.asleep();
         self.share_latch();
@@ -1301,6 +1380,56 @@ impl HandControls {
             observation.observed_at_us = Some(now_us);
         }
         Ok(observation)
+    }
+
+    /// A hold's owed sleep (`LAMP_SLEEP_LINE`, #3748), asked once its cue
+    /// is no longer sounding, or at [`SLEEP_OWED_CAP_US`] from the Hold. A
+    /// tap or new speech meanwhile does not cancel it: the person held the
+    /// head past three seconds. Never while the walk is under way.
+    fn land_owed_sleep(&mut self, now_us: u64, observation: &mut Observation) {
+        let sounding = std::mem::take(&mut self.cue_sounding);
+        let Some(OwedHold { held_at, began_us }) = self.hold_owed else {
+            return;
+        };
+        let capped = now_us >= held_at.saturating_add(SLEEP_OWED_CAP_US);
+        if sounding && !capped {
+            return;
+        }
+        self.hold_owed = None;
+        let cue_seen = self.cue_seen_us.take();
+        if self.onboarding {
+            eprintln!(
+                "lamp-voice: a hand's hold: its owed sleep is dropped: onboarding is under way"
+            );
+            return;
+        }
+        // When the contact began, for the receiver's fence: a hand that woke
+        // the lamp cannot send it back (the reviewer's P1 on #4478). Asked
+        // now, so a tap made while the cue sounded is older than the sleep.
+        match self.receiver.request_sleep(now_us, began_us, now_us) {
+            Ok(true) => {
+                self.dirty = true;
+                observation.mute_changed = true;
+                earlier(&mut observation.acquired_at_us, now_us);
+                let after_hold = (now_us - held_at) / 1_000;
+                if capped {
+                    eprintln!(
+                        "lamp-voice: a hand's hold: its owed sleep lands at the cap, {after_hold} ms after the hold, its cue still sounding"
+                    );
+                } else if let Some(seen) = cue_seen.filter(|seen| *seen >= held_at) {
+                    eprintln!(
+                        "lamp-voice: a hand's hold: its owed sleep lands {} ms after its cue ended ({after_hold} ms after the hold)",
+                        now_us.saturating_sub(seen) / 1_000
+                    );
+                } else {
+                    eprintln!(
+                        "lamp-voice: a hand's hold: its owed sleep lands {after_hold} ms after the hold, no cue sounding then"
+                    );
+                }
+            }
+            Ok(false) => {}
+            Err(_) => add(&self.shared.rejected, 1),
+        }
     }
 
     /// One accepted head request (#711): a touch for the coordinator to stop
@@ -1320,6 +1449,16 @@ impl HandControls {
             // giving way tells the person to hold the head, and the hold
             // already counted as the touch at 20 ms. The latch stays open,
             // and is said so, so Expression doesn't fold either.
+            // With `LAMP_SLEEP_LINE=on` (#3748) the hold's sleep is owed
+            // until its cue has played ([`Self::land_owed_sleep`]).
+            TouchGesture::Hold if mute && !self.onboarding && self.sleep_line => {
+                if self.hold_owed.is_none() {
+                    self.hold_owed = Some(OwedHold {
+                        held_at: now_us,
+                        began_us: event.began_us,
+                    });
+                }
+            }
             TouchGesture::Hold if mute && !self.onboarding => {
                 match self
                     .receiver
@@ -2463,9 +2602,15 @@ pub(crate) struct TestHead {
 #[cfg(test)]
 impl TestHead {
     pub(crate) fn new(clock_id: &str, from_us: u64) -> Self {
+        Self::with_gap(clock_id, from_us, None)
+    }
+
+    /// As [`Self::new`], with the pads' short gaps `gap_ms` long when given.
+    pub(crate) fn with_gap(clock_id: &str, from_us: u64, gap_ms: Option<u64>) -> Self {
         let config = lamp_controls::touch::TouchConfig {
             enabled: true,
             head_pads: vec!["head-1".into()],
+            head_gap_ms: gap_ms,
             ..lamp_controls::touch::TouchConfig::default()
         };
         Self {

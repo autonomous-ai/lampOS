@@ -238,7 +238,8 @@ lamp-setup reset-now`). That unit, in this order:
    never holds the start back. A lamp without those tools still starts.
    Any that failed are named in one line after the vacuum, `reset: not
    forgotten, going on: …`, so the vacuum doesn't take it; the start's own
-   line, `reset: started in place, no reboot: …`, comes next. **Not emptied:** `/tmp`, which a reboot emptied too.
+   line, `reset: started in place, no reboot: …`, comes next. **Not
+   emptied:** `/tmp`, which a reboot emptied too.
    The product's lampOS parts write none of the person's words there, but
    `lamp-tasks` runs agents' tools, so its unit's `PrivateTmp=` is the
    tasks owner's to settle (#4513). With the marker gone, setup serves:
@@ -887,8 +888,8 @@ ARM64 run and the keeper's `--setup-marker` (#816):
    Each failure must leave the previous Wi-Fi file, and the ring amber until
    the next try.
 5. **Reset.** Controls with `--touch` and a `reset` line in its pins file. Hold
-   the RESET pinhole 5 s with a paperclip and release: the lamp pauses, folds, reboots into the
-   hotspot, and every path in the plan is empty. Once, cut the power during the
+   the RESET pinhole 5 s with a paperclip and release: the lamp pauses, folds and
+   starts setup again in place with no reboot, its hotspot up within 60 s, and every path in the plan is empty. Once, cut the power during the
    wipe: setup must finish it at the next start.
 
 Most likely wrong on a lamp: what V1's image left of the radio (whether

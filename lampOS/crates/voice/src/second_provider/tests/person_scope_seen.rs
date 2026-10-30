@@ -63,29 +63,43 @@ fn feed(
     boot: &'static str,
     done: Arc<AtomicBool>,
 ) -> std::thread::JoinHandle<()> {
+    feed_faces(eyes, vec![("f1", f1_speaks)], boot, done)
+}
+
+/// [`feed`] with `in_view` the faces in each look, by passing id, each
+/// speaking it or silent; none, looks with no face in them.
+fn feed_faces(
+    eyes: Arc<SpeakingFaces>,
+    in_view: Vec<(&'static str, bool)>,
+    boot: &'static str,
+    done: Arc<AtomicBool>,
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut frame = 0u64;
         while !done.load(Ordering::Acquire) {
             let faces = lamp_msgs::Faces {
-                faces: vec![lamp_msgs::Face {
-                    id: "f1".to_owned(),
-                    xmin: 0.1,
-                    ymin: 0.1,
-                    xmax: 0.3,
-                    ymax: 0.4,
-                    confidence: 1.0,
-                    yaw: None,
-                    facing: None,
-                    speaking: Some(lamp_msgs::Speaking {
-                        state: if f1_speaks {
-                            lamp_msgs::SpeakingState::Yes
-                        } else {
-                            lamp_msgs::SpeakingState::No
-                        },
-                        score: 0.9,
-                        from: None,
-                    }),
-                }],
+                faces: in_view
+                    .iter()
+                    .map(|&(id, speaks)| lamp_msgs::Face {
+                        id: id.to_owned(),
+                        xmin: 0.1,
+                        ymin: 0.1,
+                        xmax: 0.3,
+                        ymax: 0.4,
+                        confidence: 1.0,
+                        yaw: None,
+                        facing: None,
+                        speaking: Some(lamp_msgs::Speaking {
+                            state: if speaks {
+                                lamp_msgs::SpeakingState::Yes
+                            } else {
+                                lamp_msgs::SpeakingState::No
+                            },
+                            score: 0.9,
+                            from: None,
+                        }),
+                    })
+                    .collect(),
             };
             frame += 1;
             eyes.look(Instant::now(), Some(((boot, frame), &faces)));
@@ -110,6 +124,9 @@ struct Outcome {
     asked: Vec<Message>,
     /// Every output of the turn, as [`turn`]'s labels.
     labels: Vec<String>,
+    /// Whether the line's lease ends held, told from the conversation as
+    /// it stood ([`crate::memory_scope::ScopeSnapshot::held`]).
+    held: bool,
 }
 
 async fn one_line(
@@ -136,6 +153,31 @@ async fn one_line_eyes(
     seen: bool,
     eyes_up: bool,
     early: Option<&str>,
+) -> Outcome {
+    let in_view = vec![("f1", f1_speaks)];
+    one_line_with(
+        what, words, chats, in_view, boot, seen, eyes_up, early, None, true,
+    )
+    .await
+}
+
+/// [`one_line_eyes`] with `in_view` the faces in each of the eyes' looks
+/// ([`feed_faces`]) and `going_on` whether A is in a conversation going on
+/// (`LAMP_CONVERSATION_CARRIES`, #4339); none, the switch off. With
+/// `named` false the face cache names nobody, so the line is admitted as the
+/// room's (lamp-06c1's turns with no face line, 29 Oct).
+#[allow(clippy::too_many_arguments)]
+async fn one_line_with(
+    what: &str,
+    words: &str,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    in_view: Vec<(&'static str, bool)>,
+    boot: &'static str,
+    seen: bool,
+    eyes_up: bool,
+    early: Option<&str>,
+    going_on: Option<bool>,
+    named: bool,
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
@@ -166,11 +208,16 @@ async fn one_line_eyes(
             .push(lease.scope().unwrap().person().map(str::to_owned));
         Box::pin(async { json!({"ok":true}) })
     });
+    // The lease each context was told for: a held line asks memory nothing,
+    // so it never reaches `remembering` below.
+    let told_leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
+    let seen_told = told_leases.clone();
     let engine = engine.with_memory_scope(
         lamp_turn_owner::BootId::new([41; 16]).unwrap(),
         cache.clone(),
         runner,
-        Some(Arc::new(|lease: &ScopeLease| {
+        Some(Arc::new(move |lease: &ScopeLease| {
+            seen_told.lock().unwrap().push(lease.clone());
             Told::from(format!("for {:?}", lease.scope().unwrap().person()))
         })),
     );
@@ -181,6 +228,12 @@ async fn one_line_eyes(
     } else {
         failed_reader(engine, &path, seen)
     };
+    let a = crate::remember::person_id("A");
+    let engine = engine.carrying_conversations_by(going_on.map(
+        |going_on| -> crate::second_provider::GoingOnWith {
+            Arc::new(move |_| going_on.then(|| a.clone()))
+        },
+    ));
     let mut engine = engine
         .remembering(Arc::new(
             move |_, words: &str, lease: Option<&ScopeLease>| {
@@ -196,12 +249,14 @@ async fn one_line_eyes(
         ))
         .announcing(false);
     engine.memory_camera(true, 1);
-    cache.replace(
-        cache.begin_refresh(),
-        crate::known_faces::FaceObservation::read(&path),
-    );
+    if named {
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+    }
     let done = Arc::new(AtomicBool::new(false));
-    let feeder = feed(eyes, f1_speaks, boot, done.clone());
+    let feeder = feed_faces(eyes, in_view, boot, done.clone());
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     tokio::time::sleep(Duration::from_millis(40)).await;
@@ -210,11 +265,22 @@ async fn one_line_eyes(
     done.store(true, Ordering::Release);
     feeder.join().unwrap();
     clean(&path);
-    let lease = leases.lock().unwrap().first().and_then(|lease| {
+    // The line's lease: as its context was told, else as memory was asked.
+    let first = told_leases
+        .lock()
+        .unwrap()
+        .first()
+        .cloned()
+        .or_else(|| leases.lock().unwrap().first().cloned());
+    let lease = first.as_ref().and_then(|lease| {
         lease
             .scope()
             .and_then(|scope| scope.person().map(str::to_owned))
     });
+    let held = first
+        .as_ref()
+        .and_then(ScopeLease::scope)
+        .is_some_and(crate::memory_scope::ScopeSnapshot::held);
     let asked: Vec<Message> = script
         .asked
         .lock()
@@ -229,6 +295,7 @@ async fn one_line_eyes(
         noted: noted.lock().unwrap().clone(),
         asked,
         labels,
+        held,
     }
 }
 
@@ -597,5 +664,167 @@ async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
         feeder.join().unwrap();
         clean(&path);
         assert_eq!(*keepers.lock().unwrap(), [expected], "{what}");
+    }
+}
+
+/// #4339, lamp-3e83: A's line no face was seen speaking, A's own face in
+/// view and silent, in A's conversation going on (`LAMP_CONVERSATION_CARRIES`):
+/// told from A's conversation as it stood, a held scope, not the room's,
+/// so the chat keeps the talk it was part of. With no face in view at all
+/// from the start, it is the room's: an unseen line carries only within
+/// `CARRY_UNSEEN_WITHIN` of their face in view (the Reviewer-lead's P2 on
+/// #4479).
+#[tokio::test]
+async fn an_unseen_line_in_their_conversation_going_on_keeps_that_conversation() {
+    let a = crate::remember::person_id("A");
+    for (what, in_view) in [("carried", vec![("f1", false)])] {
+        let chats = vec![vec![text("Floral, then."), Ok(ChatEvent::Done)]];
+        let got = one_line_with(
+            what,
+            "The floral one, I think.",
+            chats,
+            in_view,
+            BOOT,
+            true,
+            true,
+            None,
+            Some(true),
+            true,
+        )
+        .await;
+        assert_eq!(
+            got.lease,
+            Some(a.clone()),
+            "{what}: A's conversation, not the room's"
+        );
+        assert!(got.held, "{what}: told from the conversation as it stood");
+        assert_eq!(
+            got.told,
+            Message::system(format!("for {:?}", Some(a.as_str()))),
+            "{what}"
+        );
+    }
+}
+
+/// #4339: carried, a memory call on that line runs for no one, as a
+/// gap-held line's does: an off-camera "forget everything about me" reaches
+/// nobody's memory (reviewer-three's P1 on #3435 holds).
+#[tokio::test]
+async fn a_carried_lines_memory_calls_run_for_no_one() {
+    let got = one_line_with(
+        "carried-forget",
+        FORGET_ME,
+        forget_everything(),
+        vec![("f1", false)],
+        BOOT,
+        true,
+        true,
+        None,
+        Some(true),
+        true,
+    )
+    .await;
+    assert!(got.calls.is_empty(), "no memory call runs: {:?}", got.calls);
+    assert!(got.held);
+}
+
+/// #4339: a line no face was seen speaking stays the room's, as before,
+/// when A isn't in a conversation going on (a 45 s quiet, or someone
+/// else's exchange between), with the switch off, with a face not A's in
+/// view, and with another face seen speaking it.
+#[tokio::test]
+async fn without_their_conversation_or_with_another_face_an_unseen_line_is_the_rooms() {
+    for (what, in_view, going_on) in [
+        ("quiet", vec![("f1", false)], Some(false)),
+        ("off", vec![("f1", false)], None),
+        ("empty-from-start", vec![], Some(true)),
+        ("other-face", vec![("f2", false)], Some(true)),
+        ("two-faces", vec![("f1", false), ("f2", false)], Some(true)),
+        (
+            "other-speaks",
+            vec![("f1", false), ("f2", true)],
+            Some(true),
+        ),
+    ] {
+        let chats = vec![vec![text("Okay."), Ok(ChatEvent::Done)]];
+        let got = one_line_with(
+            what,
+            "The floral one, I think.",
+            chats,
+            in_view,
+            BOOT,
+            true,
+            true,
+            None,
+            going_on,
+            true,
+        )
+        .await;
+        assert_eq!(got.lease, None, "{what}: the room's");
+        assert!(!got.held, "{what}");
+        assert_eq!(got.told, Message::system("for None"), "{what}");
+    }
+}
+
+/// #4339: A's own face seen speaking it is A's as ever, with memory, not
+/// merely carried.
+#[tokio::test]
+async fn their_face_seen_speaking_is_theirs_not_carried() {
+    let a = crate::remember::person_id("A");
+    let chats = vec![vec![text("Floral."), Ok(ChatEvent::Done)]];
+    let got = one_line_with(
+        "own",
+        "The floral one, I think.",
+        chats,
+        vec![("f1", true)],
+        BOOT,
+        true,
+        true,
+        None,
+        Some(true),
+        true,
+    )
+    .await;
+    assert_eq!(got.lease, Some(a));
+    assert!(!got.held, "seen speaking: theirs, with memory");
+}
+
+/// #4339, lamp-06c1's turns with no face line (29 Oct): a line admitted as
+/// the room's, the face cache naming nobody, in A's conversation going on,
+/// with only A's face in view and none seen speaking it: carried as A's
+/// conversation, held. Not in one, with an empty view from the start, or
+/// with another face in view or speaking it, it stays the room's.
+#[tokio::test]
+async fn a_rooms_line_in_their_conversation_going_on_is_carried_as_it() {
+    let a = crate::remember::person_id("A");
+    for (what, in_view, going_on, carried) in [
+        ("room-own", vec![("f1", false)], Some(true), true),
+        ("room-none", vec![], Some(true), false),
+        ("room-quiet", vec![("f1", false)], Some(false), false),
+        ("room-off", vec![("f1", false)], None, false),
+        ("room-other", vec![("f2", false)], Some(true), false),
+        ("room-other-speaks", vec![("f2", true)], Some(true), false),
+    ] {
+        let chats = vec![vec![text("Okay."), Ok(ChatEvent::Done)]];
+        let got = one_line_with(
+            what,
+            "The floral one, I think.",
+            chats,
+            in_view,
+            BOOT,
+            true,
+            true,
+            None,
+            going_on,
+            false,
+        )
+        .await;
+        if carried {
+            assert_eq!(got.lease, Some(a.clone()), "{what}: A's conversation");
+            assert!(got.held, "{what}: held, never memory's");
+        } else {
+            assert_eq!(got.lease, None, "{what}: the room's");
+            assert!(!got.held, "{what}");
+        }
     }
 }

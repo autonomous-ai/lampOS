@@ -43,6 +43,20 @@ pub const MAX_RECORDS: u64 = 50_000;
 pub const MAX_OBSERVATIONS: u64 = 2048;
 pub const MAX_SESSIONS: u64 = 32;
 pub const MAX_PENDING: u64 = 8;
+/// A talk note's category (`talk_note`, #1693's long-conversation plan,
+/// step 3): the voice's running summary of one conversation, kept at its
+/// end. It is an observation, so its links to its conversation's exchanges
+/// and every forget's walks carry it, but kept inactive: a build before it
+/// reads only active observations into a session's note, so even after a
+/// rollback it is never told unasked. Only `talk_notes` reads it.
+pub const TALK: &str = "talk";
+/// The most a talk note may be: the voice's own cap, about 1,600 tokens.
+pub const TALK_BYTES: usize = 6_400;
+/// The most `talk_notes` gives in one answer, and by default.
+pub const TALK_NOTES_MOST: usize = 4;
+pub const TALK_NOTES_BYTES: usize = 12_800;
+/// A talk note as `talk_notes` gives it: its id, its day and its text.
+pub type TalkNote = (u64, String, String);
 const DAY_MS: u64 = 86_400_000;
 const MAX_IMPORT_FILE: u64 = 64 * 1024 * 1024;
 
@@ -91,6 +105,9 @@ impl From<io::Error> for Error {
         )
     }
 }
+/// `conversation_end`'s refusal for a pass over [`tidy::MAX_INPUT_BYTES`]:
+/// the voice counts it by "exceeds 32 KiB" (#1693, step 2).
+pub const INPUT_TOO_LARGE_REFUSED: &str = "the tidy input exceeds 32 KiB";
 fn bad(message: &'static str) -> Error {
     Error::new("bad_request", message)
 }
@@ -375,8 +392,9 @@ impl Days {
             .and_then(|today| today.before(FOLLOW_UP_WITHIN_DAYS))
             .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let tx = self.db.transaction()?;
+        keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
-        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'')!='talk' AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
         descendants(&tx, Some(&event))?;
         let count = erase(&tx)?;
         tx.execute(
@@ -973,9 +991,9 @@ impl Days {
         // is never asked ([`crate::days_protocol`]).
         let last = wider.last_day.or(ask.day).map(|d| d.to_string());
         let sql = if expression.is_some() {
-            "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR ((e.kind='exchange' OR (?8 AND e.kind='kept')) AND e.day BETWEEN ?3 AND ?7)) AND (?4 OR e.kind!='observation') AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR ((e.kind='exchange' OR (?8 AND e.kind='kept')) AND e.day BETWEEN ?3 AND ?7)) AND (?4 OR e.kind!='observation') AND coalesce(e.category,'')!='talk' AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         } else {
-            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND (?5 OR e.active=1) ORDER BY CASE WHEN ?8 AND ?3 IS NOT NULL AND e.kind='kept' THEN 0 ELSE 1 END,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND coalesce(e.category,'')!='talk' AND (?5 OR e.active=1) ORDER BY CASE WHEN ?8 AND ?3 IS NOT NULL AND e.kind='kept' THEN 0 ELSE 1 END,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         };
         let mut statement = self.db.prepare(sql)?;
         let ids = statement
@@ -1123,6 +1141,7 @@ impl Days {
         for rid in evidence {
             tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
         }
+        talk_with_doomed(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
         Ok(count)
@@ -1168,6 +1187,7 @@ impl Days {
         for rid in made {
             tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
         }
+        talk_with_doomed(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
         self.forget_set_aside()?;
@@ -1862,13 +1882,141 @@ impl Days {
             records,
             previous,
         };
-        tidy::validate_input(&input)
-            .map_err(|_| bad("the tidy input exceeds its limits or is invalid"))?;
+        tidy::validate_input(&input).map_err(|error| {
+            // Over the input bound, said apart from any other refusal so
+            // the voice can count it (#1693, step 2); the journal has the
+            // source count only, never a word of the talk.
+            if error == tidy::ModelError::InvalidInput(tidy::INPUT_TOO_LARGE) {
+                eprintln!(
+                    "lamp-memory: conversation_end input exceeds {} bytes; refused with no job (sources={})",
+                    tidy::MAX_INPUT_BYTES,
+                    source_ids.len()
+                );
+                bad(INPUT_TOO_LARGE_REFUSED)
+            } else {
+                bad("the tidy input exceeds its limits or is invalid")
+            }
+        })?;
         let encoded =
             serde_json::to_string(&input).map_err(|_| bad("tidy input could not be encoded"))?;
         tx.execute("UPDATE jobs SET input=? WHERE job=?", params![encoded, job])?;
         tx.commit()?;
         Ok(input)
+    }
+
+    /// A conversation's talk note (`talk_note`): the voice's running summary
+    /// of it, `text`, kept in `person`'s scope (the room's included) as an
+    /// inactive observation of category [`TALK`], linked to `source_ids`,
+    /// the conversation's exchanges (1 to 64), each this scope's and
+    /// already happened: a forget of any of them takes it
+    /// ([`talk_with_doomed`]), and so does a forget of a kept thing or an
+    /// observation from any of them, even after the exchanges expired (by
+    /// their ids, kept in `origins`), and `forget_all`. Dated by its
+    /// newest exchange, the conversation's day. Kept until forgotten: no
+    /// expiry and no count but the store's own. Never in a session's note,
+    /// a search or the observation pass; only [`Self::talk_notes`] reads it.
+    pub fn talk_note(&mut self, person: &Person, text: &str, source_ids: &[u64]) -> Result<u64> {
+        if !talk_text_is_valid(text) {
+            return Err(bad(
+                "a talk note is nonblank text of at most 6400 UTF-8 bytes",
+            ));
+        }
+        let tx = self.db.transaction()?;
+        validate_sources(&tx, person, source_ids, true)?;
+        let mut at = 0;
+        for id in source_ids {
+            let (kind, when): (String, u64) = tx.query_row(
+                "SELECT kind,at_unix_ms FROM entries WHERE person=?1 AND id=?2",
+                params![person.as_str(), id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?;
+            if kind != "exchange" || when > self.now {
+                return Err(bad(
+                    "a talk note's sources must be journal exchanges that have already happened",
+                ));
+            }
+            at = at.max(when);
+        }
+        let id = next_id(&tx, person)?;
+        insert_record(
+            &tx,
+            &Record {
+                id,
+                person: person.as_str().into(),
+                kind: "observation".into(),
+                at_unix_ms: at,
+                heard: String::new(),
+                said: String::new(),
+                text: text.into(),
+                category: None,
+                source_ids: source_ids.to_vec(),
+                supersedes: None,
+                active: false,
+            },
+            &self.local,
+            self.now,
+        )?;
+        tx.execute(
+            "UPDATE entries SET category=?3 WHERE person=?1 AND id=?2",
+            params![person.as_str(), id, TALK],
+        )?;
+        tx.commit()?;
+        Ok(id)
+    }
+
+    /// `person`'s talk notes ([`Self::talk_note`]), newest first: of the
+    /// days `from` to `to` when given, whatever `query` says (a day asked
+    /// is the surer key: "what did we talk about yesterday?"); else those
+    /// the search index finds with `query`; else the newest. At most
+    /// `limit` ([`TALK_NOTES_MOST`]) and `max_bytes` ([`TALK_NOTES_BYTES`]),
+    /// a note too long for the room left given without its oldest facts.
+    /// Each as (id, its day, its text), and whether there were more.
+    pub fn talk_notes(
+        &self,
+        person: &Person,
+        query: Option<&str>,
+        days: Option<(Day, Day)>,
+        limit: usize,
+        max_bytes: usize,
+    ) -> Result<(Vec<TalkNote>, bool)> {
+        let limit = limit.clamp(1, TALK_NOTES_MOST);
+        // "What did we talk about earlier?": no word of it is one a talk
+        // note would hold, so the newest are what is asked for.
+        let expression = query
+            .map(without_talk_words)
+            .and_then(|query| search::query_with(&query, true));
+        let (from, to) = days.map_or((None, None), |(from, to)| {
+            (Some(from.to_string()), Some(to.to_string()))
+        });
+        let ids: Vec<u64> = if from.is_some() || expression.is_none() {
+            self.db
+                .prepare("SELECT id FROM entries WHERE person=?1 AND kind='observation' AND category='talk' AND (?2 IS NULL OR day BETWEEN ?2 AND ?3) ORDER BY at_unix_ms DESC,id DESC LIMIT ?4")?
+                .query_map(params![person.as_str(), from, to, limit + 1], |r| r.get(0))?
+                .collect::<rusqlite::Result<_>>()?
+        } else {
+            self.db
+                .prepare("SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND e.kind='observation' AND e.category='talk' ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?3")?
+                .query_map(params![expression, person.as_str(), limit + 1], |r| r.get(0))?
+                .collect::<rusqlite::Result<_>>()?
+        };
+        let mut more = ids.len() > limit;
+        let mut room = max_bytes.min(TALK_NOTES_BYTES);
+        let mut notes = vec![];
+        for id in ids.into_iter().take(limit) {
+            let (text, day): (String, String) = self.db.query_row(
+                "SELECT text,day FROM entries WHERE person=?1 AND id=?2",
+                params![person.as_str(), id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?;
+            let Some(fitted) = talk_fitted(&text, room) else {
+                more = true;
+                break;
+            };
+            more |= fitted.len() < text.len();
+            room = room.saturating_sub(fitted.len());
+            notes.push((id, day, fitted));
+        }
+        Ok((notes, more))
     }
 
     /// A generation check and source validation are repeated in the same
@@ -1985,7 +2133,7 @@ impl Days {
         let output = &stated;
         validate_sources(&tx, person, &input.source_ids, true)?;
         let count: u64 = tx.query_row(
-            "SELECT count(*) FROM entries WHERE person=? AND kind='observation'",
+            "SELECT count(*) FROM entries WHERE person=? AND kind='observation' AND coalesce(category,'')!='talk'",
             [person.as_str()],
             |r| r.get(0),
         )?;
@@ -2128,17 +2276,28 @@ impl Days {
         // Derived only from what moves: every parent of it moves too. A
         // version (a replacement either way) stays where it is.
         while tx.execute(
-            "INSERT OR IGNORE INTO adopting SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM adopting) AND e.person=?1 AND e.rid NOT IN (SELECT rid FROM adopting) AND NOT EXISTS (SELECT 1 FROM replacements r WHERE r.newer=e.rid OR r.older=e.rid) AND NOT EXISTS (SELECT 1 FROM sources o WHERE o.child=e.rid AND o.parent NOT IN (SELECT rid FROM adopting))",
+            "INSERT OR IGNORE INTO adopting SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM adopting) AND e.person=?1 AND coalesce(e.category,'')!='talk' AND e.rid NOT IN (SELECT rid FROM adopting) AND NOT EXISTS (SELECT 1 FROM replacements r WHERE r.newer=e.rid OR r.older=e.rid) AND NOT EXISTS (SELECT 1 FROM sources o WHERE o.child=e.rid AND o.parent NOT IN (SELECT rid FROM adopting))",
             [from.as_str()],
         )? > 0
         {}
+        // A room's talk note of words that now become `to`'s is never left
+        // readable to the room (the reviewer-lead's P2 on #4479): it goes,
+        // never moved, since it may hold other room lines too. Its words
+        // are still in the exchanges that move.
+        tx.execute("DELETE FROM doomed", [])?;
+        tx.execute(
+            "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM adopting) AND e.person=?1 AND e.kind='observation' AND e.category='talk'",
+            [from.as_str()],
+        )?;
+        erase(&tx)?;
+        tx.execute("DELETE FROM doomed", [])?;
         ensure_person(&tx, to)?;
         for (kind, most) in [
             ("kept", store::KEPT_ENTRIES as u64),
             ("observation", MAX_OBSERVATIONS),
         ] {
             let after: u64 = tx.query_row(
-                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
+                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
                 params![to.as_str(), kind],
                 |r| r.get(0),
             )?;
@@ -2164,6 +2323,23 @@ impl Days {
             )?;
             moved.push((old, new));
         }
+        // The moved entries' origins are in `to`'s numbering now; one of an
+        // exchange that stays the room's is no source in `to`'s scope.
+        keep_origins(&tx)?;
+        for (old, new) in &moved {
+            tx.execute(
+                "UPDATE origins SET origin=-?2 WHERE origin=?1 AND rid IN (SELECT rid FROM adopting)",
+                params![old, new],
+            )?;
+        }
+        tx.execute(
+            "DELETE FROM origins WHERE origin>0 AND rid IN (SELECT rid FROM adopting)",
+            [],
+        )?;
+        tx.execute(
+            "UPDATE origins SET origin=-origin WHERE rid IN (SELECT rid FROM adopting)",
+            [],
+        )?;
         // A moved observation asked about once is still asked about once,
         // now as `to`'s: their pacing counts it. Its event day, by rid, is
         // still its own.
@@ -2750,7 +2926,7 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
         // expired exchange goes by the foreign key (#2176). So does an
         // observation whose event day is on or after `event`: it is kept to
         // its follow-up window. A forget, below, still follows those links.
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND coalesce(e.category,'')!='talk' AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
     } else {
         // A forget: a kept thing goes only when it is named (the doomed rows
         // this walk starts from, with their versions), never because it
@@ -2786,6 +2962,120 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         [person.map(Person::as_str)],
     )?;
     Ok(count)
+}
+/// A talk note goes with any one of its sources that goes (#2176's sweep
+/// for talk notes): it is one note of the whole conversation, in the
+/// lamp's words, so it may carry what was forgotten in any of them. Never
+/// on expiry: an exchange that ages out leaves the note kept.
+fn talk_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+    keep_origins(tx)?;
+    tx.execute(
+        "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND e.kind='observation' AND e.category='talk'",
+        [],
+    )?;
+    // Past its exchanges' expiry (reviewer-three's P1 on #4479): a talk note
+    // of the same scope that shares a source exchange id with anything
+    // going, or is of an exchange going, goes too ([`keep_origins`]).
+    tx.execute(
+        "INSERT OR IGNORE INTO doomed SELECT DISTINCT t.rid FROM entries t JOIN origins o ON o.rid=t.rid WHERE t.kind='observation' AND t.category='talk' AND EXISTS (SELECT 1 FROM entries d WHERE d.rid IN (SELECT rid FROM doomed) AND d.person=t.person AND coalesce(d.category,'')!='talk' AND (d.id=o.origin OR EXISTS (SELECT 1 FROM origins od WHERE od.rid=d.rid AND od.origin=o.origin)))",
+        [],
+    )?;
+    Ok(())
+}
+
+/// Each kept thing's and observation's source exchanges, by id in its own
+/// scope, into `origins`, where they outlive the exchanges' expiry: before
+/// any exchange expires, and before a forget reads them.
+fn keep_origins(tx: &Transaction<'_>) -> Result<()> {
+    tx.execute(
+        "INSERT OR IGNORE INTO origins(rid,origin) SELECT c.rid,p.id FROM sources s JOIN entries c ON c.rid=s.child JOIN entries p ON p.rid=s.parent WHERE c.person=p.person AND c.kind IN ('kept','observation') AND p.kind='exchange'",
+        [],
+    )?;
+    Ok(())
+}
+/// Words that ask about a talk itself, not what it was about: a
+/// `talk_notes` query of only these (and [`search`]'s common words) gives
+/// the newest. On lamp-06c1 on 30 October, "what did we talk about?" found
+/// none of the 7 talk notes kept.
+const TALK_WORDS: &[&str] = &[
+    "talk",
+    "talked",
+    "talking",
+    "talks",
+    "chat",
+    "chatted",
+    "chatting",
+    "conversation",
+    "conversations",
+    "discuss",
+    "discussed",
+    "discussing",
+    "said",
+    "say",
+    "saying",
+    "spoke",
+    "speak",
+    "speaking",
+    "earlier",
+    "before",
+    "just",
+    "now",
+    "today",
+    "yesterday",
+    "ago",
+    "last",
+    "time",
+    "then",
+    "again",
+    "all",
+    "everything",
+    "anything",
+    "something",
+    "stuff",
+    "things",
+    "thing",
+    "nói",
+    "chuyện",
+    "lúc",
+    "nãy",
+    "hôm",
+    "nay",
+    "qua",
+    "vừa",
+    "đã",
+    "trước",
+    "chúng",
+    "ta",
+    "mình",
+];
+
+/// `query` without [`TALK_WORDS`], case aside.
+fn without_talk_words(query: &str) -> String {
+    let talk: Vec<String> = TALK_WORDS.iter().map(|word| search::text(word)).collect();
+    search::text(query)
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty() && !talk.iter().any(|known| known == word))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+/// A talk note's text: nonblank, at most [`TALK_BYTES`], lines but no
+/// other control character.
+fn talk_text_is_valid(text: &str) -> bool {
+    text.len() <= TALK_BYTES
+        && !text.trim().is_empty()
+        && !text.chars().any(|c| c.is_control() && c != '\n')
+}
+/// `text` in at most `room` bytes: the oldest `- ` lines go first, never
+/// its first line or its end; nothing when even that does not fit.
+fn talk_fitted(text: &str, room: usize) -> Option<String> {
+    let mut lines: Vec<&str> = text.lines().collect();
+    let size = |lines: &[&str]| lines.iter().map(|line| line.len() + 1).sum::<usize>();
+    while size(&lines) > room + 1 {
+        let oldest = (1..lines.len().saturating_sub(1))
+            .find(|&index| lines[index].trim_start().starts_with("- "))?;
+        lines.remove(oldest);
+    }
+    Some(lines.join("\n"))
 }
 fn erase(tx: &Transaction<'_>) -> Result<u64> {
     let people: Vec<String> = tx
@@ -3708,6 +3998,284 @@ mod tests {
             .query_row("PRAGMA journal_mode", [], |row| row.get(0))
             .unwrap();
         assert_eq!(journal, "delete");
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A talk note (#1693's long-conversation plan, step 3) is kept in its
+    /// scope with its conversation's day, found by `talk_notes` by that day
+    /// or its words, never in a session's note, a search or the observation
+    /// pass's previous; it outlives its exchanges' expiry, and goes with any
+    /// one of them forgotten.
+    #[test]
+    fn a_talk_note_is_found_by_its_day_and_goes_with_a_forgotten_exchange() {
+        let (dir, mut store, person, now) = scratch("talk-note");
+        let first = store
+            .append(
+                &person,
+                now,
+                "let's play a capitals quiz",
+                "First: Peru?",
+                &[],
+            )
+            .unwrap();
+        let second = store
+            .append(&person, now + 1_000, "Lima", "Right, one point", &[])
+            .unwrap();
+        let text = "Current activity: capitals quiz, question 2, score 1\nKey facts:\n- plays a capitals quiz";
+        store.maintain(now + 10_000).unwrap();
+        let note = store.talk_note(&person, text, &[first, second]).unwrap();
+        let day = Day::at(now + 1_000, &LocalTime::Offset(0)).unwrap();
+        let (found, more) = store
+            .talk_notes(&person, None, Some((day, day)), 2, 6400)
+            .unwrap();
+        assert_eq!(found, vec![(note, day.to_string(), text.to_owned())]);
+        assert!(!more);
+        let (found, _) = store
+            .talk_notes(&person, Some("quiz"), None, 2, 6400)
+            .unwrap();
+        assert_eq!(found.len(), 1);
+        // An ask about the talk itself (lamp-06c1, 30 Oct: none of 7 found
+        // so) is the newest; a subject it doesn't have, nothing.
+        for asked in [
+            "what did we talk about earlier",
+            "what we talked about",
+            "the conversation before",
+            "chúng ta đã nói chuyện gì lúc nãy",
+        ] {
+            let (found, _) = store
+                .talk_notes(&person, Some(asked), None, 2, 6400)
+                .unwrap();
+            assert_eq!(found.len(), 1, "{asked}");
+        }
+        assert!(
+            store
+                .talk_notes(
+                    &person,
+                    Some("what did we say about the dentist"),
+                    None,
+                    2,
+                    6400
+                )
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        // Another day, another scope: nothing.
+        let other = day.before(1).unwrap();
+        assert!(
+            store
+                .talk_notes(&person, None, Some((other, other)), 2, 6400)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        assert!(
+            store
+                .talk_notes(&Person::everyone(), None, None, 2, 6400)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        // Never in a session's note, nor a search, nor told as a fact.
+        let opened = store.session_open(&person, "s-talk", 1200).unwrap();
+        assert!(!opened.note.contains("capitals"), "{}", opened.note);
+        let ask = Ask {
+            query: Some("quiz"),
+            day: None,
+            limit: 10,
+            max_bytes: 16384,
+        };
+        let searched = store.search(&person, &ask, true).unwrap();
+        assert!(
+            searched.iter().all(|record| record.id != note),
+            "{searched:?}"
+        );
+        assert!(
+            store
+                .kept_with(&person, 16384, true)
+                .unwrap()
+                .iter()
+                .all(|kept| kept.id != note)
+        );
+        // The exchanges age out; the note stays.
+        let later = now + 40 * DAY_MS;
+        store.maintain(later).unwrap();
+        assert!(store.record(&person, first).unwrap().is_none());
+        assert!(store.record(&person, note).unwrap().is_some());
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A forget of one of its exchanges, or of a kept thing whose evidence
+    /// it shares, takes the talk note; `forget_all` too; another scope's
+    /// stays.
+    #[test]
+    fn a_talk_note_goes_with_any_forget_of_its_conversation() {
+        for how in ["exchange", "kept", "all"] {
+            let (dir, mut store, person, now) = scratch(&format!("talk-forget-{how}"));
+            let budget = store
+                .append(&person, now, "my budget is 300 dollars", "Got it", &[])
+                .unwrap();
+            let other = store
+                .append(&person, now + 1, "and I like tea", "Nice", &[])
+                .unwrap();
+            let kept = store
+                .remember_from(&person, now + 2, "budget is 300 dollars", &[budget])
+                .unwrap();
+            store.maintain(now + 10).unwrap();
+            let note = store
+                .talk_note(
+                    &person,
+                    "Current activity: none\nKey facts:\n- a budget",
+                    &[budget, other],
+                )
+                .unwrap();
+            let room = store
+                .append(&Person::everyone(), now, "hello", "Hi", &[])
+                .unwrap();
+            let room_note = store
+                .talk_note(&Person::everyone(), "Current activity: none", &[room])
+                .unwrap();
+            match how {
+                "exchange" => {
+                    store.forget(&person, other).unwrap();
+                }
+                "kept" => {
+                    store.forget(&person, kept).unwrap();
+                }
+                _ => {
+                    store.forget_all(Some(&person)).unwrap();
+                }
+            }
+            assert!(store.record(&person, note).unwrap().is_none(), "{how}");
+            assert!(
+                store
+                    .record(&Person::everyone(), room_note)
+                    .unwrap()
+                    .is_some(),
+                "{how}"
+            );
+            drop(store);
+            fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
+    /// Reviewer-three's P1 on #4479: a talk note never expires, so the
+    /// forget of a kept thing from its conversation takes it after the
+    /// exchanges themselves expired (day 40) as before it (day 5).
+    #[test]
+    fn a_forget_past_the_exchanges_expiry_still_takes_the_talk_note() {
+        for days in [5, 40] {
+            let (dir, mut store, person, now) = scratch(&format!("talk-expired-{days}"));
+            let budget = store
+                .append(&person, now, "my budget is 300 dollars", "Got it", &[])
+                .unwrap();
+            let kept = store
+                .remember_from(&person, now + 1, "budget is 300 dollars", &[budget])
+                .unwrap();
+            store.maintain(now + 10).unwrap();
+            let note = store
+                .talk_note(
+                    &person,
+                    "Current activity: none\nKey facts:\n- Budget: $300 a month",
+                    &[budget],
+                )
+                .unwrap();
+            let later = now + days * DAY_MS;
+            store.maintain(later).unwrap();
+            assert_eq!(
+                store.record(&person, budget).unwrap().is_some(),
+                days < 30,
+                "{days}: the exchange's expiry"
+            );
+            assert!(store.record(&person, note).unwrap().is_some(), "{days}");
+            store.forget(&person, kept).unwrap();
+            assert!(store.record(&person, note).unwrap().is_none(), "{days}");
+            let (found, _) = store
+                .talk_notes(&person, Some("budget"), None, 8, 64 * 1024)
+                .unwrap();
+            assert!(found.is_empty(), "{days}: {found:?}");
+            drop(store);
+            fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
+    /// The reviewer-lead's P2 on #4479: room lines adopted by someone known
+    /// take the room's talk note made from any of them, so the room can no
+    /// longer recall those words; a room talk note of other lines stays.
+    #[test]
+    fn an_adopted_room_line_takes_the_rooms_talk_note_of_it() {
+        let (dir, mut store, person, now) = scratch("talk-adopt");
+        let room = Person::everyone();
+        let said = store
+            .append(&room, now, "my budget is 300 dollars", "Got it", &[])
+            .unwrap();
+        let other = store.append(&room, now + 1, "hello", "Hi", &[]).unwrap();
+        store.maintain(now + 10).unwrap();
+        let note = store
+            .talk_note(
+                &room,
+                "Current activity: none\nKey facts:\n- a budget",
+                &[said, other],
+            )
+            .unwrap();
+        let apart = store
+            .append(&room, now + 2, "it rains", "Yes", &[])
+            .unwrap();
+        store.maintain(now + 10).unwrap();
+        let stays = store
+            .talk_note(&room, "Current activity: none", &[apart])
+            .unwrap();
+        let moved = store.adopt(&room, &person, &[said]).unwrap();
+        assert_eq!(moved.len(), 1);
+        assert!(store.record(&room, note).unwrap().is_none());
+        assert!(store.record(&room, stays).unwrap().is_some());
+        let (found, _) = store.talk_notes(&room, None, None, 8, 64 * 1024).unwrap();
+        assert!(
+            found
+                .iter()
+                .all(|(_, _, summary)| !summary.contains("budget"))
+        );
+        assert!(store.record(&room, other).unwrap().is_some());
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A talk note is refused with another scope's source, a source that is
+    /// no exchange, no source, or text past its bound; and too long a note
+    /// for the room asked is given without its oldest facts, its end kept.
+    #[test]
+    fn a_talk_note_is_checked_and_fitted() {
+        let (dir, mut store, person, now) = scratch("talk-checked");
+        let mine = store.append(&person, now, "hi", "hello", &[]).unwrap();
+        let kept = store.remember(&person, now, "coffee black").unwrap();
+        let room = store
+            .append(&Person::everyone(), now, "x", "y", &[])
+            .unwrap();
+        assert!(store.talk_note(&person, "a note", &[]).is_err());
+        assert!(store.talk_note(&person, "a note", &[kept]).is_err());
+        assert!(store.talk_note(&person, " \n ", &[mine]).is_err());
+        assert!(
+            store
+                .talk_note(&person, &"x".repeat(TALK_BYTES + 1), &[mine])
+                .is_err()
+        );
+        // Ids are numbered a scope: the room's is not the person's.
+        assert!(store.talk_note(&person, "a note", &[room + 10]).is_err());
+        let facts: Vec<String> = (0..100).map(|n| format!("- fact {n:03}")).collect();
+        let text = format!(
+            "Current activity: none\nKey facts:\n{}\n- the newest",
+            facts.join("\n")
+        );
+        store.talk_note(&person, &text, &[mine]).unwrap();
+        let (found, more) = store.talk_notes(&person, None, None, 2, 300).unwrap();
+        assert!(more);
+        let given = &found[0].2;
+        assert!(given.len() <= 300, "{}", given.len());
+        assert!(given.starts_with("Current activity: none\nKey facts:"));
+        assert!(given.ends_with("- the newest"));
+        assert!(!given.contains("- fact 000"));
         drop(store);
         fs::remove_dir_all(dir).unwrap();
     }

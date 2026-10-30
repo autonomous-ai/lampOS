@@ -1022,6 +1022,10 @@ fn worker_command(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
         ))
+        .envs(conversation_summary_worker_environment(
+            role,
+            var(crate::conversation_summary::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_reopen_quiet_worker_environment(
             role,
             var(crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT).as_deref(),
@@ -1247,6 +1251,17 @@ fn memory_observe_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::OBSERVE_ENVIRONMENT, "on"))
+}
+
+// The conversation's running summary (#1693's long-conversation plan, step
+// 3), passed the same narrow way: the exact `on`, to the second route
+// alone, the one with the chat's model to ask.
+fn conversation_summary_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::conversation_summary::ENVIRONMENT, "on"))
 }
 
 // Keeping a fact as it was heard (#2176), passed the same narrow way: the
@@ -1607,6 +1622,7 @@ fn second_route_worker_environment(
         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
         crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
         crate::person::BY_DEFAULT_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
@@ -1753,6 +1769,7 @@ mod tests {
             crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
             crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -2117,6 +2134,13 @@ mod tests {
                         "LAMP_MEMORY_OBSERVE",
                         ["second"].as_slice(),
                     ),
+                    // The conversation's running summary, the route with a
+                    // model (#1693's long-conversation plan, step 3).
+                    (
+                        conversation_summary_worker_environment,
+                        "LAMP_CONVERSATION_SUMMARY",
+                        ["second"].as_slice(),
+                    ),
                     // The note asked again after a quiet, the second route's
                     // (#1693 (1)).
                     (
@@ -2296,6 +2320,7 @@ mod tests {
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
+                    crate::conversation_summary::ENVIRONMENT,
                     crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
@@ -2390,6 +2415,7 @@ mod tests {
                     || name == crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT
                     || name == crate::second_provider::TWO_FACES_HELD_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
@@ -2476,6 +2502,8 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_CONVERSATION_CARRIES=on",
+                    "LAMP_CONVERSATION_SUMMARY=on",
                     "LAMP_DECLINE_SILENT=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACE_GAP_HOLD=on",

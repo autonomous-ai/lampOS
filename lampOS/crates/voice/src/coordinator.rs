@@ -5106,6 +5106,10 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
     /// A loop test's `LAMP_TASK_NEWS_AT_PAUSE=on` (#560), as `TEST_FULL_LOOK`.
     static TEST_NEWS_AT_PAUSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's speech cache for the hold's sleep line (#3748), as
+    /// `TEST_TASK_NEWS`.
+    static TEST_SPEECH_CACHE: std::cell::RefCell<Option<std::sync::Arc<crate::say::tts_cache::TtsCache>>> =
+        const { std::cell::RefCell::new(None) };
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
@@ -5842,6 +5846,24 @@ fn conversation_with_gate_inner(
     let sleep_breath = if controls.as_ref().is_some_and(HandControls::head_sleep) {
         let level = crate::head_cue::level_from_environment().map_err(io::Error::other)?;
         Some(crate::head_cue::breath(level))
+    } else {
+        None
+    };
+    // With `LAMP_SLEEP_LINE=on` (#3748): "Going to sleep. Tap my head to
+    // wake me." in the breath's place, from the speech cache, rendered at
+    // start in the product voice (`tts_cache::WARM`); read at each hold, one
+    // file read, never rendered on this path, so a line the warm thread
+    // renders after this loop started is said at the next hold (the
+    // reviewer on #4478). The breath plays while it is not kept yet.
+    // Either way the hold's sleep waits for its cue
+    // (`HandControls::sleep_cue_sounding`).
+    let sleep_line_on = controls.as_ref().is_some_and(HandControls::sleep_line);
+    let sleep_line_cache = if sleep_breath.is_some() && sleep_line_on {
+        #[cfg(test)]
+        let cache = TEST_SPEECH_CACHE.with(|cache| cache.borrow_mut().take());
+        #[cfg(not(test))]
+        let cache = crate::say::tts_cache::from_environment();
+        cache
     } else {
         None
     };
@@ -7005,6 +7027,16 @@ fn conversation_with_gate_inner(
                 ),
             }
         }
+        // The hold's sleep cue still sounding (#3748, `LAMP_SLEEP_LINE`):
+        // an owed sleep waits for it.
+        if sleep_line_on
+            && let Some(controls) = controls.as_mut()
+            && reply
+                .as_ref()
+                .is_some_and(|current| current.notice.origin() == SpeechOrigin::SleepBreath)
+        {
+            controls.sleep_cue_sounding(monotonic_us());
+        }
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
             None => None,
@@ -7037,7 +7069,19 @@ fn conversation_with_gate_inner(
         let speaking = reply
             .as_ref()
             .is_some_and(|current| current.had_audio || current.playback.is_some());
-        let head_stop = speaking && head_touch_at_us.is_some();
+        // A hand let go before the hold's 3 s while its sleep cue sounds
+        // (#3748, `LAMP_SLEEP_LINE`): the cue is cut at once, as a head
+        // touch cuts speech, and no sleep follows.
+        let cue_let_go = observation.as_ref().is_some_and(|seen| seen.head_lifted)
+            && reply
+                .as_ref()
+                .is_some_and(|current| current.notice.origin() == SpeechOrigin::SleepBreath);
+        if cue_let_go {
+            eprintln!(
+                "lamp-voice: a hand let go of the head before the hold's 3 s: its sleep cue is cut, no sleep"
+            );
+        }
+        let head_stop = speaking && head_touch_at_us.is_some() || cue_let_go;
         // A stop phrase said over the lamp and heard while it speaks
         // (#828, `LAMP_STOP_WORDS=heard-always`) stops it as the hand does,
         // and so does one said before its answer began, heard as a waited
@@ -11842,11 +11886,30 @@ fn conversation_with_gate_inner(
                     "boundary":"this decision, at Controls' hand time on the head; the first sample is head_sleep_breath_first_write"}),
             )?;
             if decided.is_ok() {
+                // The recorded line in the breath's place (#3748).
+                let sleep_line = sleep_line_cache
+                    .as_ref()
+                    .and_then(|cache| cache.kept(lamp_msgs::SLEEP_LINE));
+                if sleep_line_cache.is_some() && sleep_line.is_none() {
+                    eprintln!(
+                        "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"
+                    );
+                }
+                let (cue, basis) = match &sleep_line {
+                    Some(line) => {
+                        eprintln!(
+                            "lamp-voice: a hand's hold: the sleep line starts {} ms after the hold's 2 s",
+                            held_us.saturating_sub(crate::head_cue::BREATH_FROM_US) / 1_000
+                        );
+                        (line, "head_sleep_line")
+                    }
+                    None => (sound, "head_sleep_breath"),
+                };
                 let (now_state, _) = speaker_tone::commit_sound_turn(
                     owner,
                     reply,
-                    NoticeDelivery::sound(SpeechOrigin::SleepBreath, sound.clone()),
-                    "head_sleep_breath",
+                    NoticeDelivery::sound(SpeechOrigin::SleepBreath, cue.clone()),
+                    basis,
                     "a hand kept on the head: the lamp settles to sleep, nothing heard, nothing sent to the provider",
                     0,
                     rig.playout_start_now(),

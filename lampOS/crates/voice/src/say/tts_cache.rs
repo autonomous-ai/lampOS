@@ -5,7 +5,8 @@
 //! route's, ElevenLabs through the relay, its voice and model), kept as a
 //! WAV named by the SHA-256 of `voice|model|language|text`, and played from
 //! there on every later ask, with no network. [`WARM`] is rendered at start,
-//! so the first shutdown is said from the cache even offline.
+//! so the first shutdown is said from the cache even offline, and so is a
+//! hand's hold's sleep line (#3748, `LAMP_SLEEP_LINE`).
 use super::SOUND_RATE;
 use sha2::{Digest, Sha256};
 use std::{
@@ -26,8 +27,9 @@ pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
 /// The longest one rendering may take.
 pub const RENDER_WITHIN: Duration = Duration::from_secs(5);
 /// Rendered at start, after the speech service is configured, until each is
-/// kept: the safe shutdown's line, one source with the shutdown.
-pub const WARM: &[&str] = &[lamp_msgs::GOING_TO_SLEEP];
+/// kept: the safe shutdown's line, one source with the shutdown, then the
+/// hold's sleep line (#3748), read by the coordinator with [`TtsCache::kept`].
+pub const WARM: &[&str] = &[lamp_msgs::GOING_TO_SLEEP, lamp_msgs::SLEEP_LINE];
 /// How often an unrendered [`WARM`] line is tried again (offline at start).
 const WARM_EVERY: Duration = Duration::from_secs(60);
 
@@ -101,6 +103,12 @@ impl TtsCache {
         Ok(samples)
     }
 
+    /// `text`'s samples if kept already, never rendered here: for a caller
+    /// that must not wait on the speech service (#3748).
+    pub fn kept(&self, text: &str) -> Option<Vec<i16>> {
+        read(&self.path(text))
+    }
+
     /// Each of `lines` rendered and kept, unless it is already.
     pub fn warm(&self, lines: &[&str]) -> Result<(), String> {
         lines
@@ -162,8 +170,14 @@ fn read(path: &Path) -> Option<Vec<i16>> {
 /// The cache over the second route's speech service, when it is configured
 /// (`LAMP_VOICE_SECOND_CONFIG`), with [`WARM`] rendered on a thread of its
 /// own, tried again every minute until kept. Without it, none: a cached ask
-/// is refused and its asker says the words another way.
+/// is refused and its asker says the words another way. Made once per
+/// process: the say service and the hold's sleep line (#3748) share it.
 pub fn from_environment() -> Option<Arc<TtsCache>> {
+    static SHARED: std::sync::OnceLock<Option<Arc<TtsCache>>> = std::sync::OnceLock::new();
+    SHARED.get_or_init(made_from_environment).clone()
+}
+
+fn made_from_environment() -> Option<Arc<TtsCache>> {
     use crate::second_provider::net::{Tts, default_model, voice_name};
     let config = match crate::second_config::load_from_env().and_then(|config| {
         config
@@ -300,13 +314,20 @@ mod tests {
     }
 
     #[test]
-    fn warm_renders_the_shutdown_line_once() {
+    fn warm_renders_the_shutdown_line_and_the_sleep_line_once() {
+        assert_eq!(WARM, [lamp_msgs::GOING_TO_SLEEP, lamp_msgs::SLEEP_LINE]);
         let dir = scratch("warm");
         let (cache, calls) = counted(&dir, "Rachel");
+        assert_eq!(cache.kept(lamp_msgs::SLEEP_LINE), None);
         cache.warm(WARM).unwrap();
         cache.warm(WARM).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
         assert!(cache.path(lamp_msgs::GOING_TO_SLEEP).is_file());
+        assert_eq!(
+            cache.kept(lamp_msgs::SLEEP_LINE),
+            Some(vec![lamp_msgs::SLEEP_LINE.len() as i16; 2_400])
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2, "kept never renders");
     }
 
     #[test]

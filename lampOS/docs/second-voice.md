@@ -1533,8 +1533,9 @@ order is kept. A written turn is the same from the chat on.
 - **The first words go early.** Until some of the answer is on its way, a
   clause of at least four words ending in a comma, semicolon or colon is
   said on its own (`Sentences::clause`).
-- **The chat is given the person's last exchanges.** Up to six, each said
-  within five minutes, as user and assistant messages after the system
+- **The chat is given the person's last exchanges.** Up to twelve, each said
+  within ten minutes (six and five minutes before #1693: a long talk's quiz
+  rules left them), as user and assistant messages after the system
   message: a Live session keeps its own, and "and how many people live
   there?" needs the one before (on lamp-52e6, without it, "there" became
   the lamp's own city). They are read from the thread (`Thread::recent`),
@@ -1809,9 +1810,9 @@ order is kept. A written turn is the same from the chat on.
     that the worker installs. A refused keep does not refresh; held and
     revoked contexts leave a confirmed keep for the next admitted context.
     That context opens a new snapshot once, and its provider-facing messages
-    still carry the synthetic name after nine exchanges over 368 simulated
-    seconds have evicted it from both the six-exchange/300 s history and
-    eight-exchange thread recap. The companion
+    still carry the synthetic name after fifteen exchanges over 700 simulated
+    seconds have evicted it from both the twelve-exchange/600 s history and
+    twelve-exchange thread recap. The companion
     `a_room_keep_reaches_the_next_context_without_a_person_change` keeps
     every operation in room scope, so a person change cannot cause the
     refresh or mask a missing keep marker. The local socket fixture freezes
@@ -3989,6 +3990,42 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   personal keep or forget is not done as theirs: `forget_everything`
   refuses, and a keep is the room's, or withheld with
   `LAMP_MEMORY_PERSONAL_NEEDS_FACE`.
+  **Within their conversation** (`LAMP_CONVERSATION_CARRIES=on`, #4339):
+  such a line no face was seen speaking stays the conversation's, not the
+  room's, when all of these hold: the newest exchange before it is theirs
+  and began within 45 s (`Thread::going_on_with`), the eyes' looks fell in
+  it and none tracked a face but theirs (`SpeakingFaces::no_other_face_in_view`;
+  no look, a stalled eye or a covered camera, is not), their face was in
+  view through it or within 5 s before it began
+  (`SpeakingFaces::face_seen_between`, `CARRY_UNSEEN_WITHIN`; an empty view
+  from the start, or their face gone longer, is the room's: the lamp-memory
+  owner's decision on #4479), and the thread's lock
+  was free (a busy one is the room's). It is then carried
+  (`ScopeLease::carry_conversation`) and read as a line held by a face's
+  gap (`ScopeSnapshot::held`): told their thread and the exchanges before
+  it, with no memory note, hits, recall, keep, forget or yes
+  (`HELD_MEMORY_CALL`), and never journalled. A face seen speaking it,
+  another face in view, a 45 s quiet or another person's exchange between
+  narrows it to the room as before. A line admitted as the room's, the
+  face cache naming nobody, is carried the same way into the known person's
+  conversation going on (`Thread::going_on_with` names whose it is), when
+  no face was seen speaking it, none but theirs was in view and theirs was
+  within the same 5 s: `request N:
+  admitted as the room's, no face seen speaking it, in a known person's
+  conversation going on, no other face in view: told from that
+  conversation, never memory's (LAMP_CONVERSATION_CARRIES)`. A line
+  admitted as another known person's is never carried into someone else's.
+  On lamp-3e83 (29 Oct) one such line dropped to the room's, the chat saw
+  16, then 4, then 16 messages, and the lamp asked its question again; on
+  lamp-06c1 (29 Oct) 13 of 68 turns with the person in view throughout
+  were not theirs, 5 of them with no face line at all. Its exchange is never given to the running
+  summary or a talk note. Risk, accepted: someone off camera, with no
+  other sign, within those 5 s, is answered inside the conversation going
+  on and can hear what was said in it and its running summary; they reach
+  none of the person's saved memory. The
+  journal: `request N: no face was seen speaking it, in their conversation
+  going on, no other face in view: told from that conversation, never
+  memory's (LAMP_CONVERSATION_CARRIES)`.
   The switch is installed whether or not the eyes' reader starts; with no
   reader (the bus would not open) no face is seen, so every line is the
   room's and a late look gives no keeper: `no eyes read who spoke it

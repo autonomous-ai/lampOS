@@ -58,6 +58,23 @@ const FACE_SAVE_WAIT_US: u64 = 15_000_000;
 pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
 /// The provider worker's flag: the onboarding file, whose mailbox it writes.
 pub const FLAG: &str = "--onboarding-file";
+/// The provider worker's flags after [`FLAG`]: this lamp offers room sounds
+/// (`no-slide`) or face expressions, so `setup_step` may name them (#3769).
+pub const ROOM_SOUNDS_FLAG: &str = "--onboarding-room-sounds";
+pub const FACE_EXPRESSIONS_FLAG: &str = "--onboarding-face-expressions";
+
+/// [`ROOM_SOUNDS_FLAG`] and [`FACE_EXPRESSIONS_FLAG`] for the steps this
+/// voice's walk offers, from the same switches it reads.
+pub fn offers_arguments(privacy_controls: Option<&str>, face_ask: Option<&str>) -> Vec<String> {
+    let mut flags = Vec::new();
+    if no_slide(privacy_controls) {
+        flags.push(ROOM_SOUNDS_FLAG.to_owned());
+    }
+    if face_ask == Some("on") {
+        flags.push(FACE_EXPRESSIONS_FLAG.to_owned());
+    }
+    flags
+}
 pub const STEP: &str = "setup_step";
 pub const REDO: &str = "redo_setup";
 /// `redo_setup`'s step for the whole walk again: the person asked for all of it.
@@ -3694,7 +3711,14 @@ fn yes_or_no(text: &str) -> Option<bool> {
     }
     let (rest, phrase) = without_yes_phrases(&words);
     let has = |set: &[&str]| rest.iter().any(|word| set.contains(word));
-    if has(&["no", "nope", "nah", "not", "wrong"]) {
+    // A "…n't" left once the yes phrases are out ("don't mind" is one) is a
+    // no: "Right, I don't." and "Yeah, I won't." were a yes, and a consent
+    // with them (Fourth's P3 on #4469).
+    if has(&["no", "nope", "nah", "not", "wrong"])
+        || rest
+            .iter()
+            .any(|word| word.ends_with("n't") || word.ends_with("n’t"))
+    {
         Some(false)
     } else if phrase
         || has(&[
@@ -3805,14 +3829,36 @@ fn nearest(faces: &lamp_msgs::Faces) -> Option<Framing> {
 /// The two functions the model is told of when the walk is switched on.
 /// A parked step ([`giving_way::PARKED`]) is in neither, nor in their
 /// words: the model only knows a step from them, and on lamp-29e7 (29 Oct,
-/// #3702) one it was told of was asked in its own words.
-pub fn tools() -> Vec<Tool> {
-    let parked = |name: &&str| giving_way::PARKED && *name == Step::GivingWay.name();
+/// #3702) one it was told of was asked in its own words. Nor is a step this
+/// lamp never offers (room sounds without `no-slide`, face expressions
+/// without [`FACE_EXPRESSIONS_ASK_ENVIRONMENT`]): on lamp-52e6 on 30 Oct
+/// (8811, #3769) the model, told of face_expressions, asked "whether you're
+/// smiling or frowning" itself while the step was off. The provider worker
+/// learns which it offers from its flags ([`offers_arguments`]).
+pub fn tools(no_slide: bool, face_ask: bool) -> Vec<Tool> {
+    let off = |name: &&str| match Step::named(name) {
+        Some(Step::GivingWay) => giving_way::PARKED,
+        Some(Step::RoomSounds) => !no_slide,
+        Some(Step::FaceExpressions) => !face_ask,
+        _ => false,
+    };
     let names: Vec<&str> = Step::IDS
         .iter()
         .copied()
-        .filter(|name| !parked(name))
+        .filter(|name| !off(name))
         .collect();
+    let yes_steps: Vec<&str> = [ROOM_SOUNDS, FACE_EXPRESSIONS]
+        .into_iter()
+        .filter(|name| !off(name))
+        .collect();
+    let clear_yes = match yes_steps.len() {
+        0 => String::new(),
+        1 => format!("{} is done only after a clear yes. ", yes_steps[0]),
+        _ => format!(
+            "{} are done only after a clear yes. ",
+            yes_steps.join(" and ")
+        ),
+    };
     let redo_names: Vec<&str> = names.iter().copied().chain([REDO_ALL]).collect();
     let (measured, evidence) = if giving_way::PARKED {
         (
@@ -3835,8 +3881,7 @@ pub fn tools() -> Vec<Tool> {
                  they want to skip the rest, call it skipped for the step you are on. Then go on \
                  talking as the step asked. Only for the step you are leading now; {measured} \
                  can only be skipped; the runner requires physical evidence: {evidence}. \
-                 room_sounds and face_expressions are done only after a clear yes. The runner \
-                 asks each step in its own words and counts every try: never name, announce, \
+                 {clear_yes}The runner asks each step in its own words and counts every try: never name, announce, \
                  explain or ask a step yourself, and never count calls or say how many are left."
             ),
             parameters: Some(json!({
@@ -3877,6 +3922,11 @@ pub fn is_tool(name: &str) -> bool {
 /// outcome and answer go in the journal: on lamp-29e7 on 27 Oct three
 /// setup_step calls left "the onboarding answered" and nothing more, so
 /// what held "who you are" for 5 minutes could not be read (#3883).
+/// What `setup_step` tells the model when it reports "preferences": there
+/// is nothing more to ask, and the walk says the last line.
+const PREFERENCES_ANSWER: &str = "That was the last question. Answer in at most five words, \
+     never with a question: there are no more questions, and I say the last line myself.";
+
 pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
     let (told, answered) = answer(file, call);
     let said = |key: &str| call.args.get(key).and_then(Value::as_str).unwrap_or("none");
@@ -3928,6 +3978,18 @@ fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
                         json!({"ok": true, "note": "I say that it is skipped myself. Say nothing about it, and nothing more until I do."}),
                         true,
                     );
+                }
+                // "Preferences"' hello is the walk's last question, and its
+                // done line follows: on lamp-52e6 on 30 Oct (8811, #3769) the
+                // model's answer to it went on to a question of its own.
+                (Some(Step::Preferences), Some(told)) if Step::Preferences.reportable(told) => {
+                    if post(file, &json!({"step": "preferences", "outcome": outcome})).is_err() {
+                        return (
+                            json!({"error": "I could not note that just now. Go on all the same."}),
+                            false,
+                        );
+                    }
+                    return (json!({"ok": true, "note": PREFERENCES_ANSWER}), true);
                 }
                 (Some(step), Some(told)) if step.reportable(told) => {
                     json!({"step": step.name(), "outcome": outcome})
@@ -5657,6 +5719,17 @@ mod tests {
             assert!(refuses(&words(no)), "{no}");
         }
         assert_eq!(yes_or_no("of course not"), Some(false));
+        // Fourth's P3 on #4469: a short line with a yes word and a "…n't"
+        // is a no, and "don't mind" is still a yes.
+        for no in [
+            "Right, I don't.",
+            "Yeah, I won't.",
+            "Sure, don't.",
+            "Yes, please don't.",
+        ] {
+            assert_eq!(yes_or_no(no), Some(false), "{no}");
+        }
+        assert_eq!(yes_or_no("Yes, I don't mind"), Some(true));
     }
 
     /// With a face to keep (the eyes' who socket), a name and a yes leave
@@ -7578,14 +7651,8 @@ mod tests {
     /// model never to lead or count a step itself.
     #[test]
     fn a_parked_step_is_never_told_to_the_model() {
-        let told = tools();
-        let text = serde_json::to_string(
-            &told
-                .iter()
-                .map(|tool| json!([tool.name, tool.description, tool.parameters]))
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
+        let told = tools(true, true);
+        let text = told_text(&told);
         // Put back (PARKED false), it is told again, with nothing else changed.
         let told_of = !giving_way::PARKED;
         assert_eq!(text.contains("giving_way"), told_of, "{text}");
@@ -7603,6 +7670,81 @@ mod tests {
             "{}",
             told[0].description
         );
+    }
+
+    fn told_text(told: &[Tool]) -> String {
+        serde_json::to_string(
+            &told
+                .iter()
+                .map(|tool| json!([tool.name, tool.description, tool.parameters]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+
+    /// lamp-52e6 on 30 Oct (8811, #3769): face expressions off
+    /// (`LAMP_FACE_EXPRESSIONS_ASK` unset), the model, told of
+    /// face_expressions by `setup_step`, asked "Do you mind if I notice
+    /// whether you're smiling or frowning" after the hello. A step this lamp
+    /// never offers is in no function's steps or words; offered, it is told
+    /// as before. Room sounds likewise.
+    #[test]
+    fn a_step_this_lamp_never_offers_is_never_told_to_the_model() {
+        let off = told_text(&tools(false, false));
+        for word in [
+            "face",
+            "smil",
+            "frown",
+            "express",
+            "room_sounds",
+            "clear yes",
+        ] {
+            assert!(!off.contains(word), "{word}: {off}");
+        }
+        let face_only = tools(false, true);
+        assert!(
+            face_only[0]
+                .description
+                .contains(" face_expressions is done only after a clear yes. The runner asks")
+        );
+        assert!(!told_text(&face_only).contains("room_sounds"));
+        let sounds_only = tools(true, false);
+        assert!(
+            sounds_only[0]
+                .description
+                .contains(" room_sounds is done only after a clear yes. The runner asks")
+        );
+        assert!(!told_text(&sounds_only).contains("face"));
+        // Both offered: today's words and steps, unchanged.
+        let both = tools(true, true);
+        assert!(both[0].description.contains(
+            "receipt. room_sounds and face_expressions are done only after a clear yes. The \
+             runner asks"
+        ));
+        for tool in &both {
+            let steps = tool.parameters.as_ref().unwrap()["properties"]["step"]["enum"]
+                .as_array()
+                .unwrap()
+                .clone();
+            for name in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
+                assert!(steps.iter().any(|step| step == name), "{name}");
+            }
+        }
+    }
+
+    /// The hello answered, `setup_step` for "preferences" tells the model
+    /// there is nothing more to ask: the walk's done line follows (#3769).
+    #[test]
+    fn preferences_reported_tells_the_model_no_more_questions() {
+        let call = ToolCall {
+            id: "c".into(),
+            name: STEP.into(),
+            args: json!({"step": "preferences", "outcome": "done"}),
+        };
+        let (told, ok) = run(&file("preferences-answer"), &call);
+        assert!(ok, "{told}");
+        assert_eq!(told, json!({"ok": true, "note": PREFERENCES_ANSWER}));
+        assert!(PREFERENCES_ANSWER.contains("at most five words, never with a question"));
     }
 }
 

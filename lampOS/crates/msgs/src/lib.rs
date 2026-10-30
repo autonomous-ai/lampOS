@@ -123,6 +123,12 @@ pub mod owner_place;
 /// The ring's unplug light is soft green.
 pub const GOING_TO_SLEEP: &str = "Going to sleep now. Unplug me when my light turns green.";
 
+/// The sleep line (#3748, `docs/controls.md`): said by a hand's hold on the
+/// head with `LAMP_SLEEP_LINE=on`, played from the voice's speech cache
+/// (rendered at start in the product voice), and by the `go_to_sleep`
+/// function. The cache is keyed by these exact words.
+pub const SLEEP_LINE: &str = "Going to sleep. Tap my head to wake me.";
+
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Invalid(pub String);

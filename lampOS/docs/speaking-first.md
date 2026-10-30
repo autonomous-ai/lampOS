@@ -519,9 +519,14 @@ second route's configuration, or offline on a miss, it is refused at once
 with why (`the speech cache is off`, `not in the speech cache, and not
 rendered: …`), and the asker says the words another way. Its samples are
 played as a skill's sound is, with the same gates. At start the voice
-renders the cache's fixed lines, the shutdown's `lamp_msgs::GOING_TO_SLEEP`
-alone, on a thread of its own, tried again each minute until kept, so
-the first shutdown is said from the cache even with no network then.
+renders the cache's fixed lines (`tts_cache::WARM`), the shutdown's
+`lamp_msgs::GOING_TO_SLEEP` first, then a hand's hold's sleep line
+`lamp_msgs::SLEEP_LINE` (#3748, `LAMP_SLEEP_LINE`, controls.md), on a
+thread of its own, tried again each minute until kept, so the first
+shutdown is said from the cache even with no network then. The cache is
+made once per process and shared: the coordinator reads the sleep line
+from it once per conversation (`TtsCache::kept`), a file read only, never
+a render.
 
 **When it is said.** After a due reminder and before the news, through a reminder's gates: no reply owed or queued, the speaker
 free, nobody's utterance pending, the microphone's capture fresh and a

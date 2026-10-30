@@ -740,7 +740,8 @@ for every part: `lampos-setup-done.path` (with the marker still there it
 would start the lamp again), then `lampos.target` with each of its parts
 named (its `ConsistsOf`). Then it runs the reset as the button does (setup's
 `reset-now` on the lamp's plan, in the unit `lamp-setup-wipe`), and the lamp
-reboots into setup, unset. The stop waits because `systemctl stop
+starts setup again in place, unset, with no reboot (setup.md, the reset's
+step 5; it reboots only if that fails). The stop waits because `systemctl stop
 lampos.target` alone returns before the parts have stopped (systemd 252:
 0.04 s, a part's write on stop 3.1 s later). On lamp-29e7 on 26 Oct, Voice's
 onboarding, written as it stopped, outlived the wipe, so the customer got no
@@ -835,7 +836,7 @@ product does it with systemd alone (#811):
 |---|---|---|
 | `lamp-setup.service` | at boot, `WantedBy=multi-user.target`, only while `/var/lib/lampos-setup/done` is missing and setup's two settings exist | the hotspot and V1's setup page until the home's Wi-Fi and the person's settings are saved; then writes the marker |
 | `lampos-setup-done.path` | at boot, `WantedBy=multi-user.target` | starts `lampos.target` once the marker exists: the moment setup writes it, and at every later boot |
-| `lamp-setup-reset.service` | in the target, after setup | the reset button held 5 s: stops the lamp, wipes, removes the marker, reboots into setup. Sandboxed (#3710): it writes only its subscriber's socket under `/run/lampos-bus` (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`), and hands the reset to `lamp-setup-wipe` through `systemd-run` (the plan's `detach`), which runs outside it. So it needs a plan with `detach`, as every plan a build ships has (the install test checks it): a plan kept by hand without one, which only a keeper-installed lamp can have (`crates/keeper/src/profile.rs`, a hand-changed plan is kept), would reset inside this read-only unit, fail on its journal and restart without wiping; give such a plan the shipped `detach` |
+| `lamp-setup-reset.service` | in the target, after setup | the reset button held 5 s: stops the lamp, wipes, removes the marker, and starts setup again in place with no reboot (#4500; it reboots if that fails, setup.md). Sandboxed (#3710): it writes only its subscriber's socket under `/run/lampos-bus` (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`), and hands the reset to `lamp-setup-wipe` through `systemd-run` (the plan's `detach`), which runs outside it. So it needs a plan with `detach`, as every plan a build ships has (the install test checks it): a plan kept by hand without one, which only a keeper-installed lamp can have (`crates/keeper/src/profile.rs`, a hand-changed plan is kept), would reset inside this read-only unit, fail on its journal and restart without wiping; give such a plan the shipped `detach` |
 | `lamp-waking.service` | early at boot, `WantedBy=sysinit.target`, only once the marker exists, and with every start of the voice (`lamp-voice.service` wants it and starts after it, #2848) | the waking face until the voice asks for the ring (#1681, [ring-choreography.md](ring-choreography.md), "The waking face"); off unless `LAMP_WAKING_FACE=on`, and then it exits at once. Sandboxed (#3710): `ProtectSystem=strict` with nothing written but its runtime directory and the ring's `/dev/spidev3.0`, `ProtectHome`, `NoNewPrivileges`; no `PrivateTmp`, which would order it after the /tmp mounts and delay first light |
 
 Setup, its reset and the waking face start the same binary, `/opt/lampOS/setup/current/lamp-setup`.
