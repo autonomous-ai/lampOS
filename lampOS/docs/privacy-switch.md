@@ -187,6 +187,14 @@ original acquisition or the current controller deadline, whichever comes first.
 The controller's existing maximum authority lease is 250 ms: if the main owner
 stalls but this child and Controls continue, that controller deadline still
 limits renewal. A blocked/dead privacy child cannot renew the shorter Bus lease.
+The coordinator keeps renewing every worker's authority through its startup
+prologue too, from its last start-up pulse to its loop's first publish, at
+least every 50 ms between its setup steps (#4332); the lease, its expiry and
+the fail-closed exit are unchanged, so one setup step held past 250 ms still
+ends the voice closed. The privacy worker's observations queue up through
+that prologue, so the voice's one second of waiting past one read stale
+before the microphone is first allowed (`PRIVACY_START_STALE_US`) counts
+from its loop's start, after the prologue, with the gate closed until then.
 
 Ears also holds Voice to its latch: once a `voice/privacy` session has reported
 the switch closed, Ears refuses any later permit from that session, and only a
