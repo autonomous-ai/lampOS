@@ -491,7 +491,10 @@ skills".)
     from the eyes' known file as it asks (`--known-file`, the id on the
     file's second line, else the id of the name; never the name), and none
     for a face not known. The product's `lamp-policy` runs with `--hello
-    --act hello --gate` to answer it. Every other skill acts at once, as
+    --act hello --gate --hello-by-rule` to answer it: the hard rules alone
+    decide, a pass is `say_now` at once with no wait for the model, and the
+    judge is asked only in shadow, never acting (the first builder on
+    #4625; [policy.md](policy.md#by-the-hard-rules-alone-4625)). Every other skill acts at once, as
     before. Tests: `skipping_the_ask_a_hello_is_still_asked_of_the_policy`,
     `skipping_the_ask_any_other_skill_acts_at_once`,
     `known::tests::the_person_a_hello_is_for_is_the_memorys_id_never_the_name`.
