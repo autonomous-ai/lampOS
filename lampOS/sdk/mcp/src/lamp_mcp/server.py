@@ -22,18 +22,20 @@ import importlib.metadata
 import os
 import socket
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any, Literal
 
 from lampos import Lamp, LampError, schema
+from lampos.client import SAY_MAX_BYTES
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
 
-# The body's clips a client may name, less the two the lamp refuses through
-# this door: `idle` is the lamp's own life, and `scanning` sweeps a room like
-# a camera (CLAUDE.md rule 8; Nine's `GESTURES_REFUSED`, #3504 13:27).
-REFUSED_GESTURES = ("idle", "scanning")
+# The body's clips an agent is offered: the schema's `examples`, which leave
+# out `idle`, the lamp's own life, and `scanning`, a room sweep (CLAUDE.md
+# rule 8). The door itself takes both from a developer's own program since
+# 30 Oct; an agent choosing for itself is offered the clips a person expects.
 # A body lease for one look or move, never renewed: released at `done`, or
 # left to lapse if `done` doesn't come (Nine, #3504 13:27).
 ACTION_LEASE_MS = 10_000
@@ -90,7 +92,7 @@ LIMIT_KIND = {
 
 
 def gestures() -> list[str]:
-    return [name for name in schema.gestures() if name not in REFUSED_GESTURES]
+    return list(schema.gestures())
 
 
 def refused(error: LampError) -> ToolError:
@@ -99,6 +101,16 @@ def refused(error: LampError) -> ToolError:
     if error.retry_ms is not None:
         text += f" (try again in {error.retry_ms} ms)"
     return ToolError(text)
+
+
+def words(field: str, text: str) -> None:
+    """A say's text or a turn's prompt held as the lamp holds it: no control
+    character (a newline or tab too) and at most the 900 UTF-8 bytes the voice
+    takes, never stricter than the lamp."""
+    if any(unicodedata.category(c) == "Cc" for c in text):
+        raise ToolError(f"bad_request: {field}: words, no control characters")
+    if len(text.encode("utf-8")) > SAY_MAX_BYTES:
+        raise ToolError(f"bad_request: {field}: at most {SAY_MAX_BYTES} bytes as the voice takes it")
 
 
 class Limits:
@@ -482,7 +494,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             elbow: float | None = None,
         ) -> str:
             """Aim the joints you name, in degrees (−180 to 180), reached within `within_ms`
-            (up to 5,000): head `pitch` and `roll`, base `yaw`, `shoulder` and `elbow`. At least one.
+            (0 or more; the body's caps pace each step): head `pitch` and `roll`, base `yaw`, `shoulder`
+            and `elbow`. At least one.
             The body bounds each step as it does every move. A lamp that doesn't route `joints` yet
             says so, as the tool's error."""
             targets = {
@@ -534,12 +547,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_say(text: str, rephrase: bool = False) -> str:
-            """Say a short line in the lamp's own voice (300 characters at most), exactly as written, once
-            the person isn't talking; `rephrase` lets the lamp say it in its own words instead, which also
-            waits until the lamp isn't talking with someone, as before. It isn't said while the lamp is in
-            quiet hours or private."""
-            if len(text) > 300:
-                raise ToolError("bad_request: at most 300 characters")
+            """Say a line in the lamp's own voice, at most 900 bytes of UTF-8 (the voice's own cap;
+            about 900 Latin letters, fewer in other scripts), exactly as written, once the person isn't
+            talking; `rephrase` lets the lamp say it in its own words instead, which also waits until the
+            lamp isn't talking with someone, as before. It isn't said while the lamp is private, or in
+            quiet hours where this lamp has them set."""
+            words("text", text)
             await act("say", text=text, rephrase=True if rephrase else None)
             return "said"
 
@@ -644,12 +657,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_start_turn(prompt: str | None = None, wait: bool = False) -> str:
-            """Open a conversation turn as a tap on the lamp's head does: it says `prompt` first (300
-            characters at most), then answers the person's next line as spoken to it. What the person
-            says never comes back here, only how the turn ended. With `wait`, return when it ends
-            (120 s at most). Not in quiet hours, private, or while the lamp talks with someone."""
-            if prompt is not None and len(prompt) > 300:
-                raise ToolError("bad_request: at most 300 characters")
+            """Open a conversation turn as a tap on the lamp's head does: it says `prompt` first (900
+            bytes of UTF-8 at most, as `lamp_say`), then answers the person's next line as spoken to it.
+            What the person says never comes back here, only how the turn ended. With `wait`, return when
+            it ends (120 s at most). Not while private or the lamp talks with someone, or in quiet hours
+            where this lamp has them set."""
+            if prompt is not None:
+                words("prompt", prompt)
             limits.take("turn.start")
             ended: asyncio.Future = asyncio.get_running_loop().create_future()
             asked: int | None = None

@@ -46,8 +46,8 @@ Each of these cost someone a run on a real lamp.
 
 ## Voice
 
-- **Quiet hours** (`limits.quiet_hours`, by default 22:00 to 07:00) refuse
-  `say` and `sound`. Use light then.
+- **Quiet hours** (`limits.quiet_hours`, off unless this lamp sets them)
+  refuse `say`, `sound` and `turn.start`. Use light then.
 - **`say` is refused while the lamp talks with someone, or is private.**
 - **Turns and your mute: the person wins.** A turn you start answers the
   person's next line as spoken to the lamp, but what they say never reaches

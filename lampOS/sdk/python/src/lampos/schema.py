@@ -46,7 +46,15 @@ def states() -> tuple[str, ...]:
 
 
 def gestures() -> tuple[str, ...]:
-    return _enum("gesture")
+    """The body clips offered to programs (the schema's `examples`). The door
+    takes any gesture name of the right shape (`gesture_pattern`), `idle` and
+    `scanning` too, and the body answers a name it doesn't have."""
+    return tuple(schema()["$defs"]["gesture"]["examples"])
+
+
+def gesture_pattern() -> str:
+    """A gesture name's shape, as lamp-control's plain_name checks it."""
+    return schema()["$defs"]["gesture"]["pattern"]
 
 
 def colours() -> tuple[str, ...]:

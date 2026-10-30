@@ -31,7 +31,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `timeout_s` | number | 0 to 120; more waits 120 | 60 | | |
 | `lamp_express` | `feeling` | string, required | a feeling of the `feelings` skill: `glad`, `lively` or `low` (the lamp refuses another) | — | body, light | no |
 | | `strength` | number | 0 to 1: from 0.5 up the whole move, a smaller step of it below | 0.5 | | |
-| `lamp_gesture` | `name` | string, required | `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (the schema's gestures less `idle` and `scanning`) | — | body | no |
+| `lamp_gesture` | `name` | string, required | `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (the schema's offered gestures; the lamp itself also takes `idle` and `scanning` from a program, but an agent is offered the clips a person expects, rule 8) | — | body | no |
 | `lamp_look` | `at` | string | `face`, `name` or `ahead` | none: then `yaw` and `pitch` | body (and look for `face`) | yes, 10 s |
 | | `yaw` | number | degrees, right positive, within the head's reach | 0 | | |
 | | `pitch` | number | degrees, up positive, within the head's reach | 0 | | |
@@ -40,7 +40,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | `lamp_move` | `step_ms` | integer, required | 20 to 1000 | — | body | yes, 10 s |
 | | `frames` | list of lists of integers, required | each 5 joint offsets in counts (pitch, roll, yaw, shoulder, elbow), the first and last all 0; the body checks it | — | | |
 | `lamp_play` | `name` | string, required | a recorded move's name: lowercase letters, digits, `-` and `_`, 40 at most; a lamp that doesn't route `play` yet refuses it | — | body | yes, 10 s |
-| `lamp_joints` | `within_ms` | integer | up to 5000: how soon the joints get there | 1000 | body | yes, 10 s, named in the request |
+| `lamp_joints` | `within_ms` | integer | 0 or more: how soon the joints get there (the body's caps pace each step) | 1000 | body | yes, 10 s, named in the request |
 | | `pitch` | number | degrees, −180 to 180; at least one of the five | none | | |
 | | `roll` | number | degrees, −180 to 180 | none | | |
 | | `yaw` | number | degrees, −180 to 180 | none | | |
@@ -54,9 +54,9 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `rgb` | string | one `#rrggbb` for the whole ring | none | | |
 | | `brightness` | integer | 0 to 100 of the given colours, under the ring's own ceiling | 100 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
-| `lamp_say` | `text` | string, required | 300 characters at most, said exactly as written once the person isn't talking | — | speak | no |
+| `lamp_say` | `text` | string, required | words, at most 900 UTF-8 bytes, the voice's own cap (the lamp refuses more, so lamp-mcp does too), said exactly as written once the person isn't talking | — | speak | no |
 | | `rephrase` | boolean | `true`: the lamp says it in its own words instead | `false` | | |
-| `lamp_sound` | `name` | string, required | `hum`, the lamp's own short hum, or one of this computer's clips (`lamp_upload_sound`), played once the person isn't talking; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
+| `lamp_sound` | `name` | string, required | `hum`, the lamp's own short hum, or one of this computer's clips (`lamp_upload_sound`), played once the person isn't talking; refused in quiet hours where this lamp has them set, and by a lamp that doesn't route `sound` yet | — | speak | no |
 | `lamp_upload_sound` | `name` | string, required | the clip's name: a lowercase letter, then lowercase letters, digits, `_` or `-`, 64 at most, never `hum`; replaces a clip of the same name | — | speak | no |
 | | `path` | string, required | a WAV file on this computer: 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS. Each computer keeps up to 64 clips and 20 MB on the lamp; revoking it deletes them | — | | |
 | `lamp_sounds` | none | | | | speak | no |
@@ -64,7 +64,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | `lamp_volume` | `to` | integer | 0 to 100 of what the lamp allows; 0 is muted. Exactly one of `to`, `step` or `mute`. The person's own volume, the same they set by voice or in the app; it returns the level it left, `{level, muted}` | none | speak | no |
 | | `step` | string | `up` or `down`: the lamp's own step, within its floor and ceiling | none | | |
 | | `mute` | boolean | `true` mutes; `false` brings it back to where it was | none | | |
-| `lamp_start_turn` | `prompt` | string | words the lamp says first, 300 characters at most. Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. What the person says never comes back, only how the turn ended (`turn finished`, or `turn dropped: …` with the voice's why); refused in quiet hours, as `lamp_say` | none | speak, hear | no |
+| `lamp_start_turn` | `prompt` | string | words the lamp says first, at most 900 UTF-8 bytes, as `lamp_say`. Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. What the person says never comes back, only how the turn ended (`turn finished`, or `turn dropped: …` with the voice's why); refused in quiet hours where this lamp has them set, as `lamp_say` | none | speak, hear | no |
 | | `wait` | boolean | return when the turn ends, 120 s at most | false | | |
 | `lamp_end_turn` | none | | ends the turn this computer started, never another's; with none, `busy: not this computer's turn` | | speak | no |
 | `lamp_set_listening` | `on` | boolean, required | `false` mutes the lamp's listening for this computer until `true`, a hand on its head, or lamp-mcp going (its connection closes); `lamp_stop` doesn't lift it. The person always wins | — | hear | no |

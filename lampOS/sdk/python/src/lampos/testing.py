@@ -129,8 +129,8 @@ LIMITS = {
     "refused": [{"most": 20, "within_ms": 1_000}],
     "phrases": [{"most": 6, "within_ms": 60_000}],
     "hold_max_ms": 30_000,
-    "take_max_ms": 600_000,
-    "say_max_chars": 300,
+    "lease_max_ms": 600_000,
+    "say_max_bytes": 900,
     "sounds": {
         "rate_hz": 24_000,
         "clip_max_ms": 30_000,
@@ -141,7 +141,7 @@ LIMITS = {
         "store_max_bytes": 20_000_000,
     },
     "ring": {"pixels": 32},
-    "quiet_hours": {"from": "22:00", "to": "07:00"},
+    "quiet_hours": "off",
 }
 
 def _clip(name: str, data: bytes) -> dict:

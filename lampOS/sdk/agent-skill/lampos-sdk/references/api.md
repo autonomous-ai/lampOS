@@ -106,7 +106,7 @@ Ranges, from lamp-control and the body:
   `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`,
   `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`,
   `dance_waltz`, `dance_jazz`.
-- **move:** 2–500 frames of 5 joints (pitch, roll, yaw, shoulder, elbow) in
+- **move:** 2 frames at least (at most what 10 s allows: 251 at 40 ms) of 5 joints (pitch, roll, yaw, shoulder, elbow) in
   counts from home, first and last all 0; `step_ms` 40–1,000; 1.5 to 10 s
   in all; each joint within reach (200, 200, 150, 350, 350 counts) and speed.
 - **clips:** a WAV of 16-bit mono PCM at 24 kHz, up to 30 s, no sample past
@@ -114,10 +114,12 @@ Ranges, from lamp-control and the body:
   then lowercase letters, digits, `_` or `-`, never `hum`. Up to 64 clips and
   20 MB a computer (`limits.sounds`); a revoke deletes them. A clip plays
   as an exact `say` does: once the person isn't talking.
-- **say:** up to 300 characters, said exactly as written since #4958;
+- **say:** at most 900 UTF-8 bytes (the voice's own cap), no control characters, said exactly as written since #4958;
   `rephrase=True` (`{ rephrase: true }`, `lamp_say(text, rephrase)`) for the
-  model's own words, every say's behaviour before it. **look:** `yaw` −180 to 180, `pitch` −90 to
-  90, right and up positive.
+  model's own words, every say's behaviour before it. **look:** `yaw` and `pitch` in degrees,
+  right and up positive, any finite number: the body clamps them to its reach.
+  Gestures `idle` and `scanning` are taken too (keep `scanning` for when a
+  person asks).
 
 ## Skills of your own
 
