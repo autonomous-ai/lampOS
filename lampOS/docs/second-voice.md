@@ -2891,17 +2891,23 @@ after a take-over, but now for every turn:
   second face seen speaking it (two faces, or one not the caller's while a
   conversation has one; `worker::others_may_talk`,
   `Heeding::holds_round_one`, given the engine as
-  `Engine::holding_round_one_when`). Two faces only in view, none seen
+  `Engine::holding_round_one_when`), kept with each request (the last
+  eight judged so), so a newer line judged before an earlier request's
+  round asks does not unhold it (Reviewer-three's P3s on #4458). Two faces only in view, none seen
   speaking, count as the busy room `LAMP_NAME_OR_FOLLOW_UP` makes of them,
   and not without it. Elsewhere its words stream as with the switch off
   (journal: `a quiet room, one voice, no second face: its words are not
   held (LAMP_DECLINE_SILENT)`); a `not_for_me` after them says its first
   words as with the switch off, and its decline is still told the rule.
+  So a decline in a quiet room after words still undoes the call and the
+  carry though the lamp spoke: its words told keep nothing going
+  (Reviewer-three's P3s on #4458).
   Without the rule's hook (a harness), every such line waits, as before.
   Tests: `round one waits only where the rule says others may talk`
   (first audio 80 ms off, 80 ms on in a quiet room, 360/480 ms where
   others may talk) and `round one is held only in a busy room or with a
-  second voice or face` (worker). What waits: the first audio of round 1
+  second voice or face` and `round one hold is kept with each request`
+  (worker). What waits: the first audio of round 1
   on a line that may be declined, where others may talk, for the rest of that round's reply; measured on the test clock
   with a word every 40 ms and four first words
   (`the_hold_costs_the_first_audio_only_on_lines_that_may_be_declined`),

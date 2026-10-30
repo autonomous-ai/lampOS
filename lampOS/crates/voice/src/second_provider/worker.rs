@@ -4965,9 +4965,11 @@ pub(crate) struct Heeding {
     alone: Option<u64>,
     /// The request last judged in a busy room ([`Self::judged_busy`]).
     busy: Option<u64>,
-    /// The request last judged where talk not for the lamp may be
-    /// ([`Self::holds_round_one`]).
-    others_may_talk: Option<u64>,
+    /// The requests judged where talk not for the lamp may be, newest
+    /// last, at most [`SPOKE_KEPT`] ([`Self::holds_round_one`]): kept with
+    /// each request, so a newer line judged before an earlier request's
+    /// round asks leaves that request held (Reviewer-three's P3s on #4458).
+    others_may_talk: std::collections::VecDeque<u64>,
     /// The Policy's attention decisions, with `LAMP_GOING_ON_ASKS`
     /// ([`Self::asking_the_policy`]).
     policy: Option<crate::policy_holds::Verdicts>,
@@ -5873,7 +5875,7 @@ impl Heeding {
             fired: None,
             alone: None,
             busy: None,
-            others_may_talk: None,
+            others_may_talk: std::collections::VecDeque::new(),
             policy: None,
             waiting: None,
             by_name: None,
@@ -8446,7 +8448,14 @@ impl Heeding {
     fn verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
         // `LAMP_DECLINE_SILENT`: where talk not for the lamp may be, read
         // before its let-out changes the caller's faces (#3945).
-        self.others_may_talk = others_may_talk(seen, &self.caller_faces).then_some(request);
+        // Kept per request: a line judged again keeps only its newest answer.
+        self.others_may_talk.retain(|&held| held != request);
+        if others_may_talk(seen, &self.caller_faces) {
+            if self.others_may_talk.len() == SPOKE_KEPT {
+                self.others_may_talk.pop_front();
+            }
+            self.others_may_talk.push_back(request);
+        }
         let why = self.judged_verdict(request, seen);
         // The last line held as a remark about the lamp, for `voice/remarked`
         // (#4175): Expression's small glance.
@@ -8882,9 +8891,12 @@ impl Heeding {
     /// lamp may be ([`others_may_talk`]): the first builder's call, "narrow
     /// the hold to when the room is busy or a second voice or face is
     /// present: that's where a decline happens, and where saying it aloud
-    /// does harm".
+    /// does harm". The answer is kept with each request, the last
+    /// [`SPOKE_KEPT`] judged so, so a newer line judged between this
+    /// request's verdict and its round asking does not undo it
+    /// (Reviewer-three's P3s on #4458).
     pub(crate) fn holds_round_one(&self, request: u64) -> bool {
-        self.others_may_talk == Some(request)
+        self.others_may_talk.contains(&request)
     }
 }
 
@@ -22225,6 +22237,36 @@ mod tests {
         assert!(judged(&mut desk, 1, "", &["f1", "f2"]), "two faces");
         assert!(judged(&mut desk, -1, "f1", &[]), "another voice");
         assert!(!judged(&mut desk, 1, "f1", &[]), "the caller again");
+    }
+
+    /// `LAMP_DECLINE_SILENT`: the hold is kept with each request, so a
+    /// newer line judged in a quiet room before an earlier request's round
+    /// asks leaves the earlier one held, and the newer one still reads not
+    /// held (Reviewer-three's P3s on #4458).
+    #[test]
+    fn round_one_hold_is_kept_with_each_request() {
+        use crate::room_told::Room;
+        let _one = crate::provider_worker::tests::one_thread();
+        let signs = |room| super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.declining_silently();
+        heeding.judge(11, line, "That lamp is cute.", signs(Room::Busy));
+        heeding.judge(12, line, "That lamp is cute.", signs(Room::Quiet));
+        assert!(
+            heeding.holds_round_one(11),
+            "a newer quiet line leaves the busy room's request held"
+        );
+        assert!(!heeding.holds_round_one(12), "a quiet room");
     }
 
     /// The faces `faces` seen speaking together over a desk line begun at
