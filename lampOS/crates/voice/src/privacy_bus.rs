@@ -221,6 +221,20 @@ pub struct SwitchFence {
     /// The next message resyncs the order rather than continues it
     /// ([`SwitchFence::resync`]).
     resync: bool,
+    /// What was said when a state without a header `clock` was first
+    /// accepted ([`unclocked_line`]): once a fence, not with every state.
+    unclocked: Option<String>,
+}
+
+/// The journal's line for a Controls state whose header says no `clock`:
+/// a Controls from before it stamped one, which an update round that mixes
+/// builds can leave running. It is read by the wall clock, as before, and
+/// so is open to a step of the wall clock again; it is said, not refused.
+pub fn unclocked_line(boot: &str) -> String {
+    format!(
+        "lamp-voice: privacy: the Controls state of publisher {boot} says no clock; \
+         it is judged by the wall clock, as before Controls stamped its monotonic one"
+    )
 }
 
 impl SwitchFence {
@@ -234,6 +248,22 @@ impl SwitchFence {
             publication: None,
             last: None,
             resync: false,
+            unclocked: None,
+        }
+    }
+
+    /// What this fence said of a state without a header `clock`, if it
+    /// accepted one ([`unclocked_line`]).
+    pub fn unclocked(&self) -> Option<&str> {
+        self.unclocked.as_deref()
+    }
+
+    /// An accepted state whose header says no clock is said once.
+    fn note_clock(&mut self, header: &lamp_bus::Header) {
+        if header.clock.is_none() && self.unclocked.is_none() {
+            let line = unclocked_line(&header.boot);
+            eprintln!("{line}");
+            self.unclocked = Some(line);
         }
     }
 
@@ -330,6 +360,7 @@ impl SwitchFence {
             }
             _ => true,
         };
+        self.note_clock(&message.header);
         self.session = Some(state.session_id);
         self.header_sequence = h;
         self.publication = Some(state.stamp);
@@ -357,6 +388,7 @@ impl SwitchFence {
                 "Controls does not say this lamp has no slide (LAMP_PRIVACY_CONTROLS=no-slide)",
             ));
         }
+        self.note_clock(&message.header);
         self.session = Some(state.session_id);
         self.header_sequence = h;
         self.publication = Some(state.stamp.clone());
@@ -374,6 +406,15 @@ impl SwitchFence {
         unix_ms: u64,
     ) -> io::Result<(u64, ControlsState)> {
         let h = &message.header;
+        // The bus's own rule: a header whose `clock` is the one Controls'
+        // stamp names is judged by `at_us`, which a wall clock stepped by a
+        // time server does not move; one of another clock has expired; and
+        // one that says none, by the wall clock as before.
+        let read_at = lamp_bus::Now {
+            unix_ms,
+            monotonic_us: now_us,
+            boot_id: Some(&self.clock),
+        };
         if h.topic != ControlsState::TOPIC
             || h.source != "controls"
             || h.kind != Kind::Latest
@@ -384,8 +425,8 @@ impl SwitchFence {
             || h.boot.len() != 16
             || !h.boot.bytes().all(|b| b.is_ascii_hexdigit())
             || message.expired
-            || h.expired_at(unix_ms)
-            || h.at_unix_ms > unix_ms.saturating_add(lamp_bus::EXPIRY_GRACE_MS)
+            || h.expired_by(&read_at)
+            || h.ahead_of(&read_at)
             || (message.gap != 0 && !self.resync)
             || message.publisher_restarted
         {
@@ -1408,6 +1449,7 @@ pub(crate) mod tests {
                 at_us: ahead.stamp.at_us,
                 at_unix_ms: wall_ms(),
                 expires_ms: Some(50),
+                clock: None,
             };
             let mut datagram = serde_json::to_vec(&header).unwrap();
             datagram.push(b'\n');
@@ -1468,6 +1510,7 @@ pub(crate) mod tests {
                 at_us: lamp_ipc::monotonic_us(),
                 at_unix_ms: 0,
                 expires_ms: None,
+                clock: None,
             };
             let mut sent = 0;
             while going.load(Ordering::Acquire) && std::time::Instant::now() < deadline {

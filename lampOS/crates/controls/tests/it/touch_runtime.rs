@@ -1732,3 +1732,45 @@ fn a_strip_hold_at_the_boards_sleep_is_a_valid_event() {
         assert!(hold >= 40_000 + sleep_ms * 1_000, "{sleep_ms}: {hold}");
     }
 }
+
+/// The product lamp serves `--touch` (queue #3997, C): its `controls/state`
+/// says its monotonic clock as the plain runtime's does, only when its clock
+/// is this boot's, whether the pins' primary button made its owner or the
+/// privacy route did with no button at all.
+#[test]
+fn the_touch_runtimes_state_says_its_monotonic_clock_only_when_its_clock_is_this_boot() {
+    for buttons in [true, false] {
+        for (boot, said) in [
+            (Some(CLOCK), Some(CLOCK)),
+            (Some("another-boot"), None),
+            (None, None),
+        ] {
+            let root = Root::new();
+            let bus = Bus::new(&root.0)
+                .unwrap()
+                .rescan_every(Duration::ZERO)
+                .boot_id(boot);
+            let mut pins = wiring();
+            if !buttons {
+                pins.buttons.clear();
+            }
+            let mut config = config(true);
+            if !buttons {
+                config.buttons.clear();
+            }
+            let mut service =
+                Service::new(&bus, config, pins, Gpio::default(), Strip::default(), CLOCK).unwrap();
+            if !buttons {
+                service.mark_no_slide(&bus, CLOCK).unwrap();
+            }
+            service.step(|| 1_000_000);
+            let kept = bus.latest(ControlsState::TOPIC).unwrap().unwrap();
+            assert_eq!(kept.header.clock.as_deref(), said, "{buttons} {boot:?}");
+            let state: ControlsState = kept.parse().unwrap();
+            assert_eq!(kept.header.at_us, state.stamp.at_us);
+            // Its other topics say nothing of the kind.
+            let touch = bus.latest(TouchState::TOPIC).unwrap().unwrap();
+            assert!(touch.header.clock.is_none());
+        }
+    }
+}

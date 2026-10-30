@@ -37,6 +37,7 @@ fn message(index: usize, value: &impl serde::Serialize) -> Message {
             at_us: 7,
             at_unix_ms: WALL,
             expires_ms: None,
+            clock: None,
         },
         payload: serde_json::to_vec(value).unwrap(),
         gap: 0,

@@ -267,6 +267,7 @@ fn wire(due: &ScheduleDue, boot: &str, sequence: u64) -> Message {
             at_us: 999_999_999,
             at_unix_ms: 1,
             expires_ms: Some(3000),
+            clock: None,
         },
         payload: serde_json::to_vec(due).unwrap(),
         gap: 0,

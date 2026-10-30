@@ -81,8 +81,17 @@ that declared nothing leaves it out, and so does a recording made before
 there were types. `source` is the publisher's name, `boot` sixteen hex
 characters it picked when it was made, `seq` its count on this topic from 1,
 `at_us` the caller's monotonic clock in microseconds, `at_unix_ms` the wall
-clock, `expires_ms` (optional) how long after `at_unix_ms` the value means
-anything. The `kind` is one of two:
+clock, `expires_ms` (optional) how long after its stamp the value means
+anything, and `clock` (optional, last) the kernel's boot id
+(`/proc/sys/kernel/random/boot_id`), said only by a publisher that has told
+the bus its `at_us` is CLOCK_MONOTONIC (`Publisher::stamp_monotonic_clock`).
+The bus never guesses that: only the caller knows what its `at_us` is, so a
+publisher that does not call it, or whose bus knows no boot id (macOS),
+says no `clock`. A build from before `clock` passes the field over as it
+does any field it does not know, and reads the rest as before; a header
+without it reads to a new build as one with no clock. Controls' state
+publisher says it whenever Controls' stamp clock is this boot's (queue
+#3997, C). The `kind` is one of two:
 
 - `latest`: a value that replaces the one before it (where the joints are).
   The publisher sends it, then puts the same bytes in `latest`, written
@@ -174,7 +183,7 @@ A subscriber also learns what no message can say:
 | The source is back | After that: a publisher's entry is there, or a message came | `Notice::SourceBack`, once |
 | The topic is late | It declares a period and nothing has come for more than twice as long | `Notice::Late`, once |
 | It is on time again | After that: a message came | `Notice::OnTime`, once |
-| A message had expired | It arrived more than 50 ms after `at_unix_ms + expires_ms`, by the subscriber's wall clock. It is not handed over | Counted: `expired()` |
+| A message had expired | By the clock its header calls for (below): more than 50 ms past its stamp and `expires_ms`, stamped more than 50 ms ahead by this boot's monotonic clock, or stamped by another boot's. It is not handed over | Counted: `expired()` |
 | A message was of another type | The subscriber named a type and the header names another. It is not handed over | Counted: `wrong_type()` |
 
 `recv` returns messages and nothing else, as it did. The notices come from
@@ -213,10 +222,36 @@ instance, is said with the next message handed over.
 | `mean_interval`, `largest_interval` | The time between taking one message and the next, by the subscriber's monotonic clock. The stream's rhythm for a subscriber that reads as fast as messages come, the reader's for one that does not |
 | `mean_age` | Wall clock at arrival less `at_unix_ms`: how old a message is when it gets here |
 
-Liveness and lifespan are judged by the wall clock, the only one two
-processes share. A clock stepped by more than the lease makes every publisher
-look dead until its next refresh, at most a second later, and a topic quiet
-for a lease is then reported gone and back.
+Which clock judges a message is the header's to say (`Header::expired_by`,
+`Header::ahead_of`, `Header::stamp_clock`, with what the reader's clocks say
+now in `Now`, from `Bus::now` or `Subscriber::now`):
+
+| The header's `clock` | Expired when | Refused as ahead when | The silence between two |
+|---|---|---|---|
+| This boot's id | CLOCK_MONOTONIC now > `at_us` + `expires_ms` + 50 ms | `at_us` > CLOCK_MONOTONIC now + 50 ms (and so also passed over as expired) | The two `at_us` |
+| Another boot's id | Always: a `latest` file kept in an earlier boot | Never (it has expired) | Not measured |
+| None, or the reader knows no boot | Wall now > `at_unix_ms` + `expires_ms` + 50 ms, as before | `at_unix_ms` > wall now + 50 ms (said, not passed over, as before) | The two `at_unix_ms`, as before |
+
+A time server that steps the wall clock (chrony moves lamp-06c1's by about
++20 s some 46 s into every cold boot) therefore neither ages nor freshens a
+message that says this boot's clock, nor makes a silence of it: before
+`clock`, a +20 s step read as a 20 s hole (`Notice::Late`, the voice's
+"privacy publisher unavailable") and expired what was in flight (the
+voice's "invalid Controls message discarded"), and a −20 s step kept a value
+live 20 s too long. The reader's own time of reading is never taken for the
+message's stamp, so a `latest` file left by a publisher that was restarted
+in this same boot is as old as its `at_us` says. Two stamps of different
+clocks, which a round of updates that mixes builds can send on one topic,
+are not measured against each other for a silence; the subscriber's own
+monotonic clock still says a silence it saw. A bus takes the kernel's boot
+id and clocks unless it is given others (`Bus::boot_id`, `Bus::clocks`, for
+tests and simulators that step a wall clock).
+
+Liveness (a publisher's entry in `pubs/`) is still judged by the wall
+clock, the only one two processes share through a file's time. A clock
+stepped by more than the lease makes every publisher look dead until its
+next refresh, at most a second later, and a topic quiet for a lease is then
+reported gone and back.
 
 The queue is where this differs from ROS on purpose for now: each
 subscriber's socket is its own queue and the kernel cannot evict from it, so
@@ -492,7 +527,10 @@ The existing bus transport and its per-topic ordering are unchanged.
 
 The new payload timestamps explicitly use the shared host monotonic clock
 and boot identity. This does not change the meaning of existing bus header
-`at_us`: that remains a publisher-private timestamp. Expression's replay
+`at_us`: it remains a publisher-private timestamp unless the header also
+says `clock`, which only a publisher that called `stamp_monotonic_clock`
+does (Controls' state, queue #3997, C), and then it is this boot's
+CLOCK_MONOTONIC. Expression's replay
 importer warns when it estimates a shared timeline from legacy wall stamps.
 
 `expression_topics()` also declares `expression/rest_request` (event,
@@ -645,8 +683,10 @@ lease running out, a lifespan, or a subscriber that falls behind.
 
 Not exercised at all:
 
-- A wall clock that is stepped. The rule for an entry whose time is ahead
-  of the clock is tested by setting a file's time, not the clock.
+- A wall clock that is stepped, for liveness. The rule for an entry whose
+  time is ahead of the clock is tested by setting a file's time, not the
+  clock. For lifespan and lateness a step is played with a bus's own clocks
+  (`Bus::clocks`, `tests/it/clock_step.rs`), not the host's.
 - The lease of 3 s. The tests of liveness use leases of 150 to 300 ms so
   that they end quickly; the default was in use only where the tool was run
   against a publisher.
