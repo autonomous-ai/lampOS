@@ -20,11 +20,11 @@ StateDirectoryMode=0700
 LoadCredential=jev.key:/etc/lampOS/policy/jev.key
 # --zone system: the hour of its decisions in the lamp's own zone, as setup points /etc/localtime,
 # across daylight saving and a re-setup (#820); was --utc-offset-minutes 420.
-# --hello-by-rule (the first builder, 30 Oct, on #4625): the hello is decided by the hard rules alone,
-# a pass is say_now at once, the judge asked only in shadow and never acting. The pinned binary must
-# be one built with #4625: an older lamp-policy refuses the unknown option and exits (status 2) at
-# every start, so the policy would not run at all until the SHA-256 below is replaced.
-ExecStart=/opt/lampOS/policy/aef70157b022d155794f9396da27e6606d839aeab690f6fffb1d51a84f8e9dd4/lamp-policy --progress --act progress --act attention --hello --act hello --gate --hello-by-rule --images typesafe/jev-1.14 --sight-file /run/lampos-eyes/sight.jpg --zone system --key-file %d/jev.key --log-dir /var/lib/lampos-policy
+# --hello-by-rule is not given here yet (the Reviewer-lead on #4625): the hello decided by the hard
+# rules alone, the judge only in shadow, as the product runs it. The pinned binary predates it, and
+# lamp-policy refuses an unknown option and exits (status 2) at every start, so the option comes in
+# the same change that pins a lamp-policy built with #4625. --gate is as old as #958 (15 Oct).
+ExecStart=/opt/lampOS/policy/aef70157b022d155794f9396da27e6606d839aeab690f6fffb1d51a84f8e9dd4/lamp-policy --progress --act progress --act attention --hello --act hello --gate --images typesafe/jev-1.14 --sight-file /run/lampos-eyes/sight.jpg --zone system --key-file %d/jev.key --log-dir /var/lib/lampos-policy
 Restart=on-failure
 RestartSec=5s
 SyslogIdentifier=lamp-policy
