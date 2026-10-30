@@ -37,6 +37,8 @@ use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
+/// Camera frames queued for one connection at most; past that one is dropped.
+pub const FRAMES_QUEUED: usize = 4;
 /// How long a new connection has to say `hello` (or `pair`).
 pub const HELLO_WITHIN: Duration = Duration::from_secs(30);
 /// How long a connection may say nothing before it is closed (an SDK's
@@ -147,6 +149,9 @@ pub const LEASE_TICK: Duration = Duration::from_millis(250);
 struct Open {
     client: Option<String>,
     outbox: mpsc::UnboundedSender<Value>,
+    /// Its camera frames, binary, [`FRAMES_QUEUED`] at most: past that a
+    /// frame is dropped, never queued, so a slow link never grows memory.
+    frames: mpsc::Sender<Vec<u8>>,
     /// What it subscribed to, and its phrases, as its session says.
     events: BTreeSet<EventKind>,
     phrases: Vec<String>,
@@ -335,6 +340,26 @@ impl Shared {
     }
 
     /// Sends `event` to every connection of `client`.
+    /// Sends a binary camera frame to every connection of `client` on the
+    /// lamp's own network: dropped for one whose queue is full.
+    fn send_binary_to(&self, client: &str, frame: &[u8]) {
+        for open in self.open.lock().expect("open").values() {
+            if open.client.as_deref() == Some(client) {
+                let _ = open.frames.try_send(frame.to_vec());
+            }
+        }
+    }
+
+    /// Binary camera frames for a client (`crate::camera`'s fast stream).
+    pub fn binary(self: &Arc<Self>) -> crate::parts::Binary {
+        let shared = Arc::downgrade(self);
+        Arc::new(move |client: &str, frame: &[u8]| {
+            if let Some(shared) = shared.upgrade() {
+                shared.send_binary_to(client, frame);
+            }
+        })
+    }
+
     fn send_to(&self, client: &str, event: Value) {
         for open in self.open.lock().expect("open").values() {
             if open.client.as_deref() == Some(client) {
@@ -706,6 +731,7 @@ async fn connection<S>(
 {
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
+    let (frames, mut framed) = mpsc::channel::<Vec<u8>>(FRAMES_QUEUED);
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
@@ -717,6 +743,7 @@ async fn connection<S>(
         Open {
             client: None,
             outbox,
+            frames,
             events: BTreeSet::new(),
             phrases: Vec::new(),
             grants: BTreeSet::new(),
@@ -794,6 +821,17 @@ async fn connection<S>(
                     }
                     if session.client().is_some() {
                         quiet_until = tokio::time::Instant::now() + quiet;
+                    }
+                }
+                frame = framed.recv() => {
+                    let Some(frame) = frame else { continue };
+                    // Never beyond the lamp's own network (control.md, "The
+                    // camera").
+                    if remote {
+                        continue;
+                    }
+                    if socket.send(Message::Binary(frame.into())).await.is_err() {
+                        break;
                     }
                 }
                 event = inbox.recv() => {
