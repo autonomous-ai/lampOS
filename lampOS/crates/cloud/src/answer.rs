@@ -56,14 +56,14 @@ pub trait Lamp {
     /// again, without keeping it (`light/request`), until the person asks
     /// for a light at the lamp.
     fn preview_light(&mut self, light: &Light) -> Result<(), String>;
-    /// Whether setup's hotspot opens by itself when the saved network is
-    /// gone (#3020, `LAMP_WIFI_RECOVERY=on`), so the app may name it. False:
-    /// no field, read as before.
     /// `signed_out` while the lamp's login is no longer accepted
     /// (`LAMP_SIGNED_OUT`, "Signed out" in `docs/cloud.md`). None otherwise.
     fn account(&mut self) -> Option<&'static str> {
         None
     }
+    /// Whether setup's hotspot opens by itself when the saved network is
+    /// gone (#3020, `LAMP_WIFI_RECOVERY=on`), so the app may name it. False:
+    /// no field, read as before.
     fn recovery(&self) -> bool {
         false
     }

@@ -9,7 +9,6 @@
 //! its credentials are handed in at start).
 use lamp_msgs::AccountState;
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
@@ -78,10 +77,12 @@ struct Kept {
     since_s: u64,
 }
 
+/// 64-bit FNV-1a: a fixed algorithm, so the kept state survives a new build.
 fn fingerprint(key: &str) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    key.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
+    let hash = key.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    format!("{hash:016x}")
 }
 
 fn read_kept(path: &Path) -> Option<Kept> {
@@ -223,6 +224,11 @@ pub async fn tell(mut since: watch::Receiver<Option<u64>>, bus: Option<lamp_bus:
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_fingerprint_is_fixed_across_builds() {
+        assert_eq!(fingerprint("a"), "af63dc4c8601ec8c");
+    }
+
     use super::*;
 
     fn login(kept: Option<PathBuf>) -> Login {
