@@ -67,7 +67,9 @@ pub(super) fn kind(fault: Fault) -> Option<&'static str> {
 
 #[derive(Debug, Default)]
 pub(super) struct ModelRefusing {
-    /// When the refusal began, and when a turn was last sent during it.
+    /// When the refusal began, and when its last turn was refused or an
+    /// onboarding line sent: lines are sent again [`TRY_AGAIN_EVERY_US`]
+    /// after it, until one is refused.
     since_us: Option<u64>,
     tried_at_us: u64,
     /// The kinds already said in the journal this refusal: one line each.
@@ -105,7 +107,7 @@ impl ModelRefusing {
                 if !self.said.contains(&kind) {
                     self.said.push(kind);
                     eprintln!(
-                        "lamp-voice: request {request}: the model service refused the turn ({kind}); turns are held and the lamp says so, one sent every {} s (LAMP_SECOND_REFUSED_HOLD)",
+                        "lamp-voice: request {request}: the model service refused the turn ({kind}); turns are held and the lamp says so, and sent again {} s after the last refused one, until one is refused (LAMP_SECOND_REFUSED_HOLD)",
                         TRY_AGAIN_EVERY_US / 1_000_000
                     );
                 }
