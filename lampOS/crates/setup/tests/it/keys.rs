@@ -366,7 +366,8 @@ fn only_lamp_clouds_processes_are_the_asker() {
 }
 
 /// The helper's units: its socket, root with the network for the one
-/// check, writing only the keys' folder, which the reset plan wipes whole.
+/// check, writing only the keys' folder, which the reset plan wipes whole,
+/// and lamp-update's lock.
 #[test]
 fn the_helpers_units_are_as_the_helper_reads_them() {
     let unit = include_str!("../../../../deploy/product/lamp-setup-keys@.service");
@@ -380,6 +381,9 @@ fn the_helpers_units_are_as_the_helper_reads_them() {
     assert!(unit.contains("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\n"));
     assert!(!unit.contains("PrivateNetwork=yes"));
     assert!(!unit.contains("ReadWritePaths=/etc"));
+    // lamp-update's records, only for the lock held through the voice's
+    // restart (`change::quiet_and_unlocked`).
+    assert!(unit.contains("ReadWritePaths=/run/lampos-bus -/var/lib/lampos-update\n"));
     let socket = include_str!("../../../../deploy/product/lamp-setup-keys.socket");
     assert!(socket.contains("ListenStream=/run/lampos-setup-keys/keys.sock\n"));
     assert!(socket.contains("SocketMode=0660\n"));
