@@ -14,8 +14,10 @@ role labels and the lines below.
 
 ## What the lamp should do
 
-A 7071 lamp's own `lamp-update.service` already follows `lampos-stable`, which is
-8899 since 30 Oct 15:21. No drop-in is needed.
+A 7071 lamp's own `lamp-update.service` already follows `lampos-stable`, with
+`--apply on` and `LAMP_UPDATE_SELF=on`. No drop-in is needed. Stable was 8899 on
+30 Oct 15:21; it may have moved by the run (8925, train 409, carries #4517), so
+the first thing the run notes is the build stable names. Below, 8899 stands for it.
 
 1. **Setup through the app**, as a customer does. `lamp-update serve` runs before
    and after setup (it is outside `lampos.target`), a round every 900 s.
@@ -38,7 +40,8 @@ A 7071 lamp's own `lamp-update.service` already follows `lampos-stable`, which i
 ## The run
 
 1. Flash one lamp with the 7071 image (sha256 `15449d4f…`, as #3530's 4c4 used).
-   Note the time.
+   Note the time, and the build stable names (the release
+   `lampos-stable`'s `manifest.json`, `sequence`).
 2. Set it up through the app. **Finish the walk** it starts, so the walk hold
    doesn't add up to 2 h.
 3. Use it a little, as a person would: say its name, let it see a face, tell it
@@ -51,7 +54,7 @@ A 7071 lamp's own `lamp-update.service` already follows `lampos-stable`, which i
 
 ```sh
 journalctl -u lamp-update --since -2h --no-pager \
-  | grep -E "needs updater|self-switched|confirm|switching to build|switched to build|putting build|walk is under way|no quiet moment|unreachable|failed|refused|nothing is switched"
+  | grep -E "needs updater|switches from its build|confirmed: lamp-update|switching to build|switched to build|putting build|walk is under way|no quiet moment|unreachable|failed|refused|nothing is switched"
 cat /run/lampos-bus/voice/mute/latest
 journalctl -u lamp-voice -b --no-pager | grep -iE "guard|muted" | tail -5
 systemctl show -p NRestarts lamp-voice.service lamp-controls.service
@@ -63,9 +66,10 @@ and whether each of the two questions was answered.
 
 | Seen | Means |
 | --- | --- |
-| `needs updater 8 or newer, and this is updater 5`, then `self-switched` and a confirm line | the climb worked |
+| `build 8899 needs updater 8; lamp-update switches from its build … to …, which the build carries, …`, then `confirmed: lamp-update runs its new build` | the climb worked (7071's `Outcome::Climbs`, then the new updater's confirm) |
+| `build 8899 needs updater 8 or newer, and this is updater 5; …` | **fail, no climb**: 7071's refusal (`TooOld::why`), written only when it did not climb. Post the whole line and `systemctl show -p Environment lamp-update` |
 | `switching to build 8899`, then `switched to build 8899; every part is well` | **pass**, if the voice then answers both questions and is not muted |
-| `putting build 8899 back: …` | the watch put the parts back. The lamp keeps 7071's parts and the climbed updater. It records 8899 as refused and never tries it again (`round.rs:917` at `1e42b1032d`); it takes the next promoted build. Post the line's `why` and the voice's last 40 journal lines before it. A speaker that was busy at the new voice's start points to the PulseAudio race that #4517 (not in 8899) guards |
+| `putting build 8899 back: …` | the watch put the parts back. The lamp keeps 7071's parts and the climbed updater. It records 8899 as refused and never tries it again (`round.rs:917` at `1e42b1032d`); it takes the next promoted build. Post the line's `why` and the voice's last 40 journal lines before it. A speaker that was busy at the new voice's start points to the PulseAudio race that #4517 guards (in 8925 and later, not in 8899) |
 | `the setup walk is under way` | held by the walk, as designed. Finish the walk and wait for the next round |
 | `no quiet moment in … s` | someone was heard, or the lamp wasn't resting. Leave it quiet; the next round tries again |
 | `unreachable` | the channel couldn't be reached. Nothing changed; the next round tries again |
@@ -73,6 +77,6 @@ and whether each of the two questions was answered.
 
 ## Afterwards
 
-Nothing to put back: the lamp stays on 8899, the build every customer lamp is
-meant to reach. If it was put back, it stays on 7071's parts until the next
+Nothing to put back: the lamp stays on the stable build, the one every customer
+lamp is meant to reach. If it was put back, it stays on 7071's parts until the next
 promote, as a customer's lamp would.
