@@ -381,6 +381,7 @@ unchanged. Actions publishes it only with exact `LAMP_REQUESTED_AUDIO=on`.
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
 | `SpeakerState` | `speaker/state` | latest | 1 / 3 s | The mixer's owning Actions process reports host `stamp`, publisher `session_id`, monotonic `mute_generation`, optional `volume_raw` (0–100) and logical/observed `muted`; unavailable volume grants no output |
+| `SpeakerVolume` | `speaker/volume` | latest | on change | The speaker's volume as everyone sees it: `volume` 0–100 of the lamp's allowed range, `muted` exactly at 0. lamp-actions, the control's only writer, says it at start and after each change it makes for the voice, the app or a paired computer; lamp-control's `volume.changed` is made from it ([control.md](control.md))
 
 The bus envelope must identify `actions`, `lamp_msgs/SpeakerState`, JSON and
 Latest with a three-second expiry. The payload's publisher session, sequence

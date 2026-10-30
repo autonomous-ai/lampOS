@@ -242,7 +242,9 @@ export class FakeLamp {
     this.pings = 0;
     this.leases = new Map();
     this.subscribed = new Map();
-    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false } };
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false }, volume: { level: 50, muted: false } };
+    // Where an unmute brings it back to (lamp-actions' `before_mute`).
+    this.beforeMute = 50;
     this.refusals = new Map();
     this.nextLease = 1;
     // The newest light a computer asked for, and until when (the fake's
@@ -298,6 +300,16 @@ export class FakeLamp {
   // The ring shows a computer's light while it lasts.
   show(request) {
     this.shown = { light: { on: true, colour: request.colour, level: request.level }, until: this.clock() + request.for_ms };
+  }
+
+  // The person changes the volume (by voice or in the app), or a `volume`
+  // op does: `get('volume')` follows, and subscribers hear `volume.changed`
+  // when it changed, as lamp-control tells it from `speaker/volume`.
+  setVolume(level) {
+    const now = { level: Math.max(0, Math.min(100, Math.round(level))), muted: level <= 0 };
+    const before = this.state.volume;
+    this.state.volume = now;
+    if (before.level !== now.level || before.muted !== now.muted) this.emit('volume.changed', now);
   }
 
   // `get`'s light, as lamp-control answers it (Nine's light/drawn): the
@@ -429,16 +441,16 @@ export class FakeLamp {
   static EVENT_GRANT = {
     'person.arrived': 'look', 'person.left': 'look', 'person.stood_up': 'look', 'person.facing': 'look',
     hand: 'look',
-    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
+    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak',
   };
 
   needs(op, request) {
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
-    if (op === 'get') return (request.state ?? []).includes('presence') ? ['look'] : [];
+    if (op === 'get') return [...((request.state ?? []).includes('presence') ? ['look'] : []), ...((request.state ?? []).includes('volume') ? ['speak'] : [])];
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
-    return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'] }[op] ?? [];
+    return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'], volume: ['speak'] }[op] ?? [];
   }
 
   op(ws, client, request) {
@@ -550,6 +562,21 @@ export class FakeLamp {
         // As lamp-control routes them: the body takes them, and no `done`
         // follows.
         return this.ok(ws, id, { to: 'body' });
+      case 'volume': {
+        // As lamp-control through lamp-actions' app calls: a level, the
+        // voice's 20-point step within its floor of 10 and ceiling of 100, or
+        // a mute that an unmute takes back. The answer is the level it left,
+        // and `volume.changed` follows when it changed.
+        const { level } = this.state.volume;
+        let next = level;
+        if (request.to !== undefined) next = request.to;
+        else if (request.step === 'up') next = Math.min(100, level + 20);
+        else if (request.step === 'down') next = level === 0 ? 0 : Math.max(10, level - 20);
+        else if (request.mute === true) { if (level > 0) this.beforeMute = level; next = 0; }
+        else if (request.mute === false) next = level > 0 ? level : this.beforeMute;
+        this.setVolume(next);
+        return this.ok(ws, id, { ...this.state.volume });
+      }
       case 'say':
         // As lamp-control: the voice takes it, and its `done` follows.
         this.ok(ws, id, { to: 'voice' });

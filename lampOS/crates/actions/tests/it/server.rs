@@ -179,6 +179,45 @@ fn the_list_is_there_a_call_changes_the_control_and_anything_else_is_refused_in_
         50
     );
     assert_eq!(level.load(Ordering::Acquire), 50);
+    // lamp-control's step and mute: the voice's own changes, answered in
+    // numbers, never in the model's list either.
+    let call = |name: &str, args: serde_json::Value| {
+        ask(
+            &home,
+            format!("{}\n", json!({"op": "call", "name": name, "args": args})).as_bytes(),
+        )
+    };
+    assert_eq!(
+        call("volume_step", json!({"step": "up"})),
+        json!({"ok":true,"level":{"volume":70,"raw":70,"max_volume":100}})
+    );
+    assert_eq!(
+        call("volume_step", json!({"step": "down"}))["level"]["volume"],
+        50
+    );
+    assert_eq!(
+        call("volume_muted", json!({"muted": true}))["level"]["raw"],
+        0
+    );
+    assert_eq!(level.load(Ordering::Acquire), 0);
+    // Unmuted, back to where it was.
+    assert_eq!(
+        call("volume_muted", json!({"muted": false}))["level"]["volume"],
+        50
+    );
+    for refused in [
+        call("volume_step", json!({"step": "sideways"})),
+        call("volume_step", json!({})),
+        call("volume_muted", json!({"muted": "yes"})),
+    ] {
+        assert_eq!(refused["ok"], false, "{refused}");
+    }
+    assert_eq!(level.load(Ordering::Acquire), 50);
+    assert!(
+        !names(&home)
+            .iter()
+            .any(|name| name == "volume_step" || name == "volume_muted")
+    );
     // A caller that connects and says nothing costs the next one a second,
     // not the service.
     let silent = UnixStream::connect(home.join(CALL_SOCKET)).unwrap();

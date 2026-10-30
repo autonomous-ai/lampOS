@@ -2,7 +2,8 @@
 //!
 //! ```text
 //! lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
-//!                    [--mood-socket PATH] [--say-socket PATH] [--bus-root DIR] [--boot-id ID]
+//!                    [--mood-socket PATH] [--say-socket PATH] [--actions-socket PATH]
+//!                    [--bus-root DIR] [--boot-id ID]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
@@ -13,7 +14,9 @@
 //! `--state-dir` (`/var/lib/lampos-control`), listens on `--listen`
 //! (`0.0.0.0:7731`) and answers the owner's side on `--admin-socket`
 //! (`/run/lampos-control/admin.sock`, 0600). Actions go to the body's
-//! `--mood-socket`, the voice's `--say-socket` and the ring's light requests
+//! `--mood-socket`, the voice's `--say-socket`, the speaker's volume to
+//! lamp-actions' `--actions-socket` (`/run/lampos-actions/call.sock`) and the
+//! ring's light requests
 //! on the bus at `--bus-root` (docs/control.md, "Routing"); a part not given
 //! is refused with a why.
 
@@ -166,6 +169,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     }
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
+    let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
         None => None,
@@ -196,7 +200,10 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let follow = lamp_control::body_lease::Follower::default();
     let on_lease = lease_socket.is_some().then(|| (looks, follow.clone()));
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
-        let lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
+        let mut lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
+        if let Some(actions) = actions {
+            lamp = lamp.volume_through(actions);
+        }
         Box::new(match on_lease {
             Some((looks, follow)) => lamp.looking(looks).following(follow),
             None => lamp,

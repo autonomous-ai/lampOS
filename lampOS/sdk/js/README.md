@@ -102,6 +102,7 @@ await lamp.closed();
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
   | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; the door already refuses `say` and `sound` in quiet hours, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
+  | `volume.changed` | `level` (0–100), `muted`: the speaker's volume changed, whoever changed it (the person by voice or in the app, or a computer) | `speak` |
 
 - **State:** `await lamp.get('presence', 'lamp')` resolves with the states
   asked, by those names, as lamp-control answers them: `{ presence: {...},
@@ -198,6 +199,7 @@ subscribe.
 | `touch` | `kind`: `tap` (two or more taps are one tap) or `pet`. The schema also has `hold` and `where`, not sent yet | `{"ev":"touch","kind":"pet"}` | a tap or a pet on the lamp | none |
 | `button` | `press`: `long_press`. The schema also has `press`, not sent yet | `{"ev":"button","press":"long_press"}` | the button is held | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false). `quiet_hours` is planned, not sent yet | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
+| `volume.changed` | `level`: 0–100 of what the lamp allows. `muted`: true at 0 | `{"ev":"volume.changed","level":30,"muted":false}` | the volume changes, whoever changed it: the person by voice or in the app, or a computer | `speak` |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
 | `hand` | `seen`. When seen: `x`, `y` (the palm's centre, 0–1 from the picture's left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. All to 2 places, never the tracker's clock | `{"ev":"hand","seen":true,"x":0.42,"y":0.55,"size":0.12,"open":true,"confidence":0.91}` and `{"ev":"hand","seen":false}` | a hand is first seen, moves or grows by 0.05, opens or closes, at most 4 a second (the newest kept). `seen: false` once, 1 s after the last. Under 0.5 confidence is no hand | `look` |
 
@@ -216,6 +218,7 @@ And two that come by themselves, with no subscription:
 | `light` | the person's own light: `on`, `colour`, `level`. Also `shows`: what the ring draws now, `{on, colour, level}`. `null` until the lamp has said either | `{"on":true,"colour":"warm","level":3,"shows":{"on":true,"colour":"green","level":2}}` | none |
 | `mood` | `energy`, `warmth`, `awake`, `asleep`, the lamp's inner state. `null` until known | `{"energy":0.6,"warmth":0.7,"awake":true,"asleep":false}` | none |
 | `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
+| `volume` | `level` (0–100 of what the lamp allows), `muted`. `null` until lamp-actions has said it | `{"level":50,"muted":false}` | `speak` |
 | `air` | the room's air (particles, humidity, temperature, CO2), from the lamp's air part | planned: not a state `get` answers yet | |
 
 ### Never readable
@@ -253,7 +256,7 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 
 | call | parameters | grant |
 |---|---|---|
-| `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`; their fields and grants are [control.md](../../docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
+| `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`, `volume.changed`; their fields and grants are [control.md](../../docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | an array of events | each event's |
 | `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp` | the states asked, by those names |
@@ -282,6 +285,7 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.joints(lease, withinMs, targets)` | `lease`: your held `body` lease. `withinMs`: up to 5,000. `targets`: `{ pitch, roll, yaw, shoulder, elbow }` in degrees, −180 to 180, at least one | `body` | `body` (named) | 20 a second |
 | `lamp.light(colour, level, forMs, pattern)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `forMs`: 1–30,000. `pattern`: none (steady), `'breathe'` (level 2 or up), `'candle'` (3 or up) or `'pulse'` (2 or up). Under its level a pattern is `refused`. The ring plays one pulse a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no | 5 a second |
 | `lamp.say(text)` | `text`: words, up to 300 characters | `speak` | no | 6 a minute, 60 an hour; refused in quiet hours |
+| `lamp.volume({ to, step, mute })` | exactly one of `to`: 0–100 of what the lamp allows (0 is muted), `step`: `'up'` or `'down'` (the voice's own step, within the lamp's floor and ceiling), or `mute`: `true` or `false` (an unmute brings it back to where it was). Resolves to `{ level, muted }`, the level it left. The person's own volume, the same the voice and the app set | `speak` | no | none |
 | `lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no | as `say` |
 | `lamp.stop()` | | none | no | |
 | `lamp.request(op, fields)` | any op of the schema, checked against it first | the op's | | |

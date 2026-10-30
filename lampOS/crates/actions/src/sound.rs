@@ -53,6 +53,8 @@ pub struct Volume<M> {
     last_observed: Option<u8>,
     observation_revocation: Option<u64>,
     observation_sequence: Option<u64>,
+    /// The raw level last read from the mixer, as it is (`heard`).
+    heard_raw: Option<u8>,
 }
 
 const UNREAD: &str = "I could not read my speaker's volume.";
@@ -70,7 +72,15 @@ impl<M: Mixer> Volume<M> {
             last_observed: None,
             observation_revocation: Some(0),
             observation_sequence: Some(0),
+            heard_raw: None,
         }
+    }
+
+    /// The volume as last read from the mixer, with no new read: what
+    /// `speaker/volume` says after each call (`volume_out`). None before a
+    /// first read.
+    pub fn heard(&self) -> Option<Level> {
+        self.heard_raw.map(|raw| self.level_at(raw))
     }
 
     pub fn observed(&self) -> Option<u8> {
@@ -110,6 +120,9 @@ impl<M: Mixer> Volume<M> {
     fn read(&mut self) -> io::Result<u8> {
         self.observed = None;
         let result = self.mixer.get();
+        if let Ok(raw) = result {
+            self.heard_raw = Some(raw);
+        }
         self.record_observation(result.as_ref().ok().copied());
         result
     }

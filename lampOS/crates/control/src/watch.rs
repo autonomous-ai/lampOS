@@ -128,6 +128,9 @@ pub struct Watch {
     /// light a computer or a skill asked for over it; none until it says.
     shows: Option<Value>,
     mood: Value,
+    /// The speaker's volume (`speaker/volume`): `{level, muted}`, none until
+    /// lamp-actions says it.
+    volume: Option<Value>,
     sounds: [bool; 4],
     /// The newest hand heard, and when.
     hand: Option<(Hand, u64)>,
@@ -220,6 +223,25 @@ impl Watch {
                 };
                 out.push(event);
                 out
+            }
+            // Every change is said by lamp-actions, the speaker's only
+            // writer: told when it differs from the one before, so the first
+            // heard (the one kept on the bus) is state, not news.
+            "speaker/volume" => {
+                let (Some(level), Some(muted)) = (
+                    payload["volume"].as_u64().filter(|level| *level <= 100),
+                    payload["muted"].as_bool(),
+                ) else {
+                    return Vec::new();
+                };
+                let now = json!({"level": level, "muted": muted});
+                let before = self.volume.replace(now.clone());
+                match before {
+                    Some(before) if before != now => {
+                        vec![Out::Event(EventKind::VolumeChanged, now)]
+                    }
+                    _ => Vec::new(),
+                }
             }
             "body/hand" if payload["pushed"] == true => {
                 vec![Out::Lose(Some(Part::Body), LeaseWhy::Hand)]
@@ -337,6 +359,7 @@ impl Watch {
                 }
             },
             StateKind::Mood => self.mood.clone(),
+            StateKind::Volume => self.volume.clone().unwrap_or(Value::Null),
             StateKind::Lamp => {
                 json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
             }
@@ -859,6 +882,61 @@ mod tests {
         assert_eq!(
             watch.state(StateKind::Light)["shows"],
             json!({"on": true, "colour": "warm", "level": 1})
+        );
+    }
+
+    #[test]
+    fn a_volume_change_from_anyone_is_told_once_and_the_first_heard_is_state() {
+        let mut watch = Watch::new();
+        let volume = |level: u64, muted: bool| json!({"volume": level, "muted": muted});
+        // The one kept on the bus, heard at the start: state, not news.
+        assert!(
+            watch
+                .take("speaker/volume", &volume(40, false), S)
+                .is_empty()
+        );
+        assert_eq!(
+            watch.state(crate::protocol::StateKind::Volume),
+            json!({"level": 40, "muted": false})
+        );
+        assert!(
+            watch
+                .take("speaker/volume", &volume(40, false), 2 * S)
+                .is_empty()
+        );
+        // The person says "louder", the app mutes it: each is told.
+        assert_eq!(
+            watch.take("speaker/volume", &volume(60, false), 3 * S),
+            [Out::Event(
+                EventKind::VolumeChanged,
+                json!({"level": 60, "muted": false})
+            )]
+        );
+        assert_eq!(
+            watch.take("speaker/volume", &volume(0, true), 4 * S),
+            [Out::Event(
+                EventKind::VolumeChanged,
+                json!({"level": 0, "muted": true})
+            )]
+        );
+        // Not a volume: nothing, and the state stands.
+        assert!(
+            watch
+                .take(
+                    "speaker/volume",
+                    &json!({"volume": 101, "muted": false}),
+                    5 * S
+                )
+                .is_empty()
+        );
+        assert!(watch.take("speaker/volume", &json!({}), 5 * S).is_empty());
+        assert_eq!(
+            watch.state(crate::protocol::StateKind::Volume),
+            json!({"level": 0, "muted": true})
+        );
+        assert_eq!(
+            Watch::new().state(crate::protocol::StateKind::Volume),
+            Value::Null
         );
     }
 }

@@ -59,7 +59,8 @@
         "touch",
         "button",
         "time",
-        "lamp.changed"
+        "lamp.changed",
+        "volume.changed"
       ]
     },
     "state_name": {
@@ -67,7 +68,8 @@
         "presence",
         "light",
         "mood",
-        "lamp"
+        "lamp",
+        "volume"
       ]
     },
     "colour": {
@@ -186,6 +188,9 @@
         },
         {
           "$ref": "#/$defs/sound"
+        },
+        {
+          "$ref": "#/$defs/volume"
         },
         {
           "$ref": "#/$defs/stop"
@@ -1577,6 +1582,32 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "volume.changed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "0 to 100 of what the lamp allows."
+              },
+              "muted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "level",
+              "muted"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "lease"
               }
             }
@@ -1658,6 +1689,57 @@
           }
         }
       ]
+    },
+    "volume": {
+      "description": "The speaker's volume, the person's own (the same the voice and the app set, through lamp-actions): exactly one of a level, a step or a mute. Needs the speak grant; no rate. The reply is the level it left, {level, muted}.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "volume"
+        },
+        "to": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "A level, 0 to 100 of what the lamp allows; 0 is muted."
+        },
+        "step": {
+          "enum": [
+            "up",
+            "down"
+          ],
+          "description": "The voice's own step, within the lamp's floor and ceiling."
+        },
+        "mute": {
+          "type": "boolean",
+          "description": "true mutes; false brings it back to where it was."
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "to"
+          ]
+        },
+        {
+          "required": [
+            "step"
+          ]
+        },
+        {
+          "required": [
+            "mute"
+          ]
+        }
+      ],
+      "additionalProperties": false
     }
   }
 }

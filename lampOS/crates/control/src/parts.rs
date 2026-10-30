@@ -47,7 +47,9 @@ use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority}
 use serde_json::{Value, json};
 
 use crate::feelings;
-use crate::protocol::{Angles, Error, ErrorCode, LookAt, LookTarget, Op, Pattern, StateKind};
+use crate::protocol::{
+    Angles, Error, ErrorCode, LookAt, LookTarget, Op, Pattern, StateKind, VolumeStep,
+};
 use crate::session::Parts;
 
 /// How long a `say` may wait to begin before the voice lets it go.
@@ -101,6 +103,9 @@ pub struct Lamp {
     /// told to it on the lease socket (`crate::body_lease`); none without
     /// one.
     follow: Option<crate::body_lease::Follower>,
+    /// lamp-actions' call socket (`--actions-socket`), where the speaker's
+    /// volume is the person's own: the same as the voice and the app set.
+    actions: Option<PathBuf>,
     /// When the last motion sent to the body ends, on the door's clock.
     /// One for the lamp, since the body plays one at a time whoever asked
     /// (#4209). A `stop` doesn't free it: the door never stops the body,
@@ -133,7 +138,47 @@ impl Lamp {
             clock: lamp_ipc::monotonic_us,
             follow: None,
             motion: None,
+            actions: None,
         }
+    }
+
+    /// The `volume` op through lamp-actions' call socket at `path`.
+    pub fn volume_through(mut self, path: PathBuf) -> Self {
+        self.actions = Some(path);
+        self
+    }
+
+    /// One `volume` op: lamp-actions' app calls (`volume_to`, `volume_step`,
+    /// `volume_muted`), which answer in numbers and change the volume as the
+    /// voice and the app do, ceiling and floor included. The answer is the
+    /// level it left, `{level, muted}`; `volume.changed` follows from
+    /// `speaker/volume`. A few tens of milliseconds on a lamp (one `amixer`
+    /// write and its readback), bounded by [`ACTIONS_WAIT`].
+    fn volume(
+        &self,
+        to: Option<u8>,
+        step: Option<VolumeStep>,
+        mute: Option<bool>,
+    ) -> Result<Value, Error> {
+        let Some(path) = self.actions.as_ref() else {
+            return Err(not_here("the speaker's volume"));
+        };
+        let (name, args) = match (to, step, mute) {
+            (Some(to), _, _) => ("volume_to", json!({"volume": to})),
+            (_, Some(VolumeStep::Up), _) => ("volume_step", json!({"step": "up"})),
+            (_, Some(VolumeStep::Down), _) => ("volume_step", json!({"step": "down"})),
+            (_, _, Some(muted)) => ("volume_muted", json!({"muted": muted})),
+            _ => return Err(Error::new(ErrorCode::BadRequest, "one of to, step or mute")),
+        };
+        let answer = actions_call(path, name, args).map_err(|why| {
+            Error::new(ErrorCode::Refused, format!("the speaker's volume: {why}"))
+        })?;
+        volume_of(&answer).ok_or_else(|| {
+            Error::new(
+                ErrorCode::Refused,
+                "the speaker's volume: an answer it can't read",
+            )
+        })
     }
 
     /// Another clock for claims, for tests.
@@ -428,6 +473,44 @@ fn source(client: &str) -> String {
     format!("control:{client}")
 }
 
+/// How long a call to lamp-actions may take, connecting, asking and the
+/// answer: an `amixer` write and its readback are tens of milliseconds.
+pub const ACTIONS_WAIT: Duration = Duration::from_millis(1_500);
+
+/// One call on lamp-actions' socket, its answer when `ok`, or why not.
+fn actions_call(path: &std::path::Path, name: &str, args: Value) -> Result<Value, String> {
+    let gone = |_| "lamp-actions is not running".to_owned();
+    let mut stream = UnixStream::connect(path).map_err(gone)?;
+    stream.set_read_timeout(Some(ACTIONS_WAIT)).map_err(gone)?;
+    stream.set_write_timeout(Some(ACTIONS_WAIT)).map_err(gone)?;
+    writeln!(
+        stream,
+        "{}",
+        json!({"op": "call", "name": name, "args": args})
+    )
+    .map_err(gone)?;
+    let mut line = String::new();
+    std::io::BufRead::read_line(&mut BufReader::new(stream), &mut line)
+        .map_err(|_| "lamp-actions did not answer".to_owned())?;
+    let answer: Value =
+        serde_json::from_str(&line).map_err(|_| "lamp-actions said nonsense".to_owned())?;
+    if answer["ok"] == true {
+        Ok(answer)
+    } else {
+        Err(answer["error"].as_str().unwrap_or("not done").to_owned())
+    }
+}
+
+/// `{level, muted}` from lamp-actions' `{"level": {"volume", "raw", ...}}`:
+/// muted is a raw level of nothing.
+fn volume_of(answer: &Value) -> Option<Value> {
+    let level = answer["level"]["volume"]
+        .as_u64()
+        .filter(|level| *level <= 100)?;
+    let raw = answer["level"]["raw"].as_u64()?;
+    Some(json!({"level": level, "muted": raw == 0}))
+}
+
 fn not_here(part: &str) -> Error {
     Error::new(
         ErrorCode::Refused,
@@ -466,6 +549,7 @@ impl Parts for Lamp {
                 for_ms,
             } => self.light(client, colour, *level, *pattern, *for_ms),
             Op::Say { text } => self.say(client, re, text),
+            Op::Volume { to, step, mute } => self.volume(*to, *step, *mute),
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
@@ -799,6 +883,108 @@ mod tests {
         let asked = ring.0.lock().unwrap();
         assert_eq!(asked.len(), 2);
         assert_eq!(asked[1].claim.until_us, 61_000_000);
+    }
+
+    /// lamp-actions' call socket answering `calls` the way it does: each
+    /// asked line is kept, and the level moves as the voice's own steps do.
+    fn actions(name: &str, calls: usize) -> (PathBuf, std::thread::JoinHandle<Vec<Value>>) {
+        let dir = dir(name);
+        let path = dir.join("call.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let serving = std::thread::spawn(move || {
+            let (mut level, mut before) = (50u64, 50u64);
+            let mut asked = Vec::new();
+            for _ in 0..calls {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let call: Value = serde_json::from_str(&line).unwrap();
+                match (call["name"].as_str().unwrap(), &call["args"]) {
+                    ("volume_to", args) => level = args["volume"].as_u64().unwrap(),
+                    ("volume_step", args) if args["step"] == "up" => level = (level + 20).min(100),
+                    ("volume_step", _) => level = level.saturating_sub(20).max(10),
+                    ("volume_muted", args) if args["muted"] == true => (before, level) = (level, 0),
+                    ("volume_muted", _) => level = before,
+                    _ => {}
+                }
+                let mut out = &stream;
+                writeln!(
+                    out,
+                    "{}",
+                    json!({"ok": true, "level": {"volume": level, "raw": level, "max_volume": 100}})
+                )
+                .unwrap();
+                asked.push(call);
+            }
+            asked
+        });
+        (path, serving)
+    }
+
+    #[test]
+    fn the_volume_op_sets_steps_and_mutes_through_lamp_actions_app_calls() {
+        let (path, serving) = actions("volume", 4);
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet()).volume_through(path);
+        let mut ask = |frame: &str| lamp.act("c_1", 1, &op(frame), 0).unwrap();
+        assert_eq!(
+            ask(r#"{"id":1,"op":"volume","to":35}"#),
+            json!({"level": 35, "muted": false})
+        );
+        assert_eq!(
+            ask(r#"{"id":2,"op":"volume","step":"up"}"#),
+            json!({"level": 55, "muted": false})
+        );
+        assert_eq!(
+            ask(r#"{"id":3,"op":"volume","mute":true}"#),
+            json!({"level": 0, "muted": true})
+        );
+        assert_eq!(
+            ask(r#"{"id":4,"op":"volume","mute":false}"#),
+            json!({"level": 55, "muted": false})
+        );
+        let asked = serving.join().unwrap();
+        assert_eq!(
+            asked
+                .iter()
+                .map(|call| (call["name"].clone(), call["args"].clone()))
+                .collect::<Vec<_>>(),
+            [
+                (json!("volume_to"), json!({"volume": 35})),
+                (json!("volume_step"), json!({"step": "up"})),
+                (json!("volume_muted"), json!({"muted": true})),
+                (json!("volume_muted"), json!({"muted": false})),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_volume_without_lamp_actions_or_refused_by_it_says_why() {
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
+        let error = lamp
+            .act("c_1", 1, &op(r#"{"id":1,"op":"volume","to":10}"#), 0)
+            .unwrap_err();
+        assert!(error.why.contains("not reachable"), "{}", error.why);
+        let dir = dir("volume-refused");
+        let path = dir.join("call.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let actions = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let mut out = &stream;
+            writeln!(
+                out,
+                r#"{{"ok":false,"error":"this lamp has no volume control"}}"#
+            )
+            .unwrap();
+        });
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet()).volume_through(path);
+        let error = lamp
+            .act("c_1", 1, &op(r#"{"id":1,"op":"volume","step":"down"}"#), 0)
+            .unwrap_err();
+        actions.join().unwrap();
+        assert_eq!(error.code, ErrorCode::Refused);
+        assert!(error.why.contains("no volume control"), "{}", error.why);
     }
 
     #[test]

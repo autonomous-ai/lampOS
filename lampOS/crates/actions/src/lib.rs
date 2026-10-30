@@ -30,6 +30,7 @@ pub mod schedule;
 pub mod server;
 pub mod sound;
 pub mod speaker_state;
+pub mod volume_out;
 
 use serde_json::{Value, json};
 
@@ -185,7 +186,7 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
 /// The app's calls (#1396), never offered to the model. The voice keeps
 /// the same list (`lamp_voice::tools::APP_CALLS`) and a test of its holds
 /// the two equal.
-pub const APP_CALLS: [&str; 2] = ["volume_level", "volume_to"];
+pub const APP_CALLS: [&str; 4] = ["volume_level", "volume_to", "volume_step", "volume_muted"];
 
 /// Whether `name` is one of the app's calls.
 pub fn is_app_call(name: &str) -> bool {
@@ -215,7 +216,11 @@ impl<S: sound::Mixer, L: light::Light> Executive<S, L> {
     }
 
     /// One of the app's calls (#1396), answered with numbers, not
-    /// sentences: `volume_level`, and `volume_to` with `{"volume": 0..100}`.
+    /// sentences: `volume_level`, `volume_to` with `{"volume": 0..100}`, and
+    /// for lamp-control's `volume` op `volume_step` with `{"step": "up" |
+    /// "down"}` and `volume_muted` with `{"muted": true | false}`. The step
+    /// and the mute are the voice's own (`volume_up`, `volume_mute`, ...): the
+    /// same steps, floor and ceiling, and an unmute back to where it was.
     /// They are never in the model's list, so only a caller on the socket
     /// that names them (`lamp-cloud`) asks them. `None` for any other name.
     pub fn app_call(&mut self, name: &str, args: &Value) -> Option<Value> {
@@ -225,8 +230,35 @@ impl<S: sound::Mixer, L: light::Light> Executive<S, L> {
         let Some(volume) = self.sound.as_mut() else {
             return Some(json!({"ok": false, "error": "this lamp has no volume control"}));
         };
+        // The voice's own change, then the level it left, or why not.
+        let changed = |outcome: Outcome, volume: &mut sound::Volume<S>| match outcome {
+            Outcome::Done(_) | Outcome::Already(_) => volume.level(),
+            Outcome::Failed(why) => Err(why),
+        };
         let level = match name {
             "volume_level" => volume.level(),
+            "volume_step" => match args.get("step").and_then(Value::as_str) {
+                Some("up") => {
+                    let outcome = volume.up();
+                    changed(outcome, volume)
+                }
+                Some("down") => {
+                    let outcome = volume.down();
+                    changed(outcome, volume)
+                }
+                _ => Err("step must be \"up\" or \"down\"".to_owned()),
+            },
+            "volume_muted" => match args.get("muted").and_then(Value::as_bool) {
+                Some(true) => {
+                    let outcome = volume.mute();
+                    changed(outcome, volume)
+                }
+                Some(false) => {
+                    let outcome = volume.unmute();
+                    changed(outcome, volume)
+                }
+                None => Err("muted must be true or false".to_owned()),
+            },
             _ => match args
                 .get("volume")
                 .and_then(Value::as_u64)

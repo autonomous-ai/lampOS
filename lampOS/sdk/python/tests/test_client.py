@@ -1329,3 +1329,42 @@ def test_a_look_at_the_hand_needs_the_bodys_lease_socket_as_other_looks_do(tmp_p
                 assert not fake.leases
 
     run(go())
+
+
+def test_the_volume_is_set_stepped_muted_and_told_when_the_person_changes_it(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert await lamp.get("volume") == {"volume": {"level": 50, "muted": False}}
+                assert await lamp.volume(to=35) == {"level": 35, "muted": False}
+                assert await lamp.volume(step="up") == {"level": 55, "muted": False}
+                assert await lamp.volume(mute=True) == {"level": 0, "muted": True}
+                assert await lamp.volume(mute=False) == {"level": 55, "muted": False}
+                for wrong in ({}, {"to": 10, "mute": True}):
+                    with pytest.raises(LampError) as refused:
+                        await lamp.volume(**wrong)
+                    assert refused.value.code == "bad_request"
+                heard = asyncio.Queue()
+                lamp.on("volume.changed", heard.put)
+                while not fake.asked("subscribe"):
+                    await asyncio.sleep(0.01)
+                # The person says "quieter" to the lamp.
+                await fake.set_volume(30)
+                event = await heard.get()
+                assert (event["level"], event["muted"]) == (30, False)
+
+    run(go())
+
+
+def test_the_volume_needs_the_speak_grant(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for asking in (lamp.volume(to=10), lamp.get("volume")):
+                    with pytest.raises(LampError) as refused:
+                        await asking
+                    assert refused.value.code == "no_grant"
+
+    run(go())

@@ -95,7 +95,44 @@ impl SpeakerState {
 
 /// Kept outside the baseline catalogue so a disabled runtime creates nothing.
 pub fn speaker_state_topics() -> Vec<(&'static str, Declaration)> {
-    vec![(SpeakerState::TOPIC, SpeakerState::declaration())]
+    vec![
+        (SpeakerState::TOPIC, SpeakerState::declaration()),
+        (SpeakerVolume::TOPIC, SpeakerVolume::declaration()),
+    ]
+}
+
+/// The speaker's volume as the person and every caller see it
+/// (`speaker/volume`): `volume` is 0 to 100 of what the lamp allows (its
+/// ceiling), as the app's slider and lamp-control's `volume` op set it, and
+/// `muted` is a volume of nothing. lamp-actions, the only writer of the
+/// speaker's control, says it once it starts and after each change it makes,
+/// asked by the voice, the app or a paired computer, so a reader such as
+/// lamp-control's `volume.changed` sees every change without reading the
+/// mixer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpeakerVolume {
+    pub volume: u8,
+    pub muted: bool,
+}
+
+impl SpeakerVolume {
+    pub const TYPE: &str = "lamp_msgs/SpeakerVolume";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "speaker/volume";
+    pub const SOURCE: &str = "actions";
+
+    /// The volume now replaces the one before.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+    }
+
+    /// 0 to 100, and muted exactly when it is 0.
+    pub fn check(&self) -> Result<(), Invalid> {
+        if self.volume > 100 || self.muted != (self.volume == 0) {
+            return Err(Invalid("a volume is 0 to 100, muted when 0".into()));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -178,5 +215,20 @@ mod tests {
         message.header.boot = state.session_id;
         message.header.seq += 1;
         assert!(SpeakerState::from_message(&message, "host-boot", 10, 1000).is_err());
+    }
+
+    #[test]
+    fn a_volume_is_0_to_100_and_muted_exactly_at_0() {
+        let at = |volume, muted| SpeakerVolume { volume, muted }.check().is_ok();
+        assert!(at(40, false) && at(0, true) && at(100, false));
+        assert!(!at(101, false) && !at(0, false) && !at(40, true));
+        let said: SpeakerVolume = serde_json::from_str(r#"{"volume":35,"muted":false}"#).unwrap();
+        assert_eq!(
+            said,
+            SpeakerVolume {
+                volume: 35,
+                muted: false
+            }
+        );
     }
 }

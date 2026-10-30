@@ -137,6 +137,9 @@ pub enum EventKind {
     Time,
     #[serde(rename = "lamp.changed")]
     LampChanged,
+    /// The speaker's volume changed, whoever changed it: `level`, `muted`.
+    #[serde(rename = "volume.changed")]
+    VolumeChanged,
 }
 
 impl EventKind {
@@ -150,6 +153,7 @@ impl EventKind {
             | Self::Hand => Some(Grant::Look),
             Self::PhraseHeard | Self::NameHeard => Some(Grant::Hear),
             Self::SoundHeard => Some(Grant::Sound),
+            Self::VolumeChanged => Some(Grant::Speak),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
         }
     }
@@ -167,6 +171,8 @@ pub enum StateKind {
     Mood,
     /// Talking, paused, private, asleep, quiet hours, the lease holder.
     Lamp,
+    /// The speaker's volume, 0 to 100, and whether it is muted.
+    Volume,
 }
 
 impl StateKind {
@@ -174,6 +180,7 @@ impl StateKind {
     pub fn needs(self) -> Option<Grant> {
         match self {
             Self::Presence => Some(Grant::Look),
+            Self::Volume => Some(Grant::Speak),
             Self::Light | Self::Mood | Self::Lamp => None,
         }
     }
@@ -340,6 +347,17 @@ pub enum Op {
         parts: u32,
         data: String,
     },
+    /// The speaker's volume, the person's own: exactly one of a level
+    /// (`to`, 0 to 100), a step, or a mute or an unmute.
+    #[serde(rename = "volume")]
+    Volume {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<u8>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        step: Option<VolumeStep>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mute: Option<bool>,
+    },
     /// The client's own pushed skills.
     #[serde(rename = "skill.list")]
     SkillList {},
@@ -379,7 +397,7 @@ impl Op {
                 _ => vec![Grant::Body],
             },
             Self::Light { .. } => vec![Grant::Light],
-            Self::Say { .. } | Self::Sound { .. } => vec![Grant::Speak],
+            Self::Say { .. } | Self::Sound { .. } | Self::Volume { .. } => vec![Grant::Speak],
             Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
                 vec![Grant::Skills]
             }
@@ -621,10 +639,30 @@ impl Op {
                     return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
                 }
             }
+            Self::Volume { to, step, mute } => {
+                let asked = usize::from(to.is_some())
+                    + usize::from(step.is_some())
+                    + usize::from(mute.is_some());
+                if asked != 1 {
+                    return Err("one of to, step or mute".to_owned());
+                }
+                if to.is_some_and(|to| to > 100) {
+                    return Err("to: from 0 to 100".to_owned());
+                }
+            }
             Self::Stop {} | Self::SkillList {} => {}
         }
         Ok(())
     }
+}
+
+/// Which way a `volume` step goes: the voice's own step (`volume_up`,
+/// `volume_down`), within the lamp's floor and ceiling.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VolumeStep {
+    Up,
+    Down,
 }
 
 /// A request: its id, as its reply names it, and its operation.
@@ -1186,5 +1224,32 @@ mod tests {
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA*=",
             32
         ));
+    }
+
+    #[test]
+    fn a_volume_asks_exactly_one_thing_and_needs_speak() {
+        let checked = |frame: &str| parse(frame).map(|request| request.op.check());
+        assert_eq!(checked(r#"{"id":1,"op":"volume","to":0}"#), Ok(Ok(())));
+        assert_eq!(
+            checked(r#"{"id":1,"op":"volume","step":"down"}"#),
+            Ok(Ok(()))
+        );
+        assert_eq!(
+            checked(r#"{"id":1,"op":"volume","mute":false}"#),
+            Ok(Ok(()))
+        );
+        for refused in [
+            r#"{"id":1,"op":"volume"}"#,
+            r#"{"id":1,"op":"volume","to":101}"#,
+            r#"{"id":1,"op":"volume","to":30,"mute":true}"#,
+            r#"{"id":1,"op":"volume","step":"up","mute":true}"#,
+        ] {
+            assert!(!matches!(checked(refused), Ok(Ok(()))), "{refused}");
+        }
+        assert!(parse(r#"{"id":1,"op":"volume","step":"sideways"}"#).is_err());
+        let op = parse(r#"{"id":1,"op":"volume","to":30}"#).unwrap().op;
+        assert_eq!(op.needs(), vec![Grant::Speak]);
+        assert_eq!(StateKind::Volume.needs(), Some(Grant::Speak));
+        assert_eq!(EventKind::VolumeChanged.needs(), Some(Grant::Speak));
     }
 }
