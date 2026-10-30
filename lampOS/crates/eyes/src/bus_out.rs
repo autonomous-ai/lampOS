@@ -607,6 +607,14 @@ impl BusOut {
         }
     }
 
+    /// Whether the lamp's head was moving at this look
+    /// (`speaking::Mouths::set_head_moved`).
+    pub fn set_head_moved(&mut self, moved: bool) {
+        if let Some(mouths) = self.ids.mouths.as_mut() {
+            mouths.set_head_moved(moved);
+        }
+    }
+
     /// One look: what the detector found in it.
     pub fn saw(
         &mut self,
