@@ -3711,7 +3711,14 @@ fn yes_or_no(text: &str) -> Option<bool> {
     }
     let (rest, phrase) = without_yes_phrases(&words);
     let has = |set: &[&str]| rest.iter().any(|word| set.contains(word));
-    if has(&["no", "nope", "nah", "not", "wrong"]) {
+    // A "…n't" left once the yes phrases are out ("don't mind" is one) is a
+    // no: "Right, I don't." and "Yeah, I won't." were a yes, and a consent
+    // with them (Fourth's P3 on #4469).
+    if has(&["no", "nope", "nah", "not", "wrong"])
+        || rest
+            .iter()
+            .any(|word| word.ends_with("n't") || word.ends_with("n’t"))
+    {
         Some(false)
     } else if phrase
         || has(&[
@@ -5712,6 +5719,17 @@ mod tests {
             assert!(refuses(&words(no)), "{no}");
         }
         assert_eq!(yes_or_no("of course not"), Some(false));
+        // Fourth's P3 on #4469: a short line with a yes word and a "…n't"
+        // is a no, and "don't mind" is still a yes.
+        for no in [
+            "Right, I don't.",
+            "Yeah, I won't.",
+            "Sure, don't.",
+            "Yes, please don't.",
+        ] {
+            assert_eq!(yes_or_no(no), Some(false), "{no}");
+        }
+        assert_eq!(yes_or_no("Yes, I don't mind"), Some(true));
     }
 
     /// With a face to keep (the eyes' who socket), a name and a yes leave
