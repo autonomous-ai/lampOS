@@ -247,10 +247,13 @@ impl OptionalRing {
             "of":RING_RESTARTS, "after_fault_ms":at_us.saturating_sub(state.at_us) / 1_000,
             "reason":state.cause}),
         )?;
-        // Its exit was observed: dropping it removes its namespace, which
-        // the restart then makes afresh. What its cleanup could not confirm
+        // Its exit was observed: dropping it reaps it and removes its
+        // namespace, which the restart then makes afresh. That is file work,
+        // so it is done on the restart's thread, just before the startup: a
+        // lamp whose disk or memory stalls never holds the loop here
+        // (Reviewer-two's P3 on #4658). What its cleanup could not confirm
         // was recorded; the restarted ring's own stop is what a stop checks.
-        self.worker = None;
+        let old = self.worker.take();
         self.degraded = None;
         let (executable, directory, parent, extra) = (
             restart.executable.clone(),
@@ -259,6 +262,7 @@ impl OptionalRing {
             restart.extra.clone(),
         );
         restart.pending = Some(std::thread::spawn(move || {
+            drop(old);
             let extra: Vec<&str> = extra.iter().map(String::as_str).collect();
             Worker::spawn_optional_ring_with_tick(
                 &executable,
