@@ -2450,7 +2450,8 @@ then use that person's scope:
   once their memory is emptied, after the place below: the model hears
   `name: "forgotten too"` in place of `setup_name`, or that it could not be
   (`everything: false`), and the second route reads the name again for each
-  reply, so it names no one from the next (`person::forget_with_everything`,
+  reply, so it names no one from the next (the Live route, not the
+  product's, only from the voice's next start; `person::forget_with_everything`,
   #4461: lamp-52e6 still named its owner after "forget everything"). Another
   person's forget or the room's leaves it, and their answer still says it
   stays (`setup_name`); the 5 s reset clears it too. When the app set the owner's
