@@ -377,9 +377,13 @@ mod tests {
         let failed = kept().last.unwrap();
         assert_eq!(failed.reason.as_deref(), Some("fetching"));
         assert!(failed.started_at_unix_ms.unwrap() >= began);
-        // A round that ends before its first phase (its lock taken) says
-        // neither, and takes nothing from the round before.
-        telling.ended(&Outcome::Failed("another lamp-update is at work".into()), 9);
+        // A round that ends before its first phase (its lock taken, #4490:
+        // not a failure) says neither, and takes nothing from the round
+        // before.
+        telling.ended(
+            &Outcome::NotQuiet("another lamp-update is at work".into()),
+            9,
+        );
         let locked = kept().last.unwrap();
         assert_eq!(
             (
@@ -387,7 +391,7 @@ mod tests {
                 locked.reason,
                 locked.started_at_unix_ms
             ),
-            ("failed", None, None)
+            ("not-quiet", None, None)
         );
 
         // Said again: a newer value of the same status within a few periods.
