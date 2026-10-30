@@ -440,3 +440,29 @@ fn the_wifi_recovering_line_is_a_kind_of_its_own() {
         lost
     );
 }
+
+/// #3748: the hold's sleep line is a kind of its own, loaded only by its
+/// own name.
+#[test]
+fn the_going_to_sleep_line_is_a_kind_of_its_own() {
+    let directory = Directory::new();
+    let samples = tone(RATE * 3);
+    let bytes = wav(RATE, 1, &samples);
+    directory.write("going-to-sleep.en-US.wav", &bytes);
+    let mut value = entry(
+        "going_to_sleep",
+        "going-to-sleep.en-US.wav",
+        &bytes,
+        RATE * 3,
+    );
+    value["transcript"] = "Going to sleep. Tap my head to wake me.".into();
+    directory.provision(vec![value]);
+    let notices = directory.load(Approval::Production);
+    let notice = notices.get(NoticeKind::GoingToSleep, "en-US").unwrap();
+    assert_eq!(notice.samples(), samples);
+    assert_eq!(notice.info.kind, NoticeKind::GoingToSleep);
+    assert_eq!(
+        notices.get(NoticeKind::WifiLost, "en-US").err(),
+        Some(Missing::NotProvisioned)
+    );
+}
