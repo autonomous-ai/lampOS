@@ -1192,15 +1192,18 @@ only a self-switch or a climb goes to the journal's form, before its `exec`.
 | `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before, or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
 | `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, or `another lamp-update is at work` |
 | `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
-| `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts (or with none to change) |
+| `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts switched and their watch passed (or with none to change). That round writes this end instead of `switched to build N; every part is well`, as most product rounds do, since a build's lamp-update is built anew (lamp-9adf's 8999 → 9063, 30 Oct) |
 | `build N needs updater M; lamp-update switches from its build A to B, which the build carries, and takes nothing else of it until that one has confirmed itself` | `self-switched` | a **climb**: only the updater the build carries is taken |
 | `build N put back: …; the previous build is well`, or `…; the previous build is not well either: …` | `rolled-back` | the parts were put back (the watch, or a start that failed). The second ending, the old build failing its own check too, is the one to post at once; grep `build N put back:` for both |
 | `failed: …` | `failed` | an error, said with why |
 
 Inside a round: `installed <folder> beside <folder>` for each new folder
 (a self-switch's or a climb's updater too, before its own line),
-`switching to build N`, `waiting for a quiet moment: …` (once per wait), and
-`putting build N back: …` before a `put back` end.
+`switching to build N`, `waiting for a quiet moment: …` (once per wait),
+`the voice is stopped before the parts it reads restart` (see "The voice
+stopped first"), `lamp-update switches to its build B; it must confirm
+itself within M min` before a self-switch's end, and `putting build N back: …`
+before a `put back` end.
 After a self-switch or a climb, the new updater says
 `confirmed: lamp-update runs its new build` once its dry round passes
 (`self-confirmed` in `log.jsonl`), or `not confirmed yet: …` and
