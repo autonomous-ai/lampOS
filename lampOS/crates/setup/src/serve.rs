@@ -745,6 +745,14 @@ fn put_in_place(temporary: &Path, path: &Path) -> io::Result<()> {
 /// later wording that asks for more starts at no until they are asked again.
 pub const REPORTS_ASKED: u64 = 1;
 
+/// Whether the status says it takes own keys from the hotspot's start,
+/// before any setup, so the app knows whether to ask (#2094): as `save`
+/// says ([`Save::own_keys_on`]), but never in a recovery, which saves the
+/// network only.
+pub fn takes_own_keys_at_start(save: &impl Save, recovering: bool) -> bool {
+    !recovering && save.own_keys_on()
+}
+
 /// The answer on reports the last setup kept at `path`, read as lamp-cloud
 /// reads setup's record: a yes only with `"share": true` to a wording this
 /// setup knows (`asked` at most [`REPORTS_ASKED`]) and no field but
