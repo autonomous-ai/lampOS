@@ -5792,7 +5792,7 @@ fn conversation_with_gate_inner(
     let mut key_refusals = key_refusals::KeyRefusals::default();
     // With `LAMP_SECOND_REFUSED_HOLD=on`: the model service refusing every
     // turn is said once and held, not failed turn by turn (#4265).
-    let refused_hold = std::env::var(model_refusing::ENVIRONMENT).ok().as_deref() == Some("on");
+    let refused_hold = model_refusing::switched_on();
     let mut model_refusing = model_refusing::ModelRefusing::default();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
@@ -9588,9 +9588,13 @@ fn conversation_with_gate_inner(
                     };
                     // Someone is answered: the lamp has shown it is back.
                     back_owed_since = None;
-                    // Sent while refusing: the service is tried, and the
-                    // turns after it held for the time again (#4265).
-                    model_refusing.tried(monotonic_us());
+                    // Sent while refusing, a spoken line is not yet a try
+                    // (#4265): only its chat asks the service, and a line
+                    // heard as no words or as no speech never asks. A
+                    // refused chat holds the turns after it again
+                    // (`ModelRefusing::observe`); on lamp-52e6 on 30 Oct
+                    // the room's short sounds took each minute's try, and
+                    // every ask after them was held.
                     // Taking over from the lamp's own answer is cutting in,
                     // and taking over from something that was said is going
                     // on with it. Taking over from a sound is neither.
