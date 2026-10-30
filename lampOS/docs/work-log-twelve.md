@@ -558,3 +558,10 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 
 - #4304 (#4286's three P3s, part of #4226) landed on lamp-voice as `b32c0b0ce6` and the commits before it. The branch is deleted.
 - The glance check on lamp-c0a4 for #4175 (c6489222733): not shown, since no remark was let out by the name, and one split d09 was answered as "the text shows it was called". This waits for the first builder.
+
+## 29–30 Oct: #3733's install check, #4226's reads, #4534 for #4175
+
+- #3733: the install check on lamp-c0a4 (c6499326462). 8545's `lamp-update install` handed over to 8652's own lamp-update; the units are byte-identical to 8652's; a second run changed nothing. A round had left two units at older text, now noted for the first builder.
+- #4226: answered the first builder's 45 minutes on lamp-4ace (chance, no bisect) and the Reviewer-lead's TV-bed repro on 52e6 (c6515652108; asked for the heard texts, since a quiet room lets out a "Lamp, …" text whatever lamp-name hears).
+- #4175: #4534, Part of #4175 (`LAMP_REMARK_ABOUT_IT`). A held remark, the line after one, or another voice's line keeps the person's conversation, and the line right after a held remark is held. Also `RoomTold` keeps every held line, not only the last. Local gate green; lamp-c0a4, Mac-played: the room was never judged busy, so the remark rule didn't run there. busy_day on lamp-4ace was asked of the first builder on #3997 (c6516694106).
+- Slip: I asked the person to sit in c0a4's view and waited about 14 hours for the answer, and my c0a4 lock lapsed meanwhile. Thirteen saved my drop-in. Now: Mac-only tests while the person is away, and the lock renewed every 4 minutes.
