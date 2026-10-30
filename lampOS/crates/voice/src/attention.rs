@@ -876,9 +876,11 @@ struct Written {
 fn written(language: Language) -> Written {
     match language {
         Language::Japanese => Written {
-            greetings: &["hey", "ヘイ", "エイ"],
+            // "a": 「Aランク。」 for "Hey Lamp." on lamp-52e6 (#4554).
+            greetings: &["hey", "ヘイ", "エイ", "a"],
             real: &["ランプ", "らんぷ"],
-            stand_ins: &["ランク"],
+            // 「ヘイ、マンプ。」 on lamp-52e6 (#4554): マンプス is "mumps".
+            stand_ins: &["ランク", "マンプ"],
             whole_words: false,
             not_the_name: |c| matches!(c, '\u{30A0}'..='\u{30FF}'),
             everyday: false,
@@ -2727,6 +2729,9 @@ mod tests {
             (Japanese, "ランプ、今何時ですか。"),
             (Japanese, "らんぷ、聞こえる？"),
             (Japanese, "今何時ですか。ランク。"),
+            (Japanese, "ヘイ、マンプ。"),
+            (Japanese, "Aランク。今何時？"),
+            (Japanese, "Aランク、明日の天気は？"),
             (Chinese, "兰普，现在几点？"),
             (Chinese, "蓝普，开灯。"),
             (Chinese, "嘿兰普，现在几点？"),
@@ -2759,6 +2764,11 @@ mod tests {
             (Vietnamese, "Ê làm bài tập chưa?"),
             (Japanese, "エイランクのホテルに泊まった。"),
             (Japanese, "エイランクだね。"),
+            (Japanese, "Aランクのホテルに泊まった。"),
+            (Japanese, "Aランクだね。"),
+            (Japanese, "マンプス"),
+            (Japanese, "マンプスにかかった。"),
+            (Japanese, "A lamp is on the desk."),
             // Vietnamese's stand-ins are everyday one-word replies: only
             // in the first clause, greeted or with more after.
             (Vietnamese, "Ừ, làm."),
@@ -2800,6 +2810,8 @@ mod tests {
         for (language, alone) in [
             (Japanese, "エイランク。"),
             (Japanese, "ヘイ、ランプ。"),
+            (Japanese, "ヘイ、マンプ。"),
+            (Japanese, "Aランク。"),
             (Chinese, "嘿兰普。"),
             (Korean, "헤이 램프."),
             (Vietnamese, "Hây lăm."),
