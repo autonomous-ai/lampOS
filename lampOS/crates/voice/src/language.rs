@@ -128,6 +128,123 @@ impl Language {
     }
 }
 
+/// The product's failure notices' English words (`docs/failure-notices.md`,
+/// "The product's recordings"): the keys of [`FIXED_LINES`] for the lines
+/// the notices release holds. An English lamp plays the release's files,
+/// never these.
+pub const PROVIDER_UNAVAILABLE: &str =
+    "Sorry, I can't reach the internet right now. I'll be back soon.";
+pub const BACK_ONLINE: &str = "I'm back online.";
+pub const VOICE_SERVICE_UNREACHABLE: &str =
+    "Sorry, I'm having trouble thinking right now. Give me a moment.";
+pub const WIFI_LOST: &str = "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again.";
+pub const WIFI_RECOVERING: &str =
+    "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.";
+
+/// The lamp's fixed lines (#4473 (c)), by their English words, in
+/// Vietnamese, Japanese, Chinese and Korean, in that order: said from the
+/// speech cache in the owner's language, English where a line is not kept.
+const FIXED_LINES: &[(&str, [&str; 4])] = &[
+    (
+        lamp_msgs::GOING_TO_SLEEP,
+        [
+            "Mình đi ngủ đây. Khi đèn chuyển sang màu xanh lá thì rút điện cho mình nhé.",
+            "おやすみなさい。ライトが緑になったら、プラグを抜いてね。",
+            "我要睡觉了。等灯变绿了，就可以拔掉电源了。",
+            "이제 잘게요. 불이 초록색으로 바뀌면 플러그를 뽑아 주세요.",
+        ],
+    ),
+    (
+        lamp_msgs::SLEEP_LINE,
+        [
+            "Mình ngủ đây. Chạm vào đầu mình để đánh thức nhé.",
+            "おやすみ。頭をタップしたら起きるよ。",
+            "我去睡了。拍拍我的头就能叫醒我。",
+            "잘게요. 머리를 톡 치면 깨어날게요.",
+        ],
+    ),
+    (
+        PROVIDER_UNAVAILABLE,
+        [
+            "Xin lỗi, giờ mình không kết nối được internet. Mình sẽ quay lại sớm thôi.",
+            "ごめんね、今インターネットにつながらないんだ。すぐ戻るね。",
+            "抱歉，我现在连不上网。很快就回来。",
+            "미안해요, 지금 인터넷에 연결할 수 없어요. 곧 돌아올게요.",
+        ],
+    ),
+    (
+        BACK_ONLINE,
+        [
+            "Mình kết nối lại rồi nhé.",
+            "またつながったよ。",
+            "我又连上网了。",
+            "다시 연결됐어요.",
+        ],
+    ),
+    (
+        VOICE_SERVICE_UNREACHABLE,
+        [
+            "Xin lỗi, mình đang hơi chậm một chút. Đợi mình một chút nhé.",
+            "ごめんね、今うまく考えられないんだ。ちょっと待ってね。",
+            "抱歉，我现在脑子有点转不过来。稍等我一下。",
+            "미안해요, 지금 생각이 잘 안 나요. 잠깐만 기다려 주세요.",
+        ],
+    ),
+    (
+        WIFI_LOST,
+        [
+            "Mình không kết nối được Wi-Fi nào cả. Nếu bạn đã đổi tên hoặc mật khẩu Wi-Fi, hãy dùng kẹp giấy ấn vào lỗ có chữ reset ở mặt sau đế đèn và giữ năm giây. Mình sẽ được đưa về cài đặt ban đầu để bạn cài lại từ đầu.",
+            "Wi-Fiにつながらないよ。Wi-Fiの名前かパスワードを変えたなら、台座の裏にある「reset」の穴にクリップを差し込んで、5秒間押し続けてね。データが消えて、最初から設定し直せるよ。",
+            "我连不上任何Wi-Fi。如果你改了Wi-Fi的名称或密码，请用回形针按住我底座背面标着reset的小孔五秒钟。这样会清除我的数据，重新开始设置。",
+            "와이파이에 연결할 수 없어요. 와이파이 이름이나 비밀번호를 바꿨다면, 받침 뒷면의 reset 구멍에 클립을 넣고 5초 동안 눌러 주세요. 그러면 제가 초기화되고 설정이 처음부터 다시 시작돼요.",
+        ],
+    ),
+    (
+        WIFI_RECOVERING,
+        [
+            "Mình không kết nối được Wi-Fi nên đã mở chế độ cài đặt. Bạn cài lại Wi-Fi cho mình trong ứng dụng nhé.",
+            "Wi-Fiにつながらないから、設定モードにしたよ。アプリでWi-Fiをもう一度設定してね。",
+            "我连不上Wi-Fi，已经打开了设置。请在App里重新帮我设置Wi-Fi。",
+            "와이파이에 연결할 수 없어서 설정 모드를 열었어요. 앱에서 와이파이를 다시 설정해 주세요.",
+        ],
+    ),
+];
+
+impl Language {
+    /// Its place in each of [`FIXED_LINES`]' rows.
+    fn column(self) -> usize {
+        match self {
+            Self::Vietnamese => 0,
+            Self::Japanese => 1,
+            Self::Chinese => 2,
+            Self::Korean => 3,
+        }
+    }
+
+    /// The fixed line whose English words are `english`, in this language;
+    /// none for a line that is not one of [`FIXED_LINES`].
+    pub fn fixed(self, english: &str) -> Option<&'static str> {
+        FIXED_LINES
+            .iter()
+            .find(|(line, _)| *line == english)
+            .map(|(_, words)| words[self.column()])
+    }
+
+    /// Every fixed line in this language, for the speech cache to warm.
+    pub fn fixed_lines(self) -> impl Iterator<Item = &'static str> {
+        FIXED_LINES
+            .iter()
+            .map(move |(_, words)| words[self.column()])
+    }
+}
+
+/// `english`, a fixed line, as `language` says it: English as it is.
+pub fn fixed_in(language: Option<Language>, english: &'static str) -> &'static str {
+    language
+        .and_then(|language| language.fixed(english))
+        .unwrap_or(english)
+}
+
 /// The language in `text`; an unknown value is said and taken as English.
 fn from_text(text: &str) -> Option<Language> {
     Language::parse(text).unwrap_or_else(|why| {
@@ -391,6 +508,37 @@ mod tests {
             let heard = heard_in(route(), Some(language));
             assert_eq!(heard.stt_language.as_deref(), Some(language.code()));
         }
+    }
+
+    /// #4473 (c): every fixed line has its own words in each language, none
+    /// left English; English keeps the English, byte for byte.
+    #[test]
+    fn each_fixed_line_has_its_words_in_each_language() {
+        assert_eq!(FIXED_LINES.len(), 7);
+        for (english, _) in FIXED_LINES {
+            assert_eq!(fixed_in(None, english), *english);
+        }
+        assert_eq!(fixed_in(Some(Language::Japanese), "Hello."), "Hello.");
+        for language in [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+        ] {
+            let lines: Vec<_> = language.fixed_lines().collect();
+            assert_eq!(lines.len(), FIXED_LINES.len());
+            for ((english, _), words) in FIXED_LINES.iter().zip(&lines) {
+                assert!(!words.trim().is_empty(), "{language:?}");
+                assert_ne!(words, english, "{language:?}");
+                assert_eq!(language.fixed(english), Some(*words));
+                assert_eq!(fixed_in(Some(language), english), *words);
+            }
+            assert_eq!(language.fixed("Hello."), None);
+        }
+        assert_eq!(
+            Language::Vietnamese.fixed(lamp_msgs::SLEEP_LINE),
+            Some("Mình ngủ đây. Chạm vào đầu mình để đánh thức nhé.")
+        );
     }
 
     #[test]

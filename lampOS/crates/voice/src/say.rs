@@ -1558,17 +1558,34 @@ impl Recordings {
         self
     }
 
-    /// The samples of a cached `text`, kept or rendered now, or why not.
+    /// The samples of a cached `text`, kept or rendered now, or why not:
+    /// in the owner's language when it is kept (#4473 (c)).
     pub fn cached(&self, text: &str) -> Result<Vec<i16>, String> {
-        self.cache
+        let cache = self
+            .cache
             .as_ref()
-            .ok_or_else(|| "the speech cache is off".to_owned())?
-            .samples(text)
+            .ok_or_else(|| "the speech cache is off".to_owned())?;
+        cache
+            .owners_kept(text)
+            .map_or_else(|| cache.samples(text), Ok)
     }
 
     /// The samples of `name`, or why there are none, in words the asker
-    /// can journal: never a path.
+    /// can journal: never a path. A Wi-Fi line is said in the owner's
+    /// language when the speech cache keeps it (#4473 (c)), the recording
+    /// otherwise.
     pub fn samples(&self, name: &str) -> Result<Vec<i16>, String> {
+        let english = match name {
+            "wifi_lost" => Some(crate::language::WIFI_LOST),
+            "wifi_recovering" => Some(crate::language::WIFI_RECOVERING),
+            _ => None,
+        };
+        if let Some(owners) = english
+            .zip(self.cache.as_ref())
+            .and_then(|(english, cache)| cache.owners_kept(english))
+        {
+            return Ok(owners);
+        }
         match self.held.iter().find(|(held, _)| *held == name) {
             Some((_, Ok(samples))) => Ok(samples.to_vec()),
             Some((_, Err(why))) => Err(format!("the recording is not there: {why}")),
@@ -2276,6 +2293,65 @@ mod tests {
             Recordings::none().cached("Bye.").unwrap_err(),
             "the speech cache is off"
         );
+    }
+
+    /// #4473 (c): the shutdown's line and the Wi-Fi lines in the owner's
+    /// language when the cache keeps them; the English line and the
+    /// recording otherwise, and always for English.
+    #[test]
+    fn the_owners_language_is_played_when_kept_and_english_otherwise() {
+        use crate::language::Language;
+        let dir = std::env::temp_dir().join(format!("lamp-say-owners-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let cache = |language: Option<Language>, sub: &str| {
+            tts_cache::TtsCache::new(
+                dir.join(sub),
+                "Ngan",
+                crate::language::SPEECH_MODEL,
+                language.map_or("en", Language::code),
+                Box::new(|text: &str| Ok(vec![text.chars().count() as i16; 2_400])),
+            )
+            .speaking(language)
+        };
+        let english_file: Loaded = Ok(Arc::from(vec![9_i16; 2_400]));
+        let held = |cache: tts_cache::TtsCache| {
+            Recordings::none()
+                .with("wifi_lost", english_file.clone())
+                .with_cache(Some(Arc::new(cache)))
+        };
+        let sound = |text: &str| vec![text.chars().count() as i16; 2_400];
+        // English: today's line and today's file.
+        let english = held(cache(None, "en"));
+        assert_eq!(
+            english.cached(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            sound(lamp_msgs::GOING_TO_SLEEP)
+        );
+        assert_eq!(english.samples("wifi_lost").unwrap(), vec![9_i16; 2_400]);
+        // Vietnamese not kept yet: the English line, the English file.
+        let vietnamese = held(cache(Some(Language::Vietnamese), "vi"));
+        assert_eq!(
+            vietnamese.cached(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            sound(lamp_msgs::GOING_TO_SLEEP)
+        );
+        assert_eq!(vietnamese.samples("wifi_lost").unwrap(), vec![9_i16; 2_400]);
+        // Kept: its own words.
+        let warmed = cache(Some(Language::Vietnamese), "vi");
+        warmed.warm(&warmed.warm_lines()).unwrap();
+        let vietnamese = held(warmed);
+        let vi = |english| Language::Vietnamese.fixed(english).unwrap();
+        assert_eq!(
+            vietnamese.cached(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            sound(vi(lamp_msgs::GOING_TO_SLEEP))
+        );
+        assert_eq!(
+            vietnamese.samples("wifi_lost").unwrap(),
+            sound(vi(crate::language::WIFI_LOST))
+        );
+        assert_eq!(
+            vietnamese.samples("wifi_recovering").unwrap(),
+            sound(vi(crate::language::WIFI_RECOVERING))
+        );
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// #3697: the shutdown's line, warmed at start, reaches the voice as a

@@ -5854,8 +5854,9 @@ fn conversation_with_gate_inner(
     // start in the product voice (`tts_cache::WARM`); read at each hold, one
     // file read, never rendered on this path, so a line the warm thread
     // renders after this loop started is said at the next hold (the
-    // reviewer on #4478). The breath plays while it is not kept yet.
-    // Either way the hold's sleep waits for its cue
+    // reviewer on #4478). In the owner's language when it is kept, the
+    // English otherwise (#4473 (c)). The breath plays while neither is kept
+    // yet. Either way the hold's sleep waits for its cue
     // (`HandControls::sleep_cue_sounding`).
     let sleep_line_on = controls.as_ref().is_some_and(HandControls::sleep_line);
     let sleep_line_cache = if sleep_breath.is_some() && sleep_line_on {
@@ -11887,9 +11888,11 @@ fn conversation_with_gate_inner(
             )?;
             if decided.is_ok() {
                 // The recorded line in the breath's place (#3748).
-                let sleep_line = sleep_line_cache
-                    .as_ref()
-                    .and_then(|cache| cache.kept(lamp_msgs::SLEEP_LINE));
+                let sleep_line = sleep_line_cache.as_ref().and_then(|cache| {
+                    cache
+                        .owners_kept(lamp_msgs::SLEEP_LINE)
+                        .or_else(|| cache.kept(lamp_msgs::SLEEP_LINE))
+                });
                 if sleep_line_cache.is_some() && sleep_line.is_none() {
                     eprintln!(
                         "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"

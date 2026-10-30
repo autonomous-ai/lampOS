@@ -513,7 +513,7 @@ applied, and its speech-to-text language). A hit is played with no
 network. A miss is rendered once through the speech service the voice
 already speaks with (`Tts::speak`, ElevenLabs through the relay), within
 5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
-the lamp is unplugged after a shutdown) and played; at most 16 lines and
+the lamp is unplugged after a shutdown) and played; at most 48 lines and
 20 s each are kept, a line past that is played but not kept. Without the
 second route's configuration, or offline on a miss, it is refused at once
 with why (`the speech cache is off`, `not in the speech cache, and not
@@ -522,11 +522,18 @@ played as a skill's sound is, with the same gates. At start the voice
 renders the cache's fixed lines (`tts_cache::WARM`), the shutdown's
 `lamp_msgs::GOING_TO_SLEEP` first, then a hand's hold's sleep line
 `lamp_msgs::SLEEP_LINE` (#3748, `LAMP_SLEEP_LINE`, controls.md), on a
-thread of its own, tried again each minute until kept, so the first
+thread of its own, tried again until kept (after a minute, then twice as
+long each time, at most hourly; a line that renders empty or past 20 s is
+never asked for again in that run), so the first
 shutdown is said from the cache even with no network then. The cache is
 made once per process and shared: the coordinator reads the sleep line
 from it once per conversation (`TtsCache::kept`), a file read only, never
-a render.
+a render. With an owner's language other than English (#4473 (c),
+second-voice.md, "The fixed lines"), its seven fixed lines in that language
+are warmed first, then these two, and a cached `text` that is one of them
+is played in the owner's words when kept, its English otherwise. Every
+warmed line is tried each round, so one that can't be kept holds back no
+other.
 
 **When it is said.** After a due reminder and before the news, through a reminder's gates: no reply owed or queued, the speaker
 free, nobody's utterance pending, the microphone's capture fresh and a

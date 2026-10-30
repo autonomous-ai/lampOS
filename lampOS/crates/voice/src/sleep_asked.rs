@@ -87,10 +87,17 @@ pub fn tool() -> Tool {
 /// What the model is told of its call: the line to say, or, while onboarding
 /// is under way, that it is not now.
 pub fn told(onboarding: bool) -> Value {
+    told_in(onboarding, crate::language::at_start())
+}
+
+/// [`told`] with the line in `language`'s words (#4473 (c)); English as
+/// it is.
+fn told_in(onboarding: bool, language: Option<crate::language::Language>) -> Value {
     if onboarding {
         json!({ "say": NOT_NOW })
     } else {
-        json!({ "say": format!("Say only this, nothing before or after it: \"{LINE}\"") })
+        let line = crate::language::fixed_in(language, LINE);
+        json!({ "say": format!("Say only this, nothing before or after it: \"{line}\"") })
     }
 }
 
@@ -124,6 +131,22 @@ mod tests {
         let walking = told(true);
         assert_eq!(walking["say"], NOT_NOW);
         assert!(!walking["say"].as_str().unwrap().contains(LINE));
+    }
+
+    /// #4473 (c): English is told today's words byte for byte; another
+    /// language its own.
+    #[test]
+    fn the_model_is_told_the_line_in_the_owners_language() {
+        use crate::language::Language;
+        assert_eq!(
+            told_in(false, None)["say"],
+            format!("Say only this, nothing before or after it: \"{LINE}\"")
+        );
+        let vietnamese = told_in(false, Some(Language::Vietnamese));
+        let said = vietnamese["say"].as_str().unwrap();
+        assert!(said.contains(Language::Vietnamese.fixed(LINE).unwrap()));
+        assert!(!said.contains(LINE));
+        assert_eq!(told_in(true, Some(Language::Korean))["say"], NOT_NOW);
     }
 
     #[test]
