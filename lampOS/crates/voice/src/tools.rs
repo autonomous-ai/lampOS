@@ -47,6 +47,9 @@ mod schedule_integration_tests;
 #[path = "tools/schedule_asked.rs"]
 pub mod schedule_asked;
 
+#[path = "tools/schedule_whose.rs"]
+pub mod schedule_whose;
+
 /// Where the coordinator reads whether the model may say a thing was not
 /// for it. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_TOOLS";
@@ -944,8 +947,14 @@ pub enum Route {
     Schedule(PathBuf),
     /// Ask the memory on this socket; with the eyes' socket and switches,
     /// a known person's "forget everything about me" forgets their face too
-    /// ([`crate::remember::forget_everything_face`]).
-    Memory(PathBuf, Option<(PathBuf, crate::known_faces::FaceSwitches)>),
+    /// ([`crate::remember::forget_everything_face`]); with the executive's
+    /// directory when the schedule's tools are on, the reminders they set go
+    /// too ([`schedule_whose::forget_reminders`], #4527's P2).
+    Memory(
+        PathBuf,
+        Option<(PathBuf, crate::known_faces::FaceSwitches)>,
+        Option<PathBuf>,
+    ),
     /// The time: answered here, at once.
     Clock,
     /// Work for an agent elsewhere, through the tasks part.
@@ -1015,6 +1024,10 @@ pub fn route(settings: &Settings, name: &str) -> Route {
                 .who
                 .clone()
                 .map(|who| (who, face_switches(settings))),
+            settings
+                .schedule_tools
+                .then(|| settings.exec.clone())
+                .flatten(),
         );
     }
     if crate::agent_tasks::is_tool(name) {
@@ -1286,7 +1299,7 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
         return json!({"error": MOVES_ONLY_AT_THE_LAMP});
     }
     match route {
-        Route::Memory(socket, _) => {
+        Route::Memory(socket, ..) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
@@ -1576,7 +1589,7 @@ fn run_call_with_scope(
     }
     let deadline = ASK_DEADLINE;
     let result = match route {
-        Route::Memory(socket, faces) => {
+        Route::Memory(socket, faces, reminders) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
@@ -1712,6 +1725,16 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the reminders they set, once their memory is emptied
+            // (#4527's P2): never the room's, nor anyone else's.
+            let (told, answered) = match (reminders, lease) {
+                (Some(directory), Some(lease))
+                    if heard && model.name == crate::remember::FORGET_EVERYTHING =>
+                {
+                    schedule_whose::forget_reminders((told, answered), directory, lease)
+                }
+                _ => (told, answered),
+            };
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
@@ -1721,7 +1744,12 @@ fn run_call_with_scope(
         ),
         Route::Schedule(directory) => (
             "the schedule through the executive",
-            ask_schedule(directory, call, deadline),
+            ask_schedule_for(
+                directory,
+                call,
+                deadline,
+                Some(&schedule_whose::caller(lease, &call.name)),
+            ),
         ),
         // A face is the person's at the lamp: only words they said there
         // may keep or forget one, never a request the lamp wrote or a text
@@ -1930,13 +1958,28 @@ fn take_requested_audio(
 /// may follow a committed mutation; do not turn it into a claim of failure or
 /// silently repeat the call under a new identity.
 pub fn ask_schedule(directory: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
+    ask_schedule_for(directory, call, deadline, None)
+}
+
+/// [`ask_schedule`] for a line's `caller` ([`schedule_whose::caller`]):
+/// whose reminders it hears and changes, and whose one it sets is. With
+/// none, the executive takes the call as nobody's.
+pub fn ask_schedule_for(
+    directory: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    caller: Option<&Value>,
+) -> (Value, bool) {
     if !is_schedule_tool(&call.name) {
         return (unavailable(), false);
     }
     let Some(until) = Instant::now().checked_add(deadline) else {
         return (unavailable(), false);
     };
-    let line = json!({"op":"call","name":call.name,"args":call.args});
+    let mut line = json!({"op":"call","name":call.name,"args":call.args});
+    if let Some(caller) = caller {
+        line["caller"] = caller.clone();
+    }
     match lamp_schedule::client::exchange(&directory.join(CALL_SOCKET), &line, until) {
         Ok(answer) => {
             let told = match answer.get("ok").and_then(Value::as_bool) {
@@ -2121,7 +2164,7 @@ mod tests {
             name: crate::remember::RECALL.into(),
             args: json!({}),
         };
-        let route = Route::Memory(PathBuf::from("/missing-memory.sock"), None);
+        let route = Route::Memory(PathBuf::from("/missing-memory.sock"), None, None);
         assert_eq!(
             run_call_scoped(&route, &call, 2, true, &lease),
             ("nobody", (unavailable(), false))
@@ -2334,7 +2377,7 @@ mod tests {
             onboarding: Some(file.clone()),
             ..Settings::default()
         };
-        let memory = Route::Memory(dir.join("memory.sock"), None);
+        let memory = Route::Memory(dir.join("memory.sock"), None, None);
         let mailbox =
             || std::fs::read_to_string(crate::onboarding::mailbox_of(&file)).unwrap_or_default();
         let kept = json!({"forgotten": true, "everything": false,
@@ -3690,7 +3733,7 @@ mod tests {
         for name in ["remember", "recall", "forget"] {
             assert_eq!(
                 route(&with, name),
-                Route::Memory("/run/lampos-memory/memory.sock".into(), None)
+                Route::Memory("/run/lampos-memory/memory.sock".into(), None, None)
             );
         }
         assert_eq!(route(&with, "light_on"), Route::Executive(dir.clone()));

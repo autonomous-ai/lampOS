@@ -1,7 +1,7 @@
 //! Durable scheduling policy. Every mutation is prepared on a copy, committed,
 //! then made visible. No publication or speech is a storage acknowledgement.
 use crate::{
-    protocol::{Guard, MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
+    protocol::{Asker, Guard, MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
     time::{self, ClockSample, Deadline, When},
 };
@@ -103,12 +103,27 @@ struct Item {
     snooze: Option<Deadline>,
     delivery: u64,
     pending: Option<Pending>,
+    /// Who set it, as a memory person id (#4527's P2, (a)): optional stored
+    /// metadata, so no `schema` bump. An item stored before it, or set with
+    /// nobody sure, has none and is the owner's line's ([`Asker::may_see`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    person: Option<String>,
 }
 
 impl Item {
     fn effective(&self) -> &Deadline {
         self.snooze.as_ref().unwrap_or(&self.deadline)
     }
+}
+
+/// Whether `asker`, if any, may see `item`: no asker sees everything.
+fn visible(asker: Option<&Asker>, item: &Item) -> bool {
+    asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
+}
+
+/// A setter's person id as memory makes them: `p-` and 16 hex digits.
+fn valid_person(person: &str) -> bool {
+    lamp_msgs::known::is_person_id(person) && person.len() <= 64
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -248,6 +263,7 @@ impl State {
                 || !valid_text(&item.text)
                 || !valid_request_id(&item.request_id)
                 || !(time::MIN_UNIX_MS..=time::MAX_UNIX_MS).contains(&item.created_unix_ms)
+                || item.person.as_deref().is_some_and(|p| !valid_person(p))
             {
                 return Err(invalid());
             }
@@ -276,10 +292,11 @@ impl State {
             }
             let receipt_revision = guard.revision.checked_add(1).ok_or_else(invalid)?;
             let body = match &receipt.request {
-                Request::Set { text, .. } => {
+                Request::Set { text, person, .. } => {
                     let item = self.items.last().ok_or_else(invalid)?;
                     if item.id != self.next_id - 1
                         || item.request_id != guard.request_id
+                        || item.person != *person
                         || item.text != text.trim()
                         || item.delivery != 1
                         || item.snooze.is_some()
@@ -298,6 +315,17 @@ impl State {
                         .filter(|d| *d > 0)
                         .ok_or_else(invalid)?;
                     json!({"cancelled":true,"id":id,"delivery":delivery})
+                }
+                Request::Forget { person, .. } => {
+                    if self
+                        .items
+                        .iter()
+                        .any(|i| i.person.as_deref() == Some(person.as_str()))
+                    {
+                        return Err(invalid());
+                    }
+                    let forgotten = receipt.response["forgotten"].as_u64().ok_or_else(invalid)?;
+                    json!({"forgotten":forgotten})
                 }
                 Request::Snooze { id, delivery, .. } => {
                     let item = self
@@ -815,11 +843,13 @@ impl<P: Persistence> Engine<P> {
 
     pub fn answer(&mut self, request: Request, now: &ClockSample) -> Result<Value, Error> {
         // `ListSet` is `List` whose items also say when each was set.
-        let (request, with_set) = match request {
+        // With an asker, only the items that line may see (#4527's P2).
+        let (request, with_set, asker) = match request {
             Request::ListSet {
                 after_id,
                 limit,
                 pending_only,
+                asker,
             } => (
                 Request::List {
                     after_id,
@@ -827,8 +857,9 @@ impl<P: Persistence> Engine<P> {
                     pending_only,
                 },
                 true,
+                asker,
             ),
-            request => (request, false),
+            request => (request, false, None),
         };
         self.follow_zone();
         self.tick(now)?;
@@ -853,7 +884,11 @@ impl<P: Persistence> Engine<P> {
                     .state
                     .items
                     .iter()
-                    .filter(|item| item.id > *after_id && (!pending_only || item.pending.is_some()))
+                    .filter(|item| {
+                        item.id > *after_id
+                            && (!pending_only || item.pending.is_some())
+                            && visible(asker.as_ref(), item)
+                    })
                     .take(usize::from(*limit) + 1)
                     .collect();
                 let mut views = Vec::new();
@@ -879,7 +914,19 @@ impl<P: Persistence> Engine<P> {
                 }
                 let next_after_id =
                     (views.len() < available.len()).then(|| available[views.len() - 1].id);
-                return Ok(self.reply(json!({"items":views,"next_after_id":next_after_id})));
+                let mut body = json!({"items":views,"next_after_id":next_after_id});
+                if let Some(asker) = &asker {
+                    // What this line may see that is set and not yet due,
+                    // never the whole store's count (#1595, #4527's P2).
+                    body["not_yet_due"] = json!(
+                        self.state
+                            .items
+                            .iter()
+                            .filter(|i| i.pending.is_none() && visible(Some(asker), i))
+                            .count()
+                    );
+                }
+                return Ok(self.reply(body));
             }
             Request::Get { id } => {
                 let item = self
@@ -909,7 +956,12 @@ impl<P: Persistence> Engine<P> {
         self.guard(guard)?;
         let mut next = self.state.clone();
         let body = match &request {
-            Request::Set { text, when, .. } => {
+            Request::Set {
+                text, when, person, ..
+            } => {
+                if person.as_deref().is_some_and(|p| !valid_person(p)) {
+                    return Err(err("bad_request", "The setter is not a person id."));
+                }
                 if !valid_text(text) {
                     return Err(err(
                         "bad_text",
@@ -950,11 +1002,12 @@ impl<P: Persistence> Engine<P> {
                     snooze: None,
                     delivery: 1,
                     pending: None,
+                    person: person.clone(),
                 });
                 json!({"id":id,"delivery":1,"due_unix_ms":deadline.unix_ms,"local":deadline.local})
             }
-            Request::Cancel { id, .. } => {
-                let index = find(&next, *id)?;
+            Request::Cancel { id, asker, .. } => {
+                let index = find_for(&next, *id, asker.as_ref())?;
                 let delivery = next.items[index].delivery;
                 next.items.remove(index);
                 json!({"cancelled":true,"id":id,"delivery":delivery})
@@ -963,8 +1016,10 @@ impl<P: Persistence> Engine<P> {
                 id,
                 delivery,
                 seconds,
+                asker,
                 ..
             } => {
+                find_for(&next, *id, asker.as_ref())?;
                 let index = find_pending(&next, *id, *delivery)?;
                 let until = time::resolve(&When::After { seconds: *seconds }, now, &self.zone)
                     .map_err(bad_time)?;
@@ -976,6 +1031,15 @@ impl<P: Persistence> Engine<P> {
                 item.snooze = Some(until.clone());
                 item.pending = None;
                 json!({"snoozed":true,"id":id,"delivery":item.delivery,"due_unix_ms":until.unix_ms,"local":until.local})
+            }
+            Request::Forget { person, .. } => {
+                if !valid_person(person) {
+                    return Err(err("bad_request", "That is not a person id."));
+                }
+                let before = next.items.len();
+                next.items
+                    .retain(|i| i.person.as_deref() != Some(person.as_str()));
+                json!({"forgotten":before - next.items.len()})
             }
             Request::Ack { id, delivery, .. } => {
                 let index = find_pending(&next, *id, *delivery)?;
@@ -1071,6 +1135,18 @@ fn find(state: &State, id: u64) -> Result<usize, Error> {
         .iter()
         .position(|i| i.id == id)
         .ok_or_else(|| err("not_found", "That reminder or timer is no longer active."))
+}
+/// [`find`] for a line that may see only its own ([`Asker::may_see`]): one
+/// it may not see is not found, never named as someone else's.
+fn find_for(state: &State, id: u64, asker: Option<&Asker>) -> Result<usize, Error> {
+    let index = find(state, id)?;
+    if !visible(asker, &state.items[index]) {
+        return Err(err(
+            "not_found",
+            "That reminder or timer is no longer active.",
+        ));
+    }
+    Ok(index)
 }
 fn find_pending(state: &State, id: u64, delivery: u64) -> Result<usize, Error> {
     let index = find(state, id)?;

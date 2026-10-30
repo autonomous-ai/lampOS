@@ -11602,6 +11602,7 @@ mod tests {
         let route = crate::tools::Route::Memory(
             memory.clone(),
             Some((eyes.clone(), crate::known_faces::FaceSwitches::default())),
+            None,
         );
         let forget = call(FORGET_EVERYTHING, json!({}));
         // Not marked: the memory is emptied, the face kept, the eyes asked

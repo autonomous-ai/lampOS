@@ -479,7 +479,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         "face.remove" if on(lamp, kind) => {
             let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
-            crate::faces::remove(&eyes, data).map(Some)
+            crate::faces::remove(&eyes, data, lamp.schedule()).map(Some)
         }
         // The lamp's timers and reminders, for the app's Lamp 2 page
         // (#2195): only with `LAMP_APP_SCHEDULE=on`.
