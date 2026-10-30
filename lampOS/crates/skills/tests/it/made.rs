@@ -192,6 +192,7 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
         &skills.join("no-state"),
         wait,
         None,
+        None,
         asked.as_bytes(),
         &mut answer,
     )
@@ -387,6 +388,7 @@ fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
             &served.join("no-state"),
             std::time::Duration::from_secs(2),
             None,
+            None,
             &stream,
             &stream,
         )
@@ -560,6 +562,7 @@ fn once_the_newest_is_on_an_older_ask_puts_nothing_on() {
             &helper_made,
             &served.join("no-state"),
             std::time::Duration::from_secs(2),
+            None,
             None,
             &stream,
             &stream,

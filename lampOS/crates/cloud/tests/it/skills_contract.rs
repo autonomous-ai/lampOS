@@ -263,6 +263,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
                 &state,
                 lamp_skills::package::ASKED_LOCK_WAIT,
                 None,
+                None,
                 &stream,
                 &stream,
             );
