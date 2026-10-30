@@ -543,6 +543,59 @@ still reaches the person's turn, marked `(said in the room)`: a guest's
 words, said aloud beside them, are told to the person's turn; never into
 their running summary, talk note or saved memory.
 
+**A line of theirs no face was seen speaking, their face the one face in
+view** (`LAMP_PERSON_SCOPE_ONE_FACE=on`, on in the product; the launch
+testers' item 1 on #3997): on lamp-220c on 30 Oct the owner's face was in 17
+looks of a line and read speaking in none, so under `LAMP_PERSON_SCOPE_SEEN`
+every line was the room's, their own memory held "3 of the room's kept
+things and 0 of the person's own", and testers said its memory was
+short-term. Now, on a line admitted as a known person's, no face seen
+speaking it, when the eyes' looks through it held their own known face in at
+least 3 and no other face in any (`SpeakingFaces::one_face_in_view`; a look
+with nobody in it is no other face), and the conversation has shown **no
+other voice**, **their keep is theirs and nothing else is**: a `remember` on
+the line is written in their scope (`ScopeLease::take_by_one_face`,
+`ScopeLease::kept_by_one_face`, read only by the memory route's keep in
+`tools.rs`). **Every read stays the room's**: the line is narrowed to the
+room, so no recall or hits from their scope, no memory note of theirs, no
+person's context, no thread or summary of theirs; the turn is told and read
+as without the rule. Why (reviewer-three's P1 on #4584, option 2, Friday's
+call): "no other voice" is measured against the conversation's voice, not
+theirs, so a guest off camera who begins the conversation while they sit
+silent, the one face in view, looks the same; a wrong keep lands in their
+own memory, where they can forget it, but a wrong read would send their
+memory to someone else. **Reads need a sign it is them**: their face seen
+speaking the line, or a carried conversation (#4479); either path wins over
+this one, as before. The "another voice" evidence is the second route's
+rule's own record (`worker::Heeding::another_person`, the flag
+`LAMP_PERSON_NAME_BY_DEFAULT` reads): a line printed as another voice than
+the conversation's (`same_voice::DIFFERENT_BELOW`) or two faces seen
+speaking one, since the conversation began (it clears only when a line is
+judged with no conversation going on). It is read as the line is admitted
+and again once the line is judged, so another voice heard in the line itself
+makes its keep the room's too. A late look's keeper (#2807) is the same: a
+line admitted as the room's whose late look names them by this rule keeps
+for them, its reads the room's (`ScopeLease::keep_for_one_face`). The switch
+acts only with `LAMP_PERSON_SCOPE_SEEN` and the rule keeping each line's
+room (`LAMP_JOIN_CUT_WORDS` or `LAMP_SECOND_NAME_CARRIES`)
+(`worker::one_face_not_acted`); without either, why is said at start and
+nothing changes. It does not wait on the same-voice check (the first
+builder's option 1 on #3997): with no printer started, or as a standby
+beside Live, no line is printed as another voice, so only a second face
+seen speaking shows another person, and since only the keep goes to them
+the cost is words kept, never read. A second face in any look, an unknown
+face, no face in view, or another voice, and it is as before. A line
+admitted as the room's with nobody named is untouched, so an unplaced voice
+still reaches nobody's memory (#4196, #4207). **A forget is unchanged:** a
+`forget` or `forget_everything` on such a line runs in the room's scope, and
+**a yes said on such a line never runs a held forget**
+(`ScopeLease::by_one_face`, `take_held_forget`; the model is told the yes
+did not count): the yes still needs their face seen saying it. Risk left: a
+voice off camera while they sit alone in view, with no print to tell it
+apart, may be kept in their memory; it is never read back to that voice.
+A line kept as yours while you were the only face in view can include words
+someone else said out of view.
+
 ### Talk notes and the running summary
 
 With `LAMP_CONVERSATION_SUMMARY=on` (on in the product, the lamp-memory

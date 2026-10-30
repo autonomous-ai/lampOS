@@ -647,6 +647,15 @@ pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 /// `ScopeLease::save_carried`). Reads, forgets and a yes stay refused. `on`,
 /// and nothing else; off, a carried line keeps nothing, as before.
 pub const CONVERSATION_CARRIED_SAVES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIED_SAVES";
+/// A known person's keep on a line no face was seen speaking is theirs when
+/// their known face was the one face in every look of it and no other voice
+/// was heard since the conversation began (the launch testers' item 1 on
+/// #3997: on lamp-220c the owner's face was in 17 looks, read speaking in
+/// none, and their own memory stayed empty). Only the keep: every read
+/// stays the room's (reviewer-three's P1 on #4584, option 2). `on`, and nothing else;
+/// acts only with [`PERSON_SCOPE_SEEN_ENVIRONMENT`] and the rule's record of
+/// another voice ([`Engine::scoping_by_one_face`]).
+pub const PERSON_SCOPE_ONE_FACE_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE";
 
 /// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a silent face doesn't count
 /// (#4339, lamp-3e83, 30 Oct: the known face in all 30 looks of a line and
@@ -1233,6 +1242,13 @@ struct Shared {
     /// shown another voice; none, any other face in view keeps a line the
     /// room's.
     past_silent: Option<AnotherVoice>,
+
+    /// With [`Self::scope_seen`], whether the conversation has shown another
+    /// voice (`LAMP_PERSON_SCOPE_ONE_FACE`, [`Engine::scoping_by_one_face`]):
+    /// a known person's line their known face alone was in view through, no
+    /// face seen speaking it, keeps for them while this reads `false`, its
+    /// reads the room's. None, off.
+    one_face: Option<Arc<AtomicBool>>,
 }
 
 /// [`Shared::past_silent`]: whether the conversation going on has shown
@@ -1351,6 +1367,23 @@ async fn line_sight(
                 .flatten();
         (speakers, pair, false)
     }
+}
+
+/// [`Engine::scoping_by_one_face`]'s rule for one line from `begun` to
+/// `finishing`: the switch on (`another_voice` given) and the conversation
+/// showing no other voice, and `face`, the line's known person's own
+/// (`boot/f3`), the one face the eyes saw through it
+/// ([`crate::speaking_faces::SpeakingFaces::one_face_in_view`]). No face of
+/// theirs known, or the switch off: `false`.
+fn one_face_theirs(
+    another_voice: Option<&AtomicBool>,
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    face: Option<&str>,
+    begun: Instant,
+    finishing: Instant,
+) -> bool {
+    another_voice.is_some_and(|another| !another.load(Ordering::Acquire))
+        && face.is_some_and(|face| eyes.one_face_in_view(face, begun, finishing))
 }
 
 /// How long after its end a line whose words end before a name waits for
@@ -2650,6 +2683,7 @@ impl Engine {
                 carries: None,
                 carried_saves: false,
                 past_silent: None,
+                one_face: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -2961,6 +2995,24 @@ impl Engine {
                 self
             }
         }
+    }
+
+    /// With [`Self::scoping_by_sight`], a known person's line no face was
+    /// seen speaking keeps for them, its reads the room's
+    /// (`LAMP_PERSON_SCOPE_ONE_FACE=on`, the launch testers' item 1 on
+    /// #3997; option 2 of reviewer-three's P1 on #4584), when their known
+    /// face was the one face the eyes saw through it
+    /// (`SpeakingFaces::one_face_in_view`) and `another_voice` (the
+    /// rule's record that the conversation has shown another person: a
+    /// voice printed as another's, or two faces seen speaking a line, since
+    /// it began) reads `false` both as the line is admitted and once it is
+    /// judged. A second face, an unknown face, another voice or no face in
+    /// view, and it is as before. Never a held forget's yes
+    /// ([`take_held_forget`]).
+    pub fn scoping_by_one_face(mut self, another_voice: Arc<AtomicBool>) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.one_face = Some(another_voice);
+        self
     }
 
     /// [`Self::carrying_conversations`] with `going_on` naming whose
@@ -5557,6 +5609,7 @@ async fn spoken(
     // (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`): judged again by the voice
     // once the rule has heard it.
     let mut carried_past_silent = false;
+    let mut one_face = false;
     if let Some(scope) = scope.as_ref()
         && let Some(person) = scope
             .scope()
@@ -5602,6 +5655,25 @@ async fn spoken(
                         carried_as(&shared)
                     );
                 }
+                // Their known face the one face through it, none seen
+                // speaking it, no other voice in the conversation, and not
+                // carried: the room's, as without the rule, but its keep is
+                // theirs (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers'
+                // item 1 on #3997). Never their reads: a guest off camera
+                // who begins the conversation while they sit silent looks
+                // the same (reviewer-three's P1 on #4584, option 2). Taken
+                // below, once narrowed; checked again once the line is
+                // judged, for its own voice.
+                one_face = !carried
+                    && shared.scope_seen
+                    && speakers.is_empty()
+                    && one_face_theirs(
+                        shared.one_face.as_deref(),
+                        eyes,
+                        own_face,
+                        begun,
+                        finishing,
+                    );
                 let theirs = carried
                     || !crate::speaking_faces::not_theirs(
                         &speakers,
@@ -5641,6 +5713,11 @@ async fn spoken(
         }
     {
         scope.narrow_to_room();
+        if one_face && scope.take_by_one_face() {
+            eprintln!(
+                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: told and read as the room's, its keep theirs (LAMP_PERSON_SCOPE_ONE_FACE)"
+            );
+        }
         if named {
             scope.name_for_reply();
             eprintln!(
@@ -5714,21 +5791,45 @@ async fn spoken(
         let lease = lease.clone();
         let speaking = shared.speaking.clone();
         let seen_only = shared.scope_seen;
+        let one_voice = shared.one_face.clone();
         tokio::spawn(async move {
             let found = late_face.await.ok().flatten();
             let keeper = match (found, speaking) {
                 (Some(person), Some((eyes, known))) => {
                     let (speakers, pair, _) =
                         line_sight(&eyes, &known, begun, finishing, seen_only).await;
-                    if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only) {
-                        eprintln!(
-                            "lamp-voice second: request {request}: {}: its keep stays the room's",
-                            if speakers.is_empty() {
-                                "no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)"
-                            } else {
-                                "a face not the known face's was seen speaking it"
-                            }
+                    // Their known face the one face through it, and no other
+                    // voice: the keep is theirs, every read and forget the
+                    // room's (`LAMP_PERSON_SCOPE_ONE_FACE`, reviewer-three's
+                    // P1 on #4584, option 2).
+                    let own_face = pair
+                        .as_ref()
+                        .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
+                        .map(|(_, face)| face.clone());
+                    let one_face = seen_only
+                        && speakers.is_empty()
+                        && one_face_theirs(
+                            one_voice.as_deref(),
+                            &eyes,
+                            own_face.as_deref(),
+                            begun,
+                            finishing,
                         );
+                    if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only) {
+                        if one_face && lease.keep_for_one_face(&person) {
+                            eprintln!(
+                                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: its keep is theirs, its reads the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
+                            );
+                        } else {
+                            eprintln!(
+                                "lamp-voice second: request {request}: {}: its keep stays the room's",
+                                if speakers.is_empty() {
+                                    "no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)"
+                                } else {
+                                    "a face not the known face's was seen speaking it"
+                                }
+                            );
+                        }
                         None
                     } else {
                         Some(person)
@@ -6144,6 +6245,23 @@ async fn spoken(
             );
         }
     }
+    // `LAMP_PERSON_SCOPE_ONE_FACE`: a line whose keep was theirs by their
+    // face alone in view, whose own judging showed another person (another
+    // voice, or two faces seen speaking it), keeps nothing for them after
+    // all, before the model is asked: the room's, keeps and all.
+    if one_face
+        && shared
+            .one_face
+            .as_ref()
+            .is_some_and(|another| another.load(Ordering::Acquire))
+        && let Some(scope) = scope.as_ref()
+        && scope.by_one_face()
+    {
+        scope.narrow_to_room();
+        eprintln!(
+            "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: its keep is the room's too (LAMP_PERSON_SCOPE_ONE_FACE)"
+        );
+    }
     // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
     // heard as "Stop them." was asked of the model, which said "Stop who?",
     // then "Stop telling story." got "I wasn't telling a story"). The cut-in
@@ -6184,6 +6302,9 @@ async fn spoken(
             true,
             &text,
             asker.as_ref(),
+            scope
+                .as_ref()
+                .is_some_and(crate::memory_scope::ScopeLease::by_one_face),
             (shared.clock)(),
         );
         eprintln!(
@@ -8380,12 +8501,14 @@ enum Taken {
 /// ([`Engine::confirming_forgets_by_sight`]), only with that person's face
 /// seen saying it and no other face (`speaking_faces::seen_saying`). Any
 /// other turn drops it, running nothing. The journal never has the words.
+#[allow(clippy::too_many_arguments)]
 fn take_held_forget(
     shared: &Shared,
     request: u64,
     heard: bool,
     said: &str,
     asker: Option<&(u64, String)>,
+    by_one_face: bool,
     now: Instant,
 ) -> Taken {
     let Ok(mut hold) = shared.held_forget.lock() else {
@@ -8412,6 +8535,15 @@ fn take_held_forget(
         // A carried line's keep is let go only on a yes their face is seen
         // saying ([`hold_carried_keep`]).
         Some("the eyes don't read who speaks")
+    } else if by_one_face {
+        // A line theirs only by their face alone in view
+        // (`LAMP_PERSON_SCOPE_ONE_FACE`) is no yes to a forget: nothing saw
+        // them say it, and a forget is not undone.
+        eprintln!(
+            "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): their face was not seen saying the yes (LAMP_PERSON_SCOPE_ONE_FACE)",
+            held.call.name, held.request
+        );
+        return Taken::Unseen(held.call.name);
     } else if shared.forget_sight.is_some()
         && !sight.is_some_and(|(seen, speakers, known)| {
             seen == request && crate::speaking_faces::seen_saying(&speakers, &held.asker.1, known)
@@ -8767,6 +8899,9 @@ async fn answer(
         heard,
         &said,
         asker.as_ref(),
+        scope
+            .as_ref()
+            .is_some_and(crate::memory_scope::ScopeLease::by_one_face),
         (shared.clock)(),
     ) {
         Taken::Nothing => (None, None),

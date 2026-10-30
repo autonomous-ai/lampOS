@@ -312,6 +312,14 @@ Environment=LAMP_SCHEDULE_ASKED=on
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
 Environment=LAMP_PERSON_SCOPE_SEEN=on
+# But with exactly one face in view through a line, their own known face, and no other voice heard since the
+# conversation began, its keep is theirs though no face was seen speaking it (the launch testers' item 1 on #3997:
+# on lamp-220c the owner's face was in 17 looks, read speaking in none, and their own memory stayed empty). Only the
+# keep: recall, hits, their note and context stay the room's, since a guest off camera talking while they sit silent
+# looks the same (reviewer-three's P1 on #4584); reads need their face seen speaking or a carried conversation. It
+# does not wait on the same-voice check, so a keep can hold words said out of view. A second face, another voice or
+# no face in view, and it is as above; a held forget's yes still needs their face seen saying it.
+Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
 # But within a conversation going on, a line of theirs no face was seen speaking (or one with nobody named), with no
 # other face in view and no 45 s quiet since their last exchange, stays in that conversation (#4339, lamp-3e83: one such line dropped to the
 # room's, the chat lost the talk and asked its question again), when their face was in view through it or within

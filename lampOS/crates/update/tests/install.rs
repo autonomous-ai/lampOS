@@ -1519,6 +1519,31 @@ fn the_product_tells_a_person_the_rooms_lines_of_their_conversation() {
     }
 }
 
+/// A known person's keep on a line no face was seen speaking is theirs when
+/// their own known face was the one face in view and no other voice was
+/// heard (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers' item 1 on
+/// #3997): on lamp-220c on 30 Oct the owner's face was in 17 looks, read
+/// speaking in none, and their own memory stayed empty. Its reads stay the
+/// room's: a guest off camera reads the same (reviewer-three's P1 on #4584).
+/// Beside the scope by sight it acts with, and the line rooms that record
+/// another voice.
+#[test]
+fn the_product_keeps_a_keep_theirs_with_one_known_face_in_view() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
+        "Environment=LAMP_JOIN_CUT_WORDS=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A long conversation keeps its rules and score past the thread's view
 /// (`LAMP_CONVERSATION_SUMMARY`, #1693's long-conversation plan, step 3): on
 /// lamp-06c1 on 29 Oct, 11 exchanges after a quiz's rules the lamp said

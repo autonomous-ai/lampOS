@@ -214,8 +214,26 @@ async fn one_line_saving(
         going_on,
         named,
         saves,
+        Voice::Off,
     )
     .await
+}
+
+/// `LAMP_PERSON_SCOPE_ONE_FACE` for [`lines_saving`]: off, or on with the
+/// rule's record of another voice in the conversation.
+#[derive(Clone, Copy, PartialEq)]
+enum Voice {
+    /// The switch off.
+    Off,
+    /// On, no other voice heard.
+    One,
+    /// On, another voice heard earlier in the conversation.
+    AnotherBefore,
+    /// On, another voice heard as this line was judged.
+    AnotherInIt,
+    /// On, the same-voice check not running: the rule judges the line, but
+    /// nothing ever records another voice.
+    Unchecked,
 }
 
 /// One line said: its words, the faces in the eyes' looks while it is said
@@ -237,9 +255,10 @@ async fn lines_saving(
     going_on: Option<bool>,
     named: bool,
     saves: bool,
+    voice: Voice,
 ) -> Outcome {
     lines_past_silent(
-        what, lines, chats, boot, seen, eyes_up, early, going_on, named, saves, None,
+        what, lines, chats, boot, seen, eyes_up, early, going_on, named, saves, None, voice,
     )
     .await
 }
@@ -261,6 +280,7 @@ async fn lines_past_silent(
     named: bool,
     saves: bool,
     past_silent: Option<(bool, crate::second_provider::AnotherVoice)>,
+    voice: Voice,
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
@@ -284,11 +304,16 @@ async fn lines_past_silent(
     let calls: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
     let leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
     let (seen_calls, seen_leases) = (calls.clone(), leases.clone());
-    let runner: ScopedToolRunner = Arc::new(move |_, _, _, _, lease: ScopeLease| {
-        seen_calls
-            .lock()
-            .unwrap()
-            .push(lease.scope().unwrap().person().map(str::to_owned));
+    let runner: ScopedToolRunner = Arc::new(move |_, _, name: String, _, lease: ScopeLease| {
+        // Whose scope the call runs in, as the memory's route picks it: a
+        // `remember` on a one-face line is its person's
+        // (`ScopeLease::kept_by_one_face`), all else the lease's scope.
+        seen_calls.lock().unwrap().push(
+            (name == crate::remember::REMEMBER)
+                .then(|| lease.kept_by_one_face())
+                .flatten()
+                .or_else(|| lease.scope().unwrap().person().map(str::to_owned)),
+        );
         Box::pin(async { json!({"ok":true}) })
     });
     // The lease each context was told for: a held line asks memory nothing,
@@ -310,6 +335,25 @@ async fn lines_past_silent(
             .scoping_by_sight(seen)
     } else {
         failed_reader(engine, &path, seen)
+    };
+    let engine = if voice == Voice::Off {
+        engine
+    } else {
+        let another = Arc::new(AtomicBool::new(voice == Voice::AnotherBefore));
+        let heard = another.clone();
+        let engine = engine.scoping_by_one_face(another);
+        if voice == Voice::AnotherInIt {
+            // The rule's judging of this line hears another voice.
+            engine.heeding(Arc::new(move |_, _, _, _, _| {
+                heard.store(true, Ordering::Release);
+                None
+            }))
+        } else if voice == Voice::Unchecked {
+            // The rule judges this line with no voice print to hear by.
+            engine.heeding(Arc::new(|_, _, _, _, _| None))
+        } else {
+            engine
+        }
     };
     let a = crate::remember::person_id("A");
     let engine = engine.carrying_conversations_by(going_on.map(
@@ -956,6 +1000,7 @@ async fn past_silent_line_hearing(
         named,
         false,
         Some((hears, another)),
+        Voice::Off,
     )
     .await
 }
@@ -1310,6 +1355,7 @@ async fn a_held_carried_keep_is_written_only_on_their_seen_yes() {
             Some(true),
             true,
             true,
+            Voice::Off,
         )
         .await;
         assert_eq!(got.calls, expected, "{what}");
@@ -1450,5 +1496,258 @@ fn a_carried_line_is_kept_out_of_the_journal_whether_or_not_it_saves() {
             given.iter().all(|(given, ..)| *given != request),
             "{request}: never in a talk note: {given:?}"
         );
+    }
+}
+
+/// A chat that keeps what was said, then answers.
+fn remember_tokyo() -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "m1",
+                crate::remember::REMEMBER,
+                json!({"text": "Flying to Tokyo next week."}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Noted. Have a good trip."), Ok(ChatEvent::Done)],
+    ]
+}
+
+async fn one_face_line(
+    what: &str,
+    words: &str,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    in_view: Vec<(&'static str, bool)>,
+    going_on: Option<bool>,
+    voice: Voice,
+) -> Outcome {
+    lines_saving(
+        what,
+        vec![(words.to_owned(), in_view, 0)],
+        chats,
+        BOOT,
+        true,
+        true,
+        None,
+        going_on,
+        true,
+        false,
+        voice,
+    )
+    .await
+}
+
+/// The launch testers' item 1 on #3997 (`LAMP_PERSON_SCOPE_ONE_FACE`), as
+/// on lamp-220c: A's known face the one face in every look, never read
+/// speaking, and no other voice. Narrowed to option 2 of reviewer-three's
+/// P1 on #4584: A's keep lands in A's scope, but the line is told and read
+/// as the room's (no A note, context or thread). In A's conversation going
+/// on, the carry wins, as without the rule: held, never memory's.
+#[tokio::test]
+async fn one_known_face_and_one_voice_keep_their_keep_but_read_the_rooms_unseen_speaking() {
+    let a = crate::remember::person_id("A");
+    let got = one_face_line(
+        "one-face",
+        TOKYO,
+        remember_tokyo(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.lease, None, "told and read as the room's");
+    assert!(!got.held);
+    assert_eq!(got.calls, [Some(a.clone())], "the keep lands in A's scope");
+    assert_eq!(got.told, Message::system("for None"), "no A context");
+    assert!(
+        got.noted.iter().all(|(person, _)| person.is_none()),
+        "no A note: {:?}",
+        got.noted
+    );
+    let got = one_face_line(
+        "one-face-carried",
+        TOKYO,
+        vec![vec![text("Okay."), Ok(ChatEvent::Done)]],
+        vec![("f1", false)],
+        Some(true),
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.lease, Some(a));
+    assert!(got.held, "carried, as without the rule");
+}
+
+/// The first builder's option 1 on #3997 (22:12): the rule does not wait on
+/// the same-voice check. Without it (no printer, or a standby beside Live)
+/// no voice is ever heard as another, and a one-face line's keep still lands
+/// in A's scope while the line is told and read as the room's.
+#[tokio::test]
+async fn without_the_same_voice_check_a_one_face_keep_is_theirs_and_its_reads_the_rooms() {
+    let got = one_face_line(
+        "one-face-unchecked",
+        TOKYO,
+        remember_tokyo(),
+        vec![("f1", false)],
+        None,
+        Voice::Unchecked,
+    )
+    .await;
+    assert_eq!(
+        got.calls,
+        [Some(crate::remember::person_id("A"))],
+        "the keep lands in A's scope"
+    );
+    assert_eq!(got.lease, None, "told and read as the room's");
+    assert!(!got.held);
+    assert_eq!(got.told, Message::system("for None"), "no A context");
+    assert!(
+        got.noted.iter().all(|(person, _)| person.is_none()),
+        "no A note: {:?}",
+        got.noted
+    );
+}
+
+/// Reviewer-three's P1 on #4584: A sits silent, the one face in view; a
+/// guest off camera begins the conversation (the first voice, so no other
+/// voice is heard) and asks about A's memory. Nothing of A's is read or
+/// told: the recall runs in the room's scope, the turn is told the room's
+/// context and no A note; with the switch off, the same.
+#[tokio::test]
+async fn a_guest_off_camera_asking_about_a_silent_one_face_reads_nothing_of_theirs() {
+    for voice in [Voice::One, Voice::Off] {
+        let got = one_face_line(
+            "guest-asks",
+            "Lamp, what did she say about her doctor?",
+            vec![
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "r1",
+                        crate::remember::RECALL,
+                        json!({"query": "doctor"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("I don't have anything on that."), Ok(ChatEvent::Done)],
+            ],
+            vec![("f1", false)],
+            None,
+            voice,
+        )
+        .await;
+        let what = if voice == Voice::One { "on" } else { "off" };
+        assert_eq!(got.calls, [None], "{what}: the recall is the room's");
+        assert_eq!(got.lease, None, "{what}");
+        assert_eq!(
+            got.told,
+            Message::system("for None"),
+            "{what}: no A context"
+        );
+        assert!(
+            got.noted.iter().all(|(person, _)| person.is_none()),
+            "{what}: no A note: {:?}",
+            got.noted
+        );
+    }
+}
+
+/// A second face, a face the eyes don't know as A's, no face at all, another
+/// voice before it or in it, or the switch off: as today, the room's (or
+/// carried, in A's conversation going on, with no other face).
+#[tokio::test]
+async fn a_second_face_an_unknown_face_no_face_or_another_voice_is_as_before() {
+    for (what, in_view, voice) in [
+        (
+            "second-face",
+            vec![("f1", false), ("f2", false)],
+            Voice::One,
+        ),
+        ("unknown-face", vec![("f2", false)], Voice::One),
+        ("no-face", vec![], Voice::One),
+        ("voice-before", vec![("f1", false)], Voice::AnotherBefore),
+        ("voice-in-it", vec![("f1", false)], Voice::AnotherInIt),
+        ("off", vec![("f1", false)], Voice::Off),
+    ] {
+        let got = one_face_line(what, TOKYO, remember_tokyo(), in_view, None, voice).await;
+        assert_eq!(got.lease, None, "{what}: the room's");
+        assert!(!got.held, "{what}");
+        assert_eq!(got.calls, [None], "{what}: the keep is the room's");
+        // The chat is asked only after the line is judged, so another
+        // voice heard as it was judged is told the room's too.
+        assert_eq!(got.told, Message::system("for None"), "{what}");
+    }
+    // Another voice, in A's conversation going on: carried, as before.
+    let a = crate::remember::person_id("A");
+    let got = one_face_line(
+        "voice-carried",
+        TOKYO,
+        vec![vec![text("Okay."), Ok(ChatEvent::Done)]],
+        vec![("f1", false)],
+        Some(true),
+        Voice::AnotherBefore,
+    )
+    .await;
+    assert_eq!(got.lease, Some(a));
+    assert!(got.held, "carried, never memory's");
+}
+
+/// "Forget everything about me" on a line whose keep is theirs by one face
+/// alone never runs in their scope: the line is the room's, as without the
+/// rule, and a yes is never one either
+/// ([`a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget`]).
+#[tokio::test]
+async fn forget_everything_on_a_one_face_line_never_runs_in_their_scope() {
+    let a = crate::remember::person_id("A");
+    let got = one_face_line(
+        "one-face-forget",
+        FORGET_ME,
+        forget_everything(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert!(
+        !got.calls.contains(&Some(a)),
+        "never run in A's scope: {:?}",
+        got.calls
+    );
+    assert_eq!(got.lease, None, "the room's");
+}
+
+/// A held forget's yes on a line theirs only by their face alone in view
+/// (`ScopeLease::by_one_face`) runs nothing, whatever else the yes passes:
+/// a forget is never relaxed by `LAMP_PERSON_SCOPE_ONE_FACE`. The same yes
+/// on a line not so taken runs it.
+#[tokio::test]
+async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
+    let script = Arc::new(Script::default());
+    let (engine, _, _) = scripted(script);
+    let asker = (7, crate::remember::person_id("A"));
+    for (by_one_face, runs) in [(true, false), (false, true)] {
+        let now = Instant::now();
+        if let Ok(mut hold) = engine.shared.held_forget.lock() {
+            hold.held = Some(HeldForget {
+                call: call("f1", crate::remember::FORGET_EVERYTHING, json!({})),
+                request: 1,
+                asker: asker.clone(),
+                at: now,
+                asked: true,
+            });
+        }
+        let taken = take_held_forget(
+            &engine.shared,
+            2,
+            true,
+            "Yes.",
+            Some(&asker),
+            by_one_face,
+            now,
+        );
+        match taken {
+            Taken::Runs(_) => assert!(runs, "by one face: no yes"),
+            Taken::Unseen(_) => assert!(!runs, "not by one face: runs"),
+            Taken::Nothing => panic!("dropped for another reason"),
+        }
     }
 }
