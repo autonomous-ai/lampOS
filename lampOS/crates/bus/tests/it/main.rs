@@ -2,4 +2,5 @@
 //! the crate is linked once for them, not once a file (#1806).
 mod bus;
 mod cli;
+mod clock_step;
 mod logs;

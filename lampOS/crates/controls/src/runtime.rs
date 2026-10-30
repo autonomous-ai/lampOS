@@ -139,15 +139,29 @@ impl From<&ControlsState> for Feedback {
     }
 }
 
+/// The `controls/state` publisher every serve mode publishes on, the plain
+/// runtime's and `--touch`'s alike. A state's `at_us` is its stamp's,
+/// CLOCK_MONOTONIC of the boot named by `clock`. When that is this boot's,
+/// the header says so, and the voice judges the privacy state by it and not
+/// by a wall clock that chrony steps some 46 s into a cold boot (queue
+/// #3997, C).
+pub(crate) fn state_publisher(bus: &Bus, clock: &str) -> io::Result<Publisher> {
+    let mut state = bus.publisher_declared(
+        ControlsState::TOPIC,
+        &ControlsState::declaration(),
+        "controls",
+    )?;
+    if bus.this_boot() == Some(clock) {
+        state.stamp_monotonic_clock();
+    }
+    Ok(state)
+}
+
 impl<R: PinReader> Service<R> {
     pub fn new(bus: &Bus, config: Config, reader: R, clock: &str) -> io::Result<Self> {
         config.check().map_err(|e| invalid(e.to_string()))?;
         let lock = owner_lock(bus.root())?;
-        let state = bus.publisher_declared(
-            ControlsState::TOPIC,
-            &ControlsState::declaration(),
-            "controls",
-        )?;
+        let state = state_publisher(bus, clock)?;
         let engine =
             Engine::new(config, clock, state.boot()).map_err(|e| invalid(e.to_string()))?;
         Ok(Self {

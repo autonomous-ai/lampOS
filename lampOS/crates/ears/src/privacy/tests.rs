@@ -42,6 +42,7 @@ fn envelope(lease: MicrophonePrivacy) -> Message {
             at_us: lease.stamp.at_us,
             at_unix_ms: 10_000,
             expires_ms: Some(50),
+            clock: None,
         },
         payload: serde_json::to_vec(&lease).unwrap(),
         gap: 0,

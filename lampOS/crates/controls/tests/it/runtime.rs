@@ -196,6 +196,29 @@ fn missing_reader_publishes_an_error_without_claiming_hardware_readiness() {
 }
 
 #[test]
+fn the_state_says_its_monotonic_clock_only_when_its_clock_is_this_boot() {
+    // Its `at_us` is the stamp's, of the clock named `CLOCK`: when the bus
+    // takes that to be this boot, the header says so (queue #3997, C), and
+    // a subscriber judges the state by `at_us` and not the wall clock.
+    for (boot, said) in [
+        (Some(CLOCK), Some(CLOCK)),
+        (Some("another-boot"), None),
+        (None, None),
+    ] {
+        let root = Root::new();
+        let bus = root.bus().boot_id(boot);
+        let mut service = Service::new(&bus, config(true), MissingPins, CLOCK).unwrap();
+        let output = service.step(|| 1_000_000);
+        let kept = bus.latest(ControlsState::TOPIC).unwrap().unwrap();
+        assert_eq!(kept.header.clock.as_deref(), said, "{boot:?}");
+        assert_eq!(kept.header.at_us, output.state.stamp.at_us);
+        // Its other topics say nothing of the kind.
+        let report = bus.latest(Diagnostic::TOPIC).unwrap();
+        assert!(report.is_none_or(|report| report.header.clock.is_none()));
+    }
+}
+
+#[test]
 fn silence_from_a_reader_is_not_a_fresh_released_level() {
     let root = Root::new();
     let bus = root.bus();

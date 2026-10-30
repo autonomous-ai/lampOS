@@ -139,6 +139,7 @@ impl Controls {
                 at_us: published_us,
                 at_unix_ms: wall(published_us),
                 expires_ms: Some(300),
+                clock: None,
             },
             serde_json::to_vec(&state).unwrap(),
         )
@@ -217,6 +218,7 @@ impl Worker {
                 at_us: now(),
                 at_unix_ms: wall(now()),
                 expires_ms: Some(50),
+                clock: None,
             },
             serde_json::to_vec(&lease).unwrap(),
         ))
