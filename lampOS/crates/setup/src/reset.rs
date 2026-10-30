@@ -290,6 +290,12 @@ pub trait Effects {
     /// Before setup is started in place (#4500): what a reboot cleared by
     /// being memory, [`VOLATILE`], emptied, each folder kept.
     fn clear_volatile(&mut self) -> io::Result<()>;
+    /// One of [`FORGET`]'s commands. A lamp's runs bounded, as setup's other
+    /// `wpa_cli` and `journalctl` calls are ([`System`]'s, `QUERY_TIMEOUT`);
+    /// by default as [`Effects::run`].
+    fn forget(&mut self, argv: &[String]) -> io::Result<()> {
+        self.run(argv)
+    }
 }
 
 /// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
@@ -333,6 +339,23 @@ impl Effects for System {
             wipe(Path::new(folder))?;
         }
         Ok(())
+    }
+    fn forget(&mut self, argv: &[String]) -> io::Result<()> {
+        run_within(argv, crate::wifi::QUERY_TIMEOUT)
+    }
+}
+
+/// `argv` run and killed with its children once `most` has passed
+/// ([`crate::wifi::within`]): a stuck journald or wpa_supplicant never holds
+/// back setup's start in place (the Reviewer-lead's P3 on #4533).
+pub fn run_within(argv: &[String], most: std::time::Duration) -> io::Result<()> {
+    let mut command = Command::new(&argv[0]);
+    command.args(&argv[1..]);
+    let (status, _) = crate::wifi::within(&mut command, most)?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!("{} ended with {status}", argv[0])))
     }
 }
 
@@ -754,7 +777,8 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
 /// disk on the product) and which names the networks joined, is rotated and
 /// emptied. The start's own line is written after it. Absolute, as the
 /// plan's own commands are (Reviewer-two's P3 on #4513): Debian 12's
-/// merged `/usr`, so a unit's `PATH` is never asked.
+/// merged `/usr`, so a unit's `PATH` is never asked. Each is bounded, as
+/// setup's other calls of them are ([`Effects::forget`]).
 pub const FORGET: [&[&str]; 4] = [
     &["/usr/sbin/wpa_cli", "-i", "wlan0", "disconnect"],
     &["/usr/sbin/wpa_cli", "-i", "wlan0", "remove_network", "all"],
@@ -783,12 +807,21 @@ fn start_in_place(
     // What else a reboot dropped from memory, best effort: the old network
     // wpa_supplicant still runs, though its file is wiped, and the journal,
     // which keeps the networks joined (a RAM disk on the product). Neither
-    // keeps the start from going on.
+    // keeps the start from going on. What failed is said once, after the
+    // vacuum, which would take a line written before it (Reviewer-three's
+    // P3 on #4533).
+    let mut failed = Vec::new();
     for forget in FORGET {
         let argv: Vec<String> = forget.iter().map(|word| (*word).to_owned()).collect();
-        if let Err(error) = effects.run(&argv) {
-            eprintln!("lamp-setup: reset: {} ({error}); going on", argv.join(" "));
+        if let Err(error) = effects.forget(&argv) {
+            failed.push(format!("{} ({error})", argv.join(" ")));
         }
+    }
+    if !failed.is_empty() {
+        eprintln!(
+            "lamp-setup: reset: not forgotten, going on: {}",
+            failed.join("; ")
+        );
     }
     let mut argv = vec![plan.stop[0].clone(), "start".into()];
     argv.extend(again.iter().cloned());
