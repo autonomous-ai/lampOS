@@ -58,11 +58,11 @@ STATE_OF_EVENT = {
     "lamp.changed": "lamp",
     "air.changed": "air",
 }
-STATES = ("presence", "light", "mood", "lamp", "air", "device")
+STATES = ("presence", "light", "mood", "lamp", "air", "device", "volume")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
 # here needs none.
-STATE_NEEDS = {"presence": "look", "air": "air", "device": "device"}
+STATE_NEEDS = {"presence": "look", "air": "air", "device": "device", "volume": "speak"}
 EVENT_NEEDS = {
     "person.arrived": "look",
     "person.left": "look",
@@ -349,6 +349,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "lamp": "whether it is talking, paused, private or asleep",
         "air": "the air at its sensor (particles, carbon dioxide, humidity, temperature, and how it feels)",
         "device": "its own computer (processor load, memory, disk free, temperatures)",
+        "volume": "its speaker's volume (0 to 100, and whether muted)",
     }
 
     @server.tool(
@@ -357,7 +358,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         + f". `which` is some of {', '.join(states)}; by default all of them."
     )
     async def lamp_state(
-        which: list[Literal["presence", "light", "mood", "lamp", "air", "device"]] | None = None,
+        which: list[Literal["presence", "light", "mood", "lamp", "air", "device", "volume"]] | None = None,
     ) -> dict:
         ungranted = [state for state in which or [] if state not in states]
         if ungranted:
@@ -590,6 +591,18 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             conversation grown from it; never one the person or another computer started."""
             ended = await act("turn.end")
             return f"turn ended (the one request {ended.get('started')} started)"
+
+        @server.tool()
+        async def lamp_volume(
+            to: int | None = None, step: Literal["up", "down"] | None = None, mute: bool | None = None
+        ) -> dict:
+            """Set the lamp's speaker volume, the person's own (the same they set by voice or in the app):
+            exactly one of `to` (0 to 100 of what the lamp allows), `step` ("up" or "down", the lamp's own
+            step), or `mute` (true, or false to bring it back). Returns the level it left."""
+            try:
+                return await lamp.volume(to=to, step=step, mute=mute)
+            except LampError as error:
+                raise refused(error) from error
 
     if allowed("camera"):
 

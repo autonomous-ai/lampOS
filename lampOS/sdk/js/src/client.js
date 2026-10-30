@@ -531,6 +531,16 @@ export class Lamp {
   // Say `text` in the lamp's voice, exactly as written, once the person isn't talking; `{ rephrase: true }` lets the
   // lamp's model say it in its own words instead, as before.
   say(text, { rephrase } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }); }
+  // The speaker's volume, the person's own: one of `to` (0-100), `step` ('up' or 'down'), or `mute` (true or
+  // false). Resolves to the level it left, `{ level, muted }`.
+  async volume({ to, step, mute } = {}) {
+    // Exactly one, as the lamp holds it (control.schema.json's `volume`).
+    if ([to, step, mute].filter((v) => v !== undefined).length !== 1) {
+      throw new LampError('volume: one of to, step or mute', { code: 'bad_request' });
+    }
+    const { level, muted } = await this.act('volume', { to, step, mute });
+    return { level, muted };
+  }
 
   // The camera (the `camera` grant): the eyes' own newest picture, never
   // while the lamp is private.

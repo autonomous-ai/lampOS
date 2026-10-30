@@ -309,7 +309,9 @@ export class FakeLamp {
     this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false },
       // Made-up readings, as lamp-control answers them; `setAir` changes the
       // air and tells `air.changed`, `{ known: false }` for none.
-      air: { ...AIR }, device: { ...DEVICE, temperature_c: { ...DEVICE.temperature_c } } };
+      air: { ...AIR }, device: { ...DEVICE, temperature_c: { ...DEVICE.temperature_c } }, volume: { level: 50, muted: false } };
+    // Where an unmute brings it back to (lamp-actions' `before_mute`).
+    this.beforeMute = 50;
     this.refusals = new Map();
     this.nextLease = 1;
     // The newest light a computer asked for, and until when (the fake's
@@ -379,6 +381,16 @@ export class FakeLamp {
   // The ring shows a computer's light while it lasts.
   show(request) {
     this.shown = { light: { on: true, colour: request.colour, level: request.level }, until: this.clock() + request.for_ms };
+  }
+
+  // The person changes the volume (by voice or in the app), or a `volume`
+  // op does: `get('volume')` follows, and subscribers hear `volume.changed`
+  // when it changed, as lamp-control tells it from `speaker/volume`.
+  setVolume(level) {
+    const now = { level: Math.max(0, Math.min(100, Math.round(level))), muted: level <= 0 };
+    const before = this.state.volume;
+    this.state.volume = now;
+    if (before.level !== now.level || before.muted !== now.muted) this.emit('volume.changed', now);
   }
 
   // `get`'s light, as lamp-control answers it (Nine's light/drawn): the
@@ -566,8 +578,9 @@ export class FakeLamp {
     hand: 'look',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
     'air.changed': 'air',
+    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak',
   };
-  static STATE_GRANT = { presence: 'look', air: 'air', device: 'device' };
+  static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak' };
 
   needs(op, request) {
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
@@ -575,7 +588,7 @@ export class FakeLamp {
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
-    const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end'];
+    const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end', 'volume'];
     if (op.startsWith('skill.')) return ['skills'];
     if (speak.includes(op)) return ['speak'];
     // A turn speaks and hears what is said to the lamp.
@@ -772,6 +785,21 @@ export class FakeLamp {
           return this.refuse(ws, id, 'refused', `no clip named ${request.name} on this lamp for this computer`);
         }
         return this.ok(ws, id, { removed: request.name });
+      case 'volume': {
+        // As lamp-control through lamp-actions' app calls: a level, the
+        // voice's 20-point step within its floor of 10 and ceiling of 100, or
+        // a mute that an unmute takes back. The answer is the level it left,
+        // and `volume.changed` follows when it changed.
+        const { level } = this.state.volume;
+        let next = level;
+        if (request.to !== undefined) next = request.to;
+        else if (request.step === 'up') next = Math.min(100, level + 20);
+        else if (request.step === 'down') next = level === 0 ? 0 : Math.max(10, level - 20);
+        else if (request.mute === true) { if (level > 0) this.beforeMute = level; next = 0; }
+        else if (request.mute === false) next = level > 0 ? level : this.beforeMute;
+        this.setVolume(next);
+        return this.ok(ws, id, { ...this.state.volume });
+      }
       case 'say':
       case 'sound':
         // As lamp-control: the voice takes it (a sound is its hum or one of

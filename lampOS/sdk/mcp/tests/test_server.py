@@ -21,7 +21,7 @@ from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
     "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
-    "lamp_light", "lamp_ring", "lamp_say", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound",
+    "lamp_light", "lamp_ring", "lamp_say", "lamp_volume", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound",
     "lamp_end_turn",
     "lamp_events", "lamp_stop",
 }
@@ -929,6 +929,7 @@ def test_the_readme_lease_column_is_the_servers_own(tmp_path):
         "lamp_ring": {"rgb": "#ff8000"},
         "lamp_express": {"feeling": "glad"},
         "lamp_say": {"text": "Hello."},
+        "lamp_volume": {"step": "up"},
         "lamp_state": {},
     }
 
@@ -1082,5 +1083,32 @@ def test_lamp_ring_lights_the_ring_in_a_computers_own_colours(tmp_path):
             assert asked[1]["rgb"] == "#0000ff"
             for wrong in ({}, {"rgb": "#0000ff", "pixels": pixels}, {"pixels": pixels[:31]}):
                 assert (await session.call_tool("lamp_ring", wrong)).isError, wrong
+
+    run(go())
+
+
+def test_lamp_volume_sets_steps_and_mutes_and_its_state_is_read(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("speak",)) as (fake, _, session):
+            said = await session.call_tool("lamp_volume", {"to": 35})
+            assert json.loads(text(said)) == {"level": 35, "muted": False}
+            assert json.loads(text(await session.call_tool("lamp_volume", {"step": "up"}))) == {"level": 55, "muted": False}
+            assert json.loads(text(await session.call_tool("lamp_volume", {"mute": True}))) == {"level": 0, "muted": True}
+            assert [*fake.asked("volume")] == [{"to": 35}, {"step": "up"}, {"mute": True}]
+            both = await session.call_tool("lamp_volume", {"to": 10, "mute": False})
+            assert both.isError and "bad_request" in text(both)
+            read = await session.read_resource("lamp://state/volume")
+            assert json.loads(read.contents[0].text) == {"volume": {"level": 0, "muted": True}}
+
+    run(go())
+
+
+def test_without_speak_volume_is_neither_offered_nor_listed(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (_, _, session):
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert "lamp_volume" not in names
+            uris = {str(r.uri) for r in (await session.list_resources()).resources}
+            assert "lamp://state/volume" not in uris
 
     run(go())

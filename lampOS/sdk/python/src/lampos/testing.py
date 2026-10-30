@@ -370,7 +370,10 @@ class FakeLamp:
             # the air and tells `air.changed`, `{"known": False}` for none.
             "air": dict(AIR),
             "device": dict(DEVICE),
+            "volume": {"level": 50, "muted": False},
         }
+        # Where an unmute brings it back to (lamp-actions' `before_mute`).
+        self._before_mute = 50
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
         # Each connection whose head follows the hand (`look` at `hand`) and
         # its lease, until its stop, another look, or the lease ends; and the
@@ -441,6 +444,17 @@ class FakeLamp:
         self.state["air"] = {**reading, "known": True} if reading else {"known": False}
         if reading:
             await self.emit("air.changed", **reading)
+
+    async def set_volume(self, level: int) -> None:
+        """The person changes the volume (by voice or in the app), or a
+        `volume` op does: `get("volume")` follows, and subscribers hear
+        `volume.changed` when it changed, as lamp-control tells it from
+        `speaker/volume`."""
+        level = max(0, min(100, round(level)))
+        now = {"level": level, "muted": level == 0}
+        before, self.state["volume"] = self.state["volume"], now
+        if before != now:
+            await self.emit("volume.changed", **now)
 
     def _show(self, request: dict) -> None:
         """The ring shows a computer's light while it lasts."""
@@ -627,8 +641,9 @@ class FakeLamp:
         "hand": "look",
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
         "air.changed": "air",
+        "volume.changed": "speak",
     }
-    STATE_GRANT = {"presence": "look", "air": "air", "device": "device"}
+    STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak"}
 
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "subscribe":
@@ -658,6 +673,7 @@ class FakeLamp:
             "turn.start": ["speak", "hear"],
             "turn.end": ["speak"],
             "listen.set": ["hear"],
+            "volume": ["speak"],
         }.get(op, [])
 
     async def _upload(self, ws, client: str, request: dict) -> None:
@@ -872,6 +888,26 @@ class FakeLamp:
             if self.auto_done:
                 at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
                 await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
+        elif op == "volume":
+            # As lamp-control through lamp-actions' app calls: a level, the
+            # voice's 20-point step within its floor of 10 and ceiling of 100,
+            # or a mute that an unmute takes back. The answer is the level it
+            # left, and `volume.changed` follows when it changed.
+            level = self.state["volume"]["level"]
+            if request.get("to") is not None:
+                level_next = request["to"]
+            elif request.get("step") == "up":
+                level_next = min(100, level + 20)
+            elif request.get("step") == "down":
+                level_next = 0 if level == 0 else max(10, level - 20)
+            elif request.get("mute") is True:
+                if level > 0:
+                    self._before_mute = level
+                level_next = 0
+            else:
+                level_next = level if level > 0 else self._before_mute
+            await self.set_volume(level_next)
+            await self._ok(ws, id_, **self.state["volume"])
         elif op == "skill.push":
             await self._push(ws, client, id_, request)
         elif op == "skill.list":
