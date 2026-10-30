@@ -492,7 +492,17 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   2026-10-16: with the locks 0775 the body never opened the servo port, and
   without the sessions folder the voice could not start.
   It also makes `/run/lampos-photos` (`lampos`'s, 0700), the app's photos
-  for the eyes when `LAMP_PHOTO_FACES` is on (cloud.md).
+  for the eyes when `LAMP_PHOTO_FACES` is on (cloud.md). And it keeps
+  PulseAudio out of the board user's session (#4332): it masks
+  `pulseaudio.socket` and `pulseaudio.service` for every user session
+  (`/etc/systemd/user/`, links to `/dev/null`) and turns libpulse's
+  `autospawn` off (`/etc/pulse/client.conf.d/90-lampos-no-autospawn.conf`).
+  On lamp-06c1 on 30 Oct, the autologin's `pulseaudio` took the speaker
+  while the voice restarted, and the voice's open failed busy. An update's
+  restart that fails that way puts the build back. The lamp plays and
+  records through ALSA only. A round carries this file
+  (updates.md, "Settings and tmpfiles"). The masks take effect from the
+  next boot, so a `pulseaudio` already running keeps going until then.
 - **The body's unit id** is the host name (`--unit-id %H`), and no unit
   says `ConditionHost=`.
 - **The clock** (#811): a lamp has no battery clock, so after a boot its
