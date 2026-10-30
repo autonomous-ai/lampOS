@@ -1,0 +1,298 @@
+//! The camera through the door: `camera.snapshot` and `camera.stream`
+//! (the `camera` grant, docs/control.md, "The camera").
+//!
+//! The door never opens the camera. The eyes own it, and with
+//! `--sight-file` they keep their newest frame in one file (a 320-across
+//! JPEG, about six a second) while the camera is open, and remove it when
+//! it closes (`lamp-eyes`). The door reads that file: a snapshot is the
+//! newest frame if it is fresh ([`FRESH`]), and a stream sends each new one
+//! as a `camera.frame` event, [`FPS_MOST`] a second at most. So the eyes and
+//! the voice go on as before, and nothing here holds the device.
+//!
+//! Never while the lamp is private: the privacy switch ends every stream at
+//! once with a `camera.ended` event and refuses a snapshot, whatever the
+//! file holds. The voice stops the eyes' camera then too, so the file goes,
+//! but the door doesn't wait on that.
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, SystemTime};
+
+use base64::Engine as _;
+use serde_json::{Value, json};
+
+use crate::parts::Events;
+use crate::protocol::{Error, ErrorCode};
+
+/// A frame older than this is not the camera's now: the camera has closed
+/// or stalled.
+pub const FRESH: Duration = Duration::from_secs(2);
+/// The largest frame sent; the eyes' sight frame is about 20 KiB.
+pub const FRAME_MAX: u64 = 256 * 1024;
+/// A stream's most frames a second, and its default.
+pub const FPS_MOST: u8 = 5;
+pub const FPS_DEFAULT: u8 = 2;
+/// A stream with no fresh frame this long ends, saying so.
+pub const GONE_AFTER: Duration = Duration::from_secs(10);
+
+/// Whether the lamp is private now.
+pub type Private = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// The newest frame: its JPEG and how old it is.
+#[derive(Debug)]
+pub struct Frame {
+    pub jpeg: Vec<u8>,
+    pub age: Duration,
+    pub modified: SystemTime,
+}
+
+impl Frame {
+    /// As a reply or an event carries it.
+    pub fn json(&self) -> Value {
+        json!({
+            "jpeg": base64::engine::general_purpose::STANDARD.encode(&self.jpeg),
+            "bytes": self.jpeg.len(),
+            "age_ms": u64::try_from(self.age.as_millis()).unwrap_or(u64::MAX),
+        })
+    }
+}
+
+/// The newest frame in `path` if it is fresh at `now`, or why not.
+pub fn newest(path: &Path, now: SystemTime) -> Result<Frame, String> {
+    let meta = std::fs::metadata(path).map_err(|_| "the camera is closed".to_owned())?;
+    if meta.len() > FRAME_MAX {
+        return Err(format!("the frame is over {FRAME_MAX} bytes"));
+    }
+    let modified = meta
+        .modified()
+        .map_err(|_| "the frame has no time".to_owned())?;
+    let age = now.duration_since(modified).unwrap_or(Duration::ZERO);
+    if age > FRESH {
+        return Err("the camera is closed".to_owned());
+    }
+    let jpeg = std::fs::read(path).map_err(|_| "the camera is closed".to_owned())?;
+    // A frame caught mid-write by the eyes is not whole.
+    if !(jpeg.starts_with(&[0xff, 0xd8]) && jpeg.ends_with(&[0xff, 0xd9])) {
+        return Err("the frame was being written; ask again".to_owned());
+    }
+    Ok(Frame {
+        jpeg,
+        age,
+        modified,
+    })
+}
+
+/// The camera as the door reads it: the eyes' sight file, whether the lamp
+/// is private, and each client's stream.
+pub struct Camera {
+    sight: PathBuf,
+    private: Private,
+    streams: HashMap<String, Arc<AtomicBool>>,
+}
+
+impl Camera {
+    pub fn new(sight: PathBuf, private: Private) -> Self {
+        Self {
+            sight,
+            private,
+            streams: HashMap::new(),
+        }
+    }
+
+    /// `camera.snapshot`.
+    pub fn snapshot(&self) -> Result<Value, Error> {
+        if (self.private)() {
+            return Err(Error::new(ErrorCode::Private, "the lamp is private"));
+        }
+        newest(&self.sight, SystemTime::now())
+            .map(|frame| frame.json())
+            .map_err(|why| Error::new(ErrorCode::Refused, why))
+    }
+
+    /// `camera.stream`, on or off. On again while one runs takes the new
+    /// rate.
+    pub fn stream(
+        &mut self,
+        client: &str,
+        on: bool,
+        fps: Option<u8>,
+        events: Events,
+    ) -> Result<Value, Error> {
+        self.end(client);
+        if !on {
+            return Ok(json!({"stream": "off"}));
+        }
+        if (self.private)() {
+            return Err(Error::new(ErrorCode::Private, "the lamp is private"));
+        }
+        let fps = fps.unwrap_or(FPS_DEFAULT).clamp(1, FPS_MOST);
+        let running = Arc::new(AtomicBool::new(true));
+        self.streams.insert(client.to_owned(), running.clone());
+        let (sight, private, client) =
+            (self.sight.clone(), self.private.clone(), client.to_owned());
+        std::thread::spawn(move || {
+            run(&sight, fps, &running, &private, &|event| {
+                events(&client, event)
+            });
+        });
+        Ok(json!({"stream": "on", "fps": fps}))
+    }
+
+    /// Ends `client`'s stream, if any, without an event: its own `off`,
+    /// `stop` or going.
+    pub fn end(&mut self, client: &str) {
+        if let Some(running) = self.streams.remove(client) {
+            running.store(false, Ordering::SeqCst);
+        }
+    }
+}
+
+/// One stream, on its own thread, until `running` is cleared, the lamp is
+/// private or the camera has been gone [`GONE_AFTER`].
+fn run(sight: &Path, fps: u8, running: &AtomicBool, private: &Private, tell: &dyn Fn(Value)) {
+    let every = Duration::from_millis(1_000 / u64::from(fps));
+    let mut last: Option<SystemTime> = None;
+    let mut fresh_at = std::time::Instant::now();
+    while running.load(Ordering::SeqCst) {
+        if private() {
+            running.store(false, Ordering::SeqCst);
+            tell(json!({"ev": "camera.ended", "why": "the lamp is private"}));
+            return;
+        }
+        match newest(sight, SystemTime::now()) {
+            Ok(frame) if last != Some(frame.modified) => {
+                last = Some(frame.modified);
+                fresh_at = std::time::Instant::now();
+                let mut event = frame.json();
+                event["ev"] = json!("camera.frame");
+                tell(event);
+            }
+            Ok(_) => fresh_at = std::time::Instant::now(),
+            Err(_) if fresh_at.elapsed() >= GONE_AFTER => {
+                running.store(false, Ordering::SeqCst);
+                tell(json!({"ev": "camera.ended", "why": "the camera is closed"}));
+                return;
+            }
+            Err(_) => {}
+        }
+        std::thread::sleep(every);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    const JPEG: &[u8] = &[0xff, 0xd8, 1, 2, 3, 0xff, 0xd9];
+
+    fn dir() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-control-camera-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn a_snapshot_is_the_newest_whole_fresh_frame() {
+        let sight = dir().join("sight.jpg");
+        let camera = Camera::new(sight.clone(), Arc::new(|| false));
+        assert_eq!(camera.snapshot().unwrap_err().why, "the camera is closed");
+        std::fs::write(&sight, JPEG).unwrap();
+        let reply = camera.snapshot().unwrap();
+        assert_eq!(reply["bytes"], 7);
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD
+                .decode(reply["jpeg"].as_str().unwrap())
+                .unwrap(),
+            JPEG
+        );
+        // Caught mid-write.
+        std::fs::write(&sight, &JPEG[..4]).unwrap();
+        assert!(camera.snapshot().unwrap_err().why.contains("ask again"));
+        // Old: the camera has closed.
+        let later = SystemTime::now() + FRESH + Duration::from_secs(1);
+        std::fs::write(&sight, JPEG).unwrap();
+        assert_eq!(newest(&sight, later).unwrap_err(), "the camera is closed");
+    }
+
+    #[test]
+    fn nothing_is_seen_while_private() {
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let mut camera = Camera::new(sight, Arc::new(|| true));
+        assert_eq!(camera.snapshot().unwrap_err().code, ErrorCode::Private);
+        let events: Events = Arc::new(|_, _| {});
+        assert_eq!(
+            camera.stream("c_1", true, None, events).unwrap_err().code,
+            ErrorCode::Private
+        );
+    }
+
+    #[test]
+    fn a_stream_sends_each_new_frame_once_and_ends_when_private() {
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let private = Arc::new(AtomicBool::new(false));
+        let watching = private.clone();
+        let mut camera = Camera::new(
+            sight.clone(),
+            Arc::new(move || watching.load(Ordering::SeqCst)),
+        );
+        let seen: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let into = seen.clone();
+        let events: Events = Arc::new(move |client, event| {
+            into.lock().unwrap().push((client.to_owned(), event));
+        });
+        assert_eq!(
+            camera.stream("c_1", true, Some(5), events).unwrap(),
+            json!({"stream": "on", "fps": 5})
+        );
+        std::thread::sleep(Duration::from_millis(500));
+        let frames = |seen: &Mutex<Vec<(String, Value)>>| {
+            seen.lock()
+                .unwrap()
+                .iter()
+                .filter(|(_, event)| event["ev"] == "camera.frame")
+                .count()
+        };
+        // The same file, unchanged: one frame, not five.
+        assert_eq!(frames(&seen), 1);
+        private.store(true, Ordering::SeqCst);
+        std::thread::sleep(Duration::from_millis(500));
+        let seen = seen.lock().unwrap();
+        let last = &seen.last().unwrap().1;
+        assert_eq!(last["ev"], "camera.ended");
+        assert_eq!(last["why"], "the lamp is private");
+        assert!(seen.iter().all(|(client, _)| client == "c_1"));
+    }
+
+    #[test]
+    fn off_and_stop_end_a_stream_with_no_more_frames() {
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let mut camera = Camera::new(sight.clone(), Arc::new(|| false));
+        let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let into = seen.clone();
+        let events: Events = Arc::new(move |_, event| into.lock().unwrap().push(event));
+        camera.stream("c_1", true, Some(5), events.clone()).unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(
+            camera.stream("c_1", false, None, events).unwrap(),
+            json!({"stream": "off"})
+        );
+        let before = seen.lock().unwrap().len();
+        // A new frame after off is never sent.
+        std::thread::sleep(Duration::from_millis(50));
+        std::fs::write(&sight, JPEG).unwrap();
+        std::thread::sleep(Duration::from_millis(500));
+        assert_eq!(seen.lock().unwrap().len(), before);
+    }
+}

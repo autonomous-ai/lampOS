@@ -95,6 +95,12 @@ pub enum Grant {
     /// The lamp's own computer (`board/state`): processor load, memory,
     /// disk and its temperatures; `get` `device`.
     Device,
+    /// The camera's pictures: `camera.snapshot` and `camera.stream`, the
+    /// eyes' own newest frame, never while the lamp is private.
+    Camera,
+    /// The microphone's sound as it is heard, never while the lamp is
+    /// private.
+    Microphone,
 }
 
 impl Grant {
@@ -115,6 +121,10 @@ impl Grant {
                 "can read the air sensor: particles, carbon dioxide and humidity, which can show when someone is in the room"
             }
             Self::Device => "can read the lamp's processor, memory, disk and temperature",
+            Self::Camera => "can see what the lamp's camera sees, never while it is private",
+            Self::Microphone => {
+                "can hear what the lamp's microphone hears, never while it is private"
+            }
         }
     }
 }
@@ -378,6 +388,18 @@ pub enum Op {
     /// One of the client's own pushed skills, taken off.
     #[serde(rename = "skill.remove")]
     SkillRemove { name: String },
+    /// The camera's newest picture, once: a JPEG, as the eyes keep it.
+    #[serde(rename = "camera.snapshot")]
+    CameraSnapshot {},
+    /// The camera's pictures as `camera.frame` events, `fps` a second at
+    /// most, until `on: false`, `stop`, the client goes or the lamp turns
+    /// private (`camera.ended`, with why).
+    #[serde(rename = "camera.stream")]
+    CameraStream {
+        on: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fps: Option<u8>,
+    },
 }
 
 impl Op {
@@ -415,6 +437,7 @@ impl Op {
             Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
                 vec![Grant::Skills]
             }
+            Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
         };
         needs.sort();
         needs.dedup();
@@ -523,6 +546,11 @@ impl Op {
                 }
             }
             Self::SkillRemove { name } => skill_name(name)?,
+            Self::CameraStream { fps: Some(fps), .. } => {
+                if !(1..=crate::camera::FPS_MOST).contains(fps) {
+                    return Err(format!("fps: 1 to {}", crate::camera::FPS_MOST));
+                }
+            }
             Self::Unsubscribe { events } => {
                 if events.is_empty() {
                     return Err("events: at least one".to_owned());
@@ -660,7 +688,10 @@ impl Op {
                     return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
                 }
             }
-            Self::Stop {} | Self::SkillList {} => {}
+            Self::Stop {}
+            | Self::SkillList {}
+            | Self::CameraSnapshot {}
+            | Self::CameraStream { fps: None, .. } => {}
         }
         Ok(())
     }
@@ -1108,6 +1139,8 @@ mod tests {
             Grant::Skills,
             Grant::Air,
             Grant::Device,
+            Grant::Camera,
+            Grant::Microphone,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -1135,6 +1168,14 @@ mod tests {
                 (
                     json!("device"),
                     "can read the lamp's processor, memory, disk and temperature"
+                ),
+                (
+                    json!("camera"),
+                    "can see what the lamp's camera sees, never while it is private"
+                ),
+                (
+                    json!("microphone"),
+                    "can hear what the lamp's microphone hears, never while it is private"
                 ),
             ]
         );
