@@ -1249,10 +1249,17 @@ can't tell them apart:
   carries a lamp-update with a new hash, so on a self-updating product lamp
   this, not `done`, is how most updates end: `started`, `self-switched`,
   then `self-confirmed`. `done` comes only from a round whose lamp-update is
-  unchanged (Second, on #4370's run, 30 Oct).
+  unchanged (Second, on #4370's run, 30 Oct). A round whose parts were
+  already on `to` (`UpToDate`) ends the same way when lamp-update is not
+  yet on that build's own self, e.g. after an `install` or a self put back
+  (`round.rs`, `run.own`): there too the parts run `to`.
 - **`Climbs`:** the build needs a newer updater than the one running, so only
   lamp-update was taken; the parts stay on the old build until the next
-  round, and `to` is still the build it climbed for.
+  round, and `to` is still the build it climbed for. That round is not a
+  wait for the timer: once the new self confirms itself, `serve` goes
+  straight on to a round (lamp-9adf at 8899: `confirmed` at 15:37:59,
+  `up to date` at 15:38:01), so the parts' own end normally follows within
+  minutes, on the same quiet terms.
 
 So from the alerts alone, a `self-switched` with `to` doesn't prove the
 parts run `to`: after a climb they do only once a later round ends `done` or
