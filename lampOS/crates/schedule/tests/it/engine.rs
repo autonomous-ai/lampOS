@@ -1204,3 +1204,60 @@ fn with_no_known_zone_or_offset_a_clock_time_is_refused_and_minutes_still_work()
     let engine = Engine::open(Disk::default(), "Etc/UTC", &at, STORE).unwrap();
     assert_eq!(engine.zone_fallback(), None);
 }
+
+/// When an item was set (the person's call, 30 Oct: "when did I set that
+/// reminder?"): `ListSet` says it, from the item's stored creation time, in
+/// the lamp's zone, its day against now's. 14 Oct 23:30 UTC is 06:30 on 15
+/// Oct in Ho Chi Minh City: the day is the lamp's, not UTC's. With now's
+/// wall clock untrusted, the day is its date, never "today" on a guess.
+/// `List` and `Get`, which the delivery ledger reads strictly, are as they
+/// were.
+#[test]
+fn a_list_set_item_says_when_it_was_set_in_the_lamps_zone() {
+    // WALL is 14 Oct 08:00 UTC; 23:30 UTC is 15.5 hours on.
+    let at = now(15 * 3_600_000 + 1_800_000);
+    let mut e = Engine::open(Disk::default(), "Asia/Ho_Chi_Minh", &at, STORE).unwrap();
+    set(&mut e, &at, 86_400 * 3);
+    let listed = |e: &mut Engine<Disk>, at: &ClockSample| {
+        e.answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+            },
+            at,
+        )
+        .unwrap()["items"][0]
+            .clone()
+    };
+    let item = listed(&mut e, &at);
+    assert_eq!(
+        (item["set_local"].as_str(), item["set_day"].as_str()),
+        (
+            Some("2026-10-15T06:30:00+07:00[Asia/Ho_Chi_Minh]"),
+            Some("today")
+        ),
+        "{item}"
+    );
+    let mut plain = item.as_object().unwrap().clone();
+    plain.remove("set_local");
+    plain.remove("set_day");
+    assert_eq!(Value::Object(plain), get(&mut e, &at, 1));
+    let list = e
+        .answer(
+            Request::List {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+            },
+            &at,
+        )
+        .unwrap();
+    assert!(list["items"][0].get("set_local").is_none(), "{list}");
+    let day = |e: &mut Engine<Disk>, at: &ClockSample| listed(e, at)["set_day"].clone();
+    assert_eq!(day(&mut e, &now(39 * 3_600_000 + 1_800_000)), "yesterday");
+    assert_eq!(day(&mut e, &now(63 * 3_600_000 + 1_800_000)), "2026-10-15");
+    let mut untrusted = now(64 * 3_600_000);
+    untrusted.wall_trusted = false;
+    assert_eq!(day(&mut e, &untrusted), "2026-10-15");
+}

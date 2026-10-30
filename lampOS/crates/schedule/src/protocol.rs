@@ -33,6 +33,19 @@ pub enum Request {
         #[serde(default)]
         pending_only: bool,
     },
+    /// [`Request::List`] with each item's set time, `set_local` and
+    /// `set_day` (the person's call, 30 Oct: "when did I set that
+    /// reminder?"). A request of its own, so `List`'s items stay exactly
+    /// what the delivery ledger reads strictly; an older build refuses it as
+    /// `bad_request`, and the caller lists without it.
+    ListSet {
+        #[serde(default)]
+        after_id: u64,
+        #[serde(default = "default_page_size")]
+        limit: u16,
+        #[serde(default)]
+        pending_only: bool,
+    },
     Get {
         id: u64,
     },
@@ -79,6 +92,7 @@ impl Request {
         match self {
             Self::Status {} => "status",
             Self::List { .. } => "list",
+            Self::ListSet { .. } => "list_set",
             Self::Get { .. } => "get",
             Self::Set { .. } => "set",
             Self::Cancel { .. } => "cancel",

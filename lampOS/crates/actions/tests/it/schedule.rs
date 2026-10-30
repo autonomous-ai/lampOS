@@ -600,7 +600,7 @@ fn listing_keeps_complete_escaped_labels_and_returns_the_actual_remaining_cursor
     assert_eq!(text.len(), 300);
     let items: Vec<_> = (1..=8).map(|id| listed(id, text.clone())).collect();
     let mut script = Script::with(2, move |request, index| {
-        assert_eq!(request["op"], "list");
+        assert_eq!(request["op"], "list_set");
         let after = request["after_id"].as_u64().unwrap();
         if index == 0 {
             assert_eq!(after, 0);
@@ -950,7 +950,7 @@ fn a_full_due_only_page_still_fits_its_count_of_what_is_not_yet_due() {
             .collect();
         let mut script = Script::with(2, move |request, index| match index {
             0 => {
-                assert_eq!(request["op"], "list");
+                assert_eq!(request["op"], "list_set");
                 assert_eq!(request["pending_only"], true);
                 json!({"ok":true,"store_id":STORE,"revision":1,"items":items,"next_after_id":null})
             }
@@ -996,4 +996,135 @@ fn the_clock_is_the_local_hour_and_minute() {
     );
     assert_eq!(clock_of("next week"), None);
     assert_eq!(clock_of("2026-10-25T9:7"), None);
+}
+
+/// The person's call (30 Oct): asked when a reminder was set, the lamp says
+/// it from the list. Each item set through the real service says its day
+/// and local clock time; a day on it is `yesterday`.
+#[test]
+fn each_listed_item_says_when_it_was_set_and_a_day_on_it_is_yesterday() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    *schedule.clock.0.lock().unwrap() = sample(3_600_000);
+    let set = actions.call(
+        "set_reminder",
+        json!({"text":"Call Ana","time":"18:00","day":"tomorrow"}),
+    );
+    assert_eq!(set["result"]["status"], "committed", "{set}");
+    let today = actions.call("list_reminders", json!({}));
+    let item = &today["result"]["items"][0];
+    assert_eq!(
+        (item["set_day"].as_str(), item["set_clock"].as_str()),
+        (Some("today"), Some("09:00")),
+        "{today}"
+    );
+    *schedule.clock.0.lock().unwrap() = sample(25 * 3_600_000);
+    let next_day = actions.call("list_reminders", json!({}));
+    let item = &next_day["result"]["items"][0];
+    assert_eq!(
+        (item["set_day"].as_str(), item["set_clock"].as_str()),
+        (Some("yesterday"), Some("09:00")),
+        "{next_day}"
+    );
+}
+
+/// An older Schedule service's item has no set time, and one whose set time
+/// is malformed is not told: both list with it null, never guessed, and
+/// the rest of the item stands.
+#[test]
+fn an_item_without_a_readable_set_time_lists_with_it_unknown() {
+    let mut odd = listed(2, "Bins".into());
+    odd["set_local"] = json!("yesterday morning");
+    odd["set_day"] = json!("yesterday");
+    let mut good = listed(3, "Tea".into());
+    good["set_local"] = json!("2026-10-13T21:05:00+07:00[Asia/Ho_Chi_Minh]");
+    good["set_day"] = json!("2026-10-13");
+    let mut script = Script::new(vec![json!({"ok":true,"store_id":STORE,"revision":3,
+        "items":[listed(1, "Call Ana".into()), odd, good],"next_after_id":null})]);
+    let got = script.adapter().call("list_reminders", &json!({}));
+    let items = got["result"]["items"].as_array().unwrap();
+    let said: Vec<_> = items
+        .iter()
+        .map(|i| {
+            (
+                i["text"].as_str().unwrap(),
+                i["set_day"].clone(),
+                i["set_clock"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        said,
+        [
+            ("Call Ana", Value::Null, Value::Null),
+            ("Bins", Value::Null, Value::Null),
+            ("Tea", json!("2026-10-13"), json!("21:05")),
+        ],
+        "{got}"
+    );
+    script.finish();
+}
+
+/// An older Schedule service refuses `list_set` as a bad request: the same
+/// list is asked once as `list`, its items told as set at an unknown time.
+/// Any other refusal is not asked again.
+#[test]
+fn an_older_schedule_is_listed_without_set_times() {
+    let mut script = Script::with(2, |request, index| match index {
+        0 => {
+            assert_eq!(request["op"], "list_set");
+            json!({"ok":false,"error":"bad_request","message":"x"})
+        }
+        _ => {
+            assert_eq!(request["op"], "list");
+            assert_eq!(request["after_id"], 0);
+            json!({"ok":true,"store_id":STORE,"revision":1,"items":[listed(1, "Call Ana".into())],"next_after_id":null})
+        }
+    });
+    let got = script.adapter().call("list_reminders", &json!({}));
+    let item = &got["result"]["items"][0];
+    assert_eq!(item["text"], "Call Ana", "{got}");
+    assert_eq!(
+        (&item["set_day"], &item["set_clock"]),
+        (&Value::Null, &Value::Null)
+    );
+    assert_eq!(script.finish().len(), 2);
+    let mut script = Script::new(vec![json!({"ok":false,"error":"busy","message":"x"})]);
+    assert_eq!(
+        script.adapter().call("list_reminders", &json!({}))["code"],
+        "unavailable"
+    );
+    assert_eq!(script.finish().len(), 1);
+}
+
+/// `list_reminders`' description names questions about reminders as its
+/// own, not recall's, says how the set time reads, and never lists unasked
+/// (rule 8); it stays within a function's 1,024 bytes.
+#[test]
+fn list_reminders_is_described_for_questions_about_reminders() {
+    let listing = catalog()
+        .into_iter()
+        .find(|f| f.name == "list_reminders")
+        .unwrap();
+    assert_eq!(listing.description, lamp_actions::schedule::LIST_DESCRIBED);
+    assert!(
+        listing
+            .description
+            .starts_with(lamp_actions::schedule::LIST_BEFORE)
+    );
+    for words in [
+        "not recall",
+        "when they set it",
+        "never say you do not remember a reminder before calling this",
+        "set_day and set_clock",
+        "say you don't know when",
+        "Never list reminders unasked",
+    ] {
+        assert!(listing.description.contains(words), "{words}");
+    }
+    assert!(
+        listing.description.len() <= 1_024,
+        "{}",
+        listing.description.len()
+    );
 }
