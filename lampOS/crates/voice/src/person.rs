@@ -456,25 +456,43 @@ pub fn forget_with_everything(
     let Some(path) = path_from_environment().filter(|path| path.is_absolute()) else {
         return told;
     };
-    let owner = now().map(|name| crate::known_faces::memory_person(&name));
-    forget_if(&path, told, lease.admitted_person(), owner.as_deref())
+    forget_if(&path, told, lease.admitted_person(), &owner_ids())
+}
+
+/// The memory ids the owner goes by, for their own "forget everything"
+/// ([`forget_with_everything`], `owner_place::forget_with_everything`): the
+/// typed name's ([`now`]) and the one who_you_are kept with their face
+/// (`known_faces::owner_now`), as [`by_default_owner`] names them (#4530).
+/// A typed "Minh Nguyen" whose face was kept as "Minh" forgets as "Minh",
+/// and the typed name must go too (Friday's P2 on #4476). `owner_now` is
+/// still set here: the face's forget clears it only after the call
+/// (`tools::face_gone_with_everything`).
+pub fn owner_ids() -> Vec<String> {
+    let mut ids: Vec<String> = now()
+        .into_iter()
+        .chain(crate::known_faces::owner_now())
+        .map(|name| crate::known_faces::memory_person(&name))
+        .collect();
+    ids.dedup();
+    ids
 }
 
 /// [`forget_with_everything`] once its mark is judged: the name at `file`
-/// removed when `admitted`, the line's person, is the `owner`'s memory
-/// person and `told` says their memory was emptied. The answer then says
+/// removed when `admitted`, the line's person, is one of `owners`, the
+/// owner's memory ids ([`owner_ids`]), and `told` says their memory was
+/// emptied. The answer then says
 /// `name: "forgotten too"` in place of the face's `setup_name` note that it
 /// stays.
 pub(crate) fn forget_if(
     file: &Path,
     mut told: (serde_json::Value, bool),
     admitted: Option<&str>,
-    owner: Option<&str>,
+    owners: &[String],
 ) -> (serde_json::Value, bool) {
     use serde_json::json;
     let emptied =
         told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
-    let theirs = admitted.is_some() && admitted == owner;
+    let theirs = admitted.is_some_and(|admitted| owners.iter().any(|owner| owner == admitted));
     if !emptied || !theirs || fs::symlink_metadata(file).is_err() {
         return told;
     }
@@ -1290,7 +1308,12 @@ mod tests {
             (None, None),
         ] {
             assert_eq!(
-                forget_if(&file, emptied(), admitted, owner),
+                forget_if(
+                    &file,
+                    emptied(),
+                    admitted,
+                    &owner.into_iter().map(str::to_owned).collect::<Vec<_>>()
+                ),
                 emptied(),
                 "{admitted:?} {owner:?}"
             );
@@ -1302,12 +1325,18 @@ mod tests {
             false,
         );
         assert_eq!(
-            forget_if(&file, failed.clone(), Some("p-owner"), Some("p-owner")),
+            forget_if(
+                &file,
+                failed.clone(),
+                Some("p-owner"),
+                &["p-owner".to_owned()]
+            ),
             failed
         );
         assert!(file.exists());
         // The owner's: gone, and said, the face's "it stays" note taken out.
-        let (told, answered) = forget_if(&file, emptied(), Some("p-owner"), Some("p-owner"));
+        let (told, answered) =
+            forget_if(&file, emptied(), Some("p-owner"), &["p-owner".to_owned()]);
         assert!(answered);
         assert_eq!(told["name"], "forgotten too");
         assert_eq!(told["everything"], true);
@@ -1319,16 +1348,50 @@ mod tests {
             true,
         );
         assert_eq!(
-            forget_if(&file, nothing.clone(), Some("p-owner"), Some("p-owner")),
+            forget_if(
+                &file,
+                nothing.clone(),
+                Some("p-owner"),
+                &["p-owner".to_owned()]
+            ),
             nothing
         );
         // Not removable: kept, and said so.
         let kept = dir.join("name-dir");
         fs::create_dir_all(kept.join("inner")).unwrap();
-        let (told, _) = forget_if(&kept, emptied(), Some("p-owner"), Some("p-owner"));
+        let (told, _) = forget_if(&kept, emptied(), Some("p-owner"), &["p-owner".to_owned()]);
         assert_eq!(told["name"], NAME_KEPT);
         assert_eq!(told["everything"], false);
         assert!(told.get("setup_name").is_none(), "{told}");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Friday's P2 on #4476: a typed "Robin Example" whose face was kept as
+    /// "Robin" (#4530) forgets as "Robin", and the typed name goes too:
+    /// the line's person matched against either of the owner's ids
+    /// (`owner_ids`). A guest by neither leaves it. Made-up names.
+    #[test]
+    fn the_owner_forgets_the_typed_name_by_either_name_they_go_by() {
+        let dir = std::env::temp_dir().join(format!("lamp-person-split-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        fs::write(&file, "Robin Example\n").unwrap();
+        let emptied = || {
+            (
+                serde_json::json!({"forgotten": true, "everything": true}),
+                true,
+            )
+        };
+        let owners = ["p-robin-example".to_owned(), "p-robin".to_owned()];
+        assert_eq!(
+            forget_if(&file, emptied(), Some("p-guest"), &owners),
+            emptied()
+        );
+        assert!(file.exists());
+        let (told, _) = forget_if(&file, emptied(), Some("p-robin"), &owners);
+        assert_eq!(told["name"], "forgotten too");
+        assert!(!file.exists());
         fs::remove_dir_all(&dir).unwrap();
     }
 

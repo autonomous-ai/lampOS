@@ -2417,8 +2417,10 @@ then use that person's scope:
   (build 6963) the memory was forgotten, `people.json` kept the face and its
   name, and the lamp greeted the person by it when asked (the lead on #1711).
   The name typed at setup (`/etc/lampOS/person/name`) goes with the same
-  marked forget said by the owner (the line's person is the typed name's),
-  once their memory is emptied, after the place below: the model hears
+  marked forget said by the owner (the line's person is the typed name's
+  or the owner the onboarding kept with their face, by either name they go
+  by: a typed "Robin Example" kept as "Robin" forgets as "Robin";
+  `person::owner_ids`), once their memory is emptied, after the place below: the model hears
   `name: "forgotten too"` in place of `setup_name`, or that it could not be
   (`everything: false`), and the second route reads the name again for each
   reply, so it names no one from the next (the Live route, not the
@@ -2427,8 +2429,8 @@ then use that person's scope:
   person's forget or the room's leaves it, and their answer still says it
   stays (`setup_name`); the 5 s reset clears it too. When the app set the owner's
   place (#4333, [owner-place.md](owner-place.md)), the same marked forget said by
-  the owner (the line's person is the typed name's, or the owner the
-  onboarding kept), once their memory is emptied, removes the place the app
+  the owner (the line's person is either of the owner's, as for the name
+  above), once their memory is emptied, removes the place the app
   set too, and the model hears `place: "forgotten too"`, or that it could
   not be (`everything: false`); another person's or the room's leaves it.
   This holds with `LAMP_OWNER_PLACE` off too, so a place kept while it was

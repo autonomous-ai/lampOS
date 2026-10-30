@@ -234,28 +234,29 @@ pub fn forget_with_everything(
     if !lease.everything_marked() {
         return told;
     }
-    let owner = crate::person::from_environment().or_else(crate::known_faces::owner_now);
-    let owner = owner.as_deref().map(crate::known_faces::memory_person);
+    // The owner by either name they go by, the typed one and the one their
+    // face was kept as (`person::owner_ids`, Friday's P2 on #4476).
     forget_if(
         Path::new(lamp_msgs::owner_place::FILE),
         told,
         lease.admitted_person(),
-        owner.as_deref(),
+        &crate::person::owner_ids(),
     )
 }
 
 /// [`forget_with_everything`] once its mark is judged: the place at `file`
-/// removed when `admitted`, the line's person, is the `owner`'s memory
-/// person and `told` says their memory was emptied, the switch on or not.
+/// removed when `admitted`, the line's person, is one of `owners`, the
+/// owner's memory ids, and `told` says their memory was emptied, the switch
+/// on or not.
 pub(crate) fn forget_if(
     file: &Path,
     mut told: (Value, bool),
     admitted: Option<&str>,
-    owner: Option<&str>,
+    owners: &[String],
 ) -> (Value, bool) {
     let emptied =
         told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
-    let theirs = admitted.is_some() && admitted == owner;
+    let theirs = admitted.is_some_and(|admitted| owners.iter().any(|owner| owner == admitted));
     if !emptied || !theirs || std::fs::symlink_metadata(file).is_err() {
         return told;
     }
@@ -412,19 +413,26 @@ mod tests {
             (Some("p-owner"), None),
             (None, None),
         ] {
-            let told = forget_if(&file, emptied(), admitted, owner);
+            let owners: Vec<String> = owner.into_iter().map(str::to_owned).collect();
+            let told = forget_if(&file, emptied(), admitted, &owners);
             assert_eq!(told, emptied(), "{admitted:?} {owner:?}");
             assert!(file.exists(), "{admitted:?} {owner:?}");
         }
         // A forget whose memory was not emptied leaves it.
         let failed = (json!({"error": "the memory did not answer"}), false);
         assert_eq!(
-            forget_if(&file, failed.clone(), Some("p-owner"), Some("p-owner")),
+            forget_if(
+                &file,
+                failed.clone(),
+                Some("p-owner"),
+                &["p-owner".to_owned()]
+            ),
             failed
         );
         assert!(file.exists());
         // The owner's: gone, and said.
-        let (told, answered) = forget_if(&file, emptied(), Some("p-owner"), Some("p-owner"));
+        let (told, answered) =
+            forget_if(&file, emptied(), Some("p-owner"), &["p-owner".to_owned()]);
         assert!(answered);
         assert_eq!(told["place"], "forgotten too");
         assert_eq!(told["everything"], true);
@@ -432,15 +440,46 @@ mod tests {
         // Nothing kept: nothing said of it.
         let nothing = (json!({"note": "I was keeping nothing of them."}), true);
         assert_eq!(
-            forget_if(&file, nothing.clone(), Some("p-owner"), Some("p-owner")),
+            forget_if(
+                &file,
+                nothing.clone(),
+                Some("p-owner"),
+                &["p-owner".to_owned()]
+            ),
             nothing
         );
         // Not removable: kept, and said so.
         let file_in = dir.join("place-dir");
         std::fs::create_dir_all(file_in.join("inner")).unwrap();
-        let (told, _) = forget_if(&file_in, emptied(), Some("p-owner"), Some("p-owner"));
+        let (told, _) = forget_if(
+            &file_in,
+            emptied(),
+            Some("p-owner"),
+            &["p-owner".to_owned()],
+        );
         assert_eq!(told["place"], PLACE_KEPT);
         assert_eq!(told["everything"], false);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Friday's P2 on #4476: the owner kept as "Robin" with a typed "Robin
+    /// Example" (#4530) forgets as "Robin", and their place goes too: the
+    /// line's person matched against either of the owner's ids.
+    #[test]
+    fn the_owner_forgets_the_place_by_either_name_they_go_by() {
+        let dir = folder("forget-split");
+        let file = dir.join("place");
+        std::fs::write(&file, lamp_msgs::owner_place::text(&hanoi())).unwrap();
+        let emptied = || (json!({"forgotten": true, "everything": true}), true);
+        let owners = ["p-robin-example".to_owned(), "p-robin".to_owned()];
+        assert_eq!(
+            forget_if(&file, emptied(), Some("p-guest"), &owners),
+            emptied()
+        );
+        assert!(file.exists());
+        let (told, _) = forget_if(&file, emptied(), Some("p-robin"), &owners);
+        assert_eq!(told["place"], "forgotten too");
+        assert!(!file.exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -455,7 +494,7 @@ mod tests {
         // Off, nothing is told of it.
         assert!(kept_now().is_none());
         let emptied = (json!({"forgotten": true, "everything": true}), true);
-        let (told, answered) = forget_if(&file, emptied, Some("p-owner"), Some("p-owner"));
+        let (told, answered) = forget_if(&file, emptied, Some("p-owner"), &["p-owner".to_owned()]);
         assert!(answered);
         assert_eq!(told["place"], "forgotten too");
         assert!(!file.exists());
