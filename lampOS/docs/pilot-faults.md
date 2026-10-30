@@ -356,6 +356,20 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   after it keep the 100 ms bound. If nothing fresh is waiting yet, nothing is
   taken and the next look goes on with the run. The bound itself is
   unchanged, and no other channel drops.
+- **The second worker's startup renewals queued behind a slow first look.**
+  While the voice starts, the coordinator sends every worker an authority
+  every 20 ms. A second worker (`LAMP_VOICE_ROUTE=second`) that did not read
+  for about 120 ms or more after Ready took the first on the first message's
+  grace and the second late, then ended on the third (`second.c.w: stale, …
+  sequence 3 after 2`), and the voice with it: a candidate for #4332's
+  unexplained `exit status 1` at boot, not yet matched to that lamp's
+  journal. Its control channel now passes over a stale authority renewal
+  with the next renewal right behind it and judges that one, as the audio
+  workers do (`receive_renewed`, #1569 row 42), and says the run
+  (`second.c.w: a renewal … passed over`). Anything else stale, out of
+  order, from another boot or stamped after now still ends it, as does a
+  stale renewal with nothing fresh behind it; the 250 ms lease still ends it
+  when the coordinator stops renewing.
 - **The first direct capture-ready message while the speaker starts.** On
   build 6963 after setup, lamp-dbda reported `ref.c.speaker` sequence 1
   after 0, aged 143402 us against 100000 us, then restarted muted (#3530).
