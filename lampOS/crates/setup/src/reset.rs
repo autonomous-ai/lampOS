@@ -637,9 +637,13 @@ pub const STARTERS: [&str; 8] = [
 /// records' check (`/var/lib/lampOS/voice/sessions`), and the updater and
 /// its apply (the skills' state, `/var/lib/lampOS`; the reboot after the
 /// reset would end them all the same), and the boot's Wi-Fi restore (the
-/// Wi-Fi file; Third on #3579). Patterns name only loaded units, and none
-/// matches `lamp-setup-wipe.service`, the reset's own unit.
-pub const WRITERS: [&str; 10] = [
+/// Wi-Fi file; Third on #3579). And `lamp-peek`, an office lamp's page,
+/// which a reboot kept off by its setup condition: a start in place would
+/// leave it holding port 80 from setup's page (#4536); stopped, it is not
+/// started again until the lamp next boots. Patterns name only loaded
+/// units (no product lamp has `lamp-peek`), and none matches
+/// `lamp-setup-wipe.service`, the reset's own unit.
+pub const WRITERS: [&str; 11] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
@@ -650,6 +654,7 @@ pub const WRITERS: [&str; 10] = [
     "lamp-update.service",
     "lamp-update-apply.service",
     "lamp-setup-wifi-restore.service",
+    "lamp-peek.service",
 ];
 
 /// Units as [`listed`] gives them: each name, and whether it is active.

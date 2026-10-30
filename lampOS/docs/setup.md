@@ -193,8 +193,11 @@ lamp-setup reset-now`). That unit, in this order:
    paths outside it (`reset::WRITERS`): `lamp-setup.service`, which serves
    for 600 s after setup, its recovery, the loaded `lamp-setup-change@`,
    `-keys@` and `-wifi@` instances, `lamp-skills-manage@` instances,
-   `lamp-records`, the updater with its apply, and the boot's Wi-Fi
-   restore. What starts them (`reset::STARTERS`: the helpers' and the
+   `lamp-records`, the updater with its apply, the boot's Wi-Fi
+   restore, and an office lamp's `lamp-peek`, which a reboot kept off by
+   its setup condition and which would otherwise keep port 80 from setup's
+   page after a start in place (#4536; not started again until the next
+   boot). What starts them (`reset::STARTERS`: the helpers' and the
    skills' sockets, the records' timer, the updater's way back, its timer
    and a worker already running, which can restart the updater for a pending
    self-switch, and the keeper's restart socket) is stopped first, so none
