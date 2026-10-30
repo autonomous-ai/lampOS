@@ -12,6 +12,9 @@ Each of these cost someone a run on a real lamp.
   you. Use `breathe` for repeated attention, or wait a minute.
 - **A light lasts 30 s at most** (`for_ms` up to 30,000). Renew it about
   every 25 s to keep it; when you stop, the person's own light comes back.
+- **Closing the connection ends your light at once** (and a `say` still
+  waiting). A one-shot script must stay connected while the light should
+  show: `await asyncio.sleep(20)` before leaving `async with`.
 - **`get("light")` has two lights.** `on`, `colour`, `level` are the
   person's own setting; `shows` is what the ring draws right now (yours
   while it lasts). Read `shows` to see your light, not the top level.
@@ -51,3 +54,6 @@ Each of these cost someone a run on a real lamp.
   don't add your own keepalive.
 - **Grants are read at hello:** after the owner changes them, reconnect.
 - **Each event carries `at` in UTC** ending `Z`, not the lamp's local time.
+  Parse it with a timezone-aware parser: an older fake stamps its own offset.
+- **`lamp.limits` keys can be missing** (an older lamp, the fake): read them
+  with `.get()`, never `limits["quiet_hours"]`.

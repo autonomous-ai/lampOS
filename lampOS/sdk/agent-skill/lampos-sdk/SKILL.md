@@ -47,8 +47,27 @@ python scripts/check_pairing.py   # this skill's check: grants, limits, what eac
 ```
 
 The pairing (a key and the lamp's pin) is kept in `~/.config/lampos`, or
-`LAMPOS_HOME`. A lamp outside the local network: `--host` takes any address
-that reaches port 7731.
+`LAMPOS_HOME`.
+
+## Reaching the lamp from off its network
+
+By default the lamp answers only computers on its own network. Two ways from
+elsewhere:
+
+1. **The lamp's remote opt-in**, on a lamp whose lamp-control has it (`--remote`, or
+   `LAMP_CONTROL_REMOTE=on`): off by default, and **the owner must switch it
+   on** on the lamp. Then any address that reaches port 7731 is admitted
+   (still only paired computers). Camera and microphone never leave the
+   lamp's own network, whatever this says.
+2. **An ssh tunnel to the lamp**, which needs the lamp's ssh: the owner's to
+   give, and nothing else to switch on. `ssh -N -L 7731:127.0.0.1:7731
+   orangepi@lamp-xxxx.local`, then `--host 127.0.0.1` for `lamp pair` and
+   `Lamp.connect(host="127.0.0.1")`. Through a tunnel the lamp sees
+   `127.0.0.1`, which is its own network (lamp-control counts loopback as
+   local), so **a tunnel carries every grant, the camera and microphone
+   included.** Never use or suggest a tunnel to get the camera or microphone
+   off the lamp's network: that is the owner's decision when they give ssh,
+   not a way around item 1.
 
 ## The mental model (read before writing code)
 
@@ -68,7 +87,12 @@ that reaches port 7731.
   `"rates": "off"`, and only refused actions (20 a second, then the
   connection closes) and phrase changes (6 a minute) are bounded. A lamp run
   with `--rates default` sends a window for each kind. The body bounds every
-  move whatever the rate.
+  move whatever the rate. Read `lamp.limits` with `.get()`: an older lamp or
+  fake leaves keys out.
+- **Closing ends what you asked for:** when your program's last connection
+  closes, the lamp gives back its light and stops its waiting lines at once.
+  A script that lights the ring and exits shows it for a moment only: stay
+  connected for as long as it should show.
 - **One motion at a time:** a gesture, move or feeling's move asked while
   another still plays is refused `busy` with `retry_ms`. Wait and ask again.
 - **Quiet hours:** a lamp setting (`limits.quiet_hours`, by default 22:00 to

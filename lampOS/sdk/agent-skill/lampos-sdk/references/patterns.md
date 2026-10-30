@@ -63,6 +63,7 @@ async def main(result):
         else:
             await lamp.light("red", 3, 20_000, pattern="pulse")   # one pulse a minute: see gotchas
             await lamp.say("The build failed.")
+        await asyncio.sleep(20)     # closing gives the light back at once: stay while it shows
 
 asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "pass"))
 ```
@@ -162,7 +163,7 @@ async def alert(lamp, text, urgent=False):
 async def main():
     async with await Lamp.connect() as lamp:
         await alert(lamp, "Message from the on-call channel.", urgent=True)
-        await asyncio.sleep(5)
+        await asyncio.sleep(20)     # the light lasts while this stays connected
 
 asyncio.run(main())
 ```

@@ -13,7 +13,13 @@ lamp fake --hands               # also waves a hand after each arrival
 
 Without `--everything` the fake refuses what real lamps don't route yet
 (`lampos.testing.LAMP_CONTROL_REFUSES`), as they do. Run your program in
-another terminal with the same `LAMPOS_HOME`.
+another terminal with the same `LAMPOS_HOME`. The fake also plays a small
+day on its own: every `--every` seconds (10) it says `person.arrived`, then
+`phrase.heard` ("good night lamp"), then `person.left`, for `--cycles` rounds
+(until Ctrl-C), so a program that listens has something to hear. It prints
+`asked` lines only between those events; for every frame, run your program
+with `LAMPOS_LOG=debug`. This skill's `scripts/try_fake.sh` starts a fresh
+fake, runs your program, and prints the fake's log after.
 
 ## In Python tests (pytest)
 
@@ -34,14 +40,28 @@ def test_my_ci_light(tmp_path):
     asyncio.run(go())
 ```
 
+`FakeLamp(...)` answers every op by default, as `--everything` does; pass
+`refuses=LAMP_CONTROL_REFUSES` to answer as a lamp does today.
+
 What the fake gives a test:
-- `fake.asked(op)`: the fields of every `op` request it took, oldest first.
+- `fake.asked(op)`: the fields of every `op` request it took, oldest first,
+  without `id` and `op`, as the program sent them: `light` →
+  `{"colour", "level", "for_ms"}` plus `"pattern"` only when one was given;
+  `say` → `{"text"}`; `express` → `{"feeling", "strength"}`; `gesture` →
+  `{"name"}`; `look` → `{"at"}` (a name, or `{"yaw", "pitch"}`); `joints` →
+  `{"lease", "targets", "within_ms"}`. A refused request isn't in it.
 - `await fake.emit(event, **fields)`: say an event to subscribers.
-- `fake.refuse_next(op, code, why, retry_ms=None)`: the next `op` is refused.
+- `fake.refuse_next(op, code, why, retry_ms=None)`: the next `op` is refused
+  with that code (one of the schema's) and `why` (any text).
 - `await fake.done(re, how)`, `await fake.lose_lease(lease, why)`.
-- `fake.clock`: set it to test the one-pulse-a-minute rule.
+- `fake.clock`: a function giving seconds (JS: milliseconds); set it to step time. With it,
+  `fake.pulses_played` and `fake.pulses_dropped` (JS `pulsesPlayed`,
+  `pulsesDropped`) show the one-pulse-a-minute rule: a second pulse within a
+  minute is in `asked("light")` but lands in `pulses_dropped`.
 - `hand_track(...)`, `await fake.emit_hand_track(track)`: a synthetic hand.
-- `refuses=LAMP_CONTROL_REFUSES`: answer as a lamp does today.
+- Grants: a call without its grant is refused `no_grant`, as on a lamp
+  (`express` needs both `body` and `light`), so test with the grants your
+  program will have.
 
 ## In JavaScript tests (node --test)
 
