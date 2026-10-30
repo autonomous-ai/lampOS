@@ -2643,6 +2643,7 @@ pub fn serve(
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
     let routes_task = net.routes_task();
+    crate::cut_in_told::marking_cut_answers(files.cut_in_told);
     let mut engine = Engine::new(
         Arc::new(net),
         {
@@ -10975,6 +10976,12 @@ pub(super) fn keep_heard(
 /// has its words marked [`SAID_IN_THE_ROOM`], or with none, a note before
 /// the lamp's.
 fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
+    let cut = crate::cut_in_told::cut_here(exchange.cut);
+    messages_marked(exchange, cut)
+}
+
+/// [`messages`], with `cut` told right after the lamp's words when given.
+fn messages_marked(exchange: crate::thread::Recent, cut: Option<&str>) -> Vec<Message> {
     let mut messages = Vec::with_capacity(3);
     if let Some(written) = exchange.written {
         messages.push(Message::system(format!(
@@ -10991,6 +10998,9 @@ fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
         messages.push(Message::system(SAID_IN_THE_ROOM.to_owned()));
     }
     messages.push(Message::assistant(exchange.lamp));
+    // A cut answer kept as heard, marked where it stopped, so "go on" picks
+    // up from there (`LAMP_CUT_IN_TOLD`).
+    messages.extend(cut.map(Message::system));
     messages
 }
 
@@ -18785,6 +18795,7 @@ mod tests {
             person: String::new(),
             lamp: "ORCHID.".into(),
             room: false,
+            cut: false,
         });
         assert_eq!(
             written,
@@ -18800,6 +18811,7 @@ mod tests {
             person: "Hi.".into(),
             lamp: "Hello.".into(),
             room: false,
+            cut: false,
         });
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
     }
@@ -18897,6 +18909,37 @@ mod tests {
         crate::thread::THREAD.lock().unwrap().forget();
         let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true);
         assert!(forgotten.is_empty(), "a forget drops the room's lines too");
+    }
+
+    /// #3997's cut-in proposal: an answer cut while it played and kept as
+    /// heard is followed by where it stopped, so "go on" picks up there.
+    #[test]
+    fn a_cut_answer_is_told_where_it_stopped_and_a_whole_one_is_not() {
+        let story = |cut: bool| crate::thread::Recent {
+            written: None,
+            person: "Tell me a story.".into(),
+            lamp: format!(
+                "The keeper climbed the stairs and{}",
+                crate::said_as_heard::CUT
+            ),
+            room: false,
+            cut,
+        };
+        let here = crate::cut_in_told::CUT_HERE;
+        assert_eq!(
+            messages_marked(story(true), Some(here)),
+            [
+                Message::user("Tell me a story."),
+                Message::assistant(format!(
+                    "The keeper climbed the stairs and{}",
+                    crate::said_as_heard::CUT
+                )),
+                Message::system(here),
+            ]
+        );
+        assert_eq!(messages_marked(story(true), None).len(), 2);
+        // Off by default: the switch sets it as the worker starts.
+        assert_eq!(crate::cut_in_told::cut_here(false), None);
     }
 
     /// The reviewer-lead on #2675: an add-on's quoted line, and the lamp's

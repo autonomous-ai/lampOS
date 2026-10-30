@@ -42,10 +42,13 @@ pub enum Command {
     /// Which function DeepSeek calls first for a question about a reminder
     /// (`lamp-voice probe-reminders`, #4527): counts only, run by hand.
     ProbeReminders,
+    /// What the second route's chat says to a cut-in told its note
+    /// (`lamp-voice probe-cut-in`, #3997): counts only, run by hand.
+    ProbeCutIn,
 }
 
 impl Command {
-    pub const ALL: [Command; 16] = [
+    pub const ALL: [Command; 17] = [
         Command::Serve,
         Command::Directed,
         Command::DirectedFixture,
@@ -62,6 +65,7 @@ impl Command {
         Command::ProbeCache,
         Command::ProbeTools,
         Command::ProbeReminders,
+        Command::ProbeCutIn,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -82,6 +86,7 @@ impl Command {
             Command::ProbeCache => "probe-cache",
             Command::ProbeTools => "probe-tools",
             Command::ProbeReminders => "probe-reminders",
+            Command::ProbeCutIn => "probe-cut-in",
         }
     }
 
