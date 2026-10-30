@@ -3437,4 +3437,32 @@ mod tests {
             Ok(())
         );
     }
+
+    /// docs/install.md names every unit `install` enables, beyond the
+    /// parts in `lampos.target` (its "every part"), so a unit added to
+    /// [`enabled`] is said where a reader of the install looks: the Wi-Fi
+    /// restore, the hotspot's recovery and the camera's socket had gone
+    /// unsaid there.
+    #[test]
+    fn install_md_names_every_unit_install_enables() {
+        let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/install.md");
+        let doc = fs::read_to_string(doc).unwrap();
+        let part = |name: &str| {
+            PRODUCT.iter().any(|(unit, text)| {
+                *unit == name
+                    && text.lines().any(|line| line == "PartOf=lampos.target")
+                    && text
+                        .lines()
+                        .any(|line| line.starts_with("WantedBy=") && line.contains("lampos.target"))
+            })
+        };
+        let unsaid: Vec<String> = enabled()
+            .into_iter()
+            .filter(|name| !part(name) && !doc.contains(&format!("`{name}`")))
+            .collect();
+        assert!(
+            unsaid.is_empty(),
+            "docs/install.md does not name {unsaid:?}"
+        );
+    }
 }
