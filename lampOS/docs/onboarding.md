@@ -71,6 +71,7 @@ unanswered and unkept; tests
 `setup_step` for `preferences` answers the model that it was the last
 question: at most five words, never a question, since the walk says the
 done line (`preferences_reported_tells_the_model_no_more_questions`).
+`setup_step`'s words also hold every answer in `preferences`, the quiet hours' too, and only there (other steps still ask again), to at most five words and no question (#3769: on lamp-52e6 on 30 Oct 13:27 the quiet hours' answer ran to 17 words and the hello came 13.1 s after the line; `every_preferences_answer_is_told_five_words_and_no_question`).
 Privacy, whose availability changes while the voice runs, is still named.
 Never reported, a step is failed after 90 s once the room has been quiet
 for 20 s, and the walk goes on.
