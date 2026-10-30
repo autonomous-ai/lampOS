@@ -30,9 +30,9 @@ Each of these cost someone a run on a real lamp.
   `express` don't. Hold the lease around a sequence of moves, not per move.
 - **The lamp takes the body back** when someone talks to it, touches its
   head, or sets it private. Listen for `lease` events with `state: lost`.
-- **Not every lamp routes every op yet.** A lamp may refuse `joints`,
-  `play` or `sound` with `refused`, "not routed yet: waits for …". Handle it;
-  don't retry.
+- **Not every lamp routes every op yet.** A lamp may refuse `joints` or
+  `play` (and a build from before the hum, `sound`) with `refused`, "not
+  routed yet: waits for …". Handle it; don't retry.
 - **A move must start and end at home** (all five joints 0) and last 1.5 to
   10 s, within each joint's reach and speed. The body's words say which
   frame was wrong.
