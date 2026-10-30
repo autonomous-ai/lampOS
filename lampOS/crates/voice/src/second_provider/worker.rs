@@ -3309,6 +3309,26 @@ pub fn serve(
                 heeding.keeping_the_name_in_its_line();
             }
         }
+        // The name opening a line that repeats the line before's last words
+        // is no call by its text (`LAMP_NAME_REPEAT_NOT_A_CALL=on`, #3923).
+        if std::env::var(crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: the lamp's name opening a line whose words repeat the end of the line just before it is no call by its text (LAMP_NAME_REPEAT_NOT_A_CALL)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.not_calling_on_a_repeat(true);
+            }
+            // Each line's words as soon as they are written, so a line
+            // judged before the one before it still reads that one's.
+            let back = heeding.clone();
+            engine = engine.telling_words_back(Arc::new(move |request, window, words| {
+                if let Ok(mut heeding) = back.lock() {
+                    heeding.attention.words_back(request, window, words);
+                }
+            }));
+        }
         // The conversation's windows measured to when a line began
         // (`LAMP_WINDOW_FROM_START=on`, #4594).
         if std::env::var(crate::second_provider::WINDOW_FROM_START_ENVIRONMENT)
@@ -8448,6 +8468,14 @@ impl Heeding {
         // `LAMP_BUSY_CALLED_STRICT=on`: in a busy room with nobody turned to
         // the lamp, a stand-in or "Lamp is broken, …" is no call in itself.
         attention.narrow_the_call(self.busy_called_strict && busy && signs.turned != Some(true));
+        // `LAMP_NAME_REPEAT_NOT_A_CALL=on`: the name opening words that
+        // repeat the line before's end is no call by its text (#3923).
+        if let Some((words, gap_us)) = attention.call_taken_as_a_repeat() {
+            eprintln!(
+                "lamp-voice second: request {request}: its words open with \"{words}\", the end of the line before it written again (begun {} ms after that line ended): its name there is not taken as a call by its text (LAMP_NAME_REPEAT_NOT_A_CALL)",
+                gap_us / 1_000
+            );
+        }
         // Said to the lamp from close to it, over the line's sound, judged
         // once as the Live worker judges it as the sound ends.
         if let Some((looks, out)) = self.addressed.as_mut()

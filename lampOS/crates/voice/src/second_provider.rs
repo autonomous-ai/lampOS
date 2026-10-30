@@ -536,6 +536,12 @@ pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON"
 /// [`worker::Heeding::keeping_the_name_in_its_line`]).
 pub const NAME_STAYS_ENVIRONMENT: &str = "LAMP_NAME_STAYS_IN_ITS_LINE";
 
+/// Where the worker reads whether the lamp's name opening a line is no call
+/// by its text when the line's opening words repeat the closing words of the
+/// line just before it (`on`, and nothing else;
+/// [`crate::attention::Attention::not_calling_on_a_repeat`], #3923).
+pub const NAME_REPEAT_NOT_A_CALL_ENVIRONMENT: &str = "LAMP_NAME_REPEAT_NOT_A_CALL";
+
 /// Whether the conversation's windows are measured to when a line began, not
 /// to its judging after it ended (`on`, and nothing else;
 /// [`worker::Heeding::measuring_windows_from_start`], #4594).
@@ -828,6 +834,10 @@ pub type Hearing = Arc<dyn Fn(u64, Heard<'_>) + Send + Sync>;
 /// when it was said: from its first sound read to its last, by the lamp's
 /// monotonic clock ([`Engine::telling_lines_heard`]).
 pub type LineHeard = Arc<dyn Fn(u64, (u64, u64)) + Send + Sync>;
+/// Told each spoken line's words as soon as its speech to text has written
+/// them, by its request, with when it was said, before anything waits or
+/// judges it ([`Engine::telling_words_back`]).
+pub type WordsBack = Arc<dyn Fn(u64, (u64, u64), &str) + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -1029,6 +1039,8 @@ struct Shared {
     /// Told each line's span once it ends, words or none
     /// ([`Engine::telling_lines_heard`]).
     line_heard: Option<LineHeard>,
+    /// Told each line's words once written ([`Engine::telling_words_back`]).
+    words_back: Option<WordsBack>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -2607,6 +2619,7 @@ impl Engine {
                 resend: None,
                 hearing: None,
                 line_heard: None,
+                words_back: None,
                 asked: None,
                 cues: None,
                 cue_after: CUE_AFTER,
@@ -3546,6 +3559,18 @@ impl Engine {
     pub fn telling_lines_heard(mut self, heard: LineHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.line_heard = Some(heard);
+        }
+        self
+    }
+
+    /// Each spoken line's words are told to `back` as soon as its speech to
+    /// text has written them, with when it was said, before the line waits
+    /// for anything or is judged (`LAMP_NAME_REPEAT_NOT_A_CALL`, #3923): a
+    /// line's judging can come after the next line's, which then still
+    /// reads the words before it. Before any turn only.
+    pub fn telling_words_back(mut self, back: WordsBack) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.words_back = Some(back);
         }
         self
     }
@@ -5549,6 +5574,12 @@ async fn spoken(
     let text = match finished {
         Ok(text) => {
             reached(&times, |times| &mut times.words);
+            // Its words, told before anything waits or judges it
+            // (`LAMP_NAME_REPEAT_NOT_A_CALL`, #3923).
+            if let Some(back) = &shared.words_back {
+                let window = said.lock().map_or((0, 0), |said| *said);
+                back(request, window, &text);
+            }
             eprintln!(
                 "lamp-voice second: request {request} heard {} words, the last {} ms after the line ended",
                 text.split_whitespace().count(),
