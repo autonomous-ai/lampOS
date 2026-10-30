@@ -138,7 +138,9 @@ impl Said {
             self.held = true;
             line = Some("night face: held, the light is on".to_owned());
         }
-        if !self.shown && share > 0.0 {
+        // Shown only as it fades in: a face still fading out after waking
+        // is the same face going, not a new one shown.
+        if !self.shown && said && allowed && share > 0.0 {
             self.shown = true;
             line = Some(format!(
                 "night face: shown {} ms after asleep",
@@ -329,6 +331,7 @@ mod tests {
         step(true, true, 0.01, 1_525_000);
         step(true, true, 0.5, 2_250_000);
         step(false, true, 0.4, 0);
+        step(false, true, 0.3, 0);
         step(true, false, 0.0, 0);
         step(true, false, 0.0, 0);
         step(true, true, 0.2, 1_600_000);
