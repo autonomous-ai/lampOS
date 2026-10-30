@@ -3261,6 +3261,18 @@ pub fn serve(
                 heeding.keeping_the_name_in_its_line();
             }
         }
+        // The conversation's windows measured to when a line began
+        // (`LAMP_WINDOW_FROM_START=on`, #4594).
+        if std::env::var(crate::second_provider::WINDOW_FROM_START_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: the conversation's windows are measured to when a line began, not to its judging (LAMP_WINDOW_FROM_START)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.measuring_windows_from_start();
+            }
+        }
         // At a desk, a face turned to the lamp is no sign, and a
         // conversation goes on only shortly after its words
         // (`LAMP_NAME_OR_FOLLOW_UP=on`).
@@ -5307,6 +5319,8 @@ pub(crate) struct Heeding {
     /// whose hearing goes on, and where the name at its start is dated from
     /// (`Attention::start_of`, #4226).
     name_stays: bool,
+    /// `LAMP_WINDOW_FROM_START=on` ([`Self::measuring_windows_from_start`]).
+    from_start: bool,
     said_lately: std::collections::VecDeque<(u64, (u64, u64), bool, u64)>,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
@@ -5729,9 +5743,10 @@ pub(crate) const AFTER_THE_LAMPS_WORDS: Duration =
 /// Whether a conversation with the lamp is going on: the thread's, 45 s from
 /// an answer's start ([`crate::thread::GOING_ON_FOR`]); or within
 /// [`AFTER_THE_LAMPS_WORDS`] of the end of the lamp's words (`said_ago`); or
-/// [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). Each is
-/// measured to when the line began, however long it then went on
-/// (`signs_begun`, Migrate's launch finding 2 on #3997). A story told
+/// [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). With
+/// `LAMP_WINDOW_FROM_START=on`, each is measured to when the line began,
+/// however long it then went on (`signs_begun`, Migrate's launch finding
+/// 2 on #3997); off, to its judging. A story told
 /// for 40 s or more outlives the thread's window while it is told: on
 /// lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said as stories
 /// ended ("Hey Lamp, ask Claude Code to write a two-line poem…", "… ask
@@ -6139,6 +6154,7 @@ impl Heeding {
             name_or_follow_up: false,
             faces_held: None,
             name_stays: false,
+            from_start: false,
             said_lately: std::collections::VecDeque::new(),
             spoke: std::collections::VecDeque::new(),
             near: None,
@@ -6463,6 +6479,14 @@ impl Heeding {
     pub(crate) fn keeping_the_name_in_its_line(&mut self) {
         self.name_stays = true;
         self.attention.keep_the_name_in_its_line(true);
+    }
+
+    /// The conversation's windows measured to when a line began, not to its
+    /// judging after it ended (`signs_begun`, #4594): a follow-up begun 9 s
+    /// after the lamp's words and spoken for 13 s goes on
+    /// (`LAMP_WINDOW_FROM_START=on`).
+    pub(crate) fn measuring_windows_from_start(&mut self) {
+        self.from_start = true;
     }
 
     /// With [`Self::needing_name_or_follow_up`], whether the line in hand,
@@ -7983,7 +8007,14 @@ impl Heeding {
         // 13 s was held as no conversation going on (lamp-3e83 on 30 Oct,
         // Jarvis and Migrate's launch finding 2 on #3997). The moment from
         // its end to its judging is left in, so a window ends no later.
-        let ran_for = Duration::from_micros(ended.saturating_sub(onset_us));
+        // Only with `LAMP_WINDOW_FROM_START=on`, until its played check
+        // (Reviewer-two's P2 on #4604); off, measured to the judging as before.
+        let line_ran = Duration::from_micros(ended.saturating_sub(onset_us));
+        let ran_for = if self.from_start {
+            line_ran
+        } else {
+            Duration::ZERO
+        };
         let at_start = |ago: Option<Duration>| ago.map(|ago| ago.saturating_sub(ran_for));
         let said_going_on =
             at_start(said_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
@@ -8168,7 +8199,7 @@ impl Heeding {
                 called_ago,
                 left_alone,
                 thread_or_call,
-                ran_for,
+                line_ran,
             )
         };
         let Some((bus, names)) = &mut self.bus else {
@@ -11846,12 +11877,13 @@ mod tests {
     /// as no conversation going on. The windows are measured to the line's
     /// start: it goes on however long it runs; one begun 21 s after the
     /// words doesn't, however short; and the thread's 45 s from the answer's
-    /// start is read the same way.
+    /// start is read the same way. Only with `LAMP_WINDOW_FROM_START`: off,
+    /// the long follow-up is held as before.
     #[test]
     fn a_long_follow_up_begun_inside_the_window_is_in_the_conversation() {
         let _one = crate::provider_worker::tests::one_thread();
         let s = Duration::from_secs;
-        let judged = |answer_began_s: u64, ended_s: i64, began_s: u64| {
+        let judged = |from_start: bool, answer_began_s: u64, ended_s: i64, began_s: u64| {
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             let mut thread = crate::thread::Thread::new();
             let answered = Instant::now() - s(answer_began_s);
@@ -11860,6 +11892,9 @@ mod tests {
             *crate::thread::THREAD.lock().unwrap() = thread;
             let mut heeding = Heeding::new(false, false, None, None);
             heeding.as_the_only_voice(false, true, false);
+            if from_start {
+                heeding.measuring_windows_from_start();
+            }
             let now_us = monotonic_us();
             let until = now_us.saturating_add_signed(-ended_s * 1_000_000);
             heeding.lamp_did(crate::second_provider::Did::Said(1, until));
@@ -11873,12 +11908,25 @@ mod tests {
         };
         // The answer began 60 s ago, past the thread's 45 s, so only the
         // 20 s after the lamp's words is left.
-        assert_eq!(judged(60, 22, 13), None, "begun 9 s after, 13 s long");
-        assert_eq!(judged(60, 35, 16), None, "begun 19 s after, 16 s long");
-        assert!(judged(60, 22, 1).is_some(), "begun 21 s after, 1 s long");
+        assert_eq!(judged(true, 60, 22, 13), None, "begun 9 s after, 13 s long");
+        assert_eq!(
+            judged(true, 60, 35, 16),
+            None,
+            "begun 19 s after, 16 s long"
+        );
+        assert!(
+            judged(true, 60, 22, 1).is_some(),
+            "begun 21 s after, 1 s long"
+        );
         // The thread's own window: the answer began 50 s ago, the line 40 s
         // into it, and its words (no end known) 50 s ago.
-        assert_eq!(judged(50, 50, 10), None, "begun 40 s into the thread");
+        assert_eq!(judged(true, 50, 50, 10), None, "begun 40 s into the thread");
+        // Off: measured to the judging, as before.
+        assert!(judged(false, 60, 22, 13).is_some(), "off, begun 9 s after");
+        assert!(
+            judged(false, 50, 50, 10).is_some(),
+            "off, 40 s into the thread"
+        );
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     }
 
