@@ -1829,6 +1829,9 @@ unanswered would leave the hello to its rule.
 rules as built are the policy, so on the product and on lamp-4ace the hello
 is decided by the hard rules alone: someone talking, twenty minutes since
 the last hello, one an hour to each person, and kept rules with `--rules`.
+The product units pass it. lamp-4ace's unit does not yet: its pinned
+lamp-policy predates the option, and lamp-policy exits on an unknown
+option, so it comes with the change that pins a build with #4625 there.
 With the switch:
 
 - **A pass is `say_now` at once**, by the rule: `by` `rule`, probability
