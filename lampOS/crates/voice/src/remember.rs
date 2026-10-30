@@ -3843,6 +3843,65 @@ pub fn face_saved(request: u64, to: &str) {
     }
 }
 
+/// What is kept of the name a face was saved under at onboarding
+/// ([`keep_name_with_face`]): a kept thing of that person's own, so a
+/// person-scoped "what's my name?" finds it past the conversation's window.
+/// None for a name with nothing to keep.
+pub fn name_with_face(name: &str) -> Option<ToolCall> {
+    let name = name.trim();
+    (name.chars().any(char::is_alphanumeric) && name.len() <= 64).then(|| ToolCall {
+        id: "onboarding-name-with-face".to_owned(),
+        name: REMEMBER.to_owned(),
+        args: json!({"text": format!("Their name is {name}.")}),
+    })
+}
+
+/// The memory ids [`keep_name_with_face`] kept a name for in this run, so a
+/// face saved twice in one "who you are" (a tester's 7071 lamp, 27 Oct)
+/// keeps it once.
+static NAMES_KEPT: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The name a face was saved under while "who you are" was not yet done
+/// (`onboarding::who_you_are_open`), kept as a thing of that person's own,
+/// in their scope (`known_faces::memory_person`), as a "remember my name"
+/// would keep it (the onboarding forgets report, 30 Oct: the walk kept no
+/// name, so once its exchange left the window a recognised owner had no
+/// source for it). On a thread of its own, never on a turn's path; only on
+/// the Days memory. Forgotten as any kept thing of theirs: a forget of it,
+/// their "forget everything", their face's forget with
+/// `LAMP_MEMORY_FORGET_ALL`. Only their own scope reads it: a voice in the
+/// room's scope or another person's never recalls it.
+pub fn keep_name_with_face(name: &str) {
+    let Some(call) = name_with_face(name) else {
+        return;
+    };
+    let Some(client) = DAYS.get().and_then(Option::as_ref) else {
+        return;
+    };
+    let person = crate::known_faces::memory_person(name.trim());
+    {
+        let Ok(mut kept) = NAMES_KEPT.lock() else {
+            return;
+        };
+        if kept.contains(&person) {
+            return;
+        }
+        kept.push(person.clone());
+    }
+    let socket = client.socket.clone();
+    std::thread::spawn(move || {
+        let (told, _) = run_for(&socket, &call, WRITER_DEADLINE, Some(&person));
+        let kept = told["remembered"] == true;
+        eprintln!(
+            "lamp-voice provider: the name a face was saved under at onboarding {} in their own memory",
+            if kept { "is kept" } else { "could not be kept" }
+        );
+        if !kept && let Ok(mut names) = NAMES_KEPT.lock() {
+            names.retain(|id| *id != person);
+        }
+    });
+}
+
 /// The same keep/forget exclusion for both journal backends. Scope is carried
 /// by each exchange; completion-time face observations never remap it.
 fn journalable(done: Vec<FinishedExchange>) -> impl Iterator<Item = FinishedExchange> {

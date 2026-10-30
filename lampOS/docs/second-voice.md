@@ -3951,7 +3951,25 @@ after a take-over, but now for every turn:
   name is never taken for the owner (the eyes' ids can't tell the two apart:
   a forgotten name gets the same id back); a whole redo or a reset drops it
   too. Names match as the eyes match them, in any case. The name kept is the one the eyes
-  kept (`remembered`). On lamp-29e7 (8474, 29 Oct) the owner, set up by voice,
+  kept (`remembered`). With a typed name too, the owner is kept as well, and
+  a face the eyes know under either name is the owner's, matched by memory
+  person id (`person::by_default_owner`, `known_faces::memory_person`); the
+  reply is told the typed name. An app user who typed "Minh Nguyen" and said
+  "Minh" at "What should I call you?" had their face kept under "Minh", so
+  every turn the eyes knew them read as "a known face that isn't theirs" and
+  the name was held back and taken out of the lamp's lines on each one (the
+  onboarding forgets report, 30 Oct). A different known person, two faces,
+  an unknown face or another voice still holds it back, with one exception:
+  a line carried as the owner's conversation going on
+  (`LAMP_CONVERSATION_CARRIES`, `ScopeLease::carried_for`: no face seen
+  speaking it, no face but theirs in any look through it, their face in
+  view through it or within 5 s before it began, `CARRY_UNSEEN_WITHIN`, and
+  their own last exchange within 45 s) keeps the name through one face the eyes don't
+  name just now, a recognition slip (a missed check, a track found again).
+  Two faces, another voice or a known face that isn't theirs still holds
+  it back on a carried line, and a line not carried, or carried for
+  someone else, is as before. The reply only, as the carry: nothing is kept,
+  recalled or forgotten on it. On lamp-29e7 (8474, 29 Oct) the owner, set up by voice,
   asked who they were and was told the lamp remembered no name: no name
   source reached the reply (#4118). While someone else may be speaking, the
 name is also taken out of the lamp's own earlier lines the reply is given

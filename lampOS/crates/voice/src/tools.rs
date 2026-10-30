@@ -1529,6 +1529,28 @@ fn spoken_scope_current(
         })
 }
 
+/// The name a `remember_my_face` that saved a face keeps in that person's
+/// own memory: only while the onboarding walk at `onboarding` has not yet
+/// ended "who you are" ([`crate::onboarding::who_you_are_open`]); once it
+/// has (done, skipped, failed, later), or with no walk, none, so a later
+/// save by anyone keeps no "Their name is X." (the Reviewer-lead's P3 on
+/// #4530). The name the eyes kept, else the one asked.
+fn name_kept_with_face<'a>(
+    call: &'a ToolCall,
+    told: &'a Value,
+    onboarding: Option<&Path>,
+) -> Option<&'a str> {
+    (call.name == crate::known_faces::REMEMBER
+        && told["ok"] == true
+        && onboarding.is_some_and(crate::onboarding::who_you_are_open))
+    .then(|| {
+        told["remembered"]
+            .as_str()
+            .or_else(|| call.args.get("name").and_then(Value::as_str))
+    })
+    .flatten()
+}
+
 fn run_call_with_scope(
     route: &Route,
     call: &ToolCall,
@@ -1722,6 +1744,13 @@ fn run_call_with_scope(
                 && let Some(lease) = lease
             {
                 lease.face_remembered();
+            }
+            // A face saved while the walk leads "who you are" to its end:
+            // the name it was saved under is kept in that person's own
+            // memory, off this call's path (`remember::keep_name_with_face`,
+            // the onboarding forgets report). Read before the mailbox below.
+            if let Some(name) = name_kept_with_face(call, &told.0, onboarding.as_deref()) {
+                crate::remember::keep_name_with_face(name);
             }
             // A face saved while the walk leads "who you are" ends that step
             // (#3740), through the mailbox `setup_step` writes; one saved
@@ -5115,5 +5144,51 @@ mod tests {
         let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
         let asked = forget("unknown", cache, Box::new(|| {}));
         assert!(asked.get("person").is_none(), "{asked}");
+    }
+
+    /// The Reviewer-lead's P3 on #4530: a face saved while the walk leads
+    /// "who you are" keeps its name in that person's memory; after the walk
+    /// is past that step (done, skipped, failed, later, the file kept), or
+    /// with no walk, a `remember_my_face` by anyone keeps no name.
+    #[test]
+    fn a_face_saved_keeps_its_name_only_while_who_you_are_is_running() {
+        let dir = std::env::temp_dir().join(format!("lamp-name-kept-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("progress.json");
+        let call = ToolCall {
+            id: "face".into(),
+            name: crate::known_faces::REMEMBER.into(),
+            args: json!({"name": "Sam"}),
+        };
+        let saved = json!({"ok": true, "remembered": "Sam"});
+        let walk =
+            |steps: Value| std::fs::write(&file, json!({"steps": steps}).to_string()).unwrap();
+        walk(json!({"where_you_sit": {"outcome": "done", "at_unix_s": 1}}));
+        assert_eq!(
+            name_kept_with_face(&call, &saved, Some(&file)),
+            Some("Sam"),
+            "during the walk"
+        );
+        assert_eq!(
+            name_kept_with_face(&call, &json!({"ok": true}), Some(&file)),
+            Some("Sam"),
+            "the name asked when the eyes name none"
+        );
+        assert_eq!(
+            name_kept_with_face(&call, &json!({"ok": false}), Some(&file)),
+            None,
+            "a refused save"
+        );
+        assert_eq!(name_kept_with_face(&call, &saved, None), None, "no walk");
+        for outcome in ["done", "skipped", "failed", "later"] {
+            walk(json!({"who_you_are": {"outcome": outcome, "at_unix_s": 2}}));
+            assert_eq!(
+                name_kept_with_face(&call, &saved, Some(&file)),
+                None,
+                "{outcome}"
+            );
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

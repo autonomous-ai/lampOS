@@ -12,8 +12,8 @@ use lamp_memory::{
     tidy::{Category, Proposal},
 };
 use lamp_voice::remember::{
-    Carry, DaysClient, FORGET, FORGET_EVERYTHING, RECALL, REMEMBER, named_forget_with,
-    switch_forget_all, tools_with,
+    Carry, DaysClient, FORGET, FORGET_EVERYTHING, RECALL, REMEMBER, name_with_face,
+    named_forget_with, person_id, switch_forget_all, tools_with,
 };
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
@@ -246,6 +246,69 @@ fn forget_everything_removes_all_of_someone_known_and_never_the_room_s() {
     // Nothing left of theirs: said so, not as a failure.
     let (told, ok) = run(FORGET_EVERYTHING, json!({}));
     assert!(ok && told["forgotten"] == false, "{told}");
+}
+
+/// The onboarding forgets report (30 Oct), fix C: the name a face was saved
+/// under at onboarding (`remember::keep_name_with_face`) is a kept thing of
+/// that person's own. Their recall finds it; the room's and another
+/// person's never do; their forget of it, and their "forget everything",
+/// remove it. Made-up names.
+#[test]
+fn the_name_kept_with_an_onboarding_face_is_theirs_alone_and_forgotten_as_any() {
+    assert!(switch_forget_all(true));
+    assert!(name_with_face("  ").is_none());
+    assert!(name_with_face(&"x".repeat(65)).is_none());
+    let fixture = Fixture::new(|_, _| {}, None);
+    let client = fixture.client();
+    let robin = person_id("Robin");
+    let guest = person_id("Sam Example");
+    let keep = name_with_face(" Robin ").unwrap();
+    assert_eq!(keep.name, REMEMBER);
+    assert_eq!(keep.args["text"], "Their name is Robin.");
+    let kept = || {
+        let (told, ok) = client.run_for(&keep, BUDGET, Some(&robin));
+        assert!(ok && told["remembered"] == true, "{told}");
+    };
+    let recall = |person: Option<&str>| {
+        let (told, ok) = client.run_for(&call(RECALL, json!({"about":"name"})), BUDGET, person);
+        assert!(ok, "{told}");
+        told
+    };
+    kept();
+    let theirs = recall(Some(&robin));
+    assert!(
+        theirs.to_string().contains("Their name is Robin"),
+        "{theirs}"
+    );
+    for other in [None, Some(guest.as_str())] {
+        let told = recall(other);
+        assert!(!told.to_string().contains("Robin"), "{other:?}: {told}");
+    }
+    // Their forget of it, by what recall gave.
+    let id = recall(Some(&robin))["found"][0]["source_id"]
+        .as_u64()
+        .expect("recall gives its id");
+    let (told, ok) = client.run_for(
+        &call(FORGET, json!({"source_id": id})),
+        BUDGET,
+        Some(&robin),
+    );
+    assert!(ok && told["forgotten"] == true, "{told}");
+    assert!(
+        !recall(Some(&robin))
+            .to_string()
+            .contains("Their name is Robin")
+    );
+    // Kept again, and their "forget everything".
+    kept();
+    let (told, ok) = client.run_for(&call(FORGET_EVERYTHING, json!({})), BUDGET, Some(&robin));
+    assert!(ok && told["forgotten"] == true, "{told}");
+    assert!(
+        !recall(Some(&robin))
+            .to_string()
+            .contains("Their name is Robin")
+    );
+    assert_eq!(fixture.count("entries"), 0);
 }
 
 /// #1693: something remembered goes with the conversation it came up in.
