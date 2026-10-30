@@ -1,0 +1,23 @@
+# The same sharp rise at 03:00, with the privacy switch read open: the voice
+# says `physical_muted = false` on `voice/privacy`, its 50 ms lease, every
+# 40 ms from 340 s to 380 s. It speaks
+# once, at 360 s, with its light and its lift, as with no switch at all.
+clock = "03:00"
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

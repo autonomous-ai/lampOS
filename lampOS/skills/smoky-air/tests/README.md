@@ -11,6 +11,9 @@ reading has every PM null), and `voice/state` resting from the start. The
 script is a scratch tool, not kept in the repository. Each `expect.toml`
 says what its case holds, and sets the local time of its first message
 (`clock`).
+The two privacy cases add `voice/privacy`, the voice's 50 ms lease, every
+40 ms from 340 to 380 s around the chance at 360 s, not its 10 ms for the
+whole case: the rest of the time the topic is unknown or run out.
 
 **Run** with `lamp-skills test lampOS/skills/smoky-air` (or `cargo test -p
 lamp-skills`, which runs every skill's cases).
@@ -19,6 +22,8 @@ lamp-skills`, which runs every skill's cases).
 |---|---|---|
 | `fires-once-on-a-sharp-rise` | 80, then up to 400 in 90 s (300 to 390 s), held to 900 s, back to 80 | Pass: `curious`, the amber breath and the line, exactly, once at 360 s (the rise and the level hold from 330 s, then 30 s) |
 | `speaks-at-night-too` | The same at 03:00 | Pass: once at 360 s: no quiet hours |
+| `speaks-at-night-with-the-switch-open` | The same at 03:00, `voice/privacy` saying `physical_muted: false` from 340 to 380 s | Pass: once at 360 s, with the light and the lift |
+| `never-while-the-privacy-switch-is-closed` | The same at 03:00, `voice/privacy` saying `physical_muted: true` from 340 to 380 s | Pass: nothing, no line, light or lift (#3997's rule for a `warning`) |
 | `never-on-a-slow-cooking-rise` | 80 up to 300 over 30 minutes, then 300 for 10 | Pass: nothing (about 22 in any 3 minutes) |
 | `never-on-a-short-puff` | Puffs to 300 for 15 s and to 320 for 25 s | Pass: nothing (neither held 30 s) |
 | `never-on-noise-or-haze` | An hour of 100 ± 25, with 10 minutes of 130 and 170 by turns | Pass: nothing |
@@ -33,7 +38,9 @@ lamp-skills`, which runs every skill's cases).
 
 Changed by hand, the cases catch each number: a 10-minute cooldown, a
 rearm of 4 or 12 minutes, a hold of 10 s, a rise of 30, a window of 6
-minutes or a level of 400 each fails one of them.
+minutes or a level of 400 each fails one of them; so do the privacy
+condition read the other way (`not_equals = false`) and its `unknown =
+"holds"` left out (every case with no switch then silent).
 
 **The four placeholders** are to be replaced by the real recording (#1684,
 §6; the first builder, 12:56: "Record real traces: a kettle beside the

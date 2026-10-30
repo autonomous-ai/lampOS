@@ -25,7 +25,8 @@ never said over someone speaking.
 
 It has no quiet hours, but it is not for the night: a desk lamp's voice
 won't reliably wake a sleeper, and a lamp asleep (a hand held on its head,
-or muted) says nothing at all.
+or muted) says nothing at all. With the privacy switch closed it does
+nothing at all: no line, no light, no lift.
 
 It can't tell burnt toast from a frying pan or anything else that smokes.
 It can't sense carbon monoxide or a gas leak, which have no particles. It

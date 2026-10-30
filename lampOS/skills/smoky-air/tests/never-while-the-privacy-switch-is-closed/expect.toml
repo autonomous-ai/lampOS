@@ -1,0 +1,9 @@
+# The same sharp rise at 03:00, with the privacy switch closed: the voice
+# says `physical_muted = true` on `voice/privacy`, its 50 ms lease, every
+# 40 ms from 340 s to 380 s. A warning
+# is never given while the switch has the lamp muted for a person (the first
+# builder's rule for `warning`, #3997): no line, no light and no lift. The
+# chance is spent, as one held back by a condition; this case ends before
+# the air has been under 150 for 10 minutes.
+clock = "03:00"
+none = true

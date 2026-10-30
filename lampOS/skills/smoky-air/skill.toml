@@ -11,11 +11,12 @@ needs = ["air", "voice", "body", "light"]
 kind = "core"
 version = "1.0.0"
 
-# What it may read and use, and nothing more: the air, one line, one lift and
-# one breath of light. No `voice/state`: it waits for a pause, which the say
-# service's own gates give (priority 8), not for the end of a talk.
+# What it may read and use, and nothing more: the air, the privacy switch,
+# one line, one lift and one breath of light. No `voice/state`: it waits for
+# a pause, which the say service's own gates give (priority 8), not for the
+# end of a talk.
 [permissions]
-topics = ["air/state"]
+topics = ["air/state", "voice/privacy"]
 speak = true
 light = true
 body = true
@@ -30,9 +31,23 @@ gap = "10s"                             # one missed reading (every 5 s) does no
 rearm = { below = 150, for = "10m" }    # once a spell; again only after 10 minutes under 150
 cooldown = "30m"
 # No [quiet]: smoke at night matters most (the first builder's decision,
-# #1684 12:56). It speaks once at its normal volume and does not wake a
-# sleeping lamp: the say service is not there while the voice is muted
-# (docs/skills.md, "A say's priority, the voice's turns, and sleep").
+# #1684 12:56, and the rule for a `warning`, #3997: "said by the rule alone,
+# even in quiet hours"). It speaks once a spell (the rearm and the cooldown
+# above), at the voice's volume: a say has no softer voice of its own yet.
+# It does not wake a sleeping lamp: the say service refuses every say while
+# the voice is muted (docs/skills.md, "A say's priority, the voice's turns,
+# and sleep").
+
+# Never while the privacy switch has the lamp muted for a person (#3997's
+# rule): no line, no light and no lift, and the chance is spent. The voice's
+# own lease says the switch (`physical_muted`, docs/privacy-switch.md); a
+# lamp whose voice does not say it (the privacy route off) has no switch to
+# close, so it holds until the topic says something.
+[[while]]
+topic = "voice/privacy"
+field = "physical_muted"
+not_equals = true
+unknown = "holds"
 
 [ask]
 # The design's own act (§4). The Policy has no `warning` yet, so with

@@ -174,7 +174,16 @@ Their words never say fire, alarm or smoke alarm: Smoky air's line is
 "The air reads like smoke. If something's burning, please check it.", and
 Dusty air's "The air here has been very dusty for about an hour. I can't
 tell where it's coming from." Neither has a `[stop]`, so a passing "stop"
-said to the lamp cannot snooze them (#1837's P3). Their numbers are
+said to the lamp cannot snooze them (#1837's P3). Smoky air is a
+`warning` (#3997's rule: said by the rule alone, even in quiet hours, once,
+softly at night, with the light, never while the privacy switch has the
+lamp muted for a person). Its `[[while]]` on `voice/privacy` keeps it
+wholly silent, no line, light or lift, while the switch is closed. Two parts
+of the rule are not in the skill yet: a say has no softer voice at night
+(the voice speaks it at its volume, under Bedtime's night ceiling when that
+is on), and its amber breath is given back as the line ends and lies under
+the Speaking face while the voice speaks unless
+`LAMP_SKILL_LIGHT_SPEAKING=on`. Their numbers are
 provisional: four of Smoky air's cases (kettle steam, toast, a candle blown
 out, a match) are placeholders, to be replaced by the real recording
 (#1684), and the numbers are set again from those traces.
