@@ -1,3 +1,15 @@
+## 30 October 2026, 14:14 +07: Harness in the round can't write past lamp-update's sandbox
+
+**#4503 (Eighth, Harness turned on by a build), HOLD with one P2:**
+- **The problem:** the round fetches and links Harness inside `lamp-update.service`, which is `ProtectSystem=strict`. Its `ReadWritePaths` don't include `/var/lib/lampos-tasks`, `/usr/local/bin` or `/var/lib/systemd/linger`. So on a lamp every fetch fails, and the build switches without Harness. The fakes can't show this.
+- **Why it can't be widened over the air:** no round rewrites lamp-update's own unit (#3689's 2c is held past the first lamps).
+- **Suggested:** a one-shot unit of its own, as `lamp-update-apply.service` writes `/etc`.
+- **What's right:** older updaters are kept safe by `min_updater` 9 and by the journal field that's skipped when false.
+
+**#4539:** #4533's two P3s. FORGET is killed after 10 s (`wifi::within`), so a stuck journald never holds back the start. What failed is said once, after the vacuum, so the evidence survives it. A test checks the bound.
+
+**Also:** READ-OK restated on #4524 by range-diff.
+
 ## 30 October 2026, 14:05 +07: a pinhole reset that never reboots the board
 
 **Why (#4500):** on lamp-cb94 a pinhole reset ran to "The system will reboot now!", and the board never came back. The A733 hangs in its boot firmware on a warm reset, one time in three that day. A customer would have had a dark lamp, with no ring and no hotspot. The first builder chose approach (1): don't reboot.
