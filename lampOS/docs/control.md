@@ -87,6 +87,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `button` | `press` (`press`, `long_press`) | `controls/gesture` | none |
 | `time` | the client's own schedule | the lamp's clock and zone | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
+| `body.state` | `joints`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow`, each `deg`, `counts`, `goal_deg`, `load`, `moving`, `temp_c`; `lamp`: `light`, `talking`, `private` ("Where the body is") | `body/joint_states`, the body's `diagnostics`, the light and the voice | `body` (proposed: a read-only `body_state`, Queue #3997) |
 | `air.changed` | `pm1_0`, `pm2_5`, `pm4_0`, `pm10` (µg/m³), `co2_ppm`, `humidity` (%), `temperature` (°C at the sensor, inside the base), each to a tenth (carbon dioxide whole) and left out while the sensor doesn't know it; `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`) | `air/state`, every 5 s. Told on the first reading, then when a value moves by its step (particles 5, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C, `watch::AIR_STEPS`), comes or goes, or `feel` changes; at most every 5 s, the newest held back until then | `air` |
 | `volume.changed` | `level` (0–100 of what the lamp allows), `muted` | `speaker/volume`, which lamp-actions says after each change: the person's by voice or in the app, or a computer's | `speak` |
 
@@ -212,9 +213,10 @@ leaves `shows` at its last draw, though `light/drawn` itself lapses in 3 s),
 mood
 (`mood/state`'s energy, warmth, awake, asleep), and `lamp_state`.
 
-**Never through this door:** camera frames, audio, transcripts, face prints
-or names. A later grant for any of them would be its own decision, with its
-own consent screen.
+**Never through this door:** transcripts, face prints or names. The
+camera's pictures go only with the `camera` grant ("The camera"), and the
+microphone's sound only with the `microphone` grant, not routed yet; each
+has its own line on the consent screen.
 
 ## The doors, and when
 
@@ -453,6 +455,38 @@ One physical bound stays, enforced by the ring itself (`ring_face::Face`): **at 
 - **A small change,** one pixel's blink, or a fade that only goes one way, is drawn at once.
 
 **For animations,** each `light` replaces the last under the same claim, so a computer can send a frame at a time. `ring.play` (frames played by the ring's own worker) and `ring.stream` (binary frames under a `light` lease, up to the ring's resting refresh of 40 a second) come next.
+
+### Where the body is
+
+`body.state` says where each joint is, from the body's own reads, so that
+a computer can draw the lamp as it stands (a digital twin). It goes out with
+each `body/joint_states` message, at most 25 a second (`body_state::EVERY_US`).
+The body says its joints every fourth step of its 20 ms loop, so that is 12.5
+a second today. The voice's `body_motion` and the eyes' `full_look` judge a
+moving joint by that 80 ms, so it stays as it is, and a page drawing the lamp
+eases between two messages.
+
+`load` and `moving` also show a hand on the lamp: a computer with the `body`
+grant, and no lease, sees when someone pushes or turns the arm, a few times
+a second. The pairing screen says the grant moves the body, not that it
+sees the lamp handled; a read-only `body_state` grant is proposed on Queue
+#3997 and would settle it.
+
+```json
+{"ev":"body.state","at":"2026-10-30T15:40:00+07:00","joints":{"yaw":{"deg":-25.8,"counts":1722,"goal_deg":-22.9,"load":0.1,"moving":true,"temp_c":41},"pitch":{"deg":17.2,"counts":2244,"goal_deg":17.2,"load":0.06,"moving":false,"temp_c":44}},"lamp":{"light":{"on":true,"colour":"warm","level":3},"talking":false,"private":false}}
+```
+
+- **Each joint**, under the `joints` op's names, holds these fields:
+  - `deg`: degrees from its home, to a tenth, as `get` `body` counts them (`body_info::from_home`, "The body's limits"): from the found home for the head and base and the folded pose for the arm, `pitch` positive looking up. `null` until the body has said its limits (`body/limits`).
+  - `counts`: the servo's encoder counts, 4,096 a turn, 2,048 its middle.
+  - `goal_deg`: where it was last asked to be, in the same degrees.
+  - `load`: the share of its servo's strength, 0 to 1, without a direction.
+  - `moving`: turning at 5° a second or more (`MOVING_DEG_S`), since a held servo's reading wanders a count or two.
+  - `temp_c`: from the body's once-a-second report, where each joint's `temperature_<joint>` follows its other facts. It is absent until the first report, and again once no report has said it for 5 s (`body_state::TEMPERATURE_KEPT_US`), so an old one never passes for now.
+- **A slow computer:** each connection holds only its newest `body.state` not yet sent, apart from its other events; a newer one takes its place, so a computer that reads slowly gets fewer, never a growing queue, and may get one after an event that came later.
+- **The lamp beside them:** the light it shows now (`light/drawn`, or `light/state` before that), whether it talks, and whether it is private.
+- **The model:** [lamp.model.json](lamp.model.json) is the lamp's kinematic model, written from the rigged CAD (`robots/lamp/hardware/cad/glb/lamp.glb`) by the JS SDK's `tools/lamp-model.js` and shipped in both SDKs as `model`. It holds the chain from the base out, each joint's bone, origin, axis and reach. Each joint's `zero_deg` and `sign` (its `deg` here, from its home, at the CAD's rest pose) are the CAD's until measured on a lamp. The JS SDK's `examples/twin/` draws the lamp with it, live.
+- **The cost:** each `body/joint_states` message, and every part's once-a-second `diagnostics`, now reaches lamp-control's watch. Twelve and a half messages a second is an eighth of the `voice/privacy` hundred that once cost 1% of a core on lamp-75c9; the cost on a lamp is to be measured.
 
 ### Leases
 
@@ -785,7 +819,8 @@ connections at once.
 
 `lamp-control` writes one journal line for every command and its answer,
 every lease the lamp takes back, suspends or holds again, and every event it
-sends (`crates/control/src/journal.rs`).
+sends but `body.state`, which at 12.5 a second would spend a computer's lines
+a second on itself (`crates/control/src/journal.rs`).
 
 **Command lines.** Each says:
 - the computer: its id and, when plain (letters, digits, `_` and `-`, 32

@@ -20,7 +20,10 @@
 
 use serde_json::{Value, json};
 
-use crate::protocol::{EventKind, LeaseWhy, Part};
+use crate::{
+    body_state::BodyState,
+    protocol::{EventKind, LeaseWhy, Part},
+};
 
 /// A face counts as arrived after none for this long.
 pub const ABSENT_FOR_US: u64 = 3_000_000;
@@ -230,6 +233,8 @@ pub struct Watch {
     /// The newest reading of the lamp's own computer (`board/state`), and
     /// when it was heard.
     device: Option<(Value, u64)>,
+    /// Where the body is, for `body.state`.
+    body: BodyState,
 }
 
 impl Watch {
@@ -273,10 +278,6 @@ impl Watch {
             "humans/faces/tracked" => self.faces(payload, now_us),
             "body/limits" => {
                 self.body_limits = Some((payload.clone(), now_us));
-                Vec::new()
-            }
-            "body/joint_states" => {
-                self.body_joints = Some((payload.clone(), now_us));
                 Vec::new()
             }
             "humans/hands/tracked" => match Hand::of(payload) {
@@ -343,6 +344,26 @@ impl Watch {
                     }
                     _ => Vec::new(),
                 }
+            }
+            // Kept for `get` `body`, and told as `body.state`, in degrees
+            // from the homes of the body's last limits.
+            "body/joint_states" => {
+                self.body_joints = Some((payload.clone(), now_us));
+                let lamp = json!({
+                    "light": self.shows.clone().unwrap_or_else(|| self.light.clone()),
+                    "talking": self.talking,
+                    "private": self.private,
+                });
+                let limits = self.body_limits.as_ref().map(|(limits, _)| limits);
+                self.body
+                    .joints(payload, limits.unwrap_or(&Value::Null), lamp, now_us)
+                    .map(|state| Out::Event(EventKind::BodyState, state))
+                    .into_iter()
+                    .collect()
+            }
+            "diagnostics" => {
+                self.body.report(payload, now_us);
+                Vec::new()
             }
             "body/hand" if payload["pushed"] == true => {
                 vec![Out::Lose(Some(Part::Body), LeaseWhy::Hand)]
