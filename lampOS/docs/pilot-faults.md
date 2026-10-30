@@ -391,7 +391,30 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   Ready is read ~100 ms after its start, then ~200 ms to the first look and
   ~100 ms in its gate, keeps its lease with the authority at Ready and
   lapses without it; each refused renewal names itself. A fixture worker,
-  not tried on a lamp.
+  not tried on a lamp. Then 1 cold boot of 6 on lamp-06c1 with both in
+  still ended: one pass of the wait took 890.8 ms at 15.28 s, with 5 major
+  faults, 6 blocked processes and 1250 dirty pages on the board, and the
+  privacy worker ended on `authority snapshot has expired`, exit 1: the
+  wait's Denied authority had lapsed in the worker's queue, and installing
+  it was fatal. The worker now rides a lapse of a lease that grants
+  nothing (`DeniedLapse` in `privacy_bus.rs`): an expired snapshot with the
+  microphones and the camera Denied and no turn is skipped, the worker
+  publishes nothing meanwhile, and the next fresh authority re-arms it, said
+  once as `lamp-voice: privacy worker re-armed its denied lease after <N>
+  ms lapsed (microphones and camera stayed closed)`. The coordinator is
+  unchanged: it never refuses a snapshot of its own, and after such a stall
+  its own stale readings already end that wait as unreadable, read again
+  after 1 s with a fresh worker, which the worker's clean stop now allows.
+  A lapse of a lease that grants anything, a Denied lapse past 1.5 s from
+  its expiry, no authority within 250 ms of the start, the publisher gone
+  and a worker that ended abnormally all end as before. Unit tests: a
+  Denied lease lapsed by a 900 ms stall is ridden with nothing granted and
+  re-armed with one line; the 06c1 queue (an expired Denied authority) is
+  skipped and an expired granting one still ends with "authority snapshot
+  has expired"; granting, Unknown, past-the-bound and no-authority lapses
+  still end; a worker dead in the wait still ends the voice. Two Linux
+  tests of the real worker (a 900 ms Denied lapse ridden, a granting lapse
+  ends) run on the ARM64 gate only. Not yet tried on a lamp.
 - **A worker's first control message older than 100 ms.** A worker sends its
   first control message as soon as its peer is there; at start the
   coordinator may read it only after starting its other workers. lamp-4ace
