@@ -13,8 +13,10 @@ the video face) comes before the skill leaves `PRODUCT_SKILLS_OFF`;
 re-recording a case there, with its owner's yes, replaces the written one.
 
 A relative light's case names its `for` and, with a breath, its
-`breathe_ms`; the level and colour it becomes are made against the light
-shown as the run begins, which a replay has none of. That the ring keeps it
+`breathe_ms`, and Glad's and Lively's their `warm_at_dimmest` (#3691); the
+level and colour it becomes are made against the light shown as the run
+begins, which a replay has none of. The warmth alone at level 1 is `glow`'s
+unit tests in `crates/skills`. That the ring keeps it
 under the night's caps is `ring_caps`' host test in `crates/voice`.
 
 A case names a move only (`body.move`); its frames are held to the body's

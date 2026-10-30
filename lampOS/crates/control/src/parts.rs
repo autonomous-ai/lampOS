@@ -18,8 +18,9 @@
 //!   `done` event: spoken, dropped, expired or refused, with why.
 //! - `express` → the `feelings` skill's own move for it, sent whole on the
 //!   mood socket as `move` is, and its light as `light` is
-//!   (`crate::feelings`). With no light to show (off, not known or at its
-//!   dimmest) the move goes alone, and the answer says why.
+//!   (`crate::feelings`). With no light to show (off, not known, or at its
+//!   dimmest with no warmth to add) the move goes alone, and the answer says
+//!   why.
 //!
 //! The priority is this part's, never the caller's: a client cannot claim
 //! more than `skill`. With the parts' own caller check (#3720, Ten's caps)

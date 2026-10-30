@@ -11,4 +11,4 @@ args = { move = "perk" }
 at = "40s"
 within = "1s"
 call = "light"
-args = { relative = { warmer = 1, dimmer = 1 }, for = "8s", breathe_ms = 4000 }
+args = { relative = { warmer = 1, dimmer = 1, warm_at_dimmest = true }, for = "8s", breathe_ms = 4000 }

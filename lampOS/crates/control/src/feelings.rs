@@ -21,6 +21,10 @@ pub struct Feeling {
     pub lasting_ms: u32,
     /// Its light's breath, if it breathes.
     breathe_ms: Option<u32>,
+    /// At the person's dimmest level, the warmth alone while the colour
+    /// can still warm (the skill's `warm_at_dimmest`, #3691: Glad and
+    /// Lively, not Low).
+    warm_at_dimmest: bool,
     /// Its smallest step of [`STEPS`]: `low` goes no smaller than three
     /// quarters, so its lift back keeps the lead a head needs to come up
     /// (jarvis's P3 on #4020: 06c1's pitch lifted only once its goal led
@@ -35,6 +39,7 @@ pub const FEELINGS: [Feeling; 3] = [
         move_file: include_str!("../../../skills/feelings/moves/glad-lift.json"),
         lasting_ms: 12_000,
         breathe_ms: Some(6_000),
+        warm_at_dimmest: true,
         least_step: 1,
     },
     Feeling {
@@ -42,6 +47,7 @@ pub const FEELINGS: [Feeling; 3] = [
         move_file: include_str!("../../../skills/feelings/moves/perk.json"),
         lasting_ms: 8_000,
         breathe_ms: Some(4_000),
+        warm_at_dimmest: true,
         least_step: 1,
     },
     Feeling {
@@ -49,6 +55,7 @@ pub const FEELINGS: [Feeling; 3] = [
         move_file: include_str!("../../../skills/feelings/moves/low-droop.json"),
         lasting_ms: 20_000,
         breathe_ms: None,
+        warm_at_dimmest: false,
         least_step: 3,
     },
 ];
@@ -141,8 +148,9 @@ impl Feeling {
     /// (`get`'s `light`, from `light/state`), as `lamp_skills::glow::relative`
     /// makes the skill's: one step warmer and at least one level down, never
     /// up; breathing from the person's level down to that and back, or
-    /// steady there. Or why none: the light off, not known, or at its
-    /// dimmest.
+    /// steady there; at level 1, Glad and Lively warm a white light alone,
+    /// steady (#3691). Or why none: the light off, not known, or at its
+    /// dimmest with no warmth to add.
     pub fn light(&self, now: &Value) -> Result<(Light, Option<LightPattern>), &'static str> {
         let (Some(on), Some(colour), Some(level)) = (
             now["on"].as_bool(),
@@ -156,14 +164,25 @@ impl Feeling {
         if !on {
             return Err("the light is off");
         }
-        let colour = match WARMTH.iter().position(|shade| *shade == colour) {
+        let warmer = match WARMTH.iter().position(|shade| *shade == colour) {
             Some(at) => WARMTH[(at + 1).min(WARMTH.len() - 1)],
             None => colour,
         };
         let low = level.saturating_sub(1).max(1);
         if low == level {
+            if self.warm_at_dimmest && warmer != colour {
+                return Ok((
+                    Light {
+                        on: true,
+                        colour: warmer.to_owned(),
+                        level,
+                    },
+                    None,
+                ));
+            }
             return Err("the person's light is at its dimmest");
         }
+        let colour = warmer;
         let (level, pattern) = match self.breathe_ms {
             Some(period_ms) => (
                 level,
@@ -232,7 +251,8 @@ mod tests {
     }
 
     /// The table is the skill's `[[do]]`, feeling by feeling: its move, its
-    /// light's `for`, its breath, and one step warmer and one dimmer.
+    /// light's `for`, its breath, one step warmer and one dimmer, and
+    /// whether it warms alone at the dimmest level.
     #[test]
     fn the_table_is_the_skills_do() {
         let text = std::fs::read_to_string(skill().join("skill.toml")).unwrap();
@@ -247,9 +267,13 @@ mod tests {
             assert_eq!(
                 does.light["relative"].as_table().map(|relative| (
                     relative["warmer"].as_integer(),
-                    relative["dimmer"].as_integer()
+                    relative["dimmer"].as_integer(),
+                    relative
+                        .get("warm_at_dimmest")
+                        .and_then(toml::Value::as_bool)
+                        .unwrap_or(false)
                 )),
-                Some((Some(1), Some(1))),
+                Some((Some(1), Some(1), feeling.warm_at_dimmest)),
                 "{}",
                 feeling.name
             );
@@ -277,6 +301,7 @@ mod tests {
                 dimmer: 1,
                 lasting: None,
                 breathe_ms: feeling.breathe_ms,
+                warm_at_dimmest: feeling.warm_at_dimmest,
             };
             for colour in Light::COLOURS {
                 for level in 1..=Light::BRIGHTEST {
@@ -325,6 +350,7 @@ mod tests {
             move_file: r#"{"name":"low-droop","step_ms":300,"frames":[[0,0,0,0,0],[20,0,0,0,0],[40,0,0,0,0],[40,0,0,0,0],[20,0,0,0,0],[-25,0,0,0,0],[0,0,0,0,0]]}"#,
             lasting_ms: 20_000,
             breathe_ms: None,
+            warm_at_dimmest: false,
             least_step: 1,
         };
         let weak = droop.scaled(0.125).unwrap().unwrap();

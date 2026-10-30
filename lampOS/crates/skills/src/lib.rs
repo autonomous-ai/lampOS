@@ -1109,6 +1109,9 @@ struct LightFile {
     /// The person's own light, set as they asked and never given back
     /// (#1679: a scene). Only in a skill its tool alone starts.
     keep: Option<bool>,
+    /// `true`: never brighter than the person's light as the run begins
+    /// (#3691): the level, and a breath's low, are at most the person's.
+    no_brighter: Option<bool>,
     /// Steps from the person's light as the ring shows it now, read as the
     /// run begins (#1672: the evening glow), in place of a colour.
     relative: Option<RelativeFile>,
@@ -1121,6 +1124,9 @@ struct LightFile {
 struct RelativeFile {
     warmer: Option<u8>,
     dimmer: Option<u8>,
+    /// `true`, with `warmer = 1`: at the person's dimmest level, where
+    /// there is no level under it, the warmth alone, steady (#3691).
+    warm_at_dimmest: Option<bool>,
 }
 
 /// How a skill's light moves, as its file says it (#940 item 3):
@@ -2327,18 +2333,26 @@ pub enum Call {
         /// Held until the trigger stops holding, then given back (#1681:
         /// the pale breath of a lamp that is a little unwell).
         until_ends: bool,
+        /// Never brighter than the person's light as the run begins
+        /// (#3691): made so by [`glow::relative`] then, its level and a
+        /// breath's low at most the person's, and nothing over a light
+        /// that is off.
+        no_brighter: bool,
     },
     /// A light some steps warmer and dimmer than the person's own as the
     /// run begins (#1672), made into a [`Call::Light`] by
     /// [`glow::relative`] then: with a breath, the light breathes from the
     /// person's level down `dimmer` steps and back; without, it is steady
     /// `dimmer` steps down. Always at least a level down, never up: at
-    /// level 1 nothing is asked. Given back as any skill's light.
+    /// level 1 nothing is asked, unless `warm_at_dimmest` and the colour
+    /// can still warm, when the warmth alone is asked, steady (#3691).
+    /// Given back as any skill's light.
     Relative {
         warmer: u8,
         dimmer: u8,
         lasting: Option<String>,
         breathe_ms: Option<u32>,
+        warm_at_dimmest: bool,
     },
     /// A light show (`shows/NAME.toml`): each frame's light in turn, held
     /// its while, then the light given back (#1679). Only in a skill its
@@ -2528,6 +2542,7 @@ impl Call {
                 pattern,
                 keep,
                 until_ends,
+                no_brighter,
             } => {
                 let mut args = json!({ "colour": colour });
                 if let Some(level) = level {
@@ -2544,6 +2559,9 @@ impl Call {
                 }
                 if *until_ends {
                     args["until"] = json!("ends");
+                }
+                if *no_brighter {
+                    args["no_brighter"] = json!(true);
                 }
                 ("light", args)
             }
@@ -2597,8 +2615,12 @@ impl Call {
                 dimmer,
                 lasting,
                 breathe_ms,
+                warm_at_dimmest,
             } => {
                 let mut args = json!({ "relative": { "warmer": warmer, "dimmer": dimmer } });
+                if *warm_at_dimmest {
+                    args["relative"]["warm_at_dimmest"] = json!(true);
+                }
                 if let Some(lasting) = lasting {
                     args["for"] = json!(lasting);
                 }
@@ -4442,6 +4464,7 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             || file.over.is_some()
             || file.until.is_some()
             || file.keep.is_some()
+            || file.no_brighter.is_some()
         {
             return Err(
                 "relative takes only for and a breathe pattern: its colour and level are the person's light, stepped"
@@ -4453,6 +4476,14 @@ fn light_call(file: LightFile) -> Result<Call, String> {
         if warmer > 1 || dimmer > 4 || warmer + dimmer == 0 {
             return Err("relative is warmer = 0 or 1 and dimmer = 0 to 4, not both 0".into());
         }
+        let warm_at_dimmest = match relative.warm_at_dimmest {
+            None => false,
+            Some(true) if warmer == 1 => true,
+            Some(true) => {
+                return Err("warm_at_dimmest goes with warmer = 1: it is the warmth alone".into());
+            }
+            Some(false) => return Err("warm_at_dimmest is true or left out".into()),
+        };
         let Some(lasting) = file.lasting else {
             return Err("relative needs a for: it is a glow, given back".into());
         };
@@ -4488,6 +4519,7 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             dimmer,
             lasting: Some(lasting),
             breathe_ms,
+            warm_at_dimmest,
         });
     }
     let until_ends = match file.until.as_deref() {
@@ -4510,9 +4542,11 @@ fn light_call(file: LightFile) -> Result<Call, String> {
                 || file.level.is_some()
                 || file.lasting.is_some()
                 || file.pattern.is_some()
+                || file.no_brighter.is_some()
             {
                 return Err(
-                    "out takes no colour, dim, level, for or pattern: only over and until".into(),
+                    "out takes no colour, dim, level, for, pattern or no_brighter: only over and until"
+                        .into(),
                 );
             }
             // As the ring takes a fade (`LightRequest::FADE_MS`), whole ms.
@@ -4568,6 +4602,19 @@ fn light_call(file: LightFile) -> Result<Call, String> {
                     "a kept light takes no for and no pattern: it is the person's own light".into(),
                 );
             }
+            // Never brighter than the person's: against a level it caps,
+            // on a skill's light, not the person's own (#3691).
+            let no_brighter = match file.no_brighter {
+                None => false,
+                Some(true) if file.level.is_some() && !keep => true,
+                Some(true) => {
+                    return Err(
+                        "no_brighter goes with a colour's level, not keep: it caps the level at the person's"
+                            .into(),
+                    );
+                }
+                Some(false) => return Err("no_brighter is true or left out".into()),
+            };
             let pattern = file
                 .pattern
                 .map(|pattern| pattern_of(pattern, file.level))
@@ -4579,6 +4626,7 @@ fn light_call(file: LightFile) -> Result<Call, String> {
                 pattern,
                 keep,
                 until_ends,
+                no_brighter,
             })
         }
         (None, Some(steps)) if (1..=4).contains(&steps) => {
@@ -4590,6 +4638,9 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             }
             if file.pattern.is_some() {
                 return Err("dim takes no pattern".into());
+            }
+            if file.no_brighter.is_some() {
+                return Err("dim takes no no_brighter: a dim is never brighter".into());
             }
             Ok(Call::Dim { steps, until_ends })
         }

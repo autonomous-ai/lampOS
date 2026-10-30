@@ -54,5 +54,7 @@ policy = "nudge"
 body = { gesture = "sleepy" }          # a slow droop, once
 # A pale, low, slow breath, given back when what ran it ends (the error, or
 # the quiet part heard again) or lamp/health goes silent. Without the ring's
-# light requests it is a steady pale light.
-light = { colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }
+# light requests it is a steady pale light. Never brighter than the person's
+# light as it begins (#3691): over level 1 a steady pale 1, and over a light
+# that is off nothing.
+light = { colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends", no_brighter = true }

@@ -14,7 +14,7 @@ args = { gesture = "sleepy" }
 at = "155s"
 within = "1s"
 call = "light"
-args = { colour = "white", level = 2, pattern = { kind = "breathe", period_ms = 10000, low = 1 }, until = "ends" }
+args = { colour = "white", level = 2, pattern = { kind = "breathe", period_ms = 10000, low = 1 }, until = "ends", no_brighter = true }
 
 [[expect]]
 at = "305s"
