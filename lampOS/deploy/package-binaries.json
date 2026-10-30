@@ -3,12 +3,13 @@
   "core": [
     "lamp-keeper", "lamp-voice", "lamp-turn-end", "lamp-body", "lamp-body-worker",
     "lamp-eyes", "lamp-name", "lamp-memory", "lamp-actions", "lamp-controls",
-    "lamp-expression", "lamp-health", "lamp-policy"
+    "lamp-expression", "lamp-health", "lamp-policy",
+    "lamp-control"
   ],
   "optional": [
     "lamp-surround", "lamp-update", "lamp-ears", "lamp-schedule", "lamp-tasks", "lamp-air",
     "lamp-records", "lamp-mood", "lamp-bus", "lamp-selftest", "lamp-settings", "lamp-setup",
-    "lamp-cloud", "lamp-skills", "lamp-peek", "lamp-addons", "lamp-control"
+    "lamp-cloud", "lamp-skills", "lamp-peek", "lamp-addons"
   ],
   "provisioning": [
     "lamp-body-measure", "lamp-body-mood"
