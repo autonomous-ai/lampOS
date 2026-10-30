@@ -1185,8 +1185,10 @@ only a self-switch or a climb goes to the journal's form, before its `exec`.
 | `build N put back: …; the previous build is well`, or `…; the previous build is not well either: …` | `rolled-back` | the parts were put back (the watch, or a start that failed). The second ending, the old build failing its own check too, is the one to post at once; grep `build N put back:` for both |
 | `failed: …` | `failed` | an error, said with why |
 
-Inside a round: `switching to build N`, `waiting for a quiet moment: …`
-(once per wait), and `putting build N back: …` before a `put back` end.
+Inside a round: `installed <folder> beside <folder>` for each new folder
+(a self-switch's or a climb's updater too, before its own line),
+`switching to build N`, `waiting for a quiet moment: …` (once per wait), and
+`putting build N back: …` before a `put back` end.
 After a self-switch or a climb, the new updater says
 `confirmed: lamp-update runs its new build` once its dry round passes
 (`self-confirmed` in `log.jsonl`), or `not confirmed yet: …` and
@@ -1194,7 +1196,10 @@ After a self-switch or a climb, the new updater says
 (`main.rs`). A climb's parts switch follows the confirm in the same `serve`
 run. A new updater that never confirms is put back by `lamp-update-back`,
 in its own unit's journal (`journalctl -u lamp-update-back`, lines
-`lamp-update-back: …`), not `-u lamp-update`.
+`lamp-update-back: …`), not `-u lamp-update`. Tests
+(`crates/update/tests/journal_lines.rs`, #4606): each end's words and name
+above, `TooOld::why`'s two endings, `walk::held` and the lock's words; the
+confirm line is `self_cli_exec`'s (Linux).
 
 ### The second route's services in a round
 
