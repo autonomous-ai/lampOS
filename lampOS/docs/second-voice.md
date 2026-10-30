@@ -628,6 +628,27 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     is `POST <deepseek>/v1/tools/fetch` with `{"url"}`; the page's title and
     its Markdown cut at 2,000 characters go back. $0.75 a thousand
     successful calls of each from 1 Nov 2026; 5 a second an account.
+  - **Prices** (Migrate's finding 5 on #3997: on lamp-29e7 on 30 Oct a
+    searched $399 was given as the ErgoChair Pro's price, and argued for when
+    the person said the page showed $499). `web_search`'s description says a
+    price found may be out of date, that Autonomous's own products are priced
+    only from autonomous.ai's own product page, and that someone looking at
+    the page is believed, never argued with. A search whose query or results
+    speak of a price (the word, "how much", or an amount with `$ € £ ¥ ₫ ₹`,
+    USD or VND) carries `note` saying the same (`SEARCHED_PRICE_NOTE`), and a
+    result on autonomous.ai carries its `url`, so `fetch_page` can read it.
+    `fetch_page` of an autonomous.ai page (`autonomous.ai` or
+    `www.autonomous.ai`, no port; never the relay's `campaign-api`) also
+    reads the page itself, `GET https://www.autonomous.ai<path>`, beside the
+    fetch and within the same 3 s, at most 2 MiB: the price is from the
+    page's own schema.org data, the first `Product` or `ProductGroup`'s
+    `Offer`s (`AggregateOffer`'s low and high too), never a related
+    product's and never the page's text, as `price: {product, currency,
+    price}` or `{…, from, to}` when its options differ (the ErgoChair Pro's
+    page on 30 Oct: 499 USD, 410 KB), with `note` to give that price and
+    believe the person (`OWN_PRICE_NOTE`). No price read, or offers in two
+    currencies: `note` says to give none from elsewhere
+    (`OWN_PRICE_UNREAD_NOTE`).
   - `openrouter`: OpenRouter's web plugin on Exa, `plugins: [{"id": "web",
     "engine": "exa", "mode": "instant", "max_results": 3}]` on the chat
     request, with `LAMP_SECOND_CHAT=openrouter` only. It searches before
