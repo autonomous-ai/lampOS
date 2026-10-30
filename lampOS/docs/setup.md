@@ -874,8 +874,8 @@ ARM64 run and the keeper's `--setup-marker` (#816):
    Each failure must leave the previous Wi-Fi file, and the ring amber until
    the next try.
 5. **Reset.** Controls with `--touch` and a `reset` line in its pins file. Hold
-   the RESET pinhole 5 s with a paperclip and release: the lamp pauses, folds, reboots into the
-   hotspot, and every path in the plan is empty. Once, cut the power during the
+   the RESET pinhole 5 s with a paperclip and release: the lamp pauses, folds and
+   starts setup again in place with no reboot, its hotspot up within 60 s, and every path in the plan is empty. Once, cut the power during the
    wipe: setup must finish it at the next start.
 
 Most likely wrong on a lamp: what V1's image left of the radio (whether
