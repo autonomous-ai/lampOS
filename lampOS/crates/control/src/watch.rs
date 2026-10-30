@@ -210,9 +210,11 @@ pub struct Watch {
     /// lamp-actions says it.
     volume: Option<Value>,
     /// The body's last `body/limits` and `body/joint_states`, for `get`
-    /// `body`.
-    body_limits: Value,
-    body_joints: Value,
+    /// `body`, and when each was heard: none once not heard for
+    /// [`READING_STALE_US`], so a stopped or restarted body is not known
+    /// and `joints` never fills a joint from an old position.
+    body_limits: Option<(Value, u64)>,
+    body_joints: Option<(Value, u64)>,
     sounds: [bool; 4],
     /// The newest hand heard, and when.
     hand: Option<(Hand, u64)>,
@@ -270,11 +272,11 @@ impl Watch {
         match topic {
             "humans/faces/tracked" => self.faces(payload, now_us),
             "body/limits" => {
-                self.body_limits = payload.clone();
+                self.body_limits = Some((payload.clone(), now_us));
                 Vec::new()
             }
             "body/joint_states" => {
-                self.body_joints = payload.clone();
+                self.body_joints = Some((payload.clone(), now_us));
                 Vec::new()
             }
             "humans/hands/tracked" => match Hand::of(payload) {
@@ -423,6 +425,12 @@ impl Watch {
         if stale(&self.device) {
             self.device = None;
         }
+        if stale(&self.body_limits) {
+            self.body_limits = None;
+        }
+        if stale(&self.body_joints) {
+            self.body_joints = None;
+        }
         let mut out = self.hand_news(now_us);
         out.extend(self.air_news(now_us));
         let lapsed = self
@@ -512,7 +520,14 @@ impl Watch {
             StateKind::Air => known(self.air.as_ref()),
             StateKind::Device => known(self.device.as_ref()),
             StateKind::Volume => self.volume.clone().unwrap_or(Value::Null),
-            StateKind::Body => crate::body_info::state(&self.body_limits, &self.body_joints),
+            StateKind::Body => {
+                let heard = |reading: &Option<(Value, u64)>| {
+                    reading
+                        .as_ref()
+                        .map_or(Value::Null, |(value, _)| value.clone())
+                };
+                crate::body_info::state(&heard(&self.body_limits), &heard(&self.body_joints))
+            }
             StateKind::Lamp => {
                 json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
             }
@@ -1137,6 +1152,7 @@ mod tests {
         watch.lapse(16_000_000);
         assert_eq!(watch.state(StateKind::Device), json!({"known": false}));
     }
+
     #[test]
     fn a_volume_change_from_anyone_is_told_once_and_the_first_heard_is_state() {
         let mut watch = Watch::new();
@@ -1190,5 +1206,36 @@ mod tests {
             Watch::new().state(crate::protocol::StateKind::Volume),
             Value::Null
         );
+    }
+
+    /// `get` `body` once lamp-body stops or restarts: limits not said for
+    /// 15 s are not known, and a position not heard for 15 s is none, never
+    /// the old one (the first builder's P2 on #4580).
+    #[test]
+    fn the_body_not_heard_for_15_s_is_not_known() {
+        let mut watch = Watch::new();
+        let limits = json!({"joints": [{"name": "base_yaw", "min": 1975, "max": 2055, "home": 2015}], "speed": 50.0});
+        let joints = json!({"name": ["base_yaw"], "position": [0.0]});
+        watch.take("body/limits", &limits, S);
+        watch.take("body/joint_states", &joints, S);
+        assert_eq!(
+            watch.state(StateKind::Body)["joints"]["yaw"]["counts"],
+            2_048.0
+        );
+        // Limits said again every 10 s; the positions stop.
+        watch.take("body/limits", &limits, 10 * S);
+        watch.lapse(S + READING_STALE_US - 1);
+        assert_eq!(
+            watch.state(StateKind::Body)["joints"]["yaw"]["counts"],
+            2_048.0
+        );
+        watch.lapse(S + READING_STALE_US);
+        let body = watch.state(StateKind::Body);
+        assert_eq!(body["known"], true, "the limits are still fresh");
+        assert!(body["joints"]["yaw"]["counts"].is_null(), "{body}");
+        assert!(body["joints"]["yaw"]["deg"].is_null(), "{body}");
+        // And the limits stop too.
+        watch.lapse(10 * S + READING_STALE_US);
+        assert_eq!(watch.state(StateKind::Body)["known"], false);
     }
 }

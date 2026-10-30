@@ -1968,7 +1968,7 @@ answered `refused` with why and closed. Lines of JSON each way
 |-------|----------|
 | `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
 | `{"let_go":true}` | `{"lease":"free"}` |
-| `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive) or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
+| `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive, from the pose's own direction, as the gaze's look), `{"look":{"yaw":Y,"pitch":P,"from":"home"}}` (from where the head and base were found at start, as a computer's `joints` and `get` `body`: the body takes its pose's offset off, `body::aim_from_home`, and says `there` in the same frame), or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
 | `{"pose":{"roll":R,"shoulder":S,"elbow":E}}` (degrees, one at least; as `get('body')` counts them), while held | once, later: `{"pose":"there","roll":…,"shoulder":…,"elbow":…,"clamped":…}`, or `{"pose":"cut_short","why":…}`; at once while not held, while the body takes no pose, or for another pose: `{"pose":"refused","why":…}` |
 | `{"limp":true}` or `{"limp":false}`, while held | at once: `{"limp":"on"}` or `{"limp":"off"}`; `{"limp":"refused","why":…}` while not held; and unasked, once, `{"limp":"off","why":…}` when the hold ends |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
