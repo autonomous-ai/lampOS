@@ -252,3 +252,80 @@ await lamp.on("phrase.heard", handler, phrases=["good night lamp"])
 
 Up to 16 phrases per computer, whole words, 8 letters at least; the event
 carries only which of yours it was, never the words around it.
+
+## A program that runs for days
+
+The lamp restarts on every update, and a reconnect is a new session: it
+loses its subscriptions, leases and camera stream. Loop on the connection,
+set up again each time, and back off.
+
+```python
+import asyncio
+from lampos import Lamp
+from lampos.errors import LampError
+
+async def run_once(lamp):
+    # Everything a session needs, again on every connection.
+    await lamp.on("person.arrived", lambda e: print("arrived", e["count"]))
+    await lamp.on("touch", lambda e: print("touched", e["kind"]))
+    await lamp.wait_closed()          # returns when the lamp goes away
+
+async def main():
+    wait = 1
+    while True:
+        try:
+            async with await Lamp.connect() as lamp:
+                wait = 1              # connected: reset the backoff
+                await run_once(lamp)
+        except (LampError, OSError) as gone:
+            print("lamp away:", gone)
+        await asyncio.sleep(wait)
+        wait = min(wait * 2, 60)
+
+asyncio.run(main())
+```
+
+```js
+import { Lamp, LampError } from 'lampos';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let wait = 1000;
+for (;;) {
+  let lamp;
+  try {
+    lamp = await Lamp.connect();
+    wait = 1000;
+    await lamp.on('person.arrived', (e) => console.log('arrived', e.count));
+    await lamp.on('touch', (e) => console.log('touched', e.kind));
+    await lamp.closed();
+  } catch (e) {
+    if (!(e instanceof LampError) && !e.code) throw e;
+    console.log('lamp away:', e.message);
+  } finally {
+    await lamp?.close().catch(() => {});
+  }
+  await sleep(wait);
+  wait = Math.min(wait * 2, 60_000);
+}
+```
+
+Take a body lease only around what needs it, and let it go after.
+
+## A web app on the SDK
+
+A browser page can't hold the lamp's pairing key, so put a small local
+server between them:
+- **The server holds the key and the one connection** to the lamp (the SDK),
+  and offers the page your own small API and an event stream (server-sent
+  events or a WebSocket).
+- **Bind `127.0.0.1`**, never `0.0.0.0`: other computers on the network
+  mustn't drive your lamp through it.
+- **A random token on every API call and the event stream** (made at start,
+  put in the page's URL or a cookie), so another page in the same browser
+  can't call it.
+- **Check `Origin` against `Host`** on every call and the event stream; behind
+  a tunnel the host changes, so compare the two, don't hard-code a name.
+- **Serve the page and its assets (HTML, CSS, JS) without the token**, and
+  require it only on the API and the stream; asked for on the assets, the
+  CSS and JS come back 403 and the page is blank.
+- Reconnect to the lamp as in "A program that runs for days", and tell the
+  page when the lamp is away.
