@@ -2211,84 +2211,114 @@ fn head_touch_rounds(wait: bool, rounds: usize) -> Vec<u64> {
     let directory = Directory::new();
     let mut elapsed_us = Vec::with_capacity(rounds);
     for round in 0..rounds {
-        // A fresh bus, publishers, listener and pump each round; all of it,
-        // and the recognizer's own work, is outside the measured boundary.
-        let root = directory.0.join(format!("b{round}"));
-        let bus = Bus::new(&root).unwrap();
-        let declared = |topic, declaration| bus.publisher_declared(topic, &declaration, "controls");
-        let mut states = declared(TouchState::TOPIC, TouchState::declaration()).unwrap();
-        let mut events = declared(TouchEvent::TOPIC, TouchEvent::declaration()).unwrap();
-        let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
-        let shared = Arc::new(Shared::default());
-        let mut owner = HandControls::from_parts(
-            ControlsOptions {
-                head_touch: true,
-                ..Default::default()
-            },
-            CLOCK,
-            MuteRecord::new(CLOCK).unwrap(),
-            input,
-            Arc::clone(&shared),
-            lamp_ipc::monotonic_us(),
-        )
-        .unwrap();
-        let woken = wait.then(|| waking(&shared));
-        let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
-        let worker =
-            thread::spawn(move || pump(pump_root, true, false, woken, sender, &pump_shared));
-        let mut worker = JoinedHeadPump {
-            shared: Arc::clone(&shared),
-            worker: Some(worker),
-        };
-        let result = (|| -> Result<u64, String> {
-            let ready_until = std::time::Instant::now() + Duration::from_secs(2);
-            while !shared.pump_ready.load(Ordering::Acquire) {
-                if std::time::Instant::now() >= ready_until {
-                    return Err("pump never completed its first subscribed drain".into());
+        let mut attempt = 0;
+        loop {
+            // A fresh bus, publishers, listener and pump each round; all of it,
+            // and the recognizer's own work, is outside the measured boundary.
+            let root = directory.0.join(format!("b{round}-{attempt}"));
+            // How long the two publications themselves took, for the retry below.
+            let mut publish_took = 0;
+            let bus = Bus::new(&root).unwrap();
+            let declared =
+                |topic, declaration| bus.publisher_declared(topic, &declaration, "controls");
+            let mut states = declared(TouchState::TOPIC, TouchState::declaration()).unwrap();
+            let mut events = declared(TouchEvent::TOPIC, TouchEvent::declaration()).unwrap();
+            let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+            let shared = Arc::new(Shared::default());
+            let mut owner = HandControls::from_parts(
+                ControlsOptions {
+                    head_touch: true,
+                    ..Default::default()
+                },
+                CLOCK,
+                MuteRecord::new(CLOCK).unwrap(),
+                input,
+                Arc::clone(&shared),
+                lamp_ipc::monotonic_us(),
+            )
+            .unwrap();
+            let woken = wait.then(|| waking(&shared));
+            let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
+            let worker =
+                thread::spawn(move || pump(pump_root, true, false, woken, sender, &pump_shared));
+            let mut worker = JoinedHeadPump {
+                shared: Arc::clone(&shared),
+                worker: Some(worker),
+            };
+            let result = (|| -> Result<u64, String> {
+                let ready_until = std::time::Instant::now() + Duration::from_secs(2);
+                while !shared.pump_ready.load(Ordering::Acquire) {
+                    if std::time::Instant::now() >= ready_until {
+                        return Err("pump never completed its first subscribed drain".into());
+                    }
+                    thread::sleep(Duration::from_millis(1));
                 }
-                thread::sleep(Duration::from_millis(1));
+                let (state, touch) = test_head_touch(CLOCK, lamp_ipc::monotonic_us() - 40_000);
+                let published = lamp_ipc::monotonic_us();
+                states
+                    .publish_json(published, &state)
+                    .map_err(|error| format!("state publication: {error}"))?;
+                let state_sent = lamp_ipc::monotonic_us();
+                events
+                    .publish_json(published, &touch[0])
+                    .map_err(|error| format!("event publication: {error}"))?;
+                let event_sent = lamp_ipc::monotonic_us();
+                publish_took = event_sent.saturating_sub(published);
+                let receipt_until = std::time::Instant::now() + Duration::from_secs(2);
+                loop {
+                    if owner
+                        .poll()
+                        .map_err(|error| format!("owner poll: {error}"))?
+                        .head_touch_at_us
+                        .is_some()
+                    {
+                        return Ok(lamp_ipc::monotonic_us() - published);
+                    }
+                    if std::time::Instant::now() >= receipt_until {
+                        let now = lamp_ipc::monotonic_us();
+                        return Err(format!(
+                            "touch did not arrive; round={round}, state_publish_us={}, event_publish_us={}, state_age_at_publish_us={}, event_age_at_publish_us={}, receipt_wait_us={}, health={:?}",
+                            state_sent.saturating_sub(published),
+                            event_sent.saturating_sub(state_sent),
+                            published.saturating_sub(state.stamp.at_us),
+                            published.saturating_sub(touch[0].stamp.at_us),
+                            now.saturating_sub(event_sent),
+                            owner.health()
+                        ));
+                    }
+                    thread::yield_now();
+                }
+            })();
+            // Preserve failure evidence, then stop and join before asserting it.
+            worker.stop_and_join().expect("head-touch pump joined");
+            // The touch is stamped as it is published, and the owner takes it
+            // only while its source's reading is under `TOUCH_INPUT_TTL_US`
+            // (100 ms) old. On a loaded Mac the publication alone took 93 to
+            // 299 ms (30 Oct, load 13), so the event was rightly refused as
+            // stale and the round could not pass by design. A round whose own
+            // publications took half that bound is the host's, not the voice's:
+            // it is run again, at most `ROUND_TRIES` times, and said. Any other
+            // failure fails at once.
+            if result.is_err()
+                && publish_took >= lamp_msgs::TOUCH_INPUT_TTL_US / 2
+                && attempt + 1 < ROUND_TRIES
+            {
+                eprintln!(
+                    "head-touch round {round}: the host took {publish_took} µs to publish; run again"
+                );
+                attempt += 1;
+                continue;
             }
-            let (state, touch) = test_head_touch(CLOCK, lamp_ipc::monotonic_us() - 40_000);
-            let published = lamp_ipc::monotonic_us();
-            states
-                .publish_json(published, &state)
-                .map_err(|error| format!("state publication: {error}"))?;
-            let state_sent = lamp_ipc::monotonic_us();
-            events
-                .publish_json(published, &touch[0])
-                .map_err(|error| format!("event publication: {error}"))?;
-            let event_sent = lamp_ipc::monotonic_us();
-            let receipt_until = std::time::Instant::now() + Duration::from_secs(2);
-            loop {
-                if owner
-                    .poll()
-                    .map_err(|error| format!("owner poll: {error}"))?
-                    .head_touch_at_us
-                    .is_some()
-                {
-                    return Ok(lamp_ipc::monotonic_us() - published);
-                }
-                if std::time::Instant::now() >= receipt_until {
-                    let now = lamp_ipc::monotonic_us();
-                    return Err(format!(
-                        "touch did not arrive; round={round}, state_publish_us={}, event_publish_us={}, state_age_at_publish_us={}, event_age_at_publish_us={}, receipt_wait_us={}, health={:?}",
-                        state_sent.saturating_sub(published),
-                        event_sent.saturating_sub(state_sent),
-                        published.saturating_sub(state.stamp.at_us),
-                        published.saturating_sub(touch[0].stamp.at_us),
-                        now.saturating_sub(event_sent),
-                        owner.health()
-                    ));
-                }
-                thread::yield_now();
-            }
-        })();
-        // Preserve failure evidence, then stop and join before asserting it.
-        worker.stop_and_join().expect("head-touch pump joined");
-        elapsed_us.push(result.unwrap_or_else(|error| panic!("{error}")));
+            elapsed_us.push(result.unwrap_or_else(|error| panic!("{error}")));
+            break;
+        }
     }
     elapsed_us
 }
+
+/// How often one head-touch round is run again when the host stalled its
+/// own publications past half the touch input's freshness bound.
+const ROUND_TRIES: usize = 5;
 
 /// #705, the lamp's heat: with the wait, a head touch reaches the owner as
 /// it is published, not at the wait's 200 ms end. The bound is loose, for a
