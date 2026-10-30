@@ -637,7 +637,8 @@ Eighth's proposal on #3504, agreed by Nine and blue. A paired computer can
 put a rules skill of its own on its own lamp, with no Store, the way a skill
 the owner makes by voice is installed today. `lamp-control` serves the ops
 below with `--manage-socket`; the manage helper's side (lamp-skills, piece
-B), the SDK calls and the schema's three request ops follow.
+B) follows. The schema has the three request ops, and both SDKs push, list
+and remove (`push_skill`/`pushSkill`, `lamp skill push|list|remove`).
 
 **What is different about it:** every other grant ends with the
 connection or the lease. **A pushed skill keeps running after the computer
@@ -648,8 +649,12 @@ on the lamp that run on their own".
 - **The grant, `skills`,** a seventh, ticked by the owner at pairing. A
   pushed skill may ask only for what the pairing grants, mapped onto the
   skill format's `[permissions]` ([skill-format.md](skill-format.md)):
-  `body`, `light` and `speak`, and `look` as the presence topics alone. So a
-  computer can't push a skill that does more than it may do live.
+  `body`, `light` and `speak`, and `look` as the presence topics alone
+  (`humans/faces/tracked`, `room/stood_up`). The topics the protocol's
+  events take with no grant are open to it too: `clock/local`,
+  `voice/state`, `lamp/pause` and `controls/touch` (lamp-skills'
+  `PUSHED_TOPICS`). So a computer can't push a skill that does more than it
+  may do live.
 - **`hear` and `sound` are refused by a push** (`no_grant`, "waits for
   format 2's phrase and class lists"). In format 1 they are topics
   (`voice/heard`, `ears/classes`), which give a skill every phrase or class

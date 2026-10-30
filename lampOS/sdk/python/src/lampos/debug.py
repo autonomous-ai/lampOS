@@ -30,6 +30,8 @@ SUMMARISED = frozenset({"text", "data"})
 SHOWN = frozenset({
     # A dev lamp's `--rates off`, said in hello's limits.
     "rates",
+    # A pushed skill's whole hash and each part's number (skill.push).
+    "sha256", "part",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
@@ -44,7 +46,7 @@ SHOWN = frozenset({
 # and a `look` at `hand`'s `follow`).
 SHOWN_BEYOND_SCHEMA = frozenset({
     "joints_hz", "to", "move", "on", "energy", "warmth", "awake", "shows", "seen", "x", "y", "size", "open",
-    "confidence", "sha256", "part", "follow",
+    "confidence", "follow",
 })
 # A said text's tag is keyed with this process's own random key: the same text
 # gives the same tag within a run, and nobody holding the log can test a guess.

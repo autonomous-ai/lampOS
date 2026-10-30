@@ -43,7 +43,7 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
 example runs this way: `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
-`phrase.py`, `pomodoro.py`, `ci_light.py`.
+`phrase.py`, `pomodoro.py`, `ci_light.py`, and `push_skill.py ../../examples/relaxing-music` (a pairing with `skills`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light,
@@ -207,6 +207,33 @@ format other than 1 or 2 is refused. The rules between keys, such as permissions
 covering every read, are the lamp's own load check: a folder that passes
 here can still be refused there, with its reason.
 
+## Push a skill to your own lamp
+
+With the `skills` grant, which the owner ticks at pairing, a computer can put
+a skill of its own on its own lamp, with no Store
+([control.md](../../docs/control.md), "Skills pushed from a computer"):
+
+```sh
+lamp skill push path/to/my-skill     # checks it, packs it, sends it in parts
+lamp skill list
+lamp skill remove my-skill
+```
+
+`push` first runs `lamp skill check`, and refuses on this computer what the
+lamp would refuse:
+- a check error;
+- a grant this pairing doesn't hold;
+- a `core` or add-on skill;
+- `hear` or `sound` topics, which wait for format 2's phrase and class lists;
+- a raw topic, or a key outside the protocol's grants.
+
+The lamp checks it all again. A skill that sees the picture is held off until
+the owner says yes in the app, and the answer says so. In code:
+`await lamp.push_skill(folder)`, `await lamp.skills()`,
+`await lamp.remove_skill(name)`. A pushed skill keeps running after this
+computer goes; revoking the computer, or taking back `skills`, turns its
+skills off.
+
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
@@ -325,6 +352,14 @@ its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 `no_lease`, `lease_lost`, `busy`, `refused`, `quiet_hours`, `private`,
 `paused`, `asleep`, `rate`, `bad_request`, `off`.
 
+### Skills
+
+| call | parameters | grant |
+|---|---|---|
+| `await lamp.push_skill(folder)` | a skill folder (`SKILL.md`, `skill.toml` with a `version`): checked as `lamp skill check` does, packed and sent in parts | `skills` |
+| `await lamp.skills()` | | `skills` |
+| `await lamp.remove_skill(name)` | one of this computer's own pushed skills | `skills` |
+
 ### The `lamp` command
 
 | command | options |
@@ -333,6 +368,9 @@ its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 | `lamp pair CODE --pin PIN [--host HOST] [--port 7731] [--name NAME]` | `CODE`: the 8-digit code. `--pin`: the 64-hex pin the app shows (required). `--host`: the address, found by mDNS without it. `--port`: 7731. `--name`: this computer's name in the app |
 | `lamp hello [LAMP_ID]` | a paired lamp's id, or the only one: connects and shows its grants |
 | `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
+| `lamp skill push FOLDER [LAMP_ID]` | a skill folder: checked first, then put on the paired lamp (`skills` grant) |
+| `lamp skill list [LAMP_ID]` | this computer's own pushed skills |
+| `lamp skill remove NAME [LAMP_ID]` | takes one of them off the lamp |
 | `lamp skill check FOLDER...` | each a skill folder (`SKILL.md` and `skill.toml`), checked against the skill format |
 
 `LAMPOS_HOME` sets where the key and pairings are kept, for every command.

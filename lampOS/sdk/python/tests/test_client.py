@@ -51,8 +51,9 @@ def test_proofs_name_what_they_are_for():
 
 def test_every_op_has_a_call_and_every_error_code_a_class():
     calls = {"lease.take", "lease.renew", "lease.release", "pair", "hello", "subscribe", "unsubscribe", "get"}
+    named = {"skill.push": "push_skill", "skill.list": "skills", "skill.remove": "remove_skill"}
     for op in schema.ops():
-        assert op in calls or callable(getattr(Lamp, op, None)), op
+        assert op in calls or callable(getattr(Lamp, named.get(op, op), None)), op
     for code in schema.error_codes():
         assert errors.BY_CODE[code].code == code
     assert errors.from_reply({"code": "rate", "why": "x", "retry_ms": 900}).retry_ms == 900
@@ -1312,3 +1313,204 @@ def test_a_look_at_the_hand_needs_the_bodys_lease_socket_as_other_looks_do(tmp_p
                 assert not fake.leases
 
     run(go())
+
+
+def _skill(folder: Path, name: str, rules: str = 'version = "0.1.0"\n[permissions]\nlight = true\n') -> Path:
+    path = folder / name
+    path.mkdir(parents=True)
+    (path / "SKILL.md").write_text(f"---\nname: {name}\ndescription: A test skill.\n---\n")
+    (path / "skill.toml").write_text(rules)
+    (path / ".DS_Store").write_bytes(b"\0mac")
+    return path
+
+
+def test_lamp_skill_push_list_and_remove_run_as_the_js_clis_do(tmp_path):
+    import os
+    import sys
+
+    async def lamp_cli(home: Path, *args: str) -> tuple[int, str, str]:
+        # A process of its own, as a person runs it; the fake answers on
+        # this event loop meanwhile.
+        process = await asyncio.create_subprocess_exec(
+            sys.executable, "-m", "lampos.cli", *args,
+            env={**os.environ, "LAMPOS_HOME": str(home)},
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await process.communicate()
+        return process.returncode, out.decode().strip(), err.decode().strip()
+
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            home = tmp_path / "home"
+            await paired(fake, home)
+            assert await lamp_cli(home, "skill", "push", str(_skill(tmp_path, "desk-wave"))) == (0, "desk-wave 0.1.0 pushed, on", "")
+            assert (await lamp_cli(home, "skill", "list"))[1] == "desk-wave\t0.1.0\ton"
+            assert (await lamp_cli(home, "skill", "remove", "desk-wave"))[1] == "desk-wave removed"
+            assert (await lamp_cli(home, "skill", "list"))[1] == ""
+            core = await lamp_cli(home, "skill", "push", str(_skill(tmp_path, "core", 'version = "0.1.0"\nkind = "core"\n')))
+            assert (core[0], core[2]) == (1, 'lamp: refused: kind = "core": a pushed skill is installable')
+            assert fake.asked("skill.remove") == [{"name": "desk-wave"}]
+
+    run(go())
+
+
+def test_a_skill_is_packed_as_lamp_skills_packs_it(tmp_path):
+    import io
+    import tarfile
+
+    from lampos.push import pack
+
+    folder = _skill(tmp_path, "desk-wave")
+    (folder / "moves").mkdir()
+    (folder / "moves" / "wave.json").write_text("{}")
+    package = pack(folder)
+    assert package.name == "desk-wave" and package.version == "0.1.0"
+    assert pack(folder).data == package.data, "the same folder packs to the same bytes"
+    with tarfile.open(fileobj=io.BytesIO(package.data)) as tar:
+        members = tar.getmembers()
+        manifest = json.loads(tar.extractfile("lamp-skill.json").read())
+    assert [m.name for m in members] == ["lamp-skill.json", "desk-wave/SKILL.md", "desk-wave/moves/wave.json", "desk-wave/skill.toml"]
+    assert all(m.isfile() and m.mode == 0o644 and m.mtime == 0 and m.uid == m.gid == 0 for m in members)
+    assert [f["path"] for f in manifest["files"]] == ["SKILL.md", "moves/wave.json", "skill.toml"]
+    assert manifest["format"] == 1 and manifest["version"] == "0.1.0"
+
+
+def test_a_skill_is_pushed_in_parts_listed_and_removed(tmp_path, monkeypatch):
+    from lampos import push
+
+    monkeypatch.setattr(push, "PART_BYTES", 600)  # several parts from a small skill
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                skill = await lamp.push_skill(_skill(tmp_path, "desk-wave"))
+                assert (skill["name"], skill["version"], skill["on"]) == ("desk-wave", "0.1.0", True)
+                pushes = fake.asked("skill.push")
+                assert len(pushes) > 1 and [p["part"] for p in pushes] == list(range(len(pushes)))
+                assert [s["name"] for s in await lamp.skills()] == ["desk-wave"]
+                await lamp.remove_skill("desk-wave")
+                assert await lamp.skills() == []
+
+    run(go())
+
+
+def test_a_push_beyond_the_pairing_is_refused_before_a_byte_is_sent(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.push_skill(_skill(tmp_path, "mover", 'version = "0.1.0"\n[permissions]\nbody = true\n'))
+                with pytest.raises(LampError) as broken:
+                    await lamp.push_skill(_skill(tmp_path, "broken", 'version = "0.1.0"\nverison = 1\n'))
+                assert broken.value.code == "bad_request"
+                assert fake.asked("skill.push") == []
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "keys2")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.push_skill(_skill(tmp_path / "b", "lit"))
+                assert fake.asked("skill.push") == []
+
+    run(go())
+
+
+@pytest.mark.parametrize(
+    "rules, code, says",
+    [
+        ('kind = "core"\n', "refused", "installable"),
+        ('kind = "addon"\n', "refused", "installable"),
+        # As the door answers the helper's hear and sound refusal (push.rs).
+        ('[permissions]\ntopics = ["voice/heard"]\n', "no_grant", "format 2's phrase"),
+        ('[permissions]\ntopics = ["ears/classes"]\n', "no_grant", "format 2's phrase"),
+        ('[permissions]\ntopics = ["room/activity"]\n', "refused", "raw topic"),
+        ('[permissions]\ntopics = ["humans/faces/tracked"]\n', "no_grant", "look grant"),
+        ('[permissions]\nmessages = true\n', "refused", "outside the protocol"),
+        ('[permissions]\nspeak = true\n', "no_grant", "speak grant"),
+    ],
+)
+def test_a_push_refuses_on_the_computer_what_the_lamp_refuses(tmp_path, rules, code, says):
+    from lampos.push import asks_beyond
+
+    folder = _skill(tmp_path, "pushed", 'version = "0.1.0"\n' + rules)
+    # Only a grant the pairing lacks is no_grant, as the lamp answers.
+    assert asks_beyond(folder, ["body", "light", "skills"])[0] == code
+    assert says in asks_beyond(folder, ["body", "light", "skills"])[1]
+
+
+def test_a_picture_or_presence_skill_is_left_to_the_lamp(tmp_path):
+    from lampos.push import asks_beyond
+
+    seer = _skill(tmp_path, "seer", 'version = "0.1.0"\n[permissions]\ncamera = true\n')
+    assert asks_beyond(seer, ["skills"]) is None
+    there = _skill(tmp_path, "there", 'version = "0.1.0"\n[permissions]\ntopics = ["humans/faces/tracked"]\n')
+    assert asks_beyond(there, ["look", "skills"]) is None
+
+
+def test_a_push_takes_every_topic_lamp_skills_takes(tmp_path):
+    # Reviewer-lead's P2 on #4029: lamp-skills' PUSHED_TOPICS (#3879) takes the
+    # topics the protocol's events need no grant for, so a pairing with none
+    # but `skills` pushes them, and never stricter than the lamp.
+    from lampos.push import asks_beyond
+
+    for topic in ("clock/local", "voice/state", "lamp/pause", "controls/touch"):
+        folder = _skill(tmp_path / topic.replace("/", "-"), "open", f'version = "0.1.0"\n[permissions]\ntopics = ["{topic}"]\n')
+        assert asks_beyond(folder, ["skills"]) is None
+
+
+# harness-reviewer's P3 on #4029: the tar crate's layout, byte for byte (seven
+# octal digits and a NUL for the checksum, two zero blocks and no record
+# padding at the end), so this, the JS SDK and `lamp-skills pack` give one
+# SHA-256 for one folder. The JS test pins the same digest.
+PACKED_SHA256 = "4b956fc5e58e17f1165e68ccb16024df1a135a14e65d50b94febe372bf4a8321"
+
+
+def test_a_skill_packs_to_the_bytes_lamp_skills_writes(tmp_path):
+    import io
+    import re
+    import tarfile
+
+    from lampos.push import pack
+
+    folder = tmp_path / "desk-golden"
+    (folder / "moves").mkdir(parents=True)
+    (folder / "SKILL.md").write_text("---\nname: desk-golden\ndescription: A test skill.\n---\n")
+    (folder / "skill.toml").write_text('version = "0.1.0"\n[permissions]\nlight = true\n')
+    (folder / "moves" / "wave.json").write_text("{}")
+    data = pack(folder).data
+    assert hashlib.sha256(data).hexdigest() == PACKED_SHA256
+    assert re.fullmatch(rb"[0-7]{7}\0", data[148:156])
+    assert len(data) == 4 * 1024 + 1024 and data[-1024:] == bytes(1024)
+    names = [member.name for member in tarfile.open(fileobj=io.BytesIO(data))]
+    assert names == ["lamp-skill.json", "desk-golden/SKILL.md", "desk-golden/moves/wave.json", "desk-golden/skill.toml"]
+
+
+def test_a_path_lamp_skills_refuses_or_no_header_holds_is_refused_before_packing(tmp_path):
+    # Reviewer-lead's P3 on #4029: lamp-skills' path rule (package.rs
+    # `path_ok`) first, then the tar crate's ustar cut, never a corrupt header.
+    import io
+    import tarfile
+
+    from lampos.push import pack
+
+    def folder(name, path):
+        root = tmp_path / name
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        (root / "skill.toml").write_text('version = "0.1.0"\n')
+        (root / path).write_text("{}")
+        return root
+
+    with pytest.raises(LampError) as raised:
+        pack(folder("desk-part", "m" * 101 + ".json"))
+    assert "at most 4 parts" in raised.value.why
+    with pytest.raises(LampError) as raised:
+        pack(folder("desk-deep", "a/b/c/d/e.json"))
+    assert "at most 4 parts" in raised.value.why
+    # Cut after its 100-byte folder: the prefix holds the folder, the name the file.
+    data = pack(folder("desk-long", "a" * 100 + "/w.json")).data
+    names = [member.name for member in tarfile.open(fileobj=io.BytesIO(data))]
+    assert "desk-long/" + "a" * 100 + "/w.json" in names
+    # The last `/` within 155 bytes leaves a 107-byte name: a GNU entry in the crate.
+    with pytest.raises(LampError) as raised:
+        pack(folder("desk-over", "a" * 100 + "/" + "b" * 100 + "/c.json"))
+    assert "longer than a tar header holds" in raised.value.why

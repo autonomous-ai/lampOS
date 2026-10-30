@@ -13,7 +13,7 @@
 // certificate is made by `openssl` at start. It moves nothing, so it never
 // stands in for a lamp check.
 import { execFileSync } from 'node:child_process';
-import { X509Certificate, createPublicKey, randomBytes, verify } from 'node:crypto';
+import { X509Certificate, createHash, createPublicKey, randomBytes, verify } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { tmpdir } from 'node:os';
@@ -241,6 +241,9 @@ export class FakeLamp {
     // WebSocket pings from clients (their keepalive).
     this.pings = 0;
     this.leases = new Map();
+    // Pushed skills by name, and the one push in flight on the lamp.
+    this.pushed = new Map();
+    this.pushing = null;
     this.subscribed = new Map();
     this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false } };
     this.refusals = new Map();
@@ -399,6 +402,37 @@ export class FakeLamp {
     ws.send(JSON.stringify({ re, ok: false, error: { code, why, ...(retryMs !== undefined ? { retry_ms: retryMs } : {}) } }));
   }
 
+  // A part of a push, as lamp-control and the helper take it: in order from
+  // 0, one push at a time, the whole checked against its SHA-256 and its
+  // manifest, then kept as this computer's.
+  push(ws, client, id, request) {
+    let going = this.pushing;
+    if (request.part === 0) {
+      if (going && going.client !== client) return this.refuse(ws, id, 'busy', "another computer's push is in flight");
+      going = this.pushing = { client, part: -1, chunks: [] };
+    } else if (!going || going.client !== client || request.part !== going.part + 1) {
+      return this.refuse(ws, id, 'bad_request', 'parts out of order');
+    }
+    going.part = request.part;
+    going.chunks.push(Buffer.from(request.data, 'base64'));
+    if (request.part < request.parts - 1) return this.ok(ws, id, { got: request.part + 1 });
+    this.pushing = null;
+    const data = Buffer.concat(going.chunks);
+    const sha = createHash('sha256').update(data).digest('hex');
+    if (data.length !== request.size || sha !== request.sha256.toLowerCase()) {
+      return this.refuse(ws, id, 'bad_request', "the package's SHA-256 doesn't match");
+    }
+    const size = parseInt(data.subarray(124, 135).toString('ascii'), 8);
+    const first = data.subarray(0, 100).toString('utf8').replace(/\0.*$/s, '');
+    const manifest = JSON.parse(data.subarray(512, 512 + size).toString('utf8'));
+    if (first !== 'lamp-skill.json' || manifest.name !== request.name) return this.refuse(ws, id, 'refused', 'not a package of that skill');
+    const kept = this.pushed.get(request.name);
+    if (kept && kept.client !== client) return this.refuse(ws, id, 'refused', "another computer's skill has that name");
+    const skill = { name: manifest.name, version: manifest.version, sha256: sha, on: true, held: null };
+    this.pushed.set(request.name, { ...skill, client, pushed_at: now() });
+    return this.ok(ws, id, { skill: { ...skill, asks: [], shown: [] } });
+  }
+
   ok(ws, re, fields = {}) { ws.send(JSON.stringify({ re, ok: true, ...fields })); }
 
   pair(ws, request, nonce) {
@@ -438,6 +472,7 @@ export class FakeLamp {
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
+    if (op.startsWith('skill.')) return ['skills'];
     return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'] }[op] ?? [];
   }
 
@@ -550,6 +585,16 @@ export class FakeLamp {
         // As lamp-control routes them: the body takes them, and no `done`
         // follows.
         return this.ok(ws, id, { to: 'body' });
+      case 'skill.push':
+        return this.push(ws, client, id, request);
+      case 'skill.list':
+        return this.ok(ws, id, { skills: [...this.pushed.values()].filter((s) => s.client === client) });
+      case 'skill.remove': {
+        const kept = this.pushed.get(request.name);
+        if (!kept || kept.client !== client) return this.refuse(ws, id, 'refused', "not one of this computer's pushed skills");
+        this.pushed.delete(request.name);
+        return this.ok(ws, id);
+      }
       case 'say':
         // As lamp-control: the voice takes it, and its `done` follows.
         this.ok(ws, id, { to: 'voice' });

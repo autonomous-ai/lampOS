@@ -4,6 +4,7 @@
 //   lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
 //   lamp hello [LAMP_ID]
 //   lamp fake [--every 10] [--cycles N] [--everything] [--hands]
+//   lamp skill push FOLDER [LAMP_ID] | lamp skill list [LAMP_ID] | lamp skill remove NAME [LAMP_ID]
 import { parseArgs } from 'node:util';
 import { Lamp } from './client.js';
 import { find } from './discovery.js';
@@ -14,7 +15,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, hands: { type: 'boolean' } },
 });
-const [command, arg] = positionals;
+const [command, arg, third, fourth] = positionals;
 
 async function main() {
   if (command === 'find') {
@@ -37,12 +38,34 @@ async function main() {
     console.log(`paired with ${pairing.lamp} (${pairing.name}) as ${pairing.client}: ${pairing.grants.join(', ')}`);
   } else if (command === 'fake') {
     return fake({ every: Number(values.every ?? 10), cycles: values.cycles === undefined ? undefined : Number(values.cycles), everything: Boolean(values.everything), hands: Boolean(values.hands) });
+  } else if (command === 'skill' && third && (arg === 'push' || arg === 'remove')) {
+    // A skill of this computer's own on its paired lamp (the skills grant).
+    const lamp = await Lamp.connect(fourth);
+    try {
+      if (arg === 'push') {
+        const skill = await lamp.pushSkill(third);
+        console.log(`${skill.name} ${skill.version} pushed, ${skill.on ? 'on' : 'off'}${skill.held ? `, held: ${skill.held}` : ''}`);
+        for (const shown of skill.shown ?? []) console.log(`  ${shown}`);
+      } else {
+        await lamp.removeSkill(third);
+        console.log(`${third} removed`);
+      }
+    } finally {
+      await lamp.close();
+    }
+  } else if (command === 'skill' && arg === 'list') {
+    const lamp = await Lamp.connect(third);
+    try {
+      for (const skill of await lamp.skills()) console.log(`${skill.name}\t${skill.version}\t${skill.on ? 'on' : 'off'}${skill.held ? ` (held: ${skill.held})` : ''}`);
+    } finally {
+      await lamp.close();
+    }
   } else if (command === 'hello') {
     const lamp = await Lamp.connect(arg);
     console.log(`${lamp.info.id}: grants ${lamp.grants.join(', ')}`);
     await lamp.close();
   } else {
-    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] [--everything] [--hands]');
+    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] [--everything] [--hands] | lamp skill push FOLDER | list | remove NAME [LAMP_ID]');
     return 2;
   }
   return 0;
