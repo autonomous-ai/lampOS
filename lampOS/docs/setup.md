@@ -346,6 +346,8 @@ Its `GET /api/device/setup/status` answers V1's fields, plus one of its own: `"g
 
 It also says `"share_reports"`, read only: true only when the last setup kept the person's yes to health and crash reports (#1683), so the app can show it after a reconnect. The app changes it later through `lamp-cloud` (`reports.set`, `cloud.md`), never here.
 
+And `"takes_own_keys"`, always said: true only when this setup takes a person's own keys (`LAMP_OWN_KEYS=on`, `own-keys.md`; never while recovering), so the app asks its own-keys question only on a lamp that will use the answer. An older lamp has no such field, which the app reads as false (#2094).
+
 ```sh
 lamp-setup serve --config SERVE.json --plan PLAN.json --enable
 ```
@@ -373,7 +375,7 @@ on it. The routes:
 
 | Route | What it does |
 |---|---|
-| `GET /api/device/setup/status` | V1's `phase` (`idle`/`connecting`/`connected`/`failed`), `lan_ip`, `error`, `mac` (the kernel's host name, `lamp-xxxx`, which avahi announces), `run`, `set_up_completed`, `runtime_phase`. |
+| `GET /api/device/setup/status` | V1's `phase` (`idle`/`connecting`/`connected`/`failed`), `lan_ip`, `error`, `mac` (the kernel's host name, `lamp-xxxx`, which avahi announces), `run`, `set_up_completed`, `runtime_phase`; V2's own `generation`, `share_reports`, `takes_own_keys` and, when keys were given, `own_keys`. |
 | `GET /api/network` | `iw dev wlan0 scan`, parsed as V1 does, in V1's `domain.Network` fields. |
 | `POST /api/device/setup` | V1's `SetupRequest`; its other fields are accepted and ignored. Checked before anything is touched: the network's name and password as for the join; `llm_api_key`, the user's voice key (at most 512 printable characters; none keeps the key already there, as on a lamp that ran V1, but a lamp missing either key file is refused with "the lamp needs its voice key", since it would have Wi-Fi and no voice); V2's own `name` (up to 64 characters) and `timezone` (an IANA name whose file, links followed, is a `TZif` zone file inside the zone data; one the lamp lacks is skipped, not a reason to refuse setup). Replies at once, then, 2 s later as in V1, joins; one run at a time; refused once the lamp is set up. |
 
