@@ -1,3 +1,11 @@
+## 2026-10-30 09:1x ICT — #4322 carried as #4465; #4278 rebased; reads for #4332
+
+**Carries:**
+- **#4465**, a draft carry of Mobile's #4322 (the app's Restart and Shut down on in the product). Mobile's commit is unchanged; the one `switches.md` conflict was the new `LAMP_CONTROL_RATES` row. It stays a draft until the first builder's two lamp checks (08:4x) are shown.
+- **#4278** (Fifth's "Lamp, get lower"): rebased as `fourth/carry-4278-stand-asked`, for Fifth to take. There were two conflicts: the skill counts in `update/tests/install.rs` (27 and 26 make 28) and, after train 395, #4097's held-lift tests beside the stand-asked test in `body/tests.rs` (both kept). Under another session's build, lamp-skills failed 11 timing tests; with 4 threads, 360 passed.
+
+**Reads:** READ-OK on #4463 (El's `muted_by`: unchanged declaration, optional both ways, and an old voice gives no field rather than a guessed one); #4467 (El's second-worker startup backlog, the existing `receive_renewed` skip, generations rather than edges); and #4464 (Seventh's walk-owned sentence prompts, the same path as the two existing fallbacks; a P3 on the Live route's mark).
+
 ## 2026-10-30 08:2x ICT — #4439 landed; reads for the 7071 lamps; #3754 setup views
 
 **#4439** (Part of #1569) landed in train 388: the motor tests' `wait` watchdog went from 2 s to 10 s, measured first (longest real wait 869 ms at load 7.4).
