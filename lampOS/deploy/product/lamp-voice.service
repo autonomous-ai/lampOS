@@ -366,12 +366,15 @@ Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
-# The name typed at setup (lamp-setup writes it; a reset wipes it), told to the model with its character
-# so Welcome back can greet by it when no face is known (docs/setup.md, #806). No file, no name.
+# The name typed at setup (lamp-setup writes it; a reset and the owner's own "forget everything" wipe it,
+# #4461), told to the model (docs/setup.md, #806). No file, no name.
 Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name
 # The owner's language (#4473), read at each start: en, vi, ja, zh or ko. No file, empty, en or unknown is English,
 # as before (docs/second-voice.md, "The owner's language").
 Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
+# Never in the character: told only to the owner's own known face alone in view, and by default below
+# (LAMP_PERSON_NAME_OWNER_ONLY, #2602, the first builder's piece 2 on #1711; #4461).
+Environment=LAMP_PERSON_NAME_OWNER_ONLY=on
 # A reply is told the person speaking is most likely the one who set the lamp up, unless someone else is
 # seen or heard now; the reply only, nothing personal kept on it (LAMP_PERSON_NAME_BY_DEFAULT, #3884).
 Environment=LAMP_PERSON_NAME_BY_DEFAULT=on
