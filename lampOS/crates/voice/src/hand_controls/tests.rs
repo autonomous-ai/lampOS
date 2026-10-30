@@ -1098,6 +1098,7 @@ fn a_hand_held_on_the_head_puts_it_to_sleep_and_a_tap_wakes_it_once_saved() {
     let times: Vec<(u64, u64)> = held
         .iter()
         .filter_map(|(_, seen, _)| seen.head_held)
+        .map(|(contact, _, held)| (contact, held))
         .collect();
     assert!(
         times

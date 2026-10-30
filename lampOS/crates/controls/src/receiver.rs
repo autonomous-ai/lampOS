@@ -172,12 +172,19 @@ impl Receiver {
     /// its reason: sleep never takes over a person's privacy mute.
     pub fn request_sleep(&mut self, now_us: u64, began_us: u64, at_us: u64) -> io::Result<bool> {
         self.clock(now_us)?;
-        if began_us <= self.record.through_us || at_us > now_us || !self.record.request_sleep(at_us)
-        {
+        if !self.may_sleep(began_us) || at_us > now_us || !self.record.request_sleep(at_us) {
             return Ok(false);
         }
         self.fence_clear(now_us)?;
         Ok(true)
+    }
+
+    /// Whether a hold whose contact began at `began_us` could put the lamp
+    /// to sleep, as [`Self::request_sleep`] fences it: awake, and the hand
+    /// arrived after the last mute change or clear, so not a hand that woke
+    /// it (#3748: its sleep cue is not played either).
+    pub fn may_sleep(&self, began_us: u64) -> bool {
+        !self.record.muted && began_us > self.record.through_us
     }
 
     /// A tap on the head wakes a lamp put to sleep (#711): an explicit local

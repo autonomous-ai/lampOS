@@ -227,7 +227,10 @@ A tap or new speech while it is owed doesn't cancel it either: it still
 lands when the cue's turn ends, which the tap's own stop may end early.
 The owed sleep is asked with the time the hand arrived, so a hand that woke
 the lamp (a kept hand's wake at the stroke) and stays past 3 s still cannot
-send it back. **Privacy:** with the switch on, the mute and the microphones
+send it back; nor does that hand get the line or the breath, with the switch
+on or off: the coordinator asks `HandControls::hold_may_sleep`, the
+receiver's own fence (`Receiver::may_sleep`), before playing either, and
+the journal says when it skips one for that. **Privacy:** with the switch on, the mute and the microphones
 closing move from the 3 s Hold to the cue's end, at most 6 s after the
 Hold. The microphones stay open past the person's hold for that time, and
 speech in that window does not cancel the sleep. Not

@@ -2988,17 +2988,19 @@ fn held_run_with(
     fresh_us: u64,
     sleep_line: Option<Option<Vec<i16>>>,
 ) -> (Ran, u64) {
-    held_run_kept_at(held_us, lifted_us, fresh_us, sleep_line, None)
+    held_run_kept_at(held_us, lifted_us, fresh_us, sleep_line, None, false)
 }
 
 /// As [`held_run_with`], the line rendered into the speech cache only
-/// `kept_after_us` into the loop when given, not before it starts.
+/// `kept_after_us` into the loop when given, not before it starts; and
+/// with `waking`, on a lamp asleep that the same hand woke at its stroke.
 fn held_run_kept_at(
     held_us: u64,
     lifted_us: u64,
     fresh_us: u64,
     sleep_line: Option<Option<Vec<i16>>>,
     kept_after_us: Option<u64>,
+    waking: bool,
 ) -> (Ran, u64) {
     use std::os::unix::fs::PermissionsExt;
     RIG_SPEAKER_PLAYS.with(|plays| plays.set(sleep_line.is_some()));
@@ -3044,9 +3046,12 @@ fn held_run_kept_at(
                 SPEECH_CACHE_WARMS_AT
                     .with(|warms| *warms.borrow_mut() = Some((now + after, cache)));
             }
-            let mut controls =
-                HandControls::with_test_hold("test-hand-clock", now, held_us, lifted_us, &record)
-                    .unwrap();
+            let hold = if waking {
+                HandControls::with_test_waking_hold
+            } else {
+                HandControls::with_test_hold
+            };
+            let mut controls = hold("test-hand-clock", now, held_us, lifted_us, &record).unwrap();
             controls.set_sleep_line(sleep_line.is_some());
             controls
         },
@@ -3237,6 +3242,7 @@ fn with_the_sleep_line_kept_after_the_loop_started_the_next_hold_says_it() {
         4_000_000,
         Some(Some(line.clone())),
         Some(300_000),
+        false,
     );
     let admitted = ran
         .trace
@@ -3246,6 +3252,46 @@ fn with_the_sleep_line_kept_after_the_loop_started_the_next_hold_says_it() {
     assert_eq!(admitted["admission_basis"], "head_sleep_line");
     assert_eq!(played(&ran), line, "the whole line: {}", ran.error);
     slept_owed(&ran);
+}
+
+/// #3748 (lamp-52e6, 30 Oct): a hand that woke the lamp at its stroke and
+/// stays past three seconds gets no sleep cue, the line or, with the
+/// switch off, the breath: the receiver refuses its sleep, so the lamp
+/// never says "Going to sleep" and stays awake.
+#[test]
+fn a_hand_that_woke_the_lamp_gets_no_sleep_cue_and_it_stays_awake() {
+    for sleep_line in [Some(Some(sleep_line(2))), None] {
+        let (ran, holds_at) =
+            held_run_kept_at(2_050_000, 9_000_000, 3_000_000, sleep_line, None, true);
+        let cues: Vec<_> = ran
+            .trace
+            .iter()
+            .filter(|row| row["kind"] == "head_sleep_breath")
+            .collect();
+        assert_eq!(cues.len(), 1, "{cues:?}");
+        assert_eq!(cues[0]["plays"], false, "{}", cues[0]);
+        assert_eq!(cues[0]["why"], "hold_cannot_sleep");
+        assert!(
+            ran.trace.iter().all(|row| row["kind"] != "input_admitted"
+                || !row["admission_basis"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("head_sleep")),
+            "no sleep cue's turn (the wake's \"hm?\" is the person's)"
+        );
+        assert!(
+            ran.trace
+                .iter()
+                .all(|row| row["kind"] != "hand_control_cancel"),
+            "no sleep"
+        );
+        assert!(
+            ran.error.contains("privacy") && !ran.error.contains("software mute"),
+            "ended only by the stale switch: {}",
+            ran.error
+        );
+        assert!(ran.ended_us > holds_at, "ran past the Hold");
+    }
 }
 
 /// #3748: a hand let go at 2.5 s, before the Hold, cuts the line at once,

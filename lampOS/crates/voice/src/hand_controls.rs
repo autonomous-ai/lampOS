@@ -179,8 +179,9 @@ pub struct Observation {
     /// A hand on the head now, as the newest touch state taken in this poll
     /// says: its contact and how long it has been there (Controls' own
     /// `held_us`), for the breath in a hold's last second (#1362). None
-    /// with no hand, or one Controls gives no time.
-    pub head_held: Option<(u64, u64)>,
+    /// with no hand, or one Controls gives no time. Between the two, when
+    /// the contact began, for [`HandControls::hold_may_sleep`] (#3748).
+    pub head_held: Option<(u64, u64, u64)>,
     /// With `LAMP_SLEEP_LINE=on` and no sleep owed once this poll's events
     /// are taken, a Hold among them included (#3748): the newest touch
     /// state taken in this poll says the hand has left the head (its contact
@@ -303,15 +304,15 @@ fn latch_message(latch: u8) -> Option<VoiceMute> {
     }
 }
 
-/// A hand on the head in a touch state: its contact and Controls' time
-/// for it, while it is there (#1362).
-fn head_held(state: &TouchState) -> Option<(u64, u64)> {
+/// A hand on the head in a touch state: its contact, when it began and
+/// Controls' time for it, while it is there (#1362).
+fn head_held(state: &TouchState) -> Option<(u64, u64, u64)> {
     let head = state
         .sources
         .iter()
         .find(|source| source.source == TouchSource::Head)?;
-    match (head.active, head.contact_id, head.held_us) {
-        (Some(true), Some(contact), Some(held)) => Some((contact, held)),
+    match (head.active, head.contact_id, head.began_us, head.held_us) {
+        (Some(true), Some(contact), Some(began), Some(held)) => Some((contact, began, held)),
         _ => None,
     }
 }
@@ -668,8 +669,38 @@ impl HandControls {
         lifted_us: u64,
         record: &Path,
     ) -> io::Result<Self> {
+        Self::with_test_hold_from(clock_id, now_us, held_us, lifted_us, record, false)
+    }
+
+    /// As [`Self::with_test_hold`], on a lamp asleep before the hand came:
+    /// the same hand woke it at its stroke, 1 s in, the clear committed
+    /// as the muted wait commits it (#3748).
+    #[cfg(test)]
+    pub(crate) fn with_test_waking_hold(
+        clock_id: &str,
+        now_us: u64,
+        held_us: u64,
+        lifted_us: u64,
+        record: &Path,
+    ) -> io::Result<Self> {
+        Self::with_test_hold_from(clock_id, now_us, held_us, lifted_us, record, true)
+    }
+
+    #[cfg(test)]
+    fn with_test_hold_from(
+        clock_id: &str,
+        now_us: u64,
+        held_us: u64,
+        lifted_us: u64,
+        record: &Path,
+        asleep: bool,
+    ) -> io::Result<Self> {
         let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
         let began_us = now_us - held_us;
+        let mut mute = MuteRecord::new(clock_id)?;
+        if asleep {
+            assert!(mute.request_sleep(began_us - 1_500_000));
+        }
         let mut owner = Self::from_parts(
             ControlsOptions {
                 head_touch: true,
@@ -677,7 +708,7 @@ impl HandControls {
                 ..Default::default()
             },
             clock_id,
-            MuteRecord::new(clock_id)?,
+            mute,
             input,
             Arc::new(Shared::default()),
             began_us - 1_000_000,
@@ -701,7 +732,14 @@ impl HandControls {
                     Input::Touch(Box::new(event.clone())),
                 );
             }
-            owner.poll_with_clock(|| *at)?;
+            if asleep {
+                owner.quiescent_with_clock(|| *at)?;
+            } else {
+                owner.poll_with_clock(|| *at)?;
+            }
+        }
+        if asleep {
+            assert!(!owner.muted(), "the hand woke it at its stroke");
         }
         let (_, state, events) = first;
         enqueue(
@@ -1047,6 +1085,13 @@ impl HandControls {
     /// does, unless onboarding is under way.
     pub fn ask_sleep(&mut self) {
         self.sleep_asked = true;
+    }
+
+    /// Whether a hold whose contact began at `began_us` could put the lamp
+    /// to sleep, by the receiver's own fence (#3748): a hand that woke the
+    /// lamp cannot send it back, so its hold gets no sleep cue either.
+    pub fn hold_may_sleep(&self, began_us: u64) -> bool {
+        self.options.mute_record.is_some() && self.receiver.may_sleep(began_us)
     }
 
     /// `LAMP_SLEEP_LINE=on` (#3748): a hand's hold says the recorded sleep

@@ -11842,16 +11842,27 @@ fn conversation_with_gate_inner(
         // the mute above ends this conversation on the pass that sees it,
         // the breath cut there if it still plays, so the microphones close
         // not one sample later for it (the first builder on #1362, 10:35).
-        if let (Some(sound), Some((contact, held_us))) = (sleep_breath.as_ref(), head_held)
+        if let (Some(sound), Some((contact, began_us, held_us))) =
+            (sleep_breath.as_ref(), head_held)
             && crate::head_cue::sighs_at(held_us)
             && sighed_for != Some(contact)
         {
             sighed_for = Some(contact);
             let at_us = monotonic_us();
             // No sigh while the walk is under way: the hold puts nothing to
-            // sleep then (#3747).
+            // sleep then (#3747). Nor for a hold the receiver's fence would
+            // refuse, as the hand that woke the lamp (#3748): no "Going to
+            // sleep" from a lamp that stays awake.
             let decided = if walk_under_way {
                 Err("onboarding_under_way")
+            } else if !controls
+                .as_ref()
+                .is_some_and(|controls| controls.hold_may_sleep(began_us))
+            {
+                eprintln!(
+                    "lamp-voice: a hand's hold: no sleep cue: this hand cannot put the lamp to sleep (it woke it, or the lamp is muted)"
+                );
+                Err("hold_cannot_sleep")
             } else {
                 crate::head_cue::may_sigh(&crate::head_cue::Now {
                     at_us,
