@@ -1111,6 +1111,10 @@ fn worker_command(
             role,
             var(lamp_msgs::SHUTDOWN_SWITCH).as_deref(),
         ))
+        .envs(night_worker_environment(
+            role,
+            var(crate::ring_night::ENVIRONMENT).as_deref(),
+        ))
         .envs(scheduling_worker_environment(
             role,
             var(crate::worker_scheduling::ENVIRONMENT).as_deref(),
@@ -1671,6 +1675,16 @@ fn shutdown_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((lamp_msgs::SHUTDOWN_SWITCH, "on"))
+}
+
+// The night's asleep face (#3748), the same narrow way: the exact `on`, to
+// the ring only, which eases its resting face into it.
+fn night_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::ring_night::ENVIRONMENT, "on"))
 }
 
 #[cfg(test)]
@@ -2289,8 +2303,8 @@ mod tests {
     /// days, the clock, the name's file (#1323) and its scoped context
     /// (#1839), both task news's told file (#2762), capture the quiet
     /// evidence switch (#1285) and the detector's input (#828), and the ring
-    /// the unplug switch (#1674, the reviewer on #1699) and the shutdown's
-    /// (#3697). With every other variable set to a secret,
+    /// the unplug switch (#1674, the reviewer on #1699), the shutdown's
+    /// (#3697) and the night's asleep face (#3748). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
     fn a_started_worker_gets_its_roles_switches_and_nothing_else() {
@@ -2339,6 +2353,7 @@ mod tests {
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
+                    crate::ring_night::ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                 ]
                 .contains(&name)
@@ -2608,7 +2623,14 @@ mod tests {
                     "LAMP_VAD_INPUT=linear",
                 ],
             ),
-            ("ring", vec!["LAMP_SHUTDOWN=on", "LAMP_UNPLUG=on"]),
+            (
+                "ring",
+                vec![
+                    "LAMP_NIGHT_ASLEEP_FACE=on",
+                    "LAMP_SHUTDOWN=on",
+                    "LAMP_UNPLUG=on",
+                ],
+            ),
             ("speaker", vec![]),
         ] {
             let status = status_of_fresh(&mut worker_command(

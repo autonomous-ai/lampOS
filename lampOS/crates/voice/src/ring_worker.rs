@@ -69,6 +69,9 @@ pub struct Senses {
     /// ([`crate::ring_mood`]).
     pub mood: Option<crate::ring_mood::RingMood>,
     pub unplug: Option<crate::ring_unplug::RingUnplug>,
+    /// Expression's night sleep, for the asleep face at rest (#3748): only
+    /// with `LAMP_NIGHT_ASLEEP_FACE=on` ([`crate::ring_night`]).
+    pub night: Option<crate::ring_night::RingNight>,
     /// The primary button held, for the shutdown's warning (#3697): with
     /// `LAMP_SHUTDOWN=on`, held 5 to 15 s ([`lamp_msgs::shutdown_hold`]),
     /// the ring shows [`shutdown_warning`] in place of its face.
@@ -266,6 +269,10 @@ pub fn run_continuous(
         .filter(|_| lamp_body::unplug::enabled())
         .map(crate::ring_unplug::RingUnplug::on)
         .transpose()?;
+    let night = bus_root
+        .filter(|_| crate::ring_night::enabled())
+        .map(crate::ring_night::RingNight::on)
+        .transpose()?;
     // Only with the switch on, which the voice hands this worker (#3697).
     let button = bus_root
         .filter(|_| lamp_msgs::shutdown_switched_on())
@@ -274,6 +281,7 @@ pub fn run_continuous(
     let senses = Senses {
         caps,
         unplug,
+        night,
         button,
         light,
         eye,
@@ -571,6 +579,7 @@ fn service(
         mut head,
         mut mood,
         mut unplug,
+        mut night,
         mut button,
     } = senses;
     let mut light = light.map(|(light, begins)| {
@@ -788,7 +797,14 @@ fn service(
                     unplug.drew(receipt.finished_at().as_micros(), presentation)?;
                 }
             } else {
-                let pixels = face.render(Mood::Resting, 0, at, ceiling.get());
+                let mut pixels = face.render(Mood::Resting, 0, at, ceiling.get());
+                // Asleep at night, the asleep face eases in; the person's
+                // light, on, wins, as at a hand's sleep (#3748).
+                let lit = face.lit().on;
+                let share = night.as_mut().map_or(0.0, |night| night.tick(at, !lit));
+                if share > 0.0 {
+                    pixels = crate::ring_night::over(&pixels, share, at);
+                }
                 let own_light = face.rests_on_its_light(at);
                 rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
             }
