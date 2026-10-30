@@ -3882,7 +3882,8 @@ pub fn tools(no_slide: bool, face_ask: bool) -> Vec<Tool> {
                  talking as the step asked. Only for the step you are leading now; {measured} \
                  can only be skipped; the runner requires physical evidence: {evidence}. \
                  {clear_yes}The runner asks each step in its own words and counts every try: never name, announce, \
-                 explain or ask a step yourself, and never count calls or say how many are left."
+                 explain or ask a step yourself, and never count calls or say how many are left. \
+                 {PREFERENCES_LINES}"
             ),
             parameters: Some(json!({
                 "type": "object",
@@ -3917,16 +3918,26 @@ pub fn is_tool(name: &str) -> bool {
     matches!(name, STEP | REDO)
 }
 
-/// The provider worker's side: put what the model reported in the mailbox
-/// for the runner, and say what to tell the model. Each call's step,
-/// outcome and answer go in the journal: on lamp-29e7 on 27 Oct three
-/// setup_step calls left "the onboarding answered" and nothing more, so
-/// what held "who you are" for 5 minutes could not be read (#3883).
 /// What `setup_step` tells the model when it reports "preferences": there
 /// is nothing more to ask, and the walk says the last line.
 const PREFERENCES_ANSWER: &str = "That was the last question. Answer in at most five words, \
      never with a question: there are no more questions, and I say the last line myself.";
 
+/// What `setup_step`'s description tells the model of every answer it
+/// gives in "preferences", and only there, since the tools are declared once
+/// for the whole walk and other steps ask again ("Sorry, what should I call
+/// you?"): the skill's own words say so too, but on lamp-52e6 on 30
+/// Oct (#4520 over 8811, #3769) "Quiet from ten until I wake up again." got
+/// 17 words, and the walk's hello, which waits for them, came 13.1 s after
+/// the line against its 8 s.
+const PREFERENCES_LINES: &str = "In the preferences step only, answer each line in at most five \
+     words and never with a question: the runner asks the rest itself.";
+
+/// The provider worker's side: put what the model reported in the mailbox
+/// for the runner, and say what to tell the model. Each call's step,
+/// outcome and answer go in the journal: on lamp-29e7 on 27 Oct three
+/// setup_step calls left "the onboarding answered" and nothing more, so
+/// what held "who you are" for 5 minutes could not be read (#3883).
 pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
     let (told, answered) = answer(file, call);
     let said = |key: &str| call.args.get(key).and_then(Value::as_str).unwrap_or("none");
@@ -7729,6 +7740,32 @@ mod tests {
             for name in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
                 assert!(steps.iter().any(|step| step == name), "{name}");
             }
+        }
+    }
+
+    /// lamp-52e6 on 30 Oct 13:27 (#3769): the quiet hours' answer ran to 17
+    /// words and held the hello 13.1 s. Every answer turn in "preferences",
+    /// the quiet hours' too, is told five words and no question, whichever
+    /// steps the lamp offers; no other step is.
+    #[test]
+    fn every_preferences_answer_is_told_five_words_and_no_question() {
+        for (sounds, face) in [(false, false), (true, false), (false, true), (true, true)] {
+            let told = tools(sounds, face);
+            assert!(
+                told[0].description.ends_with(
+                    "In the preferences step only, answer each line in at most five words and \
+                     never with a question: the runner asks the rest itself."
+                ),
+                "{}",
+                told[0].description
+            );
+            // Other steps still ask again ("Sorry, what should I call
+            // you?"): the cap is said once, scoped to preferences, and no
+            // other function carries it.
+            let text = told_text(&told);
+            assert_eq!(text.matches("five words").count(), 1, "{text}");
+            assert_eq!(text.matches("never with a question").count(), 1, "{text}");
+            assert!(!told[1].description.contains("five words"));
         }
     }
 
