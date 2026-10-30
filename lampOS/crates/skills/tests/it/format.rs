@@ -420,7 +420,7 @@ fn the_schemas_lists_are_the_codes() {
     .unwrap();
     assert_eq!(
         listed(&["$defs", "gesture"]),
-        control["$defs"]["gesture"]["enum"]
+        control["$defs"]["gesture"]["examples"]
             .as_array()
             .unwrap()
             .iter()

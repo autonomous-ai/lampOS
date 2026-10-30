@@ -94,8 +94,10 @@
       ]
     },
     "gesture": {
-      "description": "The body's built-in clips (crates/body/src/clips/data.rs) a client may ask for. Not `idle`, which is the lamp's own, or `scanning`, which reads as a machine (rule 8).",
-      "enum": [
+      "description": "A body clip (crates/body/src/clips/data.rs) by name. The door checks only the name's shape, as lamp-control's plain_name (a lowercase letter, then lowercase letters, digits, _ or -, at most 64), and the body answers a name it doesn't have. `examples` are the clips offered to programs (skills and add-ons name these); `idle`, the lamp's own life, and `scanning`, a room sweep, are taken too.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+      "examples": [
         "nod",
         "headshake",
         "greeting",
@@ -404,10 +406,10 @@
           "uniqueItems": true
         },
         "for_ms": {
-          "description": "At most 30 s; renew to keep it, up to 10 min a take.",
+          "description": "At most 10 min a take or renewal; renewed in time, a lease is held as long as its holder renews.",
           "type": "integer",
           "minimum": 1,
-          "maximum": 30000
+          "maximum": 600000
         },
         "why": {
           "description": "Journaled and shown in the app.",
@@ -438,7 +440,7 @@
         "for_ms": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 30000
+          "maximum": 600000
         }
       },
       "required": [
@@ -485,7 +487,7 @@
         },
         "feeling": {
           "type": "string",
-          "pattern": "^[a-z][a-z_]{1,23}$"
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
         },
         "strength": {
           "type": "number",
@@ -542,18 +544,14 @@
               ]
             },
             {
-              "description": "Degrees from straight ahead: yaw right positive, pitch up positive; the body keeps it within its gaze reach.",
+              "description": "Degrees from straight ahead: yaw right positive, pitch up positive; any finite number, the body clamps it to its gaze reach (the done says `clamped`).",
               "type": "object",
               "properties": {
                 "yaw": {
-                  "type": "number",
-                  "minimum": -180,
-                  "maximum": 180
+                  "type": "number"
                 },
                 "pitch": {
-                  "type": "number",
-                  "minimum": -90,
-                  "maximum": 90
+                  "type": "number"
                 }
               },
               "required": [
@@ -590,12 +588,13 @@
           "maximum": 1000
         },
         "frames": {
+          "description": "At least 2; at most what the body's move check allows (10 s at the shortest step, 40 ms: 251 frames).",
           "type": "array",
           "items": {
             "$ref": "#/$defs/frame"
           },
           "minItems": 2,
-          "maxItems": 500,
+          "maxItems": 251,
           "prefixItems": [
             {
               "description": "The first frame is the pose: all 0.",
@@ -630,7 +629,7 @@
         },
         "name": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
         }
       },
       "required": [
@@ -677,8 +676,7 @@
         },
         "within_ms": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 5000
+          "minimum": 0
         }
       },
       "required": [
@@ -727,7 +725,7 @@
       "additionalProperties": false
     },
     "say": {
-      "description": "A line in the lamp's own voice, through its quiet, privacy and busy gates.",
+      "description": "A line in the lamp's own voice, through its privacy and busy gates, and its quiet hours when set.",
       "type": "object",
       "properties": {
         "id": {
@@ -737,10 +735,10 @@
           "const": "say"
         },
         "text": {
+          "description": "Words, at most 900 UTF-8 bytes, the voice's own cap (lamp-voice's MOST_WORDS_BYTES; hello's limits say_max_bytes). JSON Schema can't count bytes, so lamp-control checks it.",
           "type": "string",
           "minLength": 1,
-          "maxLength": 300,
-          "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f]+$"
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
         }
       },
       "required": [
@@ -762,7 +760,7 @@
         },
         "name": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
         }
       },
       "required": [
@@ -988,7 +986,7 @@
       "description": "A refusal. New fields may come; a client ignores what it doesn't know."
     },
     "limits": {
-      "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), the lease and say bounds, and this lamp's quiet hours.",
+      "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), a light's and a lease's longest hold, the longest say, and this lamp's quiet hours.",
       "type": "object",
       "properties": {
         "rates": {
@@ -996,7 +994,7 @@
           "const": "off"
         },
         "quiet_hours": {
-          "description": "This lamp's quiet hours (lamp-control's --quiet-hours, 22:00 to 07:00 local unless set): `say` and `sound` are refused inside them, local times from `from` up to `to`, across midnight when `to` comes first; or \"off\".",
+          "description": "This lamp's quiet hours (lamp-control's --quiet-hours or LAMP_CONTROL_QUIET; \"off\" unless set): when set, `say` and `sound` are refused inside them, local times from `from` up to `to`, across midnight when `to` comes first; or \"off\".",
           "anyOf": [
             {
               "const": "off"
@@ -1163,10 +1161,12 @@
         "hold_max_ms": {
           "type": "integer"
         },
-        "take_max_ms": {
+        "lease_max_ms": {
+          "description": "The longest one lease take or renewal asks for (600000); renewed in time, a lease has no ceiling. `hold_max_ms` stays a light's longest `for_ms` (30000).",
           "type": "integer"
         },
-        "say_max_chars": {
+        "say_max_bytes": {
+          "description": "The longest say's text in UTF-8 bytes (900), the voice's own cap.",
           "type": "integer"
         },
         "push": {
@@ -1248,7 +1248,7 @@
           "type": "boolean"
         },
         "quiet_hours": {
-          "description": "Planned: not produced yet. The door refuses say and sound in quiet hours, or while the lamp's local time isn't known, with the error `quiet_hours` (control.md, quiet hours); this state key is a later piece.",
+          "description": "Planned: not produced yet. With quiet hours set (off by default), the door refuses say and sound in them, or while the lamp's local time isn't known, with the error `quiet_hours` (control.md, quiet hours); this state key is a later piece.",
           "type": "boolean"
         },
         "lease": {

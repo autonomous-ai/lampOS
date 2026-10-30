@@ -111,19 +111,22 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         identity.pin
     );
     // The quiet hours (#3917): the lamp's zone, `--zone`, `system` by
-    // default. One that can't be read keeps every computer's say and sound
-    // refused as quiet, never a silent UTC.
+    // default. With a window set, one that can't be read keeps every
+    // computer's say and sound refused as quiet, never a silent UTC; with
+    // the quiet hours off (the default) the zone is never consulted.
     let zone = option(arguments, "--zone").unwrap_or_else(|| "system".to_owned());
     let local_time = match lamp_local_time::LocalTime::zone(&zone) {
         Ok(local_time) => Some(Arc::new(local_time)),
         Err(error) => {
-            eprintln!("lamp-control: {error}; say and sound are refused as quiet hours");
+            eprintln!(
+                "lamp-control: {error}; with quiet hours set, say and sound are refused as quiet"
+            );
             None
         }
     };
     // This lamp's own window (`--quiet-hours`, else LAMP_CONTROL_QUIET),
-    // 22:00 to 07:00 unless set; `off` only when said. A bad value stops it
-    // here, before anything is served.
+    // off unless set (the owner's "no limits for developers", 30 Oct). A
+    // bad value stops it here, before anything is served.
     let window = session::quiet_window_of(
         option(arguments, "--quiet-hours").as_deref(),
         std::env::var("LAMP_CONTROL_QUIET").ok().as_deref(),

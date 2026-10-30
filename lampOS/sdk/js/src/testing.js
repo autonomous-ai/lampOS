@@ -60,8 +60,9 @@ export const PULSE_GAP_MS = 60_000;
 // second. The Python SDK's skillcheck has the same.
 export const MOVE_STEP_MS = [40, 1000];
 export const MOVE_LASTS_MS = [1500, 10000];
-// A computer's move: 2 to 500 frames (lamp-control's protocol.rs FRAMES).
-export const MOVE_FRAMES = [2, 500];
+// A computer's move: 2 frames at the least (lamp-control's protocol.rs
+// FRAMES_MIN); its most are the body's check's (10 s at a 40 ms step, 251).
+export const MOVE_FRAMES_MIN = 2;
 export const MOVE_FARTHEST = [200, 200, 150, 350, 350];
 export const MOVE_FASTEST = [900, 1300, 1000, 800, 800];
 
@@ -99,7 +100,7 @@ export function moveWhy(stepMs, frames) {
 // `bad_request`: its own shape first, then the body's check; null for one it takes.
 export function moveRefusal(stepMs, frames) {
   if (stepMs < MOVE_STEP_MS[0] || stepMs > MOVE_STEP_MS[1]) return `step_ms: from ${MOVE_STEP_MS[0]} to ${MOVE_STEP_MS[1]}`;
-  if (frames.length < MOVE_FRAMES[0] || frames.length > MOVE_FRAMES[1]) return `frames: from ${MOVE_FRAMES[0]} to ${MOVE_FRAMES[1]}`;
+  if (frames.length < MOVE_FRAMES_MIN) return `frames: at least ${MOVE_FRAMES_MIN}`;
   const home = (frame) => Array.isArray(frame) && frame.length === 5 && frame.every((count) => count === 0);
   if (!home(frames[0]) || !home(frames.at(-1))) return 'frames: start and end at home, all five 0';
   const why = moveWhy(stepMs, frames);

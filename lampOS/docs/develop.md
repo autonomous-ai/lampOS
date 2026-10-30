@@ -117,10 +117,14 @@ then `heard: good night lamp` and `lease: held`.
   registered, never what else was said. The full table is in the SDK's
   README.
 - **Actions** return once the lamp has taken them. A refusal is a typed
-  error, such as `rate` (with `retry_ms`), `no_grant`, `private` or
-  `quiet_hours`. `say` and `sound` are refused in the lamp's quiet hours,
-  22:00 to 07:00 its local time unless the lamp sets its own; hello's
-  `limits.quiet_hours` says this lamp's window, or `"off"`.
+  error, such as `rate` (with `retry_ms`), `no_grant`, `busy` or
+  `quiet_hours`. Quiet hours are off by default; a lamp that sets them
+  (`--quiet-hours`) refuses `say` and `sound` inside them, and hello's
+  `limits.quiet_hours` says this lamp's window, or `"off"`. Privacy, a
+  pause or sleep don't refuse a request: they lose your leases (with that
+  `why`) and drop a `say` (its `done` says `dropped`). A `say` is at
+  most 900 UTF-8 bytes, the voice's own cap, a gesture may be any of the body's clips, and a
+  `look` any angle: the body clamps it to its reach.
 - **The rates are off by default** (the person's decision, 30 Oct 02:1x): hello's `limits`
   says `"rates": "off"`, and only the refused actions' guard and the phrase
   changes (6 a minute) hold. `lamp-control --rates default` (or
@@ -135,8 +139,9 @@ then `heard: good night lamp` and `lease: held`.
   refused `busy` with a `retry_ms`, not queued.
 - **A body lease** (`lamp.lease("body")`) is needed for `look`, `move`,
   `play` and `joints`. For a gesture it keeps the lamp's own idle life
-  back. It is renewed for you every 15 s, lasts at most 10 minutes a take,
-  and is let go when the block ends.
+  back. It is renewed for you every 15 s, held as long as it is renewed
+  (one take or renewal asks for up to 10 minutes), and let go when the
+  block ends.
 
 **Reading state:** `await lamp.get("presence", "lamp")` gives the states asked,
 by name: `{"presence": {"count": 1, "near": 0.31, "facing": true}, "lamp": {...}}`.

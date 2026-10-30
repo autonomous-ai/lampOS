@@ -13,8 +13,10 @@ use serde_json::{Map, Value, json};
 /// The protocol's version, as the path (`/v1`) and `hello` say it.
 pub const VERSION: u32 = 1;
 
-/// The longest `say`, in characters.
-pub const SAY_MAX_CHARS: usize = 300;
+/// The longest `say`, in UTF-8 bytes: the voice's own (`lamp_voice::say`'s
+/// `MOST_WORDS_BYTES`), so a say the voice would refuse is refused here, in
+/// words, never answered `{"to":"voice"}` and then dropped.
+pub const SAY_MAX_BYTES: usize = 900;
 /// How many phrases one client may listen for (`phrase.heard`).
 pub const PHRASES_MAX: usize = 16;
 /// The longest phrase, in characters.
@@ -38,15 +40,19 @@ pub fn phrase_words(text: &str) -> Vec<String> {
         .map(str::to_lowercase)
         .collect()
 }
-/// The longest a light request or one lease renewal holds, in ms: as the
-/// ring's own light requests ([`lamp_msgs::LightRequest`]'s claims, ≤ 30 s).
+/// The longest a light request holds, in ms: as the ring's own light
+/// requests ([`lamp_msgs::LightRequest`]'s claims, ≤ 30 s).
 pub const HOLD_MAX_MS: u32 = 30_000;
+/// The longest one lease take or renewal asks for, in ms: ten minutes. A
+/// lease renewed in time is held as long as its holder renews (the owner's
+/// "no limits for developers", 30 Oct).
+pub const LEASE_MAX_MS: u32 = 600_000;
 /// A move's step, in ms: the body's own (`lamp_body::moves::check`).
 pub const STEP_MS: std::ops::RangeInclusive<u32> = 40..=1_000;
-/// A move's frames: from a start to an end at the least.
-pub const FRAMES: std::ops::RangeInclusive<usize> = 2..=500;
-/// The longest a `joints` goal may take to reach, in ms.
-pub const WITHIN_MAX_MS: u32 = 5_000;
+/// A move's fewest frames: a start and an end. Its most are the body's own
+/// bound, held by `lamp_body::moves::check` (at most 10 s, so at most 251
+/// frames at the shortest step); the frame's 64 KiB bounds the list read.
+pub const FRAMES_MIN: usize = 2;
 /// The longest name a client gives itself at pairing, in characters.
 pub const CLIENT_NAME_MAX_CHARS: usize = 64;
 /// A pushed skill package's largest size, in bytes.
@@ -199,11 +205,6 @@ pub struct Angles {
     pub yaw: f32,
     pub pitch: f32,
 }
-
-/// Body clips a client may not ask for: `idle` is the lamp's own life, and
-/// `scanning` a room sweep, which CLAUDE.md's rule 8 keeps for a person's
-/// own ask (blue on #3504, 27 Oct).
-pub const GESTURES_REFUSED: [&str; 2] = ["idle", "scanning"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -505,14 +506,14 @@ impl Op {
                 if parts.is_empty() {
                     return Err("parts: at least one".to_owned());
                 }
-                held_for(*for_ms)?;
+                held_for(*for_ms, LEASE_MAX_MS)?;
                 if why.as_ref().is_some_and(|why| why.chars().count() > 200) {
                     return Err("why: at most 200 characters".to_owned());
                 }
             }
             Self::LeaseRenew { lease, for_ms } => {
                 lease_id(lease)?;
-                held_for(*for_ms)?;
+                held_for(*for_ms, LEASE_MAX_MS)?;
             }
             Self::LeaseRelease { lease } => lease_id(lease)?,
             Self::Express { feeling, strength } => {
@@ -521,23 +522,19 @@ impl Op {
                     return Err("strength: from 0 to 1".to_owned());
                 }
             }
-            Self::Gesture { name } => {
-                plain_name(name, "name")?;
-                if GESTURES_REFUSED.contains(&name.as_str()) {
-                    return Err(format!("name: {name} is the lamp's own, not a client's"));
-                }
-            }
-            Self::Play { name } | Self::Sound { name } => {
+            // Any gesture the body has, `idle` and `scanning` too: the body
+            // answers a name it doesn't know (the owner's "no limits for
+            // developers", 30 Oct).
+            Self::Gesture { name } | Self::Play { name } | Self::Sound { name } => {
                 plain_name(name, "name")?;
             }
+            // Any finite angles: the body clamps them to its reach and says
+            // so in the done (`clamped`).
             Self::Look { at } => {
                 if let LookAt::Angles(Angles { yaw, pitch }) = at
-                    && !(yaw.is_finite()
-                        && pitch.is_finite()
-                        && (-180.0..=180.0).contains(yaw)
-                        && (-90.0..=90.0).contains(pitch))
+                    && !(yaw.is_finite() && pitch.is_finite())
                 {
-                    return Err("at: yaw from -180 to 180, pitch from -90 to 90".to_owned());
+                    return Err("at: yaw and pitch, finite degrees".to_owned());
                 }
             }
             Self::Move { step_ms, frames } => {
@@ -548,12 +545,8 @@ impl Op {
                         STEP_MS.end()
                     ));
                 }
-                if !FRAMES.contains(&frames.len()) {
-                    return Err(format!(
-                        "frames: from {} to {}",
-                        FRAMES.start(),
-                        FRAMES.end()
-                    ));
+                if frames.len() < FRAMES_MIN {
+                    return Err(format!("frames: at least {FRAMES_MIN}"));
                 }
                 if frames.first() != Some(&[0; 5]) || frames.last() != Some(&[0; 5]) {
                     return Err("frames: start and end at home, all five 0".to_owned());
@@ -574,11 +567,9 @@ impl Op {
                 lamp_body::moves::check(&file)
                     .map_err(|why| format!("frames: a move this body cannot play: {why}"))?;
             }
-            Self::Joints {
-                lease,
-                targets,
-                within_ms,
-            } => {
+            // Any `within_ms`: the body's caps pace each step (the owner's
+            // "no limits for developers", 30 Oct).
+            Self::Joints { lease, targets, .. } => {
                 lease_id(lease)?;
                 let values = targets.values();
                 if values.iter().all(Option::is_none) {
@@ -590,9 +581,6 @@ impl Op {
                     .any(|value| !value.is_finite() || !(-180.0..=180.0).contains(value))
                 {
                     return Err("targets: degrees from -180 to 180".to_owned());
-                }
-                if *within_ms > WITHIN_MAX_MS {
-                    return Err(format!("within_ms: at most {WITHIN_MAX_MS}"));
                 }
             }
             Self::Light {
@@ -610,15 +598,19 @@ impl Op {
                 if !(1..=lamp_msgs::Light::BRIGHTEST).contains(level) {
                     return Err(format!("level: from 1 to {}", lamp_msgs::Light::BRIGHTEST));
                 }
-                held_for(*for_ms)?;
+                held_for(*for_ms, HOLD_MAX_MS)?;
             }
+            // Words, at most what the voice takes ([`SAY_MAX_BYTES`]), and no
+            // control character, a newline or tab included, as the voice
+            // refuses them (lamp-voice's say.rs).
             Self::Say { text } => {
-                let chars = text.chars().count();
-                if !text.chars().any(char::is_alphanumeric)
-                    || chars > SAY_MAX_CHARS
-                    || text.chars().any(|c| c.is_control() && c != '\n')
-                {
-                    return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
+                if !text.chars().any(char::is_alphanumeric) || text.chars().any(char::is_control) {
+                    return Err("text: words, no control characters".to_owned());
+                }
+                if text.len() > SAY_MAX_BYTES {
+                    return Err(format!(
+                        "text: at most {SAY_MAX_BYTES} bytes as the voice takes it"
+                    ));
                 }
             }
             Self::Stop {} | Self::SkillList {} => {}
@@ -836,11 +828,11 @@ fn lease_id(text: &str) -> Result<(), String> {
         .ok_or_else(|| "lease: the id lease.take gave, l_ and digits".to_owned())
 }
 
-fn held_for(ms: u32) -> Result<(), String> {
-    (1..=HOLD_MAX_MS)
+fn held_for(ms: u32, max_ms: u32) -> Result<(), String> {
+    (1..=max_ms)
         .contains(&ms)
         .then_some(())
-        .ok_or_else(|| format!("for_ms: from 1 to {HOLD_MAX_MS}"))
+        .ok_or_else(|| format!("for_ms: from 1 to {max_ms}"))
 }
 
 /// A lowercase name, as skills', moves' and gestures' are: a letter, then
@@ -964,15 +956,67 @@ mod tests {
         );
     }
 
+    /// The owner's "no limits for developers" (30 Oct): what the door
+    /// once refused for policy alone is taken, and the body's own bounds
+    /// and the frame's size still hold it.
+    #[test]
+    fn limits_kept_only_for_policy_are_lifted() {
+        let accepted = [
+            r#"{"id":1,"op":"gesture","name":"idle"}"#.to_owned(),
+            r#"{"id":1,"op":"gesture","name":"scanning"}"#.to_owned(),
+            r#"{"id":1,"op":"look","at":{"yaw":270,"pitch":-120}}"#.to_owned(),
+            r#"{"id":1,"op":"joints","lease":"l_1","targets":{"pitch":4},"within_ms":10000}"#
+                .to_owned(),
+            r#"{"id":1,"op":"lease.take","parts":["body"],"for_ms":600000}"#.to_owned(),
+            r#"{"id":1,"op":"lease.renew","lease":"l_1","for_ms":600000}"#.to_owned(),
+        ];
+        for frame in &accepted {
+            assert!(parse(frame).is_ok(), "{frame}: {:?}", parse(frame));
+        }
+        // A move as long as the body plays (10 s at a 40 ms step, 251
+        // frames) is taken; one longer, the body's check refuses.
+        let still = |n: usize| {
+            let frames = vec!["[0,0,0,0,0]"; n].join(",");
+            format!(r#"{{"id":1,"op":"move","step_ms":40,"frames":[{frames}]}}"#)
+        };
+        assert!(parse(&still(251)).is_ok());
+        assert!(why(&still(252)).1.contains("not 1500 to 10000"));
+    }
+
+    /// A say is held to the voice's own length, 900 UTF-8 bytes
+    /// (`lamp_voice::say::MOST_WORDS_BYTES`), counted in bytes, not
+    /// characters.
+    #[test]
+    fn a_say_is_at_most_the_900_bytes_the_voice_takes() {
+        let say = |text: &str| format!(r#"{{"id":1,"op":"say","text":"{text}"}}"#);
+        assert!(parse(&say(&"a".repeat(SAY_MAX_BYTES))).is_ok());
+        let (re, words) = why(&say(&"a".repeat(SAY_MAX_BYTES + 1)));
+        assert_eq!(re, Some(1));
+        assert!(
+            words.contains("text: at most 900 bytes as the voice takes it"),
+            "{words}"
+        );
+        // "ế" is three bytes: 300 of them are 900 bytes, 301 are over.
+        assert_eq!("ế".len(), 3);
+        assert!(parse(&say(&"ế".repeat(300))).is_ok());
+        // Any control character, a newline or tab too, as the voice refuses.
+        for control in [r"\n", r"\t", r"\r", r"\u0007"] {
+            assert!(
+                why(&say(&format!("two{control}lines")))
+                    .1
+                    .contains("text: words, no control characters"),
+                "{control}"
+            );
+        }
+        assert!(why(&say(&"ế".repeat(301))).1.contains("at most 900 bytes"));
+    }
+
     #[test]
     fn each_ops_own_limits_refuse_it() {
         let refused = [
             r#"{"id":1,"op":"say","text":""}"#.to_owned(),
             r#"{"id":1,"op":"say","text":"..."}"#.to_owned(),
-            format!(
-                r#"{{"id":1,"op":"say","text":"{}"}}"#,
-                "a".repeat(SAY_MAX_CHARS + 1)
-            ),
+            r#"{"id":1,"op":"say","text":"hi\u0007"}"#.to_owned(),
             r#"{"id":1,"op":"light","colour":"magenta","level":3,"for_ms":1000}"#.to_owned(),
             r#"{"id":1,"op":"light","colour":"warm","level":0,"for_ms":1000}"#.to_owned(),
             r#"{"id":1,"op":"light","colour":"warm","level":6,"for_ms":1000}"#.to_owned(),
@@ -983,14 +1027,14 @@ mod tests {
             r#"{"id":1,"op":"lease.take","parts":[],"for_ms":1000}"#.to_owned(),
             r#"{"id":1,"op":"lease.take","parts":["arm"],"for_ms":1000}"#.to_owned(),
             r#"{"id":1,"op":"lease.renew","lease":"81","for_ms":1000}"#.to_owned(),
+            r#"{"id":1,"op":"lease.take","parts":["body"],"for_ms":600001}"#.to_owned(),
+            r#"{"id":1,"op":"lease.take","parts":["body"],"for_ms":0}"#.to_owned(),
+            r#"{"id":1,"op":"lease.renew","lease":"l_1","for_ms":600001}"#.to_owned(),
             r#"{"id":1,"op":"express","feeling":"glad","strength":1.5}"#.to_owned(),
             r#"{"id":1,"op":"express","feeling":"Glad"}"#.to_owned(),
             r#"{"id":1,"op":"gesture","name":"../nod"}"#.to_owned(),
-            r#"{"id":1,"op":"look","at":{"yaw":200,"pitch":0}}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":10,"pitch":5,"roll":30}}"#.to_owned(),
             r#"{"id":1,"op":"stop","lease":"l_1"}"#.to_owned(),
-            r#"{"id":1,"op":"gesture","name":"idle"}"#.to_owned(),
-            r#"{"id":1,"op":"gesture","name":"scanning"}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":5,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
             // What the body would drop: 600 ms, a 20 ms step, too far, too fast
             // (lamp_body::moves::check; Ten's finding on #3997).
@@ -1003,8 +1047,6 @@ mod tests {
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[0,0,0,0,0],[0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"joints","lease":"l_1","targets":{},"within_ms":100}"#.to_owned(),
             r#"{"id":1,"op":"joints","lease":"l_1","targets":{"pitch":400},"within_ms":100}"#
-                .to_owned(),
-            r#"{"id":1,"op":"joints","lease":"l_1","targets":{"pitch":4},"within_ms":5001}"#
                 .to_owned(),
             r#"{"id":1,"op":"subscribe","events":[]}"#.to_owned(),
             r#"{"id":1,"op":"subscribe","events":["phrase.heard"]}"#.to_owned(),

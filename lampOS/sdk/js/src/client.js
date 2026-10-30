@@ -84,9 +84,27 @@ function open(host, port, pin) {
   });
 }
 
+// The longest say's text in UTF-8 bytes: the voice's own cap, which
+// lamp-control holds too (protocol.rs SAY_MAX_BYTES, lamp-voice's
+// MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
+export const SAY_MAX_BYTES = 900;
+
 function check(op, fields) {
   if (!schema.ops.includes(op)) throw new LampError(`no op ${op} in v${schema.VERSION}`, { code: 'bad_request' });
-  const allowed = { name: op === 'gesture' ? schema.gestures : null, colour: schema.colours, pattern: schema.patterns };
+  if (op === 'say' && typeof fields.text === 'string') {
+    // Any control character (Unicode Cc, as Rust's char::is_control), a newline
+    // or tab too: the door and the voice refuse them.
+    if (/\p{Cc}/u.test(fields.text)) throw new LampError('text: words, no control characters', { code: 'bad_request' });
+    if (Buffer.byteLength(fields.text, 'utf8') > SAY_MAX_BYTES) {
+      throw new LampError(`text: at most ${SAY_MAX_BYTES} bytes as the voice takes it`, { code: 'bad_request' });
+    }
+  }
+  // A gesture's name is held to its shape only, as the door holds it: any body
+  // clip, `idle` and `scanning` too (never stricter than the lamp).
+  if (op === 'gesture' && fields.name !== undefined && !(typeof fields.name === 'string' && schema.gesturePattern.test(fields.name))) {
+    throw new LampError(`name ${fields.name}: a lowercase letter, then lowercase letters, digits, _ or -, at most 64`, { code: 'bad_request' });
+  }
+  const allowed = { colour: schema.colours, pattern: schema.patterns };
   for (const [field, names] of Object.entries(allowed)) {
     const value = fields[field];
     if (names && value !== undefined && !names.includes(value)) {

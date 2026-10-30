@@ -21,7 +21,7 @@ export const SHOWN = new Set([
   // A dev lamp's `--rates off`, said in hello's limits.
   'rates',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
-  'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id',
+  'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id', 'lease_max_ms', 'say_max_bytes',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',
   'most', 'motion', 'name', 'near', 'ok', 'on', 'op', 'open', 'parts', 'pattern', 'paused', 'phrase', 'phrases',
   'pitch', 'presence', 'press', 'private', 'push', 'quiet_hours', 're', 'refused', 'retry_ms',

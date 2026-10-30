@@ -113,7 +113,7 @@ test('the debug log redacts what would pair or hello as this computer', async ()
     { re: 2, ok: true, state: { mood: { energy: 0.5, warmth: 0.6, awake: true, asleep: false }, light: { on: true, colour: 'warm', level: 3, shows: { on: true, colour: 'warm', level: 3 } } } },
     { ev: 'hand', seen: true, x: 0.4, y: 0.5, size: 0.12, open: true, confidence: 0.9 },
     { re: 4, ok: true, to: 'body', follow: 'hand' },
-    { re: 5, ok: true, limits: { say: { most: 6, within_ms: 60000 }, hold_max_ms: 30000, take_max_ms: 600000, say_max_chars: 300, quiet_hours: { from: '22:00', to: '07:00' } } },
+    { re: 5, ok: true, limits: { say: { most: 6, within_ms: 60000 }, hold_max_ms: 30000, lease_max_ms: 600000, take_max_ms: 600000, say_max_chars: 300, quiet_hours: { from: '22:00', to: '07:00' } } },
   ]) assert.ok(!JSON.stringify(debug.redact(frame)).includes('<not shown>'), JSON.stringify(frame));
   assert.ok(shown.text.startsWith('<13 chars, tag ') && !shown.text.includes('Build'));
   // Keyed for this run: the same text tags the same, and the unkeyed SHA-256's start isn't it.
@@ -193,7 +193,7 @@ const UNPLAYABLE = [
 test('the move rules are the body\'s and lamp-control\'s own', async (t) => {
   // The fakes' numbers, read against lamp-body's moves.rs and lamp-control's
   // protocol.rs, so a change there fails here.
-  const { MOVE_FARTHEST, MOVE_FASTEST, MOVE_STEP_MS, MOVE_LASTS_MS, MOVE_FRAMES } = await import('../src/testing.js');
+  const { MOVE_FARTHEST, MOVE_FASTEST, MOVE_STEP_MS, MOVE_LASTS_MS, MOVE_FRAMES_MIN } = await import('../src/testing.js');
   const body = new URL('../../../crates/body/src/moves.rs', import.meta.url);
   const door = new URL('../../../crates/control/src/protocol.rs', import.meta.url);
   if (!existsSync(body) || !existsSync(door)) return t.skip('the Rust crates are not beside this copy');
@@ -206,7 +206,7 @@ test('the move rules are the body\'s and lamp-control\'s own', async (t) => {
   assert.deepEqual([shortest / 1000, longest / 1000], MOVE_LASTS_MS);
   assert.deepEqual(numbers(bodyText.match(/if !\(([0-9_]+)\.\.=([0-9_]+)\)\.contains\(&file\.step_ms\)/)[0]).slice(0, 2), MOVE_STEP_MS);
   assert.deepEqual(numbers(doorText.match(/pub const STEP_MS: [^=]*= ([0-9_]+)\.\.=([0-9_]+);/)[0]).slice(-2), MOVE_STEP_MS);
-  assert.deepEqual(numbers(doorText.match(/pub const FRAMES: [^=]*= ([0-9_]+)\.\.=([0-9_]+);/)[0]).slice(-2), MOVE_FRAMES);
+  assert.equal(numbers(doorText.match(/pub const FRAMES_MIN: usize = ([0-9_]+);/)[1])[0], MOVE_FRAMES_MIN);
 });
 
 test('the fake refuses a move the body would drop, with its words, before the lease', async () => {
@@ -214,7 +214,7 @@ test('the fake refuses a move the body would drop, with its words, before the le
   assert.equal(moveRefusal(500, PLAYABLE), null);
   for (const [frames, stepMs, refusal] of UNPLAYABLE) assert.equal(moveRefusal(stepMs, frames), refusal, JSON.stringify(frames));
   assert.equal(moveRefusal(20, PLAYABLE), 'step_ms: from 40 to 1000');
-  assert.equal(moveRefusal(500, [[0, 0, 0, 0, 0]]), 'frames: from 2 to 500');
+  assert.equal(moveRefusal(500, [[0, 0, 0, 0, 0]]), 'frames: at least 2');
   await withLamp({}, async (lamp, fake) => {
     // Refused before the lease is asked for, as lamp-control's protocol.rs checks it.
     await assert.rejects(lamp.move(UNPLAYABLE[0][0], 200), (error) => error instanceof byCode.bad_request && error.message.includes('a move this body cannot play: it lasts 600 ms'));
@@ -350,12 +350,37 @@ test('actions send the schema\'s fields and wait for done', async () => {
 
 test('names outside the schema never leave this computer', async () => {
   await withLamp({}, async (lamp, fake) => {
-    for (const call of [lamp.gesture('scanning'), lamp.gesture('idle'), lamp.light('magenta', 3, 1000)]) {
+    for (const call of [lamp.gesture('Nod'), lamp.gesture('../nod'), lamp.light('magenta', 3, 1000)]) {
       await assert.rejects(call, (error) => error.code === 'bad_request');
     }
     assert.throws(() => lamp.on('camera.frame', () => {}), LampError);
     await lamp.stop();
     assert.deepEqual(fake.received.filter((f) => ['gesture', 'light'].includes(f.op)), []);
+  });
+});
+
+test('a say is held to the voice\'s 900 bytes here as on the lamp', async () => {
+  // 900 UTF-8 bytes, lamp-control's SAY_MAX_BYTES (the voice's own), in bytes:
+  // 300 three-byte letters are 900, one more is over.
+  await withLamp({ grants: ['speak'] }, async (lamp, fake) => {
+    for (const text of ['a'.repeat(900), 'ế'.repeat(300)]) await lamp.say(text);
+    for (const text of ['a'.repeat(901), 'ế'.repeat(301)]) {
+      await assert.rejects(lamp.say(text), (error) => error.code === 'bad_request' && error.message.includes('text: at most 900 bytes as the voice takes it'));
+    }
+    // A newline or tab is a control character, refused as the door does.
+    for (const text of ['two\nlines', 'a\ttab']) {
+      await assert.rejects(lamp.say(text), (error) => error.code === 'bad_request' && error.message.includes('text: words, no control characters'));
+    }
+    assert.deepEqual(fake.asked('say'), [{ text: 'a'.repeat(900) }, { text: 'ế'.repeat(300) }]);
+  });
+});
+
+test('any gesture name the door takes is sent, idle and scanning too', async () => {
+  // The owner's "no limits for developers" (30 Oct): the door takes any gesture
+  // name of the right shape, so the client never refuses one first.
+  await withLamp({}, async (lamp, fake) => {
+    for (const name of ['idle', 'scanning', 'a_new_clip']) await lamp.gesture(name);
+    assert.deepEqual(fake.asked('gesture'), [{ name: 'idle' }, { name: 'scanning' }, { name: 'a_new_clip' }]);
   });
 });
 
@@ -611,7 +636,7 @@ test('a waiting gesture or move returns at the body\'s answer', async () => {
 test('an action refused here takes no id, so the next waiting one keeps its own', async () => {
   await withLamp({ autoDone: false, grants: ['body', 'light', 'speak'] }, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
-      const bogus = lamp.gesture('bogus', { wait: true });
+      const bogus = lamp.gesture('Bogus', { wait: true });
       const wave = lamp.play('wave', { wait: true });
       await assert.rejects(bogus, (error) => error.code === 'bad_request');
       await until(() => fake.asked('play').length);

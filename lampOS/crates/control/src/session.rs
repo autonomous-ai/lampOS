@@ -158,10 +158,11 @@ pub struct Door {
 /// to root's helper).
 pub const ASKING_MOST: usize = 4;
 
-/// The lamp's quiet hours on the door: `say` and `sound` refused inside
-/// this lamp's window (`--quiet-hours`, 22:00 to 07:00 local by default,
-/// `lamp_local_time::QuietWindow`), and while the lamp's local time isn't
-/// known; never with the window `off`.
+/// The lamp's quiet hours on the door: off by default (the owner's "no
+/// limits for developers", 30 Oct). Set (`--quiet-hours`, a
+/// `lamp_local_time::QuietWindow`), `say` and `sound` are refused inside
+/// this lamp's window and while the lamp's local time isn't known; never
+/// with the window `off`, whatever the clock.
 pub struct Quiet {
     /// The lamp's zone, or none when it couldn't be read.
     pub local_time: Option<std::sync::Arc<lamp_local_time::LocalTime>>,
@@ -180,12 +181,12 @@ impl Quiet {
     pub fn new(local_time: Option<std::sync::Arc<lamp_local_time::LocalTime>>) -> Self {
         Self {
             local_time,
-            window: Some(lamp_local_time::QuietWindow::DEFAULT),
+            window: None,
             journaled: BTreeMap::new(),
         }
     }
 
-    /// This lamp's own window, or `None` for `off`.
+    /// This lamp's own window, or `None` for `off` (the default).
     pub fn with_window(mut self, window: Option<lamp_local_time::QuietWindow>) -> Self {
         self.window = window;
         self
@@ -945,8 +946,8 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
             "refused": class(Class::Refused),
             "phrases": class(Class::Phrases),
             "hold_max_ms": protocol::HOLD_MAX_MS,
-            "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
-            "say_max_chars": protocol::SAY_MAX_CHARS,
+            "lease_max_ms": protocol::LEASE_MAX_MS,
+            "say_max_bytes": protocol::SAY_MAX_BYTES,
             "quiet_hours": quiet_hours_of(quiet),
         });
     }
@@ -961,8 +962,8 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
         "push": class(Class::Push),
         "manage": class(Class::Manage),
         "hold_max_ms": protocol::HOLD_MAX_MS,
-        "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
-        "say_max_chars": protocol::SAY_MAX_CHARS,
+        "lease_max_ms": protocol::LEASE_MAX_MS,
+        "say_max_bytes": protocol::SAY_MAX_BYTES,
         "quiet_hours": quiet_hours_of(quiet),
     })
 }
@@ -996,8 +997,9 @@ pub fn rates_off_of(flag: Option<&str>, env: Option<&str>) -> Result<bool, Strin
 }
 
 /// This lamp's quiet hours from its setting: `--quiet-hours` first, then
-/// `LAMP_CONTROL_QUIET`, else the default, 22:00 to 07:00. `off` only when
-/// one of them says so; a bad value stops lamp-control at its start.
+/// `LAMP_CONTROL_QUIET`, else off (the owner's "no limits for developers",
+/// 30 Oct). A window turns them on; a bad value stops lamp-control at its
+/// start.
 pub fn quiet_window_of(
     flag: Option<&str>,
     env: Option<&str>,
@@ -1009,7 +1011,7 @@ pub fn quiet_window_of(
         (None, Some(env)) => {
             lamp_local_time::QuietWindow::parse(env).map_err(|e| format!("LAMP_CONTROL_QUIET {e}"))
         }
-        (None, None) => Ok(Some(lamp_local_time::QuietWindow::DEFAULT)),
+        (None, None) => Ok(None),
     }
 }
 
@@ -1070,7 +1072,7 @@ fn refused_by_lease(re: u64, refusal: Refusal) -> Outcome {
         }
         Refusal::BadHold => Error::new(
             ErrorCode::BadRequest,
-            format!("for_ms: from 1 to {}", protocol::HOLD_MAX_MS),
+            format!("for_ms: from 1 to {}", protocol::LEASE_MAX_MS),
         ),
     };
     reply_refused(Some(re), error)
@@ -1530,7 +1532,9 @@ mod tests {
         let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak, Grant::Light]);
         // UTC+7, as the lamps' own; 2026-10-28 at 00:00 UTC is 07:00 there.
         let utc7 = std::sync::Arc::new(lamp_local_time::LocalTime::Offset(7 * 60));
-        let mut door = door.with_quiet_hours(Quiet::new(Some(utc7)));
+        let mut door = door.with_quiet_hours(
+            Quiet::new(Some(utc7)).with_window(Some(lamp_local_time::QuietWindow::DEFAULT)),
+        );
         const MIDNIGHT_UTC: u64 = 1_793_145_600;
         let at = |hour_local: u64| MIDNIGHT_UTC + ((hour_local + 24 - 7) % 24) * 3_600;
         macro_rules! send {
@@ -1573,7 +1577,9 @@ mod tests {
             "quiet hours: the lamp's local time isn't known"
         );
         let (door, mut session, mut fake) = paired(&Computer::new(2), &[Grant::Speak]);
-        let mut door = door.with_quiet_hours(Quiet::new(None));
+        let mut door = door.with_quiet_hours(
+            Quiet::new(None).with_window(Some(lamp_local_time::QuietWindow::DEFAULT)),
+        );
         let unknown = door.handle(&mut session, say, &mut fake, 2 * S, at(12));
         assert_eq!(code_of(&unknown), Some("quiet_hours"));
         assert!(fake.did.is_empty());
@@ -1678,6 +1684,102 @@ mod tests {
         );
     }
 
+    /// Quiet hours are off by default (the owner's "no limits for
+    /// developers", 30 Oct): a door wired as `serve` wires it with no
+    /// setting refuses no say or sound, by night or with the lamp's time
+    /// unknown, and hello says `off`, the lease bound and no say length.
+    #[test]
+    fn quiet_hours_are_off_by_default_and_a_say_at_an_unknown_time_goes_through() {
+        let computer = Computer::new(30);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak]);
+        let window = quiet_window_of(None, None).unwrap();
+        let mut door = door.with_quiet_hours(Quiet::new(None).with_window(window));
+        let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, 1_000))["ok"],
+            true
+        );
+        let sound = r#"{"id":4,"op":"sound","name":"chime"}"#;
+        assert_eq!(
+            reply(&door.handle(&mut session, sound, &mut fake, 3 * S, 1_000))["ok"],
+            true
+        );
+        // 23:00 at UTC+7 on 2026-10-28, the zone known, no window set: said.
+        let utc7 = std::sync::Arc::new(lamp_local_time::LocalTime::Offset(7 * 60));
+        let other = Computer::new(31);
+        let (door, mut session, mut fake) = paired(&other, &[Grant::Speak]);
+        let mut door = door.with_quiet_hours(Quiet::new(Some(utc7)));
+        let night = 1_793_145_600 + 16 * 3_600;
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, night))["ok"],
+            true
+        );
+        let (mut session, welcome) = door.open();
+        let hello = door.handle(&mut session, &other.hello_frame(&welcome), &mut fake, S, 1);
+        let limits = &reply(&hello)["limits"];
+        assert_eq!(limits["quiet_hours"], "off");
+        assert_eq!(limits["hold_max_ms"], 30_000);
+        assert_eq!(limits["lease_max_ms"], 600_000);
+        assert_eq!(limits["say_max_bytes"], 900);
+        assert!(limits.get("say_max_chars").is_none());
+        assert!(limits.get("take_max_ms").is_none());
+    }
+
+    /// Hello's `hold_max_ms` keeps its meaning, a light's longest `for_ms`
+    /// (and a renewal an older client sizes from it), so a client written
+    /// before `lease_max_ms` still works; `lease_max_ms` is the longest one
+    /// lease take or renewal.
+    #[test]
+    fn hello_says_a_lights_hold_and_a_leases_and_each_is_taken() {
+        for rates_off in [true, false] {
+            let computer = Computer::new(40);
+            let (door, _, mut fake) = paired(&computer, &[Grant::Light]);
+            let mut door = if rates_off {
+                door.with_rates_off()
+            } else {
+                door
+            };
+            let (mut session, welcome) = door.open();
+            let hello = door.handle(
+                &mut session,
+                &computer.hello_frame(&welcome),
+                &mut fake,
+                S,
+                1,
+            );
+            let limits = reply(&hello)["limits"].clone();
+            let hold = limits["hold_max_ms"].as_u64().unwrap();
+            let lease = limits["lease_max_ms"].as_u64().unwrap();
+            assert_eq!((hold, lease), (30_000, 600_000), "{rates_off}");
+            // An old-style client: a light for `hold_max_ms`, a lease taken
+            // and renewed for it.
+            let light =
+                format!(r#"{{"id":3,"op":"light","colour":"warm","level":3,"for_ms":{hold}}}"#);
+            let outcome = door.handle(&mut session, &light, &mut fake, 2 * S, 1);
+            assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+            let take = format!(r#"{{"id":4,"op":"lease.take","parts":["light"],"for_ms":{hold}}}"#);
+            let taken = door.handle(&mut session, &take, &mut fake, 3 * S, 1);
+            assert_eq!(reply(&taken)["ok"], true, "{taken:?}");
+            let id = reply(&taken)["lease"].as_str().unwrap().to_owned();
+            let renew = format!(r#"{{"id":5,"op":"lease.renew","lease":"{id}","for_ms":{hold}}}"#);
+            let renewed = door.handle(&mut session, &renew, &mut fake, 4 * S, 1);
+            assert_eq!(reply(&renewed)["ok"], true, "{renewed:?}");
+            // A new client: the lease for `lease_max_ms`.
+            let renew = format!(r#"{{"id":6,"op":"lease.renew","lease":"{id}","for_ms":{lease}}}"#);
+            let renewed = door.handle(&mut session, &renew, &mut fake, 5 * S, 1);
+            assert_eq!(reply(&renewed)["ok"], true, "{renewed:?}");
+            let release = format!(r#"{{"id":7,"op":"lease.release","lease":"{id}"}}"#);
+            assert_eq!(
+                reply(&door.handle(&mut session, &release, &mut fake, 6 * S, 1))["ok"],
+                true
+            );
+            let take =
+                format!(r#"{{"id":8,"op":"lease.take","parts":["light"],"for_ms":{lease}}}"#);
+            let taken = door.handle(&mut session, &take, &mut fake, 7 * S, 1);
+            assert_eq!(reply(&taken)["ok"], true, "{taken:?}");
+        }
+    }
+
     /// `--rates off`: hello says so and holds only the refused actions' and
     /// the phrase changes' windows; each class is lifted at the door, the refused guard still
     /// closes a connection; the setting is read as the quiet hours' is.
@@ -1751,12 +1853,12 @@ mod tests {
         );
     }
 
-    /// The setting at start: the flag, else the environment, else the
-    /// default; `off` only when said; a bad value stops lamp-control.
+    /// The setting at start: the flag, else the environment, else off; a
+    /// bad value stops lamp-control.
     #[test]
     fn the_quiet_hours_setting_is_read_at_start_and_a_bad_one_refused() {
         use lamp_local_time::QuietWindow;
-        assert_eq!(quiet_window_of(None, None), Ok(Some(QuietWindow::DEFAULT)));
+        assert_eq!(quiet_window_of(None, None), Ok(None));
         assert_eq!(quiet_window_of(None, Some("off")), Ok(None));
         assert_eq!(quiet_window_of(Some("off"), None), Ok(None));
         assert_eq!(
@@ -2177,7 +2279,7 @@ mod tests {
         assert_eq!(code_of(&outcome), Some("bad_request"));
         let outcome = door.handle(
             &mut session,
-            r#"{"id":4,"op":"gesture","name":"idle"}"#,
+            r#"{"id":4,"op":"gesture","name":"Idle"}"#,
             &mut fake,
             2 * S,
             1,

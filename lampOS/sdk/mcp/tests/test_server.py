@@ -315,8 +315,15 @@ def test_a_refusal_keeps_the_lamps_code_words_and_retry(tmp_path):
             fake.refuse_next("gesture", "quiet_hours", "it's night")
             result = await session.call_tool("lamp_gesture", {"name": "nod"})
             assert result.isError and "quiet_hours: it's night" in text(result)
-            result = await session.call_tool("lamp_say", {"text": "x" * 301})
-            assert result.isError and not fake.asked("say")
+            # The voice's 900 bytes, as the door holds them, counted in bytes.
+            for said in ("a" * 900, "ế" * 300):
+                assert not (await session.call_tool("lamp_say", {"text": said})).isError
+            for over in ("a" * 901, "ế" * 301):
+                result = await session.call_tool("lamp_say", {"text": over})
+                assert result.isError and "text: at most 900 bytes as the voice takes it" in text(result)
+            result = await session.call_tool("lamp_say", {"text": "two\nlines"})
+            assert result.isError and "text: words, no control characters" in text(result)
+            assert fake.asked("say") == [{"text": "a" * 900}, {"text": "ế" * 300}]
 
     run(go())
 

@@ -31,7 +31,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `timeout_s` | number | 0 to 120; more waits 120 | 60 | | |
 | `lamp_express` | `feeling` | string, required | a feeling of the `feelings` skill: `glad`, `lively` or `low` (the lamp refuses another) | — | body, light | no |
 | | `strength` | number | 0 to 1: from 0.5 up the whole move, a smaller step of it below | 0.5 | | |
-| `lamp_gesture` | `name` | string, required | `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (the schema's gestures less `idle` and `scanning`) | — | body | no |
+| `lamp_gesture` | `name` | string, required | `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (the schema's offered gestures; the lamp itself also takes `idle` and `scanning` from a program, but an agent is offered the clips a person expects, rule 8) | — | body | no |
 | `lamp_look` | `at` | string | `face`, `name` or `ahead` | none: then `yaw` and `pitch` | body (and look for `face`) | yes, 10 s |
 | | `yaw` | number | degrees, right positive, within the head's reach | 0 | | |
 | | `pitch` | number | degrees, up positive, within the head's reach | 0 | | |
@@ -43,7 +43,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `level` | integer | 1 to 5 | 3 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
-| `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
+| `lamp_say` | `text` | string, required | words, at most 900 UTF-8 bytes, the voice's own cap (the lamp refuses more, so lamp-mcp does too) | — | speak | no |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |
 
 **An argument a tool doesn't take is refused**, never read past. Each

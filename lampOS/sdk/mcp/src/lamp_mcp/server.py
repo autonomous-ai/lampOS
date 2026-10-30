@@ -21,16 +21,18 @@ import importlib.metadata
 import os
 import socket
 import time
+import unicodedata
 from typing import Any, Literal
 
 from lampos import Lamp, LampError, schema
+from lampos.client import SAY_MAX_BYTES
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
-# The body's clips a client may name, less the two the lamp refuses through
-# this door: `idle` is the lamp's own life, and `scanning` sweeps a room like
-# a camera (CLAUDE.md rule 8; Nine's `GESTURES_REFUSED`, #3504 13:27).
-REFUSED_GESTURES = ("idle", "scanning")
+# The body's clips an agent is offered: the schema's `examples`, which leave
+# out `idle`, the lamp's own life, and `scanning`, a room sweep (CLAUDE.md
+# rule 8). The door itself takes both from a developer's own program since
+# 30 Oct; an agent choosing for itself is offered the clips a person expects.
 # A body lease for one look or move, never renewed: released at `done`, or
 # left to lapse if `done` doesn't come (Nine, #3504 13:27).
 ACTION_LEASE_MS = 10_000
@@ -71,7 +73,7 @@ LIMIT_KIND = {
 
 
 def gestures() -> list[str]:
-    return [name for name in schema.gestures() if name not in REFUSED_GESTURES]
+    return list(schema.gestures())
 
 
 def refused(error: LampError) -> ToolError:
@@ -426,10 +428,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_say(text: str) -> str:
-            """Say a short line in the lamp's own voice (300 characters at most). It isn't said while the
-            lamp is in quiet hours, private, or talking with someone."""
-            if len(text) > 300:
-                raise ToolError("bad_request: at most 300 characters")
+            """Say a line in the lamp's own voice, at most 900 bytes of UTF-8 (the voice's own cap;
+            about 900 Latin letters, fewer in other scripts). It isn't said while the lamp is private or
+            talking with someone, or in quiet hours where this lamp has them set."""
+            if any(unicodedata.category(c) == "Cc" for c in text):
+                raise ToolError("bad_request: text: words, no control characters")
+            if len(text.encode("utf-8")) > SAY_MAX_BYTES:
+                raise ToolError(f"bad_request: text: at most {SAY_MAX_BYTES} bytes as the voice takes it")
             await act("say", text=text)
             return "said"
 

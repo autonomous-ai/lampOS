@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import re
 import socket
 import ssl
 import unicodedata
@@ -93,12 +94,32 @@ async def _welcome(ws: ClientConnection) -> dict:
     return first
 
 
+# The longest say's text in UTF-8 bytes: the voice's own cap, which
+# lamp-control holds too (protocol.rs SAY_MAX_BYTES, lamp-voice's
+# MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
+SAY_MAX_BYTES = 900
+
+
 def _check(op: str, fields: dict) -> None:
     """The names the schema enumerates, checked before sending."""
     if op not in schema.ops():
         raise LampError(f"no op {op!r} in v{schema.VERSION}", code="bad_request")
+    text = fields.get("text")
+    if op == "say" and isinstance(text, str):
+        # Any control character (Unicode Cc, as Rust's char::is_control), a
+        # newline or tab too: the door and the voice refuse them.
+        if any(unicodedata.category(c) == "Cc" for c in text):
+            raise LampError("text: words, no control characters", code="bad_request")
+        if len(text.encode("utf-8")) > SAY_MAX_BYTES:
+            raise LampError(f"text: at most {SAY_MAX_BYTES} bytes as the voice takes it", code="bad_request")
+    # A gesture's name is held to its shape only, as the door holds it: any
+    # body clip, `idle` and `scanning` too (never stricter than the lamp).
+    name = fields.get("name")
+    if op == "gesture" and name is not None and not (isinstance(name, str) and re.fullmatch(schema.gesture_pattern(), name)):
+        raise LampError(
+            f"name {name!r}: a lowercase letter, then lowercase letters, digits, _ or -, at most 64", code="bad_request"
+        )
     allowed = {
-        "name": schema.gestures() if op == "gesture" else None,
         "colour": schema.colours(),
         "pattern": schema.patterns(),
     }

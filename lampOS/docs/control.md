@@ -90,24 +90,27 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | op | args | carried out by | grant | lease |
 |---|---|---|---|---|
 | `express` | `feeling`, `strength` 0–1 (0.5) | the `feelings` skill's (#3691) move on `mood.sock` `{move}` and its light as a `light/request`, so one set of feelings (below). One action: while a motion plays, an `express` with a move is refused `busy` whole, its light too; below strength 0.0625 there's no move, and the light goes alone | `body`, `light` | no |
-| `gesture` | `name`, one of 19 built-in clips (below) | `mood.sock` `{gesture}` | `body` | no |
-| `look` | `at`: `face`, `hand`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive). `hand` follows it until `stop`, another look or the lease ends | `ahead` and `{yaw, pitch}`: the body's lease socket `{look}`, eased to and held while the lease is, inside the gaze's reach and the pose's bounds (below); `hand` with the lease socket's hold; `face` and `name` refused, "not in this release: look at a face or a name" | `body` (and `look` for `face` and `hand`) | body |
-| `move` | `step_ms` 40–1,000, `frames` (2–500) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
+| `gesture` | `name`, a body clip (below; any lowercase name, the body answers one it doesn't have) | `mood.sock` `{gesture}` | `body` | no |
+| `look` | `at`: `face`, `hand`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive; any finite number, the body clamps it to its reach). `hand` follows it until `stop`, another look or the lease ends | `ahead` and `{yaw, pitch}`: the body's lease socket `{look}`, eased to and held while the lease is, inside the gaze's reach and the pose's bounds (below); `hand` with the lease socket's hold; `face` and `name` refused, "not in this release: look at a face or a name" | `body` (and `look` for `face` and `hand`) | body |
+| `move` | `step_ms` 40–1,000, `frames` (2 at least; at most the body's 10 s allows, 251 at a 40 ms step) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
-| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
+| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` (any, 0 or more) | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
-| `say` | `text`, at most 300 characters | `say.sock`, with its quiet after a turn, privacy and busy gates | `speak` | no |
+| `say` | `text`: words, at most 900 UTF-8 bytes, the voice's own cap (a longer one is refused at the door, not sent and dropped) | `say.sock`, with its quiet after a turn, privacy and busy gates | `speak` | no |
 | `sound` | `name` of a clip of 3 s or less in the client's package | `say.sock` `{sound}` | `speak` | no |
 | `stop` | | ends the client's own actions now | none | no |
 
-**Gestures** a client may name: `nod`, `headshake`, `greeting`, `laugh`,
+**Gestures** offered to programs: `nod`, `headshake`, `greeting`, `laugh`,
 `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`,
 `surprised`, `confused`, `sleepy`, `excited`, and the five dances
 `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz`.
-These are the body's own clips (`crates/body/src/clips/data.rs`) but two:
-`idle` is the lamp's own life, and `scanning` looks like a camera sweeping a
-room, which CLAUDE.md's rule 8 keeps for when a person asks for it. A test in
-`lamp-body` keeps this list and the schema's in step with the clips.
+These are the body's own clips (`crates/body/src/clips/data.rs`) but two,
+`idle`, the lamp's own life, and `scanning`, a room sweep. The door takes
+those two as well (the owner's "no limits for developers", 30 Oct): it
+checks only a name's shape, and the body answers a name it doesn't have.
+A program that sweeps a room unasked reads as a machine (CLAUDE.md's rule
+8), so keep `scanning` for when a person asks. A test in `lamp-body` keeps
+this list (the schema's gesture `examples`) in step with the clips.
 
 **Feelings** (`express`, `crates/control/src/feelings.rs`): the `feelings`
 skill's three, each its `[[do]]` (`skills/feelings/skill.toml`). `glad` is
@@ -227,7 +230,7 @@ lamp-control clients
 - **The body's lease:** with `--lease-socket` (lamp-body's, docs/body.md "Held by lamp-control"), while a computer holds `body` the door holds the body too, so the lamp's own life (the rest glance, Expression's offsets, a stand timing out) stands back. It holds for 30 s, renewed every 10 s, and lets go when no computer holds `body`. The body's own end of it (`lost` for a hand, privacy, a pause, a sleep, a slump or a lapse) ends the computer's `body` lease with that why, a lapse as `expired`; a why the door doesn't know, or a hold the body refuses, ends it as `released`, so a computer never thinks the lamp's own life stands back when it doesn't. A body that restarts is held again at the next 250 ms check, and a line from a connection the door has dropped is ignored. A body that can't be reached is journaled once, and the lamp's own life goes on.
 - **Following a hand:** a `look` at `hand` under the `body` lease has each hold say `"follow":"hand"` (`{"hold":{"for_ms":30000,"follow":"hand"}}`), said at once when it starts or stops, not at the next renewal; a hold without it follows nothing. lamp-body does the fast loop on the lamp from `humans/hands/tracked`, so the picture and the loop never leave it. It ends with the holder's `stop` (never rated), another look once it is taken (rated as motion, one a second; a refused look, such as one at `face`, leaves it following), or the lease ending, and a new holder never starts out following. A body that doesn't know `follow` refuses the hold, which ends the lease as `released`, as any refused hold does.
 - **Rates off, the default** (the person's decision, 30 Oct 02:1x: "remove the rate"): unless `--rates default` (or `LAMP_CONTROL_RATES=default`; the flag wins; `off` is the default) turns them back on, lamp-control lifts every rate in the table below: `express`, motion, `joints`, `light`, `say`/`sound`, `skill.push`, `skill.list`/`skill.remove`. Two stay: the refused actions' guard (20 a second, then the connection closes), and the phrase changes (6 a minute), which bound `hear` for privacy, not pace: lifted, a program could cycle a word list to learn what people near the lamp say. Hello's `limits` then says `"rates": "off"`, with only the `refused` and `phrases` windows, so a client doesn't pace itself to rates the door doesn't hold. The body still bounds every move itself (below). It's read once at start, journaled ("rates off" or "rates on"), and a bad value stops lamp-control. The product unit sets neither, so it runs with the rates off.
-- **The quiet hours:** `--quiet-hours HH:MM-HH:MM` (or `LAMP_CONTROL_QUIET`; the flag wins) is this lamp's window, 22:00-07:00 unless set, and `off` turns them off; it is read once at the start, and a bad value (a window whose ends are the same minute too) stops lamp-control there. The window is journaled at start and said in hello's `limits`. `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. A zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC.
+- **The quiet hours, off by default** (the owner's "no limits for developers", 30 Oct): `--quiet-hours HH:MM-HH:MM` (or `LAMP_CONTROL_QUIET`; the flag wins) sets this lamp's window and turns them on; unset, or `off`, they are off. It is read once at the start, and a bad value (a window whose ends are the same minute too) stops lamp-control there. The window, or `off`, is journaled at start and said in hello's `limits`. `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. With a window set, a zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC; with them off, the time is never asked and nothing is refused.
 - **Skill push:** with `--manage-socket` (root's manage helper, `/run/lampos-skills-manage/manage.sock`), the skill ops are served and a pushed package is kept in `--state-dir`'s `push/` for the helper ("Skills pushed from a computer" below). Without it, each is refused with "skill push is not on this lamp".
 - **The certificate:** made on first start in `--state-dir` (`/var/lib/lampos-control`): P-256, valid to 2100, `cert.der` and `key.der`, the key 0600. Its pin, the certificate's SHA-256 in hex, is journaled at start and returned with every pairing code.
 - **Listening:** `--listen`, `0.0.0.0:7731` by default. TLS 1.3 only, and only `/v1`: any other path is 404 before the WebSocket opens.
@@ -330,9 +333,11 @@ so one made for pairing can never stand as a hello's, or the other way round
 listener's included, after its leases' `lost`, and its leases end; they also end when its last
 connection closes. `limits` says the rates the door holds, so an
 SDK can keep under them. With the rates off, the default, it says `"rates": "off"` and only the `refused` and `phrases` windows. With `--rates default`, it gives for each class (`joints`, `motion`, `light`, `say`,
-`express`, `refused`, `phrases`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
-`take_max_ms` and `say_max_chars`, and `quiet_hours`: this lamp's window,
-`{"from": "22:00", "to": "07:00"}`, or `"off"`.
+`express`, `refused`, `phrases`) a list of `{"most": N, "within_ms": M}`. Either way it says
+`hold_max_ms`, a light's longest `for_ms` (30000, as before, so a client that sizes a light or a renewal from it still works), `lease_max_ms`, the longest one lease take or renewal asks for (600000), `say_max_bytes`, the longest say's text in
+UTF-8 bytes (900, the voice's own cap, lamp-voice's `MOST_WORDS_BYTES`), and `quiet_hours`: this lamp's window,
+`{"from": "22:00", "to": "07:00"}`, or `"off"`, the default. There is no ceiling on renewing, and a say is counted
+in bytes, not characters, so `take_max_ms` and `say_max_chars`, which older lamps sent, are gone.
 
 ### Subscribe and state
 
@@ -361,9 +366,11 @@ client holds a part at a time: a second take is `busy`.
 {"id":7,"op":"lease.release","lease":"l_81"}
 ```
 
-A lease lasts at most 30 s before it must be renewed, and a take can be
-renewed for at most 10 minutes in all; then the client takes it again. The
-lamp says what happens to it:
+A take or renewal asks for up to 10 minutes (`for_ms` 1–600,000), and a
+lease renewed before it lapses is held as long as its holder keeps renewing:
+there is no ceiling (the owner's "no limits for developers", 30 Oct). One
+not renewed in time is lost as `expired`, and every loss below still ends
+it. The lamp says what happens to it:
 `{"ev":"lease","lease":"l_81","state":"suspended","why":"conversation"}`,
 later `held` again or `lost`, with `why` one of `conversation`, `hand`,
 `stop_heard`, `private`, `paused`, `asleep`, `expired`,
@@ -421,7 +428,8 @@ which back. An SDK's wait for them returns at the answer.
 | `no_lease`, `lease_lost` | the action needs a lease the client doesn't hold |
 | `busy` | another client holds the part, or this one by another lease |
 | `refused` | the body's own check, with its why: "centre of gravity 27 mm > 22 mm", "pitch past its window" |
-| `quiet_hours` (`say` and `sound`, see "Limits, rates and quiet hours"), `private`, `paused`, `asleep` | the lamp's state refuses it |
+| `quiet_hours` | `say` and `sound` in this lamp's quiet hours, when it has them set (off by default; see "Limits, rates and quiet hours") |
+| `private`, `paused`, `asleep` | reserved: no request is refused with them today. These states reach a client another way: its leases are lost with that `why` (a `lease` event), `lamp.changed`'s `lamp_state` says them, and a `say` the voice's privacy gate doesn't speak ends with a `done` of `how: "dropped"` and the voice's why. A gesture or move the body drops while private or asleep is not told |
 | `rate` | over a rate below; `retry_ms` says when |
 | `bad_request` | not this schema, or an op it doesn't know |
 | `off` | developer access is off in the app |
@@ -435,17 +443,17 @@ which back. An SDK's wait for them returns at the answer.
 | `subscribe` | `events` (at least one), `phrases` (≤ 16 across the computer's connections, each ≤ 64 chars and of 8 letters at least, only with `phrase.heard`, which needs them) | each event's grant | — |
 | `unsubscribe` | `events` | — | — |
 | `get` | `state`: `presence` (`look`), `light`, `mood`, `lamp` | — | — |
-| `lease.take` | `parts` (`body`, `light`, `voice`), `for_ms` 1–30,000, `why` ≤ 200 chars | `body`, `light` or `speak` for each part | — |
-| `lease.renew` | `lease`, `for_ms` 1–30,000 | — | — |
+| `lease.take` | `parts` (`body`, `light`, `voice`), `for_ms` 1–600,000, `why` ≤ 200 chars | `body`, `light` or `speak` for each part | — |
+| `lease.renew` | `lease`, `for_ms` 1–600,000; renewed in time, no ceiling | — | — |
 | `lease.release` | `lease` | — | — |
 | `express` | `feeling` (a lowercase name, the `feelings` skill's), `strength` 0–1 (0.5) | `body` + `light` | — |
-| `gesture` | `name` (a built-in, not `idle` or `scanning`) | `body` | — |
-| `look` | `at`: `"face"` (+ `look`), `"hand"` (+ `look`, followed), `"name"`, `"ahead"`, or `{yaw, pitch}` in degrees (±180, ±90); `"face"` and `"name"` are refused in this release, "not in this release: look at a face or a name" | `body` | body |
-| `move` | `step_ms` 40–1,000, `frames` 2–500 of five joints (body counts from home), first and last all 0, lasting 1.5–10 s ((frames − 1) × `step_ms`), within the body's reach and speed (`lamp_body::moves::check`) | `body` | body |
+| `gesture` | `name` (a lowercase name of a body clip, `idle` and `scanning` too; ≤ 64 chars) | `body` | — |
+| `look` | `at`: `"face"` (+ `look`), `"hand"` (+ `look`, followed), `"name"`, `"ahead"`, or `{yaw, pitch}` in degrees (any finite number; the body clamps it to its reach); `"face"` and `"name"` are refused in this release, "not in this release: look at a face or a name" | `body` | body |
+| `move` | `step_ms` 40–1,000, `frames` 2 at least (at most what 10 s allows: 251 at 40 ms) of five joints (body counts from home), first and last all 0, lasting 1.5–10 s ((frames − 1) × `step_ms`), within the body's reach and speed (`lamp_body::moves::check`) | `body` | body |
 | `play` | `name` (a recorded move of the client's package) | `body` | body |
-| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |
+| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` (0 or more; the body's caps pace each step) | `body` | body |
 | `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
-| `say` | `text`: words, ≤ 300 chars | `speak` | — |
+| `say` | `text`: words, no control characters (a newline or tab included, as the voice refuses them), at most 900 UTF-8 bytes (`text: at most 900 bytes as the voice takes it`): the voice's say socket takes no more (`MOST_WORDS_BYTES`), so the door refuses it rather than send a say the voice drops. About 900 Latin letters, 300 in a three-byte script. A longer text is several says | `speak` | — |
 | `sound` | `name` (a clip of the client's package, ≤ 3 s) | `speak` | — |
 | `stop` | — | — | — |
 | `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |
@@ -519,16 +527,17 @@ says `retry_ms`, the time until the oldest counted action leaves its window.
 A refused action isn't counted.
 
 At night the ring's night caps still clamp every light, and nothing moves
-while the lamp sleeps. **Quiet hours:** from 22:00 to 07:00 local unless
-this lamp sets its own (`--quiet-hours`, one definition in
-`lamp_local_time::QuietWindow`; lamp-skills keeps its own), a computer's
-`say` and `sound` are refused with `quiet_hours`, the window in its why
-("quiet hours: 22:00 to 07:00 local, this lamp's setting"), and so are they
-while the lamp's local time isn't known (its clock not yet
-set, or its zone unreadable: "quiet hours: the lamp's local time isn't
-known"). A refusal reaches no part and isn't counted against the rate, and
-it's journaled once a computer a night. With this lamp's window `off`
-nothing is refused, even while its time isn't known. Besides that setting,
+while the lamp sleeps. **Quiet hours:** off by default (the owner's "no
+limits for developers", 30 Oct). When this lamp sets a window
+(`--quiet-hours`, one definition in `lamp_local_time::QuietWindow`;
+lamp-skills keeps its own), a computer's `say` and `sound` are refused
+inside it with `quiet_hours`, the window in its why ("quiet hours: 22:00
+to 07:00 local, this lamp's setting"), and so are they while the lamp's
+local time isn't known (its clock not yet set, or its zone unreadable:
+"quiet hours: the lamp's local time isn't known"). A refusal reaches no
+part and isn't counted against the rate, and it's journaled once a
+computer a night. With no window, or `off`, nothing is refused, even while
+its time isn't known. Besides that setting,
 the owner's per-client allowance, with the app's setting, will be the only
 thing that lifts it (Fourteen, Eighth and Nine on #3504). Every command and its answer is
 journaled as one line (client id and name, op, result: "The journal"
@@ -672,7 +681,7 @@ on the lamp that run on their own".
 - **A ceiling the skill can't raise:** `skill.toml`'s `[budget]` and
   `[quiet]` are written by the computer, so the lamp holds a pushed skill
   to the live door's rates at most (`say` 6 a minute and 60 an hour) and to
-  the quiet hours (planned, 22:00 to 07:00 local, as below), whatever the
+  lamp-skills' own quiet hours (planned, 22:00 to 07:00 local), whatever the
   skill declares. lamp-skills holds
   it, for every skill it loaded as pushed (Eighth and Nine, #3504).
 - **The package** is the shape `lamp-skills pack` makes: ustar,

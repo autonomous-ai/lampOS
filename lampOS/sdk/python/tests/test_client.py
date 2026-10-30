@@ -133,7 +133,7 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
                                                             "shows": {"on": True, "colour": "warm", "level": 3}}}},
                   {"ev": "hand", "seen": True, "x": 0.4, "y": 0.5, "size": 0.12, "open": True, "confidence": 0.9},
                   {"re": 4, "ok": True, "to": "body", "follow": "hand"},
-                  {"re": 5, "ok": True, "limits": {"say": {"most": 6, "within_ms": 60_000}, "hold_max_ms": 30_000,
+                  {"re": 5, "ok": True, "limits": {"say": {"most": 6, "within_ms": 60_000}, "hold_max_ms": 30_000, "lease_max_ms": 600_000,
                                                    "take_max_ms": 600_000, "say_max_chars": 300,
                                                    "quiet_hours": {"from": "22:00", "to": "07:00"}}}):
         assert "<not shown>" not in json.dumps(debug.redact(sample)), sample
@@ -354,13 +354,52 @@ def test_names_outside_the_schema_never_leave_this_computer(tmp_path):
         async with FakeLamp() as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
-                for call in (lamp.gesture("scanning"), lamp.gesture("idle"), lamp.light("magenta", 3, 1000)):
+                for call in (lamp.gesture("Nod"), lamp.gesture("../nod"), lamp.light("magenta", 3, 1000)):
                     with pytest.raises(errors.LampError) as refused:
                         await call
                     assert refused.value.code == "bad_request"
                 with pytest.raises(LampError):
                     lamp.on("camera.frame", print)
             assert not [frame for frame in fake.received if frame.get("op") in ("gesture", "light")]
+
+    run(go())
+
+
+def test_any_gesture_name_the_door_takes_is_sent_idle_and_scanning_too(tmp_path):
+    # The owner's "no limits for developers" (30 Oct): the door takes any
+    # gesture name of the right shape, so the client never refuses one first.
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for name in ("idle", "scanning", "a_new_clip"):
+                    await lamp.gesture(name)
+            assert fake.asked("gesture") == [{"name": "idle"}, {"name": "scanning"}, {"name": "a_new_clip"}]
+
+    run(go())
+
+
+def test_a_say_is_held_to_the_voices_900_bytes_here_as_on_the_lamp(tmp_path):
+    # 900 UTF-8 bytes, lamp-control's SAY_MAX_BYTES (the voice's own), in
+    # bytes: 300 three-byte letters are 900, one more is over.
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for text in ("a" * 900, "ế" * 300):
+                    await lamp.say(text)
+                for text in ("a" * 901, "ế" * 301):
+                    with pytest.raises(LampError) as refused:
+                        await lamp.say(text)
+                    assert refused.value.code == "bad_request"
+                    assert "text: at most 900 bytes as the voice takes it" in str(refused.value)
+                # A newline or tab is a control character, refused as the door does.
+                for text in ("two\nlines", "a\ttab"):
+                    with pytest.raises(LampError) as refused:
+                        await lamp.say(text)
+                    assert refused.value.code == "bad_request"
+                    assert "text: words, no control characters" in str(refused.value)
+            assert fake.asked("say") == [{"text": "a" * 900}, {"text": "ế" * 300}]
 
     run(go())
 
@@ -561,9 +600,9 @@ def test_the_move_rules_are_the_bodys_and_lamp_controls_own():
     assert (shortest / 1000, longest / 1000) == moves.MOVE_LASTS_MS
     body_step = numbers(re.search(r"if !\(([0-9_]+)\.\.=([0-9_]+)\)\.contains\(&file\.step_ms\)", body).group(0))[:2]
     door_step = numbers(re.search(r"pub const STEP_MS: [^=]*= ([0-9_]+)\.\.=([0-9_]+);", door).group(0))[-2:]
-    frames = numbers(re.search(r"pub const FRAMES: [^=]*= ([0-9_]+)\.\.=([0-9_]+);", door).group(0))[-2:]
+    frames = numbers(re.search(r"pub const FRAMES_MIN: usize = ([0-9_]+);", door).group(1))[0]
     assert body_step == door_step == list(moves.MOVE_STEP_MS)
-    assert frames == list(moves.MOVE_FRAMES)
+    assert frames == moves.MOVE_FRAMES_MIN
 
 @pytest.mark.parametrize("schema_check", [True, False])
 def test_the_fake_refuses_a_move_whose_frames_lamp_control_cannot_parse_and_keeps_the_connection(tmp_path, monkeypatch, schema_check):
@@ -605,7 +644,7 @@ def test_the_fake_refuses_a_move_the_body_would_drop_with_its_words_before_the_l
     for frames, step_ms, refusal in UNPLAYABLE:
         assert move_refusal(step_ms, frames) == refusal, (frames, step_ms)
     assert move_refusal(20, PLAYABLE) == "step_ms: from 40 to 1000"
-    assert move_refusal(500, [[0, 0, 0, 0, 0]]) == "frames: from 2 to 500"
+    assert move_refusal(500, [[0, 0, 0, 0, 0]]) == "frames: at least 2"
 
     async def go():
         async with FakeLamp() as fake:
