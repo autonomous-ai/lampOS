@@ -1287,14 +1287,40 @@ fn a_list_set_item_says_when_it_was_set_in_the_lamps_zone() {
 const ANN: &str = "p-0123456789abcdef";
 const BO: &str = "p-fedcba9876543210";
 
+/// A reminder `person` set, due at 08:10, 600 s after [`WALL`]: a
+/// reminder, since every line sees a timer.
 fn set_by(engine: &mut Engine<Disk>, at: &ClockSample, text: &str, person: Option<&str>) -> u64 {
+    set_when(
+        engine,
+        at,
+        text,
+        person,
+        When::At {
+            time: "08:10".into(),
+            day: None,
+            zone: None,
+            fold: None,
+        },
+    )
+}
+/// A timer `person` set, due 600 s from `at`.
+fn timer_by(engine: &mut Engine<Disk>, at: &ClockSample, text: &str, person: Option<&str>) -> u64 {
+    set_when(engine, at, text, person, When::After { seconds: 600 })
+}
+fn set_when(
+    engine: &mut Engine<Disk>,
+    at: &ClockSample,
+    text: &str,
+    person: Option<&str>,
+    when: When,
+) -> u64 {
     engine.tick(at).unwrap();
     engine
         .answer(
             Request::Set {
                 guard: guard(engine),
                 text: text.into(),
-                when: When::After { seconds: 600 },
+                when,
                 person: person.map(str::to_owned),
             },
             at,
@@ -1435,6 +1461,54 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
     assert_eq!(listed(&mut e, &due_at, None), ["Ann's pills"]);
 }
 
+/// A timer is the room's (option 1 on #4656's after-merge P2): a line with
+/// no face seen, at the stove, hears and cancels the timer it set, and
+/// another person's too, but still no one's reminder.
+#[test]
+fn every_line_hears_and_cancels_a_timer_but_never_anothers_reminder() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    let pasta = timer_by(&mut e, &at, "Pasta", None);
+    timer_by(&mut e, &at, "Tea", Some(ANN));
+    let pills = set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    set_by(&mut e, &at, "Water the plant", None);
+    let room = asker(None, false);
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Pasta", "Tea"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(BO), false))),
+        ["Pasta", "Tea"]
+    );
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(ANN), false))),
+        ["Pasta", "Tea", "Ann's pills"]
+    );
+    let cancel = |e: &mut Engine<Disk>, id: u64| {
+        e.answer(
+            Request::Cancel {
+                guard: guard(e),
+                id,
+                asker: Some(room.clone()),
+            },
+            &at,
+        )
+    };
+    assert_eq!(cancel(&mut e, pills).unwrap_err().code, "not_found");
+    cancel(&mut e, pasta).unwrap();
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Tea"]);
+    // It keeps its setter: Ann's forget takes her timer with her reminder.
+    let forgot = e
+        .answer(
+            Request::Forget {
+                guard: guard(&e),
+                person: ANN.into(),
+            },
+            &at,
+        )
+        .unwrap();
+    assert_eq!(forgot["forgotten"], 2);
+    assert_eq!(listed(&mut e, &at, None), ["Water the plant"]);
+}
+
 #[test]
 fn a_persons_forget_cancels_every_reminder_they_set_and_survives_a_reopen() {
     let at = now(0);
@@ -1479,7 +1553,8 @@ fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_se
     let at = now(0);
     let disk = Disk::default();
     let mut e = open(disk.clone(), &at);
-    set(&mut e, &at, 60);
+    // A reminder: a timer is every line's.
+    set_by(&mut e, &at, "Call Maria", None);
     set_by(&mut e, &at, "Ann's pills", Some(ANN));
     drop(e);
     // The older build's store: no `person` on the item set without one.
