@@ -910,6 +910,26 @@ later ends the run, held where it is. The load bound is high on purpose:
 the old runtime's notes say these two joints read 830 to 1,000 in free
 motion on another lamp, so following and warmth are the real guards.
 
+A stand that never lifted is told apart (#4390): a sit-down for its load
+bound whose joint is within 3 counts (`Standing::UNLIFTED_SLACK`) of where
+it was when the stand left its fold. On lamp-4ace on 29 Oct the elbow
+pushed to its 600 cap at 2048 while its goal rose to 2120, and stayed
+pressed into its stop at 464 to 557 for hours once folded. After such a
+sit-down, once the arm has been down a second, the shoulder and the elbow
+are let go for 100 ms (`Standing::RELEASE`, torque off) and taken back
+where they then lie (goal to position, torque on); folded, the arm is at
+its lowest and stays where it is let go. The report counts each
+(`arm_releases`). After two long rests begun by such sit-downs
+(`Standing::UNLIFTED_LONG_RESTS`) it stops trying until it is started
+again, and does not strain every half hour for days: one journal line
+names the joint ("pushed at its load bound without lifting, in 2 long
+rests' tries"), the report's `cannot_lift` names it, and its health is a
+warning for as long as it runs, "its elbow pushed as hard as it may and did
+not move, in two long rests' tries: the lamp stays folded until it is
+started again, and the arm may need looking at" (`Glimpse::cannot_lift`).
+The voice doesn't say this line; it shows on the lamp's health. A sit-down
+of an arm that did lift is as before: nothing let go, no count.
+
 The pose lamp-4ace is given is the old runtime's idle pose
 (`hal/recordings/idle.csv`, first frame): head pitch 1,772, shoulder 2,657,
 elbow 2,602, with this lamp's own roll and yaw. Its folded arm reads 2,048
