@@ -2429,7 +2429,16 @@ line's start is the one at its own start
 fewer the word may be bare ("Ma'am could"), but only for the line after
 it: the cut line itself, a longer one and a whole line still need the
 comma. A line joined with the one it cut short is read on the
-joined words. Lamp
+joined words. Words cut short are also never answered in a held line's
+place (`LAMP_JOIN_CUT_WORDS`) when they open with a word said to a person
+("Ma'am could", bare in two words or fewer, as above) or the held line
+does ("Sir, what time is this?"): they are let go, and the journal says
+`request N's words, cut short, are let go: they or request M open with
+"ma'am", said to a person (LAMP_NAME_SAID_TO_A_PERSON)`
+(`second_provider::cut_said_to_a_person`, #3945's c0a4 run 2 on 29 Oct: a
+cut "Ma'am, could … you pass me the salt", let out as a conversation going
+on, was answered in place of a held "Sir, what time is this?"). Words cut
+short and joined into a line let out are left as they were. Lamp
 check on c0a4 (28 Oct, a person speaking, turned away): the one "Ma'am, …"
 lamp-name heard as the name (1.00, begun 0.9 s in) was held, the other
 "Ma'am, …" lines had no hearing and were left alone; "Lamp, what time is it in

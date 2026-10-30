@@ -657,7 +657,7 @@ pub(crate) fn said_to_a_person(heard: &str) -> Option<&'static str> {
 /// may not have set off yet: one of two words or fewer also opens with the
 /// word bare ("Ma'am could", #3945's request 12 on c0a4). A whole line
 /// still needs it set off ("Honey could you …").
-fn said_to_a_person_in_a_cut_line(heard: &str) -> Option<&'static str> {
+pub(crate) fn said_to_a_person_in_a_cut_line(heard: &str) -> Option<&'static str> {
     said_to_a_person(heard).or_else(|| {
         let heard = heard.replace('\u{2019}', "'");
         let mut words = heard.split_whitespace();

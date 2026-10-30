@@ -997,6 +997,9 @@ struct Shared {
     /// A held line is asked for the calls done though it is held
     /// ([`Engine::doing_though_held`]).
     though_held: bool,
+    /// Words cut short are not answered in a held line's place when either
+    /// opens with a word said to a person ([`Engine::letting_go_cut_words_said_to_a_person`]).
+    cut_to_a_person: bool,
     /// With `LAMP_STAFF_NOTE=on`: the note for words that name the staff.
     staff: Option<StaffNote>,
     /// With `LAMP_OWNER_PLACE=on`: the note for words that need a place
@@ -2451,6 +2454,7 @@ impl Engine {
                 lamp_said: Mutex::new((0, String::new())),
                 stop_untold: Mutex::new(None),
                 though_held: false,
+                cut_to_a_person: false,
                 staff: None,
                 place: None,
                 remembered: None,
@@ -3671,6 +3675,20 @@ impl Engine {
         debug_assert!(shared.is_some(), "set before any turn");
         if let Some(shared) = shared {
             shared.though_held = on;
+        }
+        self
+    }
+
+    /// Words cut short by a held line are let go, not answered in its
+    /// place, when they open with a word said to a person ("Ma'am, could
+    /// …") or the held line does ("Sir, what time is this?"): talk between
+    /// people, not to the lamp (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945's
+    /// c0a4 run 2 on 29 Oct). Before any turn only.
+    pub fn letting_go_cut_words_said_to_a_person(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared);
+        debug_assert!(shared.is_some(), "set before any turn");
+        if let Some(shared) = shared {
+            shared.cut_to_a_person = on;
         }
         self
     }
@@ -5998,6 +6016,23 @@ async fn spoken(
                 );
             }
             !stop
+        })
+        // Talk between people (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945):
+        // never answered in a held line's place.
+        .filter(|carried| {
+            let in_its_place = empty || held || heeded.is_some();
+            let to_a_person = cut_said_to_a_person(
+                shared.cut_to_a_person && in_its_place,
+                &carried.text(),
+                &text,
+            );
+            if let Some(word) = to_a_person {
+                eprintln!(
+                    "lamp-voice second: request {}'s words, cut short, are let go: they or request {request} open with {word:?}, said to a person (LAMP_NAME_SAID_TO_A_PERSON)",
+                    carried.request
+                );
+            }
+            to_a_person.is_none()
         });
     // The turn's verdict, as the journal says it above (#1155): only for a
     // turn something judged, and never for one with nothing heard.
@@ -6448,6 +6483,18 @@ fn says_stop(text: &str) -> bool {
         .any(|pair| pair[0] == "never" && pair[1] == "mind")
         || words.iter().any(|word| word == "nevermind")
         || (words.len() <= 3 && crate::stop_words::stop_phrase(text))
+}
+
+/// The word said to a person ([`crate::attention::SAID_TO_A_PERSON`]) that
+/// opens words `cut` short, or the line `held` that cut them, when `on`
+/// (`LAMP_NAME_SAID_TO_A_PERSON=on`): they are then let go, not answered in
+/// the held line's place.
+fn cut_said_to_a_person(on: bool, cut: &str, held: &str) -> Option<&'static str> {
+    if !on {
+        return None;
+    }
+    crate::attention::said_to_a_person_in_a_cut_line(cut)
+        .or_else(|| crate::attention::said_to_a_person(held))
 }
 
 /// Whether `carried` are the lamp's name's words that `request`, the line
