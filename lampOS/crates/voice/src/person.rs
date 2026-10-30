@@ -1395,6 +1395,78 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A line's request scope admitted as `name`'s face, or the room's.
+    fn scoped(name: Option<&str>, request: u64) -> crate::memory_scope::RequestScope {
+        let cache = crate::memory_scope::FaceCache::default();
+        if let Some(name) = name {
+            let path = std::env::temp_dir()
+                .join(format!("lamp-person-face-{}-{request}", std::process::id()));
+            fs::write(&path, name).unwrap();
+            let refresh = cache.begin_refresh();
+            cache.replace(refresh, crate::known_faces::FaceObservation::read(&path));
+            fs::remove_file(path).unwrap();
+        }
+        crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            cache.snapshot(std::time::Instant::now()),
+        )
+    }
+
+    /// Friday's P2 on #4476, through `forget_with_everything` rather than
+    /// `forget_if` alone: the name typed at setup "Robin Example", the face
+    /// who_you_are kept as "Robin" (`owner_now`). The owner's marked "forget
+    /// everything", admitted as "Robin", removes the typed name; the owner's
+    /// line unmarked, a guest's marked one or the room's leave it. Made-up
+    /// names.
+    #[test]
+    fn the_owners_marked_forget_by_the_kept_name_removes_the_typed_one() {
+        let dir = std::env::temp_dir().join(format!("lamp-person-kept-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        fs::write(&file, "Robin Example\n").unwrap();
+        set_for_test(Some(file.clone()));
+        crate::known_faces::owner_for_test(Some(Some("Robin".to_owned())));
+        assert_eq!(
+            owner_ids(),
+            [
+                crate::known_faces::memory_person("Robin Example"),
+                crate::known_faces::memory_person("Robin")
+            ]
+        );
+        let emptied = || {
+            (
+                serde_json::json!({"forgotten": true, "everything": true}),
+                true,
+            )
+        };
+        let shown = crate::second_provider::everything_shown_for_test;
+        let owner = scoped(Some("Robin"), 4_476_001);
+        let owners_line = owner.lease();
+        assert_eq!(forget_with_everything(emptied(), &owners_line), emptied());
+        let guest = scoped(Some("Sam Example"), 4_476_002);
+        let guests_line = guest.lease();
+        guests_line.mark_everything_asked(&shown());
+        assert_eq!(forget_with_everything(emptied(), &guests_line), emptied());
+        let room = scoped(None, 4_476_003);
+        let rooms_line = room.lease();
+        rooms_line.mark_everything_asked(&shown());
+        assert_eq!(forget_with_everything(emptied(), &rooms_line), emptied());
+        assert!(file.exists());
+        owners_line.mark_everything_asked(&shown());
+        let (told, answered) = forget_with_everything(emptied(), &owners_line);
+        assert!(answered);
+        assert_eq!(told["name"], "forgotten too");
+        assert!(!file.exists());
+        crate::known_faces::owner_for_test(None);
+        set_for_test(None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// #4461: the name is read again for each reply, so one cleared or set
     /// again holds from the next, though none was there at start; a
     /// relative path is none.
