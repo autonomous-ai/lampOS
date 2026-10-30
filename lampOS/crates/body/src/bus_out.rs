@@ -139,7 +139,10 @@ pub const LIMITS_EVERY: Duration = Duration::from_secs(10);
 /// base were found (pitch, roll, yaw), in the order of a `JointState`. The
 /// head's pitch is counted up as fewer counts: its least is `pitch_up` above
 /// home, its most `pitch_down` below, both inside its window, and never
-/// under its floor (the servo's own limit is just below it).
+/// under its floor (the servo's own limit is just below it). The head's and
+/// base's are a folded lamp's, around `home`: a standing lamp's head can sit
+/// outside them (docs/control.md, "The body's limits"), and a look is held
+/// to the body's own bounds for the pose it is in.
 pub fn body_limits(limits: &Limits, standing: Option<&Standing>, home: [u16; 3]) -> BodyLimits {
     let [pitch, roll, yaw] = home;
     let around = |at: u16, less: f32, more: f32| {

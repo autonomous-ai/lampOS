@@ -32,7 +32,10 @@ Each of these cost someone a run on a real lamp.
   head, or sets it private. Listen for `lease` events with `state: lost`.
 - **Not every lamp routes every op yet.** A lamp may refuse `joints` or
   `play` (and a build from before the hum, `sound`) with `refused`, "not
-  routed yet: waits for …". Handle it; don't retry.
+  routed yet: waits for …". Handle it; don't retry. `joints` takes `yaw` and
+  `pitch` (degrees from home, as `body_info()` gives them, both named until
+  the body has said where it is); `roll`, `shoulder` and `elbow` are refused
+  until the body's goal stream.
 - **A move must start and end at home** (all five joints 0) and last 1.5 to
   10 s, within each joint's reach and speed. The body's words say which
   frame was wrong.

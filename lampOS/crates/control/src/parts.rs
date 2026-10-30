@@ -571,9 +571,13 @@ impl Lamp {
     }
 
     /// `joints`: the head's `yaw` and `pitch`, in degrees from home, go as
-    /// the holder's look on the body's lease socket (the same degrees, cut
-    /// to the same reach; its `done` says where the head got to). A joint
-    /// not named stays where it is now, as `get` `body` says it. `roll`,
+    /// the holder's look on the body's lease socket, said `"from":"home"`:
+    /// the body takes its pose's offset off, so a standing lamp's stand pose
+    /// doesn't move the frame (its `done` says where the head got to, from
+    /// home too). A joint
+    /// not named stays where it is now, as `get` `body` says it; with no
+    /// position heard in the last 15 s (the body stopped or restarted) it
+    /// is refused, never sent from an old one. `roll`,
     /// `shoulder` and `elbow` wait for the body's own goal stream.
     fn joints(
         &self,
@@ -599,10 +603,27 @@ impl Lamp {
         ) else {
             return Err(Error::new(
                 ErrorCode::Refused,
-                "name both yaw and pitch until the body has said where it is (get body)",
+                "name both yaw and pitch while the body has not said where it is in the last 15 s (get body)",
             ));
         };
-        self.look(client, re, &LookAt::Angles(Angles { yaw, pitch }))
+        let Some(looks) = &self.looks else {
+            return Err(Error::new(
+                ErrorCode::Refused,
+                "the body's lease socket is not on here",
+            ));
+        };
+        looks
+            .send(crate::body_lease::Look {
+                client: client.to_owned(),
+                re,
+                line: json!({"look": {"yaw": yaw, "pitch": pitch, "from": "home"}}).to_string(),
+            })
+            .map_err(|_| not_here("the body's lease"))?;
+        // As any look taken: a hand-follow ends.
+        if let Some(follow) = &self.follow {
+            *follow.lock().expect("follower") = None;
+        }
+        Ok(json!({"to": "body"}))
     }
 
     fn ask_ring(
@@ -2229,7 +2250,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(&looked.try_recv().unwrap().line).unwrap(),
-            json!({"look": {"yaw": -10.0, "pitch": 5.0}})
+            json!({"look": {"yaw": -10.0, "pitch": 5.0, "from": "home"}})
         );
         // Only yaw, before the body has said where it is: refused.
         let error = lamp
@@ -2262,7 +2283,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(&looked.try_recv().unwrap().line).unwrap(),
-            json!({"look": {"yaw": 4.0, "pitch": 3.0}})
+            json!({"look": {"yaw": 4.0, "pitch": 3.0, "from": "home"}})
         );
         let error = lamp
             .act(
@@ -2279,6 +2300,30 @@ mod tests {
             "{}",
             error.why
         );
+        // The body not heard for 15 s (stopped or restarted): the unnamed
+        // pitch is refused, never sent from where the head was before.
+        watch.lock().unwrap().lapse(crate::watch::READING_STALE_US);
+        let error = lamp
+            .act(
+                "c_1",
+                16,
+                &joints(
+                    r#"{"id":16,"op":"joints","lease":"l_1","targets":{"yaw":4},"within_ms":300}"#,
+                ),
+                0,
+            )
+            .unwrap_err();
+        assert!(error.why.contains("name both"), "{}", error.why);
+        assert!(looked.try_recv().is_err(), "nothing sent");
+        // Both named still go.
+        lamp.act(
+            "c_1",
+            17,
+            &joints(r#"{"id":17,"op":"joints","lease":"l_1","targets":{"yaw":4,"pitch":2},"within_ms":300}"#),
+            0,
+        )
+        .unwrap();
+        assert!(looked.try_recv().is_ok());
     }
 
     #[test]

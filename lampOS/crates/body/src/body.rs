@@ -672,6 +672,21 @@ pub struct Asked {
     /// lets go on this, not on a bare name heard (#5158). Only with
     /// `LAMP_NIGHT_STAYS_FOLDED=on`.
     pub night_woke: bool,
+    /// `aim` is counted from where the head and base were found at start,
+    /// not from the pose (`{"look":{…,"from":"home"}}`, a computer's
+    /// `joints`): the pose's offset is taken off ([`aim_from_home`]).
+    pub aim_from_home: bool,
+}
+
+/// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
+/// as the body's look is from the pose's own direction now (`home_now`):
+/// yaw and pitch counts, the pose's offset taken off. On a folded lamp the
+/// two are the same; standing, the head's pose is the stand pose's.
+pub fn aim_from_home(aim: [f32; 2], home: [u16; 3], home_now: [f32; 3]) -> [f32; 2] {
+    [
+        aim[0] - (home_now[2] - f32::from(home[2])),
+        aim[1] - (home_now[0] - f32::from(home[0])),
+    ]
 }
 
 impl Asked {
@@ -699,6 +714,7 @@ impl Asked {
         unseat: false,
         night: false,
         night_woke: false,
+        aim_from_home: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -726,6 +742,7 @@ impl Asked {
         unseat: false,
         night: false,
         night_woke: false,
+        aim_from_home: false,
     };
 }
 
@@ -3979,6 +3996,7 @@ pub(crate) fn run_looking(
         unseat: false,
         night: false,
         night_woke: false,
+        aim_from_home: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -6370,7 +6388,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // Held by lamp-control's lease, its holder's look in place of the
         // gaze's, inside the same bounds every pose keeps (#3504's `look`).
-        let aim = asked_now.aim.filter(|_| asked_now.held);
+        let aim = asked_now.aim.filter(|_| asked_now.held).map(|aim| {
+            if asked_now.aim_from_home {
+                aim_from_home(aim, home, home_now)
+            } else {
+                aim
+            }
+        });
         match aim {
             Some(aim) => look = aim,
             // Let go, with no gaze of its own to say otherwise: back to the
@@ -7034,7 +7058,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             arm_loads: ARM.map(|joint| samples[joint.index()].load),
             arm_temperatures: ARM.map(|joint| samples[joint.index()].temperature),
             look,
-            look_aimed: aimed,
+            // Said in the frame it was asked in: from home, the pose's
+            // offset put back.
+            look_aimed: aimed.map(|aimed| {
+                if asked_now.aim_from_home {
+                    [
+                        aimed[0] + (home_now[2] - f32::from(home[2])),
+                        aimed[1] + (home_now[0] - f32::from(home[0])),
+                    ]
+                } else {
+                    aimed
+                }
+            }),
             posed: standing.filter(|_| upright && playing.is_none()).map(|up| {
                 [
                     (f32::from(written[1]) - f32::from(home[1])) / lease::COUNTS_PER_DEGREE,

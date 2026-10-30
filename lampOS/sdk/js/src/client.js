@@ -501,7 +501,10 @@ export class Lamp {
   /** What the body may do, joint by joint, and where each joint is now:
    * `get('body')`'s `body` (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`, each
    * with `deg` from its home, `min_deg`, `max_deg` and its counts; the speed,
-   * load and heat limits). */
+   * load and heat limits), or `known: false` when the body has said nothing
+   * in the last 15 s. The head's and base's bounds are a folded lamp's: a
+   * standing lamp's head may sit outside them, so don't clamp a target to
+   * them; the body holds every look to its own. */
   async bodyInfo() { return (await this.get('body')).body ?? {}; }
 
   // `const lease = await lamp.lease('body').take()` ... `await lease.release()`,
