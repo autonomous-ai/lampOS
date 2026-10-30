@@ -14840,6 +14840,16 @@ mod tests {
             "And what about tomorrow?",
             "What about the weekend?",
             "Make it a bit warmer.",
+            // Asks of the lamp in the words of an ask: no bare "grab the",
+            // "fetch the", "pass the" or "hand over" counts.
+            "Can you grab the weather for tomorrow?",
+            "Fetch the forecast for the weekend.",
+            "Fetch me the news.",
+            "Pass the message on to my wife.",
+            "Hand over the details of the order.",
+            "I'm going downstairs, turn the light off.",
+            "On the other hand, the forecast said rain?",
+            "I want something warmer.",
         ] {
             assert_eq!(
                 judge(true, to_the_lamp, false),

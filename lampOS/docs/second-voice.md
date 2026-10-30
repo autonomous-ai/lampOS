@@ -2788,9 +2788,13 @@ after a take-over, but now for every turn:
   **A line turned to someone else** (`LAMP_TURNED_AWAY=on`,
   `crate::turned_away`, #3882): in a busy room, a line let out only as the
   conversation going on, answering no question of the lamp's, is held when
-  it turns to someone else: a role called at its start ("Mom,", "Guys,"),
-  an object asked for ("pass me", "hand me", "grab the"), or an errand
-  between people ("Do you want coffee?", "I'm going downstairs"), `held
+  it turns to someone else: a role called at its start ("Mom,", "Guys,",
+  "Mẹ ơi,"), an object asked for in the words of a request between people
+  ("pass me", "hand me", "lend me", "đưa giùm"; never bare "grab the",
+  "fetch the" or "pass the", which people say to an assistant too), or a
+  line that is all errand between people ("Do you want coffee?", "I'm going
+  downstairs"; with a command after it, "I'm going downstairs, turn the
+  light off", it plays). The signs are in English and Vietnamese, `held
   back: a busy room: a conversation with the lamp is going on, but the line
   turns to someone else: a role called, an object asked for, or an errand`.
   On lamp-4ace on 27 Oct, on stable 7632, "Can you pass me the charger? The
