@@ -7,6 +7,7 @@
 //! while its audio queue is empty. Hardware delay and acoustic latency differ.
 use crate::{
     RENDER_RATE, RENDER_SAMPLES, Result,
+    device::DeviceFault,
     ownership::{OwnershipFailure, PlaybackCursor, PlaybackOwnership, QueuedRange},
     underrun::UnderrunBudget,
 };
@@ -97,6 +98,15 @@ pub struct Speaker {
     // The software null sink never underruns; tests inject ALSA's errno.
     #[cfg(test)]
     avail_errno: Option<i32>,
+}
+
+/// The device call a failed [`Speaker::open`] or [`Speaker::open_clock`]
+/// names, and its `errno`: `snd_pcm_open` and `EBUSY` while another holds
+/// the speaker (#4332). None for an error that is not ALSA's.
+pub fn open_fault(error: &(dyn std::error::Error + Send + Sync + 'static)) -> Option<DeviceFault> {
+    error
+        .downcast_ref::<alsa::Error>()
+        .map(|error| DeviceFault::new(error.func(), error.errno()))
 }
 
 impl Speaker {

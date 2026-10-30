@@ -89,6 +89,9 @@ pub mod head_cue;
 pub mod name_or_follow_up;
 pub mod not_speech;
 pub mod onboarding;
+// Used by the Linux audio workers, and by tests anywhere.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+pub(crate) mod open_at_start;
 pub mod options;
 pub mod others_answer;
 #[cfg(target_os = "linux")]
