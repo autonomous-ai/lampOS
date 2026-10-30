@@ -233,9 +233,12 @@ lamp-setup reset-now`). That unit, in this order:
    disconnect` and `remove_network all`, so the lamp is off the old owner's
    network before setup's hotspot takes the radio; and `journalctl
    --rotate` then `--vacuum-time=1s`, since the product's journal is a RAM
-   disk that names the networks joined. A lamp without those tools still
-   starts. The start's own line, `reset: started in place, no reboot: …`,
-   is written after. **Not emptied:** `/tmp`, which a reboot emptied too.
+   disk that names the networks joined. Each is killed after 10 s
+   (`QUERY_TIMEOUT`, as setup's other calls of them), so a stuck journald
+   never holds the start back. A lamp without those tools still starts.
+   Any that failed are named in one line after the vacuum, `reset: not
+   forgotten, going on: …`, so the vacuum doesn't take it; the start's own
+   line, `reset: started in place, no reboot: …`, comes next. **Not emptied:** `/tmp`, which a reboot emptied too.
    The product's lampOS parts write none of the person's words there, but
    `lamp-tasks` runs agents' tools, so its unit's `PrivateTmp=` is the
    tasks owner's to settle (#4513). With the marker gone, setup serves:

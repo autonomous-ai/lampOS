@@ -1892,3 +1892,23 @@ fn forgetting_the_old_network_or_the_journal_never_stops_the_start() {
     assert_eq!(calls.last().map(String::as_str), Some("start"));
     assert!(!calls.iter().any(|call| call == "reboot" || call == "force"));
 }
+
+#[test]
+fn a_forget_that_hangs_is_killed_at_its_bound_and_never_holds_the_start() {
+    let words = |argv: &[&str]| {
+        argv.iter()
+            .map(|word| (*word).to_owned())
+            .collect::<Vec<_>>()
+    };
+    let started = Instant::now();
+    let error =
+        reset::run_within(&words(&["sleep", "30"]), Duration::from_millis(200)).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+    reset::run_within(&words(&["true"]), Duration::from_secs(5)).unwrap();
+    assert!(reset::run_within(&words(&["false"]), Duration::from_secs(5)).is_err());
+}
