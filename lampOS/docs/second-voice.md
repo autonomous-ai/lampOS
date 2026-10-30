@@ -3981,9 +3981,12 @@ after a take-over, but now for every turn:
   person calling it. The name heard by `lamp-name`, its second signs
   (`weigh_the_name`), a tap, a face, being addressed, an answer to the
   lamp's question and a conversation going on are unchanged. The journal
-  says `its words open with "Lamp is cute", the end of the line before it
-  written again (begun N ms after that line ended): its name there is not
-  taken as a call by its text (LAMP_NAME_REPEAT_NOT_A_CALL)`. A person who
+  says `its first 3 words repeat the end of the line before it (begun N ms
+  after that line ended): its name there is not taken as a call by its text
+  (LAMP_NAME_REPEAT_NOT_A_CALL)`: how many words, never the words. A kept
+  line's words are let go 30 s after it ended (`SAID_LINE_KEPT_US`), at most
+  four are kept, all are let go on a camera close or a mute
+  (`Heeding::privacy_changed`), and none are kept with the switch off. A person who
   really repeats the end of their own line and means the lamp ("…fix the
   lamp. Lamp, fix it" is fine; "…the lamp is on. Lamp is on, turn it off")
   needs the name heard or a face then. The Live route is unchanged.

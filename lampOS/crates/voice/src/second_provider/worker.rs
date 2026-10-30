@@ -7394,6 +7394,9 @@ impl Heeding {
     /// looks go, so no passing id outlives a privacy change.
     pub(crate) fn privacy_changed(&mut self) {
         self.caller_faces.clear();
+        // No line's words are kept past it for a repeat
+        // (`LAMP_NAME_REPEAT_NOT_A_CALL`, Reviewer-two's P3 on #4645).
+        self.attention.forget_said_lines();
         // No conversation is carried across it (`LAMP_SAME_SPEAKER_CARRIES`),
         // and no colleague's print is kept past it.
         self.carrying = false;
@@ -8470,9 +8473,9 @@ impl Heeding {
         attention.narrow_the_call(self.busy_called_strict && busy && signs.turned != Some(true));
         // `LAMP_NAME_REPEAT_NOT_A_CALL=on`: the name opening words that
         // repeat the line before's end is no call by its text (#3923).
-        if let Some((words, gap_us)) = attention.call_taken_as_a_repeat() {
+        if let Some((count, gap_us)) = attention.call_taken_as_a_repeat() {
             eprintln!(
-                "lamp-voice second: request {request}: its words open with \"{words}\", the end of the line before it written again (begun {} ms after that line ended): its name there is not taken as a call by its text (LAMP_NAME_REPEAT_NOT_A_CALL)",
+                "lamp-voice second: request {request}: its first {count} words repeat the end of the line before it (begun {} ms after that line ended): its name there is not taken as a call by its text (LAMP_NAME_REPEAT_NOT_A_CALL)",
                 gap_us / 1_000
             );
         }
