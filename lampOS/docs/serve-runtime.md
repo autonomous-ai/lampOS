@@ -302,7 +302,9 @@ the session trace is written by its own thread.
 
 With `LAMP_STALLS=on` in the voice's environment (off unless set), the
 coordinator's loop and the ring, speaker, capture, camera and provider
-workers' loops each time their passes (`crates/voice/src/stalls.rs`). One
+workers' loops each time their passes (`crates/voice/src/stalls.rs`), and so
+does the muted wait: its looks as `wait`, and each of its gate's checks as
+`wait-<check>` (#4332), where a `gap` line is the rest of the wait. One
 line is written, never on stderr, to `stalls-<role>.log` in
 `/run/lampos-voice` (or `LAMP_STALLS_DIR`), for:
 

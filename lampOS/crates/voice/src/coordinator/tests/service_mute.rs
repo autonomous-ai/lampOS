@@ -689,7 +689,7 @@ fn the_persons_light_is_said_and_taken_while_the_switch_is_closed() {
             let started = Instant::now();
             let mut asked = false;
             while started.elapsed() < Duration::from_millis(400) {
-                gate()?;
+                gate(&mut |_| Ok(()))?;
                 if !asked && started.elapsed() >= Duration::from_millis(100) {
                     said.push(state());
                     asks.publish_json(1, &blue).unwrap();

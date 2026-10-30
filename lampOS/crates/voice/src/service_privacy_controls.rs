@@ -14,7 +14,7 @@ use crate::{
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{BootId, Controller, MonoTime, Permission};
 use std::{
-    fs, io,
+    fmt, fs, io,
     path::Path,
     time::{Duration, Instant},
 };
@@ -23,14 +23,59 @@ use std::{
 /// again, with a fresh worker.
 const UNREADABLE_RETRY: Duration = Duration::from_secs(1);
 
+/// How often a look of the wait sends the privacy worker its authority, as
+/// it always has, after its gate.
+const PUBLISH_EVERY_US: u64 = 25_000;
+
+/// How often the authority is renewed before the gate and between the
+/// gate's pieces of work ([`Waiting::step`], #4332): well inside the
+/// worker's 250 ms lease, and never at a fast look, which the publish after
+/// its gate already renewed.
+const KEEP_EVERY_US: u64 = 50_000;
+
+/// The wait's gate: whether the software latch allows, given `keep`, which
+/// renews the privacy worker's Denied authority between the gate's pieces
+/// of work (#4332), each call named by the check just done, so a refused
+/// renewal says which. A gate with no worker yet is given one that does
+/// nothing.
+pub(crate) type Keep<'a> = &'a mut dyn FnMut(&'static str) -> Result<()>;
+
+/// Which of the wait's renewals of the privacy worker's authority this is,
+/// said when its send is refused (#4332): each fails closed the same way,
+/// and the journal names the one that did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Renewal {
+    /// The first, as soon as the worker's Ready was read.
+    AfterReady,
+    /// A look's, before its gate.
+    BeforeGate,
+    /// Inside a look's gate, after the named check.
+    InGate(&'static str),
+    /// A look's, after its gate.
+    AfterGate,
+}
+
+impl fmt::Display for Renewal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AfterReady => f.write_str("renewal after Ready"),
+            Self::BeforeGate => f.write_str("renewal before the gate"),
+            Self::InGate(check) => write!(f, "renewal in the gate after {check}"),
+            Self::AfterGate => f.write_str("renewal after the gate"),
+        }
+    }
+}
+
 pub(crate) fn wait_selected(
     executable: &Path,
     termination: &Termination,
     on_state: impl FnMut(PrivacyState, BootId, u64) -> Result<()>,
-    mut additional_gate: impl FnMut() -> Result<bool>,
+    mut additional_gate: impl FnMut(Keep<'_>) -> Result<bool>,
 ) -> Result<WaitOutcome> {
     let Some((root, route)) = privacy_bus::from_environment()? else {
-        return service_privacy::wait_with_gate(executable, termination, on_state, additional_gate);
+        return service_privacy::wait_with_gate(executable, termination, on_state, move || {
+            additional_gate(&mut |_| Ok(()))
+        });
     };
     // Each retry says the switch reads unavailable, as a running worker's
     // wait does, so the health says the microphones are off until it can be
@@ -96,18 +141,23 @@ fn wait(
     route: privacy_bus::Route,
     termination: &Termination,
     on_state: impl FnMut(PrivacyState, BootId, u64) -> Result<()>,
-    mut additional_gate: impl FnMut() -> Result<bool>,
+    mut additional_gate: impl FnMut(Keep<'_>) -> Result<bool>,
 ) -> Result<WaitOutcome> {
     // The durable software latch was restored by the caller before this point.
     // Unlike the legacy path, the selected slide is observed even during a
     // software mute. This creates neither capture workers nor permission.
-    additional_gate()?;
+    // No worker exists yet, so no lease to keep.
+    additional_gate(&mut |_| Ok(()))?;
     termination.check()?;
     let directory = SessionDirectory::create()?;
     let boot = new_boot()?;
     let args = privacy_bus::worker_arguments(Some((root, route)))?;
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
-    let worker = started(Worker::spawn_with_tick(
+    // The wait's controller exists before its worker does, so nothing of
+    // its own making comes between the worker's Ready and its first
+    // authority (#4332).
+    let mut waiting = Waiting::new(boot)?;
+    let mut worker = started(Worker::spawn_with_tick(
         executable,
         &directory.path,
         "privacy",
@@ -115,6 +165,19 @@ fn wait(
         &args,
         || termination.check(),
     ))?;
+    // The worker's 250 ms lease runs from its start. Its first authority
+    // goes at once, not at the first look: on lamp-06c1's cold boot with
+    // the gate's renewals in, the lease still lapsed 250 ms after Ready,
+    // before the wait's first line, and the voice exited 1 (#4332). A
+    // refused send fails closed, as every renewal does, with the worker
+    // stopped and its directory removed as after any failed look.
+    let first = waiting.ready(&mut worker);
+    if let Err(error) = first {
+        let cleanup = cleanup(&mut worker, None);
+        drop(worker);
+        let result = finish(Err(error), cleanup);
+        return finish(result, fs::remove_dir(&directory.path));
+    }
     let path = directory.path.clone();
     // Optional SPI startup is isolated while the mandatory privacy worker,
     // gate and controller continue on every bounded tick.
@@ -133,7 +196,7 @@ fn wait(
     run(
         worker,
         directory,
-        boot,
+        waiting,
         termination,
         on_state,
         additional_gate,
@@ -174,24 +237,28 @@ pub(crate) fn started(worker: io::Result<Worker>) -> Result<Worker> {
 fn run(
     mut worker: Worker,
     directory: SessionDirectory,
-    boot: BootId,
+    mut waiting: Waiting,
     termination: &Termination,
     mut on_state: impl FnMut(PrivacyState, BootId, u64) -> Result<()>,
-    mut additional_gate: impl FnMut() -> Result<bool>,
+    mut additional_gate: impl FnMut(Keep<'_>) -> Result<bool>,
     indicator_allowed: bool,
     mut start_ring: impl FnMut(&mut dyn FnMut() -> io::Result<()>) -> io::Result<RingStartup>,
 ) -> Result<WaitOutcome> {
-    let mut waiting = Waiting::new(boot)?;
     let mut indicator: Option<Box<Worker>> = None;
     let mut attempted = false;
     let mut indicator_failure = None;
     let mut indicator_failed_at = None;
     let mut indicator_kill_requested = false;
+    // With LAMP_STALLS=on, a look of the wait or a gap between looks of
+    // 50 ms or more is a line in `stalls-wait.log`, and each of the gate's
+    // own checks that long a line in its `stalls-wait-<check>.log` (#4332).
+    let mut stalls = crate::stalls::Stalls::from_environment("wait");
     let result = (|| {
         loop {
             if termination.signal_name().is_some() {
                 return Ok(WaitOutcome::Stopped);
             }
+            let pass = stalls.begin();
             let state = waiting.step(
                 &mut worker,
                 if indicator_failure.is_none() {
@@ -287,6 +354,7 @@ fn run(
                     }
                 }
             }
+            pass.done();
             std::thread::sleep(Duration::from_millis(2));
         }
     })();
@@ -333,16 +401,45 @@ impl Waiting {
         })
     }
 
+    /// The worker's first authority, sent as soon as its Ready was read:
+    /// none sent before, so no rate holds it back. The wait's own clock for
+    /// a first reading starts here, as it did at the first look's start.
+    fn ready(&mut self, worker: &mut Worker) -> Result<()> {
+        self.started = Instant::now();
+        self.renew(worker, None, 0, Renewal::AfterReady)
+    }
+
     fn step(
         &mut self,
         worker: &mut Worker,
-        indicator: Option<&mut Worker>,
+        mut indicator: Option<&mut Worker>,
         on_state: &mut impl FnMut(PrivacyState, BootId, u64) -> Result<()>,
-        additional_gate: &mut impl FnMut() -> Result<bool>,
+        additional_gate: &mut impl FnMut(Keep<'_>) -> Result<bool>,
     ) -> Result<Step> {
+        // The worker's lease is renewed before the gate and between its
+        // pieces of work too, not only after it (#4332): on lamp-06c1's cold
+        // boot the first look's gate held past 250 ms before any authority
+        // reached the new worker, which ended on `privacy controller lease
+        // expired`, and the voice with it. This authority is always the
+        // wait's Denied one, so a renewal grants nothing; the lease keeps its
+        // length and its expiry, and one piece of work held past it still
+        // lapses it, closed.
+        self.renew(
+            worker,
+            indicator.as_deref_mut(),
+            KEEP_EVERY_US,
+            Renewal::BeforeGate,
+        )?;
         // Slow durable software-clear work happens while no audio exists. Age
         // the physical evidence again afterward; never reuse an old Allowed.
-        let software_allowed = additional_gate()?;
+        let software_allowed = additional_gate(&mut |check| {
+            self.renew(
+                worker,
+                indicator.as_deref_mut(),
+                KEEP_EVERY_US,
+                Renewal::InGate(check),
+            )
+        })?;
         worker.check_running().map_err(unavailable)?;
         let at = monotonic_us();
         if self.sequence != 0
@@ -350,24 +447,7 @@ impl Waiting {
         {
             return Err(unavailable("Controls privacy freshness lost while waiting"));
         }
-        if self
-            .last_publish
-            .is_none_or(|last| at.saturating_sub(last) >= 25_000)
-        {
-            let snapshot = self.controller.snapshot(MonoTime::from_micros(at))?;
-            worker
-                .channels
-                .control
-                .send(Control::Authority { snapshot })
-                .map_err(unavailable)?;
-            if let Some(indicator) = indicator {
-                let _ = indicator
-                    .channels
-                    .control
-                    .send(Control::Authority { snapshot });
-            }
-            self.last_publish = Some(at);
-        }
+        self.renew(worker, indicator, PUBLISH_EVERY_US, Renewal::AfterGate)?;
         let mut empty = false;
         for _ in 0..16 {
             match worker
@@ -425,6 +505,40 @@ impl Waiting {
             physical,
             allowed: software_allowed && empty && physical == PrivacyState::Allowed,
         })
+    }
+
+    /// Sends the controller's snapshot, freshly timed, to the worker (and
+    /// the indicator) when `every_us` or more have passed since the last
+    /// one. The controller's permissions stay Denied throughout the wait.
+    /// A refused send is the switch unavailable, named by `which`.
+    fn renew(
+        &mut self,
+        worker: &mut Worker,
+        indicator: Option<&mut Worker>,
+        every_us: u64,
+        which: Renewal,
+    ) -> Result<()> {
+        let at = monotonic_us();
+        if self
+            .last_publish
+            .is_some_and(|last| at.saturating_sub(last) < every_us)
+        {
+            return Ok(());
+        }
+        let snapshot = self.controller.snapshot(MonoTime::from_micros(at))?;
+        worker
+            .channels
+            .control
+            .send(Control::Authority { snapshot })
+            .map_err(|error| unavailable(format!("{error} ({which})")))?;
+        if let Some(indicator) = indicator {
+            let _ = indicator
+                .channels
+                .control
+                .send(Control::Authority { snapshot });
+        }
+        self.last_publish = Some(at);
+        Ok(())
     }
 }
 
@@ -819,13 +933,13 @@ pub(crate) mod tests {
                 let outcome = run(
                     worker,
                     directory,
-                    new_boot().unwrap(),
+                    Waiting::new(new_boot().unwrap()).unwrap(),
                     &Termination::inactive(),
                     |state, _, _| {
                         states.borrow_mut().push(state);
                         Ok(())
                     },
-                    || Ok(true),
+                    |_| Ok(true),
                     false,
                     |_| unreachable!("no indicator on this wait"),
                 );
@@ -891,7 +1005,7 @@ pub(crate) mod tests {
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
             let step = waiting
-                .step(&mut worker, None, &mut record, &mut || Ok(false))
+                .step(&mut worker, None, &mut record, &mut |_| Ok(false))
                 .unwrap();
             assert!(!step.allowed, "physical open cleared the software latch");
             if step.physical == PrivacyState::Allowed {
@@ -905,7 +1019,7 @@ pub(crate) mod tests {
         }
         assert!(
             waiting
-                .step(&mut worker, None, &mut record, &mut || Ok(true))
+                .step(&mut worker, None, &mut record, &mut |_| Ok(true))
                 .unwrap()
                 .allowed
         );
@@ -931,7 +1045,7 @@ pub(crate) mod tests {
             let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
             let deadline = Instant::now() + Duration::from_secs(2);
             loop {
-                match waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut || Ok(true)) {
+                match waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |_| Ok(true)) {
                     Err(_) => break,
                     Ok(step) => assert!(!step.allowed),
                 }
@@ -1014,10 +1128,10 @@ pub(crate) mod tests {
         let outcome = run(
             worker,
             directory,
-            new_boot().unwrap(),
+            Waiting::new(new_boot().unwrap()).unwrap(),
             &Termination::inactive(),
             |_, _, _| Ok(()),
-            || Ok(true),
+            |_| Ok(true),
             true,
             |tick| {
                 starts += 1;
@@ -1049,10 +1163,10 @@ pub(crate) mod tests {
         let outcome = run(
             worker,
             directory,
-            new_boot().unwrap(),
+            Waiting::new(new_boot().unwrap()).unwrap(),
             &Termination::inactive(),
             |_, _, _| Ok(()),
-            || Ok(true),
+            |_| Ok(true),
             indicator_started(privacy_bus::Route::NoSlide),
             |_| {
                 starts += 1;
@@ -1083,10 +1197,10 @@ pub(crate) mod tests {
             let outcome = run(
                 worker,
                 directory,
-                new_boot().unwrap(),
+                Waiting::new(new_boot().unwrap()).unwrap(),
                 &Termination::inactive(),
                 |_, _, _| Ok(()),
-                || Ok(true),
+                |_| Ok(true),
                 true,
                 |_| {
                     Ok(RingStartup::Unavailable {
@@ -1144,5 +1258,222 @@ pub(crate) mod tests {
         drain_shutdown(&mut child, stopped, &mut blanked, &mut error);
         assert!(error.is_some());
         child.shutdown().unwrap();
+    }
+
+    /// What a privacy worker stand-in saw of its authority: the longest
+    /// stretch with none arriving, from its start, and whether its lease
+    /// lapsed, by `privacy_bus::serve`'s own rule.
+    struct Leased {
+        longest_us: u64,
+        lapsed: bool,
+        authorities: usize,
+    }
+
+    /// A privacy worker that ends itself as the real one does when its
+    /// controller's lease lapses (`privacy controller lease expired`): no
+    /// authority within 250 ms of its start, or the one it holds expired.
+    /// Every authority must be the wait's Denied one. It sends nothing.
+    fn lease_watching(directory: &Path) -> (Worker, std::thread::JoinHandle<Leased>) {
+        let (worker, mut peer, input) = Worker::cooperative_fixture(directory, "privacy");
+        let task = std::thread::spawn(move || {
+            let began = monotonic_us();
+            let mut last = began;
+            let mut expires: Option<u64> = None;
+            let mut seen = Leased {
+                longest_us: 0,
+                lapsed: false,
+                authorities: 0,
+            };
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                let now = monotonic_us();
+                if expires.map_or(now.saturating_sub(began) >= 250_000, |at| at <= now) {
+                    seen.lapsed = true;
+                    seen.longest_us = seen.longest_us.max(now.saturating_sub(last));
+                    drop(input);
+                    drop(peer);
+                    return seen;
+                }
+                match peer.control.receive::<Control>() {
+                    Ok(Some(Control::Authority { snapshot })) => {
+                        assert_eq!(snapshot.microphone_permission(), Permission::Denied);
+                        assert_eq!(snapshot.camera_permission(), Permission::Denied);
+                        let now = monotonic_us();
+                        seen.longest_us = seen.longest_us.max(now.saturating_sub(last));
+                        seen.authorities += 1;
+                        last = now;
+                        expires = Some(snapshot.expires_at().as_micros());
+                        continue;
+                    }
+                    Ok(Some(Control::Stop)) | Err(_) => {
+                        let now = monotonic_us();
+                        seen.longest_us = seen.longest_us.max(now.saturating_sub(last));
+                        drop(input);
+                        return seen;
+                    }
+                    Ok(Some(other)) => panic!("not a privacy wait's command: {other:?}"),
+                    Ok(None) => {}
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "the wait never stopped the stand-in"
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        });
+        (worker, task)
+    }
+
+    /// lamp-06c1's cold boot, 30 Oct, run 1 (#4332): the wait's first look
+    /// at the reminders, the controls and the health took past 250 ms
+    /// before any authority reached the new privacy worker; its lease
+    /// lapsed, it ended (`privacy controller lease expired`) and the voice
+    /// with it. A gate of ~400 ms in ~100 ms steps, renewing between them,
+    /// now keeps the worker's Denied authority arriving within 250 ms
+    /// throughout.
+    #[test]
+    fn a_slow_gate_in_bounded_steps_keeps_the_privacy_workers_lease() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, peer) = lease_watching(&directory.path);
+        let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
+        let mut gates = 0;
+        for _ in 0..2 {
+            let _ = waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |keep| {
+                gates += 1;
+                for _ in 0..4 {
+                    std::thread::sleep(Duration::from_millis(100));
+                    keep("a check")?;
+                }
+                Ok(false)
+            });
+        }
+        assert_eq!(gates, 2);
+        let _ = worker.channels.control.send(Control::Stop);
+        let seen = peer.join().unwrap();
+        let _ = cleanup(&mut worker, None);
+        drop(worker);
+        let _ = fs::remove_dir(&directory.path);
+        assert!(
+            !seen.lapsed,
+            "the lease lapsed after {} us",
+            seen.longest_us
+        );
+        assert!(
+            seen.longest_us < 250_000,
+            "{} us with no authority",
+            seen.longest_us
+        );
+        assert!(seen.authorities >= 8, "{} authorities", seen.authorities);
+    }
+
+    /// The renewals bound only the work between them: one call of the gate
+    /// held past the lease still lapses it, and the wait fails closed, as
+    /// a hang should (#4332; nothing hides it).
+    #[test]
+    fn one_gate_call_past_the_lease_still_lapses_it_and_fails_closed() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, peer) = lease_watching(&directory.path);
+        let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
+        let step = waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |_keep| {
+            std::thread::sleep(Duration::from_millis(320));
+            Ok(true)
+        });
+        let seen = peer.join().unwrap();
+        // The stand-in has gone, so the next look cannot reach it.
+        let after = waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |_| Ok(true));
+        let _ = cleanup(&mut worker, None);
+        drop(worker);
+        let _ = fs::remove_dir(&directory.path);
+        assert!(seen.lapsed, "a 320 ms call kept the lease");
+        assert!(!matches!(step, Ok(Step { allowed: true, .. })));
+        assert!(after.is_err(), "the wait went on past a lapsed worker");
+    }
+
+    /// lamp-06c1's cold boot, 30 Oct, run 2, with the gate's renewals in
+    /// (#4332): the lease still lapsed 250 ms after the worker's Ready,
+    /// before the wait's first line. The worker's 250 ms runs from its own
+    /// start, before the wait reads its Ready (~100 ms here, as under a
+    /// cold boot's load); ~200 ms more then pass before the first look,
+    /// whose gate takes ~100 ms of its own. The authority sent at Ready
+    /// keeps the lease; with none until the first look it lapsed.
+    #[test]
+    fn the_first_authority_goes_at_ready_not_at_the_first_look() {
+        let directory = SessionDirectory::create().unwrap();
+        let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
+        let (mut worker, peer) = lease_watching(&directory.path);
+        std::thread::sleep(Duration::from_millis(100));
+        waiting.ready(&mut worker).unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let _ = waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |keep| {
+            std::thread::sleep(Duration::from_millis(50));
+            keep("a check")?;
+            std::thread::sleep(Duration::from_millis(50));
+            Ok(false)
+        });
+        let _ = worker.channels.control.send(Control::Stop);
+        let seen = peer.join().unwrap();
+        let _ = cleanup(&mut worker, None);
+        drop(worker);
+        let _ = fs::remove_dir(&directory.path);
+        assert!(
+            !seen.lapsed,
+            "the lease lapsed after {} us",
+            seen.longest_us
+        );
+        assert!(
+            seen.longest_us < 250_000,
+            "{} us with no authority",
+            seen.longest_us
+        );
+    }
+
+    /// Whichever renewal finds the worker gone ends the wait closed, as
+    /// any does, and its journal line says which (#4332).
+    #[test]
+    fn a_refused_renewal_says_which_it_was() {
+        fn refused(mut send: impl FnMut(&mut Waiting, &mut Worker) -> Result<()>) -> String {
+            let directory = SessionDirectory::create().unwrap();
+            let (mut worker, peer, input) = Worker::cooperative_fixture(&directory.path, "privacy");
+            drop(peer);
+            drop(input);
+            let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
+            // A child another test forks may hold the peer's socket until
+            // its exec, so the first sends can still be taken (#1569).
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let error = loop {
+                waiting.last_publish = None;
+                match send(&mut waiting, &mut worker) {
+                    Err(error) => break error,
+                    Ok(()) => {
+                        assert!(Instant::now() < deadline, "no send was refused");
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                }
+            };
+            let _ = cleanup(&mut worker, None);
+            drop(worker);
+            let _ = fs::remove_dir(&directory.path);
+            assert!(is_unavailable(&*error), "{error}");
+            error.to_string()
+        }
+        let said = refused(|waiting, worker| waiting.ready(worker));
+        assert!(said.ends_with(" (renewal after Ready)"), "{said}");
+        let said =
+            refused(|waiting, worker| waiting.renew(worker, None, 0, Renewal::InGate("controls")));
+        assert!(
+            said.ends_with(" (renewal in the gate after controls)"),
+            "{said}"
+        );
+        let said = refused(|waiting, worker| {
+            waiting
+                .step(worker, None, &mut |_, _, _| Ok(()), &mut |_| Ok(false))
+                .map(|_| ())
+        });
+        assert!(said.ends_with(" (renewal before the gate)"), "{said}");
+        assert_eq!(
+            Renewal::AfterGate.to_string(),
+            "renewal after the gate",
+            "the look's publish after its gate"
+        );
     }
 }

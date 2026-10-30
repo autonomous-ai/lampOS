@@ -2174,7 +2174,7 @@ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
             |on_state, gate| {
                 on_state(said, crate::process::new_boot().unwrap(), 1)?;
                 for _ in 0..3 {
-                    gate()?;
+                    gate(&mut |_| Ok(()))?;
                 }
                 Ok(WaitOutcome::Allowed)
             },
@@ -2272,7 +2272,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
             let boot = crate::process::new_boot().unwrap();
             on_state(PrivacyState::Allowed, boot, 1)?;
             for _ in 0..3 {
-                gate()?;
+                gate(&mut |_| Ok(()))?;
             }
             let until = Instant::now() + Duration::from_secs(2);
             while !open.load(Ordering::SeqCst) && Instant::now() < until {
@@ -2282,10 +2282,10 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
             on_state(PrivacyState::Muted, boot, 2)?;
             closed_when_told = Some(!open.load(Ordering::SeqCst));
             for _ in 0..3 {
-                gate()?;
+                gate(&mut |_| Ok(()))?;
             }
             on_state(PrivacyState::Allowed, boot, 3)?;
-            gate()?;
+            gate(&mut |_| Ok(()))?;
             Ok(WaitOutcome::Stopped)
         },
     )
@@ -2337,7 +2337,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
                 1,
             )?;
             for _ in 0..3 {
-                assert!(!gate()?, "still muted");
+                assert!(!gate(&mut |_| Ok(()))?, "still muted");
             }
             Ok(WaitOutcome::Stopped)
         },
@@ -2402,7 +2402,7 @@ fn the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start() {
                 crate::process::new_boot().unwrap(),
                 since,
             )?;
-            gate()?;
+            gate(&mut |_| Ok(()))?;
             Ok(WaitOutcome::Stopped)
         },
     )
@@ -2830,7 +2830,7 @@ fn the_muted_wait_says_the_microphones_are_off_by_the_switch() {
                 crate::process::new_boot().unwrap(),
                 &Termination::inactive(),
                 on_state,
-                gate,
+                || gate(&mut |_| Ok(())),
             )
         },
     )

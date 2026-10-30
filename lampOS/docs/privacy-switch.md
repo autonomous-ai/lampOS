@@ -187,6 +187,18 @@ original acquisition or the current controller deadline, whichever comes first.
 The controller's existing maximum authority lease is 250 ms: if the main owner
 stalls but this child and Controls continue, that controller deadline still
 limits renewal. A blocked/dead privacy child cannot renew the shorter Bus lease.
+The muted wait (`service_privacy_controls`) sends the worker its first
+authority as soon as it has read the worker's Ready, with no rate holding it
+back, and then in each look (`Waiting::step`) before its gate and between the
+gate's checks (the reminders, the say socket's refusal, the light, the
+controls, the owed reminder and the health), at most every 50 ms, as well as
+after the gate as before (#4332). A refused renewal says which it was at the
+end of its line: `(renewal after Ready)`, `(renewal before the gate)`,
+`(renewal in the gate after <check>)` or `(renewal after the gate)`.
+That authority is always the wait's microphone and camera **Denied**, so a
+renewal grants nothing; the lease, its expiry and the fail-closed exit are
+unchanged, so one check held past 250 ms still lapses it and ends the wait
+closed.
 
 Ears also holds Voice to its latch: once a `voice/privacy` session has reported
 the switch closed, Ears refuses any later permit from that session, and only a
