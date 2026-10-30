@@ -457,6 +457,27 @@ pub const LOOK_UP_OUT_US: u64 = 500_000;
 /// A face counts for the look only if the eyes saw it this recently.
 pub const LOOK_UP_FACE_US: u64 = 1_000_000;
 
+/// A stir at its name in the night's sleep (`LAMP_REST_THROUGH_SOUNDS=on`,
+/// the first builder on #4285: "stir at the name, wake on the answer"): the
+/// head rises a few degrees from its bow, as a sleeper lifts its head at a
+/// voice, and settles again if no answer follows. Under the wake's 0.065.
+/// Authored, to be looked at on a lamp.
+pub const STIR: BodyOffsets = BodyOffsets {
+    base_yaw: 0.0,
+    shoulder: 0.0,
+    elbow: 0.0,
+    head_roll: 0.0,
+    head_pitch: -0.04,
+};
+/// The stir comes in over this from the next tick after the counted name,
+/// eased, so it has risen within half a second of it.
+pub const STIR_IN_US: u64 = 400_000;
+/// Held this long after the last counted name; with no answer by then (a
+/// name held back, nobody going on, a TV) it settles back over
+/// [`STIR_OUT_US`], and the night's sleep is unbroken.
+pub const STIR_HOLD_US: u64 = 5_000_000;
+pub const STIR_OUT_US: u64 = 2_000_000;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Phase {
     Awake,
@@ -626,6 +647,17 @@ pub(crate) struct Life {
     /// it (#940): held as the built-in sleep is, and woken by the first face
     /// out of the night as it is.
     routine_sleep: bool,
+    /// `LAMP_REST_THROUGH_SOUNDS=on` (#1672): asleep at night, the voice
+    /// thinking does not wake it, only the voice speaking does. A line's
+    /// end puts the voice in thinking while its words are written down,
+    /// with no words or with words not said to the lamp too, and on
+    /// lamp-06c1 that woke the night's sleep three times in one night.
+    sleep_through_thinking: bool,
+    /// With that switch, a counted name in the night's sleep stirs it
+    /// rather than waking it: until when the stir is held, and how far it
+    /// has come in (0 to 1).
+    stir_until: Option<u64>,
+    stir: f64,
     called: bool,
     name_called: bool,
     name_wake: NameWake,
@@ -727,6 +759,9 @@ impl Life {
             scheduling: Scheduling::default(),
             rest_owner: None,
             routine_sleep: false,
+            sleep_through_thinking: false,
+            stir_until: None,
+            stir: 0.0,
             called: false,
             name_called: false,
             name_wake: NameWake::new(name_age_us, delivery_us),
@@ -895,10 +930,54 @@ impl Life {
 
     /// Observe the stronger conversation before a routine lease is cancelled,
     /// so that cancellation cannot take the normal conversational wake away.
+    /// With `LAMP_REST_THROUGH_SOUNDS=on`, the night's sleep wakes on the
+    /// lamp's own answer (speaking), not on thinking (#1672).
     pub(crate) fn observe_routine_voice(&mut self, voice: Option<Voice>) {
-        if matches!(voice, Some(Voice::Thinking | Voice::Speaking)) {
+        match voice {
+            Some(Voice::Speaking) => self.called(),
+            Some(Voice::Thinking) if !self.sleeps_through_thinking() => self.called(),
+            _ => {}
+        }
+    }
+
+    /// Sleep through the voice thinking (`LAMP_REST_THROUGH_SOUNDS=on`,
+    /// #1672): the night's sleep, built in or the skill's, is woken by the
+    /// voice only when it speaks.
+    pub(crate) fn sleep_through_thinking(&mut self) {
+        self.sleep_through_thinking = true;
+    }
+
+    /// Asleep for the night with the switch on: the built-in sleep, or the
+    /// rest of the skill that claims the night. Not manual sleep, nor another
+    /// skill's rest, nor waking.
+    fn sleeps_through_thinking(&self) -> bool {
+        self.sleep_through_thinking
+            && self.asleep()
+            && match self.rest_owner {
+                Some(RestOwner::Autonomous) => true,
+                Some(RestOwner::Routine) => self.routine_sleep,
+                _ => false,
+            }
+    }
+
+    /// A counted name (corroborated where the catalogue asks for speech):
+    /// with `LAMP_REST_THROUGH_SOUNDS=on`, in the night's sleep, it stirs
+    /// and waits for its answer, which wakes it (the voice speaking); else
+    /// it wakes, as before.
+    fn counted_name(&mut self, now_us: u64) {
+        if self.sleeps_through_thinking() {
+            self.stir_until = Some(now_us.saturating_add(STIR_HOLD_US));
+        } else if self.name_requires_speech() {
+            self.name_called = true;
+            self.supersede_routine();
+        } else {
             self.called();
         }
+    }
+
+    /// The stir's offsets now, laid over the sleeping pose.
+    fn stirred(&self) -> BodyOffsets {
+        add(BodyOffsets::ZERO, STIR, ease(self.stir))
     }
 
     fn voice_asleep(&self, now_us: u64) -> Option<bool> {
@@ -910,6 +989,10 @@ impl Life {
     fn begin_wake(&mut self, now_us: u64, since: u64) {
         self.nobody_since = None;
         let (from, settled) = self.sleeping(now_us, since);
+        // A stir's lift is where the wake rises from: no drop first.
+        let from = add(from, self.stirred(), 1.0);
+        self.stir_until = None;
+        self.stir = 0.0;
         self.phase = Phase::Waking {
             since: now_us,
             from,
@@ -922,7 +1005,7 @@ impl Life {
         let (from, kept) = match self.phase {
             Phase::Asleep { since } => {
                 let (from, settled) = self.sleeping(now_us, since);
-                (from, 1.0 - settled)
+                (add(from, self.stirred(), 1.0), 1.0 - settled)
             }
             Phase::Waking { since, from, kept } => {
                 let (from, kept, _) = self.waking(now_us, since, from, kept);
@@ -930,6 +1013,8 @@ impl Life {
             }
             Phase::Awake | Phase::Releasing { .. } => return false,
         };
+        self.stir_until = None;
+        self.stir = 0.0;
         self.phase = Phase::Releasing {
             since: now_us,
             from,
@@ -1066,23 +1151,15 @@ impl Life {
         if !self.asleep() {
             return;
         }
-        if self.name_requires_speech() {
-            self.name_called |= self.name_wake.name(now_us, stamp_us, ago_ms);
-            if self.name_called {
-                self.supersede_routine();
-            }
-        } else {
-            self.called();
+        if !self.name_requires_speech() || self.name_wake.name(now_us, stamp_us, ago_ms) {
+            self.counted_name(now_us);
         }
     }
 
     /// Called only after Engine accepts the voice owner's speaking evidence.
-    pub(crate) fn person_speech(&mut self, stamp_us: u64) {
-        if self.asleep() && self.name_requires_speech() {
-            self.name_called |= self.name_wake.speech(stamp_us);
-            if self.name_called {
-                self.supersede_routine();
-            }
+    pub(crate) fn person_speech(&mut self, now_us: u64, stamp_us: u64) {
+        if self.asleep() && self.name_requires_speech() && self.name_wake.speech(stamp_us) {
+            self.counted_name(now_us);
         }
     }
 
@@ -1318,7 +1395,9 @@ impl Life {
         {
             self.nobody_since = None;
         }
-        // Thinking or speaking, it has been spoken to: it is awake.
+        // Thinking or speaking, it has been spoken to: it is awake. With
+        // `LAMP_REST_THROUGH_SOUNDS=on`, asleep for the night, only speaking,
+        // which also ends a stir at its name in a full wake.
         self.observe_routine_voice(context.voice);
         // Where the voice says its mute (#711), sleep from the head is the
         // voice's: asleep while it says so, whatever calls; awake when it
@@ -1372,11 +1451,26 @@ impl Life {
             self.rest_owner = Some(RestOwner::Autonomous);
             self.name_wake.clear(false);
         }
+        // A stir at a counted name (`LAMP_REST_THROUGH_SOUNDS=on`): in,
+        // held while its answer is awaited, and out again, eased both ways.
+        let stirring = self.asleep() && self.stir_until.is_some_and(|until| now_us < until);
+        if !stirring {
+            self.stir_until = None;
+        }
+        self.stir = if stirring {
+            (self.stir + step as f64 / STIR_IN_US as f64).min(1.0)
+        } else {
+            let left = self.stir - step as f64 / STIR_OUT_US as f64;
+            if left < 1e-9 { 0.0 } else { left }
+        };
         match self.phase {
             Phase::Awake => {}
             Phase::Asleep { since } => {
                 let (offsets, settled) = self.sleeping(now_us, since);
-                planned.offsets = offsets;
+                planned.offsets = add(offsets, self.stirred(), 1.0);
+                if self.stir > 0.0 {
+                    planned.names.push("stirring");
+                }
                 planned.keep = 1.0 - settled;
                 planned.asleep = true;
                 let settle = self.alive.sleep.map_or(0, |sleep| sleep.settle_us);
@@ -1987,7 +2081,7 @@ mod routine_tests {
         life.name(now, now, 0);
         assert!(life.routine_owned());
         assert!(life.step(now, &resting()).asleep);
-        life.person_speech(now);
+        life.person_speech(now, now);
         assert!(!life.routine_owned());
         assert!(!life.release_routine(now));
         assert!(life.step(now, &resting()).names.contains(&"waking"));
@@ -2061,5 +2155,198 @@ mod routine_tests {
         other.daytime(START + SECOND, 7 * 60);
         other.faces(START + SECOND, &faces(true), 0.5);
         assert!(other.step(START + SECOND, &resting()).asleep);
+    }
+
+    /// The night's sleep with `LAMP_REST_THROUGH_SOUNDS=on`, settled, at
+    /// 20 ms ticks from `now`; the head's pitch at each tick and its names.
+    fn stir_night(through: bool, speech: bool) -> (Life, u64) {
+        let mut life = life();
+        if through {
+            life.sleep_through_thinking();
+        }
+        life.alive.sleep.as_mut().unwrap().name_requires_speech = speech;
+        // Settled: the idle layer let go over the 4 s of settling.
+        let asleep_at = night(&mut life);
+        let now = asleep_at + 10 * SECOND;
+        for at in (asleep_at..=now).step_by(100_000) {
+            life.daytime(at, 23 * 60 + 50);
+            life.step(at, &resting());
+        }
+        assert!(life.asleep() && life.sleeps_through_thinking() == through);
+        (life, now)
+    }
+
+    const FRAME: u64 = 20_000;
+
+    /// Steps from `from` (exclusive) to `until` (inclusive), each frame's
+    /// time, the head's pitch and its names.
+    fn frames(
+        life: &mut Life,
+        from: u64,
+        until: u64,
+        context: &Context,
+    ) -> Vec<(u64, f64, Vec<&'static str>)> {
+        ((from + FRAME)..=until)
+            .step_by(FRAME as usize)
+            .map(|now| {
+                life.daytime(now, 23 * 60 + 50);
+                let planned = life.step(now, context);
+                (now, planned.offsets.head_pitch, planned.names)
+            })
+            .collect()
+    }
+
+    /// The sleeping pose alone (its 9 s breath included) at `now`.
+    fn bowed(life: &Life, now: u64) -> f64 {
+        let Phase::Asleep { since } = life.phase else {
+            panic!("not asleep: {:?}", life.phase);
+        };
+        life.sleeping(now, since).0.head_pitch
+    }
+
+    /// The first builder on #4285 (03:5x): at a counted name the night's
+    /// sleep stirs, the head rising a few degrees within half a second, and
+    /// it does not wake. Off, the name wakes it at once, as before.
+    #[test]
+    fn with_the_switch_a_counted_name_stirs_within_half_a_second_and_does_not_wake() {
+        let (mut life, now) = stir_night(true, false);
+        life.name(now, now, 0);
+        let seen = frames(&mut life, now, now + SECOND, &listening_free());
+        let first = seen
+            .iter()
+            .find(|(_, _, names)| names.contains(&"stirring"))
+            .expect("no stir");
+        assert!(
+            first.0 - now <= 2 * FRAME,
+            "stirred at +{} us",
+            first.0 - now
+        );
+        let (at, pitch, _) = seen.iter().find(|(at, _, _)| *at == now + 500_000).unwrap();
+        let lift = bowed(&life, *at) - pitch;
+        assert!(
+            (STIR.head_pitch.abs() - 1e-6..=STIR.head_pitch.abs() + 1e-6).contains(&lift),
+            "lifted {lift} by +0.5 s"
+        );
+        // Eased: no frame moves the head more than a hair.
+        for pair in seen.windows(2) {
+            let moved = (pair[1].1 - pair[0].1).abs();
+            assert!(moved < 0.004, "jumped {moved} at {}", pair[1].0);
+        }
+        assert!(seen.iter().all(|(_, _, names)| !names.contains(&"waking")));
+        assert!(life.asleep());
+        assert_eq!(life.rest_owner, Some(RestOwner::Autonomous));
+
+        let (mut life, now) = stir_night(false, false);
+        life.name(now, now, 0);
+        let names = life.step(now + FRAME, &listening_free()).names;
+        assert!(names.contains(&"waking") && !names.contains(&"stirring"));
+    }
+
+    /// No answer within 5 s: it settles back to its bow, eased, and the
+    /// night's sleep is unbroken (still asleep, still the night's owner,
+    /// no wake). The voice thinking meanwhile does not wake it.
+    #[test]
+    fn with_the_switch_a_name_with_no_answer_settles_back_and_the_sleep_is_unbroken() {
+        let (mut life, now) = stir_night(true, false);
+        life.name(now, now, 0);
+        let thinking = Context {
+            voice: Some(Voice::Thinking),
+            free: true,
+        };
+        let mut seen = frames(&mut life, now, now + 2 * SECOND, &listening_free());
+        seen.extend(frames(
+            &mut life,
+            now + 2 * SECOND,
+            now + 4 * SECOND,
+            &thinking,
+        ));
+        seen.extend(frames(
+            &mut life,
+            now + 4 * SECOND,
+            now + 10 * SECOND,
+            &resting(),
+        ));
+        let held = seen
+            .iter()
+            .find(|(at, _, _)| *at == now + 4_900_000)
+            .unwrap();
+        assert!(bowed(&life, held.0) - held.1 > 0.039, "not held: {held:?}");
+        let last = seen.last().unwrap();
+        assert!(!last.2.contains(&"stirring"), "{last:?}");
+        assert!((last.1 - bowed(&life, last.0)).abs() < 1e-9, "{last:?}");
+        for pair in seen.windows(2) {
+            assert!(
+                (pair[1].1 - pair[0].1).abs() < 0.004,
+                "jumped at {}",
+                pair[1].0
+            );
+        }
+        assert!(seen.iter().all(|(_, _, names)| !names.contains(&"waking")));
+        assert!(life.asleep());
+        assert_eq!(life.rest_owner, Some(RestOwner::Autonomous));
+    }
+
+    /// Its answer within the 5 s wakes it fully as it begins, the stretch
+    /// rising from where the stir held the head, never dropping first.
+    #[test]
+    fn with_the_switch_the_answer_after_a_stir_wakes_it_from_the_stir() {
+        let (mut life, now) = stir_night(true, false);
+        life.name(now, now, 0);
+        let mut seen = frames(&mut life, now, now + 3 * SECOND, &listening_free());
+        let speaking = Context {
+            voice: Some(Voice::Speaking),
+            free: true,
+        };
+        seen.extend(frames(
+            &mut life,
+            now + 3 * SECOND,
+            now + 4 * SECOND,
+            &speaking,
+        ));
+        let woke = seen
+            .iter()
+            .position(|(_, _, names)| names.contains(&"waking"))
+            .expect("not woken");
+        assert_eq!(seen[woke].0, now + 3 * SECOND + FRAME);
+        assert!(
+            seen[woke].1 <= seen[woke - 1].1 + 0.004,
+            "dropped from {} to {}",
+            seen[woke - 1].1,
+            seen[woke].1
+        );
+        assert!(!life.asleep());
+    }
+
+    /// A name not counted (`name_requires_speech` and no person speech:
+    /// an ignored sleeping name) does not stir it; one corroborated by
+    /// speech after it does.
+    #[test]
+    fn with_the_switch_an_ignored_sleeping_name_does_not_stir() {
+        let (mut life, now) = stir_night(true, true);
+        life.name(now, now, 0);
+        let seen = frames(&mut life, now, now + 4 * SECOND, &listening_free());
+        assert!(
+            seen.iter()
+                .all(|(_, _, names)| !names.contains(&"stirring")),
+            "stirred at an ignored name"
+        );
+        assert!(!take_notices_empty(&mut life));
+        let at = now + 4 * SECOND;
+        life.name(at, at, 0);
+        life.person_speech(at, at);
+        let names = life.step(at + FRAME, &listening_free()).names;
+        assert!(names.contains(&"stirring") && !names.contains(&"waking"));
+    }
+
+    fn take_notices_empty(life: &mut Life) -> bool {
+        life.advance_name(u64::MAX / 2);
+        life.take_name_notices().is_empty()
+    }
+
+    fn listening_free() -> Context {
+        Context {
+            voice: Some(Voice::Listening),
+            free: true,
+        }
     }
 }

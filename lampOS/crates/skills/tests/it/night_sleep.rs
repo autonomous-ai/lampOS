@@ -51,10 +51,13 @@ struct Seen {
     falling: Vec<u64>,
     waking: Vec<u64>,
     releasing: Vec<u64>,
+    /// When a stir at its name began (`LAMP_REST_THROUGH_SOUNDS=on`).
+    stirring: Vec<u64>,
     was_asleep: bool,
     was_falling: bool,
     was_waking: bool,
     was_releasing: bool,
+    was_stirring: bool,
 }
 
 impl Seen {
@@ -64,7 +67,9 @@ impl Seen {
         let falling = named("falling asleep");
         let waking = named("waking");
         let releasing = named("releasing rest");
+        let stirring = named("stirring");
         for (on, was, at) in [
+            (stirring, self.was_stirring, &mut self.stirring),
             (asleep, self.was_asleep, &mut self.asleep),
             (falling, self.was_falling, &mut self.falling),
             (waking, self.was_waking, &mut self.waking),
@@ -78,6 +83,7 @@ impl Seen {
         self.was_falling = falling;
         self.was_waking = waking;
         self.was_releasing = releasing;
+        self.was_stirring = stirring;
     }
 
     /// One settle, and since then no wake, no release and no settle again:
@@ -172,9 +178,12 @@ impl Night {
         night
     }
 
-    /// The skills engine with `LAMP_REST_THROUGH_SOUNDS=on` (#1672).
+    /// The skills engine and both Expressions with
+    /// `LAMP_REST_THROUGH_SOUNDS=on` (#1672).
     fn through_sounds(mut self) -> Self {
         self.skills = self.skills.take().map(Skills::resting_through_sounds);
+        self.built_in = self.built_in.with_rest_through_sounds();
+        self.skill_route = self.skill_route.with_rest_through_sounds();
         self
     }
 
@@ -1072,4 +1081,163 @@ fn with_the_switch_a_push_let_go_and_pushed_again_begins_it_again() {
         "{:?}",
         first_rest(&night)
     );
+}
+
+/// Asleep since 23:00 by both routes, at 23:10 (#1672's wakes, night row of
+/// 28 to 29 Oct on lamp-06c1).
+fn asleep_at_ten_past(through: bool) -> Night {
+    let mut night = Night::new(Some(claim(true)), true);
+    if through {
+        night = night.through_sounds();
+    }
+    night.until(23, 10);
+    assert_eq!(night.skill_seen.asleep.len(), 1, "{:?}", night.skill_seen);
+    assert_eq!(night.built_in_seen.asleep.len(), 1);
+    night
+}
+
+/// A line heard as the voice hears it at night: listening while it lasts,
+/// thinking while its words are written down at its end, then resting with
+/// no answer. `words`: what `voice/heard` wrote down, if anything.
+fn line_with_no_answer(night: &mut Night, words: Option<&str>) {
+    night.set_voice(Voice::Listening);
+    night.run(2 * SECOND);
+    night.set_voice(Voice::Thinking);
+    if let Some(text) = words {
+        night.observe(
+            "voice/heard",
+            &serde_json::json!({"text": text, "finished": true}),
+            None,
+        );
+    }
+    night.run(SECOND);
+    night.set_voice(Voice::Resting);
+}
+
+/// (a) A sound heard as no words, its line ending in thinking (00:43:38 and
+/// 01:51:37 on lamp-06c1): with the switch, both routes sleep on, the head
+/// never lifting. Without it, both wake, as before.
+#[test]
+fn with_the_switch_a_sound_of_no_words_ending_in_thinking_does_not_wake_the_lamp() {
+    let mut night = asleep_at_ten_past(true);
+    line_with_no_answer(&mut night, None);
+    night.until(23, 20);
+    night.skill_seen.still_down();
+    night.built_in_seen.still_down();
+    assert!(night.resting, "the skill's rest was ended");
+
+    let mut night = asleep_at_ten_past(false);
+    line_with_no_answer(&mut night, None);
+    night.until(23, 20);
+    assert_eq!(night.skill_seen.waking.len(), 1, "{:?}", night.skill_seen);
+    assert_eq!(night.built_in_seen.waking, night.skill_seen.waking);
+}
+
+/// (b) A line with words not said to the lamp, its answer held back
+/// (03:35:52 on lamp-06c1): the voice thinks and never speaks, and the
+/// lamp sleeps on.
+#[test]
+fn with_the_switch_a_line_not_said_to_the_lamp_does_not_wake_it() {
+    let mut night = asleep_at_ten_past(true);
+    line_with_no_answer(&mut night, Some("put it there"));
+    night.until(23, 20);
+    night.skill_seen.still_down();
+    night.built_in_seen.still_down();
+}
+
+/// (c) The lamp's own answer wakes it, as it begins to speak, by both
+/// routes at the same tick.
+#[test]
+fn with_the_switch_its_own_answer_wakes_it() {
+    let mut night = asleep_at_ten_past(true);
+    night.set_voice(Voice::Listening);
+    night.run(2 * SECOND);
+    night.set_voice(Voice::Thinking);
+    night.run(SECOND);
+    night.skill_seen.still_down();
+    let speaks = night.now;
+    night.set_voice(Voice::Speaking);
+    night.run(2 * SECOND);
+    night.set_voice(Voice::Resting);
+    night.run(5 * SECOND);
+    let waking = &night.skill_seen.waking;
+    assert_eq!(waking.len(), 1, "{:?}", night.skill_seen);
+    assert!(
+        (speaks..=speaks + 2 * TICK).contains(&waking[0]),
+        "woke at {}",
+        clock(waking[0])
+    );
+    assert_eq!(night.built_in_seen.waking, night.skill_seen.waking);
+}
+
+/// (e) The first builder on #4285 (03:5x): "stir at the name, wake on the
+/// answer". Its name, counted (heard with the person's speech), stirs both
+/// routes within half a second and wakes neither; with no answer they
+/// settle back and the night's sleep is unbroken: no wake, the skill's
+/// rest still held. Its answer within the 5 s wakes both at the same tick.
+/// Without the switch, the name wakes both, as before.
+#[test]
+fn with_the_switch_its_name_stirs_it_and_only_the_answer_wakes_it() {
+    let mut night = asleep_at_ten_past(true);
+    night.name();
+    let named = night.now;
+    night.run(2 * SECOND);
+    night.set_voice(Voice::Thinking);
+    night.run(SECOND);
+    night.set_voice(Voice::Resting);
+    night.until(23, 20);
+    for seen in [&night.skill_seen, &night.built_in_seen] {
+        assert_eq!(seen.stirring.len(), 1, "{seen:?}");
+        assert!(
+            seen.stirring[0] - named <= 5 * TICK,
+            "stirred at +{} us",
+            seen.stirring[0] - named
+        );
+        assert!(!seen.was_stirring, "still stirred: {seen:?}");
+        seen.still_down();
+    }
+    assert!(night.resting, "the skill's rest was ended");
+
+    let mut night = asleep_at_ten_past(true);
+    night.name();
+    night.run(2 * SECOND);
+    let speaks = night.now;
+    night.set_voice(Voice::Speaking);
+    night.run(2 * SECOND);
+    night.set_voice(Voice::Resting);
+    night.run(5 * SECOND);
+    assert_eq!(night.skill_seen.stirring.len(), 1, "{:?}", night.skill_seen);
+    let waking = &night.skill_seen.waking;
+    assert_eq!(waking.len(), 1, "{:?}", night.skill_seen);
+    assert!((speaks..=speaks + 2 * TICK).contains(&waking[0]));
+    assert_eq!(night.built_in_seen.waking, night.skill_seen.waking);
+
+    let mut night = asleep_at_ten_past(false);
+    night.name();
+    night.run(2 * SECOND);
+    night.set_voice(Voice::Resting);
+    night.run(5 * SECOND);
+    assert!(
+        night.skill_seen.stirring.is_empty(),
+        "{:?}",
+        night.skill_seen
+    );
+    assert_eq!(night.skill_seen.waking.len(), 1, "{:?}", night.skill_seen);
+    assert_eq!(night.built_in_seen.waking, night.skill_seen.waking);
+}
+
+/// (d) A tap wakes it, and a reminder newly due, as before.
+#[test]
+fn with_the_switch_a_tap_or_a_reminder_wakes_it() {
+    let mut night = asleep_at_ten_past(true);
+    night.touch();
+    night.run(5 * SECOND);
+    assert_eq!(night.skill_seen.waking.len(), 1, "{:?}", night.skill_seen);
+    assert_eq!(night.built_in_seen.waking, night.skill_seen.waking);
+
+    let mut night = asleep_at_ten_past(true);
+    night.due(7);
+    night.run(5 * SECOND);
+    assert_eq!(night.skill_seen.waking.len(), 1, "{:?}", night.skill_seen);
+    assert_eq!(night.built_in_seen.waking, night.skill_seen.waking);
 }
