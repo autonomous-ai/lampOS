@@ -828,7 +828,9 @@ each under the quiet rule. A round
    when the voice is running and a running part before it in startup order
    restarts too (lamp-controls, Memory, Ears, ...), the round reads queued
    speech and checks the 45 s quiet gate once more, then stops the voice
-   with a plain `systemctl stop`, while lamp-controls is still up. That is a
+   with a plain `systemctl stop`, while lamp-controls is still up, and the
+   journal says `the voice is stopped before the parts it reads restart`
+   (between `switching to build N` and its end). That is a
    clean stop with nothing in flight, so no build's voice arms its restart
    guard (#960), not even one from before `1c88f2dbd` (#4280). Then the
    other parts restart in startup order, and the voice is started at its own
