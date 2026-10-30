@@ -1,0 +1,10 @@
+04:48:18.513 off4 call W=42 G=0.7
+04:49:01.531 off4 cut
+04:49:07.700 off4 sir
+04:49:35.470 off4 call W=42 G=0.8
+04:50:18.502 off4 cut
+04:50:24.787 off4 sir
+04:50:52.569 off4 call W=42 G=0.9
+04:51:35.599 off4 cut
+04:51:41.991 off4 sir
+04:52:09 off4 PLAY-DONE vol=60
