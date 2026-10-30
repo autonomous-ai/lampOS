@@ -10579,6 +10579,44 @@ async fn asked_with(
     script.asked.lock().unwrap().clone()
 }
 
+/// `LAMP_UNTIED_GOING_ON` (Sixth's P2 on #4562): a line let out only as the
+/// conversation going on and begun over the lamp's answer is told it may be
+/// people's talk and not that it cut in when it has no tie to the lamp
+/// (`Engine::telling_the_untied`); a tied one, or one without the switch,
+/// keeps its cut-in note beside the conversation's.
+#[tokio::test]
+async fn an_untied_line_begun_over_the_answer_is_not_told_it_cut_in() {
+    let cut_in = Message::system(crate::cut_in_told::NOTE);
+    let alone = Message::system(worker::CONVERSATION_ALONE);
+    let words = "Did you send the slides to Sam yet?";
+    let asked = |untied: Option<bool>| {
+        asked_with(
+            words,
+            move |engine| {
+                let engine = engine
+                    .telling_cut_ins(true)
+                    .noting_the_conversation_alone(Arc::new(|_| Some(worker::CONVERSATION_ALONE)));
+                match untied {
+                    Some(untied) => engine.telling_the_untied(Arc::new(move |_| untied)),
+                    None => engine,
+                }
+            },
+            start_marked(1, true, false, false),
+            false,
+            false,
+        )
+    };
+    let untied = asked(Some(true)).await;
+    assert!(!untied[0].contains(&cut_in), "{:?}", untied[0]);
+    assert!(untied[0].contains(&alone), "{:?}", untied[0]);
+    assert_eq!(untied[0].last(), Some(&Message::user(words)));
+    for (untied, why) in [(Some(false), "tied"), (None, "without the switch")] {
+        let told = asked(untied).await;
+        assert!(told[0].contains(&cut_in), "{why}: {:?}", told[0]);
+        assert!(told[0].contains(&alone), "{why}: {:?}", told[0]);
+    }
+}
+
 /// #1712, item 4 of the first builder's 20:15 (`LAMP_CUT_IN_TOLD`): a line
 /// begun over the lamp's audible answer is told it cut in, beside its
 /// words, as the Live route tells it; not without the switch, and the

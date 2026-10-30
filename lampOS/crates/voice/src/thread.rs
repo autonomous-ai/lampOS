@@ -1008,6 +1008,27 @@ impl Thread {
             .and_then(|exchange| exchange.whose.clone())
     }
 
+    /// What the person said and what the lamp answered in the newest
+    /// exchange with the lamp's words, the answers to `but` and `request`
+    /// left out (`LAMP_UNTIED_GOING_ON`): what a line going on may be tied
+    /// to. The answer is its kept start and its end ([`TAIL_BYTES`]), so a
+    /// word near the end of a long answer still ties.
+    pub fn said_last_but(&self, request: u64, but: &[u64]) -> Option<(String, String)> {
+        self.exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request && !but.contains(&exchange.request))
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .map(|exchange| {
+                let lamp = if exchange.lamp.ends_with(exchange.tail.as_str()) {
+                    exchange.lamp.clone()
+                } else {
+                    format!("{} {}", exchange.lamp, exchange.tail)
+                };
+                (exchange.person.clone(), lamp)
+            })
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
@@ -3605,5 +3626,47 @@ mod tests {
         let mut empty = Thread::new();
         empty.at_start(None);
         assert!(!empty.opening(at(0)) && empty.opened_for().is_none());
+    }
+
+    /// `LAMP_UNTIED_GOING_ON` (Sixth's P3 on #4562): what a line going on
+    /// may be tied to holds the end of a long answer too, past the kept
+    /// start's 400 bytes, and leaves out the answers to `but`.
+    #[test]
+    fn said_last_but_holds_a_long_answers_end() {
+        let mut thread = Thread::new();
+        let now = Instant::now();
+        thread.person("Tell me about Saigon.", true, now);
+        let long = "Saigon is a busy city with many old streets and markets. ".repeat(10);
+        thread.lamp(
+            1,
+            &format!("{long}The best time to visit is the dry season."),
+            now,
+        );
+        let (person, lamp) = thread.said_last_but(2, &[]).unwrap();
+        assert_eq!(person, "Tell me about Saigon.");
+        assert!(lamp.starts_with("Saigon is a busy city"), "{lamp}");
+        assert!(lamp.contains("dry season"), "{lamp}");
+        assert!(crate::untied_going_on::tied(
+            "Is it humid in the dry months?",
+            &[&person, &lamp]
+        ));
+        thread.person("Did you send the slides?", true, now);
+        thread.lamp(2, "I hope so.", now);
+        assert!(
+            thread
+                .said_last_but(3, &[])
+                .unwrap()
+                .1
+                .starts_with("I hope so.")
+        );
+        assert!(
+            thread
+                .said_last_but(3, &[2])
+                .unwrap()
+                .1
+                .contains("dry season")
+        );
+        let short = Thread::new();
+        assert!(short.said_last_but(1, &[]).is_none());
     }
 }

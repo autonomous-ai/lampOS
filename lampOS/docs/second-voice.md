@@ -4270,6 +4270,82 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   (LAMP_GOING_ON_NOT_OWN)`. Not changed: the session fact, the Policy's
   `lamp_spoke_lately`, a checked sound's `lamp_just_asked`, and the Live
   route.
+- **Untied talk keeps nothing going** (`LAMP_UNTIED_GOING_ON=on`,
+  `crate::untied_going_on`, #3882; off by default and not in the product
+  unit). On lamp-06c1 on 28 Oct, with the product unit's environment, made
+  voices and no faces, desk1's lines after one answered question ("Did you
+  send the slides to Sam yet?", "Not yet, I'll do it after lunch.", "Are
+  you coming to the meeting at four?") were each let out only as the
+  conversation going on, and each answer opened a new exchange
+  (`Thread::lamp_for`), so the next line fell inside the 45 s window again,
+  or the 20 s and busy room's 15 s after its words. A line begun over the
+  lamp's answer (timing only, the coordinator's `over_the_lamps_voice`) was
+  also exempt from the people's-talk note (`Heeding::conversation_note_for`).
+  `LAMP_GOING_ON_NOT_OWN` breaks such a chain only with a face or a voice
+  print. With this switch, a line let out only as the conversation going on
+  (`Attention::played_on_the_conversation_alone`, so with `LAMP_SPOKEN_TO`:
+  no name, no call, no face turned, not near, no reply to the lamp's
+  question) is **tied** to the lamp when its words ask for the lamp's own
+  work (`Heeding::asks_its_work`), refer back (`untied_going_on::refers_back`:
+  "say that", "what about", "how about", "pardon", and Vietnamese "nói
+  lại", "lần nữa", "thì sao", "cái đó", "gì cơ", "đợi đã"; "that", "it",
+  "what", "why", "how", "when", "where", "who", "huh", "really", "again",
+  "more", "wait", "stop", "sorry", "đó", "nó", "hả", "sao" (so "tại sao"),
+  "khoan", "dừng", "xin lỗi" only in a line of four words or fewer, since
+  "Not yet, I'll do it after lunch." and "Sorry, did you send the slides
+  to Sam?" are any sentence's; a question of six words
+  or fewer opening "and" or "còn", as "And in Hanoi?" or "Còn Hà Nội?";
+  a word's `'s` is taken off, so "what's" and "that's" count), or share a
+  content word (three letters or more, not `remember::SEARCH_COMMON` or the
+  module's small words) with the newest exchange whose answer still
+  counts: the lamp's answer, its kept start and its end, and the line it
+  answered (`Thread::said_last_but`). Two words are shared when their stems
+  are the same (a plural's `s` or `es` off, "glasses" is "glass"; for an
+  English word "-y", "-er", "-est", "-ing", "-ed", "-ly" off with a doubled
+  consonant, so "sunny" is "sun", "hotter" "hot", "rainy" "rain"), or the
+  shorter, of four letters or more, begins the longer ("rain",
+  "rainfall"). It is tied too when it asks the lamp
+  (`untied_going_on::asks_the_lamp`, Tests on #4562): a question with a
+  part opening "should I", "do I", "can I", "is it", "is that", "is
+  there", "will it"… ("Should I bring an umbrella?", "Is that hot for
+  October?"; not "Are you coming to the meeting at four?"), or a part
+  opening, after "can you", "please", "okay"…, with the lamp's light,
+  sound or words ("make", "turn", "play", "tell", "check", "set", "dim",
+  "remind", "bật", "tắt", "kể"…; not "pass me"), unless the line shows desk
+  talk (`untied_going_on::desk_talk`: `turned_away::turns_to_another`,
+  "you guys", "hey" someone other than the lamp, "Anh"/"Chị"/"Em" then a
+  name at its start, a one-word name set off by a comma at its start, or
+  "tell"/"ask"/"remind" then a name). Otherwise it is untied, and:
+  - **No renewal (C2):** the request joins `Heeding::chain`, so its answer's
+    exchange and its words' end (`Did::Said`) are left out of the thread's
+    45 s, the 20 s after the lamp's words and a busy room's 15 s, as
+    `LAMP_GOING_ON_NOT_OWN`'s chain is. The lamp still answers it if the
+    model does; the thread, memory and every other reader keep the
+    exchange as before.
+  - **Told it may be people's talk (C1):** it gets `CONVERSATION_ALONE`
+    even when it began over the lamp's answer, and with `LAMP_CUT_IN_TOLD`
+    the cut-in note is not told beside it (`Engine::telling_the_untied`).
+    A tied line begun over the answer ("Sorry, can you say that last part
+    again?") keeps the exemption.
+  The journal says `its answer is played: …, only as the conversation going
+  on, with no tie to the lamp: the model is told it may be people's talk,
+  and its answer keeps no conversation going (LAMP_UNTIED_GOING_ON)`, and
+  for a cut-in `it began over the lamp's answer, but has no tie to it: the
+  model is told it may be people's talk, not that it cut in
+  (LAMP_UNTIED_GOING_ON)`. A later line's journal of the lamp's answers
+  left out names what put them there: `LAMP_UNTIED_GOING_ON` when all were
+  untied lines, `LAMP_GOING_ON_NOT_OWN` when none were (as without the
+  switch), both when mixed (`Heeding::chain_by`). **Cost:** a person's own new, unrelated question
+  two turns in, with no name, no face and no word of the last answer, is
+  not answered; they say the name or face the lamp. Test:
+  `worker::tests::untied_talk_after_an_answer_keeps_no_conversation_going`
+  (desk1's four lines; "What about tomorrow?", "Say that again.", a shared
+  word, "And in Hanoi?", "Còn Hà Nội?", "Why?", "Tại sao?", "That's weird,
+  why?", "rain" after "rainy", the name and a reply to the lamp's question
+  still play and renew; #3895's eight lamp asks still play),
+  `tests::an_untied_line_begun_over_the_answer_is_not_told_it_cut_in` (no
+  cut-in note for an untied line, kept for a tied one), and the module's own
+  tests. Not yet tried on a lamp.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
