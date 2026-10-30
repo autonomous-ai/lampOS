@@ -39,10 +39,13 @@ pub enum Command {
     /// Which function DeepSeek calls for each light-and-volume follow-up
     /// line (`lamp-voice probe-tools`, #1712): counts only, run by hand.
     ProbeTools,
+    /// What the second route's chat says to a cut-in told its note
+    /// (`lamp-voice probe-cut-in`, #3997): counts only, run by hand.
+    ProbeCutIn,
 }
 
 impl Command {
-    pub const ALL: [Command; 15] = [
+    pub const ALL: [Command; 16] = [
         Command::Serve,
         Command::Directed,
         Command::DirectedFixture,
@@ -58,6 +61,7 @@ impl Command {
         Command::ProbeCascade,
         Command::ProbeCache,
         Command::ProbeTools,
+        Command::ProbeCutIn,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -77,6 +81,7 @@ impl Command {
             Command::ProbeCascade => "probe-cascade",
             Command::ProbeCache => "probe-cache",
             Command::ProbeTools => "probe-tools",
+            Command::ProbeCutIn => "probe-cut-in",
         }
     }
 

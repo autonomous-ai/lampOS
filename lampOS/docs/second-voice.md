@@ -1623,10 +1623,17 @@ order is kept. A written turn is the same from the chat on.
   - **A cut-in** (`LAMP_CUT_IN_TOLD=on`, the worker's `--cut-in-told`): a
     line begun over the lamp's audible answer (`over_the_lamps_voice`),
     and not the first after a stop, which is told the stop instead, is
-    told `cut_in_told::NOTE`. It is known from the line's start, so a chat
+    told `cut_in_told::NOTE`, last among the notes, right before the
+    person's words. It is known from the line's start, so a chat
     begun on its early words (`LAMP_SECOND_PREPARED`) is asked with it
-    and kept; a note known only later (a stop's, a bare call's, a
-    follow-on's) still drops that chat.
+    (after the memory's note, as round 1 tells them) and kept; a note known only later (a stop's, a bare call's, a
+    follow-on's) still drops that chat. The note asks a short "Okay, I'll
+    stop." alone for a stop or wait, a few words ("Oh, sure —") before any
+    other answer, and where it was before going back (#3997's cut-in
+    proposal, `docs/not-speech.md`). With `LAMP_SAID_AS_HEARD=on` too, an
+    answer cut and kept as heard is followed in the history by
+    `cut_in_told::CUT_HERE`, so a later "go on", told no note, says where
+    it was and goes on from the cut (`worker::messages`).
   - **A line that may follow on** (`LAMP_FOLLOWS_ON=on`, the Start's
     `follows_on`): told `follows_on::NOTE`, unless its End marks a short
     sound or the rule judged it in a busy room (`Heeding::judged_busy`;
@@ -5207,6 +5214,35 @@ systemd-run --pty --wait \
   /opt/lampOS/voice/current/lamp-voice probe-cache \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 3
 ```
+
+### A cut-in made plain (`probe-cut-in`)
+
+`lamp-voice probe-cut-in PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20, 3
+by default; `second_provider/probe/cut_in.rs`, #3997's cut-in proposal).
+Each line is a fresh session as the route asks it (the character, the
+spoken words, a turn's changing part, the voice's own functions, DeepSeek
+reached as `probe-tools` reaches it), asked with two arms: `before`, the
+cut-in note as it was and no mark after a cut; `now`, `cut_in_told::NOTE`
+and `cut_in_told::CUT_HERE`. A story about a lighthouse keeper, cut with
+its dash, comes before the cut-in lines.
+
+- **stop** ("Wait.", "Hold on.", "Pause.", "Stop." over the story): right
+  for at most eight words that don't go on with it. With
+  `LAMP_SPOKEN_STOP_ENDS=on` a lamp answers "Stop." itself and never asks
+  the model, so that row measures the note alone.
+- **ack** (two plus two, what a keeper does, how to spell lighthouse, over
+  the story): right for an opening of at most four words from an
+  acknowledgement's few ("oh", "sure", "okay", …) and an answer; a long
+  apology is counted as one.
+- **resume** ("Okay, go on with the story.", "Continue." after the story was
+  cut and two plus two answered, no note): right when its first 25 words
+  say where it was ("where was I" or the cut's last moment) and it doesn't
+  start over.
+- **plain** (two plus two, a joke, no cut): right with no acknowledgement
+  first.
+
+It prints counts only: each arm and line's outcomes, then each arm's total
+for each kind. Never the character, a key or what the model said.
 
 ### Which function each follow-up line calls (`probe-tools`)
 
