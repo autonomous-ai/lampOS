@@ -24,7 +24,11 @@ for _ in $(seq 1 50); do
 done
 grep -q "paired as" "$log" || { echo "the fake lamp didn't start:"; cat "$log"; exit 1; }
 
+status=0
 case "$program" in
-  *.js) node "$program" ;;
-  *) python3 "$program" ;;
+  *.js) node "$program" || status=$? ;;
+  *) python3 "$program" || status=$? ;;
 esac
+echo "--- the fake lamp's log (it prints what it was asked between its own events):"
+cat "$log"
+exit "$status"
