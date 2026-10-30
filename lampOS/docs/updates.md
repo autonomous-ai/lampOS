@@ -1160,6 +1160,37 @@ pads in it (`"head_pads": ["head-1", "head-2"]` for two) before restarting
 `lamp-controls`, or it won't start, and on the privacy route the lamp then
 hears nothing (install.md).
 
+### Reading a round from the journal
+
+Each line is `lamp-update: <text>` in `journalctl -u lamp-update`. A round
+ends with one line, its outcome as `round::Outcome` writes it. The same end
+has a name in `log.jsonl` (`outcome`) and on `update/status` (`last`), from
+`Outcome::kind`; **that name is never in the journal**, so a run sheet greps
+the text below, not `self-switched` or `self-confirmed` (#4561's P2). `serve`
+says an end only when its text differs from the last one it said, so a lamp
+up to date for hours says `up to date: build N` once.
+
+| The journal line begins | Its name | Means |
+|---|---|---|
+| `up to date: build N` | `up-to-date` | nothing to do |
+| `nothing changed: …` | `unreachable`, `nothing-published` | the channel couldn't be read, or has no build |
+| `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, or its updater put back before |
+| `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, or `another lamp-update is at work` |
+| `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
+| `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts (or with none to change) |
+| `build N needs updater M; lamp-update switches from its build A to B, which the build carries, and takes nothing else of it until that one has confirmed itself` | `self-switched` | a **climb**: only the updater the build carries is taken |
+| `build N put back: …; the previous build is well` | `rolled-back` | the parts were put back (the watch, or a start that failed) |
+| `failed: …` | `failed` | an error, said with why |
+
+Inside a round: `switching to build N`, `waiting for a quiet moment: …`
+(once per wait), and `putting build N back: …` before a `put back` end.
+After a self-switch or a climb, the new updater says
+`confirmed: lamp-update runs its new build` once its dry round passes
+(`self-confirmed` in `log.jsonl`), or `not confirmed yet: …` and
+`not confirmed: …`, each when its text changes, looking again every 30 s
+(`main.rs`). A climb's parts switch follows the confirm in the same `serve`
+run.
+
 ### The second route's services in a round
 
 A round places `/etc/lampOS/voice/second.json` when the build's voice unit
