@@ -381,6 +381,9 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn timezone(&mut self, zone: &str) -> io::Result<()> {
         self.save.timezone(zone)
     }
+    fn language(&mut self, code: &str) -> io::Result<()> {
+        self.save.language(code)
+    }
     fn backend(&mut self, link: &crate::serve::Backend) -> io::Result<()> {
         self.save.backend(link)
     }

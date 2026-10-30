@@ -35,6 +35,8 @@ const READ: &[(&str, &str, Type)] = &[
     ("system.info", "versions.firmware", Type::Text),
     ("system.info", "network.private_ip", Type::Text),
     ("system.info", "host.hostname", Type::Text),
+    // The owner's language (#4473), always said: `en` with no file.
+    ("system.info", "host.language", Type::Text),
     ("volume.get", "volume", Type::Percent),
     ("volume.get", "raw", Type::Whole),
     ("volume.get", "max_volume", Type::Whole),
