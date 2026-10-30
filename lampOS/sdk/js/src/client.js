@@ -446,6 +446,13 @@ export class Lamp {
 
   // The states asked for (presence, light, mood, lamp), by name: the reply's `state`.
   async get(...states) { return (await this.request('get', { state: states })).state ?? {}; }
+  // The air sensor's newest reading (the `air` grant), and `known`; only
+  // `{ known: false }` with no reading. Each change past a step comes as
+  // `lamp.on('air.changed', ...)`.
+  async air() { return (await this.get('air')).air; }
+  // The lamp's own computer (the `device` grant): `cpu_load`, `memory_used`,
+  // `disk_free`, `uptime_s`, `temperature_c`, and `known`.
+  async device() { return (await this.get('device')).device; }
 
   // `const lease = await lamp.lease('body').take()` ... `await lease.release()`,
   // or `await lamp.withLease(['body'], async (lease) => ...)`.
