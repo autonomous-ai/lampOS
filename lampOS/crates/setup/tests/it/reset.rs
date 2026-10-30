@@ -722,7 +722,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 38] = [
+const PERSON_STORES: [&str; 39] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -759,6 +759,10 @@ const PERSON_STORES: [&str; 38] = [
     // Daily routine claims and durable output restrictions belong to this
     // owner even when their switches are currently off.
     "/var/lib/lampos-skills-state",
+    // The skills a paired computer pushed, and the owner's yes to any that
+    // sees the picture, kept beside them (piece B, Reviewer-three's P2 on
+    // #4514): the next owner's lamp has neither.
+    "/var/lib/lampOS/skills-dev",
     "/var/lib/lampos-output-caps",
     "/var/lib/lampos-policy",
     "/var/lib/lampOS/voice/sessions",
@@ -1015,6 +1019,40 @@ fn the_product_reset_wipes_daily_claims_and_caps_but_keeps_service_directories()
         );
     }
     assert_eq!(fs::read(root.path("kept-setting")).unwrap(), b"kept");
+}
+
+/// A pushed skill and the owner's yes to its picture are the owner's: the
+/// product reset wipes the developer folder they're kept in, and keeps the
+/// folder itself (Reviewer-three's P2 on #4514).
+#[test]
+fn the_product_reset_wipes_pushed_skills_and_their_picture_yes() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    assert!(
+        plan.wipe
+            .contains(&Path::new("/var/lib/lampOS/skills-dev").to_path_buf()),
+        "the developer folder is absent from the product plan"
+    );
+    let root = Root::new();
+    let dev = root.path("skills-dev");
+    let skill = dev.join("sees-desk");
+    fs::create_dir_all(&skill).unwrap();
+    for (file, text) in [
+        ("SKILL.md", "---\nname: sees-desk\n---\n"),
+        ("skill.toml", "format = 2\n"),
+        (".pushed.json", "{\"client\": \"c_1\"}"),
+    ] {
+        fs::write(skill.join(file), text).unwrap();
+    }
+    fs::write(
+        dev.join(".yes.json"),
+        b"{\"c_1\": {\"sees-desk\": \"sha\"}}",
+    )
+    .unwrap();
+    reset::wipe(&dev).unwrap();
+    assert!(dev.is_dir());
+    assert_eq!(fs::read_dir(&dev).unwrap().count(), 0);
 }
 
 fn event(at_us: u64, held_us: u64) -> TouchEvent {

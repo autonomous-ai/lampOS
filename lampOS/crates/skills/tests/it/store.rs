@@ -355,6 +355,7 @@ fn ask_waiting(
             key_file: key_file.to_path_buf(),
             channel: &mut channel,
         }),
+        None,
         format!("{request}\n").as_bytes(),
         &mut output,
     )

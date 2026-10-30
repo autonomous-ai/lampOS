@@ -1057,6 +1057,7 @@ pub fn install(skills: &Path, state: Option<&Path>, from: &Path) -> Result<Strin
         package.as_ref(),
         state,
         false,
+        &[],
     )
 }
 
@@ -1184,7 +1185,17 @@ pub fn install_made_at(
     let files = std::mem::take(&mut package.files);
     // What binds these bytes is the person's yes, by their SHA-256, not a
     // signature (the reviewer's P3 on #2414).
-    put_in(skills, &swept, &name, &files, Some(&package), state, false).map(|said| {
+    put_in(
+        skills,
+        &swept,
+        &name,
+        &files,
+        Some(&package),
+        state,
+        false,
+        &[],
+    )
+    .map(|said| {
         said.replace(
             NO_SIGNATURE,
             &format!(
@@ -1193,6 +1204,913 @@ pub fn install_made_at(
             ),
         )
     })
+}
+
+/// Where `lamp-control` keeps the one push in flight on the lamp
+/// (`docs/control.md`, "Skills pushed from a computer"): its state folder's
+/// `push/`, [`PUSH_INDEX`] beside [`PUSH_PACKAGE`].
+pub const PUSH_DIR: &str = "/var/lib/lampos-control/push";
+/// The push in flight: its SHA-256, the computer, the skill's name, the
+/// computer's grants and when it was taken.
+pub const PUSH_INDEX: &str = "push.json";
+/// The pushed package's bytes.
+pub const PUSH_PACKAGE: &str = "package.tar";
+/// A push is installed only within this long of `lamp-control` taking it.
+pub const PUSH_WITHIN_MS: u64 = 60_000;
+/// The most bytes of a pushed package (#3869): 1 MiB.
+pub const MOST_PUSHED_BYTES: u64 = 1024 * 1024;
+
+/// [`PUSH_INDEX`], as `lamp-control` writes it.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Push {
+    sha256: String,
+    client: String,
+    client_name: String,
+    name: String,
+    grants: Vec<String>,
+    at_unix_ms: u64,
+    /// The door's revision of that computer's pairing when it took the
+    /// push: the order of a push and a change, from the door, not a clock.
+    #[serde(default)]
+    rev: Option<u64>,
+    /// The grants the computer showed the person for this package
+    /// (`grants_asked`'s names, in its order): required of a signed
+    /// package, checked against the lamp's own list (Ten on #3931).
+    #[serde(default)]
+    asks: Option<Vec<String>>,
+}
+
+/// A pushed skill's [`super::PUSHED_FROM`]: who pushed which bytes, when.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PushedFrom {
+    pub computer: String,
+    pub client: String,
+    pub sha256: String,
+    pub at_unix_ms: u64,
+    /// For a shared package, its author's whole key (base64 of the 32
+    /// bytes): what an update of this name must be signed by.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    /// That key's fingerprint (FPR16), for showing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_fingerprint: Option<String>,
+}
+
+/// What a push installed, as the door passes it on (#3869's `skill`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PushedDone {
+    pub name: String,
+    pub version: Option<String>,
+    pub sha256: String,
+    pub on: bool,
+    pub held: Option<String>,
+    pub asks: Vec<String>,
+    pub shown: Vec<String>,
+    /// A shared package's author, FPR16: "signed by key FPR16, not the
+    /// Store", never "verified" (Fourteen's point 1 on #3504).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+}
+
+/// Said when the computer's `asks` aren't the lamp's own (`asks_differ`).
+pub const ASKS_DIFFER: &str = "the permissions differ from those the computer showed";
+
+/// Whether `signature`, a package's `lamp-skill.sig`, is an author's: it
+/// carries their public key. A Store signature carries none, and makes
+/// a plain push.
+fn carries_author(signature: &[u8]) -> bool {
+    serde_json::from_slice::<serde_json::Value>(signature)
+        .is_ok_and(|signed| signed.get("public").is_some())
+}
+
+/// What a pushed skill's refusal is called on the wire, for the door to
+/// pass on (#3869's errors, Ten on #3931).
+fn refusal_code(why: &str) -> Option<&'static str> {
+    if why.contains(ASKS_DIFFER) {
+        Some("asks_differ")
+    } else if why.contains(": remove it first") {
+        Some("signer_changed")
+    } else if why.starts_with("not installed: its signature: ") {
+        Some("bad_package")
+    } else {
+        no_grant(why).then_some("no_grant")
+    }
+}
+
+/// What `held` says of a pushed skill that sees the picture.
+pub const HELD_FOR_THE_PICTURE: &str = "sees the picture: off until the owner says yes in the app";
+
+/// The protocol's grants a skill's permissions ask, each with the words the
+/// owner's app shows for it, in the protocol's order (`docs/control.md`'s
+/// grant table): the pairing screen's `Grant::shown()` in lamp-control says
+/// the same of the computer, "can …" (Nine and Eighth on #3504). `camera` is the picture, never a grant a push carries.
+pub fn grants_asked(skill: &Skill) -> Vec<(&'static str, &'static str)> {
+    let permissions = &skill.permissions;
+    // Format 2's `look` is presence alone (#3878), whatever topics it lists.
+    let presence = (permissions.look && permissions.format_2)
+        || permissions
+            .topics
+            .iter()
+            .any(|topic| matches!(topic.as_str(), "humans/faces/tracked" | "room/stood_up"));
+    [
+        (permissions.body, ("body", "moves the lamp's body")),
+        (permissions.light, ("light", "changes the light")),
+        (permissions.speak, ("speak", "speaks and plays sounds")),
+        (presence, ("look", "knows when someone is there, never who")),
+        (
+            permissions.sees_picture(),
+            ("camera", "uses the camera when it runs"),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(asked, grant)| asked.then_some(grant))
+    .collect()
+}
+
+/// The pushed skill of `push`'s one push in flight, put into the developer
+/// folder `dev` (`docs/skills.md`, "Skills pushed from a computer"),
+/// shaped as [`install_made`]: only the push `lamp-control` took last,
+/// within [`PUSH_WITHIN_MS`], its bytes read once and hashed, loaded with
+/// every check, held to the protocol's grants and to the computer's own,
+/// never in the place of a skill in `skills` or of another computer's.
+#[allow(clippy::too_many_arguments)]
+pub fn install_pushed_at(
+    skills: &Path,
+    dev: &Path,
+    push: &Path,
+    store_key_file: &Path,
+    sha256: &str,
+    wait: Duration,
+    now_unix_ms: u64,
+) -> Result<PushedDone, String> {
+    if sha256.len() != 64
+        || !sha256
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err("not installed: a push is asked for by its SHA-256, 64 lowercase hex".into());
+    }
+    let index = read_small(&push.join(PUSH_INDEX), ASKED_MOST)
+        .map_err(|why| format!("not installed: no push is kept: {why}"))?;
+    let kept: Push = serde_json::from_slice(&index)
+        .map_err(|_| format!("not installed: {PUSH_INDEX} is not a push"))?;
+    if kept.sha256 != sha256 {
+        return Err("not installed: the push kept is not that SHA-256".into());
+    }
+    if kept.at_unix_ms > now_unix_ms || now_unix_ms - kept.at_unix_ms > PUSH_WITHIN_MS {
+        return Err(format!(
+            "not installed: that push was not taken within the last {} s",
+            PUSH_WITHIN_MS / 1000
+        ));
+    }
+    let bytes = read_small(&push.join(PUSH_PACKAGE), MOST_PUSHED_BYTES)
+        .map_err(|why| format!("not installed: {PUSH_PACKAGE}: {why}"))?;
+    if sha256_hex(&bytes) != sha256 {
+        return Err(format!(
+            "not installed: {PUSH_PACKAGE}'s SHA-256 has changed"
+        ));
+    }
+    let mut package =
+        read_package_bytes(&bytes, None).map_err(|why| format!("not installed: {why}"))?;
+    // A shared package (its signature carries its author's key) is read
+    // again with the author's check, against the Store's keys, read without
+    // fail: an error there is a refusal, never an empty list (#3931, #3938).
+    let author = match package.signature.as_deref() {
+        Some(signature) if carries_author(signature) => {
+            let store = store_keys(skills, store_key_file)
+                .map_err(|why| format!("not installed: {why}"))?;
+            let shared = read_shared_package_bytes(&bytes, &store)
+                .map_err(|why| format!("not installed: its signature: {why}"))?;
+            if kept.asks.is_none() {
+                return Err(format!(
+                    "not installed: {ASKS_DIFFER}: a signed package is pushed with the asks shown"
+                ));
+            }
+            shared.author
+        }
+        _ => None,
+    };
+    let name = package.manifest.name.clone();
+    if name != kept.name || !skill_name_ok(&name) {
+        return Err(format!(
+            "not installed: {name:?} is not the skill the push named"
+        ));
+    }
+    if !fs::metadata(dev).is_ok_and(|meta| meta.is_dir()) {
+        return Err(format!("no developer folder at {}", dev.display()));
+    }
+    if skills.join(&name).exists() {
+        return Err(
+            "not installed: a skill of that name is already on the lamp: a pushed skill never takes its place"
+                .into(),
+        );
+    }
+    let _held = locked_within(dev, wait)?;
+    // Read under the folder's lock, as a revoke or a grant change writes
+    // it: whichever the helper serves first, a push taken before a revoke
+    // never lands, nor one asking a grant taken back since.
+    // A record that can't be read stops every install, never none.
+    // A change comes after the push when the door's revisions say so; when
+    // either has none, by the time.
+    let changed: Vec<Revoked> = revoked(dev)
+        .map_err(|why| format!("not installed: {REVOKED}: {why}"))?
+        .changes
+        .into_iter()
+        .filter(|change| {
+            (change.client == kept.client || change.client == EVERY_COMPUTER)
+                && match (change.rev, kept.rev) {
+                    (Some(change), Some(push)) => change > push,
+                    _ => change.at_unix_ms >= kept.at_unix_ms,
+                }
+        })
+        .collect();
+    if changed.iter().any(|change| change.grants.is_none()) {
+        return Err("not installed: that computer was revoked after the push".into());
+    }
+    let author_key = author.as_ref().map(|author| STANDARD.encode(author.public));
+    if let Some(from) = pushed_from(&dev.join(&name)) {
+        if from.client != kept.client {
+            return Err("not installed: another computer's skill has that name".into());
+        }
+        // A signer never changes in place: an update of a name signed by
+        // one key comes signed by that key, and one pushed unsigned stays
+        // unsigned, until it's removed (Ten on #3931).
+        if from.author != author_key {
+            return Err(match &from.author_fingerprint {
+                Some(on) => format!(
+                    "not installed: {name} is signed by key {on} on this lamp: remove it first"
+                ),
+                None => format!(
+                    "not installed: {name} was pushed unsigned on this lamp: remove it first"
+                ),
+            });
+        }
+    }
+    let files = std::mem::take(&mut package.files);
+    let from = PushedFrom {
+        computer: kept
+            .client_name
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(64)
+            .collect(),
+        client: kept.client.clone(),
+        sha256: sha256.to_owned(),
+        at_unix_ms: kept.at_unix_ms,
+        author: author_key,
+        author_fingerprint: author.as_ref().map(|author| author.fingerprint.clone()),
+    };
+    let mut from_json =
+        serde_json::to_vec_pretty(&from).map_err(|error| format!("not installed: {error}"))?;
+    from_json.push(b'\n');
+    // Checked as the running program will load it, beside the skills
+    // folder, before it is moved in: the protocol's grants, and never a
+    // skill's name, tool or budget group there.
+    let checking = hidden_place(dev, "check", &name);
+    let checked = (|| -> Result<Skill, String> {
+        let failed = |error: io::Error| format!("not installed: {}: {error}", checking.display());
+        if checking.exists() {
+            fs::remove_dir_all(&checking).map_err(failed)?;
+        }
+        let folder = checking.join(&name);
+        for (path, bytes) in &files {
+            let at = folder.join(path);
+            if let Some(parent) = at.parent() {
+                fs::create_dir_all(parent).map_err(failed)?;
+            }
+            fs::write(&at, bytes).map_err(failed)?;
+        }
+        let none = BTreeSet::new();
+        let pushed = super::Pushed {
+            dir: &checking,
+            picture_yes: &none,
+        };
+        super::load_each_with(skills, Some(pushed))
+            .into_iter()
+            .find(|(path, _)| path == &folder)
+            .map(|(_, loaded)| loaded)
+            .unwrap_or_else(|| Err("it was not found where it was put".into()))
+            .map_err(|why| format!("not installed: {why}"))
+    })();
+    let _ = fs::remove_dir_all(&checking);
+    let skill = checked?;
+    let asks = grants_asked(&skill);
+    if let Some(shown) = &kept.asks
+        && !shown
+            .iter()
+            .map(String::as_str)
+            .eq(asks.iter().map(|(grant, _)| *grant))
+    {
+        return Err(format!(
+            "not installed: {ASKS_DIFFER}: it asks [{}], and [{}] were shown",
+            asks.iter()
+                .map(|(grant, _)| *grant)
+                .collect::<Vec<_>>()
+                .join(", "),
+            shown.join(", ")
+        ));
+    }
+    if let Some((grant, _)) = asks
+        .iter()
+        .find(|(grant, _)| *grant != "camera" && !kept.grants.iter().any(|given| given == grant))
+    {
+        return Err(format!(
+            "not installed: it asks {grant}, which this computer was not granted"
+        ));
+    }
+    if let Some(grant) = changed
+        .iter()
+        .find_map(|change| beyond(&asks, change.grants.as_deref().unwrap_or_default()))
+    {
+        return Err(format!(
+            "not installed: it asks {grant}, which this computer was not granted"
+        ));
+    }
+    let swept = swept(dev);
+    // No camera state and not from the Store: a pushed skill's picture yes
+    // is kept per computer and SHA-256 in the developer folder, never in
+    // the skills folder's camera record.
+    put_in(
+        dev,
+        &swept,
+        &name,
+        &files,
+        Some(&package),
+        None,
+        false,
+        &[(super::PUSHED_FROM, from_json)],
+    )?;
+    let held = skill
+        .permissions
+        .sees_picture()
+        .then(|| HELD_FOR_THE_PICTURE.to_owned());
+    Ok(PushedDone {
+        name,
+        version: skill.version.clone(),
+        sha256: sha256.to_owned(),
+        on: skill.enabled && held.is_none(),
+        held,
+        asks: asks.iter().map(|(grant, _)| (*grant).to_owned()).collect(),
+        shown: asks.iter().map(|(_, words)| (*words).to_owned()).collect(),
+        author: author.map(|author| author.fingerprint),
+    })
+}
+
+/// The computers revoked, or whose grants changed, each at the time its
+/// `off_pushed_by` or `grants_pushed_by` came, in the developer folder (a
+/// dot file): [`install_pushed_at`] refuses a push that computer made
+/// before then, after a revoke, or asking a grant it no longer holds, so an
+/// install already with another helper can't land the skill on after the
+/// change (Fourteen's P2 on #3910, and Reviewer-two's on a re-pair with
+/// fewer grants). Each is kept only while a push it could stop may still
+/// be installed, at most [`MOST_REVOKED`] of them.
+pub const REVOKED: &str = ".revoked.json";
+const MOST_REVOKED: usize = 64;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct Revoked {
+    client: String,
+    at_unix_ms: u64,
+    /// The grants it holds from then, or none for a revoke.
+    #[serde(default)]
+    grants: Option<Vec<String>>,
+    /// The door's revision of the change, when it sent one.
+    #[serde(default)]
+    rev: Option<u64>,
+}
+
+/// The record: the changes kept, and each computer's highest revision, kept
+/// past the changes' two minutes, so an older change sent late is stale
+/// however long after it comes (Reviewer-two on #3504).
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct Changes {
+    #[serde(default)]
+    changes: Vec<Revoked>,
+    #[serde(default)]
+    revs: BTreeMap<String, u64>,
+}
+
+/// The most computers whose highest revision is kept; past it, the
+/// lowest go.
+const MOST_REVS: usize = 256;
+
+/// What a change of a computer's did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Changed {
+    /// Kept, and these of its skills turned off.
+    Off(Vec<String>),
+    /// Not after the change already kept for that computer, whose revision
+    /// this is: nothing done (Reviewer-two on #3504, a reversed pair).
+    Stale(u64),
+}
+
+/// The first of a skill's `asks` that `grants` lacks: the picture is the
+/// owner's yes, never a pairing grant.
+fn beyond<'a>(asks: &[(&'a str, &str)], grants: &[String]) -> Option<&'a str> {
+    asks.iter()
+        .map(|(grant, _)| *grant)
+        .find(|grant| *grant != "camera" && !grants.iter().any(|given| given == grant))
+}
+
+/// A change kept for every computer: what stands for changes dropped to
+/// keep the record small, or for a record that could not be read, so a
+/// push made before it is refused as if its own computer's were kept
+/// (Reviewer-two on #3504: the fence fails closed).
+const EVERY_COMPUTER: &str = "*";
+
+/// The changes kept, none when there is no record; an error when it can't
+/// be read or isn't one.
+fn revoked(dev: &Path) -> Result<Changes, String> {
+    let path = dev.join(REVOKED);
+    if fs::symlink_metadata(&path).is_err_and(|error| error.kind() == io::ErrorKind::NotFound) {
+        return Ok(Changes::default());
+    }
+    let bytes = read_small(&path, 64 * 1024)?;
+    serde_json::from_slice(&bytes).map_err(|_| "not a record of changes".to_owned())
+}
+
+/// A revoke of `client`, or its `skills` grant taken back, at `now_unix_ms`:
+/// kept first, under the developer folder's lock, then every skill it
+/// pushed turned off, kept for the owner to choose (#3869). The names
+/// turned off.
+pub fn off_pushed_by_at(
+    dev: &Path,
+    state: &Path,
+    client: &str,
+    rev: Option<u64>,
+    wait: Duration,
+    now_unix_ms: u64,
+) -> Result<Changed, String> {
+    changed_at(dev, state, client, None, rev, wait, now_unix_ms)
+}
+
+/// The owner's change of `client`'s grants to `grants`, at `now_unix_ms`
+/// (a re-pair with fewer, or a grant taken back): kept first, as a revoke
+/// is, then each skill it pushed that asks a grant outside them turned off,
+/// kept for the owner to choose (#3869, "always held to the computer's
+/// current grants"). The names turned off.
+pub fn grants_pushed_by_at(
+    dev: &Path,
+    state: &Path,
+    client: &str,
+    grants: &[String],
+    rev: Option<u64>,
+    wait: Duration,
+    now_unix_ms: u64,
+) -> Result<Changed, String> {
+    changed_at(dev, state, client, Some(grants), rev, wait, now_unix_ms)
+}
+
+fn changed_at(
+    dev: &Path,
+    state: &Path,
+    client: &str,
+    grants: Option<&[String]>,
+    rev: Option<u64>,
+    wait: Duration,
+    now_unix_ms: u64,
+) -> Result<Changed, String> {
+    {
+        let _held = locked_within(dev, wait)?;
+        // Every change still able to stop a push is kept, a computer's
+        // earlier ones too: a re-pair after a revoke never lifts the revoke
+        // for a push made before it.
+        // One that can't be read is replaced by a revoke of every computer
+        // now, so nothing it held is lost.
+        let mut record = revoked(dev).unwrap_or_else(|why| {
+            eprintln!(
+                "lamp-skills: asked: {REVOKED}: {why}: every computer's older pushes refused"
+            );
+            Changes {
+                changes: vec![Revoked {
+                    client: EVERY_COMPUTER.to_owned(),
+                    at_unix_ms: now_unix_ms,
+                    grants: None,
+                    rev: None,
+                }],
+                revs: BTreeMap::new(),
+            }
+        });
+        if let Some(rev) = rev {
+            match record.revs.get(client) {
+                Some(&highest) if highest >= rev => return Ok(Changed::Stale(highest)),
+                _ => {
+                    record.revs.insert(client.to_owned(), rev);
+                }
+            }
+            while record.revs.len() > MOST_REVS {
+                let lowest = record
+                    .revs
+                    .iter()
+                    .min_by_key(|(_, rev)| **rev)
+                    .map(|(client, _)| client.clone());
+                if let Some(lowest) = lowest {
+                    record.revs.remove(&lowest);
+                }
+            }
+        }
+        let kept = &mut record.changes;
+        kept.push(Revoked {
+            client: client.to_owned(),
+            at_unix_ms: now_unix_ms,
+            grants: grants.map(<[String]>::to_vec),
+            rev,
+        });
+        kept.sort_by_key(|change| change.at_unix_ms);
+        // Those past two minutes, and past the most kept the oldest, go,
+        // and a revoke of every computer at the newest of them stands in
+        // their place: a push made before it is refused still.
+        let old = kept
+            .iter()
+            .take_while(|change| now_unix_ms.saturating_sub(change.at_unix_ms) > 2 * PUSH_WITHIN_MS)
+            .count();
+        let dropped = old.max((kept.len() + 1).saturating_sub(MOST_REVOKED));
+        if dropped > 0 {
+            let floor = kept[..dropped]
+                .iter()
+                .map(|change| change.at_unix_ms)
+                .max()
+                .unwrap_or(now_unix_ms);
+            kept.drain(..dropped);
+            kept.insert(
+                0,
+                Revoked {
+                    client: EVERY_COMPUTER.to_owned(),
+                    at_unix_ms: floor,
+                    grants: None,
+                    rev: None,
+                },
+            );
+        }
+        let mut json = serde_json::to_vec_pretty(&record).map_err(|error| error.to_string())?;
+        json.push(b'\n');
+        let path = dev.join(REVOKED);
+        lamp_update::records::write_whole(&path, &json, 0o644)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    let mut off = Vec::new();
+    for (name, _) in pushed_by_client(dev, client) {
+        let asks_more = match grants {
+            None => true,
+            // One that no longer loads is turned off too: what it asks is
+            // not known.
+            Some(grants) => super::load(&dev.join(&name)).map_or(true, |skill| {
+                beyond(&grants_asked(&skill), grants).is_some()
+            }),
+        };
+        if asks_more {
+            turn(dev, state, &name, true, wait)?;
+            off.push(name);
+        }
+    }
+    Ok(Changed::Off(off))
+}
+
+/// Whether a refused install is a grant's, answered with `"code":
+/// "no_grant"` so lamp-control gives the computer `no_grant` (#3869's
+/// errors): a permission beyond the protocol's, a topic past presence
+/// (`hear`, `sound`), or a grant this computer was not given.
+fn no_grant(why: &str) -> bool {
+    why.contains("a pushed skill may not ")
+        || why.ends_with(", which this computer was not granted")
+}
+
+/// The owner's yeses to pushed skills seeing the picture, in the developer
+/// folder (a dot file): each for a name, the computer that pushed it and
+/// the SHA-256 of what it pushed, so a re-push, or another computer's push
+/// of that name, has none (the Reviewer-lead's P3 on #3879).
+pub const PICTURE_YES: &str = ".yes.json";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct Yes {
+    name: String,
+    client: String,
+    sha256: String,
+    /// A shared skill's author's key: another signer is no yes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    author: Option<String>,
+}
+
+fn yeses(dev: &Path) -> Vec<Yes> {
+    read_small(&dev.join(PICTURE_YES), 64 * 1024)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+/// The pushed skills in `dev` the owner said yes to seeing the picture,
+/// each yes still for the computer and bytes now there.
+pub fn picture_yes(dev: &Path) -> BTreeSet<String> {
+    yeses(dev)
+        .into_iter()
+        .filter(|yes| {
+            skill_name_ok(&yes.name)
+                && pushed_from(&dev.join(&yes.name)).is_some_and(|from| {
+                    from.client == yes.client
+                        && from.sha256 == yes.sha256
+                        && from.author == yes.author
+                })
+        })
+        .map(|yes| yes.name)
+        .collect()
+}
+
+/// The owner's yes to the pushed skill `name` as it is now, kept whole.
+fn said_yes(dev: &Path, name: &str, wait: Duration) -> Result<(), String> {
+    if !skill_name_ok(name) {
+        return Err(format!("{name:?} is not a skill's name"));
+    }
+    let _held = locked_within(dev, wait)?;
+    let from = pushed_from(&dev.join(name)).ok_or_else(|| format!("no pushed skill {name}"))?;
+    let mut kept: Vec<Yes> = yeses(dev)
+        .into_iter()
+        .filter(|yes| yes.name != name && dev.join(&yes.name).exists())
+        .collect();
+    kept.push(Yes {
+        name: name.to_owned(),
+        client: from.client,
+        sha256: from.sha256,
+        author: from.author,
+    });
+    let mut json = serde_json::to_vec_pretty(&kept).map_err(|error| error.to_string())?;
+    json.push(b'\n');
+    let path = dev.join(PICTURE_YES);
+    lamp_update::records::write_whole(&path, &json, 0o644)
+        .map_err(|error| format!("{}: {error}", path.display()))
+}
+
+/// A pushed skill folder's [`super::PUSHED_FROM`], read never through a
+/// link and at most 1 KiB.
+pub fn pushed_from(folder: &Path) -> Option<PushedFrom> {
+    read_small(&folder.join(super::PUSHED_FROM), 1024)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+}
+
+/// A plain file's bytes, never through a link, at most `most`.
+fn read_small(path: &Path, most: u64) -> Result<Vec<u8>, String> {
+    let meta = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if !meta.is_file() || meta.len() > most {
+        return Err(format!("not a plain file of at most {most} bytes"));
+    }
+    let mut bytes = Vec::new();
+    open_plain(path, &meta)?
+        .take(most + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() as u64 > most {
+        return Err(format!("more than {most} bytes"));
+    }
+    Ok(bytes)
+}
+
+/// The developer folder and lamp-control's push, for the manage helper.
+#[derive(Clone, Copy)]
+pub struct Pushes<'a> {
+    pub dev: &'a Path,
+    pub push: &'a Path,
+    /// Who connected, by its cgroup ([`peer_asker`]): only lamp-control
+    /// asks the pushed requests, and lamp-control asks nothing else
+    /// (Reviewer-two on #3504).
+    pub asker: Asker,
+    /// The Store's public key, which a shared package may not carry
+    /// ([`store_keys`], with the build's beside the skills folder first).
+    pub key_file: &'a Path,
+}
+
+/// Which part asked the manage helper, by its unit ([`asker_of`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asker {
+    /// `lamp-cloud` (the owner's app) or the voice: the Store's requests,
+    /// made skills and the app's off and on.
+    App,
+    /// `lamp-control`, a paired computer's door: the pushed requests only.
+    Control,
+    /// Any peer, with [`ANY_ASKER`] on, as in the tests.
+    Any,
+}
+
+/// `lamp-control`, where the system's manager puts it.
+pub const CONTROL: &str = "/lampos.slice/lampos-parts.slice/lamp-control.service";
+
+/// Why a request isn't taken from the part that asked it.
+pub const NOT_ITS_REQUEST: &str =
+    "only lamp-control asks for pushed skills, and it asks for nothing else";
+
+/// `unix_ms` as UTC, `2026-10-30T06:22:45Z`: a pushed skill's `pushed_at`
+/// in `list_pushed_by`'s answer, as control.md shows it.
+fn utc_text(unix_ms: u64) -> String {
+    let secs = unix_ms / 1000;
+    let (days, rest) = ((secs / 86_400) as i64, secs % 86_400);
+    // Days since 1970-01-01 to a civil date (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rest / 3600,
+        rest % 3600 / 60,
+        rest % 60
+    )
+}
+
+/// The manage helper's requests for skills pushed from a computer, each
+/// one key: `{"install_pushed": SHA256}`, `{"off_pushed_by": CLIENT}`,
+/// `{"list_pushed_by": CLIENT}` and `{"remove_pushed": {"client", "name"}}`.
+pub const PUSHED_REQUESTS: [&str; 5] = [
+    "install_pushed",
+    "off_pushed_by",
+    "grants_pushed_by",
+    "list_pushed_by",
+    "remove_pushed",
+];
+
+/// The answer to a pushed request on a helper given no developer folder.
+pub const PUSH_OFF: &str = "skill push is not on this lamp";
+
+/// A change's `rev`, if it has one: a whole number.
+fn revision(value: &serde_json::Value) -> Result<Option<u64>, String> {
+    match value.get("rev") {
+        None => Ok(None),
+        Some(rev) => rev
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| "a change's rev is a whole number".to_owned()),
+    }
+}
+
+/// A change's answer: `{"off": [...]}`, or `{"stale": REV}` with the
+/// computer's revision already kept.
+fn said_changed(changed: Changed) -> serde_json::Value {
+    match changed {
+        Changed::Off(off) => serde_json::json!({ "off": off }),
+        Changed::Stale(rev) => serde_json::json!({ "stale": rev }),
+    }
+}
+
+fn now_unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
+}
+
+/// A paired computer's id as lamp-control gives it: `c_` and up to 64
+/// lowercase letters, digits and `_`.
+fn client_ok(client: &str) -> bool {
+    client.len() <= 66
+        && client.strip_prefix("c_").is_some_and(|rest| {
+            !rest.is_empty()
+                && rest
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+        })
+}
+
+/// The skills in `dev` that `client` pushed: each folder's name, and what
+/// its [`super::PUSHED_FROM`] says.
+fn pushed_by_client(dev: &Path, client: &str) -> Vec<(String, PushedFrom)> {
+    let mut found: Vec<(String, PushedFrom)> = fs::read_dir(dev)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            if name.starts_with('.') || !entry.path().is_dir() {
+                return None;
+            }
+            let from = pushed_from(&entry.path())?;
+            (from.client == client).then_some((name, from))
+        })
+        .collect();
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found
+}
+
+fn pushed_request(
+    skills: &Path,
+    state: &Path,
+    pushes: Pushes<'_>,
+    key: &str,
+    value: &serde_json::Value,
+    wait: Duration,
+) -> Result<serde_json::Value, String> {
+    let client = |value: &serde_json::Value| {
+        value
+            .as_str()
+            .filter(|client| client_ok(client))
+            .map(str::to_owned)
+            .ok_or_else(|| format!("{key} takes a computer's id, as \"c_…\""))
+    };
+    match key {
+        "install_pushed" => {
+            let sha256 = value
+                .as_str()
+                .ok_or("a push is asked for as {\"install_pushed\": SHA256}")?;
+            install_pushed_at(
+                skills,
+                pushes.dev,
+                pushes.push,
+                pushes.key_file,
+                sha256,
+                wait,
+                now_unix_ms(),
+            )
+            .and_then(|done| serde_json::to_value(done).map_err(|error| error.to_string()))
+        }
+        // A plain id, from a door that sends no revision yet, or
+        // {"client", "rev"}.
+        "off_pushed_by" => {
+            let (asker, rev) = match value.get("client") {
+                Some(asker) => (client(asker)?, revision(value)?),
+                None => (client(value)?, None),
+            };
+            off_pushed_by_at(pushes.dev, state, &asker, rev, wait, now_unix_ms()).map(said_changed)
+        }
+        "grants_pushed_by" => {
+            let said = "grants are changed as {\"grants_pushed_by\": {\"client\", \"rev\", \"grants\": [...]}}";
+            let asker = client(value.get("client").ok_or(said)?)?;
+            let rev = revision(value)?;
+            let grants: Vec<String> = value
+                .get("grants")
+                .and_then(serde_json::Value::as_array)
+                .ok_or(said)?
+                .iter()
+                .map(|grant| grant.as_str().map(str::to_owned).ok_or(said))
+                .collect::<Result<_, _>>()?;
+            if grants.len() > 16 {
+                return Err(said.into());
+            }
+            grants_pushed_by_at(pushes.dev, state, &asker, &grants, rev, wait, now_unix_ms())
+                .map(said_changed)
+        }
+        "list_pushed_by" => {
+            let client = client(value)?;
+            let offs = super::read_names(&state.join(super::OFF_FILE)).unwrap_or_default();
+            let yes = picture_yes(pushes.dev);
+            let listed: Vec<serde_json::Value> = pushed_by_client(pushes.dev, &client)
+                .into_iter()
+                .map(|(name, from)| {
+                    let skill = super::load(&pushes.dev.join(&name)).ok();
+                    let held = skill
+                        .as_ref()
+                        .is_some_and(|skill| {
+                            skill.permissions.sees_picture() && !yes.contains(&name)
+                        })
+                        .then_some(HELD_FOR_THE_PICTURE);
+                    let on = skill.as_ref().is_some_and(|skill| skill.enabled)
+                        && held.is_none()
+                        && !offs.contains(&name);
+                    serde_json::json!({
+                        "name": name,
+                        "version": skill.and_then(|skill| skill.version),
+                        "sha256": from.sha256,
+                        "on": on,
+                        "held": held,
+                        "pushed_at": utc_text(from.at_unix_ms),
+                        "pushed_at_unix_ms": from.at_unix_ms,
+                        "author": from.author_fingerprint,
+                    })
+                })
+                .collect();
+            // The list itself: lamp-control answers it as `skills`
+            // (docs/control.md, piece 7). Wrapped here too, a client got
+            // `{"skills": {"skills": [...]}}` (lamp-75c9, 30 Oct 13:23).
+            Ok(serde_json::Value::Array(listed))
+        }
+        "remove_pushed" => {
+            let (Some(asker), Some(name)) = (
+                value.get("client").and_then(serde_json::Value::as_str),
+                value.get("name").and_then(serde_json::Value::as_str),
+            ) else {
+                return Err(
+                    "a push is removed as {\"remove_pushed\": {\"client\", \"name\"}}".into(),
+                );
+            };
+            let asker = client(&serde_json::Value::from(asker))?;
+            if !skill_name_ok(name) {
+                return Err(format!("{name:?} is not a skill's name"));
+            }
+            match pushed_from(&pushes.dev.join(name)) {
+                Some(from) if from.client == asker => taken_off(pushes.dev, None, name, Some(wait))
+                    .map(|left| {
+                        if let Some(left) = left {
+                            eprintln!("lamp-skills: asked: removed {name}, but {left}");
+                        }
+                        serde_json::Value::from(removed_said(name))
+                    }),
+                Some(_) => Err("not removed: another computer pushed that skill".into()),
+                None => Err(format!("no skill {name} pushed from this computer")),
+            }
+        }
+        _ => Err(NOT_A_REQUEST.to_owned()),
+    }
 }
 
 /// What an install's done line says of a package with no signature.
@@ -1210,6 +2128,9 @@ fn made_here(card: &str) -> bool {
 /// owner's yes to the camera is kept: `from_store`, a Store package keeps
 /// its name's yes (and needs it to ask the camera); any other install
 /// takes it away ([`moved_in`]).
+// Each is its own caller's: where, what, the camera's record, and the dot
+// files beside it (a pushed skill's), none of them the same for all.
+#[allow(clippy::too_many_arguments)]
 fn put_in(
     skills: &Path,
     swept: &[String],
@@ -1218,6 +2139,7 @@ fn put_in(
     package: Option<&Package>,
     state: Option<&Path>,
     from_store: bool,
+    beside: &[(&str, Vec<u8>)],
 ) -> Result<String, String> {
     let name = name.to_owned();
     if !skill_name_ok(&name) {
@@ -1249,6 +2171,11 @@ fn put_in(
                 .map_err(|error| format!("not installed: {error}"))?;
             json.push(b'\n');
             fs::write(folder.join(INSTALLED_FROM), json).map_err(failed)?;
+        }
+        // Dot files the skill comes with on this lamp, never from its
+        // package (a pushed skill's [`super::PUSHED_FROM`]).
+        for (file, bytes) in beside {
+            fs::write(folder.join(file), bytes).map_err(failed)?;
         }
         open_to_parts(&folder).map_err(failed)?;
         moved_in(
@@ -1874,6 +2801,7 @@ pub fn install_from_url(
         Some(&package),
         Some(state),
         true,
+        &[],
     )
 }
 
@@ -1898,9 +2826,10 @@ pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// skill's spoken yes (#1685). Any other part in the group `lampos` may
 /// connect, but is refused before its line is read (the reviewer's P3 on
 /// #2429), as the keys helper does (`lamp_setup::keys`, #2167).
-pub const ASKERS: [&str; 2] = [
+pub const ASKERS: [&str; 3] = [
     APP_LINK,
     "/lampos.slice/lampos-voice.slice/lamp-voice.service",
+    CONTROL,
 ];
 /// `lamp-cloud`, the owner's app's link, where the system's manager puts
 /// it: also the only peer whose `guard.on` and `guard.off` lamp-skills'
@@ -1908,13 +2837,24 @@ pub const ASKERS: [&str; 2] = [
 pub const APP_LINK: &str = "/lampos.slice/lampos-parts.slice/lamp-cloud.service";
 
 /// The refusal to any other peer.
-pub const NOT_AN_ASKER: &str = "only the app's link and the voice may change the lamp's skills";
+pub const NOT_AN_ASKER: &str =
+    "only the app's link, the voice and lamp-control may change the lamp's skills";
 
 /// Whether `/proc/<pid>/cgroup`'s text puts the process in one of
 /// [`ASKERS`] (or a cgroup under one): the unified hierarchy's line
 /// (`0::…`), or systemd's own on a hybrid one (`…:name=systemd:…`).
 pub fn from_an_asker(cgroup: &str) -> bool {
     from_one_of(cgroup, &ASKERS)
+}
+
+/// Which of [`ASKERS`] `/proc/<pid>/cgroup`'s text puts the process in,
+/// if any: lamp-control's own requests are not the app's.
+pub fn asker_of(cgroup: &str) -> Option<Asker> {
+    if from_one_of(cgroup, &[CONTROL]) {
+        Some(Asker::Control)
+    } else {
+        from_one_of(cgroup, &ASKERS[..2]).then_some(Asker::App)
+    }
 }
 
 /// Whether `/proc/<pid>/cgroup`'s text puts the process in one of `units`
@@ -1946,16 +2886,24 @@ pub const ANY_ASKER: &str = "LAMP_SKILLS_ANY_ASKER";
 /// one of [`ASKERS`], by its credentials (`SO_PEERCRED`) and its cgroup.
 /// Peer credentials are read on Linux only; elsewhere no peer is.
 pub fn peer_is_an_asker() -> bool {
+    peer_asker().is_some()
+}
+
+/// Which of [`ASKERS`] the peer on standard input is ([`asker_of`]), by
+/// its credentials (`SO_PEERCRED`) and its cgroup; none elsewhere.
+pub fn peer_asker() -> Option<Asker> {
     #[cfg(target_os = "linux")]
     {
         let stdin = std::io::stdin();
-        rustix::net::sockopt::socket_peercred(&stdin).is_ok_and(|peer| {
-            fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
-                .is_ok_and(|cgroup| from_an_asker(&cgroup))
-        })
+        rustix::net::sockopt::socket_peercred(&stdin)
+            .ok()
+            .and_then(|peer| {
+                fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero())).ok()
+            })
+            .and_then(|cgroup| asker_of(&cgroup))
     }
     #[cfg(not(target_os = "linux"))]
-    false
+    None
 }
 
 /// The most bytes of a request to [`asked`].
@@ -1995,12 +2943,16 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 /// Each waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
 /// shorter only in a test) for the folder, then refuses with [`BUSY`]
 /// having done nothing.
+// Each place the helper may change is its own argument, as each comes
+// from the unit's command line.
+#[allow(clippy::too_many_arguments)]
 pub fn asked(
     skills: &Path,
     made: &Path,
     state: &Path,
     lock_wait: Duration,
     store: Option<Store<'_>>,
+    pushes: Option<Pushes<'_>>,
     input: impl Read,
     mut output: impl io::Write,
 ) -> io::Result<bool> {
@@ -2016,60 +2968,91 @@ pub fn asked(
             .and_then(|asked| asked.get(key))
     };
     let install = only("install").and_then(Asked::from_json);
-    let done = match (only("remove"), install) {
-        _ if only("install_made").is_some() => match only("install_made") {
-            Some(serde_json::Value::String(sha256)) => {
-                install_made(skills, Some(state), made, sha256, lock_wait)
-            }
-            _ => Err("a made skill is asked for as {\"install_made\": SHA256}".to_owned()),
+    let pushed_asked = PUSHED_REQUESTS
+        .iter()
+        .find_map(|key| only(key).map(|value| (*key, value)));
+    let done: Result<serde_json::Value, String> = match pushed_asked {
+        // Skills pushed from a computer (#3869), asked by lamp-control.
+        Some((key, value)) => match pushes {
+            Some(pushes) if pushes.asker == Asker::App => Err(NOT_ITS_REQUEST.to_owned()),
+            Some(pushes) => pushed_request(skills, state, pushes, key, value, lock_wait),
+            None => Err(PUSH_OFF.to_owned()),
         },
-        // The app's off and on (#2815), kept where a `[stop]`'s are.
-        _ if only("off").or(only("on")).is_some() => match (only("off"), only("on")) {
-            (Some(serde_json::Value::String(name)), None) => {
-                turn(skills, state, name, true, lock_wait)
+        None if pushes.is_some_and(|pushes| pushes.asker == Asker::Control) => {
+            Err(NOT_ITS_REQUEST.to_owned())
+        }
+        None => match (only("remove"), install) {
+            _ if only("install_made").is_some() => match only("install_made") {
+                Some(serde_json::Value::String(sha256)) => {
+                    install_made(skills, Some(state), made, sha256, lock_wait)
+                }
+                _ => Err("a made skill is asked for as {\"install_made\": SHA256}".to_owned()),
+            },
+            // The app's off and on (#2815), kept where a `[stop]`'s are. A
+            // pushed skill's are its own folder's: its on is also the
+            // owner's yes to the picture, for that computer and those bytes.
+            _ if only("off").or(only("on")).is_some() => {
+                let pushed = |name: &str| {
+                    pushes.filter(|pushes| pushed_from(&pushes.dev.join(name)).is_some())
+                };
+                match (only("off"), only("on")) {
+                    (Some(serde_json::Value::String(name)), None) => match pushed(name) {
+                        Some(pushes) => turn(pushes.dev, state, name, true, lock_wait),
+                        None => turn(skills, state, name, true, lock_wait),
+                    },
+                    (None, Some(serde_json::Value::String(name))) => match pushed(name) {
+                        Some(pushes) => said_yes(pushes.dev, name, lock_wait)
+                            .and_then(|()| turn(pushes.dev, state, name, false, lock_wait)),
+                        None => turn(skills, state, name, false, lock_wait),
+                    },
+                    _ => Err(NOT_A_REQUEST.to_owned()),
+                }
             }
-            (None, Some(serde_json::Value::String(name))) => {
-                turn(skills, state, name, false, lock_wait)
+            // The owner's yes to the camera's picture, given or taken back.
+            _ if only("camera").or(only("camera_off")).is_some() => {
+                match (only("camera"), only("camera_off")) {
+                    (Some(serde_json::Value::String(name)), None) => {
+                        camera(skills, state, name, true, lock_wait)
+                    }
+                    (None, Some(serde_json::Value::String(name))) => {
+                        camera(skills, state, name, false, lock_wait)
+                    }
+                    _ => Err(NOT_A_REQUEST.to_owned()),
+                }
             }
+            // Renamed aside is removed: where it was set aside, and why it
+            // was not then deleted, go to the journal alone.
+            (Some(serde_json::Value::String(name)), _) => {
+                taken_off(skills, Some(state), name, Some(lock_wait)).map(|left| {
+                    if let Some(left) = left {
+                        eprintln!("lamp-skills: asked: removed {name}, but {left}");
+                    }
+                    removed_said(name)
+                })
+            }
+            (_, Some(asked)) => match store {
+                Some(store) => install_from_url(
+                    skills,
+                    state,
+                    &asked,
+                    &store.key_file,
+                    store.channel,
+                    lock_wait,
+                ),
+                None => Err(STORE_OFF.to_owned()),
+            },
             _ => Err(NOT_A_REQUEST.to_owned()),
-        },
-        // The owner's yes to the camera's picture, given or taken back.
-        _ if only("camera").or(only("camera_off")).is_some() => {
-            match (only("camera"), only("camera_off")) {
-                (Some(serde_json::Value::String(name)), None) => {
-                    camera(skills, state, name, true, lock_wait)
-                }
-                (None, Some(serde_json::Value::String(name))) => {
-                    camera(skills, state, name, false, lock_wait)
-                }
-                _ => Err(NOT_A_REQUEST.to_owned()),
-            }
         }
-        // Renamed aside is removed: where it was set aside, and why it
-        // was not then deleted, go to the journal alone.
-        (Some(serde_json::Value::String(name)), _) => {
-            taken_off(skills, Some(state), name, Some(lock_wait)).map(|left| {
-                if let Some(left) = left {
-                    eprintln!("lamp-skills: asked: removed {name}, but {left}");
-                }
-                removed_said(name)
-            })
-        }
-        (_, Some(asked)) => match store {
-            Some(store) => install_from_url(
-                skills,
-                state,
-                &asked,
-                &store.key_file,
-                store.channel,
-                lock_wait,
-            ),
-            None => Err(STORE_OFF.to_owned()),
-        },
-        _ => Err(NOT_A_REQUEST.to_owned()),
+        .map(serde_json::Value::from),
     };
     let answer = match &done {
         Ok(said) => serde_json::json!({ "done": said }),
+        Err(why) if matches!(pushed_asked, Some(("install_pushed", _))) => {
+            match refusal_code(why) {
+                Some(code) => serde_json::json!({ "refused": why, "code": code }),
+                None => serde_json::json!({ "refused": why }),
+            }
+        }
         Err(why) => serde_json::json!({ "refused": why }),
     };
     eprintln!("lamp-skills: asked: {answer}");
@@ -2149,6 +3132,13 @@ mod tests {
     /// unit's `Slice=` puts it (systemd nests a dashed slice under each of
     /// its prefixes), so a moved slice fails here instead of refusing every
     /// request quietly.
+    #[test]
+    fn a_pushed_skills_time_is_said_in_utc() {
+        assert_eq!(utc_text(0), "1970-01-01T00:00:00Z");
+        assert_eq!(utc_text(1_793_341_365_361), "2026-10-30T06:22:45Z");
+        assert_eq!(utc_text(951_782_400_000), "2000-02-29T00:00:00Z");
+    }
+
     #[test]
     fn the_askers_cgroups_are_their_product_units_slices() {
         for (unit, text) in [
