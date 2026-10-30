@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,6 +9,20 @@ description = "Program a lampOS lamp from your own computer: the v1 control prot
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+keywords = ["lampos", "lamp", "robot", "home", "sdk"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Home Automation",
+    "Topic :: Software Development :: Libraries",
+    "Framework :: AsyncIO",
+]
 dependencies = ["websockets>=13", "cryptography>=42"]
 
 [project.optional-dependencies]
@@ -21,3 +35,9 @@ lamp = "lampos.cli:main"
 
 [tool.setuptools.package-data]
 lampos = ["control.schema.json", "skill-format.schema.json"]
+
+[project.urls]
+Homepage = "https://github.com/autonomous-ai/lampOS"
+Documentation = "https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/develop.md"
+Source = "https://github.com/autonomous-ai/lampOS/tree/lamp-voice/lampOS/sdk/python"
+Issues = "https://github.com/autonomous-ai/lampOS/issues"

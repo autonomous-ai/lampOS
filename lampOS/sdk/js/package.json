@@ -4,6 +4,10 @@
   "description": "Program a lampOS lamp from your own computer: the v1 control protocol (docs/control.md)",
   "type": "module",
   "license": "Apache-2.0",
+  "keywords": ["lampos", "lamp", "robot", "home", "sdk"],
+  "homepage": "https://github.com/autonomous-ai/lampOS",
+  "repository": { "type": "git", "url": "git+https://github.com/autonomous-ai/lampOS.git", "directory": "lampOS/sdk/js" },
+  "bugs": { "url": "https://github.com/autonomous-ai/lampOS/issues" },
   "engines": { "node": ">=20.11" },
   "exports": {
     ".": "./src/index.js",
