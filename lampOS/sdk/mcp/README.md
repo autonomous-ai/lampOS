@@ -39,11 +39,19 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | `lamp_follow_stop` | none | | ends a running `lamp_follow_hand`, or one still starting as soon as it has started; "not following" when none runs | | body, look (listed with `lamp_follow_hand`) | lets go of its lease |
 | `lamp_move` | `step_ms` | integer, required | 20 to 1000 | — | body | yes, 10 s |
 | | `frames` | list of lists of integers, required | each 5 joint offsets in counts (pitch, roll, yaw, shoulder, elbow), the first and last all 0; the body checks it | — | | |
+| `lamp_play` | `name` | string, required | a recorded move's name: lowercase letters, digits, `-` and `_`, 40 at most; a lamp that doesn't route `play` yet refuses it | — | body | yes, 10 s |
+| `lamp_joints` | `within_ms` | integer | up to 5000: how soon the joints get there | 1000 | body | yes, 10 s, named in the request |
+| | `pitch` | number | degrees, −180 to 180; at least one of the five | none | | |
+| | `roll` | number | degrees, −180 to 180 | none | | |
+| | `yaw` | number | degrees, −180 to 180 | none | | |
+| | `shoulder` | number | degrees, −180 to 180 | none | | |
+| | `elbow` | number | degrees, −180 to 180 | none | | |
 | `lamp_light` | `colour` | string, required | `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm` | — | light | no |
 | | `level` | integer | 1 to 5 | 3 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
 | `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
+| `lamp_sound` | `name` | string, required | a sound's name: lowercase letters, digits, `-` and `_`, 40 at most; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |
 
 **An argument a tool doesn't take is refused**, never read past. Each
