@@ -145,6 +145,17 @@ fn fact(key: &str, value: impl ToString) -> KeyValue {
     }
 }
 
+/// A joint as the body's report names it to a person.
+fn said_as(joint: &str) -> &str {
+    match joint {
+        "base_pitch" => "shoulder",
+        "elbow_pitch" => "elbow",
+        "wrist_pitch" => "head_pitch",
+        "wrist_roll" => "head_roll",
+        other => other,
+    }
+}
+
 /// How the body is at this step, as its report. `resisted` is how many
 /// times a joint has met resistance within the last minute.
 ///
@@ -184,6 +195,46 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
         (
             Level::Warn,
             format!("{warmest} is warm: it reads {reading}, and the body stops at 62"),
+        )
+    } else if let Some((joint, why)) = glimpse.seated {
+        (
+            Level::Warn,
+            format!(
+                "seated: the {} retreated twice in an hour ({why}); hold its head a second, or run a health check, to let it stand again",
+                said_as(joint)
+            ),
+        )
+    } else if let Some(joint) = glimpse.cannot_lift {
+        (
+            Level::Warn,
+            format!(
+                "its {} pushed as hard as it may and did not move, in two long rests' tries: the lamp stays folded until it is started again, and the arm may need looking at",
+                said_as(joint)
+            ),
+        )
+    } else if let Some((joint, load)) = glimpse.strained {
+        (
+            Level::Warn,
+            format!(
+                "the {} strained: it read a load of {load} too long while standing, and the lamp sat down to rest",
+                said_as(joint)
+            ),
+        )
+    } else if let Some(joint) = glimpse.unlifted {
+        (
+            Level::Warn,
+            format!(
+                "the {} pushed as hard as it may and didn't move",
+                said_as(joint)
+            ),
+        )
+    } else if let Some((joint, from, to)) = glimpse.warming {
+        (
+            Level::Warn,
+            format!(
+                "{} is warming fast: from {from} to {to} within 5 min, and it is said warm at {WARM}",
+                said_as(joint)
+            ),
         )
     } else if glimpse.resting_s > 0 {
         (
@@ -843,6 +894,11 @@ mod tests {
             bad_reads: [0; 5],
             retreats: 0,
             resting_s: 0,
+            cannot_lift: None,
+            unlifted: None,
+            strained: None,
+            warming: None,
+            seated: None,
             waiting: None,
         }
     }
@@ -1163,6 +1219,44 @@ mod tests {
         );
         assert_eq!(report.values[5].value, "3");
         assert!(health(&head, 3).message.starts_with("head_pitch is warm"));
+    }
+
+    /// The strain guard's warnings (#4390, #4501): seated first, then a
+    /// long strain, an arm that did not lift, and a fast warming. Warmth is
+    /// said before them all.
+    #[test]
+    fn the_strain_guards_warnings_name_the_joint_and_what_it_did() {
+        let said = |glimpse: &Glimpse| {
+            let report = health(glimpse, 0);
+            assert_eq!(report.level, Level::Warn);
+            report.message
+        };
+        let mut warming = glimpse(50);
+        warming.warming = Some(("wrist_pitch", 42, 50));
+        assert_eq!(
+            said(&warming),
+            "head_pitch is warming fast: from 42 to 50 within 5 min, and it is said warm at 55"
+        );
+        let mut unlifted = warming;
+        unlifted.unlifted = Some("elbow_pitch");
+        assert_eq!(
+            said(&unlifted),
+            "the elbow pushed as hard as it may and didn't move"
+        );
+        let mut strained = unlifted;
+        strained.strained = Some(("elbow_pitch", 512));
+        assert_eq!(
+            said(&strained),
+            "the elbow strained: it read a load of 512 too long while standing, and the lamp sat down to rest"
+        );
+        let mut seated = strained;
+        seated.seated = Some(("base_pitch", "hot"));
+        assert_eq!(
+            said(&seated),
+            "seated: the shoulder retreated twice in an hour (hot); hold its head a second, or run a health check, to let it stand again"
+        );
+        seated.arm_temperatures = [WARM, 40];
+        assert!(said(&seated).starts_with("shoulder is warm"));
     }
 
     #[test]

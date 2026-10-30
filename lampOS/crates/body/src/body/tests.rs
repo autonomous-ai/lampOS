@@ -71,6 +71,10 @@ struct Lamp {
     /// servo, load. Afterwards it reads what it read before.
     strains: Vec<(Duration, Duration, usize, u16)>,
     unstrained: Option<[u16; 5]>,
+    /// One servo that cannot turn its output, as lamp-4ace's elbow on 29
+    /// Oct (#4390): it never moves, and reads this load while its goal is
+    /// past where it is, 20 otherwise. Servo, load.
+    pinned: Option<(usize, u16)>,
     /// A temperature to put back once it has been read once.
     blip: Option<(usize, u8)>,
     /// Temperatures one servo reads from a given time: when, servo, degrees.
@@ -173,6 +177,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             event: None,
             strains: Vec::new(),
             unstrained: None,
+            pinned: None,
             blip: None,
             heats: Vec::new(),
             flicker: None,
@@ -266,6 +271,13 @@ impl Lamp {
                 *handled == index && (*from..*until).contains(&now)
             }) {
                 servo.position += (to - servo.position).clamp(-1_000.0 * step, 1_000.0 * step);
+                continue;
+            }
+            if let Some((stuck, load)) = self.pinned
+                && stuck == index
+            {
+                let pushing = servo.torque == 1 && f32::from(servo.goal) > servo.position + 4.0;
+                servo.load = if pushing { load } else { 20 };
                 continue;
             }
             if servo.torque != 1 || ((index == 1 || index == 2) && !self.arm_moves) {
@@ -1950,6 +1962,346 @@ fn three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run() {
     );
 }
 
+/// lamp-4ace, 29 Oct (#4390): its elbow could not lift. Each stand pushed it
+/// to its load bound without moving a count, and the lamp sat down, rested,
+/// and tried again every half hour. Now each such sit-down lets the folded
+/// arm go a moment and takes it back where it lies, and after two long
+/// rests' tries it stays folded until started again, and says why.
+#[test]
+fn an_elbow_that_cannot_lift_stops_trying_after_two_long_rests_and_rests_unpressed() {
+    let long = Standing::LONG_REST;
+    let ends = long * 2 + Duration::from_secs(600);
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    lamp.pinned = Some((2, 990));
+    let time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let (mut given_up, mut last_minutes) = (None, Vec::new());
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 60)),
+        news,
+        |glimpse| {
+            if glimpse.cannot_lift.is_some() && given_up.is_none() {
+                given_up = Some(time.get());
+            }
+            if time.get() > ends - Duration::from_secs(60) {
+                last_minutes.push((glimpse.stand, glimpse.cannot_lift));
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    // Three tries before each of the two long rests, and none after.
+    assert_eq!(report.retreats.len(), 6, "{:?}", report.retreats);
+    assert!(
+        report
+            .retreats
+            .iter()
+            .all(|why| why.contains("elbow_pitch load 990")),
+        "{:?}",
+        report.retreats
+    );
+    let given_up = given_up.expect("it gave up");
+    assert!(given_up > long && given_up < long * 2, "{given_up:?}");
+    assert_eq!(report.cannot_lift, Some("elbow_pitch"));
+    // Still spoken to, a long rest later: folded, and still saying why.
+    assert!(
+        !last_minutes.is_empty()
+            && last_minutes
+                .iter()
+                .all(|(stand, why)| *stand == 0.0 && *why == Some("elbow_pitch")),
+        "{:?}",
+        last_minutes.last()
+    );
+    // Each sit-down let the folded arm go and took it back: torque off,
+    // then on, to the shoulder (2) and the elbow (3).
+    assert_eq!(report.arm_releases, 6);
+    let torque: Vec<(u8, u8)> = lamp
+        .registers
+        .iter()
+        .filter(|(id, address, _)| *address == 40 && (*id == 2 || *id == 3))
+        .map(|(id, _, bytes)| (*id, bytes[0]))
+        .collect();
+    assert_eq!(
+        torque.iter().filter(|(_, on)| *on == 0).count(),
+        12,
+        "{torque:?}"
+    );
+    assert_eq!(
+        torque.iter().filter(|(_, on)| *on == 1).count(),
+        12,
+        "{torque:?}"
+    );
+    // And it rests where it lies, pushing at nothing.
+    assert_eq!(lamp.servos[2].goal, lamp.servos[2].position as u16);
+    assert_eq!(lamp.servos[2].load, 20);
+}
+
+/// A sit-down for a strain of an arm that did lift is as before: no
+/// release, and it may stand again after its rest.
+#[test]
+fn a_strain_of_an_arm_that_lifted_lets_nothing_go() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.strains = vec![(
+        Duration::from_millis(2_500),
+        Duration::from_millis(3_500),
+        1,
+        990,
+    )];
+    let news = move || Some((Mood::Listening, 100));
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 60)),
+        news,
+        |_| {},
+    );
+    assert_eq!(report.retreats.len(), 1, "{:?}", report.retreats);
+    assert_eq!(report.arm_releases, 0);
+    assert_eq!(report.cannot_lift, None);
+}
+
+/// Under the strain guard (#4501), standing with the elbow at 500, over the
+/// guard's 450, for `seconds`: the elbow's long strain sits the lamp down
+/// and is said, a second inside the hour seats it, its arm let go, and it
+/// stays seated, still spoken to, until a person lets it stand. `unseat_at`
+/// is when that person comes. What each step said: when, how far it stood,
+/// strained, seated.
+#[allow(clippy::type_complexity)]
+fn strained_twice(
+    guard: Option<StrainGuard>,
+    unseat_at: Duration,
+    ends: Duration,
+) -> (
+    BodyReport,
+    Vec<(
+        Duration,
+        f32,
+        Option<(&'static str, u16)>,
+        Option<(&'static str, &'static str)>,
+    )>,
+) {
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    // Up within its four seconds; each strain lasts well over 10 s.
+    lamp.strains = vec![
+        (Duration::from_secs(6), Duration::from_secs(30), 2, 500),
+        (Duration::from_secs(80), Duration::from_secs(110), 2, 500),
+    ];
+    let time = clock.time.clone();
+    let asked_time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: guard,
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        news,
+        move || Asked {
+            unseat: asked_time.get() >= unseat_at,
+            ..Asked::default()
+        },
+        |glimpse| seen.push((time.get(), glimpse.stand, glimpse.strained, glimpse.seated)),
+    );
+    (report, seen)
+}
+
+#[test]
+fn a_long_strain_twice_in_an_hour_seats_the_lamp_until_a_person_lets_it_stand() {
+    let guard = StrainGuard {
+        load: 450,
+        seconds: 10,
+    };
+    let unseat_at = Duration::from_secs(200);
+    let (report, seen) = strained_twice(Some(guard), unseat_at, Duration::from_secs(280));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.retreats.len(), 2, "{:?}", report.retreats);
+    assert!(
+        report
+            .retreats
+            .iter()
+            .all(|why| why.contains("elbow_pitch strained: load 500")),
+        "{:?}",
+        report.retreats
+    );
+    // The first sit-down, 10 s into the strain, says the elbow and its load
+    // while it rests, and does not seat it.
+    let first = seen
+        .iter()
+        .find(|(_, _, strained, _)| strained.is_some())
+        .expect("said");
+    assert!(
+        (Duration::from_secs(15)..Duration::from_secs(18)).contains(&first.0),
+        "{:?}",
+        first.0
+    );
+    assert_eq!(first.2, Some(("elbow_pitch", 500)));
+    assert_eq!(first.3, None);
+    // It stood again after its minute, and the second seats it.
+    assert!(seen.iter().any(|(at, stand, _, _)| {
+        (Duration::from_secs(60)..Duration::from_secs(90)).contains(at) && *stand > 0.99
+    }));
+    let seated_at = seen
+        .iter()
+        .find(|(_, _, _, seated)| seated.is_some())
+        .expect("seated")
+        .0;
+    assert!(seated_at > Duration::from_secs(85), "{seated_at:?}");
+    // Seated and still spoken to: down, and saying why, until the person.
+    let seated: Vec<_> = seen
+        .iter()
+        .filter(|(at, ..)| *at > seated_at + Duration::from_secs(20) && *at < unseat_at)
+        .collect();
+    assert!(
+        !seated.is_empty()
+            && seated.iter().all(
+                |(_, stand, _, why)| *stand == 0.0 && *why == Some(("elbow_pitch", "strained"))
+            ),
+        "{:?}",
+        seated.last()
+    );
+    // Its arm was let go once down.
+    assert_eq!(report.arm_releases, 1);
+    // A person lets it stand: it does, and is no longer said seated.
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > unseat_at)
+            .all(|(_, _, _, seated)| seated.is_none())
+    );
+    assert!(
+        seen.iter()
+            .any(|(at, stand, ..)| *at > unseat_at && *stand > 0.99)
+    );
+}
+
+/// With the guard off, the same strains under the load bound are the body
+/// as before: it stands through them.
+#[test]
+fn without_the_strain_guard_a_load_under_the_bound_never_sits_it_down() {
+    let (report, seen) = strained_twice(None, Duration::MAX, Duration::from_secs(120));
+    assert!(report.retreats.is_empty(), "{:?}", report.retreats);
+    assert!(
+        seen.iter()
+            .all(|(_, _, strained, seated)| strained.is_none() && seated.is_none())
+    );
+    let low = seen
+        .iter()
+        // Up from 10 s until it is asked to stop at 120 s.
+        .filter(|(at, ..)| (Duration::from_secs(10)..Duration::from_secs(120)).contains(at))
+        .find(|(_, stand, ..)| *stand <= 0.99);
+    assert!(low.is_none(), "{low:?} {:?}", report.stop);
+}
+
+/// #4390 under the strain guard: an elbow that cannot lift is said the
+/// first time, its arm let go, and the second try seats the lamp, with no
+/// long rest in between.
+#[test]
+fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on_the_second_try() {
+    let ends = Duration::from_secs(400);
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    lamp.pinned = Some((2, 990));
+    let time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: Some(StrainGuard {
+                load: StrainGuard::LOAD,
+                seconds: StrainGuard::SECONDS,
+            }),
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        news,
+        |glimpse| seen.push((time.get(), glimpse.stand, glimpse.unlifted, glimpse.seated)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.retreats.len(), 2, "{:?}", report.retreats);
+    assert_eq!(report.cannot_lift, None);
+    // Said from the first sit-down, a minute before the second try.
+    let said = seen
+        .iter()
+        .find(|(_, _, unlifted, _)| unlifted.is_some())
+        .expect("said");
+    assert!(said.0 < Duration::from_secs(10), "{:?}", said.0);
+    assert_eq!(said.2, Some("elbow_pitch"));
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at < said.0 + Duration::from_secs(50))
+            .all(|(.., seated)| seated.is_none())
+    );
+    let last: Vec<_> = seen
+        .iter()
+        .filter(|(at, ..)| *at > ends - Duration::from_secs(120))
+        .collect();
+    assert!(
+        !last.is_empty()
+            && last.iter().all(|(_, stand, unlifted, seated)| *stand == 0.0
+                && *unlifted == Some("elbow_pitch")
+                && *seated == Some(("elbow_pitch", "strained"))),
+        "{:?}",
+        last.last()
+    );
+    // Each sit-down let the folded arm go, and it rests pushing at nothing.
+    assert_eq!(report.arm_releases, 2);
+    assert_eq!(lamp.servos[2].load, 20);
+}
+
+/// #4501: a joint rising 8 degrees within five minutes, while under 55, is
+/// said to warm fast; a slower rise, one past 55 or one older than the
+/// window is not.
+#[test]
+fn a_joint_warming_eight_degrees_in_five_minutes_is_said_before_it_is_warm() {
+    let at = |seconds: u64| Duration::from_secs(seconds);
+    let elbow = |degrees: u8| {
+        let mut all = [40; 5];
+        all[Joint::ElbowPitch.index()] = degrees;
+        all
+    };
+    let mut climb = Climb::default();
+    assert_eq!(climb.observe(at(0), elbow(42)), None);
+    assert_eq!(climb.observe(at(120), elbow(47)), None);
+    assert_eq!(
+        climb.observe(at(240), elbow(50)),
+        Some(("elbow_pitch", 42, 50))
+    );
+    // At 55 the warm warning is the one said.
+    assert_eq!(climb.observe(at(250), elbow(55)), None);
+    // The rise a degree a minute is not.
+    let mut slow = Climb::default();
+    for minute in 0..20u8 {
+        assert_eq!(
+            slow.observe(at(u64::from(minute) * 60), elbow(40 + minute)),
+            None,
+            "{minute}"
+        );
+    }
+    // A reading of 0 is no reading.
+    let mut zero = Climb::default();
+    assert_eq!(zero.observe(at(0), elbow(0)), None);
+    assert_eq!(zero.observe(at(10), elbow(45)), None);
+}
+
 /// #1518, the reviewer's P2: the fold that is itself the sit-down for a
 /// strain, on the way up or while standing, says so, not "nothing retreated".
 #[test]
@@ -2638,6 +2990,7 @@ fn gesture_run(
                 held_by_test: false,
                 held: false,
                 aim: None,
+                unseat: false,
                 asleep: false,
                 woken: false,
             }
@@ -2712,6 +3065,7 @@ fn expression_run_with(
             held_by_test: false,
             held: false,
             aim: None,
+            unseat: false,
             asleep: false,
             woken: false,
         },
@@ -2876,6 +3230,7 @@ fn speaking_run_with(
             held_by_test: false,
             held: false,
             aim: None,
+            unseat: false,
             asleep: false,
             woken: false,
         },
@@ -3583,6 +3938,7 @@ fn rest_glances_watched(
             held_by_test: false,
             held: false,
             aim: None,
+            unseat: false,
             asleep: false,
             woken: false,
         },
@@ -4001,6 +4357,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             held_by_test: false,
             held: false,
             aim: None,
+            unseat: false,
             asleep: false,
             woken: false,
         },
@@ -4066,6 +4423,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             held_by_test: false,
             held: false,
             aim: None,
+            unseat: false,
             asleep: false,
             woken: false,
         },
@@ -4149,6 +4507,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                unseat: false,
                 asleep: false,
                 woken: false,
             }
@@ -4571,6 +4930,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     held_by_test: false,
                     held: false,
                     aim: None,
+                    unseat: false,
                     asleep: false,
                     woken: false,
                 }
@@ -4649,6 +5009,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                unseat: false,
                 asleep: false,
                 woken: false,
             }
@@ -4734,6 +5095,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 held_by_test: false,
                 held: false,
                 aim: None,
+                unseat: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -7569,6 +7931,7 @@ fn called_run(
                 held_by_test: false,
                 held: false,
                 aim: None,
+                unseat: false,
                 asleep: false,
                 woken: false,
             }
