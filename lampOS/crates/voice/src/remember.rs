@@ -1769,9 +1769,18 @@ pub fn tools() -> Vec<Tool> {
 /// What `recall`'s description adds for a person's own preference
 /// (lamp-06c1, 26 Oct, P09: "What is my favorite drink?" was answered "I
 /// don't know" with no `recall`; with this, P40 called it and said black
-/// coffee). Words for the model, not a guarantee of a call.
-const RECALL_OWN_PREFERENCE: &str =
-    " For their own preference ('my favourite drink?'), call it before saying you do not remember.";
+/// coffee), and since #4339's third long run on lamp-06c1 (30 Oct: 3 recalls
+/// in 96 turns, four "I don't have anything" answers about the person's own
+/// life with the facts kept, observed or in a talk note) for their own life
+/// and what was talked about. Words for the model, not a guarantee of a call.
+pub(crate) const RECALL_OWN_PREFERENCE: &str = " For their own life (a preference, plans, people, work, what you talked about), call it \
+     before saying you do not know or remember.";
+
+/// What recall's description says it is not for: what the model can still
+/// see. "Not for this conversation" kept the model from asking for a long
+/// talk's earlier part, now in its talk note (#4339). Both short, so recall
+/// stays within 1,024 bytes under every switch.
+pub(crate) const RECALL_NOT_FOR: &str = "Not for what you still see of this talk.";
 
 /// The recall function; with its second version ([`RECALL_V2_ENVIRONMENT`])
 /// it also takes a span of days.
@@ -1779,11 +1788,16 @@ fn recall_tool(second: bool) -> Tool {
     // Short: with `history` and a span added it stays within a function's
     // 1,024-byte description (`Tool::validate`; Reviewer-two's P2 on
     // #3625), else the function is dropped.
-    let mut description = "Call this for what you do not already know from an earlier conversation or day: what \
-                          they told you or asked you to keep. Not for this conversation. If nothing is found, say \
-                          only that you do not remember; never make anything up. You cannot tell who is speaking: \
-                          never say 'you told me'; give what you remember roughly, without dates or times."
-        .to_owned();
+    let mut description =
+        "Call this for what you do not already know from an earlier conversation or day: what \
+                          they told you or asked you to keep. "
+            .to_owned();
+    description.push_str(RECALL_NOT_FOR);
+    description.push_str(
+        " If nothing is found, say only that you do not remember; never make anything up. You \
+         cannot tell who is speaking: never say 'you told me'; give what you remember roughly, \
+         without dates or times.",
+    );
     description.push_str(RECALL_OWN_PREFERENCE);
     let mut parameters = json!({
         "type": "object",
@@ -11799,6 +11813,10 @@ mod tests {
                     recall.description.len()
                 );
                 assert!(recall.description.contains(RECALL_OWN_PREFERENCE));
+                // #4339: their own life and the talk too, and recall is not
+                // kept from a long talk's earlier part.
+                assert!(recall.description.contains(RECALL_NOT_FOR));
+                assert!(!recall.description.contains("Not for this conversation."));
             }
         }
     }

@@ -406,6 +406,23 @@ drink, unless the answer is already in the conversation
 know" with no call, P40 called it and said black coffee). Words for the
 model, not a guarantee; memory still searches only the asker's scope.
 
+Since #4339's third long run on lamp-06c1 (30 Oct: 3 recalls in 96 turns,
+four "I don't have anything" answers about the person's own life while the
+fact was kept, observed or in a talk note), the same words cover their own
+life too: plans, people, work and what they talked about. Recall is "not
+for what you still see of this talk"
+(`remember::RECALL_NOT_FOR`); it said "not for this conversation" before,
+which kept the model from asking for a long talk's earlier part, now in a
+talk note. The spoken turn says it as well, after the memory's calls
+(`worker::RECALL_BEFORE_NOT_KNOWING`): before saying it doesn't know or
+remember something about their own life, call recall first, say "I don't
+remember" only if it finds nothing, and use what it finds only to answer
+what they asked (never recited unasked). A joke, a fact, the time or small
+talk asks nothing first, so an ordinary turn has no recall round before its
+first audio. Talk notes stay recall-only: none is shown at a session's
+start. `probe-tools ... --recall` measures the rule against the words
+before it on the real model ([second-voice.md](second-voice.md)).
+
 A known person's recall whose words ask only about themself ("myself",
 "what I told you about me", "về tôi", "bản thân"; every word in
 `remember::ABOUT_THEMSELF`, one of them "me", "myself", "mine", "mình",
