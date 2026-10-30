@@ -66,6 +66,8 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard` |
 | `sound` | `sound.heard`, by class |
 | `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer") |
+| `camera` | `camera.snapshot`, `camera.stream`: the camera's pictures, the eyes' own newest frame, never while the lamp is private ("The camera") |
+| `microphone` | the microphone's sound as heard, never while the lamp is private; granted now, not routed yet |
 
 **Events**, pushed to a client that subscribed:
 
@@ -450,6 +452,8 @@ which back. An SDK's wait for them returns at the answer.
 | `stop` | — | — | — |
 | `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |
 | `skill.list` | — | `skills` | — |
+| `camera.snapshot` | — | `camera` | — |
+| `camera.stream` | `on` (true or false), `fps` 1–5 (2) | `camera` | — |
 | `skill.remove` | `name` | `skills` | — |
 
 `move`'s shape is checked here, and the body's move check
@@ -609,6 +613,18 @@ lines a second, and every command is still told.
 begins with one line, `c_3f9a: N more not logged`: at the computer's next
 line, or at the door's next 250 ms tick once the second is over, whichever
 comes first. So a burst followed by silence still says it.
+
+## The camera
+
+With the `camera` grant, ticked by the owner at pairing like any other, a computer sees what the lamp's camera sees (`crates/control/src/camera.rs`).
+
+- **The eyes own the camera, and the door never opens it.** With `--sight-file`, the eyes keep their newest frame in one file while the camera is open: a JPEG 320 across, about six a second, removed when the camera closes (eyes.md). lamp-control reads that file (`--sight-file`, `/run/lampos-eyes/sight.jpg` unless given, `off` for none). The eyes and the voice go on as before.
+- **`camera.snapshot`** answers with that frame, as `jpeg` (base64), `bytes` and `age_ms`. A frame older than 2 s is the camera closed (`refused: the camera is closed`). A frame caught mid-write is refused with `ask again`.
+- **`camera.stream`** with `on: true` sends each new frame once as a `camera.frame` event (`jpeg`, `bytes`, `age_ms`), `fps` a second at most (1 to 30, 2 if not given; each new frame as it comes, never one twice: the eyes give about 1 to 2 new frames a second today, so the rate asked is a most, not a promise). Its answer carries `fps_now`, the rate new frames came at over the last 2 s (`null` before two were seen), and so does each `camera.frame`. It runs until `on: false`, `stop`, or the connection closes. It also ends by itself with a `camera.ended` event and its `why`: when the lamp turns private, or after 10 s with the camera closed. Another `camera.stream` with `on: true` takes the new rate.
+- **Never while the lamp is private.** Both are refused `private` while the privacy switch is on, or while the voice's privacy lease has stopped coming. A stream ends at once when it turns private. The voice also closes the eyes' camera then, but the door doesn't wait on that. Without `--bus-root` the door can't know, so it offers no camera at all.
+- **Local only, and journaled.** The door takes connections only from the lamp's own network: loopback, the private IPv4 ranges (10/8, 172.16/12, 192.168/16), link-local, IPv6 unique-local and link-local, and any subnet the lamp reaches directly (its routes with no gateway, read at each connection: lamp-75c9's office LAN is 172.168.20.0/23, none of the private ranges). So "local" means one hop with no router between, not a private address: on some networks an on-link subnet is wide, and everyone on it counts as local. Any other peer is closed before TLS and said in the journal (`server::is_local`). With `--remote on` (or `LAMP_CONTROL_REMOTE=on`; off unless given, said in the journal at start) any address may connect, a VPN's 100.64/10 included, but a computer beyond the lamp's own network is never given the camera or the microphone, whatever it was granted: `refused`, "local network only…", and no `camera.*` event reaches that connection. Each snapshot and each stream's start and stop is a journal line ("The journal") naming the computer, never the picture.
+- **The ring shows it.** While a stream runs, the ring shows one small steady red dot, bright on a lit ring and dim on a dark one, and a snapshot blinks it (`light/mark`, ring-choreography.md, "A computer's mark"). The mark is asked for before a picture leaves. Where lamp-control can't ask for it (no bus), there is no camera.
+- **Not yet:** the microphone (`microphone` is granted but not routed yet).
 
 ## The SDKs
 

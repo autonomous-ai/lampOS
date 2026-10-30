@@ -37,6 +37,8 @@ use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
+/// Camera frames queued for one connection at most; past that one is dropped.
+pub const FRAMES_QUEUED: usize = 4;
 /// How long a new connection has to say `hello` (or `pair`).
 pub const HELLO_WITHIN: Duration = Duration::from_secs(30);
 /// How long a connection may say nothing before it is closed (an SDK's
@@ -147,6 +149,9 @@ pub const LEASE_TICK: Duration = Duration::from_millis(250);
 struct Open {
     client: Option<String>,
     outbox: mpsc::UnboundedSender<Value>,
+    /// Its camera frames, binary, [`FRAMES_QUEUED`] at most: past that a
+    /// frame is dropped, never queued, so a slow link never grows memory.
+    frames: mpsc::Sender<Vec<u8>>,
     /// What it subscribed to, and its phrases, as its session says.
     events: BTreeSet<EventKind>,
     phrases: Vec<String>,
@@ -171,6 +176,9 @@ pub struct Shared {
     /// The manage helper's socket, root's, which installs, lists and
     /// removes pushed skills (`crate::push`).
     manage: Mutex<Option<PathBuf>>,
+    /// Whether computers beyond the lamp's own network may connect
+    /// (`--remote on`): off unless given.
+    remote: std::sync::atomic::AtomicBool,
     /// What the helper is told of pairings, one at a time in the door's
     /// order, by one thread started at the first (Reviewer-two on #3504: a
     /// late wider grant change must never be served after a newer narrower
@@ -192,10 +200,17 @@ impl Shared {
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
             changes: Mutex::new(None),
+            remote: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
     /// The manage helper at `socket` for pushed skills.
+    /// Lets computers beyond the lamp's own network connect too (`--remote
+    /// on`), never to the camera or the microphone.
+    pub fn set_remote(&self, remote: bool) {
+        self.remote.store(remote, Ordering::Relaxed);
+    }
+
     pub fn set_manage_socket(&self, socket: PathBuf) {
         *self.manage.lock().expect("manage") = Some(socket);
     }
@@ -308,6 +323,7 @@ impl Shared {
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
                 changes: Mutex::new(None),
+                remote: std::sync::atomic::AtomicBool::new(false),
             }
         })
     }
@@ -324,6 +340,26 @@ impl Shared {
     }
 
     /// Sends `event` to every connection of `client`.
+    /// Sends a binary camera frame to every connection of `client` on the
+    /// lamp's own network: dropped for one whose queue is full.
+    fn send_binary_to(&self, client: &str, frame: &[u8]) {
+        for open in self.open.lock().expect("open").values() {
+            if open.client.as_deref() == Some(client) {
+                let _ = open.frames.try_send(frame.to_vec());
+            }
+        }
+    }
+
+    /// Binary camera frames for a client (`crate::camera`'s fast stream).
+    pub fn binary(self: &Arc<Self>) -> crate::parts::Binary {
+        let shared = Arc::downgrade(self);
+        Arc::new(move |client: &str, frame: &[u8]| {
+            if let Some(shared) = shared.upgrade() {
+                shared.send_binary_to(client, frame);
+            }
+        })
+    }
+
     fn send_to(&self, client: &str, event: Value) {
         for open in self.open.lock().expect("open").values() {
             if open.client.as_deref() == Some(client) {
@@ -510,6 +546,106 @@ pub fn acceptor(identity: &Identity) -> std::io::Result<tokio_rustls::TlsAccepto
 
 /// Serves the door on `listener` until the task is dropped, and checks the
 /// leases every [`LEASE_TICK`].
+/// Whether `ip` is on the lamp's own network: loopback, a private IPv4
+/// range (10/8, 172.16/12, 192.168/16), link-local, or IPv6's unique-local
+/// (fc00::/7) and link-local (fe80::/10), and an IPv4 address carried in
+/// IPv6 by the same rule. Anything else is the internet, refused: the door
+/// is for computers on the lamp's own network only (docs/control.md, "The
+/// wire").
+pub fn is_local(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        std::net::IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return is_local(std::net::IpAddr::V4(v4));
+            }
+            let first = v6.segments()[0];
+            v6.is_loopback() || (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+/// The subnets the lamp reaches directly, by its routes with no gateway:
+/// its own network, whatever addresses it uses. lamp-75c9's office LAN is
+/// 172.168.20.0/23 (30 Oct), which is none of the private ranges.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct OnLink {
+    v4: Vec<(u32, u32)>,
+    v6: Vec<(u128, u8)>,
+}
+
+impl OnLink {
+    /// Read now from `/proc/net/route` and `/proc/net/ipv6_route`; none if
+    /// they can't be read.
+    pub fn read() -> Self {
+        let text = |path| std::fs::read_to_string(path).unwrap_or_default();
+        Self::parse(&text("/proc/net/route"), &text("/proc/net/ipv6_route"))
+    }
+
+    /// From the two tables' text: an IPv4 route with no gateway and a mask,
+    /// an IPv6 route with no next hop and a prefix, neither on `lo`.
+    pub fn parse(v4: &str, v6: &str) -> Self {
+        let hex32 = |word: &str| u32::from_str_radix(word, 16).ok();
+        let v4 = v4
+            .lines()
+            .skip(1)
+            .filter_map(|line| {
+                let fields: Vec<&str> = line.split_whitespace().collect();
+                let (iface, destination, gateway, mask) = (
+                    fields.first()?,
+                    fields.get(1)?,
+                    fields.get(2)?,
+                    fields.get(7)?,
+                );
+                // Each is the address's bytes in network order, printed as
+                // the host's own number: on a little-endian lamp, read back.
+                let address = |word: &str| hex32(word).map(|n| u32::from_be_bytes(n.to_ne_bytes()));
+                let (destination, gateway, mask) =
+                    (address(destination)?, hex32(gateway)?, address(mask)?);
+                (*iface != "lo" && gateway == 0 && mask != 0).then_some((destination, mask))
+            })
+            .collect();
+        let v6 = v6
+            .lines()
+            .filter_map(|line| {
+                let fields: Vec<&str> = line.split_whitespace().collect();
+                let (destination, length, next_hop, iface) = (
+                    fields.first()?,
+                    fields.get(1)?,
+                    fields.get(4)?,
+                    fields.get(9)?,
+                );
+                let destination = u128::from_str_radix(destination, 16).ok()?;
+                let length = u8::from_str_radix(length, 16).ok()?;
+                let next_hop = u128::from_str_radix(next_hop, 16).ok()?;
+                (*iface != "lo" && next_hop == 0 && (1..=128).contains(&length))
+                    .then_some((destination, length))
+            })
+            .collect();
+        Self { v4, v6 }
+    }
+
+    /// Whether `ip` is in one of the subnets.
+    pub fn holds(&self, ip: std::net::IpAddr) -> bool {
+        match ip {
+            std::net::IpAddr::V4(v4) => {
+                let ip = u32::from(v4);
+                self.v4.iter().any(|(net, mask)| ip & mask == net & mask)
+            }
+            std::net::IpAddr::V6(v6) => {
+                if let Some(v4) = v6.to_ipv4_mapped() {
+                    return self.holds(std::net::IpAddr::V4(v4));
+                }
+                let ip = u128::from(v6);
+                self.v6.iter().any(|(net, length)| {
+                    let mask = u128::MAX << (128 - u32::from(*length));
+                    ip & mask == net & mask
+                })
+            }
+        }
+    }
+}
+
 pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
     let ticking = shared.clone();
     tokio::spawn(async move {
@@ -533,6 +669,17 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
                 continue;
             }
         };
+        // Only the lamp's own network, unless `--remote on`: anyone else is
+        // closed before TLS, and said once in the journal.
+        let remote = !is_local(peer.ip()) && !OnLink::read().holds(peer.ip());
+        if remote && !shared.remote.load(Ordering::Relaxed) {
+            eprintln!(
+                "lamp-control: refused a connection from {}: not on the lamp's own network",
+                peer.ip()
+            );
+            drop(stream);
+            continue;
+        }
         // Over the bound: closed at once, holding nothing.
         let Some(slot) = shared.admit(peer.ip()) else {
             drop(stream);
@@ -554,7 +701,7 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared).await;
+                connection(socket, shared, remote).await;
             }
         });
     }
@@ -575,20 +722,28 @@ fn only_v1(request: &Request, response: Response) -> Result<Response, ErrorRespo
     }
 }
 
-async fn connection<S>(mut socket: tokio_tungstenite::WebSocketStream<S>, shared: Arc<Shared>)
-where
+async fn connection<S>(
+    mut socket: tokio_tungstenite::WebSocketStream<S>,
+    shared: Arc<Shared>,
+    remote: bool,
+) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
+    let (frames, mut framed) = mpsc::channel::<Vec<u8>>(FRAMES_QUEUED);
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
+    if remote {
+        session.set_remote();
+    }
     shared.open.lock().expect("open").insert(
         id,
         Open {
             client: None,
             outbox,
+            frames,
             events: BTreeSet::new(),
             phrases: Vec::new(),
             grants: BTreeSet::new(),
@@ -668,8 +823,29 @@ where
                         quiet_until = tokio::time::Instant::now() + quiet;
                     }
                 }
+                frame = framed.recv() => {
+                    let Some(frame) = frame else { continue };
+                    // Never beyond the lamp's own network (control.md, "The
+                    // camera").
+                    if remote {
+                        continue;
+                    }
+                    if socket.send(Message::Binary(frame.into())).await.is_err() {
+                        break;
+                    }
+                }
                 event = inbox.recv() => {
                     let Some(event) = event else { break };
+                    // A picture or a sound started from the lamp's own
+                    // network never goes to the same computer's connection
+                    // from beyond it.
+                    if remote
+                        && event["ev"]
+                            .as_str()
+                            .is_some_and(|ev| ev.starts_with("camera.") || ev.starts_with("microphone."))
+                    {
+                        continue;
+                    }
                     if socket.send(Message::text(event.to_string())).await.is_err() {
                         break;
                     }
@@ -898,6 +1074,56 @@ pub fn rfc3339_utc(at: std::time::SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_lamps_own_network_may_connect() {
+        let local = |text: &str| is_local(text.parse().unwrap());
+        for near in [
+            "127.0.0.1",
+            "10.0.0.7",
+            "172.16.4.2",
+            "172.31.255.1",
+            "192.168.1.20",
+            "169.254.3.3",
+            "::1",
+            "fd12:3456::1",
+            "fe80::1",
+            "::ffff:192.168.1.20",
+        ] {
+            assert!(local(near), "{near}");
+        }
+        for far in [
+            "8.8.8.8",
+            "172.32.0.1",
+            "100.64.0.1",
+            "203.0.113.5",
+            "2001:db8::1",
+            "2606:4700::1111",
+            "::ffff:8.8.8.8",
+        ] {
+            assert!(!local(far), "{far}");
+        }
+    }
+
+    #[test]
+    fn the_lamps_own_subnets_are_its_network_whatever_their_addresses() {
+        // lamp-75c9, 30 Oct: 172.168.20.0/23 on wlan0, a default route.
+        let v4 = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                  wlan0\t00000000\t0114A8AC\t0003\t0\t0\t3006\t00000000\t0\t0\t0\n\
+                  wlan0\t0014A8AC\t00000000\t0001\t0\t0\t3006\t00FEFFFF\t0\t0\t0\n";
+        let v6 = "fd001234000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000001 00000000 00000001 wlan0\n\
+                  00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 ffffffff 00000001 00000000 00200200       lo\n";
+        let on_link = OnLink::parse(v4, v6);
+        let holds = |text: &str| on_link.holds(text.parse().unwrap());
+        assert!(holds("172.168.21.8"), "the laptop beside 75c9");
+        assert!(holds("172.168.20.1"));
+        assert!(!holds("172.168.22.1"), "the next /23");
+        assert!(!holds("8.8.8.8"), "the default route is no subnet");
+        assert!(holds("fd00:1234::7"));
+        assert!(!holds("fd00:1235::7"));
+        assert!(!holds("::1"), "lo is left out; loopback is local by itself");
+        assert_eq!(OnLink::parse("", ""), OnLink::default());
+    }
 
     #[test]
     fn times_are_rfc3339_in_utc() {

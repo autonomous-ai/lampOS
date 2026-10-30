@@ -49,5 +49,6 @@ pub mod sight;
 pub mod speaking;
 pub mod steady;
 pub mod still;
+pub mod tap;
 pub mod who;
 pub mod yawn;

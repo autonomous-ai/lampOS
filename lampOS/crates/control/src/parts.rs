@@ -58,6 +58,8 @@ pub const SAY_ANSWER_WITHIN: Duration = Duration::from_secs(90);
 /// Where the events of actions that end later go: the client, and the
 /// event (`done`).
 pub type Events = Arc<dyn Fn(&str, Value) + Send + Sync>;
+/// Where a client's binary camera frames go (`crate::camera`'s fast stream).
+pub type Binary = Arc<dyn Fn(&str, &[u8]) + Send + Sync>;
 
 /// Something a light request can be published on: the bus, or a test's
 /// list.
@@ -106,6 +108,9 @@ pub struct Lamp {
     /// (#4209). A `stop` doesn't free it: the door never stops the body,
     /// which plays the motion to its end.
     motion: Option<u64>,
+    /// The camera, read from the eyes' newest frame (`--sight-file`); none
+    /// without one.
+    camera: Option<crate::camera::Camera>,
 }
 
 impl Lamp {
@@ -133,7 +138,30 @@ impl Lamp {
             clock: lamp_ipc::monotonic_us,
             follow: None,
             motion: None,
+            camera: None,
         }
+    }
+
+    /// `camera.snapshot` and `camera.stream` from the eyes' sight file,
+    /// never while `watch` says the lamp is private: after [`Self::watching`],
+    /// whose watch it reads. Without a watch nothing tells the door the lamp
+    /// is private, so the camera is refused.
+    /// The camera's fast stream from the eyes' frames socket, its frames
+    /// sent through `sink` once the server has set it.
+    pub fn fast_frames(mut self, socket: PathBuf, sink: crate::camera::Sink) -> Self {
+        self.camera = self.camera.map(|camera| camera.fast(socket, sink));
+        self
+    }
+
+    pub fn seeing(mut self, sight: PathBuf, mark: crate::camera::Mark) -> Self {
+        let watch = self.watch.clone();
+        let private: crate::camera::Private = Arc::new(move || {
+            watch
+                .as_ref()
+                .is_none_or(|watch| watch.lock().map_or(true, |watch| watch.private()))
+        });
+        self.camera = Some(crate::camera::Camera::new(sight, private).marking(mark));
+        self
     }
 
     /// Another clock for claims, for tests.
@@ -486,6 +514,18 @@ impl Parts for Lamp {
             Op::Say { text } => self.say(client, re, text),
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
+            Op::CameraSnapshot {} => self
+                .camera
+                .as_ref()
+                .ok_or_else(|| not_here("the camera"))?
+                .snapshot(client),
+            Op::CameraStream { on, fps, size } => {
+                let events = self.events.clone();
+                self.camera
+                    .as_mut()
+                    .ok_or_else(|| not_here("the camera"))?
+                    .stream(client, *on, *fps, size.as_deref(), events)
+            }
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
             // Only the hum today (protocol.rs refuses any other name).
             Op::Sound { .. } => self.sound(client, re),
@@ -502,6 +542,9 @@ impl Parts for Lamp {
     }
 
     fn stop(&mut self, client: &str, _: u64) {
+        if let Some(camera) = &mut self.camera {
+            camera.end(client);
+        }
         if let Some(follow) = &self.follow {
             let mut follower = follow.lock().expect("follower");
             if follower.as_deref() == Some(client) {

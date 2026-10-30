@@ -89,6 +89,12 @@ pub enum Grant {
     /// `skill.remove`), which run on their own after it goes, never beyond
     /// its other grants (docs/control.md, "Skills pushed from a computer").
     Skills,
+    /// The camera's pictures: `camera.snapshot` and `camera.stream`, the
+    /// eyes' own newest frame, never while the lamp is private.
+    Camera,
+    /// The microphone's sound as it is heard, never while the lamp is
+    /// private.
+    Microphone,
 }
 
 impl Grant {
@@ -105,6 +111,10 @@ impl Grant {
             Self::Hear => "can hear its own phrases, never the words around them",
             Self::Sound => "can hear kinds of sound, never words",
             Self::Skills => "can put skills on the lamp that run on their own",
+            Self::Camera => "can see what the lamp's camera sees, never while it is private",
+            Self::Microphone => {
+                "can hear what the lamp's microphone hears, never while it is private"
+            }
         }
     }
 }
@@ -349,6 +359,21 @@ pub enum Op {
     /// One of the client's own pushed skills, taken off.
     #[serde(rename = "skill.remove")]
     SkillRemove { name: String },
+    /// The camera's newest picture, once: a JPEG, as the eyes keep it.
+    #[serde(rename = "camera.snapshot")]
+    CameraSnapshot {},
+    /// The camera's pictures as `camera.frame` events, `fps` a second at
+    /// most, until `on: false`, `stop`, the client goes or the lamp turns
+    /// private (`camera.ended`, with why).
+    #[serde(rename = "camera.stream")]
+    CameraStream {
+        on: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fps: Option<u8>,
+        /// The fast stream's size, `640x480` (the default) or `1280x720`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size: Option<String>,
+    },
 }
 
 impl Op {
@@ -386,6 +411,7 @@ impl Op {
             Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
                 vec![Grant::Skills]
             }
+            Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
         };
         needs.sort();
         needs.dedup();
@@ -494,6 +520,17 @@ impl Op {
                 }
             }
             Self::SkillRemove { name } => skill_name(name)?,
+            Self::CameraStream { fps, size, .. } => {
+                if fps.is_some_and(|fps| !(1..=crate::camera::FPS_MOST).contains(&fps)) {
+                    return Err(format!("fps: 1 to {}", crate::camera::FPS_MOST));
+                }
+                if size
+                    .as_deref()
+                    .is_some_and(|size| crate::camera::size_of(size).is_none())
+                {
+                    return Err("size: 640x480 or 1280x720".to_owned());
+                }
+            }
             Self::Unsubscribe { events } => {
                 if events.is_empty() {
                     return Err("events: at least one".to_owned());
@@ -631,7 +668,7 @@ impl Op {
                     return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
                 }
             }
-            Self::Stop {} | Self::SkillList {} => {}
+            Self::Stop {} | Self::SkillList {} | Self::CameraSnapshot {} => {}
         }
         Ok(())
     }
@@ -1077,6 +1114,8 @@ mod tests {
             Grant::Hear,
             Grant::Sound,
             Grant::Skills,
+            Grant::Camera,
+            Grant::Microphone,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -1097,8 +1136,28 @@ mod tests {
                     json!("skills"),
                     "can put skills on the lamp that run on their own"
                 ),
+                (
+                    json!("camera"),
+                    "can see what the lamp's camera sees, never while it is private"
+                ),
+                (
+                    json!("microphone"),
+                    "can hear what the lamp's microphone hears, never while it is private"
+                ),
             ]
         );
+    }
+
+    #[test]
+    fn a_camera_stream_may_ask_up_to_30_frames_a_second() {
+        for fps in [1, 30] {
+            let frame = format!(r#"{{"id":1,"op":"camera.stream","on":true,"fps":{fps}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{fps}");
+        }
+        for fps in [0, 31] {
+            let frame = format!(r#"{{"id":1,"op":"camera.stream","on":true,"fps":{fps}}}"#);
+            assert_eq!(why(&frame).1, "fps: 1 to 30", "{fps}");
+        }
     }
 
     #[test]

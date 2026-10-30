@@ -12,6 +12,17 @@ import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
 
+/** A fast stream's binary `camera.frame`: its header, with the JPEG as `data`. */
+export function binaryFrame(message) {
+  const length = message.readUInt32BE(0);
+  const frame = JSON.parse(message.subarray(4, 4 + length).toString());
+  frame.data = message.subarray(4 + length);
+  return frame;
+}
+
+// Events that come with a request, never subscribed to: a camera stream's.
+const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
+
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` answers
 // `{"to":"voice"}` and its `done` does follow.
@@ -247,7 +258,10 @@ export class Lamp {
     this.leases = new Map();
     ws.removeAllListeners('message');
     for (const frame of frames.splice(0)) this.frame(frame);
-    ws.on('message', (data) => {
+    ws.on('message', (data, isBinary) => {
+      // A fast camera frame: the header's length, the header, then the JPEG,
+      // given as `data` (a Buffer).
+      if (isBinary) return this.frame(binaryFrame(data));
       const frame = JSON.parse(data.toString());
       debug.frame('<-', frame);
       this.frame(frame);
@@ -398,7 +412,7 @@ export class Lamp {
 
   // Call `handler(event)` for each `event` the lamp says; subscribes at once.
   on(event, handler, { phrases } = {}) {
-    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done') {
+    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)) {
       throw new LampError(`no event ${event}`, { code: 'bad_request' });
     }
     const short = shortPhrase(phrases);
@@ -478,6 +492,25 @@ export class Lamp {
   joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
   say(text) { return this.act('say', { text }); }
+
+  // The camera (the `camera` grant): the eyes' own newest picture, never
+  // while the lamp is private.
+
+  /** The camera's newest picture, a JPEG about 320 across, as a Buffer. */
+  async cameraSnapshot() {
+    const reply = await this.request('camera.snapshot');
+    return unb64(reply.jpeg);
+  }
+
+  /** Pictures as `camera.frame` events (`lamp.on('camera.frame', ...)`, each
+   * with its `jpeg` in base64), `fps` a second at most (1 to 30; each new frame once as it comes, about 1 to 2 a second today: the answer and each frame carry `fps_now`), until
+   * `cameraStream(false)`, `stop`, or a `camera.ended` event. */
+  cameraStream(on = true, fps = undefined, size = undefined) {
+    const fields = { on };
+    if (fps !== undefined) fields.fps = fps;
+    if (size !== undefined) fields.size = size;
+    return this.request('camera.stream', fields);
+  }
   sound(name) { return this.act('sound', { name }); }
   async stop() {
     const reply = await this.act('stop', {});

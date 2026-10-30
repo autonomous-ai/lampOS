@@ -10,7 +10,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 // Fields replaced wherever they appear in a frame.
 export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp']);
 // Fields given only as a summary: a said text, a pushed skill part's bytes.
-export const SUMMARISED = new Set(['text', 'data']);
+export const SUMMARISED = new Set(['text', 'data', 'jpeg']);
 // Every other field the protocol has, printed as it is. A test fails on any
 // field of control.schema.json in none of these, so a new one is decided here,
 // not found later in a log; and at run time a field in none of them prints as
@@ -20,6 +20,8 @@ export const SUMMARISED = new Set(['text', 'data']);
 export const SHOWN = new Set([
   // A dev lamp's `--rates off`, said in hello's limits.
   'rates',
+  // A camera picture's size, age and a stream's rate (never the picture).
+  'age_ms', 'bytes', 'fast', 'fps', 'fps_now', 'stream',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',

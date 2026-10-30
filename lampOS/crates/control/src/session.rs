@@ -74,9 +74,26 @@ pub struct Session {
     client: Option<String>,
     events: BTreeSet<EventKind>,
     phrases: Vec<String>,
+    /// From beyond the lamp's own network (`--remote on`): never the camera
+    /// or the microphone.
+    remote: bool,
 }
 
+/// What a computer beyond the lamp's own network is told when it asks for
+/// the camera or the microphone, whatever it was granted.
+pub const LOCAL_ONLY: &str = "local network only: the camera and the microphone are never given beyond the lamp's own network";
+
 impl Session {
+    /// This connection comes from beyond the lamp's own network.
+    pub fn set_remote(&mut self) {
+        self.remote = true;
+    }
+
+    /// Whether it comes from beyond the lamp's own network.
+    pub fn remote(&self) -> bool {
+        self.remote
+    }
+
     /// The client it said `hello` as, if it has.
     pub fn client(&self) -> Option<&str> {
         self.client.as_deref()
@@ -374,6 +391,7 @@ impl Door {
             client: None,
             events: BTreeSet::new(),
             phrases: Vec::new(),
+            remote: false,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -569,6 +587,14 @@ impl Door {
                 ErrorCode::NoGrant,
                 format!("not granted: {}", missing.join(", ")),
             );
+        }
+        if session.remote
+            && op
+                .needs()
+                .iter()
+                .any(|grant| matches!(grant, Grant::Camera | Grant::Microphone))
+        {
+            return refuse(ErrorCode::Refused, LOCAL_ONLY.to_owned());
         }
         match &op {
             Op::Subscribe { events, phrases } => {
@@ -1777,6 +1803,39 @@ mod tests {
                 .starts_with("LAMP_CONTROL_QUIET ")
         );
         assert!(quiet_window_of(Some("08:00-08:00"), None).is_err());
+    }
+
+    #[test]
+    fn a_computer_beyond_the_lamps_own_network_never_gets_the_camera_whatever_it_was_granted() {
+        let computer = Computer::new(1);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Light, Grant::Camera]);
+        // On the lamp's own network the camera reaches the part.
+        let near = door.handle(
+            &mut session,
+            r#"{"id":3,"op":"camera.snapshot"}"#,
+            &mut fake,
+            2 * S,
+            1,
+        );
+        assert_eq!(code_of(&near), None, "{near:?}");
+        session.set_remote();
+        for frame in [
+            r#"{"id":4,"op":"camera.snapshot"}"#,
+            r#"{"id":5,"op":"camera.stream","on":true}"#,
+        ] {
+            let far = door.handle(&mut session, frame, &mut fake, 3 * S, 1);
+            assert_eq!(code_of(&far), Some("refused"));
+            assert_eq!(reply(&far)["error"]["why"], LOCAL_ONLY);
+        }
+        // Everything else it was granted still goes.
+        let light = door.handle(
+            &mut session,
+            r#"{"id":6,"op":"light","colour":"warm","level":2,"for_ms":1000}"#,
+            &mut fake,
+            4 * S,
+            1,
+        );
+        assert_eq!(code_of(&light), None, "{light:?}");
     }
 
     #[test]

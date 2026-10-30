@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound, never while the lamp is private (not routed yet).",
       "enum": [
         "body",
         "light",
@@ -35,7 +35,9 @@
         "look",
         "hear",
         "sound",
-        "skills"
+        "skills",
+        "camera",
+        "microphone"
       ]
     },
     "part": {
@@ -189,6 +191,12 @@
         },
         {
           "$ref": "#/$defs/stop"
+        },
+        {
+          "$ref": "#/$defs/camera.snapshot"
+        },
+        {
+          "$ref": "#/$defs/camera.stream"
         }
       ]
     },
@@ -793,7 +801,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now.",
           "type": "object",
           "properties": {
             "re": {
@@ -916,6 +924,43 @@
               "items": {
                 "type": "object"
               }
+            },
+            "jpeg": {
+              "description": "A JPEG picture, base64.",
+              "type": "string"
+            },
+            "bytes": {
+              "description": "The JPEG's size in bytes.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "age_ms": {
+              "description": "How old the picture was when read.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "stream": {
+              "enum": [
+                "on",
+                "off"
+              ]
+            },
+            "fps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "fps_now": {
+              "description": "camera.stream: the rate new frames came at lately, a second; null before any was measured.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "fast": {
+              "description": "camera.stream: true when its frames come binary, every frame the camera makes.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -1273,7 +1318,9 @@
               "enum": [
                 "welcome",
                 "lease",
-                "done"
+                "done",
+                "camera.frame",
+                "camera.ended"
               ]
             }
           ]
@@ -1657,8 +1704,117 @@
               "how"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "camera.frame"
+              }
+            }
+          },
+          "then": {
+            "description": "One new picture of a camera.stream.",
+            "properties": {
+              "jpeg": {
+                "type": "string",
+                "description": "A JPEG picture, base64."
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "age_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fps_now": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "description": "The eyes' rate of new frames over the last 2 s; null before two were seen."
+              }
+            },
+            "required": [
+              "jpeg",
+              "bytes",
+              "age_ms"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "camera.ended"
+              }
+            }
+          },
+          "then": {
+            "description": "The camera.stream ended by itself: the lamp turned private, or the camera stayed closed.",
+            "properties": {
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "why"
+            ]
+          }
         }
       ]
+    },
+    "camera.snapshot": {
+      "description": "The camera's newest picture, once, as the eyes keep it (a JPEG about 320 across). Needs the camera grant. Refused while the lamp is private (private) or with the camera closed (refused: the camera is closed).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "camera.snapshot"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "camera.stream": {
+      "description": "The camera's pictures as camera.frame events, each new frame once as it comes, at most fps a second (1 to 30, 2 if not given; today the eyes give about 1 to 2 new frames a second), until on is false, stop, the connection closes, or a camera.ended event (the lamp turned private, or the camera closed for 10 s). The answer's fps_now is the rate new frames came at lately, null before any was measured. Needs the camera grant; refused while the lamp is private. Where the eyes serve every frame (the answer's fast: true), each comes as a binary WebSocket message: the header's length (4 bytes, big-endian), the header (JSON: ev camera.frame, bytes, width, height, fps_now), then the JPEG as the camera made it, at most 512 KiB.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "camera.stream"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "size": {
+          "enum": [
+            "640x480",
+            "1280x720"
+          ],
+          "description": "The fast stream's size, where the eyes serve every frame: the camera's own 25 fps MJPEG modes. 640x480 if not given."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
+      ],
+      "additionalProperties": false
     }
   }
 }

@@ -702,6 +702,7 @@ const BUS_TOPICS: &[&str] = &[
     "lamp/shutdown_request",
     "light/command",
     "light/drawn",
+    "light/mark",
     "light/outranked",
     "light/reached",
     "light/request",

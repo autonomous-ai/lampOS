@@ -279,7 +279,54 @@ pub fn arbitration_topics() -> Vec<(&'static str, Declaration)> {
         (LightRequest::TOPIC, LightRequest::declaration()),
         (LightReached::TOPIC, LightReached::declaration()),
         (LightOutranked::TOPIC, LightOutranked::declaration()),
+        (RingMark::TOPIC, RingMark::declaration()),
     ]
+}
+
+/// What a computer is taking through the lamp, for [`RingMark`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarkKind {
+    Camera,
+    Microphone,
+}
+
+/// The ring's mark while a computer sees or hears through the lamp
+/// (`light/mark`, lamp-control's camera and microphone, docs/control.md
+/// "The camera"): one small steady dot over whatever the ring shows, a
+/// turn's face included, so a person can always tell. The asker renews it
+/// while a stream runs; it lapses at its claim's `until_us`, at most
+/// [`RingMark::MOST_US`] ahead, so a stalled asker can't leave it lit. A
+/// snapshot asks for a `blink`: the dot for a moment, once.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RingMark {
+    pub claim: Claim,
+    pub kind: MarkKind,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub blink: bool,
+}
+
+impl RingMark {
+    pub const TYPE: &str = "lamp_msgs/RingMark";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "light/mark";
+    /// The furthest ahead a mark may be asked to hold.
+    pub const MOST_US: u64 = 3_000_000;
+
+    /// Each is a message of its own: one asker's must not hide another's.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// Shape only: the claim's, and no further ahead than [`Self::MOST_US`]
+    /// at `now_us`.
+    pub fn check(&self, now_us: u64) -> Result<(), Invalid> {
+        self.claim.check()?;
+        if self.claim.until_us > now_us.saturating_add(Self::MOST_US) {
+            return Err(Invalid("a mark holds 3 s ahead at most".to_owned()));
+        }
+        Ok(())
+    }
 }
 
 /// The user a part runs as, by its product unit's `User=`.

@@ -859,6 +859,14 @@ from playback and does not know whether ambient speech addresses Lamp.
 ALSA acceptance/retirement are software/driver boundaries, not optical or
 acoustic measurements. Stillness, silence and an unlit ring are valid behavior.
 
+### A computer's mark: seeing or hearing through the lamp
+
+While a paired computer streams the lamp's camera (later its microphone), and for a moment at each snapshot, the ring shows **one small steady dot**: the top pixel (`ring_mark::MARK_PIXEL`), red like a camera's recording light. It's bright on a lit ring (`MARK_BRIGHT`, 120/0/0, under the ring's ceiling as everything is) and dim on a dark one (`MARK_DIM`, 24/0/0): on lamp-75c9 (30 Oct) a dim white dot was lost in the person's bright white light. One pixel and steady, so it never reads as the mute's dark-red breath around the whole ring. It's drawn over every frame the ring draws, a turn's face, a resting frame and a skill's light alike, so a person can always tell. It never breathes or moves, so it never reads as the lamp's own mood.
+- **Who asks for it:** `lamp-control` asks on `light/mark` (`lamp_msgs::RingMark`). A stream renews it every second, 2 s ahead (`camera::MARK_EVERY`, `MARK_HOLDS`), from before its first picture leaves. A snapshot asks for a blink, the dot for 600 ms (`ring_mark::BLINK_US`).
+- **When it goes:** once every claim has lapsed, so an asker that stops can't leave it lit. A claim more than 3 s ahead, or on another boot's clock, is none.
+- **Always on:** the ring takes it whenever it has the bus, behind no switch. lamp-control gives no camera at all where it can't ask for the mark.
+- **Where it isn't drawn:** never over the shutdown's warning, and never on a dark ring. Privacy ends every stream at once anyway (control.md, "The camera").
+
 ## Explicit qualification option
 
 Append `--ring-channel-ceiling 0..120` to `directed`, `directed-fixture` or `serve` to

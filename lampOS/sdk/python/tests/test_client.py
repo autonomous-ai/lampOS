@@ -4,6 +4,7 @@ refusals, as docs/control.md says them. No lamp needed."""
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -53,7 +54,7 @@ def test_proofs_name_what_they_are_for():
 def test_every_op_has_a_call_and_every_error_code_a_class():
     calls = {"lease.take", "lease.renew", "lease.release", "pair", "hello", "subscribe", "unsubscribe", "get"}
     for op in schema.ops():
-        assert op in calls or callable(getattr(Lamp, op, None)), op
+        assert op in calls or callable(getattr(Lamp, op.replace(".", "_"), None)), op
     for code in schema.error_codes():
         assert errors.BY_CODE[code].code == code
     assert errors.from_reply({"code": "rate", "why": "x", "retry_ms": 900}).retry_ms == 900
@@ -395,7 +396,7 @@ def test_names_outside_the_schema_never_leave_this_computer(tmp_path):
                         await call
                     assert refused.value.code == "bad_request"
                 with pytest.raises(LampError):
-                    lamp.on("camera.frame", print)
+                    lamp.on("camera.zoomed", print)
             assert not [frame for frame in fake.received if frame.get("op") in ("gesture", "light")]
 
     run(go())
@@ -1378,3 +1379,50 @@ def test_a_look_at_the_hand_needs_the_bodys_lease_socket_as_other_looks_do(tmp_p
                 assert not fake.leases
 
     run(go())
+
+
+def test_the_camera_gives_a_picture_and_a_stream_with_the_camera_grant_only(tmp_path):
+    async def go():
+        from lampos.testing import FAKE_JPEG
+
+        async with FakeLamp(grants=("light", "camera")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert await lamp.camera_snapshot() == FAKE_JPEG
+                frames = asyncio.Queue()
+                lamp.on("camera.frame", frames.put_nowait)
+                started = await lamp.camera_stream(fps=3)
+                assert (started["stream"], started["fps"]) == ("on", 3)
+                frame = await asyncio.wait_for(frames.get(), 5)
+                assert base64.b64decode(frame["jpeg"]) == FAKE_JPEG
+                assert (await lamp.camera_stream(False))["stream"] == "off"
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path / "plain")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.camera_snapshot()
+
+    run(go())
+
+
+def test_the_camera_stream_asks_up_to_30_a_second_and_31_is_refused_before_sending(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light", "camera")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                started = await lamp.camera_stream(fps=30)
+                assert started["fps"] == 30 and "fps_now" in started
+                with pytest.raises(LampError):
+                    await lamp.camera_stream(fps=31)
+
+    run(go())
+
+
+def test_a_fast_binary_frame_is_its_header_and_the_jpeg_as_data():
+    from lampos.client import binary_frame
+
+    header = json.dumps({"ev": "camera.frame", "bytes": 4, "width": 640, "height": 480, "fps_now": 24.8}).encode()
+    jpeg = bytes([0xFF, 0xD8, 0xFF, 0xD9])
+    frame = binary_frame(len(header).to_bytes(4, "big") + header + jpeg)
+    assert (frame["ev"], frame["width"], frame["fps_now"]) == ("camera.frame", 640, 24.8)
+    assert frame["data"] == jpeg
