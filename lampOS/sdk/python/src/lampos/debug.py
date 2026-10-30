@@ -31,7 +31,7 @@ SHOWN = frozenset({
     # A dev lamp's `--rates off`, said in hello's limits.
     "rates",
     # A camera picture's size, age and a stream's rate (never the picture).
-    "age_ms", "bytes", "fps", "stream",
+    "age_ms", "bytes", "fps", "fps_now", "stream",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",

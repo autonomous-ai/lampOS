@@ -801,7 +801,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now.",
           "type": "object",
           "properties": {
             "re": {
@@ -948,7 +948,15 @@
             "fps": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 5
+              "maximum": 30
+            },
+            "fps_now": {
+              "description": "camera.stream: the rate new frames came at lately, a second; null before any was measured.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
             }
           },
           "required": [
@@ -1715,6 +1723,11 @@
               "age_ms": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "fps_now": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The rate new frames have come at over the last 2 s."
               }
             },
             "required": [
@@ -1764,7 +1777,7 @@
       "additionalProperties": false
     },
     "camera.stream": {
-      "description": "The camera's pictures as camera.frame events, each new frame once, at most fps a second (1 to 5, 2 if not given), until on is false, stop, the connection closes, or a camera.ended event (the lamp turned private, or the camera closed for 10 s). Needs the camera grant; refused while the lamp is private.",
+      "description": "The camera's pictures as camera.frame events, each new frame once as it comes, at most fps a second (1 to 30, 2 if not given; today the eyes give about 1 to 2 new frames a second), until on is false, stop, the connection closes, or a camera.ended event (the lamp turned private, or the camera closed for 10 s). The answer's fps_now is the rate new frames came at lately, null before any was measured. Needs the camera grant; refused while the lamp is private.",
       "type": "object",
       "properties": {
         "id": {
@@ -1779,7 +1792,7 @@
         "fps": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 5
+          "maximum": 30
         }
       },
       "required": [

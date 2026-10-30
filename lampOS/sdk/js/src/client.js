@@ -492,7 +492,7 @@ export class Lamp {
   }
 
   /** Pictures as `camera.frame` events (`lamp.on('camera.frame', ...)`, each
-   * with its `jpeg` in base64), `fps` a second at most (1 to 5), until
+   * with its `jpeg` in base64), `fps` a second at most (1 to 30; each new frame once as it comes, about 1 to 2 a second today: the answer and each frame carry `fps_now`), until
    * `cameraStream(false)`, `stop`, or a `camera.ended` event. */
   cameraStream(on = true, fps = undefined) {
     return this.request('camera.stream', fps === undefined ? { on } : { on, fps });

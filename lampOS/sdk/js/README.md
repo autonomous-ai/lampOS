@@ -284,7 +284,7 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.light(colour, level, forMs, pattern)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `forMs`: 1–30,000. `pattern`: none (steady), `'breathe'` (level 2 or up), `'candle'` (3 or up) or `'pulse'` (2 or up). Under its level a pattern is `refused`. The ring plays one pulse a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no |
 | `lamp.say(text)` | `text`: words, up to 300 characters | `speak` | no |
 | `lamp.cameraSnapshot()` | none; resolves to the camera's newest picture, a JPEG `Buffer` about 320 across. Refused while the lamp is private, or with the camera closed | `camera` | no |
-| `lamp.cameraStream(on = true, fps)` | `fps`: 1 to 5 a second (2); pictures come as `camera.frame` events (`jpeg` in base64), each new one once, until `cameraStream(false)`, `stop` or a `camera.ended` event. Ends with `camera.ended` when the lamp turns private, or after 10 s with the camera closed | `camera` | no |
+| `lamp.cameraStream(on = true, fps)` | `fps`: 1 to 30 a second at most (2), each new frame once as it comes (about 1 to 2 a second today), `fps_now` the rate lately; pictures come as `camera.frame` events (`jpeg` in base64), each new one once, until `cameraStream(false)`, `stop` or a `camera.ended` event. Ends with `camera.ended` when the lamp turns private, or after 10 s with the camera closed | `camera` | no |
 | `lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no |
 | `lamp.stop()` | | none | no |
 | `lamp.request(op, fields)` | any op of the schema, checked against it first | the op's | |

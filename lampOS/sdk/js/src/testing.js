@@ -26,6 +26,9 @@ import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 // `express`'s feelings and their moves, as lamp-control's feelings.rs.
+// The fake's camera picture: the smallest whole JPEG (start and end markers).
+export const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
 
 // `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
@@ -450,7 +453,7 @@ export class FakeLamp {
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
-    return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'] }[op] ?? [];
+    return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'], 'camera.snapshot': ['camera'], 'camera.stream': ['camera'] }[op] ?? [];
   }
 
   op(ws, client, request) {
@@ -518,6 +521,18 @@ export class FakeLamp {
         this.show(request);
         return this.ok(ws, id, { to: 'ring' });
       }
+      case 'camera.snapshot':
+        // A picture with no camera behind it: the smallest whole JPEG.
+        return this.ok(ws, id, { jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0 });
+      case 'camera.stream':
+        // As lamp-control's check: 1 to 30 a second.
+        if (request.fps !== undefined && !(Number.isInteger(request.fps) && request.fps >= 1 && request.fps <= 30)) {
+          return this.refuse(ws, id, 'bad_request', 'fps: 1 to 30');
+        }
+        if (!request.on) return this.ok(ws, id, { stream: 'off' });
+        this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
+        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0, fps_now: 0 }));
+        return undefined;
       case 'stop':
         // The holder's stop ends its following, as any of its actions.
         this.stopFollowing(ws);

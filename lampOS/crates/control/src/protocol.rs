@@ -1143,6 +1143,18 @@ mod tests {
     }
 
     #[test]
+    fn a_camera_stream_may_ask_up_to_30_frames_a_second() {
+        for fps in [1, 30] {
+            let frame = format!(r#"{{"id":1,"op":"camera.stream","on":true,"fps":{fps}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{fps}");
+        }
+        for fps in [0, 31] {
+            let frame = format!(r#"{{"id":1,"op":"camera.stream","on":true,"fps":{fps}}}"#);
+            assert_eq!(why(&frame).1, "fps: 1 to 30", "{fps}");
+        }
+    }
+
+    #[test]
     fn grants_and_leases_each_op_needs() {
         let needs = |frame: &str| op(frame).needs();
         assert_eq!(needs(r#"{"id":1,"op":"stop"}"#), []);

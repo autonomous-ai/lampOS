@@ -675,8 +675,8 @@ class FakeLamp:
         elif op == "camera.stream":
             if request["on"]:
                 fps = request.get("fps", 2)
-                await self._ok(ws, id_, stream="on", fps=fps)
-                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(FAKE_JPEG).decode(), "bytes": len(FAKE_JPEG), "age_ms": 0}
+                await self._ok(ws, id_, stream="on", fps=fps, fps_now=None)
+                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(FAKE_JPEG).decode(), "bytes": len(FAKE_JPEG), "age_ms": 0, "fps_now": 0.0}
                 await ws.send(json.dumps(frame))
             else:
                 await self._ok(ws, id_, stream="off")

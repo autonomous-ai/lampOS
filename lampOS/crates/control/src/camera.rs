@@ -30,11 +30,50 @@ use crate::protocol::{Error, ErrorCode};
 pub const FRESH: Duration = Duration::from_secs(2);
 /// The largest frame sent; the eyes' sight frame is about 20 KiB.
 pub const FRAME_MAX: u64 = 256 * 1024;
-/// A stream's most frames a second, and its default.
-pub const FPS_MOST: u8 = 5;
+/// A stream's most frames a second, and its default. The eyes give about one
+/// or two new frames a second today, so a stream sends each new one as it
+/// comes, never one twice, up to the rate asked.
+pub const FPS_MOST: u8 = 30;
 pub const FPS_DEFAULT: u8 = 2;
 /// A stream with no fresh frame this long ends, saying so.
 pub const GONE_AFTER: Duration = Duration::from_secs(10);
+/// `fps_now` is the rate new frames came at over this long.
+pub const RATE_OVER: Duration = Duration::from_secs(2);
+/// How often a stream looks for a new frame, whatever its rate: new frames
+/// go as they come, not on a clock of their own.
+const LOOK_EVERY: Duration = Duration::from_millis(20);
+
+/// When the last new frames came, for `fps_now`: shared by every stream.
+#[derive(Default)]
+pub struct Rate(std::sync::Mutex<std::collections::VecDeque<std::time::Instant>>);
+
+impl Rate {
+    fn came(&self, at: std::time::Instant) {
+        if let Ok(mut times) = self.0.lock() {
+            times.push_back(at);
+            while times
+                .front()
+                .is_some_and(|first| at.duration_since(*first) > RATE_OVER)
+            {
+                times.pop_front();
+            }
+        }
+    }
+
+    /// New frames a second over the last [`RATE_OVER`], to a tenth; none
+    /// before two were seen in it.
+    pub fn now(&self) -> Option<f64> {
+        let times = self.0.lock().ok()?;
+        let fresh: Vec<_> = times
+            .iter()
+            .filter(|at| at.elapsed() <= RATE_OVER)
+            .collect();
+        let (first, last) = (fresh.first()?, fresh.last()?);
+        let span = last.duration_since(**first).as_secs_f64();
+        (fresh.len() >= 2 && span > 0.0)
+            .then(|| (((fresh.len() - 1) as f64 / span) * 10.0).round() / 10.0)
+    }
+}
 
 /// Whether the lamp is private now.
 pub type Private = Arc<dyn Fn() -> bool + Send + Sync>;
@@ -120,6 +159,7 @@ pub struct Camera {
     streams: HashMap<String, Arc<AtomicBool>>,
     /// The ring's mark; none, no camera at all (it is never seen unmarked).
     mark: Option<Mark>,
+    rate: Arc<Rate>,
 }
 
 impl Camera {
@@ -129,6 +169,7 @@ impl Camera {
             private,
             streams: HashMap::new(),
             mark: None,
+            rate: Arc::default(),
         }
     }
 
@@ -181,6 +222,7 @@ impl Camera {
         self.streams.insert(client.to_owned(), running.clone());
         let (sight, private, client) =
             (self.sight.clone(), self.private.clone(), client.to_owned());
+        let rate = self.rate.clone();
         std::thread::spawn(move || {
             let marked = |at: &mut Option<std::time::Instant>| {
                 if at.is_none_or(|at| at.elapsed() >= MARK_EVERY) {
@@ -188,11 +230,11 @@ impl Camera {
                     *at = Some(std::time::Instant::now());
                 }
             };
-            run(&sight, fps, &running, &private, &marked, &|event| {
+            run(&sight, fps, &running, &private, &marked, &rate, &|event| {
                 events(&client, event)
             });
         });
-        Ok(json!({"stream": "on", "fps": fps}))
+        Ok(json!({"stream": "on", "fps": fps, "fps_now": self.rate.now()}))
     }
 
     /// Ends `client`'s stream, if any, without an event: its own `off`,
@@ -212,9 +254,13 @@ fn run(
     running: &AtomicBool,
     private: &Private,
     marked: &dyn Fn(&mut Option<std::time::Instant>),
+    rate: &Rate,
     tell: &dyn Fn(Value),
 ) {
-    let every = Duration::from_millis(1_000 / u64::from(fps));
+    // At most `fps` a second: a new frame sooner than this after the last
+    // one sent waits for the next look.
+    let least_gap = Duration::from_millis(1_000 / u64::from(fps));
+    let mut sent_at: Option<std::time::Instant> = None;
     let mut last: Option<SystemTime> = None;
     let mut fresh_at = std::time::Instant::now();
     let mut marked_at = None;
@@ -225,13 +271,20 @@ fn run(
             return;
         }
         match newest(sight, SystemTime::now()) {
-            Ok(frame) if last != Some(frame.modified) => {
+            Ok(frame)
+                if last != Some(frame.modified)
+                    && sent_at.is_none_or(|at| at.elapsed() >= least_gap) =>
+            {
                 // The mark is on the ring before the picture leaves.
                 marked(&mut marked_at);
                 last = Some(frame.modified);
-                fresh_at = std::time::Instant::now();
+                let now = std::time::Instant::now();
+                fresh_at = now;
+                sent_at = Some(now);
+                rate.came(now);
                 let mut event = frame.json();
                 event["ev"] = json!("camera.frame");
+                event["fps_now"] = json!(rate.now().unwrap_or(0.0));
                 tell(event);
             }
             Ok(_) => {
@@ -245,7 +298,7 @@ fn run(
             }
             Err(_) => {}
         }
-        std::thread::sleep(every);
+        std::thread::sleep(LOOK_EVERY);
     }
 }
 
@@ -362,7 +415,7 @@ mod tests {
         });
         assert_eq!(
             camera.stream("c_1", true, Some(5), events).unwrap(),
-            json!({"stream": "on", "fps": 5})
+            json!({"stream": "on", "fps": 5, "fps_now": null})
         );
         std::thread::sleep(Duration::from_millis(500));
         let frames = |seen: &Mutex<Vec<(String, Value)>>| {

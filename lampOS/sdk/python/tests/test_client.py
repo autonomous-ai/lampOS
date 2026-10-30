@@ -1403,3 +1403,16 @@ def test_the_camera_gives_a_picture_and_a_stream_with_the_camera_grant_only(tmp_
                     await lamp.camera_snapshot()
 
     run(go())
+
+
+def test_the_camera_stream_asks_up_to_30_a_second_and_31_is_refused_before_sending(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light", "camera")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                started = await lamp.camera_stream(fps=30)
+                assert started["fps"] == 30 and "fps_now" in started
+                with pytest.raises(LampError):
+                    await lamp.camera_stream(fps=31)
+
+    run(go())
