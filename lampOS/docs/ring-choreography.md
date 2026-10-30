@@ -493,6 +493,16 @@ rest of the way in over 1.5 s. If no voice has asked for the ring within
 breathes every 10 s, and stays so, still ready to be asked: a voice that
 never started. No spinner and no blink.
 
+It comes with every start of the voice, not only at power-on (#2848):
+`lamp-voice.service` wants it and starts after it, so the app's Restart, an
+update round's start of the voice and a crash restart each open the ring
+like an eye again before the voice asks for it. A face still up is not
+started twice. It is outside `lampos.target` and never restarted, so a stop
+of the voice leaves it alone. A voice that crash-loops shows the face at
+each try, which reads as a lamp trying to wake. Checked in a systemd 252
+container on 29 Oct (a crash restart twice, `systemctl restart
+lampos.target`, `systemctl restart lamp-voice.service`); not yet on a lamp.
+
 It writes through `lamp_ring::waking::WakingRing`, the third writer that
 needs no permit: it can show only that face and black. The ring opens with
 a lock (`try_lock`), and a ring the voice cannot lock stays off all its
