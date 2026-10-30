@@ -113,10 +113,10 @@ await lamp.closed();
   `{ wait: true }` on a gesture, move or play resolves when it has finished,
   or, where the lamp hands it on and says no more (today `gesture` and
   `move`, answered `{"to": "body"}`), at that answer.
-- **A motion asked while another plays is dropped by the body**, and the
-  lamp has already answered `{"to": "body"}`, so you aren't told (#4209).
-  At one motion a second, wait for your last gesture's or move's length
-  (2 to 10 s; a feeling's move 2.5 to 7 s) before asking for the next.
+- **A motion asked while another still plays is refused `busy`**, with
+  `retry_ms`, when it ends (#4209, lamp-control #4494): `byCode.busy`. The body plays
+  one at a time (a gesture or move 2 to 10 s, a feeling's move 2.5 to 7 s),
+  whoever asked. Wait `retry_ms` and ask again.
 - **Leases:** `await lamp.withLease(['body'], async (lease) => ...)` holds
   the body for looks, moves and joints, renewed for you, until the callback
   ends or the lamp takes it back: `lease.state`, `lease.lostWhy`.
@@ -282,10 +282,26 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.stop()` | | none | no | |
 | `lamp.request(op, fields)` | any op of the schema, checked against it first | the op's | | |
 
-**Refusals** reject with `byCode[code]`, a `LampError` with `code`, `why` and,
-for `rate`, `retryMs`: `unpaired`, `no_hello`, `no_grant`, `no_lease`,
-`lease_lost`, `busy`, `refused`, `quiet_hours`, `private`, `paused`,
-`asleep`, `rate`, `bad_request`, `off`.
+**Refusals** reject with `byCode[code]`, a `LampError` with `code`, `why`
+(the lamp's own words), for `rate` `retryMs`, and `whatToDo`, the line below
+for its code (`WHAT_TO_DO`):
+
+| code | what to do |
+|---|---|
+| `unpaired` | Pair again with a new code from the owner's app (`lamp pair CODE --pin PIN`): this computer isn't paired, was revoked, or its key no longer matches. |
+| `no_hello` | Say hello first: `Lamp.connect()` does; with `request()` alone, send `hello` before anything else. |
+| `no_grant` | Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello. |
+| `no_lease` | Hold a `body` lease first (Python `lamp.lease("body")`, JS `lamp.withLease(['body'], ...)`); `joints` names it. |
+| `lease_lost` | The lamp took the body back; `why` says why (a conversation, a hand, private, a stop). Let it be, and take a new lease later. |
+| `busy` | A motion still plays (a gesture, move or feeling's move, whoever asked): wait `retry_ms` and send it again. Without `retry_ms`, someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
+| `refused` | The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again. |
+| `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, by default 22:00 to 07:00): `say` and `sound` wait until they end. A light is still fine. |
+| `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. |
+| `paused` | The person paused the lamp. Wait for `lamp.changed` with `paused` false. |
+| `asleep` | The lamp is asleep. Wait for `lamp.changed` with `asleep` false. |
+| `rate` | Too many of one kind too fast: wait `retry_ms` and send it again. With the rates off (the default), only refused actions and phrase changes are bounded. |
+| `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
+| `off` | Developer access is off on this lamp: the owner turns it on in the app. |
 
 ### The `lamp` command
 
