@@ -414,6 +414,13 @@ pub(crate) fn set_for_test(path: Option<std::path::PathBuf>) {
     FILE_FOR_TEST.with(|cell| *cell.borrow_mut() = path);
 }
 
+/// Whether `LAMP_PERSON_NAME` names an absolute path, a name there or not:
+/// what the second route keys its per-reply read on ([`now`]), so a name
+/// typed after start is told too (Reviewer-three's P3 on #4476).
+pub fn named_in_environment() -> bool {
+    path_from_environment().is_some_and(|path| path.is_absolute())
+}
+
 /// The name as the file holds it now ([`from_environment`]), read again for
 /// each reply and said nothing of, so one forgotten ([`forget_with_everything`])
 /// or set again from the app holds from the next reply (#4461). Its read at
@@ -1326,7 +1333,8 @@ mod tests {
     }
 
     /// #4461: the name is read again for each reply, so one cleared or set
-    /// again holds from the next; unset or a relative path is none.
+    /// again holds from the next, though none was there at start; a
+    /// relative path is none.
     #[test]
     fn the_typed_name_now_follows_the_file() {
         let dir = std::env::temp_dir().join(format!("lamp-person-now-{}", std::process::id()));
@@ -1334,6 +1342,9 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let file = dir.join("name");
         set_for_test(Some(file.clone()));
+        // Set with no name there yet is still set: a name typed after start
+        // is read (Reviewer-three's P3 on #4476).
+        assert!(named_in_environment());
         assert_eq!(now(), None);
         fs::write(&file, "Robin Example\n").unwrap();
         assert_eq!(now().as_deref(), Some("Robin Example"));
@@ -1342,6 +1353,7 @@ mod tests {
         fs::remove_file(&file).unwrap();
         assert_eq!(now(), None);
         set_for_test(Some("relative/name".into()));
+        assert!(!named_in_environment());
         assert_eq!(now(), None);
         set_for_test(None);
         fs::remove_dir_all(&dir).unwrap();

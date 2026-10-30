@@ -2300,17 +2300,25 @@ pub fn serve(
     }
     // The typed name, told only to the owner's line, with
     // LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of the character, and
-    // judged each turn on its own person and the faces in view.
-    let setup_name = crate::person::for_lines();
-    let setup_bus = setup_name
-        .as_ref()
-        .and(files.bus_root.as_deref())
+    // judged each turn on its own person and the faces in view. Keyed on
+    // the switch and the file's path, not on a name there at start: the
+    // name is read for each reply, so one typed again in the app after a
+    // forget holds from the next (Reviewer-three's P3 on #4476).
+    let setup_named = crate::person::owner_only() && crate::person::named_in_environment();
+    if setup_named {
+        // Said once, at start, whether a name is used.
+        let _ = crate::person::from_environment();
+    }
+    let setup_bus = files
+        .bus_root
+        .as_deref()
+        .filter(|_| setup_named)
         .and_then(|root| lamp_bus::Bus::new(root).ok());
-    match (&setup_name, &setup_bus) {
-        (Some(_), Some(_)) => eprintln!(
+    match (setup_named, &setup_bus) {
+        (true, Some(_)) => eprintln!(
             "lamp-voice second: the typed name is told only to the owner's own known face (LAMP_PERSON_NAME_OWNER_ONLY)"
         ),
-        (Some(_), None) => eprintln!(
+        (true, None) => eprintln!(
             "lamp-voice second: LAMP_PERSON_NAME_OWNER_ONLY is on but there is no bus to read the faces from, so the typed name is never told"
         ),
         _ => {}
@@ -2352,7 +2360,7 @@ pub fn serve(
             // background, never waited on by a reply; with a typed name
             // too, as a second name their face may be kept under.
             crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
-            (typed, bus)
+            bus
         });
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
@@ -2390,10 +2398,13 @@ pub fn serve(
             let mut withheld: Option<String> = None;
             let named_by_default = by_default
                 .as_ref()
-                .and_then(|(_, bus)| {
+                .and_then(|bus| {
                     // The typed name is read again for each reply: one the
                     // owner's "forget everything" cleared (#4461) names no
-                    // one from the next reply.
+                    // one from the next reply, and one typed again in the
+                    // app is named from the next (Reviewer-three's P3 on
+                    // #4476). The owner who_you_are kept is the other name
+                    // they may go by, and a forget clears it at once.
                     let (name, owners) = crate::person::by_default_owner(
                         crate::person::now(),
                         crate::known_faces::owner_now(),
@@ -2454,7 +2465,7 @@ pub fn serve(
             // the owner's sticky presence for 30 s after they go), and no
             // lease is no name.
             // Read again for each reply, as above (#4461).
-            let setup_name_now = setup_name.as_ref().and_then(|_| crate::person::now());
+            let setup_name_now = setup_named.then(crate::person::now).flatten();
             let told = |character: String| {
                 with_typed_name(
                     character,
