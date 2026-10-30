@@ -426,6 +426,30 @@ test('the fake light state shows what the ring draws', async () => {
   });
 });
 
+test('the tour runs every step against a fake lamp', async () => {
+  const { spawn } = await import('node:child_process');
+  const fake = await FakeLamp.start({ grants: [...schema.grants] });
+  const home = folder();
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
+    // Not execFileSync: the fake answers on this process's event loop.
+    const tour = new URL('../examples/tour.js', import.meta.url).pathname;
+    const said = await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [tour], { env: { ...process.env, LAMPOS_HOME: home } });
+      let out = '';
+      child.stdout.on('data', (chunk) => { out += chunk; });
+      child.stderr.on('data', (chunk) => { out += chunk; });
+      child.on('error', reject);
+      child.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`exit ${code}: ${out}`))));
+    });
+    assert.ok(!said.includes('refused'), said);
+    for (const op of ['get', 'light', 'say', 'gesture', 'express', 'look', 'joints', 'stop']) assert.ok(fake.asked(op).length, `${op}: ${said}`);
+    assert.deepEqual(fake.asked('joints')[0].targets, { pitch: 5 });
+  } finally {
+    await fake.stop();
+  }
+});
+
 test('the examples call only what the client has', async () => {
   const { readdirSync } = await import('node:fs');
   const examples = readdirSync(new URL('../examples/', import.meta.url)).filter((f) => f.endsWith('.js'));

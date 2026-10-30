@@ -42,7 +42,7 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 ```
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
-example runs this way: `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
+example runs this way: `tour.py` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
 `phrase.py`, `pomodoro.py`, `ci_light.py`.
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,

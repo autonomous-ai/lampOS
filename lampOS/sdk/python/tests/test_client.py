@@ -477,7 +477,33 @@ def test_the_examples_compile_and_call_only_what_the_client_has():
         tree = ast.parse(example.read_text(), str(example))
         for node in ast.walk(tree):
             if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "lamp":
-                assert hasattr(Lamp, node.attr), f"{example.name}: lamp.{node.attr}"
+                # `info`, `grants` and `limits` are set per connection, at hello.
+                assert hasattr(Lamp, node.attr) or node.attr in ("info", "grants", "limits"), f"{example.name}: lamp.{node.attr}"
+
+
+def test_the_tour_runs_every_step_against_a_fake_lamp(tmp_path):
+    """examples/tour.py, run as a developer would, against a fake lamp that
+    grants everything and routes everything: each step is taken."""
+    import os
+    import sys
+
+    tour = Path(__file__).resolve().parents[1] / "examples" / "tour.py"
+
+    async def go():
+        async with FakeLamp(grants=tuple(schema.grants())) as fake:
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(tmp_path))
+            ran = await asyncio.create_subprocess_exec(
+                sys.executable, str(tour), env={**os.environ, "LAMPOS_HOME": str(tmp_path)},
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            said = (await ran.communicate())[0].decode()
+            assert ran.returncode == 0, said
+            assert "refused" not in said, said
+            for op in ("get", "light", "say", "gesture", "express", "look", "joints", "stop"):
+                assert fake.asked(op), (op, said)
+            assert fake.asked("joints")[0]["targets"] == {"pitch": 5}
+
+    asyncio.run(asyncio.wait_for(go(), 60))
 
 
 def test_the_readme_reference_names_every_public_call_command_and_option():
