@@ -565,3 +565,12 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #4226: answered the first builder's 45 minutes on lamp-4ace (chance, no bisect) and the Reviewer-lead's TV-bed repro on 52e6 (c6515652108; asked for the heard texts, since a quiet room lets out a "Lamp, …" text whatever lamp-name hears).
 - #4175: #4534, Part of #4175 (`LAMP_REMARK_ABOUT_IT`). A held remark, the line after one, or another voice's line keeps the person's conversation, and the line right after a held remark is held. Also `RoomTold` keeps every held line, not only the last. Local gate green; lamp-c0a4, Mac-played: the room was never judged busy, so the remark rule didn't run there. busy_day on lamp-4ace was asked of the first builder on #3997 (c6516694106).
 - Slip: I asked the person to sit in c0a4's view and waited about 14 hours for the answer, and my c0a4 lock lapsed meanwhile. Thirteen saved my drop-in. Now: Mac-only tests while the person is away, and the lock renewed every 4 minutes.
+
+## 30 Oct, 16:1x: #4534 landed
+
+- #4534 (Part of #4175) landed on lamp-voice as `8c98050a68` and `99b9ef40e1`. Its reviews:
+  - the Reviewer-lead's HOLD: two P2s (unbounded renewal; the owner held after a remark with no print) and a P3 (session change);
+  - Thirteen's HOLD: a P2 (a reply to a colleague answered after a late print).
+  All were fixed in `e748dbf26e` with a test each, and both gave READ-OK.
+- The train bot asked for a rebase. I rebased onto `c8ff2b8424` and pushed with `--force-with-lease` on my own branch; the patch is the same and the gate is green.
+- Left for #4175: busy_day on lamp-4ace with the switches on and off (asked of the first builder on #3997), then the 3+3 night runs; the Reviewer-lead's two P3s on the asking-clause trade-off.
