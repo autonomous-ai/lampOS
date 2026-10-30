@@ -216,6 +216,10 @@ fn main() -> ExitCode {
             .then(lamp_cloud::make_skill::from_environment)
             .flatten(),
     };
+    // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
+    if let Some(socket) = &lamp.make_skill {
+        lamp_cloud::make_skill::watch(socket.clone());
+    }
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

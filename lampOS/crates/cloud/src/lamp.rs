@@ -713,6 +713,10 @@ impl Lamp for Real {
         self.make_skill.clone()
     }
 
+    fn make_skill_ready(&self) -> bool {
+        crate::make_skill::is_ready()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
