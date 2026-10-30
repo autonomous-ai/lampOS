@@ -2,8 +2,8 @@
 
 One paired lampOS lamp as MCP tools, for an agent on your own computer: Claude
 Code, Claude Desktop, or any MCP client. It runs on your computer, never on the
-lamp, and reaches the lamp only through the [`lampos`](../python) SDK and the
-pairing `lamp pair` made. The protocol is [docs/control.md](../../docs/control.md).
+lamp, and reaches the lamp only through the [`lampos`](https://github.com/autonomous-ai/lampOS/tree/lamp-voice/lampOS/sdk/python) SDK and the
+pairing `lamp pair` made. The protocol is [docs/control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md).
 
 ```sh
 pip install ./sdk/python ./sdk/mcp
