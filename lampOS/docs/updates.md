@@ -1072,7 +1072,8 @@ their host-specific handling. A by-hand `once` uses the lamp's host name unless
 entries on linked parts. `check` never writes, whatever `--apply` says. `once`
 and `check` end with
 0 (up to date, switched, or only saying), 1 (refused, put back, failed), 3
-(the channel cannot be reached), 4 (no quiet moment); a wrong option with 2.
+(the channel cannot be reached), 4 (no quiet moment, or another lamp-update
+or setup's helper held the lock, #4524); a wrong option with 2.
 `serve` prints a round's outcome only when it differs from the last. The
 defaults: channel `lamp-voice`, key `/etc/lampOS/update/key.pub`, lamp the
 host name, bus `LAMP_BUS_ROOT` or `/run/lampos-bus`.
