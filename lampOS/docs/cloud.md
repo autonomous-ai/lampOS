@@ -145,6 +145,7 @@ lamp says so.
 | `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. `data` is not read. Without the switch, V1's "not on this lamp" |
 | `system.shutdown` | with `LAMP_SHUTDOWN=on` (#3697, "The lamp turned off from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"shutting_down": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). `data` is not read. Once taken, asked again within 60 s (`lamp::YES_KEPT`) it is answered the same `success` and the helper is not asked again; after that the helper is asked again. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
+| `control.set` (`{"on": true}` or `{"on": false}`, exactly that one field) | with `LAMP_SETTINGS_CHANGE=on` (the owner's developer setting, [control.md](control.md) "Running the door"): V1's `starting` at once, then `success` or `failure` with why; anything but one boolean `on` fails at once, "on must be true or false, and the only field". On: `success` with `{"on": true}` once root's helper has written lamp-control's drop-in, and the door opens within moments after it (or once an update in progress finishes). Off: the door is closed before `success` (`{"on": false, "closed": true}`; `"closed": false` with a `note` if lamp-control would not stop, the door then possibly open until the lamp next restarts), or `failure`, "an update is installing: try again in a few minutes", with nothing changed. Off with developer access already off: `success` with `{"on": false}`. Without the switch, V1's "not on this lamp" |
 | `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
@@ -1469,7 +1470,10 @@ the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
 
 - **The kinds:** `timezone.set {"timezone"}` (V1's own kind and shapes),
   `person.name.set {"name"}` (the person's name setup asks for; `""` removes
-  it) and `device.rename {"name"}` (the lamp's name in the app).
+  it), `device.rename {"name"}` (the lamp's name in the app) and
+  `control.set {"on": bool}` (the owner's developer setting: lamp-control
+  on or off, [control.md](control.md); the helper writes or removes its
+  drop-in; on opens the door within moments after `success` (or once an update in progress finishes); off closes it before the app is told `success`, or is refused while an update installs).
   - **The lamp's name in the app never changes what the lamp answers to.**
     The wake word stays "Lamp"; only `host.device_name` reads it.
 - **The ack at once, the result after:** the reply is `starting` as soon as
@@ -1720,8 +1724,8 @@ no switch and refused with why; a name that is not a skill's
 (`a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused`).
 
 Changes after setup (#1959): the switch's two words; each kind refused as
-one this lamp lacks without it, `device.rename` included; each kind's line for
-the helper; the ack `starting` within 100 ms while a stand-in helper takes
+one this lamp lacks without it, `device.rename` and `control.set` included; each kind's line for
+the helper; `control.set`'s one boolean `on`, its ack and its result; the ack `starting` within 100 ms while a stand-in helper takes
 300 ms, then its result; a refusal, a helper not running and one that never
 answers; through the test broker, `starting` then `success` on `fd_channel`;
 and `host.device_name` from the helper's file, the host's name without one.

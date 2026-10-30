@@ -23,7 +23,13 @@
 //!   kilometre ([`lamp_msgs::owner_place::fit`]) and kept root's, 0600; the
 //!   voice reads it again for each question that needs a place, so nothing
 //!   restarts and a clear holds from the next question. `lamp-cloud` sends
-//!   it only with `LAMP_OWNER_PLACE=on`.
+//!   it only with `LAMP_OWNER_PLACE=on`;
+//! - the owner's developer setting (`control.set`, `docs/control.md`):
+//!   lamp-control's drop-in ([`CONTROL_DROPIN`], `LAMP_CONTROL=on`). On:
+//!   written and answered, then, once no update is at work (no quiet: its
+//!   restart makes no sound), `systemctl daemon-reload` and a restart of
+//!   [`CONTROL_UNIT`] ([`restart_control_when_unlocked`]). Off: the door is
+//!   closed before the answer ([`close_before_answer`]).
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -42,6 +48,12 @@ pub const LINE_MOST: usize = 4_096;
 pub const QUIET_MOST: Duration = Duration::from_secs(30 * 60);
 /// The unit restarted after a zone change.
 pub const SCHEDULE_UNIT: &str = "lamp-schedule.service";
+/// The unit restarted after the owner's developer setting changed.
+pub const CONTROL_UNIT: &str = "lamp-control.service";
+/// lamp-control's drop-in while developer access is on.
+pub const CONTROL_DROPIN: &str = "/etc/systemd/system/lamp-control.service.d/developer.conf";
+/// What the drop-in holds, exactly.
+pub const CONTROL_DROPIN_TEXT: &str = "[Service]\nEnvironment=LAMP_CONTROL=on\n";
 
 /// One change, checked.
 #[derive(Clone, Debug, PartialEq)]
@@ -54,6 +66,8 @@ pub enum Change {
     Zone(String),
     /// The owner's place, rounded; `None` clears it.
     OwnerPlace(Option<lamp_msgs::owner_place::Place>),
+    /// The owner's developer setting: lamp-control on or off.
+    Control(bool),
 }
 
 /// A control character, a line or paragraph separator, or a mark that turns
@@ -77,7 +91,8 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 
 /// The one line `lamp-cloud` sends, checked against `config`: exactly
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`, or
-/// `{"owner_place": {"name", "lat", "lon", "set_at"}}` (`null` clears it).
+/// `{"owner_place": {"name", "lat", "lon", "set_at"}}` (`null` clears it),
+/// or `{"control": bool}`.
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -118,6 +133,9 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         "owner_place" => Ok(Change::OwnerPlace(Some(lamp_msgs::owner_place::fit(
             given,
         )?))),
+        "control" => Ok(Change::Control(
+            given.as_bool().ok_or("control must be true or false")?,
+        )),
         _ => Err("the request names no change this lamp makes".into()),
     }
 }
@@ -129,6 +147,8 @@ pub struct Done {
     pub data: Value,
     /// `lamp-schedule` must take the new zone: `zone.env` changed.
     pub restart_schedule: bool,
+    /// lamp-control must follow its drop-in: it was written or removed.
+    pub restart_control: bool,
     /// The journal's line: what changed, never a name.
     pub said: String,
 }
@@ -155,6 +175,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"name": name}),
                 restart_schedule: false,
+                restart_control: false,
                 said: format!(
                     "the person's name was changed ({} characters)",
                     name.chars().count()
@@ -166,6 +187,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"name": ""}),
                 restart_schedule: false,
+                restart_control: false,
                 said: "the person's name was removed".into(),
             })
         }
@@ -174,6 +196,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"name": name}),
                 restart_schedule: false,
+                restart_control: false,
                 said: format!(
                     "the lamp's name in the app was changed ({} characters)",
                     name.chars().count()
@@ -187,6 +210,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"timezone": zone}),
                 restart_schedule: before != after,
+                restart_control: false,
                 // A zone is no one's name: said, as setup's own line says it.
                 said: format!("the time zone is now {zone}"),
             })
@@ -200,7 +224,37 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!(place),
                 restart_schedule: false,
+                restart_control: false,
                 said: "the owner's place was set".into(),
+            })
+        }
+        // Written only when it is not there as it should be, so a repeat
+        // restarts nothing.
+        Change::Control(on) => {
+            let path = &config.control_dropin;
+            let changed = if *on {
+                let there = fs::read(path).ok();
+                if there.as_deref() != Some(CONTROL_DROPIN_TEXT.as_bytes()) {
+                    files.control_dropin(CONTROL_DROPIN_TEXT.as_bytes())?;
+                    true
+                } else {
+                    false
+                }
+            } else if fs::symlink_metadata(path).is_ok() {
+                remove(path)?;
+                true
+            } else {
+                false
+            };
+            Ok(Done {
+                data: json!({"on": on}),
+                restart_schedule: false,
+                restart_control: changed,
+                said: format!(
+                    "developer access is {}{}",
+                    if *on { "on" } else { "off" },
+                    if changed { "" } else { " already" }
+                ),
             })
         }
         Change::OwnerPlace(None) => {
@@ -208,6 +262,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"cleared": true}),
                 restart_schedule: false,
+                restart_control: false,
                 said: "the owner's place was cleared".into(),
             })
         }
@@ -335,6 +390,161 @@ pub fn quiet_and_unlocked(
             return Err("an update was installing all along".into());
         }
         ears.listen(UPDATE_LOOK_EVERY);
+    }
+}
+
+/// lamp-update's lock alone, with no quiet: for lamp-control, whose restart
+/// makes no sound but must still never fall in a round's watch. Looked for
+/// every `every`, at most `most`; why not.
+pub fn unlocked(
+    ears: &mut impl Ears,
+    records: &lamp_update::records::Records,
+    every: Duration,
+    most: Duration,
+) -> Result<lamp_update::records::Lock, String> {
+    let started = ears.now_ms();
+    loop {
+        match records.lock() {
+            Ok(lock) => return Ok(lock),
+            Err(why) if why.kind() == io::ErrorKind::WouldBlock => {}
+            Err(why) => return Err(format!("the update's state could not be checked: {why}")),
+        }
+        if ears.now_ms().saturating_sub(started) >= most.as_millis() as u64 {
+            return Err("an update was installing all along".into());
+        }
+        ears.listen(every);
+    }
+}
+
+/// How long turning developer access off waits for lamp-update's lock
+/// before it refuses: under lamp-cloud's 10 s wait for this helper.
+pub const CLOSE_LOCK_MOST: Duration = Duration::from_secs(8);
+/// How often it looks for the lock meanwhile.
+pub const CLOSE_LOCK_EVERY: Duration = Duration::from_secs(1);
+/// The refusal while an update holds the lock past [`CLOSE_LOCK_MOST`].
+pub const CLOSE_INSTALLING: &str = "an update is installing: try again in a few minutes";
+/// Said when the drop-in is gone but lamp-control did not stop.
+pub const CLOSE_MAY_STAY_OPEN: &str =
+    "developer access is off, but the door may stay open until the lamp next restarts";
+
+/// systemd, as the change helper drives it for lamp-control. Injected for tests.
+pub trait Systemd {
+    /// `systemctl` with `args`; why not, when it failed.
+    fn systemctl(&mut self, args: &[&str]) -> Result<(), String>;
+}
+
+/// The real one: `/usr/bin/systemctl`.
+pub struct Systemctl;
+
+impl Systemd for Systemctl {
+    fn systemctl(&mut self, args: &[&str]) -> Result<(), String> {
+        match std::process::Command::new("/usr/bin/systemctl")
+            .args(args)
+            .status()
+        {
+            Ok(status) if status.success() => Ok(()),
+            Ok(status) => Err(status.to_string()),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+}
+
+/// A clock that only waits, for [`unlocked`] where no voice is listened to.
+pub struct Clock(std::time::Instant);
+
+impl Default for Clock {
+    fn default() -> Self {
+        Self(std::time::Instant::now())
+    }
+}
+
+impl Ears for Clock {
+    fn listen(&mut self, wait: Duration) -> Vec<Heard> {
+        std::thread::sleep(wait);
+        Vec::new()
+    }
+    fn now_ms(&mut self) -> u64 {
+        self.0.elapsed().as_millis() as u64
+    }
+}
+
+/// Developer access turned off while lamp-control's drop-in is there: the
+/// door is closed before the app is told. lamp-update's lock first, at most
+/// [`CLOSE_LOCK_MOST`], else refused with nothing changed; then, holding it,
+/// the drop-in removed, `daemon-reload` and `stop`, and only then the reply,
+/// which this returns for the caller to write. A stop that failed is said,
+/// never claimed closed. `None` when `line` is not such a request: it is
+/// answered by [`answer`] as any other.
+pub fn close_before_answer(
+    line: &str,
+    config: &Config,
+    enabled: bool,
+    records: &lamp_update::records::Records,
+    ears: &mut impl Ears,
+    systemd: &mut impl Systemd,
+) -> Option<(Value, Option<Done>)> {
+    if !enabled
+        || parse(line.trim_end_matches(['\n', '\r']), config) != Ok(Change::Control(false))
+        || fs::symlink_metadata(&config.control_dropin).is_err()
+    {
+        return None;
+    }
+    let _held = match unlocked(ears, records, CLOSE_LOCK_EVERY, CLOSE_LOCK_MOST) {
+        Ok(lock) => lock,
+        Err(_) => return Some((json!({ "refused": CLOSE_INSTALLING }), None)),
+    };
+    if let Err(error) = remove(&config.control_dropin) {
+        return Some((
+            json!({"refused": format!("the change could not be saved: {}", error.kind())}),
+            None,
+        ));
+    }
+    let stopped = systemd
+        .systemctl(&["daemon-reload"])
+        .and_then(|()| systemd.systemctl(&["stop", CONTROL_UNIT]));
+    let (data, said) = match stopped {
+        Ok(()) => (
+            json!({"on": false, "closed": true}),
+            "developer access is off; lamp-control stopped".to_owned(),
+        ),
+        Err(why) => (
+            json!({"on": false, "closed": false, "note": CLOSE_MAY_STAY_OPEN}),
+            format!("developer access is off; lamp-control did not stop ({why})"),
+        ),
+    };
+    let done = Done {
+        data: data.clone(),
+        restart_schedule: false,
+        restart_control: false,
+        said,
+    };
+    Some((json!({ "done": data }), Some(done)))
+}
+
+/// After developer access was turned on and answered: lamp-update's lock
+/// alone ([`unlocked`], every [`UPDATE_LOOK_EVERY`], at most [`QUIET_MOST`]),
+/// held through `daemon-reload` and a `restart` (never try-restart, so an
+/// enabled unit that exited off starts). What happened, for the journal.
+pub fn restart_control_when_unlocked(
+    ears: &mut impl Ears,
+    records: &lamp_update::records::Records,
+    systemd: &mut impl Systemd,
+) -> String {
+    let _held = match unlocked(ears, records, UPDATE_LOOK_EVERY, QUIET_MOST) {
+        Ok(lock) => lock,
+        Err(why) => {
+            return format!(
+                "no lock within {} min ({why}); lamp-control follows the developer setting when it next starts",
+                QUIET_MOST.as_secs() / 60
+            );
+        }
+    };
+    match systemd
+        .systemctl(&["daemon-reload"])
+        .and_then(|()| systemd.systemctl(&["restart", CONTROL_UNIT]))
+    {
+        Ok(()) => "lamp-control restarted on the developer setting".into(),
+        Err(why) => format!("lamp-control's restart failed: {why}"),
     }
 }
 

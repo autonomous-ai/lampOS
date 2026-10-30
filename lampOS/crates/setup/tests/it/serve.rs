@@ -67,6 +67,7 @@ impl Root {
             reports: self.0.join("etc/reports.json"),
             display_name: self.0.join("etc/display-name"),
             own_keys: self.0.join("etc/own"),
+            control_dropin: self.0.join("etc/lamp-control.service.d/developer.conf"),
             web_start: vec![],
             web_stop: vec![],
             free_port: vec![],

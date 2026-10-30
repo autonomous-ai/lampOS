@@ -45,6 +45,7 @@
     "/etc/lampOS/setup/display-name",
     "/etc/lampOS/person/name",
     "/etc/lampOS/person/place",
+    "/etc/systemd/system/lamp-control.service.d/developer.conf",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
   ],
   "stop": [

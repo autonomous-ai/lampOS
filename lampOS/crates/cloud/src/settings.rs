@@ -34,8 +34,18 @@ use std::time::{Duration, Instant};
 /// `on` takes the kinds below, with `LAMP_CLOUD=on`.
 pub const ENVIRONMENT: &str = "LAMP_SETTINGS_CHANGE";
 
-/// The kinds, each answered `starting` and then its result.
-pub const KINDS: [&str; 3] = ["timezone.set", "person.name.set", "device.rename"];
+/// The kinds, each answered `starting` and then its result. `control.set`
+/// (`{"on": bool}`) is the owner's developer setting: root's helper writes
+/// or removes lamp-control's drop-in and restarts it (`docs/control.md`).
+pub const KINDS: [&str; 4] = [
+    "timezone.set",
+    "person.name.set",
+    "device.rename",
+    CONTROL_KIND,
+];
+
+/// The owner's developer setting: lamp-control on or off (`{"on": bool}`).
+pub const CONTROL_KIND: &str = "control.set";
 
 /// `on`, beside [`ENVIRONMENT`] and `LAMP_CLOUD`, takes [`WIFI_KIND`].
 pub const WIFI_ENVIRONMENT: &str = "LAMP_SETTINGS_WIFI";
@@ -276,6 +286,9 @@ pub fn wifi_line(data: &Value, broker: &str) -> Result<(String, Option<String>),
 /// The helper's request line for `kind` with the app's `data`, or why not.
 /// The helper checks the text itself; here only its shape.
 pub fn line(kind: &str, data: &Value) -> Result<String, String> {
+    if kind == CONTROL_KIND {
+        return control_line(data);
+    }
     let (field, key, why) = match kind {
         "timezone.set" => ("timezone", "timezone", "timezone must be text"),
         "person.name.set" => ("name", "person_name", "name must be text"),
@@ -288,6 +301,17 @@ pub fn line(kind: &str, data: &Value) -> Result<String, String> {
         .filter(|text| text.len() <= TEXT_MOST)
         .ok_or(why)?;
     Ok(json!({ key: text }).to_string())
+}
+
+/// `control.set`'s line: exactly one field, `on`, true or false.
+fn control_line(data: &Value) -> Result<String, String> {
+    let why = || "on must be true or false, and the only field".to_owned();
+    let object = data
+        .as_object()
+        .filter(|object| object.len() == 1)
+        .ok_or_else(why)?;
+    let on = object.get("on").and_then(Value::as_bool).ok_or_else(why)?;
+    Ok(json!({ "control": on }).to_string())
 }
 
 /// What the helper's reply line says: its `data`, or why not.
@@ -1303,6 +1327,7 @@ mod tests {
             ("timezone.set", json!({"timezone": "Europe/Paris"})),
             ("person.name.set", json!({"name": "Lan"})),
             ("device.rename", json!({"name": "Desk lamp"})),
+            ("control.set", json!({"on": true})),
         ] {
             assert_eq!(
                 answer(&mut lamp, kind, &data),
@@ -1342,6 +1367,70 @@ mod tests {
             line("device.rename", &json!({"name": "x".repeat(513)})),
             Err("name must be text".to_owned())
         );
+    }
+
+    /// The owner's developer setting: exactly one boolean `on`, else
+    /// refused at once, before the helper is asked.
+    #[test]
+    fn control_set_takes_exactly_one_boolean_on() {
+        assert_eq!(
+            line("control.set", &json!({"on": true})),
+            Ok(r#"{"control":true}"#.to_owned())
+        );
+        assert_eq!(
+            line("control.set", &json!({"on": false})),
+            Ok(r#"{"control":false}"#.to_owned())
+        );
+        for data in [
+            json!({}),
+            json!({"on": "true"}),
+            json!({"on": 1}),
+            json!({"on": null}),
+            json!({"on": true, "other": 1}),
+            json!({"off": true}),
+            json!(true),
+            Value::Null,
+        ] {
+            assert_eq!(
+                line("control.set", &data),
+                Err("on must be true or false, and the only field".to_owned()),
+                "{data}"
+            );
+        }
+    }
+
+    /// `control.set` is acked at once, its line goes to the helper, and the
+    /// helper's result follows; a bad shape is refused with nothing asked.
+    #[test]
+    fn control_set_is_acked_at_once_and_its_result_follows() {
+        let path = socket("control");
+        let serving = helper(&path, Duration::ZERO, "{\"done\":{\"on\":true}}\n");
+        let changes = Changes::new(&path, Duration::from_secs(5));
+        let mut lamp = Fake {
+            changes: Some(changes.clone()),
+            ..Fake::default()
+        };
+        assert_eq!(
+            answer(&mut lamp, "control.set", &json!({"on": "yes"})),
+            Err("on must be true or false, and the only field".to_owned())
+        );
+        let sent = br#"{"cmd":"data","kind":"control.set","data":{"on":true}}"#;
+        let acked: Value =
+            serde_json::from_str(&reply(&identity(), &mut lamp, sent, "t").unwrap()).unwrap();
+        assert_eq!(
+            (&acked["kind"], &acked["status"]),
+            (&json!("control.set"), &json!("starting"))
+        );
+        let (kind, result) = first(&changes);
+        assert_eq!(kind, "control.set");
+        assert_eq!(result, Ok(Some(json!({"on": true}))));
+        assert_eq!(serving.join().unwrap(), "{\"control\":true}\n");
+        let said = identity().data("t", &kind, &result);
+        assert_eq!(
+            (&said["status"], &said["data"]["on"]),
+            (&json!("success"), &json!(true))
+        );
+        let _ = std::fs::remove_file(&path);
     }
 
     /// The ack at once, before the helper has answered (rule 7: the app

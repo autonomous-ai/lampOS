@@ -11,7 +11,9 @@ CollectMode=inactive-or-failed
 [Service]
 Type=simple
 # Root: the person's name, /etc/localtime, /etc/timezone and zone.env are root's, as setup
-# writes them, and lamp-schedule's restart.
+# writes them, and lamp-schedule's restart; so are lamp-control's drop-in (the owner's developer
+# setting, under /etc/systemd/system, below /etc's ReadWritePaths), systemd's reload and
+# lamp-control's restart or stop.
 User=root
 ExecStart=/opt/lampOS/setup/current/lamp-setup change --config /etc/lampOS/setup/serve.json --bus-root /run/lampos-bus --enable
 StandardInput=socket

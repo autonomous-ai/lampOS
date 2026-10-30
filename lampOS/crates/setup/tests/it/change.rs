@@ -51,6 +51,7 @@ impl Root {
             "backend": self.0.join("etc/backend.json"),
             "reports": self.0.join("etc/reports.json"),
             "display_name": self.0.join("etc/display-name"),
+            "control_dropin": self.0.join("etc/systemd/system/lamp-control.service.d/developer.conf"),
         }))
         .unwrap()
     }
@@ -181,6 +182,99 @@ fn the_owners_place_is_kept_rounded_beside_the_name_and_null_clears_it() {
     let (reply, _) = answer(&line, &config, false);
     assert_eq!(reply, json!({"refused": "changes after setup are off"}));
     assert!(!place.exists());
+}
+
+/// The owner's developer setting (`control.set`): on writes lamp-control's
+/// drop-in, folder and all, 0644; off removes it; only a change asks for
+/// lamp-control's restart, and an off with none there is no error.
+#[test]
+fn the_developer_setting_writes_or_removes_lamp_controls_drop_in() {
+    let root = Root::new();
+    let config = root.config();
+    let dropin = &config.control_dropin;
+    assert!(!dropin.parent().unwrap().exists());
+    // Off with nothing there: no error, nothing to restart.
+    let (reply, done) = answer(r#"{"control": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    let done = done.unwrap();
+    assert!(!done.restart_control && !done.restart_schedule);
+    assert_eq!(done.said, "developer access is off already");
+    assert!(!dropin.exists());
+    // On: written whole, readable by systemd.
+    let (reply, done) = answer(r#"{"control": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    let done = done.unwrap();
+    assert!(done.restart_control && !done.restart_schedule);
+    assert_eq!(done.said, "developer access is on");
+    assert_eq!(
+        fs::read_to_string(dropin).unwrap(),
+        "[Service]\nEnvironment=LAMP_CONTROL=on\n"
+    );
+    assert_eq!(
+        change::CONTROL_DROPIN_TEXT,
+        "[Service]\nEnvironment=LAMP_CONTROL=on\n"
+    );
+    assert_eq!(mode(dropin), 0o644);
+    // No temporary left beside it.
+    assert_eq!(fs::read_dir(dropin.parent().unwrap()).unwrap().count(), 1);
+    // On again: nothing changed, nothing to restart.
+    let (_, done) = answer(r#"{"control": true}"#, &config, true);
+    assert!(!done.unwrap().restart_control);
+    // A drop-in that says something else is written over.
+    fs::write(dropin, "[Service]\nEnvironment=LAMP_CONTROL=off\n").unwrap();
+    let (_, done) = answer(r#"{"control": true}"#, &config, true);
+    assert!(done.unwrap().restart_control);
+    assert_eq!(
+        fs::read_to_string(dropin).unwrap(),
+        change::CONTROL_DROPIN_TEXT
+    );
+    // Off: removed, and lamp-control restarted to close the door.
+    let (reply, done) = answer(r#"{"control": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    let done = done.unwrap();
+    assert!(done.restart_control);
+    assert_eq!(done.said, "developer access is off");
+    assert!(!dropin.exists());
+    // Anything but one boolean is refused, and nothing is written.
+    for line in [
+        r#"{"control": "on"}"#,
+        r#"{"control": 1}"#,
+        r#"{"control": null}"#,
+    ] {
+        let (reply, done) = answer(line, &config, true);
+        assert_eq!(
+            reply,
+            json!({"refused": "control must be true or false"}),
+            "{line}"
+        );
+        assert!(done.is_none());
+    }
+    let (reply, _) = answer(r#"{"control": true, "x": 1}"#, &config, true);
+    assert_eq!(reply, json!({"refused": "the request holds one change"}));
+    assert_eq!(
+        parse(r#"{"control": true}"#, &config),
+        Ok(Change::Control(true))
+    );
+    // Off, refused as every change is.
+    let (reply, _) = answer(r#"{"control": true}"#, &config, false);
+    assert_eq!(reply, json!({"refused": "changes after setup are off"}));
+    assert!(!dropin.exists());
+    // The product's path, and the reset forgets the setting.
+    let own: Config =
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.control_dropin,
+        std::path::Path::new("/etc/systemd/system/lamp-control.service.d/developer.conf")
+    );
+    let plan: Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    assert!(
+        plan["wipe"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w == change::CONTROL_DROPIN)
+    );
 }
 
 #[test]
@@ -447,6 +541,228 @@ fn a_zone_restart_waits_for_no_update_and_holds_its_lock() {
     assert_eq!(ears.now, 100 * S);
     assert!(update.borrow().is_none());
     drop(held);
+    let _ = fs::remove_dir_all(folder);
+}
+
+fn records_folder(name: &str) -> (PathBuf, lamp_update::records::Records) {
+    let folder = std::env::temp_dir().join(format!(
+        "lsc-{name}-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    (folder.clone(), lamp_update::records::Records::new(folder))
+}
+
+/// systemd as the test sees it: each call, and whether lamp-update's lock
+/// was held when it came; `stop` fails when told to.
+struct Units<'a> {
+    records: &'a lamp_update::records::Records,
+    calls: Vec<(String, bool)>,
+    stop_fails: bool,
+}
+
+impl change::Systemd for Units<'_> {
+    fn systemctl(&mut self, args: &[&str]) -> Result<(), String> {
+        let held = self.records.lock().is_err();
+        self.calls.push((args.join(" "), held));
+        if self.stop_fails && args[0] == "stop" {
+            return Err("exit status: 1".into());
+        }
+        Ok(())
+    }
+}
+
+/// lamp-update's lock alone, no quiet: a voice that never rests does not
+/// hold it back; looked for every `every`, given up at the bound.
+#[test]
+fn control_waits_only_for_the_update_lock() {
+    let (folder, records) = records_folder("ctl-unlocked");
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| vec![Heard::State(Voice::Speaking), Heard::Speech]),
+    };
+    let held = change::unlocked(
+        &mut ears,
+        &records,
+        change::UPDATE_LOOK_EVERY,
+        change::QUIET_MOST,
+    )
+    .unwrap();
+    assert_eq!(ears.now, 0);
+    drop(held);
+    let update = records.lock().unwrap();
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let Err(why) = change::unlocked(&mut ears, &records, S_1, Duration::from_secs(8)) else {
+        panic!("taken while an update held it");
+    };
+    assert!(why.contains("update"), "{why}");
+    assert_eq!(ears.now, 8 * S);
+    drop(update);
+    let _ = fs::remove_dir_all(folder);
+}
+
+const S_1: Duration = Duration::from_secs(1);
+
+/// Off with the drop-in there: lamp-update's lock taken, the drop-in
+/// removed, reload and stop under it, and only then the reply (returned
+/// once they ran); a stop that fails is said, never claimed closed. Off
+/// with none there is answered as any change, with no systemctl.
+#[test]
+fn off_holds_the_update_lock_and_stops_before_the_reply() {
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("ctl-off");
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let off = r#"{"control": false}"#;
+    // None there: not this path.
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    assert!(
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).is_none()
+    );
+    assert!(units.calls.is_empty());
+    answer(r#"{"control": true}"#, &config, true);
+    // Without --enable, not this path either.
+    assert!(
+        change::close_before_answer(off, &config, false, &records, &mut ears, &mut units).is_none()
+    );
+    // On isn't this path.
+    assert!(
+        change::close_before_answer(
+            r#"{"control": true}"#,
+            &config,
+            true,
+            &records,
+            &mut ears,
+            &mut units
+        )
+        .is_none()
+    );
+    let (reply, done) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    // The reply exists only now, after both calls, each under the lock.
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("stop lamp-control.service".to_owned(), true)
+        ]
+    );
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    let done = done.unwrap();
+    assert!(!done.restart_control && !done.restart_schedule);
+    assert!(!config.control_dropin.exists());
+    // Let go once answered.
+    drop(records.lock().unwrap());
+    // A stop that fails: still answered, saying the door may stay open.
+    answer(r#"{"control": true}"#, &config, true);
+    let mut failing = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: true,
+    };
+    let (reply, _) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut failing).unwrap();
+    assert_eq!(
+        reply,
+        json!({"done": {"on": false, "closed": false, "note": change::CLOSE_MAY_STAY_OPEN}})
+    );
+    assert!(!config.control_dropin.exists());
+    let _ = fs::remove_dir_all(folder);
+}
+
+/// Off while an update holds the lock past about 8 s: refused, the drop-in
+/// left in place, systemd not asked.
+#[test]
+fn off_while_an_update_holds_the_lock_refuses_and_keeps_the_drop_in() {
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("ctl-busy");
+    answer(r#"{"control": true}"#, &config, true);
+    let update = records.lock().unwrap();
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let (reply, done) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut units,
+    )
+    .unwrap();
+    assert_eq!(reply, json!({"refused": change::CLOSE_INSTALLING}));
+    assert_eq!(
+        change::CLOSE_INSTALLING,
+        "an update is installing: try again in a few minutes"
+    );
+    assert!(done.is_none());
+    assert!(units.calls.is_empty());
+    assert_eq!(ears.now, 8 * S);
+    assert_eq!(
+        fs::read_to_string(&config.control_dropin).unwrap(),
+        change::CONTROL_DROPIN_TEXT
+    );
+    drop(update);
+    let _ = fs::remove_dir_all(folder);
+}
+
+/// On: answered first (the drop-in written), then lamp-update's lock, with
+/// no quiet, and reload and restart under it once an update lets it go.
+#[test]
+fn on_replies_then_restarts_once_unlocked() {
+    use std::{cell::RefCell, rc::Rc};
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("ctl-on");
+    let (reply, done) = answer(r#"{"control": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    assert!(done.unwrap().restart_control);
+    assert!(config.control_dropin.exists());
+    // An update holds the lock until 25 s; the voice never rests.
+    let update = Rc::new(RefCell::new(Some(records.lock().unwrap())));
+    let letting = Rc::clone(&update);
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(move |now| {
+            if now >= 25 * S {
+                letting.borrow_mut().take();
+            }
+            vec![Heard::State(Voice::Speaking)]
+        }),
+    };
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let said = change::restart_control_when_unlocked(&mut ears, &records, &mut units);
+    assert_eq!(said, "lamp-control restarted on the developer setting");
+    // Looked at every 10 s: free at 30 s.
+    assert_eq!(ears.now, 30 * S);
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("restart lamp-control.service".to_owned(), true)
+        ]
+    );
     let _ = fs::remove_dir_all(folder);
 }
 

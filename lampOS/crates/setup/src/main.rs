@@ -600,7 +600,20 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             }
         };
     }
-    let (reply, done) = change::answer(&line, &config, enabled);
+    // Developer access turned off with its drop-in there: the door is closed
+    // (lamp-update's lock, the drop-in removed, reload, stop) before the
+    // reply is written. Every other change is answered first.
+    let (reply, done) = match change::close_before_answer(
+        &line,
+        &config,
+        enabled,
+        &records,
+        &mut change::Clock::default(),
+        &mut change::Systemctl,
+    ) {
+        Some(closed) => closed,
+        None => change::answer(&line, &config, enabled),
+    };
     {
         let mut out = io::stdout().lock();
         writeln!(out, "{reply}")?;
@@ -614,7 +627,20 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         }
         _ => {}
     }
-    if !done.is_some_and(|done| done.restart_schedule) {
+    let (schedule, control) = done.as_ref().map_or((false, false), |done| {
+        (done.restart_schedule, done.restart_control)
+    });
+    // lamp-control first: no quiet, only no update at work, since its
+    // restart makes no sound.
+    if control {
+        let said = change::restart_control_when_unlocked(
+            &mut change::Clock::default(),
+            &records,
+            &mut change::Systemctl,
+        );
+        eprintln!("lamp-setup: change: {said}");
+    }
+    if !schedule {
         return Ok(true);
     }
     let bus = match bus_root {
