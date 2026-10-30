@@ -938,7 +938,10 @@ same way four times and only prompt 2 counted; 1, 3 and 4 were refused "the
 name wasn't heard" with `heard: []`, while the second route's speech to text
 heard each bare "Lamp". So a line told the second route as the step's call
 (`StepCall`, below) whose words were the lamp's name alone (`name_alone`:
-"Lamp", "Lamp.", "Hey Lamp", "Hey, Lamp.", "Hey Lamp!") is told back as
+"Lamp", "Lamp.", "Hey Lamp", "Hey, Lamp.", "Hey Lamp!"; with a language
+other than English, also the name alone as that language's speech to text
+writes it, as [second-voice.md](second-voice.md) lists: 「エイランク。」 in
+`ja`, #4473) is told back as
 `ProviderOutput::StepCallHeard`, before its idle `TurnComplete`. The
 coordinator kept when that line's speech began and ended (its candidate's
 trigger, and its End; not the oldest speech block kept, which can be a sound

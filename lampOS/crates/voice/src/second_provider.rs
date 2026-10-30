@@ -2278,9 +2278,11 @@ fn past_a_greeting(text: &str) -> Vec<&str> {
 
 /// Whether a line's words are only the lamp's name
 /// ([`net::key_terms::NAME`]), in any case and with any punctuation, with
-/// "hey" or "ok" before it at most (`LAMP_SECOND_NAME_CARRIES`).
+/// "hey" or "ok" before it at most (`LAMP_SECOND_NAME_CARRIES`); or the
+/// name alone as the owner's language writes it ("エイランク。", #4473).
 fn name_alone(text: &str) -> bool {
     matches!(past_a_greeting(text)[..], [word] if word.eq_ignore_ascii_case(net::key_terms::NAME))
+        || crate::attention::only_the_name_as_written(text, crate::language::at_start())
 }
 
 /// The most words a short line may have after the lamp's name and still

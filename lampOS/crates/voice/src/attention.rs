@@ -42,6 +42,7 @@
 //! spotting its name in its own sound, the eyes seeing someone face it)
 //! is to take the text's place (docs/attention.md).
 
+use crate::language::Language;
 use crate::room_told::Room;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -597,8 +598,11 @@ pub fn called(heard: &str) -> bool {
         return true;
     }
     // A misheard name stands where the name stood: first, or after a
-    // greeting.
+    // greeting. Or the name as the owner's language writes it (#4473).
     called_by_stand_in(&all)
+        || calls_as_written(heard, crate::language::at_start())
+            .next()
+            .is_some()
 }
 
 /// Words the service has written in the lamp's name's place ([`called`]).
@@ -780,7 +784,10 @@ fn name_said_to(heard: &str, stand_alone_ins: bool, recognizer_stand_ins: bool) 
             _ => None,
         })
         .collect();
-    said_to || (recognizer_stand_ins && called_by_stand_in(&words))
+    said_to
+        || (recognizer_stand_ins && called_by_stand_in(&words))
+        || calls_as_written(heard, crate::language::at_start())
+            .any(|call| recognizer_stand_ins || call.real)
 }
 
 /// Whether what was heard is the lamp's name alone, or a word written for
@@ -802,6 +809,7 @@ pub fn only_the_name(heard: &str) -> bool {
                 || is(word, STAND_ALONE_INS)
         })
         && called_by_name_on(heard, true)
+        || only_the_name_as_written(heard, crate::language::at_start())
 }
 
 /// Whether what was heard opens with the lamp's name set off as a call:
@@ -831,8 +839,157 @@ pub fn begins_with_the_name(heard: &str) -> bool {
             .chars()
             .next()
             .is_none_or(|c| matches!(c, ',' | '.' | '?' | '!' | ';' | ':'));
-        return (greeted || set_off) && is(word, &["lamp", "lamb"]);
+        if (greeted || set_off) && is(word, &["lamp", "lamb"]) {
+            return true;
+        }
+        return begins_as_written(heard, crate::language::at_start());
     }
+}
+
+/// How the owner's language's speech to text writes the lamp's name and the
+/// "Hey" before it (#4473: on lamp-52e6 on 30 Oct, with `ja`, "Hey Lamp.
+/// 今何時ですか？" came back as 「エイランク、今何時ですか。」). English has
+/// none: its name is read as above, and nothing here changes it. `real`
+/// are the name itself, read where the name is; `stand_ins` are words
+/// speech to text writes for it that are also other words ("ランク" is
+/// "rank", "làm" is "do"), read only after a greeting or set off alone.
+struct Written {
+    greetings: &'static [&'static str],
+    real: &'static [&'static str],
+    stand_ins: &'static [&'static str],
+    /// Spaced words (Vietnamese): a greeting or a name is a whole word.
+    /// Otherwise a match is a clause's opening characters (Japanese,
+    /// Chinese), or a word's (Korean, its particles attached: "램프야").
+    whole_words: bool,
+}
+
+fn written(language: Language) -> Written {
+    match language {
+        Language::Japanese => Written {
+            greetings: &["hey", "ヘイ", "エイ"],
+            real: &["ランプ", "らんぷ"],
+            stand_ins: &["ランク"],
+            whole_words: false,
+        },
+        Language::Chinese => Written {
+            greetings: &["hey", "嘿", "嗨"],
+            real: &["兰普", "蓝普", "lamp"],
+            stand_ins: &[],
+            whole_words: false,
+        },
+        Language::Korean => Written {
+            greetings: &["hey", "헤이"],
+            real: &["램프", "렘프"],
+            stand_ins: &[],
+            whole_words: false,
+        },
+        // "Lamp" stays Latin and is read as English reads it; "làm" and
+        // "lắm" are everyday words, so never one mid-sentence.
+        Language::Vietnamese => Written {
+            greetings: &["hey", "hây", "hê", "ê", "này"],
+            real: &[],
+            stand_ins: &["lam", "lăm", "làm", "lắm", "lem"],
+            whole_words: true,
+        },
+    }
+}
+
+/// A clause that opens with the name as [`Written`].
+#[derive(Clone, Copy)]
+struct WrittenCall {
+    /// The name itself, not a stand-in.
+    real: bool,
+    greeted: bool,
+    /// Nothing after it in its clause.
+    set_off: bool,
+}
+
+/// What `heard` is split into clauses at: any punctuation, the ideographic
+/// "、" and "。" among it.
+fn clauses(heard: &str) -> impl Iterator<Item = &str> {
+    heard
+        .split(|c: char| !c.is_alphanumeric() && !c.is_whitespace())
+        .map(str::trim)
+        .filter(|clause| !clause.is_empty())
+}
+
+/// `text` past `word` at its start, lower case already, or `None`.
+fn past<'a>(text: &'a str, word: &str, whole: bool) -> Option<&'a str> {
+    let rest = text.strip_prefix(word)?;
+    (!whole || !rest.starts_with(char::is_alphanumeric)).then_some(rest)
+}
+
+/// Each clause's call with the name as `language` writes it: at its start,
+/// past greetings, as the English name is read at a sentence's start. None
+/// for English.
+fn calls_as_written(heard: &str, language: Option<Language>) -> impl Iterator<Item = WrittenCall> {
+    let written = language.map(written);
+    clauses(heard).filter_map(move |clause| opens_as_written(clause, written.as_ref()?))
+}
+
+/// `clause`, lower case, past the greetings it opens with, and whether
+/// there were any.
+fn past_greetings(clause: &str, written: &Written) -> (String, bool) {
+    let lower = clause.to_lowercase();
+    let mut rest = lower.as_str();
+    let mut greeted = false;
+    while let Some(after) = written
+        .greetings
+        .iter()
+        .find_map(|greeting| past(rest, greeting, written.whole_words))
+    {
+        rest = after.trim_start();
+        greeted = true;
+    }
+    (rest.to_owned(), greeted)
+}
+
+fn opens_as_written(clause: &str, written: &Written) -> Option<WrittenCall> {
+    let (rest, greeted) = past_greetings(clause, written);
+    let rest = rest.as_str();
+    let names = written.real.iter().map(|name| (name, true));
+    let stand_ins = written.stand_ins.iter().map(|name| (name, false));
+    names.chain(stand_ins).find_map(|(name, real)| {
+        let after = past(rest, name, written.whole_words)?;
+        let set_off = after.trim().is_empty();
+        (real || greeted || set_off).then_some(WrittenCall {
+            real,
+            greeted,
+            set_off,
+        })
+    })
+}
+
+/// [`begins_with_the_name`] for the name as `language` writes it: the
+/// line's first clause opens with it, greeted or set off.
+fn begins_as_written(heard: &str, language: Option<Language>) -> bool {
+    let Some(written) = language.map(written) else {
+        return false;
+    };
+    clauses(heard)
+        .next()
+        .and_then(|clause| opens_as_written(clause, &written))
+        .is_some_and(|call| call.greeted || call.set_off)
+}
+
+/// [`only_the_name`] for the name as `language` writes it: every clause a
+/// greeting or the name set off, the name in one ("エイランク。", "嘿，兰普",
+/// "Hây lăm"). Onboarding's how_you_sound takes such a line as its call
+/// (`second_provider::name_alone`).
+pub(crate) fn only_the_name_as_written(heard: &str, language: Option<Language>) -> bool {
+    let Some(written) = language.map(written) else {
+        return false;
+    };
+    let mut named = false;
+    let all = clauses(heard).all(|clause| match opens_as_written(clause, &written) {
+        Some(call) if call.set_off => {
+            named = true;
+            true
+        }
+        Some(_) => false,
+        None => past_greetings(clause, &written).0.is_empty(),
+    });
+    all && named
 }
 
 /// What the service has written in the name's place, first or after a
@@ -2514,6 +2671,82 @@ mod tests {
     }
 
     use super::*;
+
+    /// #4473, lamp-52e6 on 30 Oct: with `ja`, "Hey Lamp. 今何時ですか？" came
+    /// back as 「エイランク、今何時ですか。」 and was not taken as a call. The
+    /// name as each language writes it is a call; English adds nothing; the
+    /// sound inside a word, or an everyday word mid-sentence, is none.
+    #[test]
+    fn the_name_is_heard_as_each_language_writes_it() {
+        use Language::{Chinese, Japanese, Korean, Vietnamese};
+        let called = |heard: &str, language| calls_as_written(heard, language).next().is_some();
+        for (language, heard) in [
+            (Japanese, "エイランク、今何時ですか。"),
+            (Japanese, "ヘイランプ、電気をつけて。"),
+            (Japanese, "エイランプ。"),
+            (Japanese, "ヘイランク、天気は？"),
+            (Japanese, "ランプ、今何時ですか。"),
+            (Japanese, "らんぷ、聞こえる？"),
+            (Japanese, "今何時ですか。ランク。"),
+            (Chinese, "兰普，现在几点？"),
+            (Chinese, "蓝普，开灯。"),
+            (Chinese, "嘿兰普，现在几点？"),
+            (Chinese, "嗨兰普。"),
+            (Chinese, "嘿Lamp，现在几点？"),
+            (Korean, "램프, 지금 몇 시야?"),
+            (Korean, "헤이 램프, 지금 몇 시야?"),
+            (Korean, "렘프야, 불 켜 줘."),
+            (Vietnamese, "Hây lăm, mấy giờ rồi?"),
+            (Vietnamese, "Hê lăm, bật đèn lên."),
+            (Vietnamese, "Này lem, mấy giờ rồi?"),
+            (Vietnamese, "Làm, mấy giờ rồi?"),
+            (Vietnamese, "Ê lắm."),
+        ] {
+            assert!(called(heard, Some(language)), "{heard}");
+            assert!(!called(heard, None), "English adds nothing: {heard}");
+        }
+        for (language, heard) in [
+            (Japanese, "今何時ですか。"),
+            (Japanese, "クランクを回す。"),
+            (Japanese, "ランクを上げたい。"),
+            (Chinese, "我买了一个兰普。"),
+            (Korean, "캠프 가고 싶어."),
+            (Korean, "어제 캠프에서 램프를 샀어."),
+            (Vietnamese, "Tôi làm việc nhiều lắm."),
+            (Vietnamese, "Làm việc đi."),
+            (Vietnamese, "Lắm chuyện quá."),
+        ] {
+            assert!(!called(heard, Some(language)), "{heard}");
+        }
+        // The line opens with it, greeted or set off.
+        assert!(begins_as_written(
+            "エイランク、今何時ですか。",
+            Some(Japanese)
+        ));
+        assert!(begins_as_written("헤이 램프, 몇 시야?", Some(Korean)));
+        assert!(!begins_as_written("램프를 꺼 줘.", Some(Korean)));
+        assert!(!begins_as_written("今何時ですか。ランプ。", Some(Japanese)));
+        // Onboarding's how_you_sound: the name alone, greetings at most.
+        for (language, alone) in [
+            (Japanese, "エイランク。"),
+            (Japanese, "ヘイ、ランプ。"),
+            (Chinese, "嘿兰普。"),
+            (Korean, "헤이 램프."),
+            (Vietnamese, "Hây lăm."),
+        ] {
+            assert!(only_the_name_as_written(alone, Some(language)), "{alone}");
+            assert!(!only_the_name_as_written(alone, None), "{alone}");
+        }
+        for (language, not) in [
+            (Japanese, "エイランク、今何時ですか。"),
+            (Japanese, "ヘイ。"),
+            (Japanese, "クランク。"),
+            (Korean, "캠프."),
+            (Vietnamese, "Làm việc."),
+        ] {
+            assert!(!only_the_name_as_written(not, Some(language)), "{not}");
+        }
+    }
 
     /// The calls held in the played scenes of 2026-10-14 had their name
     /// heard at 0.97 to 0.99 with no face: close to the lamp, with
