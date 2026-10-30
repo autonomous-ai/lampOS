@@ -60,6 +60,10 @@ pub enum NoticeKind {
     /// loss, by `lamp-setup recover`. An older voice refuses a manifest
     /// that lists it, so it ships only after a build that knows it.
     WifiRecovering,
+    /// The lamp's login is no longer accepted (`LAMP_SIGNED_OUT`), so no
+    /// spoken reply can be made. An older voice refuses a manifest that
+    /// lists it, so it ships only with or after a build that knows it.
+    SignedOut,
 }
 
 /// Who may hear it.

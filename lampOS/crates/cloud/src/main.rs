@@ -10,7 +10,7 @@
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
-use lamp_cloud::{beat, online, ping, reports, skills, update_alerts};
+use lamp_cloud::{beat, online, ping, reports, signed_out, skills, update_alerts};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -167,6 +167,17 @@ fn main() -> ExitCode {
         .map(|shared| (shared, reports::Lamp::new(bus.clone())));
     let report_build = reports::Build::of(&build);
     let shared_for_alerts = shared.clone();
+    // A rejected login said on the bus and to the app: only with
+    // LAMP_SIGNED_OUT=on, and only with a login to reject.
+    let mut login = (signed_out::on_from_environment() && !key.is_empty()).then(|| {
+        signed_out::Login::open(
+            &key,
+            std::env::var_os("STATE_DIRECTORY")
+                .map(|dir| PathBuf::from(dir).join("signed-out.json")),
+            &mut say,
+        )
+    });
+    let telling = login.as_ref().map(|login| (login.watch(), bus.clone()));
     let alerts_bus = bus.clone();
     let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     // A made skill sent to the Skills Store (fourteen-P13): only with
@@ -299,7 +310,14 @@ fn main() -> ExitCode {
             ping::EVERY,
             &mut said,
             &mut keep,
+            login.as_mut(),
         );
+        let telling = async move {
+            match telling {
+                Some((since, bus)) => signed_out::tell(since, bus).await,
+                None => std::future::pending().await,
+            }
+        };
         let staying = online::run(accounts, me, &mut lamp, &mut said_too, ping::FIRST);
         let reporting = async move {
             match reporting {
@@ -322,6 +340,7 @@ fn main() -> ExitCode {
             () = staying => {}
             () = looks => {}
             () = reporting => {}
+            () = telling => {}
         }
     });
     ExitCode::from(1)

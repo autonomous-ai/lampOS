@@ -24,6 +24,9 @@ pub(super) struct FailureNotices {
     /// The recovery hotspot's line (#3743, #3020): played only when
     /// `lamp-setup recover` asks for it through the say service.
     wifi_recovering: std::result::Result<Arc<Recording>, Missing>,
+    /// The lamp's login is no longer accepted (`LAMP_SIGNED_OUT`): said once
+    /// a spell and when someone talks, by a local-only turn.
+    signed_out: std::result::Result<Arc<Recording>, Missing>,
     /// With a notices folder configured, what a failed line plays when its
     /// recording can't be loaded (#2943 part 3): the lamp's own sigh, made
     /// here, so a lamp whose files are missing never meets a question it
@@ -81,6 +84,7 @@ impl FailureNotices {
             service_down: get(NoticeKind::VoiceServiceUnreachable),
             wifi_lost: get(NoticeKind::WifiLost),
             wifi_recovering: get(NoticeKind::WifiRecovering),
+            signed_out: get(NoticeKind::SignedOut),
             fallback: Some(Arc::new(Recording {
                 info: None,
                 samples: crate::head_cue::breath(FALLBACK_DBFS).into_boxed_slice(),
@@ -98,6 +102,7 @@ impl FailureNotices {
             service_down: Err(Missing::NoDirectory),
             wifi_lost: Err(Missing::NoDirectory),
             wifi_recovering: Err(Missing::NoDirectory),
+            signed_out: Err(Missing::NoDirectory),
             fallback: None,
             language: None,
             owners: None,
@@ -154,6 +159,7 @@ impl FailureNotices {
             capability["service_down"] = state(&self.service_down);
             capability["wifi_lost"] = state(&self.wifi_lost);
             capability["wifi_recovering"] = state(&self.wifi_recovering);
+            capability["signed_out"] = state(&self.signed_out);
         }
         capability
     }
@@ -187,6 +193,7 @@ fn notice_words(kind: NoticeKind) -> Option<&'static str> {
         NoticeKind::VoiceServiceUnreachable => Some(crate::language::VOICE_SERVICE_UNREACHABLE),
         NoticeKind::WifiLost => Some(crate::language::WIFI_LOST),
         NoticeKind::WifiRecovering => Some(crate::language::WIFI_RECOVERING),
+        NoticeKind::SignedOut => Some(crate::language::SIGNED_OUT),
         NoticeKind::TurnLost | NoticeKind::ServiceRefused => None,
     }
 }
@@ -199,11 +206,15 @@ fn notice_words(kind: NoticeKind) -> Option<&'static str> {
 /// `back`: the turn the lamp takes for itself to say it is back online.
 /// `service`: taken while the internet answers but the voice service does
 /// not (`LAMP_SERVICE_DOWN_LINE=on`), so its line is the service's.
+/// `signed_out`: taken while the lamp's login is no longer accepted
+/// (`LAMP_SIGNED_OUT=on`), so its line says that; with `back`, the turn the
+/// lamp takes for itself to say it once, with no sigh in its place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct LocalOnly {
     pub(super) speech: bool,
     pub(super) back: bool,
     pub(super) service: bool,
+    pub(super) signed_out: bool,
 }
 
 /// What one outage has said: the offline line once, and "back online" only
@@ -225,7 +236,9 @@ impl Outage {
         let Some(current) = reply.as_ref() else {
             return;
         };
-        let offline_line = current.local_only.filter(|local| !local.back);
+        let offline_line = current
+            .local_only
+            .filter(|local| !local.back && !local.signed_out);
         let delivered = match &current.notice {
             NoticeDelivery::Selected { retired_at_us, .. } => {
                 current.playback.is_some() || retired_at_us.is_some()
@@ -545,6 +558,12 @@ pub(super) fn select_failure_notice_in(
     // speech; any other try gets no words, only the ring's offline breath.
     let (selected, stands_in, kind) = match current.local_only {
         None => (&catalog.selected, true, NoticeKind::TurnLost),
+        // Signed out comes first: it holds whether or not the link is up.
+        // Only for speech, and the lamp's own turn is never stood in for.
+        Some(local) if local.signed_out && local.speech => {
+            (&catalog.signed_out, !local.back, NoticeKind::SignedOut)
+        }
+        Some(local) if local.signed_out => return Ok(()),
         // "Back online" is never stood in for: nothing failed.
         Some(local) if local.back => (&catalog.back_online, false, NoticeKind::BackOnline),
         Some(local) if local.speech && !outage.said && local.service => (
@@ -610,6 +629,7 @@ impl FailureNotices {
         catalog.offline = recording(NoticeKind::ProviderUnavailable, 123);
         catalog.back_online = recording(NoticeKind::BackOnline, 77);
         catalog.service_down = recording(NoticeKind::VoiceServiceUnreachable, 55);
+        catalog.signed_out = recording(NoticeKind::SignedOut, 44);
         catalog
     }
 
@@ -650,6 +670,7 @@ impl FailureNotices {
             offline: Err(Missing::NotProvisioned),
             back_online: Err(Missing::NotProvisioned),
             service_down: Err(Missing::NotProvisioned),
+            signed_out: Err(Missing::NotProvisioned),
             wifi_lost: Err(Missing::NotProvisioned),
             wifi_recovering: Err(Missing::NotProvisioned),
             // The other tests' catalog stays silent on a missing line.

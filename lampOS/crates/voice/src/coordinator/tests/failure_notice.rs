@@ -874,6 +874,7 @@ fn offline_reply(speech: bool) -> (Controller, Option<Reply>) {
         speech,
         back: false,
         service: false,
+        signed_out: false,
     });
     (owner, Some(current))
 }
@@ -897,6 +898,7 @@ fn back_online_is_its_own_recording_and_does_not_count_as_the_outages_line() {
         speech: true,
         back: true,
         service: false,
+        signed_out: false,
     });
     select_failure_notice_in(&catalog, &mut back, &None, &mut outage, &mut trace).unwrap();
     assert!(selected(&back, lamp_audio::notice::NoticeKind::BackOnline));
@@ -907,6 +909,7 @@ fn back_online_is_its_own_recording_and_does_not_count_as_the_outages_line() {
         speech: true,
         back: true,
         service: false,
+        signed_out: false,
     });
     select_failure_notice_in(
         &FailureNotices::synthetic(),
@@ -949,6 +952,7 @@ fn offline_lines_are_said_in_the_owners_language_when_kept_and_english_otherwise
             speech: true,
             back,
             service,
+            signed_out: false,
         });
         let mut trace = SessionState::default();
         select_failure_notice_in(
@@ -1293,4 +1297,103 @@ fn the_service_line_is_said_once_and_is_not_the_internets() {
         silent.as_ref().unwrap().notice,
         NoticeDelivery::Skipped(_)
     ));
+}
+
+fn signed_out_turn(speech: bool, back: bool) -> (Controller, Option<Reply>) {
+    let (owner, mut reply) = offline_reply(speech);
+    reply.as_mut().unwrap().local_only = Some(notices::LocalOnly {
+        speech,
+        back,
+        service: true,
+        signed_out: true,
+    });
+    (owner, reply)
+}
+
+/// Heard speech gets the signed-out line every time, whatever an outage has
+/// said; a sound gets nothing; and the line is no outage's line, so no "back
+/// online" follows it.
+#[test]
+fn signed_out_says_its_own_line_for_speech_every_time_and_is_no_outages_line() {
+    use lamp_audio::notice::NoticeKind;
+    let catalog = FailureNotices::synthetic_offline();
+    let mut trace = SessionState::default();
+    let mut outage = Outage {
+        said: true,
+        service: false,
+    };
+    for _ in 0..3 {
+        let (_owner, mut reply) = signed_out_turn(true, false);
+        select_failure_notice_in(&catalog, &mut reply, &None, &mut outage, &mut trace).unwrap();
+        let NoticeDelivery::Selected { recording, .. } = &reply.as_ref().unwrap().notice else {
+            panic!("speech while signed out gets the line");
+        };
+        assert_eq!(recording.kind(), Some(NoticeKind::SignedOut));
+    }
+    let (_owner, mut cough) = signed_out_turn(false, false);
+    select_failure_notice_in(&catalog, &mut cough, &None, &mut outage, &mut trace).unwrap();
+    assert!(matches!(
+        cough.as_ref().unwrap().notice,
+        NoticeDelivery::Unselected
+    ));
+    let mut fresh = Outage::default();
+    let (_owner, mut line) = signed_out_turn(true, false);
+    select_failure_notice_in(&catalog, &mut line, &None, &mut fresh, &mut trace).unwrap();
+    if let NoticeDelivery::Selected { retired_at_us, .. } = &mut line.as_mut().unwrap().notice {
+        *retired_at_us = Some(1);
+    }
+    fresh.note_delivery(&line);
+    assert!(!fresh.said);
+}
+
+/// With no recording, a person who spoke gets the sigh; the lamp's own
+/// unasked turn stays silent and lets the line go, so it isn't tried forever.
+#[test]
+fn a_missing_signed_out_line_is_sighed_for_a_person_and_let_go_unasked() {
+    let catalog = FailureNotices::missing_with_sigh();
+    let mut trace = SessionState::default();
+    let mut outage = Outage::default();
+    let (_owner, mut heard) = signed_out_turn(true, false);
+    select_failure_notice_in(&catalog, &mut heard, &None, &mut outage, &mut trace).unwrap();
+    assert!(matches!(
+        heard.as_ref().unwrap().notice,
+        NoticeDelivery::Selected { .. }
+    ));
+    let (_owner, mut own) = signed_out_turn(true, true);
+    select_failure_notice_in(&catalog, &mut own, &None, &mut outage, &mut trace).unwrap();
+    assert!(matches!(
+        own.as_ref().unwrap().notice,
+        NoticeDelivery::Skipped(_)
+    ));
+    let mut state = super::super::signed_out::SignedOut::default();
+    state.take(Some(lamp_msgs::AccountState {
+        signed_out: true,
+        for_s: 0,
+    }));
+    assert!(state.owed());
+    state.note_delivery(&own);
+    assert!(!state.owed());
+}
+
+/// Chosen but not yet played, as a Stop would leave it: still owed. Played:
+/// not owed again this spell.
+#[test]
+fn the_signed_out_line_counts_as_said_only_once_it_played() {
+    let catalog = FailureNotices::synthetic_offline();
+    let mut trace = SessionState::default();
+    let mut outage = Outage::default();
+    let mut state = super::super::signed_out::SignedOut::default();
+    state.take(Some(lamp_msgs::AccountState {
+        signed_out: true,
+        for_s: 0,
+    }));
+    let (_owner, mut own) = signed_out_turn(true, true);
+    select_failure_notice_in(&catalog, &mut own, &None, &mut outage, &mut trace).unwrap();
+    state.note_delivery(&own);
+    assert!(state.owed());
+    if let NoticeDelivery::Selected { retired_at_us, .. } = &mut own.as_mut().unwrap().notice {
+        *retired_at_us = Some(1);
+    }
+    state.note_delivery(&own);
+    assert!(!state.owed());
 }
