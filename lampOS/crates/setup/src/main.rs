@@ -1185,7 +1185,7 @@ fn answer(
     use lamp_setup::{
         http::{Shared, router},
         light::ReleasingSave,
-        serve::Files,
+        serve::{Files, Save},
         wifi::ImageHost,
     };
     // One look at the networks while the radio is still a station: as the
@@ -1226,6 +1226,9 @@ fn answer(
         return Ok(true);
     };
     *status.lock().unwrap() = started;
+    // Said from the start, so the app knows before a setup whether to ask
+    // for own keys (#2094). Recovery saves the network only, so never.
+    status.lock().unwrap().takes_own_keys = !recovering && Files(&config).own_keys_on();
     // Recovery's (#3020): the lamp is set up, its network gone; the page
     // says so, and setting a new network keeps everything else.
     if recovering {

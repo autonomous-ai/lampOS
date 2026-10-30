@@ -923,7 +923,10 @@ async fn v1s_routes_answer_in_v1s_shapes() {
                // Not V1's: the app tells its two Lamps apart by it (#1396).
                "generation": "lamp-v2",
                // Not V1's: the person's answer on reports, read only (#1683).
-               "share_reports": false}})
+               "share_reports": false,
+               // Not V1's: off by default, so the app hides its own-keys
+               // question (#2094).
+               "takes_own_keys": false}})
     );
     let before = SCANS.load(Ordering::Relaxed);
     let (code, body) = call(&app, "GET", "/api/network", Value::Null).await;
@@ -1586,6 +1589,8 @@ fn own_keys_are_checked_before_the_marker_and_never_fail_setup() {
         assert_eq!(calls.last().unwrap(), "marker=");
         let shown = serde_json::to_value(&status).unwrap();
         assert!(!shown.to_string().contains(planted), "{shown}");
+        // Said either way, so the app asks only where the answer is used.
+        assert_eq!(shown["takes_own_keys"], json!(on), "{shown}");
         match deepseek {
             Some(words) => {
                 assert_eq!(calls[calls.len() - 2], "own_key=deepseek", "{calls:?}");

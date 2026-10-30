@@ -30,7 +30,9 @@ there.
   before the marker, so the voice's first start takes them. A key that's
   refused, can't be checked or doesn't fit never fails setup: the lamp uses
   the relay, and `GET /api/device/setup/status` says why in `own_keys`, by
-  service (absent when none was given).
+  service (absent when none was given). The status's `takes_own_keys` says
+  whether this switch is on, true or false, so the app asks for own keys
+  only on a lamp that will use them.
 - **From the app, after setup** (`docs/cloud.md`, "A person's own keys"):
   `keys.set`, `keys.remove` ("use the lamp's own again") and `keys.get`.
   `lamp-cloud` writes nothing: it hands one line to root's helper,

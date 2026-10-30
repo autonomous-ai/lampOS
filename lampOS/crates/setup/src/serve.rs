@@ -251,6 +251,11 @@ pub struct Status {
     /// last setup (#1683), so the app can show it after a reconnect. Read
     /// only: the app sets it later through `lamp-cloud`, not here.
     pub share_reports: bool,
+    /// Whether this setup takes a person's own keys (#2094): [`Save::own_keys_on`],
+    /// `LAMP_OWN_KEYS=on`. Always said, so the app asks its own-keys question
+    /// only on a lamp that will use the answer; an older lamp's status has no
+    /// such field, which the app reads as false.
+    pub takes_own_keys: bool,
     /// With `LAMP_OWN_KEYS=on` (#2094): for each own key the last setup was
     /// given, by service, `{"code", "answer"}`: `works`, `refused`,
     /// `unreached` or `bad_field`, and the plain words. Never a key; absent
@@ -274,6 +279,7 @@ impl Status {
             runtime_phase: String::new(),
             generation: GENERATION,
             share_reports: false,
+            takes_own_keys: false,
             own_keys: Default::default(),
         }
     }
@@ -964,6 +970,7 @@ pub fn run(
         status.phase = Phase::Connecting;
         status.error.clear();
         status.lan_ip.clear();
+        status.takes_own_keys = save.own_keys_on();
     }
     // The watcher looks once a second while joining, and ends at once when
     // the join does: its second is a wait on this channel, which the join's
