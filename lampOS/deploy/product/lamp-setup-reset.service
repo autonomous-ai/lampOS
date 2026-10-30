@@ -1,6 +1,6 @@
 # The reset (#806, lampOS/docs/setup.md), as the product installs it (lampOS/docs/install.md): the
 # reset button held 5 s and released, as Controls publishes it on controls/touch. It stops the lamp,
-# wipes the person's data, removes the setup marker and reboots into setup.
+# wipes the person's data, removes the setup marker and starts setup again in place (a reboot only if that fails).
 [Unit]
 Description=lampOS reset: the reset button held 5 s wipes the person's data
 PartOf=lampos.target
@@ -10,14 +10,14 @@ After=lamp-controls.service
 
 [Service]
 Type=simple
-# Root: the person's stores belong to several parts; stopping the lamp; reboot.
+# Root: the person's stores belong to several parts; stopping the lamp; starting setup again, or a reboot.
 User=root
 # It also turns the lamp off on a lamp/shutdown_request from Controls' button (#3697, docs/shutdown.md),
 # handing it to `lamp-setup shutdown`. Set with lamp-cloud, Controls and Voice.
 Environment=LAMP_SHUTDOWN=on
 ExecStart=/opt/lampOS/setup/current/lamp-setup watch-reset --plan /etc/lampOS/setup/reset-plan.json --bus-root /run/lampos-bus --enable
 # Its sandbox (#3710): it writes only its subscriber's socket under the bus, and hands the reset itself to a
-# unit of its own through systemd-run (the plan's `detach`), which wipes, stops the lamp and reboots outside
+# unit of its own through systemd-run (the plan's `detach`), which wipes, stops the lamp and starts setup again outside
 # this sandbox. So the whole file system is read-only to it but the bus; no home, its own /tmp, and nothing it
 # starts gains privileges. A plan without `detach` (only one kept by hand) would reset in here and fail on its
 # journal: docs/install.md.
