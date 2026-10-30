@@ -51,7 +51,10 @@ pub(crate) const BODY_PUSHED: &str = "body_pushed";
 /// a sound of its own (`cut_for_last_words`, #3697, #3748), revoking the
 /// speaker first as a hand's Stop does.
 pub(crate) const LAST_WORDS: &str = "last_words";
-pub(crate) const LOCAL_CANCELS: [&str; 8] = [
+/// A say cut by its own asker's cancel on the say socket (a paired
+/// computer's `stop`): the cut revokes the speaker as a hand's Stop does.
+pub(crate) const ASKER_STOPPED: &str = crate::say::ASKER_STOPPED;
+pub(crate) const LOCAL_CANCELS: [&str; 9] = [
     LAST_WORDS,
     HEAD_SLEEP,
     SOFTWARE_MUTED,
@@ -60,6 +63,7 @@ pub(crate) const LOCAL_CANCELS: [&str; 8] = [
     CAPTURE_GAP,
     SPOKEN_STOP,
     BODY_PUSHED,
+    ASKER_STOPPED,
 ];
 
 impl ReceiptHistory {
@@ -374,6 +378,7 @@ mod tests {
             ("head_sleep", true),
             ("software_muted", true),
             ("capture_gap", true),
+            ("asker_stopped", true),
             ("reminder_authority_lost", false),
             ("playback_discarded", false),
         ] {

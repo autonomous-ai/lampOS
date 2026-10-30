@@ -15,7 +15,12 @@
 //!   `stop` gives the light back at once.
 //! - `say` → the voice's say socket as written words (`text`), through its
 //!   quiet, privacy, pause and busy gates. Its outcome comes later as a
-//!   `done` event: spoken, dropped, expired or refused, with why.
+//!   `done` event: spoken, dropped, expired or refused, with why. The
+//!   client's `stop` cancels each of its own says on the connection that
+//!   asked it ([`SAY_CANCEL`]): waiting, the voice lets it go; playing, the
+//!   voice cuts that turn alone. Its `done` is then dropped, "stopped by its
+//!   asker". Another client's say, the person's turn and the voice's own
+//!   words are never reached.
 //! - `express` → the `feelings` skill's own move for it, sent whole on the
 //!   mood socket as `move` is, and its light as `light` is
 //!   (`crate::feelings`). With no light to show (off, not known, or at its
@@ -54,6 +59,18 @@ use crate::session::Parts;
 pub const SAY_EXPIRES_MS: u64 = 30_000;
 /// How long the say socket's answer may take, its turn included.
 pub const SAY_ANSWER_WITHIN: Duration = Duration::from_secs(90);
+/// The line that cancels a say on the connection that asked it: the
+/// voice's `lamp_voice::say::CANCEL_LINE`.
+pub const SAY_CANCEL: &str = r#"{"cancel":true}"#;
+/// Why a say its client stopped is dropped: the voice's own words for it.
+pub const STOPPED_BY_ASKER: &str = "stopped by its asker";
+/// The longest the door's lock waits to write a cancel to the voice.
+const SAY_CANCEL_WITHIN: Duration = Duration::from_millis(100);
+
+/// The says each client still waits on, by client and then by the say's
+/// own number: the connection to the voice once it is open. A say no
+/// longer listed was stopped.
+type Says = Arc<std::sync::Mutex<HashMap<String, HashMap<u64, Option<UnixStream>>>>>;
 
 /// Where the events of actions that end later go: the client, and the
 /// event (`done`).
@@ -106,6 +123,10 @@ pub struct Lamp {
     /// (#4209). A `stop` doesn't free it: the door never stops the body,
     /// which plays the motion to its end.
     motion: Option<u64>,
+    /// Each client's says still waiting on the voice, for its `stop`.
+    says: Says,
+    /// The number the next say is kept under.
+    next_say: u64,
 }
 
 impl Lamp {
@@ -133,6 +154,8 @@ impl Lamp {
             clock: lamp_ipc::monotonic_us,
             follow: None,
             motion: None,
+            says: Says::default(),
+            next_say: 0,
         }
     }
 
@@ -357,30 +380,40 @@ impl Lamp {
         }
     }
 
-    fn say(&self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
+    fn say(&mut self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
         let line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
         let events = self.events.clone();
         let client = client.to_owned();
+        // Kept before the thread starts, so that a `stop` right after the
+        // reply still reaches it.
+        let number = self.next_say;
+        self.next_say += 1;
+        let says = Arc::clone(&self.says);
+        says.lock()
+            .expect("says")
+            .entry(client.clone())
+            .or_default()
+            .insert(number, None);
         // Off the door's lock, connecting included (the Reviewer-lead's P3
         // on #3805: a voice whose backlog is full must not hold every
         // connection). The outcome comes when the turn ends, as `done`; a
         // voice that can't be reached is a `done` dropped, with why.
         std::thread::spawn(move || {
-            let (how, why) = match UnixStream::connect(&path)
-                .and_then(|mut stream| writeln!(stream, "{line}").map(|()| stream))
-            {
-                Ok(stream) => {
+            let (how, why) = match ask_voice(&path, &line, &says, &client, number) {
+                Ok(Some(stream)) => {
                     let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
                     outcome(BufReader::new(stream))
                 }
+                Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
                 Err(error) => (
                     "dropped",
                     Some(format!("the voice did not take it: {error}")),
                 ),
             };
+            forget_say(&says, &client, number);
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
                 done["why"] = json!(why);
@@ -388,6 +421,54 @@ impl Lamp {
             events(&client, done);
         });
         Ok(json!({"to": "voice"}))
+    }
+}
+
+/// Asks the voice for say `number` of `client`, unless its `stop` came
+/// first (`None`): the connection the outcome comes on, kept for a `stop`;
+/// one that came while connecting is sent on at once.
+fn ask_voice(
+    path: &std::path::Path,
+    line: &Value,
+    says: &Says,
+    client: &str,
+    number: u64,
+) -> std::io::Result<Option<UnixStream>> {
+    if !is_kept(says, client, number) {
+        return Ok(None);
+    }
+    let mut stream = UnixStream::connect(path)?;
+    writeln!(stream, "{line}")?;
+    let _ = stream.set_write_timeout(Some(SAY_CANCEL_WITHIN));
+    let kept = stream.try_clone()?;
+    let mut says = says.lock().expect("says");
+    match says
+        .get_mut(client)
+        .and_then(|asked| asked.get_mut(&number))
+    {
+        Some(slot) => *slot = Some(kept),
+        None => {
+            let _ = writeln!(&kept, "{SAY_CANCEL}");
+        }
+    }
+    Ok(Some(stream))
+}
+
+fn is_kept(says: &Says, client: &str, number: u64) -> bool {
+    says.lock()
+        .expect("says")
+        .get(client)
+        .is_some_and(|asked| asked.contains_key(&number))
+}
+
+/// Say `number` of `client` is answered: no `stop` reaches it now.
+fn forget_say(says: &Says, client: &str, number: u64) {
+    let mut says = says.lock().expect("says");
+    if let Some(asked) = says.get_mut(client) {
+        asked.remove(&number);
+        if asked.is_empty() {
+            says.remove(client);
+        }
     }
 }
 
@@ -494,6 +575,13 @@ impl Parts for Lamp {
             && until_us > now_us
         {
             let _ = self.ask_ring(client, light, None, now_us);
+        }
+        // Its own says cancelled, each on the connection that asked it, and
+        // no other client's: one still connecting cancels itself when it
+        // finds it is no longer kept (`ask_voice`).
+        let stopped = self.says.lock().expect("says").remove(client);
+        for stream in stopped.into_iter().flat_map(HashMap::into_values).flatten() {
+            let _ = writeln!(&stream, "{SAY_CANCEL}");
         }
     }
 }
@@ -848,6 +936,93 @@ mod tests {
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A client's `stop` cancels its own say on the connection that asked
+    /// it, and its `done` is dropped with the voice's why; another client's
+    /// say on the same voice is untouched and still answered.
+    #[test]
+    fn a_stop_cancels_the_clients_own_say_and_no_other() {
+        let dir = dir("say-stop");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        lamp.act("c_1", 1, &op(r#"{"id":1,"op":"say","text":"Mine."}"#), 0)
+            .unwrap();
+        lamp.act("c_2", 2, &op(r#"{"id":2,"op":"say","text":"Theirs."}"#), 0)
+            .unwrap();
+        // The voice's side: each connection by its words.
+        let mut by_text = HashMap::new();
+        for _ in 0..2 {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let asked: Value = serde_json::from_str(&line).unwrap();
+            by_text.insert(asked["text"].as_str().unwrap().to_owned(), (stream, reader));
+        }
+        // Both kept with their connections before the stop.
+        for _ in 0..200 {
+            let kept = lamp
+                .says
+                .lock()
+                .unwrap()
+                .values()
+                .flat_map(HashMap::values)
+                .flatten()
+                .count();
+            if kept == 2 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        lamp.stop("c_1", 0);
+        let (mine, mine_reader) = by_text.get_mut("Mine.").unwrap();
+        let mut line = String::new();
+        mine_reader.read_line(&mut line).unwrap();
+        assert_eq!(line.trim_end(), SAY_CANCEL);
+        writeln!(
+            mine,
+            r#"{{"outcome":"dropped","why":"{STOPPED_BY_ASKER}"}}"#
+        )
+        .unwrap();
+        // Theirs hears nothing from c_1's stop.
+        let (theirs, theirs_reader) = by_text.get_mut("Theirs.").unwrap();
+        theirs
+            .set_read_timeout(Some(Duration::from_millis(300)))
+            .unwrap();
+        let mut line = String::new();
+        assert!(theirs_reader.read_line(&mut line).is_err(), "{line}");
+        writeln!(theirs, r#"{{"outcome":"spoken"}}"#).unwrap();
+        for _ in 0..200 {
+            if told.lock().unwrap().len() == 2 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let mut told = told.lock().unwrap().clone();
+        told.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(
+            told,
+            vec![
+                (
+                    "c_1".to_owned(),
+                    json!({"ev": "done", "re": 1, "how": "dropped",
+                        "why": format!("dropped: {STOPPED_BY_ASKER}")})
+                ),
+                (
+                    "c_2".to_owned(),
+                    json!({"ev": "done", "re": 2, "how": "finished"})
+                ),
+            ]
+        );
+        // Answered, neither is kept for a later stop.
+        assert!(lamp.says.lock().unwrap().is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -166,6 +166,18 @@ pub const URGENT_QUIET_US: u64 = 1_000_000;
 const READ_WITHIN: Duration = Duration::from_secs(1);
 /// The most a request line may be.
 const MOST_LINE_BYTES: u64 = 4_096;
+/// The line an asker writes on its own connection, after its ask, to
+/// cancel that ask: waiting, it leaves the queue; begun, the turn is cut.
+/// Either way the ask is answered `dropped` with [`STOPPED_BY_ASKER`].
+/// Any other later line is passed by, and a connection closed cancels
+/// nothing.
+pub const CANCEL_LINE: &str = r#"{"cancel":true}"#;
+/// Why an ask its asker cancelled is `dropped`.
+pub const STOPPED_BY_ASKER: &str = "stopped by its asker";
+/// The trace outcome of a turn cut by its asker's cancel.
+pub const ASKER_STOPPED: &str = "asker_stopped";
+/// An ask's cancel, set by its own client's thread alone.
+type Cancel = Arc<std::sync::atomic::AtomicBool>;
 /// Told the model before a text, so that it says the words as they are.
 pub const AS_WRITTEN: &str = "Say exactly these words, in your own voice, and nothing else:";
 
@@ -577,6 +589,9 @@ struct Asked {
     read_at_us: u64,
     guard: Option<unplug_guard::Guard>,
     expires_at_us: u64,
+    /// Set by the asker's client thread when it writes [`CANCEL_LINE`]
+    /// on the same connection: never by another asker.
+    cancel: Cancel,
 }
 
 /// An ask from inside the voice, through the same queue and gates as a
@@ -619,6 +634,7 @@ impl OwnAsks {
             answer,
             read_at_us,
             guard: None,
+            cancel: Default::default(),
         });
         answered
     }
@@ -631,6 +647,7 @@ struct Waiting {
     guard: Option<unplug_guard::Guard>,
     expires_at_us: u64,
     order: u64,
+    cancel: Cancel,
 }
 
 /// A say begun: it lives on the voice's reply and is answered when the
@@ -643,6 +660,8 @@ pub struct Ticket {
     /// (`who`, #2825); never exact words, a quoted line or what the voice
     /// keeps, and never another skill's note.
     who: bool,
+    /// Its asker's cancel ([`CANCEL_LINE`]): the voice cuts the turn.
+    cancel: Cancel,
 }
 
 impl Ticket {
@@ -653,6 +672,25 @@ impl Ticket {
 
     pub fn skill(&self) -> &str {
         &self.skill
+    }
+
+    /// Whether its asker cancelled it on its own connection
+    /// ([`CANCEL_LINE`]).
+    pub fn stopped_by_asker(&self) -> bool {
+        self.cancel.load(Ordering::Acquire)
+    }
+
+    /// Why the voice must cut the turn this ticket rides on now, as the
+    /// turn's trace outcome: the unplug authority lost, or its asker's
+    /// cancel ([`ASKER_STOPPED`]). No bus I/O.
+    pub fn cut_why(&self, now_us: u64) -> Option<&'static str> {
+        if !self.authority_valid(now_us) {
+            Some("unplug_authority_lost")
+        } else if self.stopped_by_asker() {
+            Some(ASKER_STOPPED)
+        } else {
+            None
+        }
     }
 
     /// Whether it is the shutdown's last words ([`is_last_words`]).
@@ -698,10 +736,20 @@ pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
             skill: skill.to_owned(),
             answer: Some(answer),
             guard: None,
+            cancel: Default::default(),
             who: false,
         },
         answered,
     )
+}
+
+/// A ticket whose asker has cancelled it ([`CANCEL_LINE`]), for a test of
+/// the voice's cut.
+#[cfg(test)]
+pub(crate) fn cancelled_ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
+    let (ticket, answered) = ticket_for_test(skill);
+    ticket.cancel.store(true, Ordering::Release);
+    (ticket, answered)
 }
 
 /// A parsed wire request a stepped coordinator fixture delivers at its clock.
@@ -723,6 +771,7 @@ impl LineForTest {
                 answer: self.answer,
                 read_at_us,
                 guard: None,
+                cancel: Default::default(),
             })
             .unwrap();
     }
@@ -988,6 +1037,7 @@ impl Says {
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
             guard: None,
+            cancel: Default::default(),
             expires_at_us,
         })
         .unwrap();
@@ -1016,6 +1066,7 @@ impl Says {
             answer,
             read_at_us: 0,
             guard: None,
+            cancel: Default::default(),
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -1058,6 +1109,7 @@ impl Says {
             answer,
             read_at_us: 0,
             guard: None,
+            cancel: Default::default(),
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -1106,6 +1158,7 @@ impl Says {
                 request: asked.request,
                 answer: asked.answer,
                 guard: asked.guard,
+                cancel: asked.cancel,
                 expires_at_us,
                 order: self.order,
             });
@@ -1115,6 +1168,14 @@ impl Says {
 
     fn expire(&mut self, now_us: u64) {
         self.waiting.retain(|waiting| {
+            // Cancelled by its asker while it waited: out of the queue, and
+            // `dropped` with why, as a cut turn is.
+            if waiting.cancel.load(Ordering::Acquire) {
+                let _ = waiting
+                    .answer
+                    .send(Answer::Done(Outcome::Dropped(STOPPED_BY_ASKER.into())));
+                return false;
+            }
             let live = now_us < waiting.expires_at_us;
             if !live {
                 let _ = waiting.answer.send(Answer::Done(Outcome::Expired));
@@ -1167,6 +1228,7 @@ impl Says {
                 skill: waiting.request.skill,
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
+                cancel: waiting.cancel,
                 who: false,
             },
         ))
@@ -1253,6 +1315,7 @@ impl Says {
                 skill: waiting.request.skill,
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
+                cancel: waiting.cancel,
                 who,
             },
             quoted,
@@ -1285,6 +1348,7 @@ impl Says {
             skill: waiting.request.skill,
             answer: Some(waiting.answer),
             guard: waiting.guard,
+            cancel: waiting.cancel,
             who: false,
         })
     }
@@ -1306,6 +1370,7 @@ impl Says {
             skill: waiting.request.skill,
             answer: Some(waiting.answer),
             guard: waiting.guard,
+            cancel: waiting.cancel,
             who: false,
         })
     }
@@ -1430,7 +1495,14 @@ fn serve_client(
     sounds: &Path,
     recordings: &Recordings,
 ) {
-    let outcome = match read_line_within(&stream, READ_WITHIN) {
+    // What came after the ask's line, read with it, and the thread that
+    // reads on for its asker's cancel ([`CANCEL_LINE`]) once it is asked.
+    let mut rest = Vec::new();
+    let mut watch = None;
+    let outcome = match read_line_and_rest(&stream, READ_WITHIN).map(|(line, after)| {
+        rest = after;
+        line
+    }) {
         Err(why) => Outcome::Refused(why.into()),
         Ok(line) => match parse_from(&line, caller_of(&stream, recordings.helper_uid)).and_then(
             |mut request| {
@@ -1470,12 +1542,17 @@ fn serve_client(
                     let _ = stream.set_write_timeout(Some(Duration::from_millis(50)));
                 }
                 let (answer, answered) = mpsc::channel();
+                // Watched before the voice has it, so that a cancel sent at
+                // once is never missed.
+                let cancel = Cancel::default();
+                watch = watch_for_cancel(&stream, std::mem::take(&mut rest), Arc::clone(&cancel));
                 if ask
                     .send(Asked {
                         request,
                         answer,
                         read_at_us,
                         guard,
+                        cancel: Arc::clone(&cancel),
                         expires_at_us,
                     })
                     .is_err()
@@ -1512,11 +1589,92 @@ fn serve_client(
         },
     };
     let _ = writeln!(stream, "{}", outcome.line());
+    if let Some(watch) = watch {
+        watch.end(&stream);
+    }
+}
+
+/// How often the cancel's reader looks whether the ask has been answered.
+const CANCEL_WATCH_EVERY: Duration = Duration::from_millis(100);
+
+/// The reader of one asker's later lines, for its cancel.
+struct CancelWatch {
+    answered: Arc<std::sync::atomic::AtomicBool>,
+    thread: thread::JoinHandle<()>,
+}
+
+impl CancelWatch {
+    /// The ask is answered: nothing more is read.
+    fn end(self, stream: &UnixStream) {
+        self.answered.store(true, Ordering::Release);
+        let _ = stream.shutdown(std::net::Shutdown::Read);
+        let _ = self.thread.join();
+    }
+}
+
+/// Reads the asker's lines after its ask, `rest` first, on a thread of its
+/// own, and sets `cancel` on [`CANCEL_LINE`]. Only this connection's ask is
+/// cancelled: another asker's, the person's turn and the voice's own words
+/// are never reached from here. A connection closed, an error or a line
+/// past [`MOST_LINE_BYTES`] ends the watch and cancels nothing.
+fn watch_for_cancel(stream: &UnixStream, rest: Vec<u8>, cancel: Cancel) -> Option<CancelWatch> {
+    let reader = stream.try_clone().ok()?;
+    let answered = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let ended = Arc::clone(&answered);
+    let thread = thread::Builder::new()
+        .name("lamp-voice-say-cancel".into())
+        .spawn(move || {
+            let _ = reader.set_read_timeout(Some(CANCEL_WATCH_EVERY));
+            let mut line = rest;
+            let mut piece = [0u8; 256];
+            loop {
+                while let Some(end) = line.iter().position(|&byte| byte == b'\n') {
+                    let one: Vec<u8> = line.drain(..=end).collect();
+                    if is_cancel(&one) {
+                        cancel.store(true, Ordering::Release);
+                        return;
+                    }
+                }
+                if line.len() as u64 > MOST_LINE_BYTES || ended.load(Ordering::Acquire) {
+                    return;
+                }
+                match (&reader).read(&mut piece) {
+                    Ok(0) => return,
+                    Ok(read) => line.extend_from_slice(&piece[..read]),
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            io::ErrorKind::WouldBlock
+                                | io::ErrorKind::TimedOut
+                                | io::ErrorKind::Interrupted
+                        ) => {}
+                    Err(_) => return,
+                }
+            }
+        })
+        .ok()?;
+    Some(CancelWatch { answered, thread })
+}
+
+/// Whether a later line is the asker's cancel: an object whose `cancel` is
+/// `true`.
+fn is_cancel(line: &[u8]) -> bool {
+    serde_json::from_slice::<serde_json::Value>(line)
+        .is_ok_and(|said| said.get("cancel") == Some(&serde_json::Value::Bool(true)))
 }
 
 /// The client's one line, read until its newline within `within` of now,
 /// at most [`MOST_LINE_BYTES`]; or why not.
+#[cfg(test)]
 fn read_line_within(stream: &UnixStream, within: Duration) -> Result<String, &'static str> {
+    read_line_and_rest(stream, within).map(|(line, _)| line)
+}
+
+/// [`read_line_within`], and what came after the line in the same reads.
+fn read_line_and_rest(
+    stream: &UnixStream,
+    within: Duration,
+) -> Result<(String, Vec<u8>), &'static str> {
     let started = Instant::now();
     let mut line = Vec::new();
     let mut piece = [0u8; 512];
@@ -1542,8 +1700,10 @@ fn read_line_within(stream: &UnixStream, within: Duration) -> Result<String, &'s
             return Err("one line, ended by a newline, at most 4096 bytes");
         }
         if let Some(end) = end {
-            line.truncate(end + 1);
-            return String::from_utf8(line).map_err(|_| "not a say request");
+            let rest = line.split_off(end + 1);
+            return String::from_utf8(line)
+                .map(|line| (line, rest))
+                .map_err(|_| "not a say request");
         }
     }
 }
@@ -1844,7 +2004,7 @@ pub fn may_play_last_words(now: &SoundNow) -> Result<(), &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::BufReader;
+    use std::io::{BufRead as _, BufReader};
 
     /// A WAV of `samples`, as `spec` says.
     fn wav(spec: hound::WavSpec, samples: &[i16]) -> Vec<u8> {
@@ -2566,6 +2726,7 @@ mod tests {
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
                 guard: None,
+                cancel: Default::default(),
                 expires_at_us,
             },
             answered,
@@ -2782,6 +2943,7 @@ mod tests {
                 answer,
                 read_at_us,
                 guard: None,
+                cancel: Default::default(),
             })
             .unwrap();
             says.poll(deadline - 1);
@@ -2809,6 +2971,7 @@ mod tests {
             answer,
             read_at_us,
             guard: None,
+            cancel: Default::default(),
         })
         .unwrap();
         says.poll(deadline - 1);
@@ -2875,6 +3038,7 @@ mod tests {
                 answer,
                 read_at_us,
                 guard: None,
+                cancel: Default::default(),
             };
             (asked, answered)
         };
@@ -3496,6 +3660,170 @@ mod tests {
         drop(says);
         assert!(!path.exists());
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A waiting ask its asker cancels leaves the queue at the next pass,
+    /// answered `dropped` with why; another asker's waits on, untouched.
+    #[test]
+    fn a_waiting_ask_cancelled_by_its_asker_is_dropped_and_another_waits_on() {
+        let (mut says, ask) = Says::by_hand();
+        let (mine, my_answer) = asked("control", 5, 60_000_000);
+        let (theirs, their_answer) = asked("reminders", 5, 60_000_000);
+        let cancel = Arc::clone(&mine.cancel);
+        ask.send(mine).unwrap();
+        ask.send(theirs).unwrap();
+        says.poll(0);
+        assert_eq!(says.waiting(), 2);
+        cancel.store(true, Ordering::Release);
+        says.poll(1);
+        assert_eq!(
+            my_answer.try_recv(),
+            Ok(Answer::Done(Outcome::Dropped(STOPPED_BY_ASKER.into())))
+        );
+        assert_eq!(says.waiting(), 1);
+        assert_eq!(their_answer.try_recv(), Err(mpsc::TryRecvError::Empty));
+        let (_, _, ticket, _) = says.take(1).unwrap();
+        assert_eq!(ticket.skill(), "reminders");
+        assert_eq!(ticket.cut_why(1), None);
+    }
+
+    /// A begun ask its asker cancels says so on its ticket, which the voice
+    /// cuts on its next pass; the cut names its asker. Another ticket is
+    /// not cut.
+    #[test]
+    fn a_begun_ask_cancelled_by_its_asker_is_to_be_cut_and_no_other() {
+        let (mine, _) = cancelled_ticket_for_test("control");
+        let (theirs, _) = ticket_for_test("control");
+        assert!(mine.stopped_by_asker());
+        assert_eq!(mine.cut_why(0), Some(ASKER_STOPPED));
+        assert!(!theirs.stopped_by_asker());
+        assert_eq!(theirs.cut_why(0), None);
+        // The unplug authority lost comes first, as before.
+        let (guarded, _, deadline) = guarded_ticket_for_test();
+        guarded.cancel.store(true, Ordering::Release);
+        deadline.store(0, Ordering::Release);
+        assert_eq!(guarded.cut_why(1), Some("unplug_authority_lost"));
+    }
+
+    #[test]
+    fn only_a_cancel_object_is_a_cancel() {
+        assert!(is_cancel(format!("{CANCEL_LINE}\n").as_bytes()));
+        assert!(is_cancel(br#"{"cancel": true}"#));
+        for other in [
+            &br#"{"cancel":false}"#[..],
+            br#"{"cancel":"true"}"#,
+            br#"{"skill":"x","text":"t","expires_in_ms":5}"#,
+            b"cancel",
+            b"",
+        ] {
+            assert!(!is_cancel(other), "{}", String::from_utf8_lossy(other));
+        }
+    }
+
+    /// Through the socket: an asker's cancel line on its own connection
+    /// takes its waiting ask out and answers it `dropped`, also when it
+    /// came in one write with the ask; a begun one is marked for the cut.
+    /// Another asker's ask is untouched, and a connection whose asker only
+    /// stops writing cancels nothing.
+    #[test]
+    fn through_the_socket_an_asker_cancels_its_own_ask_and_no_other() {
+        let dir = socket_dir("cancel");
+        let path = dir.join("say.sock");
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+        let ask_line = |skill: &str| {
+            format!("{{\"skill\":\"{skill}\",\"text\":\"Hello.\",\"expires_in_ms\":60000}}\n")
+        };
+        let wait_for = |says: &mut Says, count: usize| {
+            for _ in 0..400 {
+                says.poll(1_000);
+                if says.waiting() == count {
+                    return;
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+            panic!("{} wait, not {count}", says.waiting());
+        };
+        // Theirs, which stops writing (half-closed) but still reads.
+        let mut theirs = UnixStream::connect(&path).unwrap();
+        theirs.write_all(ask_line("theirs").as_bytes()).unwrap();
+        theirs.shutdown(std::net::Shutdown::Write).unwrap();
+        wait_for(&mut says, 1);
+        // Mine, waiting, then cancelled on its own connection.
+        let mut mine = UnixStream::connect(&path).unwrap();
+        mine.write_all(ask_line("mine").as_bytes()).unwrap();
+        wait_for(&mut says, 2);
+        writeln!(mine, "{CANCEL_LINE}").unwrap();
+        // The voice's next pass takes it out and answers it.
+        wait_for(&mut says, 1);
+        let mut answer = String::new();
+        BufReader::new(&mine).read_line(&mut answer).unwrap();
+        assert_eq!(
+            answer,
+            format!("{}\n", Outcome::Dropped(STOPPED_BY_ASKER.into()).line())
+        );
+        // Mine again, with its cancel in the same write.
+        let mut both = UnixStream::connect(&path).unwrap();
+        both.write_all(format!("{}{CANCEL_LINE}\n", ask_line("mine")).as_bytes())
+            .unwrap();
+        let mut answer = String::new();
+        let reading = thread::spawn(move || {
+            BufReader::new(&both).read_line(&mut answer).unwrap();
+            answer
+        });
+        let mut answered = None;
+        for _ in 0..400 {
+            says.poll(1_000);
+            if reading.is_finished() {
+                answered = Some(reading.join().unwrap());
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(
+            answered.expect("answered"),
+            format!("{}\n", Outcome::Dropped(STOPPED_BY_ASKER.into()).line())
+        );
+        // Theirs is untouched: taken, begun, and then a third asker's ask,
+        // begun and cancelled while it plays, is the one to cut.
+        let (_, _, their_ticket, _) = says.take(1_000).unwrap();
+        assert_eq!(their_ticket.skill(), "theirs");
+        their_ticket.begun(7);
+        let mut playing = UnixStream::connect(&path).unwrap();
+        playing.write_all(ask_line("playing").as_bytes()).unwrap();
+        wait_for(&mut says, 1);
+        let (_, _, ticket, _) = says.take(1_000).unwrap();
+        ticket.begun(8);
+        let mut reader = BufReader::new(playing.try_clone().unwrap());
+        let mut begun = String::new();
+        reader.read_line(&mut begun).unwrap();
+        assert_eq!(begun, "{\"event\":\"begun\",\"at_us\":8}\n");
+        writeln!(playing, "{CANCEL_LINE}").unwrap();
+        for _ in 0..400 {
+            if ticket.stopped_by_asker() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(ticket.cut_why(1_000), Some(ASKER_STOPPED));
+        assert_eq!(their_ticket.cut_why(1_000), None);
+        // The voice's cut answers it in the asker's words
+        // (`coordinator::record_cancelled_reply`).
+        ticket.answer(Outcome::Dropped(STOPPED_BY_ASKER.into()));
+        let mut answer = String::new();
+        reader.read_line(&mut answer).unwrap();
+        assert_eq!(
+            answer,
+            format!("{}\n", Outcome::Dropped(STOPPED_BY_ASKER.into()).line())
+        );
+        their_ticket.answer(Outcome::Spoken);
+        let mut answer = String::new();
+        BufReader::new(&theirs).read_to_string(&mut answer).unwrap();
+        assert_eq!(
+            answer,
+            "{\"event\":\"begun\",\"at_us\":7}\n{\"outcome\":\"spoken\"}\n"
+        );
+        drop(says);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// #2530 part 2: an add-on's line is `quoted`, alone, at most 300 bytes
