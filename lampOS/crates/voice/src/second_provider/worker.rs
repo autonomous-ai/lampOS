@@ -8477,6 +8477,9 @@ impl Heeding {
         // face speaking it but the caller's, at most one face in view), read
         // only for a line opening with a set-off name that is also a word
         // ("May, what would you do?"), so the eyes are read for no other.
+        // One person must be seen: with no fresh look (the camera closed for
+        // privacy, the eyes stopped, the look expired) nobody knows how many
+        // are there, and the name stays a name (Reviewer-three's P2 on #4460).
         let one_person = crate::attention::opens_with_a_name_also_a_word(&seen.heard)
             && !seen.other_voice
             && !someone_else
@@ -8485,7 +8488,7 @@ impl Heeding {
                 .bus
                 .as_ref()
                 .and_then(|(bus, _)| crate::bus_out::faces_in_view(bus))
-                .is_none_or(|faces| faces <= 1);
+                .is_some_and(|faces| faces <= 1);
         let attention = &mut self.attention;
         attention.one_person_present(one_person);
         let (heard, busy, lamp_asked, turned) =
@@ -13037,6 +13040,81 @@ mod tests {
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
         }
+    }
+
+    /// Reviewer-three's P2 on #4460: a set-off name that is also a word
+    /// ("Mark, ...", "May, ...") is a word only when one person is seen. On
+    /// a quiet desk (`LAMP_NAME_OR_FOLLOW_UP` off), in the conversation's
+    /// voice 3 s after the lamp's answer: with no look on the bus (the
+    /// camera closed), "Mark, can you pass me that?" is held as said to
+    /// someone by name; with one face in a fresh look, "May, what would you
+    /// do?" goes on; with two faces it is held. A name that is no word
+    /// ("Anna, ...") is held with one face too.
+    #[test]
+    fn a_name_that_is_also_a_word_is_a_word_only_when_one_person_is_seen() {
+        const TO_ANOTHER: &str = "said to someone it calls by name, not to the lamp";
+        let _one = crate::provider_worker::tests::one_thread();
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lnw-{}", std::process::id()));
+        let face = |id: &str| lamp_msgs::Face {
+            id: id.into(),
+            xmin: 0.2,
+            ymin: 0.2,
+            xmax: 0.4,
+            ymax: 0.5,
+            confidence: 0.9,
+            yaw: None,
+            facing: Some(true),
+            speaking: None,
+        };
+        let verdict = |looked: Option<Vec<lamp_msgs::Face>>, words: &str| {
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).unwrap();
+            let bus = lamp_bus::Bus::new(&root).unwrap();
+            let names = bus
+                .subscribe_typed(
+                    lamp_msgs::NameHeard::TOPIC,
+                    "second",
+                    lamp_msgs::NameHeard::TYPE,
+                )
+                .unwrap();
+            let mut eyes = bus
+                .publisher_declared(
+                    lamp_msgs::Faces::TOPIC,
+                    &lamp_msgs::Faces::declaration(),
+                    "eyes",
+                )
+                .unwrap();
+            let mut desk = CarryDesk::new_in(false, false);
+            desk.heeding.name_or_follow_up = false;
+            if let Some(faces) = looked {
+                eyes.publish_json(monotonic_us(), &lamp_msgs::Faces { faces })
+                    .unwrap();
+            }
+            let in_view = crate::bus_out::faces_in_view(&bus);
+            desk.heeding.bus = Some((bus, names));
+            desk.answered(3);
+            (in_view, desk.line(1, "", words))
+        };
+        let (in_view, held) = verdict(None, "Mark, can you pass me that?");
+        assert_eq!(in_view, None, "no look on the bus");
+        assert_eq!(
+            held,
+            Some(TO_ANOTHER),
+            "with no look, the name stays a name"
+        );
+        let (in_view, held) = verdict(Some(vec![face("f1")]), "May, what would you do?");
+        assert_eq!(in_view, Some(1), "one face in a fresh look");
+        assert_eq!(held, None, "one person seen: the name is a word");
+        let (in_view, held) = verdict(
+            Some(vec![face("f1"), face("f2")]),
+            "May, what would you do?",
+        );
+        assert_eq!(in_view, Some(2), "two faces in a fresh look");
+        assert_eq!(held, Some(TO_ANOTHER), "two people: the name stays a name");
+        let (_, held) = verdict(Some(vec![face("f1")]), "Anna, what would you do?");
+        assert_eq!(held, Some(TO_ANOTHER), "a name that is no word");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A two-second colleague line begun at +3 s ends at +5 s. First's
