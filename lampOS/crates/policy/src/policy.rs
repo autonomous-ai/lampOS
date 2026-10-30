@@ -171,6 +171,16 @@ pub enum Note {
         /// A hard rule that answered `wait`, or turned a yes to it.
         guard: Option<hello::Hold>,
     },
+    /// The judge's answer for a hello the hard rules decided
+    /// (`--hello-by-rule`), asked in shadow: never acted on.
+    HelloJudged {
+        arrival: u64,
+        decided: progress::Choice,
+        /// What the judge would have decided, if it answered.
+        judged: Option<(progress::Choice, f32)>,
+        took_ms: u32,
+        failed: Option<&'static str>,
+    },
     /// A decision was made.
     Decided {
         number: u64,
@@ -315,6 +325,26 @@ impl fmt::Display for Note {
                 if by_rule { RULE } else { "model" },
                 guard.map_or("none", hello::Hold::as_str),
             ),
+            Self::HelloJudged {
+                arrival,
+                decided,
+                judged,
+                took_ms,
+                failed,
+            } => match judged {
+                Some((choice, probability)) => write!(
+                    f,
+                    "hello judge in shadow arrival={arrival} decided={} judge={} probability={probability:.3} took_ms={took_ms}",
+                    decided.as_str(),
+                    choice.as_str(),
+                ),
+                None => write!(
+                    f,
+                    "hello judge in shadow arrival={arrival} decided={} judge=none failed={} took_ms={took_ms}",
+                    decided.as_str(),
+                    failed.unwrap_or("unknown"),
+                ),
+            },
             Self::Decided {
                 number,
                 choice,
@@ -1296,6 +1326,20 @@ impl Policy<'_> {
             (now.saturating_duration_since(at) <= seen_for)
                 .then_some((Some(near > 0), (near > 0).then_some(facing > 0)))
         });
+        // The judge's answer asked in shadow (`--hello-by-rule`): written
+        // down only, after the hello it is about was decided and published.
+        if let Some(judged) = self.hello.as_mut().and_then(Hello::judge_turn) {
+            self.write_line(judged.at_unix_ms, &judged);
+            (self.say)(Note::HelloJudged {
+                arrival: judged.context.arrival,
+                decided: judged.decided,
+                judged: judged
+                    .judgement
+                    .map(|judgement| (judgement.choice, judgement.probability)),
+                took_ms: judged.took_ms,
+                failed: judged.failed,
+            });
+        }
         let Some(decided) = self
             .hello
             .as_mut()
@@ -1306,7 +1350,23 @@ impl Policy<'_> {
         // Published first: the voice is waiting for it.
         self.publish(&decided.decision);
         let line = &decided.line;
-        match self.record.write(line.at_unix_ms, line) {
+        self.write_line(line.at_unix_ms, line);
+        let number = self.hello.as_ref().map_or(0, |h| h.totals().decided);
+        (self.say)(Note::HelloDecided {
+            number,
+            arrival: line.context.arrival,
+            choice: line.judgement.choice,
+            probability: line.judgement.probability,
+            by_rule: line.judgement.from_rule,
+            took_ms: line.took_ms,
+            guard: line.guard,
+        });
+    }
+
+    /// Write one line to the decisions log, saying when writing fails and
+    /// when it works again.
+    fn write_line<T: serde::Serialize>(&mut self, unix_ms: u64, line: &T) {
+        match self.record.write(unix_ms, line) {
             Ok(()) => {
                 if let Some(missing) = self.log.right() {
                     (self.say)(Note::LogWriting { missing });
@@ -1319,16 +1379,6 @@ impl Policy<'_> {
                 }
             }
         }
-        let number = self.hello.as_ref().map_or(0, |h| h.totals().decided);
-        (self.say)(Note::HelloDecided {
-            number,
-            arrival: line.context.arrival,
-            choice: line.judgement.choice,
-            probability: line.judgement.probability,
-            by_rule: line.judgement.from_rule,
-            took_ms: line.took_ms,
-            guard: line.guard,
-        });
     }
 
     fn publish(&mut self, decision: &Decision) {
@@ -1462,6 +1512,14 @@ impl Policy<'_> {
                 // Only with `--rules`.
                 let report = if hello.obeys_rules() {
                     report.with("hello_held_rule", totals.held_rule)
+                } else {
+                    report
+                };
+                // Only with `--hello-by-rule`: the judge asked in shadow.
+                let report = if hello.by_rule() {
+                    report
+                        .with("hello_judged", totals.judged)
+                        .with("hello_judge_differs", totals.judge_differs)
                 } else {
                     report
                 };

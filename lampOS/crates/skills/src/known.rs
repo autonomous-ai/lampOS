@@ -72,14 +72,22 @@ pub fn person_in(path: &Path, fresh: Duration) -> Option<String> {
     let text = std::fs::read_to_string(path).ok()?;
     let (name, id) = lamp_msgs::known::read_known(&text)?;
     Some(match id {
-        Some(id) if id.len() == ASK_ID_BYTES => id.to_owned(),
+        Some(id) if askable(id) => id.to_owned(),
         _ => lamp_msgs::known::person_id(name),
     })
 }
 
-/// The length of a person id a skill's ask carries (`lamp_msgs::SkillAsk`):
-/// `p-` and 16 hex digits, without the eyes' `-N` for a shared one.
-const ASK_ID_BYTES: usize = 18;
+/// Whether `id` is one a skill's ask may carry, as `lamp_msgs::SkillAsk`'s
+/// check wants it: `p-` and 16 lowercase hex digits, without the eyes' `-N`
+/// for a shared one. Any other shape would be dropped by the Policy, and
+/// with it the hello.
+fn askable(id: &str) -> bool {
+    id.len() == 18
+        && id.starts_with("p-")
+        && id[2..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
 
 #[cfg(test)]
 mod tests {
@@ -141,6 +149,18 @@ mod tests {
             person_in(&known, fresh),
             Some(lamp_msgs::known::person_id("Alpha"))
         );
+        // Nor is any other 18 bytes the ask's check would drop (the
+        // Reviewer-lead on #4625): the name's id instead, never no hello.
+        for odd in [
+            "p-BE9688998F085098",
+            "q-be9688998f085098",
+            "p-be9688998f08509z",
+        ] {
+            std::fs::write(&known, format!("Alpha\n{odd}\n")).unwrap();
+            let person = person_in(&known, fresh);
+            assert_ne!(person.as_deref(), Some(odd));
+            assert!(person.is_none_or(|id| askable(&id)), "{odd}");
+        }
         let old = SystemTime::now() - Duration::from_secs(10);
         std::fs::File::options()
             .write(true)
