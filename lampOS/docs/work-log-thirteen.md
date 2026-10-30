@@ -326,3 +326,14 @@ Ready for lamp-voice: yes (#4507, behind `LAMP_NAME_SAID_TO_A_PERSON`, off; Part
 - Two engine tests; with the let-go removed, the first fails and the second still passes.
 - Gate on 550c8ee069: voice lib 4170/3, the three being known timed motor tests (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean. After a clean rebase: fmt, clippy and the focused tests clean.
 - c0a4 from the Mac: off reproduced it (1 of 3 rounds); on, the cut-before-its-answer case wasn't reached in 12 rounds, so the let-go on a lamp is in Not verified.
+
+### #4594, the conversation window measured to a line's start (#4604)
+
+Ready for lamp-voice: yes (#4604, behind `LAMP_WINDOW_FROM_START`, off; Part of #4594)
+
+- Migrate's launch finding 2: a follow-up begun 9 s after the lamp's words and spoken for 13 s was held as no conversation going on (lamp-3e83, 15 of 41 lines held).
+- With the switch, the thread's 45 s, the 20 s after the words, a call's 15 s and held lines' 90 s are measured to when the line began; a busy room's 15 s is still counted to the judging. The journal says how long a held line ran.
+- One test, both ways; without the measure to the start it fails (mutation in a throwaway worktree).
+- Reviewer-two's HOLD (no switch) answered with the switch; the census and promote `notes` tests caught two missing pieces (process.rs pass list, the plain line).
+- Gate on 798bbec50f: voice lib 4274/4 before the census fix (3 known motor flakes, #1569, and the census test, then 45/0 on `process::`); lamp-update lib 352/0; clippy, fmt, workspace build clean. Merged in train 423.
+- Played check (owner, companion, busy_day, off against on) asked as `4ACE RUN #4604`.
