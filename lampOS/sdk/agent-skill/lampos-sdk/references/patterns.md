@@ -220,7 +220,8 @@ async def alert(lamp, text, urgent=False):
     await lamp.light("purple", 3, 20_000, pattern="pulse" if urgent else None)
     if urgent:
         try:
-            await lamp.say(text[:300])
+            # A say is at most 900 bytes of UTF-8, not characters.
+            await lamp.say(text.encode()[:900].decode(errors="ignore"))
         except LampError as refused:      # quiet hours, private: the light is enough
             print("said nothing:", refused.code)
 

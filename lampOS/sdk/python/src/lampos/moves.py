@@ -6,8 +6,9 @@ and the fake lamp holds a computer's `move` to it, as lamp-control does
 from __future__ import annotations
 
 MOVE_STEP_MS = (40, 1_000)
-# A computer's move: 2 to 500 frames (lamp-control's protocol.rs FRAMES).
-MOVE_FRAMES = (2, 500)
+# A computer's move: 2 frames at the least (lamp-control's protocol.rs
+# FRAMES_MIN); its most are the body's check's (10 s at a 40 ms step, 251).
+MOVE_FRAMES_MIN = 2
 MOVE_LASTS_MS = (1_500, 10_000)
 # Head pitch, head roll, base yaw, shoulder, elbow: counts from rest, and
 # counts a second.
@@ -43,8 +44,8 @@ def move_refusal(step_ms: int, frames: list[list[int]]) -> str | None:
     None for one it takes."""
     if not MOVE_STEP_MS[0] <= step_ms <= MOVE_STEP_MS[1]:
         return f"step_ms: from {MOVE_STEP_MS[0]} to {MOVE_STEP_MS[1]}"
-    if not MOVE_FRAMES[0] <= len(frames) <= MOVE_FRAMES[1]:
-        return f"frames: from {MOVE_FRAMES[0]} to {MOVE_FRAMES[1]}"
+    if len(frames) < MOVE_FRAMES_MIN:
+        return f"frames: at least {MOVE_FRAMES_MIN}"
     if frames[0] != [0] * 5 or frames[-1] != [0] * 5:
         return "frames: start and end at home, all five 0"
     why = move_why(step_ms, frames)

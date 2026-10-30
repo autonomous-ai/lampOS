@@ -1,9 +1,10 @@
 //! Who holds which part, and for how long (docs/control.md, "Who wins").
 //!
 //! A client takes a lease on the parts it wants to drive for at most
-//! [`HOLD_MAX_MS`], renews it before it lapses, and may keep renewing for at
-//! most [`TAKE_MAX_US`] from the take; then it takes again, so no client
-//! holds the lamp for good by renewing. One client holds a part at a time.
+//! [`LEASE_MAX_MS`] and renews it before it lapses; renewed in time, it is
+//! held as long as its holder keeps renewing (no ceiling: the owner's "no
+//! limits for developers", 30 Oct). One client holds a part at a time, and
+//! every loss below still ends it.
 //!
 //! The lamp takes its body back without asking: someone talking to it
 //! *suspends* every lease (held again when the talk ends, if not lapsed by
@@ -11,10 +12,7 @@
 //! app or a revoke *loses* it. Each change is an event for its holder. The
 //! clock is the caller's (monotonic microseconds), so tests step it.
 
-use crate::protocol::{HOLD_MAX_MS, LeaseState, LeaseWhy, Part};
-
-/// The longest one take may be renewed for, from the take: 10 minutes.
-pub const TAKE_MAX_US: u64 = 10 * 60 * 1_000_000;
+use crate::protocol::{LEASE_MAX_MS, LeaseState, LeaseWhy, Part};
 
 /// A lease's change, for its holder.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,7 +34,7 @@ pub enum Refusal {
     Lost(LeaseWhy),
     /// Held, but suspended while someone talks to the lamp.
     Suspended,
-    /// Not a hold the protocol allows ([`HOLD_MAX_MS`]).
+    /// Not a hold the protocol allows ([`LEASE_MAX_MS`]).
     BadHold,
 }
 
@@ -45,7 +43,6 @@ struct Lease {
     id: String,
     client: String,
     parts: Vec<Part>,
-    taken_us: u64,
     until_us: u64,
     suspended: bool,
 }
@@ -88,7 +85,7 @@ impl Leases {
         for_ms: u32,
         now_us: u64,
     ) -> Result<Held, Refusal> {
-        if !(1..=HOLD_MAX_MS).contains(&for_ms) || parts.is_empty() {
+        if !(1..=LEASE_MAX_MS).contains(&for_ms) || parts.is_empty() {
             return Err(Refusal::BadHold);
         }
         self.expire(now_us);
@@ -110,7 +107,6 @@ impl Leases {
             id: id.clone(),
             client: client.to_owned(),
             parts,
-            taken_us: now_us,
             until_us,
             suspended: false,
         });
@@ -120,8 +116,8 @@ impl Leases {
         })
     }
 
-    /// Renews `client`'s lease for `for_ms` more from now, never past
-    /// [`TAKE_MAX_US`] from its take.
+    /// Renews `client`'s lease for `for_ms` more from now. A lease renewed
+    /// before it lapses has no ceiling.
     pub fn renew(
         &mut self,
         client: &str,
@@ -129,14 +125,13 @@ impl Leases {
         for_ms: u32,
         now_us: u64,
     ) -> Result<Held, Refusal> {
-        if !(1..=HOLD_MAX_MS).contains(&for_ms) {
+        if !(1..=LEASE_MAX_MS).contains(&for_ms) {
             return Err(Refusal::BadHold);
         }
         self.expire(now_us);
         let index = self.find(client, lease)?;
         let held = &mut self.held[index];
-        let cap = held.taken_us + TAKE_MAX_US;
-        held.until_us = (now_us + u64::from(for_ms) * 1_000).min(cap);
+        held.until_us = now_us + u64::from(for_ms) * 1_000;
         Ok(Held {
             lease: held.id.clone(),
             until_us: held.until_us,
@@ -388,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn a_lease_lapses_unless_renewed_and_never_past_ten_minutes_from_its_take() {
+    fn a_lease_lapses_unless_renewed_and_is_held_while_renewed_in_time() {
         let mut leases = Leases::new();
         leases.take("c_1", &[Part::Body], 30_000, 0).unwrap();
         assert_eq!(
@@ -414,29 +409,35 @@ mod tests {
             leases.renew("c_1", "l_1", 1_000, 50 * S),
             Err(Refusal::Lost(LeaseWhy::Expired))
         );
-        // Renewed every 20 s, it still ends ten minutes after its take.
+        // Renewed every 20 s, it is still held an hour after its take (the
+        // old ten-minute ceiling is gone), and lapses once renewals stop.
         leases.take("c_1", &[Part::Body], 30_000, 100 * S).unwrap();
         let mut now = 100 * S;
-        let mut until = 0;
-        while now < 100 * S + TAKE_MAX_US {
+        while now < 100 * S + 3_600 * S {
             now += 20 * S;
-            match leases.renew("c_1", "l_2", 30_000, now) {
-                Ok(held) => until = held.until_us,
-                Err(refusal) => {
-                    assert_eq!(refusal, Refusal::Lost(LeaseWhy::Expired));
-                    break;
-                }
-            }
+            let held = leases.renew("c_1", "l_2", 30_000, now).unwrap();
+            assert_eq!(held.until_us, now + 30 * S);
         }
-        assert_eq!(until, 100 * S + TAKE_MAX_US);
-        assert!(leases.lapse(100 * S + TAKE_MAX_US).len() <= 1);
-        assert_eq!(leases.holder(Part::Body, 100 * S + TAKE_MAX_US), None);
+        assert!(leases.lapse(now + 29 * S).is_empty());
+        assert_eq!(leases.holder(Part::Body, now + 29 * S), Some("c_1"));
+        assert_eq!(leases.lapse(now + 30 * S).len(), 1);
+        assert_eq!(leases.holder(Part::Body, now + 30 * S), None);
+        // A take or renew may ask for up to ten minutes at once.
+        let later = now + 100 * S;
+        leases.take("c_1", &[Part::Body], 600_000, later).unwrap();
+        assert_eq!(
+            leases
+                .renew("c_1", "l_3", 600_000, later + 500 * S)
+                .unwrap()
+                .until_us,
+            later + 1_100 * S
+        );
         assert_eq!(
             leases.take("c_1", &[Part::Body], 0, 0),
             Err(Refusal::BadHold)
         );
         assert_eq!(
-            leases.take("c_1", &[Part::Body], 30_001, 0),
+            leases.take("c_1", &[Part::Body], 600_001, 0),
             Err(Refusal::BadHold)
         );
         assert_eq!(leases.take("c_1", &[], 1_000, 0), Err(Refusal::BadHold));
