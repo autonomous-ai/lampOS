@@ -1167,19 +1167,22 @@ ends with one line, its outcome as `round::Outcome` writes it. The same end
 has a name in `log.jsonl` (`outcome`) and on `update/status` (`last`), from
 `Outcome::kind`; **that name is never in the journal**, so a run sheet greps
 the text below, not `self-switched` or `self-confirmed` (#4561's P2). `serve`
-says an end only when its text differs from the last one it said, so a lamp
-up to date for hours says `up to date: build N` once.
+says an end only when its text differs from the last one it said in the same
+run, so a lamp up to date for hours says `up to date: build N` once per run of
+`serve` (again after a restart, a self-switch or a climb). A `once` or `check`
+by hand prints its end on standard output with no `lamp-update: ` before it;
+only a self-switch or a climb goes to the journal's form, before its `exec`.
 
 | The journal line begins | Its name | Means |
 |---|---|---|
 | `up to date: build N` | `up-to-date` | nothing to do |
 | `nothing changed: …` | `unreachable`, `nothing-published` | the channel couldn't be read, or has no build |
-| `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, or its updater put back before |
+| `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before, or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
 | `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, or `another lamp-update is at work` |
 | `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
 | `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts (or with none to change) |
 | `build N needs updater M; lamp-update switches from its build A to B, which the build carries, and takes nothing else of it until that one has confirmed itself` | `self-switched` | a **climb**: only the updater the build carries is taken |
-| `build N put back: …; the previous build is well` | `rolled-back` | the parts were put back (the watch, or a start that failed) |
+| `build N put back: …; the previous build is well`, or `…; the previous build is not well either: …` | `rolled-back` | the parts were put back (the watch, or a start that failed). The second ending, the old build failing its own check too, is the one to post at once; grep `build N put back:` for both |
 | `failed: …` | `failed` | an error, said with why |
 
 Inside a round: `switching to build N`, `waiting for a quiet moment: …`
@@ -1189,7 +1192,9 @@ After a self-switch or a climb, the new updater says
 (`self-confirmed` in `log.jsonl`), or `not confirmed yet: …` and
 `not confirmed: …`, each when its text changes, looking again every 30 s
 (`main.rs`). A climb's parts switch follows the confirm in the same `serve`
-run.
+run. A new updater that never confirms is put back by `lamp-update-back`,
+in its own unit's journal (`journalctl -u lamp-update-back`, lines
+`lamp-update-back: …`), not `-u lamp-update`.
 
 ### The second route's services in a round
 
