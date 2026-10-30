@@ -54,12 +54,13 @@ STATE_OF_EVENT = {
     "person.stood_up": "presence",
     "person.facing": "presence",
     "lamp.changed": "lamp",
+    "air.changed": "air",
 }
-STATES = ("presence", "light", "mood", "lamp")
+STATES = ("presence", "light", "mood", "lamp", "air", "device")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
 # here needs none.
-STATE_NEEDS = {"presence": "look"}
+STATE_NEEDS = {"presence": "look", "air": "air", "device": "device"}
 EVENT_NEEDS = {
     "person.arrived": "look",
     "person.left": "look",
@@ -69,6 +70,7 @@ EVENT_NEEDS = {
     "phrase.heard": "hear",
     "name.heard": "hear",
     "sound.heard": "sound",
+    "air.changed": "air",
 }
 # Which `limits` kind each op counts against (docs/control.md, "Limits").
 LIMIT_KIND = {
@@ -337,6 +339,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "light": "its light",
         "mood": "its mood",
         "lamp": "whether it is talking, paused, private or asleep",
+        "air": "the air at its sensor (particles, carbon dioxide, humidity, temperature, and how it feels)",
+        "device": "its own computer (processor load, memory, disk free, temperatures)",
     }
 
     @server.tool(
@@ -344,7 +348,9 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         + ", ".join(state_words[state] for state in states)
         + f". `which` is some of {', '.join(states)}; by default all of them."
     )
-    async def lamp_state(which: list[Literal["presence", "light", "mood", "lamp"]] | None = None) -> dict:
+    async def lamp_state(
+        which: list[Literal["presence", "light", "mood", "lamp", "air", "device"]] | None = None,
+    ) -> dict:
         ungranted = [state for state in which or [] if state not in states]
         if ungranted:
             raise ToolError(f"no_grant: this computer may read {', '.join(states)}")
