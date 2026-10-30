@@ -29,6 +29,7 @@ fn message(log: &Log) -> Message {
             at_us: 10,
             at_unix_ms: log.created_unix_ms + 5,
             expires_ms: None,
+            clock: None,
         },
         payload: serde_json::to_vec(log).unwrap(),
         gap: 0,

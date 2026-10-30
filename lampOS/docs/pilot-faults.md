@@ -516,8 +516,9 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   privacy observation while waiting", while every other part was starting.
   The privacy worker reads the mute switch every 5 ms and an observation is
   fresh for 50 ms (`PRIVACY_FRESH_US`); one read late by a busy boot was
-  fatal. Every clock on this path is `CLOCK_MONOTONIC`, so the wall clock
-  being set by NTP after the cut does not enter it. While nothing is open, a
+  fatal. Every clock of the observation itself is `CLOCK_MONOTONIC`; the
+  bus header's lifespan and lateness were judged by the wall clock until
+  queue #3997 C (the next entry). While nothing is open, a
   late observation now only keeps the gate closed; the wait ends only when
   no fresh observation has come for 1 s (`UNAVAILABLE_WAIT`). The gate's own
   rules are unchanged: only fresh, ordered, stable observations open it.
@@ -554,6 +555,21 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   does, and says `it underran while held up mid-answer; the answer is cut,
   priming again`. More than 3 in 10 s still ends the worker
   (`audio-device-seam.md`).
+
+- **A wall clock stepped by chrony during start-up.** On lamp-06c1, in 4 of
+  4 cold boots, chrony stepped the wall clock by about +20 s some 46 s in,
+  and the voice then said "privacy publisher unavailable" (the step read as
+  a 20 s silence of `controls/state`, `Notice::Late`) or "invalid Controls
+  message discarded" (a state in flight across the step expired by its
+  `at_unix_ms`). The bus judged lifespan and silence by the wall clock, and
+  the voice repeated that check. Controls' state header now says its
+  `clock`, the kernel boot id, and the bus and the voice judge such a
+  header by `at_us`, CLOCK_MONOTONIC: no silence, no expiry from a step
+  either way, a `latest` file of an earlier boot expired, and a Controls
+  without `clock` (a mixed update round) read by the wall clock as before,
+  with one journal line (`docs/bus.md`, "Which clock judges a message").
+  It likely also ended a running voice with exit 1 in the field; that has
+  no journal yet.
 
 Not found yet: the power cut's first exit (exit 1 at 19.8 s, with no message
 of its own) and the provider's "Connection refused" at 24.7 s; that boot's

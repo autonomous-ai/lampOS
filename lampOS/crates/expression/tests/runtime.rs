@@ -6,8 +6,11 @@ use lamp_msgs::{
 };
 use std::{
     fs,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
+    path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -27,6 +30,28 @@ impl Drop for Root {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
+}
+
+/// A bus on the test's own clocks (`Bus::clocks`, #1386): a wall, in ms
+/// since 1970, that stands at the host's when the bus is made and moves only
+/// when the test moves it, and as the monotonic clock that wall in
+/// microseconds. Every publish is stamped with that one wall however long
+/// the host takes over its topic's files, so a stall can't age an input past
+/// its limit before the service reads it (#3315's three rows failed so beside
+/// other processes' file churn on a Mac).
+fn bus_on_its_own_clocks(root: &Path) -> (Bus, Arc<AtomicU64>) {
+    let wall_ms = Arc::new(AtomicU64::new(runtime::unix_ms()));
+    let bus = Bus::new(root).unwrap().clocks(
+        {
+            let wall_ms = wall_ms.clone();
+            move || wall_ms.load(Ordering::Relaxed)
+        },
+        {
+            let wall_ms = wall_ms.clone();
+            move || wall_ms.load(Ordering::Relaxed) * 1_000
+        },
+    );
+    (bus, wall_ms)
 }
 
 fn voice(at_us: u64) -> VoiceTiming {
@@ -75,7 +100,9 @@ fn populate(bus: &Bus, at_us: u64) -> u64 {
         .unwrap()
         .publish_json(7, &joints)
         .unwrap();
-    runtime::unix_ms()
+    // The bus's own wall: the host's on a plain bus, the test's on
+    // [`bus_on_its_own_clocks`].
+    bus.now().unix_ms
 }
 
 #[test]
@@ -121,7 +148,7 @@ fn the_heads_topics_are_read_only_with_head_touch() {
 #[test]
 fn enabled_output_uses_a_new_session_and_expires_after_input_loss() {
     let root = Root::new();
-    let bus = Bus::new(&root.0).unwrap();
+    let (bus, _) = bus_on_its_own_clocks(&root.0);
     let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
     let wall = populate(&bus, 10_000_000);
     let output = service.step(|| 10_000_000, wall);
@@ -200,6 +227,7 @@ fn message(topic: &str, kind: &str, payload: serde_json::Value) -> Message {
             at_us: 987_654_321,
             at_unix_ms: 1_000,
             expires_ms: None,
+            clock: None,
         },
         payload: serde_json::to_vec(&payload).unwrap(),
         gap: 0,
@@ -597,6 +625,11 @@ mod sleep_name {
         /// step at this phase and this energy.
         mood: Option<(Publisher, f32, f32)>,
         now_us: u64,
+        /// The bus's wall clock, in ms since 1970: what every publish here
+        /// is stamped with, and what the service is given. It moves only
+        /// with `now_us`, so a host that stalls a publish's file work (its
+        /// topic's `latest`) ages no input (#1386).
+        wall_ms: Arc<AtomicU64>,
         state: Voice,
         _root: Root,
     }
@@ -633,16 +666,18 @@ mod sleep_name {
             mood: Option<(f32, f32)>,
         ) -> Self {
             let root = Root::new();
-            let bus = Bus::new(&root.0).unwrap();
+            // On the fixture's own clocks, whose wall moves only with each
+            // step (#1386).
+            let (bus, wall_ms) = bus_on_its_own_clocks(&root.0);
             let mut catalogue =
                 Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
             let sleep = catalogue.alive.as_mut().unwrap().sleep.as_mut().unwrap();
             sleep.nobody_us = 60 * SECOND_US;
             sleep.name_requires_speech = true;
             catalogue.check().unwrap();
-            // The bus still supplies real publication wall times. Select a
-            // night-time offset without changing those envelope timestamps.
-            let offset = 23 * 60 + 30 - i32::from(runtime::minute_of_day(runtime::unix_ms(), 0));
+            // Select a night-time offset without changing the bus's wall.
+            let offset = 23 * 60 + 30
+                - i32::from(runtime::minute_of_day(wall_ms.load(Ordering::Relaxed), 0));
             let mut service = runtime::Service::new(&bus, catalogue, true, "test")
                 .unwrap()
                 .with_local_time(offset);
@@ -714,6 +749,7 @@ mod sleep_name {
                     )
                 }),
                 now_us: START_US,
+                wall_ms,
                 state: Voice::Resting,
                 _root: root,
             }
@@ -790,11 +826,16 @@ mod sleep_name {
 
         fn step_by(&mut self, step_us: u64) -> Output {
             self.now_us += step_us;
+            // The bus's wall moves with the step, and not while the inputs
+            // below are published: each is stamped with `wall`, the one the
+            // service is given, however long the host takes over the
+            // topics' files. Before, a host stall here aged the first
+            // inputs past their limits (#1386), or placed this step's room
+            // before the last one's (#1196).
+            let wall = self.wall_ms.fetch_add(step_us / 1_000, Ordering::Relaxed) + step_us / 1_000;
             let mut timing = voice(self.now_us);
             timing.stamp.sequence = self.now_us + 1;
             timing.state = self.state;
-            // No envelope published below is older than this.
-            let publishing = runtime::unix_ms();
             // Loosest limit first, strictest last (#912): the room (2 s),
             // the voice and the faces (500 ms), the joints (300 ms).
             self.room
@@ -827,17 +868,6 @@ mod sleep_name {
                     },
                 )
                 .unwrap();
-            // Anchor the ordinary inputs' final publication wall sample;
-            // the service's first injected clock sample is paired with it.
-            let wall = runtime::unix_ms();
-            // The service places each bus input at `now` less its wall age.
-            // A host stall of more than a tick while publishing would place
-            // this step's room before the last one's, refused as out of
-            // order (#1196). Like a lamp's, this clock then keeps up with the wall.
-            self.now_us += (wall.saturating_sub(publishing) * 1_000).saturating_sub(step_us);
-            // Mood is sampled at the first clock read inside Service::step.
-            // Stamp it after the other publications' clock adjustment.
-            let began_us = self.now_us;
             if let Some((mood, phase, energy)) = self.mood.as_mut() {
                 let state = lamp_msgs::MoodState {
                     stamp: ClockStamp {
@@ -860,22 +890,9 @@ mod sleep_name {
                     }),
                 };
                 mood.publish_json(987_654_321, &state).unwrap();
-                self.now_us += runtime::unix_ms().saturating_sub(wall) * 1_000;
             }
-            // Later receives and the planner tick include Mood's publication
-            // work. With `wall` paired to `began_us`, the service then maps
-            // every input's real wall age without moving Mood's read boundary.
-            let read_began = std::cell::Cell::new(false);
-            let output = self.service.step(
-                || {
-                    if read_began.replace(true) {
-                        self.now_us
-                    } else {
-                        began_us
-                    }
-                },
-                wall,
-            );
+            let now_us = self.now_us;
+            let output = self.service.step(|| now_us, wall);
             assert_eq!(self.service.counts.refused, 0);
             assert_eq!(self.service.counts.input_errors, 0);
             output
@@ -1157,7 +1174,11 @@ mod sleep_name {
                 .spawn()
                 .unwrap(),
         );
-        let deadline = Instant::now() + Duration::from_secs(15);
+        // A hang guard only: the test checks what the child journaled. Its
+        // run is about 0.2 s alone, but every step's four publishes rewrite
+        // their topics' `latest` files, and beside eight processes' file
+        // churn on a Mac it took 57 to 82 s, journaling as it should (#1386).
+        let deadline = Instant::now() + Duration::from_secs(120);
         let status = loop {
             if let Some(status) = child.0.try_wait().unwrap() {
                 break status;
@@ -1218,7 +1239,7 @@ fn without_a_pause_said_expression_asks_exactly_as_before() {
     // requests, but for the lease each new session names.
     let asked = |said: Option<bool>| {
         let root = Root::new();
-        let bus = Bus::new(&root.0).unwrap();
+        let (bus, _) = bus_on_its_own_clocks(&root.0);
         if let Some(paused) = said {
             keeper(&bus)
                 .publish_json(1, &lamp_msgs::Pause { paused })
@@ -1243,7 +1264,7 @@ fn without_a_pause_said_expression_asks_exactly_as_before() {
 fn only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline() {
     let face = |offline_face: bool| {
         let root = Root::new();
-        let bus = Bus::new(&root.0).unwrap();
+        let (bus, _) = bus_on_its_own_clocks(&root.0);
         let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
         if offline_face {
             service = service.with_offline_face(&bus);

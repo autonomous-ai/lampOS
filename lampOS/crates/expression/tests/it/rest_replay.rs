@@ -444,6 +444,7 @@ fn message(input: &Value) -> Message {
             at_us: 9_999_999_999,
             at_unix_ms: 1_000,
             expires_ms: None,
+            clock: None,
         },
         payload: serde_json::to_vec(&payload).unwrap(),
         gap: 0,

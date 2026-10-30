@@ -670,6 +670,7 @@ fn message() -> Message {
             at_us: 999_999_999,
             at_unix_ms: 1_000,
             expires_ms: Some(500),
+            clock: None,
         },
         payload: serde_json::to_vec(&request(START, 1, 1, Op::Rest)).unwrap(),
         gap: 0,

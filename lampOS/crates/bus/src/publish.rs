@@ -262,6 +262,9 @@ pub struct Publisher {
     unlisted: bool,
     /// Pure cadence reads; the caller owns any fixture-time advancement.
     cadence_now: Box<dyn Fn() -> Instant + Send + Sync>,
+    /// The bus's clocks: the wall clock for `at_unix_ms`, and the boot a
+    /// monotonic stamp names.
+    clocks: crate::clock::Clocks,
 }
 
 /// Sixteen hex characters no other publisher instance is likely to have:
@@ -318,6 +321,7 @@ impl Publisher {
                 at_us: 0,
                 at_unix_ms: 0,
                 expires_ms: None,
+                clock: None,
             },
             seq: 0,
             directory_mode: bus.directory_mode,
@@ -334,6 +338,7 @@ impl Publisher {
             listed: false,
             unlisted: false,
             cadence_now: Box::new(now),
+            clocks: bus.clocks.clone(),
         })
     }
 
@@ -406,6 +411,20 @@ impl Publisher {
     /// arrives later than this.
     pub fn expires_after(&mut self, lasting: Option<Duration>) {
         self.header.expires_ms = lasting.map(|lasting| lasting.as_millis() as u64);
+    }
+
+    /// Say that every `at_us` this publisher is given from now on is the
+    /// kernel's CLOCK_MONOTONIC ([`crate::monotonic_us`], as
+    /// `lamp_ipc::monotonic_us` reads it), by stamping each header's `clock`
+    /// with this boot's id. A subscriber of the same boot then judges the
+    /// message's age and silence by `at_us`, which a time server setting the
+    /// wall clock does not move. Only the caller knows what its `at_us` is,
+    /// so nothing is stamped unless it says so. Returns whether it is
+    /// stamped: not where the bus knows no boot id (macOS), and then the
+    /// wall clock judges as before.
+    pub fn stamp_monotonic_clock(&mut self) -> bool {
+        self.header.clock = self.clocks.boot_id().map(str::to_owned);
+        self.header.clock.is_some()
     }
 
     /// Show that this publisher is alive though it has nothing to publish.
@@ -565,7 +584,7 @@ impl Publisher {
         header.enc = enc.into();
         header.seq = sequence;
         header.at_us = at_us;
-        header.at_unix_ms = wire::unix_ms();
+        header.at_unix_ms = self.clocks.wall_ms();
         let mut datagram = SensitiveDatagram::new();
         datagram.encode(&header, bytes)?;
         if !authorized() {
@@ -629,7 +648,7 @@ impl Publisher {
         // refused one must not look like a lost one.
         self.header.seq = self.seq + 1;
         self.header.at_us = at_us;
-        self.header.at_unix_ms = wire::unix_ms();
+        self.header.at_unix_ms = self.clocks.wall_ms();
         let mut datagram = std::mem::take(&mut self.datagram);
         datagram.clear();
         let done = serde_json::to_writer(&mut datagram, &self.header)
