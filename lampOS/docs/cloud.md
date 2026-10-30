@@ -1200,8 +1200,8 @@ a week.
 When the lamp updates itself, the company is told at each stage, so a
 refused or rolled-back update is seen without asking the person. It is not
 a report kind: `lamp-cloud` posts to the backend's alert endpoint, the
-base of the account's `llm_base_url` with `/alert` after it (a trailing
-`/v1` stays), with the voice's key as the bearer and the body
+`/v1/alert` under the account's `llm_base_url`, whether that ends in `/v1`
+or not, with the voice's key as the bearer and the body
 `{"device_id", "type": "ops", "message", "ts", "alert_id"}`
 (`crates/cloud/src/update_alerts.rs`). Health and crash reports are
 untouched.
