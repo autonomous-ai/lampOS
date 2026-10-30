@@ -2525,7 +2525,7 @@ the file is never read back.
 | records | voice sessions, `/var/lib/lampOS/voice/sessions` | folders | n/a | an extra file in a session is refused (`records/src/store.rs:22-28`, `394-396`) | n/a | that session is kept and reported and the run exits 1 (`run.rs:253-261`); a newer voice's sessions are never pruned |
 | eyes | faces from photos, `<people>.from-photos` (only with `--photo-dir`, not in the product unit) | JSON | `version` 1; any other **deletes the file** (`eyes/src/photo.rs:195-209`) | read | n/a | dropped with a line. Off in the product |
 | voice | person's light, `/var/lib/lampOS/light/person.json` (`LAMP_LIGHT_KEEP`, not set in the product) | JSON | none | read (`msgs/src/lib.rs:597`) | an unknown colour filtered (`ring_light.rs:170-175`) | dropped silently, overwritten at the next change. Off |
-| voice | made skills index, `/var/lib/lampOS/voice/made-skills/made.json` (`LAMP_MAKE_SKILL`, off) | JSON | none | `Value` | n/a | unreadable reads as `[]` (`made_skill.rs:510-515`) and is overwritten (`547-575`). Off |
+| voice | made skills index, `/var/lib/lampOS/voice/made-skills/made.json` (`LAMP_MAKE_SKILL`, on in the product since fourteen-P15) | JSON | none | `Value` | n/a | unreadable reads as `[]` (`made_skill.rs:510-515`) and is overwritten (`547-575`). On |
 | tasks | mark of machine-written targets, `targets.json.from-machines` (only `--targets-from-machines`, off) | text | none | n/a | n/a | may overwrite a newer build's targets file whose hash is marked (`runtime.rs:1186-1220`). Off |
 
 ### Low
