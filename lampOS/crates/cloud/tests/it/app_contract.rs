@@ -174,6 +174,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -281,6 +282,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -434,6 +436,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -526,6 +529,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -707,6 +711,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         restart: Some(socket),
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -776,6 +781,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -873,6 +879,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {

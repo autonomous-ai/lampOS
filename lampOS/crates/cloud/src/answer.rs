@@ -156,6 +156,13 @@ pub trait Lamp {
         false
     }
 
+    /// The Skills Store's owner upload and this lamp's key, for a made
+    /// skill sent to the Store (`LAMP_SKILLS_SHARE=on` with the skills page,
+    /// fourteen-P13, `crate::share`).
+    fn share(&self) -> Option<crate::share::Store> {
+        None
+    }
+
     /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
     /// `crate::schedule`): there only with the switch.
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
@@ -216,7 +223,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 43] = [
+pub const KINDS: [(&str, Switch); 46] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -260,6 +267,9 @@ pub const KINDS: [(&str, Switch); 43] = [
     ("guard.off", |lamp| lamp.guard().is_some()),
     ("skills.make", MAKE_SKILL),
     ("skills.made", MAKE_SKILL),
+    (crate::share::KINDS[0], SHARE),
+    (crate::share::KINDS[1], SHARE),
+    (crate::share::KINDS[2], SHARE),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
     ("system.reboot", |lamp| lamp.restarts()),
@@ -269,6 +279,8 @@ pub const KINDS: [(&str, Switch); 43] = [
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
 /// The switch, and a computer to make the skill on (fourteen-P15).
 const MAKE_SKILL: Switch = |lamp| lamp.make_skill().is_some() && lamp.make_skill_ready();
+/// The skills page and the Store's upload (fourteen-P13).
+const SHARE: Switch = |lamp| lamp.skills().is_some() && lamp.share().is_some();
 const KEYS: Switch = |lamp| lamp.changes().is_some_and(|c| c.keys_on());
 const SETTINGS: Switch = |lamp| lamp.changes().is_some();
 const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
@@ -503,6 +515,24 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
             crate::make_skill::made(&socket, data)
         }
+        // A made skill sent to the Skills Store (fourteen-P13): packed here,
+        // only a skill made on this lamp and on, and uploaded with the
+        // lamp's key; a reviewer reads it before anyone can add it.
+        "skills.share" if on(lamp, kind) => {
+            let (places, store) = lamp
+                .skills()
+                .zip(lamp.share())
+                .ok_or_else(|| not_here(kind))?;
+            crate::share::share(&store, &places, data, &std::env::temp_dir()).map(Some)
+        }
+        "skills.shared" if on(lamp, kind) => {
+            let store = lamp.share().ok_or_else(|| not_here(kind))?;
+            crate::share::shared(&store).map(Some)
+        }
+        "skills.unshare" if on(lamp, kind) => {
+            let store = lamp.share().ok_or_else(|| not_here(kind))?;
+            crate::share::unshare(&store, data).map(Some)
+        }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
         // installs it only signed with the Store's key.
@@ -575,6 +605,7 @@ pub mod tests {
         pub guard: Option<std::path::PathBuf>,
         pub make_skill: Option<std::path::PathBuf>,
         pub make_skill_ready: bool,
+        pub share: Option<crate::share::Store>,
         pub update_page: bool,
         /// The bus lamp-update's `update/status` is read from (#2194) and
         /// `update.check` asks on, and the checks asked (#4153).
@@ -673,6 +704,9 @@ pub mod tests {
         }
         fn make_skill_ready(&self) -> bool {
             self.make_skill_ready
+        }
+        fn share(&self) -> Option<crate::share::Store> {
+            self.share.clone()
         }
         fn update_page(&self) -> bool {
             self.update_page
@@ -1173,6 +1207,28 @@ pub mod tests {
                 "guard",
                 |f| f.guard = Some(std::path::PathBuf::from("/nowhere/call.sock")),
                 &["guard.on", "guard.off"],
+            ),
+            (
+                // A made skill sent to the Store (fourteen-P13): its three
+                // kinds only with the page and the Store's upload.
+                "skills share",
+                |f| {
+                    f.skills = Some(places_of(false));
+                    f.share = Some(crate::share::Store {
+                        base: "https://api.test".into(),
+                        key: "k".into(),
+                    });
+                },
+                &[
+                    "skills.list",
+                    "skills.remove",
+                    "skills.off",
+                    "skills.on",
+                    "skills.camera",
+                    "skills.share",
+                    "skills.shared",
+                    "skills.unshare",
+                ],
             ),
             (
                 "make skill",
