@@ -7446,7 +7446,7 @@ impl Heeding {
         self.going_on_same_one = true;
     }
 
-    /// In a busy room, hold a line going on that turns to someone else
+    /// In any room, hold a line going on that turns to someone else
     /// ([`crate::turned_away`], `LAMP_TURNED_AWAY=on`).
     pub(crate) fn holding_lines_turned_away(&mut self) {
         self.turned_away = true;
@@ -8806,12 +8806,13 @@ impl Heeding {
         // lane's P3 on #4201).
         let opens_nothing =
             self.remark_about_it && name_alone && !seen.going_on && attention.played_for_its_name();
-        // In a busy room, a line going on that turns to someone else ends
-        // the conversation for that line (#3882): "Can you pass me the
-        // charger?" to a colleague, after the lamp's answer. A reply to the
+        // In any room, a line going on that turns to someone else ends the
+        // conversation for that line (#3882): "Can you pass me the
+        // charger?" to a colleague, after the lamp's answer. Not only in a
+        // busy room: on lamp-06c1 the room was judged busy in 1 round of 6,
+        // and desk talk was let out as going on all the same. A reply to the
         // lamp's own question is the person's answer, whatever it says.
         if self.turned_away
-            && busy
             && attention.played_only_as_going_on()
             && matches!(verdict, Some(crate::attention::Verdict::Play(_)))
             && !lamp_asked
@@ -15118,15 +15119,26 @@ mod tests {
         );
     }
 
-    /// #3882: with the switch on in a busy room, after the lamp answered,
+    /// #3882: with the switch on in any room, after the lamp answered,
     /// desk talk turned to someone else is held; a real follow-up, a request
     /// with no name mid-conversation, and a reply to the lamp's own question
     /// still play. Off, everything plays as today.
     #[test]
     fn turned_away_holds_desk_talk_and_plays_follow_ups() {
-        use crate::room_told::Room;
+        for room in [
+            crate::room_told::Room::Busy,
+            crate::room_told::Room::Quiet,
+            crate::room_told::Room::Unknown,
+        ] {
+            turned_away_in(room);
+        }
+    }
+
+    /// [`turned_away_holds_desk_talk_and_plays_follow_ups`] in one room:
+    /// the hold doesn't wait for the room to be judged busy.
+    fn turned_away_in(room: crate::room_told::Room) {
         let signs = |going_on, lamp_asked| Signs {
-            room: Room::Busy,
+            room,
             going_on,
             lamp_asked,
             turned: Some(false),
@@ -15158,12 +15170,12 @@ mod tests {
             assert_eq!(
                 judge(false, desk_talk, false),
                 None,
-                "off: played, as today: {desk_talk}"
+                "off, {room:?}: played, as today: {desk_talk}"
             );
             assert_eq!(
                 judge(true, desk_talk, false),
                 Some(crate::turned_away::HELD),
-                "on: held: {desk_talk}"
+                "on, {room:?}: held: {desk_talk}"
             );
         }
         for to_the_lamp in [
@@ -15184,13 +15196,13 @@ mod tests {
             assert_eq!(
                 judge(true, to_the_lamp, false),
                 None,
-                "on: still played: {to_the_lamp}"
+                "on, {room:?}: still played: {to_the_lamp}"
             );
         }
         assert_eq!(
             judge(true, "Yes, grab the umbrella.", true),
             None,
-            "on: a reply to the lamp's own question plays"
+            "on, {room:?}: a reply to the lamp's own question plays"
         );
     }
 

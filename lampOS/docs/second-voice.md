@@ -2861,8 +2861,8 @@ after a take-over, but now for every turn:
   (`Attention::played_only_as_going_on`): it first read a mark only
   `LAMP_SPOKEN_TO` sets, and lamp-52e6 and lamp-4ace run without it.
   **A line turned to someone else** (`LAMP_TURNED_AWAY=on`,
-  `crate::turned_away`, #3882): in a busy room, a line let out only as the
-  conversation going on, answering no question of the lamp's, is held when
+  `crate::turned_away`, #3882): in any room, busy or not, a line let out
+  only as the conversation going on, answering no question of the lamp's, is held when
   it turns to someone else: a role called at its start ("Mom,", "Guys,",
   "Mẹ ơi,"), an object asked for in the words of a request between people
   ("pass me", "hand me", "lend me", "đưa giùm"; never bare "grab the",
@@ -2870,14 +2870,17 @@ after a take-over, but now for every turn:
   line that is all errand between people ("Do you want coffee?", "I'm going
   downstairs"; with a command after it, "I'm going downstairs, turn the
   light off", it plays). The signs are in English and Vietnamese, `held
-  back: a busy room: a conversation with the lamp is going on, but the line
-  turns to someone else: a role called, an object asked for, or an errand`.
+  back: a conversation with the lamp is going on, but the line turns to
+  someone else: a role called, an object asked for, or an errand`.
   On lamp-4ace on 27 Oct, on stable 7632, "Can you pass me the charger? The
   white one." and "Do you want coffee? I'm going downstairs." were answered
   after a conversation with the lamp; desk talk held went from 5/6 to 1/6
   on the same build, as the lines fell inside or outside the 15 s window
   behind answers of different lengths. A follow-up ("And what about
-  tomorrow?") shows none of the signs and plays.
+  tomorrow?") shows none of the signs and plays. Not only in a busy room: on
+  lamp-06c1 on 28 Oct, with the product's switches, the room was judged
+  busy in 1 round of 6, and desk talk was let out as going on in the quiet
+  room's window all the same.
 - **A reply never says it kept something with no `remember` call**
   (finding K on #3504: lamp-06c1, 27 Oct, "Kept: the meeting room is
   called Orange." with `calls=none`, 2 of 4 remembers, the model copying
