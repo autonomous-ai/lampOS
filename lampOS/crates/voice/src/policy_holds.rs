@@ -685,7 +685,7 @@ mod tests {
         for route in [
             Route::Clock,
             Route::Decline,
-            Route::Memory(place.clone(), None),
+            Route::Memory(place.clone(), None, None),
             Route::Nobody,
         ] {
             assert!(!holds(&route, "set_timer"));

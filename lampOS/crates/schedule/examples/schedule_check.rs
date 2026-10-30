@@ -122,6 +122,7 @@ fn disk_checks(path: &Path, warm: usize) -> io::Result<Value> {
     let mut sets = Vec::new();
     for index in 0..=warm {
         let request = Request::Set {
+            person: None,
             guard: Guard {
                 store_id: engine.store_id().into(),
                 revision: engine.revision(),
@@ -597,6 +598,7 @@ fn ipc_measurements(running: &Running, clock: &Injected, warm: usize) -> io::Res
         let status = ask(socket, &Request::Status {})
             .map_err(|error| context(format!("guard Status before Set index {index}"), error))?;
         let request = Request::Set {
+            person: None,
             guard: guard(&status, format!("ipc-set-{index}")).map_err(|error| {
                 context(format!("guard construction for Set index {index}"), error)
             })?,

@@ -480,11 +480,15 @@ lamp-cloud asks it through `lamp_actions::schedule::Adapter`, the client the
 voice's `list_reminders` and `cancel_reminder` go through: a cancel first
 reads the store's identity and revision, and is sent with them as its
 compare-and-set guard; every page is checked; and its failures are fixed
-sentences that never carry a reminder's words (`crate::schedule`). The
-reminders are the household's: anyone at the lamp can already list them or
-cancel one by voice. With the switch the owner's app can too, and their
-words then pass through the broker to the app, where before they left the
-lamp only to the voice's model. Tests: `app_contract.rs`'s
+sentences that never carry a reminder's words (`crate::schedule`). By
+voice, each line hears and cancels only its own, and the ones set by no one
+only on the owner's line (#4527's P2, [schedule.md](schedule.md)). The app
+is the owner's view: it lists and cancels every one, and their words then
+pass through the broker to the app, where before they left the lamp only to
+the voice's model. With the switch, `face.remove` with `entirely` also
+cancels every reminder the person set (`reminders: {"cancelled": n}`, or
+`{"kept": …}` when the schedule could not be reached); without the switch
+the answer is as before, with no `reminders`. Tests: `app_contract.rs`'s
 `schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without`.
 
 ## The lamp's software update (#2194, `update.status`, `update.check`)

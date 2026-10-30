@@ -500,6 +500,86 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+/// #4527's P2: the app removing a person entirely cancels every reminder
+/// they set, by the memory id it forgets, and says how many; the face only
+/// leaves them, and a lamp that gives lamp-cloud no schedule answers as
+/// before.
+#[test]
+fn face_remove_entirely_cancels_the_persons_reminders() {
+    const STORE: &str = "0123456789abcdef0123456789abcdef";
+    let root = PathBuf::from(format!("/tmp/lcfr-{}", std::process::id()));
+    let places = lamp(&root);
+    let who = root.join("who.sock");
+    let listener = UnixListener::bind(&who).unwrap();
+    let eyes = std::thread::spawn(move || {
+        for _ in 0..3 {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(&stream, "{}", json!({"forgot": true})).unwrap();
+        }
+    });
+    let socket = root.join("schedule.sock");
+    let serving = schedule(
+        &socket,
+        vec![
+            (
+                "status",
+                json!({"ok": true, "store_id": STORE, "revision": 4}),
+            ),
+            (
+                "forget",
+                json!({"ok": true, "store_id": STORE, "revision": 5, "forgotten": 2}),
+            ),
+        ],
+    );
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: Some(lamp_cloud::faces::Eyes {
+            socket: who,
+            memory: None,
+        }),
+        schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        share: None,
+        shutdown: None,
+    };
+    let removed = answer(&mut real, "face.remove", &json!({"name": "Lan"}))
+        .unwrap()
+        .unwrap();
+    assert_eq!(removed["reminders"], json!({"cancelled": 2}), "{removed}");
+    serving.join().unwrap();
+    let face_only = answer(
+        &mut real,
+        "face.remove",
+        &json!({"name": "Bo", "entirely": false}),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(face_only.get("reminders").is_none(), "{face_only}");
+    real.schedule = None;
+    let kept = answer(&mut real, "face.remove", &json!({"name": "Mai"}))
+        .unwrap()
+        .unwrap();
+    assert!(kept.get("reminders").is_none(), "{kept}");
+    eyes.join().unwrap();
+    let _ = std::fs::remove_dir_all(root);
+}
+
 /// #2194: `update.status` for the Lamp 2 page, from lamp-update's kept
 /// `update/status` on the bus, with the field types the app takes; `now`
 /// is `unknown` before lamp-update has said anything, and without

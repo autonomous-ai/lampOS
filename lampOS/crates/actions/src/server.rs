@@ -60,6 +60,18 @@ fn listen(directory: &Path) -> io::Result<UnixListener> {
     Ok(listener)
 }
 
+/// The voice's ask to cancel every reminder a person set:
+/// `{"op":"schedule_forget","person":"p-…"}`, exactly.
+pub const FORGET_OP: &str = "schedule_forget";
+
+/// The person a [`FORGET_OP`] line names, when it is exactly one.
+fn forget_asked(request: &Value) -> Option<&str> {
+    let fields = request.as_object()?;
+    (fields.len() == 2 && fields.get("op")?.as_str()? == FORGET_OP)
+        .then(|| fields.get("person")?.as_str())
+        .flatten()
+}
+
 /// One caller: its line, the call, the answer. Names and outcomes are
 /// logged; nothing else of what was asked.
 fn answer<S: Mixer, L: Light>(
@@ -111,19 +123,37 @@ fn answer<S: Mixer, L: Light>(
                 None => crate::caps_service::unavailable(),
             };
             (op.to_owned(), response, None)
+        } else if let Some(person) = request.as_ref().and_then(forget_asked) {
+            // A person's "forget everything about me": the reminders they
+            // set go too (#4527's P2). Only the voice sends it, never a
+            // model's call: it is an op of its own, not a tool name.
+            let response = match schedule {
+                Some(adapter) => adapter.forget_person(person),
+                None => {
+                    serde_json::json!({"ok":false,"code":"unavailable","error":"I cannot use my reminder store just now."})
+                }
+            };
+            (FORGET_OP.to_owned(), response, None)
         } else {
             match (call, schedule) {
                 (Some((name, args)), Some(adapter)) if crate::schedule::is_tool(name) => {
-                    let exact = request
-                        .as_ref()
-                        .and_then(Value::as_object)
-                        .is_some_and(|r| {
-                            r.len() == 3
-                                && r.keys()
-                                    .all(|k| matches!(k.as_str(), "op" | "name" | "args"))
-                        });
-                    let response = if exact {
-                        adapter.call(name, args)
+                    // The voice names its line's caller beside the call
+                    // (#4527's P2); a call without one is nobody's.
+                    let fields = request.as_ref().and_then(Value::as_object);
+                    let exact = fields.is_some_and(|r| {
+                        (3..=4).contains(&r.len())
+                            && r.contains_key("args")
+                            && r.keys()
+                                .all(|k| matches!(k.as_str(), "op" | "name" | "args" | "caller"))
+                    });
+                    let caller = fields
+                        .and_then(|r| r.get("caller"))
+                        .map(|caller| {
+                            serde_json::from_value::<crate::schedule::Caller>(caller.clone())
+                        })
+                        .unwrap_or_else(|| Ok(crate::schedule::Caller::default()));
+                    let response = if let (true, Ok(caller)) = (exact, caller) {
+                        adapter.call_for(name, args, &caller)
                     } else {
                         serde_json::json!({"ok":false,"code":"bad_arguments","error":"I need the exact reminder arguments before I can do that."})
                     };
