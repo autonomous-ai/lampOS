@@ -1,3 +1,13 @@
+## 2026-10-30 13:2x ICT — #4490, #4492, #4480 landed; #4524; reads of #4506, #4513, #4520
+
+**Landed:** #4490 (the zone's `lamp-schedule` restart under lamp-update's lock, train 401); #4492 (the own-keys restart the same way) and #4480 (preferences' hello) in train 402. #4485's merge with #4490 was mine, taken by Seventh unchanged.
+
+**#4524:** a round that finds lamp-update's lock taken ends `not-quiet`, not `failed`, so the app's update page (`LAMP_APP_UPDATE=on`) and the update alerts don't say a failure when a settings change held the lock (Second's P3 on #4490).
+
+**#4476:** rebased; the Reviewer-lead's P3 (Live reads the typed name once) answered in the docs. Still waits on the first builder's yes for `LAMP_PERSON_NAME_OWNER_ONLY`.
+
+**Reads:** #4506 HOLD, then a wrong "strict" claim corrected after Reviewer-three's probe, then READ-OK after probing 32 lines per language myself; #4513 READ-OK with two P3s (the RAM journal and `/tmp` survive a reset in place); #4520 READ-OK (an off setup step never reaches the model's functions).
+
 ## 2026-10-30 11:1x ICT — #4476 forget clears the typed name; #4480 hello; update locks for settings restarts
 
 **#4461 → #4476:** the product tells the typed name only to the owner's line (`LAMP_PERSON_NAME_OWNER_ONLY=on`), and the owner's own marked "forget everything" removes it, as #4356 removes the place. The second route reads it per reply, keyed on the switch and path (Reviewer-three's P3). READ-OK from Friday and Reviewer-three; my own HOLD stands until the first builder's yes for the product switch. Train 398 took its older head and was closed without it.
