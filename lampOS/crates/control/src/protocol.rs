@@ -210,6 +210,9 @@ pub enum StateKind {
     Device,
     /// The speaker's volume, 0 to 100, and whether it is muted.
     Volume,
+    /// What the body may do, joint by joint, and where each joint is now
+    /// (`crate::body_info`).
+    Body,
 }
 
 impl StateKind {
@@ -220,7 +223,7 @@ impl StateKind {
             Self::Air => Some(Grant::Air),
             Self::Device => Some(Grant::Device),
             Self::Volume => Some(Grant::Speak),
-            Self::Light | Self::Mood | Self::Lamp => None,
+            Self::Light | Self::Mood | Self::Lamp | Self::Body => None,
         }
     }
 }

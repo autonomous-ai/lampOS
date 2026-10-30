@@ -76,7 +76,8 @@
         "lamp",
         "air",
         "device",
-        "volume"
+        "volume",
+        "body"
       ]
     },
     "colour": {

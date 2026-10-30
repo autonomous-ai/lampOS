@@ -209,6 +209,10 @@ pub struct Watch {
     /// The speaker's volume (`speaker/volume`): `{level, muted}`, none until
     /// lamp-actions says it.
     volume: Option<Value>,
+    /// The body's last `body/limits` and `body/joint_states`, for `get`
+    /// `body`.
+    body_limits: Value,
+    body_joints: Value,
     sounds: [bool; 4],
     /// The newest hand heard, and when.
     hand: Option<(Hand, u64)>,
@@ -265,6 +269,14 @@ impl Watch {
     pub fn take(&mut self, topic: &str, payload: &Value, now_us: u64) -> Vec<Out> {
         match topic {
             "humans/faces/tracked" => self.faces(payload, now_us),
+            "body/limits" => {
+                self.body_limits = payload.clone();
+                Vec::new()
+            }
+            "body/joint_states" => {
+                self.body_joints = payload.clone();
+                Vec::new()
+            }
             "humans/hands/tracked" => match Hand::of(payload) {
                 Some(hand) => {
                     self.hand = Some((hand, now_us));
@@ -500,6 +512,7 @@ impl Watch {
             StateKind::Air => known(self.air.as_ref()),
             StateKind::Device => known(self.device.as_ref()),
             StateKind::Volume => self.volume.clone().unwrap_or(Value::Null),
+            StateKind::Body => crate::body_info::state(&self.body_limits, &self.body_joints),
             StateKind::Lamp => {
                 json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
             }
