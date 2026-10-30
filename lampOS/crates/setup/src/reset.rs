@@ -746,6 +746,20 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
     Ok(steps)
 }
 
+/// Run before setup is started in place, after [`VOLATILE`] is emptied, each
+/// best effort (Reviewer-three's, Fourth's and Reviewer-two's P3s on #4513):
+/// wpa_supplicant leaves the old owner's network, which it still holds in
+/// memory with its file wiped, so the lamp is off it before setup's hotspot
+/// takes the radio; then the journal, which a reboot emptied (it is a RAM
+/// disk on the product) and which names the networks joined, is rotated and
+/// emptied. The start's own line is written after it.
+pub const FORGET: [&[&str]; 4] = [
+    &["wpa_cli", "-i", "wlan0", "disconnect"],
+    &["wpa_cli", "-i", "wlan0", "remove_network", "all"],
+    &["journalctl", "--rotate"],
+    &["journalctl", "--vacuum-time=1s"],
+];
+
 /// The lamp back into setup without a reboot (#4500): what the reset stopped
 /// that a boot starts, and setup, which serves with the marker gone and
 /// brings up its hotspot. Every part of `lampos.target` waits for the
@@ -764,10 +778,26 @@ fn start_in_place(
         reboot(plan, effects, steps);
         return;
     }
+    // What else a reboot dropped from memory, best effort: the old network
+    // wpa_supplicant still runs, though its file is wiped, and the journal,
+    // which keeps the networks joined (a RAM disk on the product). Neither
+    // keeps the start from going on.
+    for forget in FORGET {
+        let argv: Vec<String> = forget.iter().map(|word| (*word).to_owned()).collect();
+        if let Err(error) = effects.run(&argv) {
+            eprintln!("lamp-setup: reset: {} ({error}); going on", argv.join(" "));
+        }
+    }
     let mut argv = vec![plan.stop[0].clone(), "start".into()];
     argv.extend(again.iter().cloned());
     match effects.run(&argv) {
-        Ok(()) => steps.push(Step::Started),
+        Ok(()) => {
+            eprintln!(
+                "lamp-setup: reset: started in place, no reboot: {}",
+                again.join(" ")
+            );
+            steps.push(Step::Started);
+        }
         Err(error) => {
             eprintln!(
                 "lamp-setup: reset: setup could not be started in place ({error}); rebooting"
