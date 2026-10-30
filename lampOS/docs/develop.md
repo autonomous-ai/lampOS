@@ -287,6 +287,26 @@ in the lamp's words. `lamp_look` works on a lamp with `--lease-socket` and on
 `lamp fake --everything`; a product lamp refuses it ("the body's lease socket
 is not on here") until its unit passes `--lease-socket`.
 
+### Your coding agent knows the SDK: the agent skill
+
+`sdk/agent-skill/lampos-sdk` is a skill for coding agents (Claude Code,
+Codex, Cursor and others that read `SKILL.md`): when you ask your agent to
+program the lamp, it reads the mental model (grants, leases, who wins,
+limits, quiet hours), the calls side by side in Python, JavaScript and MCP,
+ready patterns, the gotchas, and how to test with the fake lamp. A test in
+the SDK keeps it naming every call, tool, event and error code.
+
+```sh
+# Claude Code, as a plugin (also adds lamp-mcp's tools when lamp-mcp is installed)
+claude plugin marketplace add ./lampOS/sdk/agent-skill
+claude plugin install lampos-sdk@lampos
+# or as a plain skill, for you or for one project
+cp -r lampOS/sdk/agent-skill/lampos-sdk ~/.claude/skills/        # or .claude/skills/ in a repo
+```
+
+For another agent, point it at `lampos-sdk/SKILL.md`, or copy the folder
+where it keeps skills.
+
 ## 5. A skill the lamp runs on its own (2 minutes)
 
 Code on your computer stops when your computer does. A **skill** is a

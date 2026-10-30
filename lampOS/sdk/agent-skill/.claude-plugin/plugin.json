@@ -1,0 +1,11 @@
+{
+  "name": "lampos-sdk",
+  "version": "0.2.0",
+  "description": "Program a lampOS lamp from your computer: the lampos SDK (Python, JavaScript) and lamp-mcp, as a skill for coding agents, with the lamp's tools when lamp-mcp is installed",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/autonomous-ai/lampOS",
+  "skills": ["./"],
+  "mcpServers": {
+    "lamp": { "command": "lamp-mcp", "args": [] }
+  }
+}
