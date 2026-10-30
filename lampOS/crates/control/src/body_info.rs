@@ -31,6 +31,26 @@ fn degrees(counts: f64) -> f64 {
     (counts * 360.0 / COUNTS_A_TURN * 10.0).round() / 10.0
 }
 
+/// The one convention for a joint's degrees, for `get` `body`, `body.state`
+/// and `joints`' targets: `counts` from `home` (the found home for the head
+/// and base, the folded pose for the arm), to a tenth of a degree, positive
+/// with more counts for `base_yaw`, `shoulder`, `elbow` and `head_roll`, and
+/// with fewer for `head_pitch`, so up is positive. By the bus's joint name;
+/// none for a name it doesn't know.
+pub fn from_home(bus_name: &str, counts: f64, home: f64) -> Option<f64> {
+    let (_, _, grows) = NAMES.iter().find(|(bus, _, _)| *bus == bus_name)?;
+    Some(degrees(if *grows { counts - home } else { home - counts }))
+}
+
+/// The protocol's name for a joint the bus names `bus_name`: `yaw`,
+/// `shoulder`, `elbow`, `roll`, `pitch`.
+pub fn protocol_name(bus_name: &str) -> Option<&'static str> {
+    NAMES
+        .iter()
+        .find(|(bus, _, _)| *bus == bus_name)
+        .map(|(_, protocol, _)| *protocol)
+}
+
 /// The body's state for `get`, from the last `body/limits` (`limits`) and the
 /// last `body/joint_states` (`joints`), either `Null` when not heard yet.
 pub fn state(limits: &Value, joints: &Value) -> Value {
@@ -47,7 +67,7 @@ pub fn state(limits: &Value, joints: &Value) -> Value {
         Some((radians * COUNTS_A_TURN / std::f64::consts::TAU + MIDDLE).round())
     };
     let mut out = serde_json::Map::new();
-    for (bus, protocol, grows) in NAMES {
+    for (bus, protocol, _) in NAMES {
         let Some(joint) = each
             .iter()
             .find(|joint| joint["name"].as_str() == Some(bus))
@@ -57,9 +77,7 @@ pub fn state(limits: &Value, joints: &Value) -> Value {
         let count = |key: &str| joint[key].as_f64();
         // The arm's home is its folded pose.
         let home = count("home").or_else(|| count("folded"));
-        let from_home = |counts: f64| {
-            home.map(|home| degrees(if grows { counts - home } else { home - counts }))
-        };
+        let from_home = |counts: f64| home.and_then(|home| from_home(bus, counts, home));
         let (min, max) = (count("min"), count("max"));
         let (low, high) = match (min.and_then(from_home), max.and_then(from_home)) {
             (Some(a), Some(b)) => (Some(a.min(b)), Some(a.max(b))),
@@ -149,6 +167,20 @@ mod tests {
         assert_eq!(body["speed_deg_s"].as_f64(), Some(4.4));
         assert_eq!(body["load_limit"].as_f64(), Some(0.6));
         assert_eq!(body["heat_stop_c"], 62);
+    }
+
+    #[test]
+    fn one_convention_for_every_joints_degrees() {
+        assert_eq!(from_home("base_yaw", 2_026.0, 2_015.0), Some(1.0));
+        assert_eq!(
+            from_home("head_pitch", 1_966.0, 2_000.0),
+            Some(3.0),
+            "up is positive"
+        );
+        assert_eq!(from_home("head_roll", 2_044.0, 2_044.0), Some(0.0));
+        assert_eq!(from_home("shoulder", 2_650.0, 2_050.0), Some(52.7));
+        assert_eq!(from_home("knee", 1.0, 0.0), None);
+        assert_eq!(protocol_name("head_pitch"), Some("pitch"));
     }
 
     #[test]

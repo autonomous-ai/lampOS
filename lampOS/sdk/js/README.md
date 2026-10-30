@@ -251,7 +251,7 @@ And two that come by themselves, with no subscription:
 | `device` | the lamp's own computer: `cpu_load` (the last minute's, 1 is every processor busy), `memory_used` and `disk_free` (0–1), `uptime_s`, `temperature_c` (by sensor, °C), and `known: true`; `{"known": false}` with no reading in 15 s | `{"cpu_load":0.42,"memory_used":0.55,"disk_free":0.71,"uptime_s":3600,"temperature_c":{"cpu_thermal":61.5},"known":true}` | `device` |
 | `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
 | `volume` | `level` (0–100 of what the lamp allows), `muted`. `null` until lamp-actions has said it | `{"level":50,"muted":false}` | `speak` |
-| `body` | `known`; `joints` (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`), each with `counts`, `deg` from its home, `min_deg`, `max_deg`, `min_counts`, `max_counts`, `home_counts`, `folded_counts`, `stand_counts`; `stands`, `speed_deg_s`, `acceleration_deg_s2`, `load_limit`, `heat_stop_c`, `counts_per_turn` | `{"known":true,"joints":{"yaw":{"counts":2015.0,"deg":0.0,"min_deg":-3.5,"max_deg":3.5,...},...},"stands":true,"speed_deg_s":4.4,...}` | none |
+| `body` | `known`; `joints` (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`), each with `counts`, `deg` from its home, `min_deg`, `max_deg`, `min_counts`, `max_counts`, `home_counts`, `folded_counts`, `stand_counts`; `stands`, `speed_deg_s`, `acceleration_deg_s2`, `load_limit`, `heat_stop_c`, `counts_per_turn` | `{"known":true,"joints":{"yaw":{"counts":2015.0,"deg":0.0,"min_deg":-3.5,"max_deg":3.5,...},...},"stands":true,"speed_deg_s":4.4,...}` | body |
 
 ### Never readable
 
@@ -291,11 +291,10 @@ hours when it sets them (off by default; a lamp sets its own window, said in
 | `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`, `volume.changed`; their fields and grants are [control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | an array of events | each event's |
-| `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `air` (needs `air`), `device` (needs `device`) | the states asked, by those names |
+| `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `air` (needs `air`), `device` (needs `device`), `body` (needs `body`) | the states asked, by those names |
 | `lamp.air()` | | the `air` grant: the air sensor's newest reading (`pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel`) and `known`; only `{ known: false }` with no reading. Changes come as `air.changed` |
 | `lamp.device()` | | the `device` grant: the lamp's own computer (`cpu_load`, `memory_used`, `disk_free`, `uptime_s`, `temperature_c`) and `known` |
-| `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `body` | the states asked, by those names |
-| `lamp.bodyInfo()` | none; what the body may do and where it is: each joint (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`) with `deg` from its home, `min_deg`, `max_deg`, its counts and poses; the speed, load and heat limits | none | no | `known: false` until the body has said its limits |
+| `lamp.bodyInfo()` | none; what the body may do and where it is: each joint (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`) with `deg` from its home, `min_deg`, `max_deg`, its counts and poses; the speed, load and heat limits | `body` | no | `known: false` until the body has said its limits |
 
 ### Leases
 

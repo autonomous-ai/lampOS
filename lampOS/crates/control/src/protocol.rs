@@ -223,7 +223,10 @@ impl StateKind {
             Self::Air => Some(Grant::Air),
             Self::Device => Some(Grant::Device),
             Self::Volume => Some(Grant::Speak),
-            Self::Light | Self::Mood | Self::Lamp | Self::Body => None,
+            // The body's bounds and where it is: as `body.state`, with the
+            // body grant.
+            Self::Body => Some(Grant::Body),
+            Self::Light | Self::Mood | Self::Lamp => None,
         }
     }
 }

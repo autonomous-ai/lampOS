@@ -645,7 +645,7 @@ class FakeLamp:
         "air.changed": "air",
         "volume.changed": "speak",
     }
-    STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak"}
+    STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak", "body": "body"}
 
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "subscribe":
