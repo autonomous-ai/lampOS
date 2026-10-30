@@ -134,9 +134,10 @@ trang kỹ năng và `LAMP_CLOUD`); chưa unit sản phẩm nào bật. Khi bậ
   `{"preview": {"name", "files": [{"path", "text"}]}}` (tệp không phải văn
   bản chỉ cho `bytes`; tối đa 65.536 ký tự), để ứng dụng cho chủ đèn xem
   đúng những gì sẽ rời đi trước khi bấm Send.
-- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine`, trang đầu:
-  **chỉ 20 kỹ năng gửi gần nhất** hiện ra (với 5 gói một ngày, các gói cũ
-  hơn mất khỏi danh sách sau bốn ngày), các dòng lấy từ `data.data`, trả
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine?limit=100`,
+  trang lớn nhất Store cho, mới nhất trước: **chỉ 100 kỹ năng gửi gần
+  nhất** hiện ra (với 5 gói một ngày của Store, khoảng hai mươi ngày), các
+  dòng lấy từ `data.data`, trả
   `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`.
 - **`skills.unshare`** (`{"id"}`): `DELETE {host}/api/v1/skills/ID`.
 
