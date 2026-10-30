@@ -33,6 +33,19 @@ that same snapshot. Independently, live physical readiness still expires and
 Voice cancels its completion reply if the body's proof is lost. This feature
 does not add a new revocation protocol or change ordinary skill lifetimes.
 
+**While the tool is not offered** (`LAMP_UNPLUG` off), the model is told it
+cannot get itself ready to be unplugged: told "I'm unplugging you", it never
+says OK as if it were ready (launch lamps did, four times). Only with the
+app's off button on (`LAMP_SHUTDOWN=on` in the voice's unit, `system.shutdown`,
+cloud.md) does it say to turn it off from the app first and unplug it once it
+is off; without it, it says plainly that pulling the plug is the only way for
+now, and names no app (`lamp-voice`'s `without_a_tool`, the first builder's
+option (b) on #4595). The voice hands the switch to its provider worker as
+`--shutdown-from-app`, as it does `LAMP_SLEEP_ASKED`. It is told this on the
+Live route while its session has no `prepare_to_unplug` (on its own or
+through `use_skill`), and on the second route while the skills' catalogs
+offer none; with the tool there it is not told.
+
 This prepares the arm; it does not run an operating-system shutdown or cut
 power. Turning the lamp off safely, with the body let go and a light that says
 it may be unplugged, is shutdown.md. An ordinary bedtime request belongs to the bedtime skill.

@@ -168,6 +168,10 @@ pub struct Settings {
     /// The person may put the lamp to sleep by voice
     /// ([`crate::sleep_asked`], `LAMP_SLEEP_ASKED=on`, #3748).
     pub sleep_asked: bool,
+    /// The app's off button turns the lamp off (`LAMP_SHUTDOWN=on`,
+    /// shutdown.md): only then is a model with no `prepare_to_unplug` told
+    /// to say so ([`crate::without_a_tool`], #4595).
+    pub shutdown_from_app: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -245,6 +249,9 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(crate::sleep_asked::ENVIRONMENT)
             .ok()
             .as_deref(),
+    ));
+    flags.extend(crate::without_a_tool::arguments(
+        std::env::var(lamp_msgs::SHUTDOWN_SWITCH).ok().as_deref(),
     ));
     flags
 }
@@ -465,6 +472,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::sleep_asked::FLAG
     {
         settings.sleep_asked = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::without_a_tool::SHUTDOWN_FLAG
+    {
+        settings.shutdown_from_app = true;
         flags = rest;
     }
     Ok((settings, flags))
@@ -2559,6 +2572,7 @@ mod tests {
     fn with_every_switch_on_the_voices_own_functions_are_a_list_the_link_takes() {
         let settings = Settings {
             sleep_asked: false,
+            shutdown_from_app: false,
             decline: true,
             use_skill: false,
             requested_audio: true,
@@ -2864,6 +2878,7 @@ mod tests {
             settings,
             Settings {
                 sleep_asked: false,
+                shutdown_from_app: false,
                 decline: true,
                 use_skill: false,
                 requested_audio: false,
