@@ -25,8 +25,8 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 
 | tool | parameter | type | allowed | default | grant | lease |
 |---|---|---|---|---|---|---|
-| `lamp_state` | `which` | list of strings | some of `presence`, `light`, `mood`, `lamp`; a state the grants don't allow is refused | every state the grants allow | none (`presence`: look) | no |
-| `lamp_wait_for` | `events` | list of strings, required | some of `person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `phrase.heard`, `name.heard`, `sound.heard`, `hand`, `touch`, `button`, `time`, `lamp.changed`; one the grants don't allow is refused before anything is sent | — | the event's: `person.*` and `hand` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound | no |
+| `lamp_state` | `which` | list of strings | some of `presence`, `light`, `mood`, `lamp`, `air`, `device`; a state the grants don't allow is refused | every state the grants allow | none (`presence`: look, `air`: air, `device`: device) | no |
+| `lamp_wait_for` | `events` | list of strings, required | some of `person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `phrase.heard`, `name.heard`, `sound.heard`, `hand`, `touch`, `button`, `time`, `lamp.changed`, `air.changed`; one the grants don't allow is refused before anything is sent | — | the event's: `person.*` and `hand` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound, `air.changed` air | no |
 | | `phrases` | list of strings | the phrases to listen for; required with `phrase.heard` | none | | |
 | | `timeout_s` | number | 0 to 120; more waits 120 | 60 | | |
 | `lamp_express` | `feeling` | string, required | a feeling of the `feelings` skill: `glad`, `lively` or `low` (the lamp refuses another) | — | body, light | no |

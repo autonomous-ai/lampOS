@@ -436,6 +436,34 @@ def test_get_answers_the_states_asked(tmp_path):
 
 
 
+def test_air_and_device_need_their_grants_and_air_changed_comes_on_a_new_reading(tmp_path):
+    from lampos.testing import AIR, DEVICE
+
+    async def go():
+        async with FakeLamp(grants=("air", "device")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert await lamp.air() == AIR
+                assert await lamp.device() == DEVICE
+                heard: asyncio.Queue = asyncio.Queue()
+                await lamp.on("air.changed", heard.put_nowait)
+                await fake.set_air(pm2_5=41.0, co2_ppm=1350, feel="stuffy")
+                event = await heard.get()
+                assert (event["pm2_5"], event["co2_ppm"], event["feel"]) == (41.0, 1350, "stuffy")
+                assert await lamp.air() == {"pm2_5": 41.0, "co2_ppm": 1350, "feel": "stuffy", "known": True}
+                # No sensor: known false, nothing else.
+                await fake.set_air()
+                assert await lamp.air() == {"known": False}
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "other")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                for call in (lamp.air, lamp.device):
+                    with pytest.raises(LampError, match="no_grant"):
+                        await call()
+
+    run(go())
+
+
 def test_the_fakes_light_state_shows_what_the_ring_draws(tmp_path):
     async def go():
         async with FakeLamp(grants=("light",)) as fake:

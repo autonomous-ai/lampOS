@@ -602,6 +602,19 @@ class Lamp:
         name: the reply's `state`."""
         return (await self.request("get", state=list(states))).get("state", {})
 
+    async def air(self) -> dict:
+        """The air sensor's newest reading (the `air` grant): `pm1_0`,
+        `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`,
+        `feel`, and `known`; only `{"known": False}` with no reading. Each
+        change past a step comes as `lamp.on("air.changed", ...)`."""
+        return (await self.get("air"))["air"]
+
+    async def device(self) -> dict:
+        """The lamp's own computer (the `device` grant): `cpu_load`,
+        `memory_used`, `disk_free`, `uptime_s`, `temperature_c` by sensor,
+        and `known`."""
+        return (await self.get("device"))["device"]
+
     # Leases.
 
     def lease(self, *parts: str, for_ms: int = 30_000, why: str | None = None) -> Lease:

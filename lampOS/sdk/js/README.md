@@ -255,7 +255,9 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 | `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`; their fields and grants are [control.md](../../docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | an array of events | each event's |
-| `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp` | the states asked, by those names |
+| `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `air` (needs `air`), `device` (needs `device`) | the states asked, by those names |
+| `lamp.air()` | | the `air` grant: the air sensor's newest reading (`pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel`) and `known`; only `{ known: false }` with no reading. Changes come as `air.changed` |
+| `lamp.device()` | | the `device` grant: the lamp's own computer (`cpu_load`, `memory_used`, `disk_free`, `uptime_s`, `temperature_c`) and `known` |
 
 ### Leases
 
