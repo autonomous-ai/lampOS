@@ -894,6 +894,14 @@ pub(crate) fn own_line(note: String) -> String {
     }
 }
 
+/// `words` as one of the lamp's own lines ([`own_line`]): said as they are
+/// and no chat asked. A skill's `text` while the model service refuses
+/// (#4265); none for words a fixed line can't hold (a `"`).
+pub(crate) fn said_as_is(words: &str) -> Option<String> {
+    let line = format!("{FIXED_OPENING}{words}\")");
+    fixed_words(&line).is_some().then(|| own_line(line))
+}
+
 /// The words of a line [`own_line`] marked, said as they are.
 pub fn own_words(note: &str) -> Option<&str> {
     fixed_words(note.strip_prefix(OWN_MARK)?)

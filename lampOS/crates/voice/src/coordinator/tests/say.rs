@@ -1397,3 +1397,171 @@ fn at_its_cap_a_sleep_is_asked_only_if_its_line_has_sounded() {
     );
     assert_eq!(sleep.due(test.reply.as_ref(), cap), Some(turn));
 }
+
+/// The speaker's ownership ledger, given each authority the coordinator
+/// published in order, as the speaker worker installs and checks it: what
+/// it then reports, a discard or a retired cancelled tail, handled as the
+/// loop handles it.
+struct LedgerSpeaker {
+    guard: lamp_turn_owner::BoundaryGuard,
+    ledger: lamp_audio::ownership::PlaybackOwnership,
+}
+
+impl LedgerSpeaker {
+    fn new(owner: &mut Controller) -> Self {
+        let boot = owner.snapshot(now()).unwrap().boot();
+        // One reading for the snapshot and its install: the install's own
+        // `now()`, read first, could be a microsecond before the snapshot's,
+        // and the guard refuses a snapshot issued after the install's time
+        // (`FutureState`, 2 of 11 runs on a Mac, and #4607's ARM64;
+        // Seventh's 19:01 on #3997).
+        let at = now();
+        let mut guard = lamp_turn_owner::BoundaryGuard::new(boot, at);
+        guard.install(at, owner.snapshot(at).unwrap()).unwrap();
+        Self {
+            guard,
+            ledger: lamp_audio::ownership::PlaybackOwnership::new(),
+        }
+    }
+
+    /// `frames` of `permit`'s speech accepted by the device.
+    fn accept(&mut self, permit: OutputPermit, frames: usize) {
+        let token = self.guard.zero_authority(now()).unwrap();
+        self.ledger.push_clock(permit, token, frames).unwrap();
+    }
+
+    fn install(
+        &mut self,
+        snapshots: &[Snapshot],
+        owner: &mut Controller,
+        reply: &mut Option<Reply>,
+        trace: &mut SessionState,
+    ) -> Result<()> {
+        for snapshot in snapshots {
+            self.guard.install(now(), *snapshot).unwrap();
+            if let Err(failure) = self.ledger.check_clock_owned(now(), &mut self.guard) {
+                self.ledger.clear().unwrap();
+                handle_playback_discard(
+                    owner,
+                    reply,
+                    trace,
+                    WorkerEvent::PlaybackDiscarded {
+                        owner: failure.owner,
+                        reason: failure.reason.into(),
+                        queued_frames: 456,
+                        other_owners: failure.other_owners,
+                        observed_at_us: monotonic_us(),
+                    },
+                )?;
+            }
+        }
+        // The device plays out what it holds.
+        self.ledger.retire_to(0);
+        if let Some(tail) = self.ledger.take_retired_tail() {
+            let at = monotonic_us();
+            handle_cancelled_tail_retirement(
+                reply,
+                trace,
+                WorkerEvent::CancelledTailRetired {
+                    owner: tail.owner,
+                    superseded_by: tail.superseded_by,
+                    first_sample: tail.first_sample,
+                    end_sample: tail.end_sample,
+                    queued_frames: tail.queued_frames,
+                    speech_frames: tail.speech_frames,
+                    started_at_us: tail.started_at_us,
+                    observed_at_us: at,
+                },
+                at,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// lamp-52e6, 30 Oct (#3748 part 3): "Lamp, go to sleep" while the model's
+/// turn still had audio queued at the speaker. Its turn is cut for the
+/// cached sleep line, which plays as a turn of its own; then the person
+/// speaks over the line. The cut's audio was kept as a cancelled tail
+/// superseded by the line's turn, which only a person's interruption may
+/// have, and the voice ended. The cut now revokes the speaker first, its
+/// audio an expected discard, and the person's line over the sleep line
+/// supersedes it as any interruption does.
+#[test]
+fn a_sleep_asked_aloud_over_queued_audio_cuts_it_and_the_person_may_speak_over_its_line() {
+    let (mut owner, current, permit) = active_reply();
+    let mut trace = SessionState::default();
+    let asked = current.owner;
+    trace
+        .receipts
+        .admitted(
+            asked,
+            owner.snapshot(now()).unwrap().issued_at().as_micros(),
+        )
+        .unwrap();
+    let mut reply = Some(current);
+    let mut speaker = LedgerSpeaker::new(&mut owner);
+    speaker.accept(permit, 456);
+    let mut published = Vec::new();
+    let (mut admission, mut detector) = (InputAdmission::default(), TurnDetector::default());
+    cut_for_last_words(
+        &mut owner,
+        &mut reply,
+        &mut VecDeque::new(),
+        &mut None,
+        &mut admission,
+        &mut detector,
+        &mut trace,
+        |state| {
+            published.push(state);
+            Ok(())
+        },
+    )
+    .unwrap();
+    let (_, line) = crate::coordinator::speaker_tone::commit_sound_turn(
+        &mut owner,
+        &mut reply,
+        NoticeDelivery::sound(SpeechOrigin::SleepBreath, vec![1_234; 480]),
+        "asked_sleep_line",
+        "test",
+        0,
+        PlayoutStart::default(),
+        &mut trace,
+        |state| {
+            published.push(state);
+            Ok(())
+        },
+    )
+    .unwrap();
+    speaker
+        .install(&published, &mut owner, &mut reply, &mut trace)
+        .expect("the cut's queued audio is retired without ending the voice");
+    assert!(
+        trace.iter().any(|row| row["kind"] == "playback_discarded"
+            && row["owner"] == json!(asked)
+            && row["expected_cancellation"] == true),
+        "the cut's audio is an expected discard"
+    );
+    // The line sounding, the person speaks over it: a newer line.
+    let line_permit = owner
+        .issue_output(now(), reply.as_ref().unwrap().plan, 100_000)
+        .unwrap();
+    speaker.accept(line_permit, 456);
+    cancel_reply(&mut owner, &mut reply, &mut trace, "user_interrupted").unwrap();
+    let newer = owner.admit(now(), AdmittedInput::NewTurn).unwrap();
+    let snapshot = owner.snapshot(now()).unwrap();
+    trace
+        .receipts
+        .admitted(newer, snapshot.issued_at().as_micros())
+        .unwrap();
+    speaker
+        .install(&[snapshot], &mut owner, &mut reply, &mut trace)
+        .expect("the line's tail is superseded by the person's turn");
+    assert!(
+        trace
+            .iter()
+            .any(|row| row["kind"] == "cancelled_tail_retired"
+                && row["owner"] == json!(line)
+                && row["superseded_by"] == json!(newer))
+    );
+}

@@ -1160,6 +1160,7 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
         &skills.join("no-state"),
         WAIT,
         None,
+        None,
         &b"{\"remove\": \"desk-tutor\"}\n"[..],
         &mut answer,
     )
@@ -1388,6 +1389,7 @@ fn the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused() {
             &state,
             package::ASKED_LOCK_WAIT,
             None,
+            None,
             line.as_bytes(),
             &mut answer,
         )
@@ -1498,6 +1500,7 @@ fn the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back() {
             &skills.join("no-made"),
             &state,
             package::ASKED_LOCK_WAIT,
+            None,
             None,
             line.as_bytes(),
             &mut answer,
@@ -1616,6 +1619,8 @@ fn the_daily_journal_opens_beside_the_apps_off_in_a_0700_state_folder() {
     let helper = fs::read_to_string(units.join("lamp-skills-manage@.service")).unwrap();
     assert!(helper.contains("\nCapabilityBoundingSet=CAP_DAC_OVERRIDE\n"));
     assert!(
-        helper.contains("\nReadWritePaths=/var/lib/lampOS/skills -/var/lib/lampos-skills-state\n")
+        helper.contains(
+            "\nReadWritePaths=/var/lib/lampOS/skills -/var/lib/lampOS/skills-dev -/var/lib/lampos-skills-state\n"
+        )
     );
 }

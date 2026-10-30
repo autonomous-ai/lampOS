@@ -149,6 +149,20 @@ pub trait Lamp {
         None
     }
 
+    /// lamp-voice's maker has a computer to hand the work to
+    /// (`crate::make_skill::is_ready`, fourteen-P15): `can` names
+    /// `skills.make` only then.
+    fn make_skill_ready(&self) -> bool {
+        false
+    }
+
+    /// The Skills Store's owner upload and this lamp's key, for a made
+    /// skill sent to the Store (`LAMP_SKILLS_SHARE=on` with the skills page,
+    /// fourteen-P13, `crate::share`).
+    fn share(&self) -> Option<crate::share::Store> {
+        None
+    }
+
     /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
     /// `crate::schedule`): there only with the switch.
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
@@ -209,7 +223,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 43] = [
+pub const KINDS: [(&str, Switch); 46] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -251,8 +265,11 @@ pub const KINDS: [(&str, Switch); 43] = [
     ("schedule.cancel", |lamp| lamp.schedule().is_some()),
     ("guard.on", |lamp| lamp.guard().is_some()),
     ("guard.off", |lamp| lamp.guard().is_some()),
-    ("skills.make", |lamp| lamp.make_skill().is_some()),
-    ("skills.made", |lamp| lamp.make_skill().is_some()),
+    ("skills.make", MAKE_SKILL),
+    ("skills.made", MAKE_SKILL),
+    (crate::share::KINDS[0], SHARE),
+    (crate::share::KINDS[1], SHARE),
+    (crate::share::KINDS[2], SHARE),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
     ("system.reboot", |lamp| lamp.restarts()),
@@ -260,6 +277,10 @@ pub const KINDS: [(&str, Switch); 43] = [
 ];
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
+/// The switch, and a computer to make the skill on (fourteen-P15).
+const MAKE_SKILL: Switch = |lamp| lamp.make_skill().is_some() && lamp.make_skill_ready();
+/// The skills page and the Store's upload (fourteen-P13).
+const SHARE: Switch = |lamp| lamp.skills().is_some() && lamp.share().is_some();
 const KEYS: Switch = |lamp| lamp.changes().is_some_and(|c| c.keys_on());
 const SETTINGS: Switch = |lamp| lamp.changes().is_some();
 const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
@@ -483,13 +504,34 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // A skill typed in the owner's app (#2813): handed to lamp-voice,
         // which makes it as the voice's own; only a spoken yes at the lamp
         // puts it on, never anything from the app.
-        "skills.make" if on(lamp, kind) => {
+        // Taken on the switch alone: `can` waits for a computer as well
+        // (fourteen-P15), but an app that asks anyway is told the voice's
+        // own reason, as before.
+        "skills.make" if lamp.make_skill().is_some() => {
             let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
             crate::make_skill::make(&socket, data)
         }
-        "skills.made" if on(lamp, kind) => {
+        "skills.made" if lamp.make_skill().is_some() => {
             let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
             crate::make_skill::made(&socket, data)
+        }
+        // A made skill sent to the Skills Store (fourteen-P13): packed here,
+        // only a skill made on this lamp and on, and uploaded with the
+        // lamp's key; a reviewer reads it before anyone can add it.
+        "skills.share" if on(lamp, kind) => {
+            let (places, store) = lamp
+                .skills()
+                .zip(lamp.share())
+                .ok_or_else(|| not_here(kind))?;
+            crate::share::share(&store, &places, data, &std::env::temp_dir()).map(Some)
+        }
+        "skills.shared" if on(lamp, kind) => {
+            let store = lamp.share().ok_or_else(|| not_here(kind))?;
+            crate::share::shared(&store).map(Some)
+        }
+        "skills.unshare" if on(lamp, kind) => {
+            let store = lamp.share().ok_or_else(|| not_here(kind))?;
+            crate::share::unshare(&store, data).map(Some)
         }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
@@ -562,6 +604,8 @@ pub mod tests {
         pub schedule: Option<lamp_actions::schedule::Adapter>,
         pub guard: Option<std::path::PathBuf>,
         pub make_skill: Option<std::path::PathBuf>,
+        pub make_skill_ready: bool,
+        pub share: Option<crate::share::Store>,
         pub update_page: bool,
         /// The bus lamp-update's `update/status` is read from (#2194) and
         /// `update.check` asks on, and the checks asked (#4153).
@@ -657,6 +701,12 @@ pub mod tests {
         }
         fn make_skill(&self) -> Option<std::path::PathBuf> {
             self.make_skill.clone()
+        }
+        fn make_skill_ready(&self) -> bool {
+            self.make_skill_ready
+        }
+        fn share(&self) -> Option<crate::share::Store> {
+            self.share.clone()
         }
         fn update_page(&self) -> bool {
             self.update_page
@@ -1010,6 +1060,32 @@ pub mod tests {
         assert!(answer(&mut lamp, "", &Value::Null).is_err());
     }
 
+    /// Making a skill (fourteen-P15): with the switch on and no computer
+    /// yet, `can` names neither kind, but a make asked anyway still reaches
+    /// lamp-voice for its own answer; with a computer, both are named.
+    #[test]
+    fn make_skill_is_named_only_while_a_computer_is_ready() {
+        let named = |lamp: &mut Fake| -> Vec<String> {
+            let info = answer(lamp, "system.info", &Value::Null).unwrap().unwrap();
+            serde_json::from_value(info["can"].clone()).unwrap()
+        };
+        let mut lamp = lamp();
+        lamp.make_skill = Some(std::path::PathBuf::from("/nowhere/make.sock"));
+        let can = named(&mut lamp);
+        assert!(
+            !can.iter().any(|kind| kind.starts_with("skills.ma")),
+            "{can:?}"
+        );
+        assert_eq!(
+            answer(&mut lamp, "skills.made", &json!({"request_id": "r1"})),
+            Err(crate::make_skill::UNREACHED.to_owned()),
+            "asked anyway: lamp-voice is asked, here unreached"
+        );
+        lamp.make_skill_ready = true;
+        let can = named(&mut lamp);
+        assert!(can.contains(&"skills.make".to_owned()) && can.contains(&"skills.made".to_owned()));
+    }
+
     /// #2864: `system.info`'s `can` holds each switch's kinds only while it
     /// is on, as [`answer`] takes them; the always-answered kinds are in it
     /// with every switch off.
@@ -1133,8 +1209,33 @@ pub mod tests {
                 &["guard.on", "guard.off"],
             ),
             (
+                // A made skill sent to the Store (fourteen-P13): its three
+                // kinds only with the page and the Store's upload.
+                "skills share",
+                |f| {
+                    f.skills = Some(places_of(false));
+                    f.share = Some(crate::share::Store {
+                        base: "https://api.test".into(),
+                        key: "k".into(),
+                    });
+                },
+                &[
+                    "skills.list",
+                    "skills.remove",
+                    "skills.off",
+                    "skills.on",
+                    "skills.camera",
+                    "skills.share",
+                    "skills.shared",
+                    "skills.unshare",
+                ],
+            ),
+            (
                 "make skill",
-                |f| f.make_skill = Some(std::path::PathBuf::from("/nowhere/make.sock")),
+                |f| {
+                    f.make_skill = Some(std::path::PathBuf::from("/nowhere/make.sock"));
+                    f.make_skill_ready = true;
+                },
                 &["skills.make", "skills.made"],
             ),
             (

@@ -7897,12 +7897,56 @@ fn conversation_with_gate_inner(
                     record(trace, row)?;
                 }
                 ProviderOutput::SleepAsked { request } => {
-                    // Asked once its line has been heard whole, or at the
-                    // cap while it is still sounding.
-                    sleep_owed.asked(request, monotonic_us());
-                    eprintln!(
-                        "lamp-voice: request {request}: asked to sleep; once its line has played"
-                    );
+                    // With `LAMP_SLEEP_LINE=on` and the line kept (#3748
+                    // part 3): the same recording a hand's hold says, in
+                    // place of the model's own words. The model's turn is
+                    // cut as the shutdown's last words cut it, and the sleep
+                    // is owed as a hold's is, until that cue has played.
+                    let line = sleep_line_cache
+                        .as_ref()
+                        .filter(|_| {
+                            reply
+                                .as_ref()
+                                .is_some_and(|current| current.owner.turn() == request)
+                        })
+                        .and_then(|cache| cache.sleep_line());
+                    if let (Some(line), Some(controls)) = (line, controls.as_mut()) {
+                        let (draining, _) = cut_for_last_words(
+                            owner,
+                            reply,
+                            &mut provider_queue,
+                            &mut speaker_pending,
+                            &mut admission,
+                            &mut detector,
+                            trace,
+                            |state| rig.publish(state),
+                        )?;
+                        submission_draining |= draining;
+                        let (now_state, _) = speaker_tone::commit_sound_turn(
+                            owner,
+                            reply,
+                            NoticeDelivery::sound(SpeechOrigin::SleepBreath, line),
+                            "asked_sleep_line",
+                            "the person asked the lamp to sleep: the cached sleep line in the model's place, nothing sent to the provider",
+                            0,
+                            rig.playout_start_now(),
+                            trace,
+                            |state| rig.publish(state),
+                        )?;
+                        snapshot = now_state;
+                        last_publish = monotonic_us();
+                        controls.owe_sleep(monotonic_us());
+                        eprintln!(
+                            "lamp-voice: request {request}: asked to sleep; the sleep line plays in the model's place, the sleep once it has played"
+                        );
+                    } else {
+                        // Asked once its line has been heard whole, or at the
+                        // cap while it is still sounding.
+                        sleep_owed.asked(request, monotonic_us());
+                        eprintln!(
+                            "lamp-voice: request {request}: asked to sleep; once its line has played"
+                        );
+                    }
                 }
                 ProviderOutput::LookNoCall { request, session } => {
                     // Only the look's own turn, still in hand on its session.
@@ -11521,10 +11565,19 @@ fn conversation_with_gate_inner(
                     )
                     && playback_mask.available(say_now_us)))
             && let Some(provider_session) = unasked_session(&cloud, paused)
-            && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
+            // The model service refusing (#4265, the lead's call on #1711):
+            // while turns are held, a skill's fixed words are said as they
+            // are, and a note the model must word waits for the minute's
+            // try, as a spoken line does, or for its own expiry.
+            && let Some((turn, priority, ticket, quoted)) =
+                if refused_hold && model_refusing.holds(say_now_us) {
+                    says.take_while_refused(say_now_us)
+                } else {
+                    says.take(say_now_us)
+                }
         {
             if ticket.last_words() {
-                submission_draining |= cut_for_last_words(
+                let (draining, now_state) = cut_for_last_words(
                     owner,
                     reply,
                     &mut provider_queue,
@@ -11532,7 +11585,11 @@ fn conversation_with_gate_inner(
                     &mut admission,
                     &mut detector,
                     trace,
+                    |state| rig.publish(state),
                 )?;
+                submission_draining |= draining;
+                snapshot = now_state;
+                last_publish = monotonic_us();
             }
             // An add-on's quoted line is the second route's alone: there its
             // turn is asked with no functions (#2530 part 2). The Live
@@ -11896,11 +11953,9 @@ fn conversation_with_gate_inner(
             )?;
             if decided.is_ok() {
                 // The recorded line in the breath's place (#3748).
-                let sleep_line = sleep_line_cache.as_ref().and_then(|cache| {
-                    cache
-                        .owners_kept(lamp_msgs::SLEEP_LINE)
-                        .or_else(|| cache.kept(lamp_msgs::SLEEP_LINE))
-                });
+                let sleep_line = sleep_line_cache
+                    .as_ref()
+                    .and_then(|cache| cache.sleep_line());
                 if sleep_line_cache.is_some() && sleep_line.is_none() {
                     eprintln!(
                         "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"
@@ -12925,7 +12980,7 @@ fn play_skill_sound(
     submission_draining: &mut bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
-    publish: impl FnMut(Snapshot) -> io::Result<()>,
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
     let Some((samples, ticket)) = says.take_sound(at_us) else {
         return Ok(None);
@@ -12952,7 +13007,9 @@ fn play_skill_sound(
             admission,
             detector,
             trace,
-        )?;
+            &mut publish,
+        )?
+        .0;
     }
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
@@ -12978,7 +13035,14 @@ fn play_skill_sound(
 /// still being said, drained until its end. Without the drain that line's
 /// microphone frames went on into the last words' turn, which sends nothing,
 /// and filled the provider queue past its bound (lamp-52e6, 27 Oct: the voice
-/// ended). Whether input is now drained.
+/// ended). The cut revokes the speaker itself, as a hand's Stop does
+/// (`hand::cancel`): the ownerless authority is published before the next
+/// turn is admitted, so the speaker drops the cut reply's queued audio as an
+/// expected discard. Admitted first, that next turn's input-active authority
+/// kept the audio as a cancelled tail superseded by it, which only a person's
+/// interruption may have (lamp-52e6, 30 Oct: "Lamp, go to sleep", its line,
+/// then "cancelled tail has no unique matching supersession" and the voice
+/// ended). Whether input is now drained, and the authority published.
 #[allow(clippy::too_many_arguments)]
 fn cut_for_last_words(
     owner: &mut Controller,
@@ -12988,14 +13052,17 @@ fn cut_for_last_words(
     admission: &mut InputAdmission,
     detector: &mut TurnDetector,
     trace: &mut SessionState,
-) -> Result<bool> {
-    cancel_reply(owner, reply, trace, "last_words")?;
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<(bool, Snapshot)> {
+    cancel_reply(owner, reply, trace, crate::receipt_history::LAST_WORDS)?;
     provider_queue.clear();
     *speaker_pending = None;
+    let snapshot = owner.snapshot(now())?;
+    publish(snapshot)?;
     let at_us = monotonic_us();
     admission.abandon_until_end(at_us)?;
     detector.abandon_input(at_us);
-    Ok(admission.draining())
+    Ok((admission.draining(), snapshot))
 }
 
 /// When a turn's answer begins to be heard, for the session's records

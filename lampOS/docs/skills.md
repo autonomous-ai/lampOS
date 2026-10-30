@@ -1170,7 +1170,10 @@ choose"; "we should have core skills and installable skills. but we should
 try to build everything as skills. core skills like core apple apps right
 always installed on the phone and then installable skills like installable
 apps". Earlier: an owner can make a private skill, and choose to publish it
-to a Skills Store for others.
+to a Skills Store for others. That last step is built as fourteen-P13
+(`LAMP_SKILLS_SHARE`, off): the app's Share sends a skill made on the lamp
+to the Store's owner upload, where a reviewer reads it before it is listed
+([cloud.md](cloud.md), "A made skill sent to the Store").
 
 As built on 2026-10-19 (`crates/skills/src/package.rs`; not yet run on a
 lamp):
@@ -1295,6 +1298,131 @@ it does not know).
 - **`asked`** is the manage helper ("The manage helper", below): one
   request read from the standard input, its answer on the standard output.
 
+**Skills pushed from a computer** (#3869, [control.md](control.md),
+"Skills pushed from a computer"). A paired computer with the `skills`
+grant puts a skill of its own on its own lamp, with no Store. The running
+program loads them from a developer folder of their own,
+`/var/lib/lampOS/skills-dev` (the product unit's
+`LAMP_SKILLS_DEV_DIR`, or `--dev-dir`, which wins; an `Environment=` line,
+as an older `lamp-skills` would end at an unknown flag, #2157), after the
+skills folder, looked at every 2 s with it (`lamp_skills::load_all_with`):
+- **Never in another's place.** A pushed folder with the name of a skill in
+  the skills folder isn't loaded ("a skill of that name is already on the
+  lamp: a pushed skill never takes its place"), and a pushed skill claims
+  its tool's name only after every skill there has, core first, so a
+  pushed skill never takes a core or Store skill's function, whatever the
+  folders' order. Nor does it join a `[budget]` group a skill there uses,
+  or share a `[stop]` with one, so it can never spend a group's hour (the
+  Reviewer-lead's P2 on #3879: a pushed member of `wellbeing` would have
+  quieted A sip of water). A skill there that fails to load just then still
+  holds its group, read from its own `skill.toml`.
+- **Held to the protocol's grants** (`lamp_skills::pushed_refuses`),
+  whatever wrote the folder:
+  - installable only, never `core` or `addon`;
+  - none of `actions`, `messages`, `known_faces`, `who`,
+    `output_limits`, `propose`, `say` or `core`;
+  - topics from `lamp_skills::PUSHED_TOPICS` alone: presence
+    (`humans/faces/tracked`, `room/stood_up`) and those the protocol's
+    events take with no grant (`clock/local`, `voice/state`,
+    `lamp/pause`, `controls/touch`). Not `voice/heard`, `name/heard` or
+    `ears/classes`, which give a skill every phrase or class heard until
+    format 2 lists them (Fourteen on #3869).
+- **The picture held for the owner's yes.** One that sees the picture
+  (`Permissions::sees_picture`: `camera = true`, or format 1's
+  `look = true`) loads off, unless the owner said yes in the app, kept as
+  its name in `--state-dir`'s `on`.
+- **Said as pushed.** Each is said as pushed by the computer its folder's
+  `.pushed.json` names (`{"computer": NAME}`, at most 1 KiB, never through
+  a link), "a computer" without one.
+
+The manage helper writes the folder; `/etc/tmpfiles.d/lampos.conf` makes
+it (0755 root), since the helper's unit may write it only if it is there.
+`lamp-control` asks it, and only `lamp-control` may (by its unit, as
+`lamp-cloud` and the voice are known):
+- `{"install_pushed": SHA256}`: the one push `lamp-control` keeps in its
+  `push/` (`push.json`: `sha256`, `client`, `client_name`, `name`,
+  `grants`, `at_unix_ms`; beside it `package.tar`, at most 1 MiB). Taken
+  only if the SHA-256 is that push's and it was taken within the last
+  60 s, never in the future; its bytes read once, never through a link,
+  and hashed again. It is checked as the running program will load it,
+  beside the skills folder (the rules above), then held to the computer's
+  `grants`: a skill that asks one the computer doesn't hold is refused
+  ("it asks speak, which this computer was not granted"). A name in the
+  skills folder, or another computer's push of that name, is refused; the
+  same computer's push replaces its own. The folder gets `.pushed.json`
+  (`computer`, `client`, `sha256`, `at_unix_ms`) in the same move as the
+  skill. The answer is `{"done": {"name", "version", "sha256", "on",
+  "held", "asks", "shown"}}`: `held` is "sees the picture: off until the
+  owner says yes in the app" or none, `asks` the protocol's grants it
+  asks, and `shown` their words as the pairing screen says them of the
+  skill ("moves the lamp's body", "changes the light", "speaks and plays
+  sounds", "knows when someone is there, never who", "uses the camera
+  when it runs"). A refusal for a grant (a permission or topic past the
+  protocol's grants, `hear` and `sound` among them, or a grant the
+  computer doesn't hold) also says `"code": "no_grant"`, which
+  `lamp-control` gives the computer as its `no_grant`.
+- **A shared package** (Ten on #3931; the helper's half, in B): one whose
+  `lamp-skill.sig` carries its author's `public` key. `install_pushed`
+  reads it again with `read_shared_package_bytes` against the Store's keys
+  (`store_keys`: the build's beside the skills folder, else `--key-file`).
+  A package changed after signing, naming another key, or carrying a Store
+  key is refused ("its signature: …", `bad_package`), and so is any
+  install when the Store's key can't be read, never an empty list. Its
+  `push.json` must carry `asks`, the computer's shown grants, equal to
+  `grants_asked`'s names in their order, or it's refused (`asks_differ`).
+  That is a check for honest tools only, and the skill is still held to
+  `grants`. `.pushed.json` keeps `author` (the whole key, base64) and
+  `author_fingerprint` (FPR16). An update of that name must be signed by
+  the same key, and a signed push over a name pushed unsigned is refused
+  ("desk-wave is signed by key FPR16 on this lamp: remove it first",
+  `signer_changed`). The answer and `list_pushed_by` say `author` (FPR16),
+  "signed by key FPR16, not the Store", never "verified". The owner's
+  picture yes is keyed by name, computer, SHA-256 and author. A Store
+  signature, with no `public`, makes a plain push, as an unsigned one does.
+- `{"off_pushed_by": CLIENT}`: a revoke, or the `skills` grant taken back:
+  that computer's pushes turned off as the app's off does, kept. The
+  revoke is kept first, with its time, in the folder's `.revoked.json`
+  under the folder's lock, so an install of a push it made before then is
+  refused ("that computer was revoked after the push") even when another
+  helper serves the install after the off: the socket starts a helper per
+  connection. A revoke is kept two minutes, past any push it could stop.
+- `{"grants_pushed_by": {"client": CLIENT, "grants": [...]}}`: the owner
+  changed that computer's grants, by a re-pair with fewer or a grant taken
+  back. Its pushed skills that ask a grant outside them (or no longer
+  load) are turned off, kept, and the change is kept in the same record as
+  a revoke, so a push made before it that asks one is refused ("it asks
+  light, which this computer was not granted"). A re-pair after a revoke
+  never lifts the revoke for a push made before it: every change is kept
+  for its two minutes, at most 64. Those dropped, by age or past the
+  64, leave a revoke of every computer at the newest of their times, and
+  a record that can't be read refuses every install until the next
+  change replaces it with a revoke of every computer then: the record
+  fails closed, never open.
+- **Ordered by the door's revision** (Reviewer-two on #3504): the door
+  keeps a `rev` for each computer's pairing, raised on every pair,
+  re-pair, grant change and revoke, writes the one it had into a push's
+  `push.json`, and sends it with each change, `{"off_pushed_by":
+  {"client", "rev"}}` or `{"grants_pushed_by": {"client", "rev",
+  "grants"}}`. A change whose `rev` isn't above the highest kept for that
+  computer is stale and does nothing, answered `{"done": {"stale": REV}}`
+  with the highest; that highest is kept apart from the changes' two
+  minutes (at most 256 computers), so a late retry of an old change is
+  stale however late. A push is after a change when its `rev` is not
+  below the change's; with either missing, by time. A plain id in
+  `off_pushed_by`, from a door that sends no `rev` yet, still works.
+- `{"list_pushed_by": CLIENT}`: that computer's pushes, each `name`,
+  `version`, `sha256`, `on`, `held` and `pushed_at_unix_ms`.
+- `{"remove_pushed": {"client", "name"}}`: removed only for the computer
+  that pushed it.
+- The app's `{"on": NAME}` of a pushed skill is also the owner's yes to it
+  seeing the picture, kept in the folder's `.yes.json` for that computer
+  and that SHA-256: a re-push of other bytes, or another computer's push
+  of the name, has no yes (the Reviewer-lead's P3 on #3879). `{"off":
+  NAME}` turns it off as any skill.
+- A helper given no developer folder answers each of these "skill push is
+  not on this lamp". Tests
+(`crates/skills/tests/it/pushed.rs`): `a_pushed_skill_*`.
+
 **The manage helper** (#1722, the first builder's 18:33). The one way a
 part that is not root changes the skills folder. `lamp-cloud`'s
 `skills.remove` and `skills.install`, for the app's skills page
@@ -1346,9 +1474,12 @@ for it.
   the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
   `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
   install) and `lamp-voice` (a made skill's spoken yes, #1685), each at
-  the system's place for it, are answered. Any other part in the group
-  `lampos` gets `only the app's link and the voice may change the lamp's
-  skills`, as the keys helper does (#2167; `package::from_an_asker`,
+  the system's place for it, are answered, and `lamp-control` for skills
+  pushed from a computer alone (`package::Asker`: it asks nothing else,
+  and nothing else asks those, "only lamp-control asks for pushed skills,
+  and it asks for nothing else"). Any other part in the group `lampos`
+  gets `only the app's link, the voice and lamp-control may change the
+  lamp's skills`, as the keys helper does (#2167; `package::from_an_asker`,
   `only_lamp_cloud_and_the_voice_may_ask_the_manage_helper`). The tests that
   drive `lamp-skills asked` over a socket pair of their own set
   `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit
@@ -1866,7 +1997,7 @@ on the lamp. A "My skills" page in the lamp's app (on or off, what each did
 and when) comes once there are more than a handful. The store comes after
 launch.
 
-#### Made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
+#### Made by voice (#1685, `LAMP_MAKE_SKILL=on`, on in the product)
 
 "Lamp, make me a skill that dims the light at 10 pm." With the switch, the
 model is given `make_skill(request)` (`crates/voice/src/made_skill.rs`). What
@@ -2016,7 +2147,7 @@ Tests:
 - `task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out`.
 - `crates/skills/tests/it/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
 
-#### Asked for in the app (#2813, off unless `LAMP_APP_MAKE_SKILL=on`)
+#### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
 The same maker, from words typed in the app; put on only as above, by a
 spoken yes at the lamp (the lead's ruling on #1711; the first builder on
@@ -2044,11 +2175,19 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    or one not 1 to 64 letters, digits, `-`, `_`, `.` or `:`; the words too
    long; an id sent before, of the newest 100; or one still being made: one
    at a time, and one "making" for 30 minutes is let go).
-3. **Told aloud.** The hand-over is never kept as typed
+3. `{"ready": {}}` (fourteen-P15): `{"ready": true}` when the tasks part
+   answers `targets` with at least one target within 1 s
+   (`app_make::READY_WAIT`, `agent_tasks::has_a_target`), else
+   `{"ready": false, "why": "the computer's agent isn't set up for the lamp
+   yet"}`; unreached is no. It reads nothing of the asks. `lamp-cloud` asks
+   it every 60 s and names `skills.make` in `can` only while it is ready,
+   so the app's "Make a skill" shows only on a lamp whose Harness has a
+   computer.
+4. **Told aloud.** The hand-over is never kept as typed
    (`task_news::keep_typed`), so its news ("… Shall I put it on the
    lamp?") is told by the spoken task news at a good moment, with someone
    there, and the ask is dated only when heard whole or played through with
-   a gap (`made_skill::asked`, step 6 above).
+   a gap (`made_skill::asked`, step 6 of "Made by voice" above).
    A spoken yes within 120 s puts it on (`put_on_made_skill`, and the
    manage helper's own check, #2874); a no, a typed yes or silence leaves
    it off. What the tasks part settles is settled here too, by the task's
@@ -2058,7 +2197,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    stopped (by the task's own states), are `not_kept` with why; work it may have
    sent (`uncertain`) stays `making`, so another may start after 30
    minutes.
-4. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
+5. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
    only, never a skill made by voice. `state` is `making`, `kept` (not yet
    asked about aloud), `asked` (the offer a spoken yes would put on now:
    the newest, within its 120 s, `made_skill::waiting`, #2874), `on`,
@@ -2066,7 +2205,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    or why it wasn't handed over; never the agent's text). Once kept:
    `name`, `description`, `version`, `uses` (`light`, `body`, `topics`) and
    `sha256`, what the lamp asks about. `{"state": "none"}` with no ask.
-5. Kept beside the made skills, root's, 0700: `app.json`, the newest five
+6. Kept beside the made skills, root's, 0700: `app.json`, the newest five
    asks, each its request id, when, its task and why it wasn't kept. Never
    the words. Every writer (the socket's admission, the hand-over's thread,
    the task news' reader, the texts' reader in the worker) holds one lock

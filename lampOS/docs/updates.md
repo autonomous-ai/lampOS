@@ -1160,6 +1160,47 @@ pads in it (`"head_pads": ["head-1", "head-2"]` for two) before restarting
 `lamp-controls`, or it won't start, and on the privacy route the lamp then
 hears nothing (install.md).
 
+### Reading a round from the journal
+
+Each line is `lamp-update: <text>` in `journalctl -u lamp-update`. A round
+ends with one line, its outcome as `round::Outcome` writes it. The same end
+has a name in `log.jsonl` (`outcome`) and on `update/status` (`last`), from
+`Outcome::kind`; **that name is never in the journal**, so a run sheet greps
+the text below, not `self-switched` or `self-confirmed` (#4561's P2). `serve`
+says an end only when its text differs from the last one it said in the same
+run, so a lamp up to date for hours says `up to date: build N` once per run of
+`serve` (again after a restart, a self-switch or a climb). A `once` or `check`
+by hand prints its end on standard output with no `lamp-update: ` before it;
+only a self-switch or a climb goes to the journal's form, before its `exec`.
+
+| The journal line begins | Its name | Means |
+|---|---|---|
+| `up to date: build N` | `up-to-date` | nothing to do |
+| `nothing changed: …` | `unreachable`, `nothing-published` | the channel couldn't be read, or has no build |
+| `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before, or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
+| `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, or `another lamp-update is at work` |
+| `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
+| `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts (or with none to change) |
+| `build N needs updater M; lamp-update switches from its build A to B, which the build carries, and takes nothing else of it until that one has confirmed itself` | `self-switched` | a **climb**: only the updater the build carries is taken |
+| `build N put back: …; the previous build is well`, or `…; the previous build is not well either: …` | `rolled-back` | the parts were put back (the watch, or a start that failed). The second ending, the old build failing its own check too, is the one to post at once; grep `build N put back:` for both |
+| `failed: …` | `failed` | an error, said with why |
+
+Inside a round: `installed <folder> beside <folder>` for each new folder
+(a self-switch's or a climb's updater too, before its own line),
+`switching to build N`, `waiting for a quiet moment: …` (once per wait), and
+`putting build N back: …` before a `put back` end.
+After a self-switch or a climb, the new updater says
+`confirmed: lamp-update runs its new build` once its dry round passes
+(`self-confirmed` in `log.jsonl`), or `not confirmed yet: …` and
+`not confirmed: …`, each when its text changes, looking again every 30 s
+(`main.rs`). A climb's parts switch follows the confirm in the same `serve`
+run. A new updater that never confirms is put back by `lamp-update-back`,
+in its own unit's journal (`journalctl -u lamp-update-back`, lines
+`lamp-update-back: …`), not `-u lamp-update`. Tests
+(`crates/update/tests/journal_lines.rs`, #4606): each end's words and name
+above, `TooOld::why`'s two endings, `walk::held` and the lock's words; the
+confirm line is `self_cli_exec`'s (Linux).
+
 ### The second route's services in a round
 
 A round places `/etc/lampOS/voice/second.json` when the build's voice unit
@@ -1547,7 +1588,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7). A manifest
+before the field climbs first. The current `UPDATER` is 9; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
@@ -1707,11 +1748,35 @@ Not shown: a real systemd restarting a socket while an instance of its
 template runs, and a carried template on a 7071 lamp. The tests use the
 round's fake systemd.
 
+### Every lamp switches in its build's order (second-P1)
+
+Every product build asks for updater level 9 (`manifest::ORDER_UPDATER`):
+a round stops the voice first and starts it last (#4431, step 8). An
+updater of level 8 or lower reads such a build as too new for it, takes
+only the lamp-update it carries, and that one confirms itself and, in the
+same `serve`, runs the switch in its own order: on lamp-9adf a confirmed
+self ran its next round 2 s later. Without it, a lamp's own older updater
+ran the switch, restarting lamp-controls before the voice, and a lamp on a
+build from 28 Oct 17:16 to 29 Oct 09:59 (8237 to 8498: updater 8, from
+before the voice's own guard release `1c88f2dbd`) came back muted until a
+head tap. The ten customer lamps shipped on the stable of the day they
+were set up at the factory (the lead, #1711, 30 Oct), which may be one of
+those. The cost is the climb itself, about 20 s, on each lamp's next
+update; the self-switch every build already makes moves from after the
+parts to before them. A lamp that put a carried lamp-update back for good
+(`own::refused_for_good`) now takes nothing from a build carrying that same
+lamp-update, where before its own updater still switched the parts; that ends
+at the next build whose lamp-update differs (Tests' P3 on #4582). A
+development lamp on `deploy/units/lamp-update.service`, pinned with no
+`LAMP_UPDATE_SELF`, refuses every product build from here ("needs updater 9
+or newer") until it is installed again. The test:
+`an_updater_of_level_eight_climbs_before_it_switches_any_part`.
+
 ### A part added over the air (#3689)
 
 From updater level 8 (`manifest::ADDS_UPDATER`) a round adds a product unit
 the lamp lacks (`crate::added`). Every build with the product's units asks
-for level 8, so an updater of level 7 climbs first. It adds only:
+for at least level 8 (9 since second-P1, above), so an updater of level 7 climbs first. It adds only:
 
 - **On a lamp installed as the product:** a managed updater (its own unit
   starts `update/current/lamp-update`), and every part started through its
@@ -1799,7 +1864,7 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7).
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 9; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
@@ -2525,7 +2590,7 @@ the file is never read back.
 | records | voice sessions, `/var/lib/lampOS/voice/sessions` | folders | n/a | an extra file in a session is refused (`records/src/store.rs:22-28`, `394-396`) | n/a | that session is kept and reported and the run exits 1 (`run.rs:253-261`); a newer voice's sessions are never pruned |
 | eyes | faces from photos, `<people>.from-photos` (only with `--photo-dir`, not in the product unit) | JSON | `version` 1; any other **deletes the file** (`eyes/src/photo.rs:195-209`) | read | n/a | dropped with a line. Off in the product |
 | voice | person's light, `/var/lib/lampOS/light/person.json` (`LAMP_LIGHT_KEEP`, not set in the product) | JSON | none | read (`msgs/src/lib.rs:597`) | an unknown colour filtered (`ring_light.rs:170-175`) | dropped silently, overwritten at the next change. Off |
-| voice | made skills index, `/var/lib/lampOS/voice/made-skills/made.json` (`LAMP_MAKE_SKILL`, off) | JSON | none | `Value` | n/a | unreadable reads as `[]` (`made_skill.rs:510-515`) and is overwritten (`547-575`). Off |
+| voice | made skills index, `/var/lib/lampOS/voice/made-skills/made.json` (`LAMP_MAKE_SKILL`, on in the product since fourteen-P15) | JSON | none | `Value` | n/a | unreadable reads as `[]` (`made_skill.rs:510-515`) and is overwritten (`547-575`). On |
 | tasks | mark of machine-written targets, `targets.json.from-machines` (only `--targets-from-machines`, off) | text | none | n/a | n/a | may overwrite a newer build's targets file whose hash is marked (`runtime.rs:1186-1220`). Off |
 
 ### Low

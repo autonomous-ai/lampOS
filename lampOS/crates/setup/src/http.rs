@@ -89,6 +89,51 @@ pub fn warm(shared: &Shared, tries: usize, every: std::time::Duration) -> bool {
     false
 }
 
+/// The recovery hotspot's refusals of a request without the lamp's own key
+/// (#3020): an open hotspot can be asked many times a second and the journal
+/// is in RAM, so the first is said, then at most one line a minute with the
+/// count since the last line (Reviewer-two on #4180). Never the key.
+#[derive(Default)]
+pub struct Refusals {
+    said: Option<std::time::Instant>,
+    unsaid: u64,
+}
+
+impl Refusals {
+    pub const fn new() -> Self {
+        Self {
+            said: None,
+            unsaid: 0,
+        }
+    }
+
+    /// Count one refusal at `now`; the journal line to write, if one is due.
+    pub fn refused(&mut self, now: std::time::Instant) -> Option<String> {
+        self.unsaid += 1;
+        if self
+            .said
+            .is_some_and(|said| now.duration_since(said) < REFUSALS_SAID_EVERY)
+        {
+            return None;
+        }
+        let count = std::mem::take(&mut self.unsaid);
+        let first = self.said.replace(now).is_none();
+        Some(if first {
+            "a request without this lamp's own key was refused".into()
+        } else {
+            format!(
+                "{count} {} without this lamp's own key refused since the last line",
+                if count == 1 { "request" } else { "requests" }
+            )
+        })
+    }
+}
+
+/// At most one refusal line this often.
+pub const REFUSALS_SAID_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
+
+static REFUSALS: Mutex<Refusals> = Mutex::new(Refusals::new());
+
 /// How long one scan's list answers before the radio is asked again.
 pub const SCAN_KEPT: std::time::Duration = std::time::Duration::from_secs(5);
 
@@ -125,7 +170,10 @@ async fn setup(State(shared): State<Arc<Shared>>, body: Bytes) -> Response {
     if recovering
         && !crate::serve::recovery_key_matches(&request.llm_api_key, &shared.config.credential)
     {
-        eprintln!("lamp-setup: recover: a request without this lamp's own key was refused");
+        let line = REFUSALS.lock().unwrap().refused(std::time::Instant::now());
+        if let Some(line) = line {
+            eprintln!("lamp-setup: recover: {line}");
+        }
         return json(
             StatusCode::FORBIDDEN,
             failure("this lamp's own key is needed to set its Wi-Fi again"),

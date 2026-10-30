@@ -459,6 +459,18 @@ open until then:
   `audio_written_with_playback_gaps_unscored`). Never tried again here: the
   asker decides.
 - `{"outcome":"expired"}`.
+
+**While the model service refuses** (#4265, `LAMP_SECOND_REFUSED_HOLD=on`,
+the lead's call on #1711; [failure-notices.md](failure-notices.md)): while
+turns are held, a `text` is said as the lamp's own line, its words as they
+are and no chat asked (`Says::take_while_refused`, `onboarding::said_as_is`;
+a `text` with a `"` in it can't be held so and waits); a skill's own sound,
+a recording or a cached line never needed the model and plays as before.
+A `note` or a `quoted` line needs the model to word it: it waits, as a
+spoken line does, and is said once the hold lifts (the minute's try or the
+service answering again), or `expired` at its own time. Sent with the try,
+it spends it only if its chat is refused; its answer ends the refusal. Words
+said as they are end none.
 - `{"outcome":"refused","why":"…"}`: a request that is not one (the reason
   names the field and never repeats what was asked), no whole line within
   1 s of being taken (one deadline for the line, so that a client sending a

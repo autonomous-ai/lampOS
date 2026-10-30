@@ -1189,6 +1189,10 @@ fn worker_command(
             role,
             var(lamp_msgs::SHUTDOWN_SWITCH).as_deref(),
         ))
+        .envs(night_worker_environment(
+            role,
+            var(crate::ring_night::ENVIRONMENT).as_deref(),
+        ))
         .envs(scheduling_worker_environment(
             role,
             var(crate::worker_scheduling::ENVIRONMENT).as_deref(),
@@ -1701,6 +1705,7 @@ fn second_route_worker_environment(
         crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
         crate::person::BY_DEFAULT_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
@@ -1749,6 +1754,16 @@ fn shutdown_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((lamp_msgs::SHUTDOWN_SWITCH, "on"))
+}
+
+// The night's asleep face (#3748), the same narrow way: the exact `on`, to
+// the ring only, which eases its resting face into it.
+fn night_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::ring_night::ENVIRONMENT, "on"))
 }
 
 #[cfg(test)]
@@ -1848,6 +1863,7 @@ mod tests {
             crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -2367,8 +2383,8 @@ mod tests {
     /// days, the clock, the name's file (#1323) and its scoped context
     /// (#1839), both task news's told file (#2762), capture the quiet
     /// evidence switch (#1285) and the detector's input (#828), and the ring
-    /// the unplug switch (#1674, the reviewer on #1699) and the shutdown's
-    /// (#3697). With every other variable set to a secret,
+    /// the unplug switch (#1674, the reviewer on #1699), the shutdown's
+    /// (#3697) and the night's asleep face (#3748). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
     fn a_started_worker_gets_its_roles_switches_and_nothing_else() {
@@ -2417,6 +2433,7 @@ mod tests {
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
+                    crate::ring_night::ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                 ]
                 .contains(&name)
@@ -2494,6 +2511,7 @@ mod tests {
                     || name == crate::second_provider::TWO_FACES_HELD_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
@@ -2580,6 +2598,7 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_CONVERSATION_CARRIED_SAVES=on",
                     "LAMP_CONVERSATION_CARRIES=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
                     "LAMP_DECLINE_SILENT=on",
@@ -2686,7 +2705,14 @@ mod tests {
                     "LAMP_VAD_INPUT=linear",
                 ],
             ),
-            ("ring", vec!["LAMP_SHUTDOWN=on", "LAMP_UNPLUG=on"]),
+            (
+                "ring",
+                vec![
+                    "LAMP_NIGHT_ASLEEP_FACE=on",
+                    "LAMP_SHUTDOWN=on",
+                    "LAMP_UNPLUG=on",
+                ],
+            ),
             ("speaker", vec![]),
         ] {
             let status = status_of_fresh(&mut worker_command(

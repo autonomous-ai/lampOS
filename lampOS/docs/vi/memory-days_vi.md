@@ -312,3 +312,34 @@ người quen theo cùng quy tắc. Rủi ro đã chấp nhận: một
 người ngoài khung hình, không có dấu hiệu nào khác, được trả lời trong cuộc trò
 chuyện đang diễn ra và nghe được những gì đã nói trong đó; họ không chạm được
 ký ức đã lưu của người kia.
+
+**Điều một câu được giữ yêu cầu lưu phải chờ lời «có» của họ**
+(`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, thay đổi quy tắc riêng tư được
+duyệt ngày 30/10, cùng quyết định của người xây dựng đầu tiên trên #4508):
+trước đây câu được giữ không lưu được gì, nên «We booked the Pine Hill Hotel»
+nói lúc khuôn mặt lệch khỏi khung hình bị mất («I can't save that just now»).
+Bật công tắc này, lệnh `remember` của một câu được giữ
+(`ScopeLease::save_carried`) được khai báo nhưng không ghi ngay: nó được giữ
+trong RAM, không ghi vào nhật ký, chờ lời «có» của chính người được giữ, như
+một lệnh quên được giữ (`hold_carried_keep`, `take_held_forget`). Mô hình được
+báo «Not kept yet» (`remember::held_keep_told`) và hỏi một lần, «Want me to
+keep that for you?»; việc giữ chỉ còn nếu câu trả lời nói trọn có hỏi
+(`remember::asks_about_keeping`). Lời «có» đơn giản của họ ở câu nói kế tiếp,
+trong vòng `HELD_FORGET_FOR` (60 giây), với chính khuôn mặt họ được thấy đang
+nói và không mặt nào khác (`LAMP_EYES_SPEAKING`,
+`speaking_faces::seen_saying`), mới ghi nó vào phạm vi của họ, và câu trả lời
+nói đã lưu. Khuôn mặt họ chỉ ở trong khung hình là chưa đủ: nó vẫn ở đó khi một
+vị khách nói từ ngoài khung hình (Reviewer-three, 14:46). Mọi trường hợp khác
+đều bỏ nó, không ghi gì ở đâu cả: không có «có», «có» không được thấy (mô hình
+được báo là không tính), một mặt khác được thấy nói, một lệnh quên, cuộc trò
+chuyện kết thúc, hay quá một phút. Khi mắt không đọc được ai đang nói thì không
+giữ gì, và việc lưu bị từ chối («Not kept»). Lượt trao đổi của câu được giữ vẫn
+không vào nhật ký, nên không lời nào trong đó thành điều quan sát về họ. Mọi thứ
+khác vẫn giữ như phạm vi được giữ: không `recall`, ghi chú hay gợi ý, không
+`forget`, `forget_everything`, quy tắc, khuôn mặt hay lời «có». Một câu được
+nhận chỉ nhờ khoảng hở của khuôn mặt (`LAMP_FACE_GAP_HOLD`) không giữ gì, và câu
+đã thu hẹp về căn phòng (thấy mặt khác nói) là của căn phòng. Bản tóm tắt chạy
+và ghi chú cuộc trò chuyện vẫn bỏ qua câu được giữ. Rủi ro còn lại: lời «có»
+được thấy của chính họ xác nhận một điều mà người khác có thể đã nói; họ được
+hỏi trước. Việc kiểm tra cùng giọng (`same_voice_releases`, một điểm móc, hiện
+chưa bao giờ đúng) là phần làm sau.

@@ -1,0 +1,27 @@
+# Synthetic; documents today's behaviour; the humidity guard is not decided
+# (#1684). Steam can fool an optical sensor: humidity jumps from 55 % to
+# 95 % in a minute (300 to 360 s) while PM2.5 rises from 80 to 300 over the
+# same minute, both held to 900 s and back by 1,000. The rule reads no
+# humidity, so it treats this as smoke: at 330 s PM2.5 is 190, over 150 and
+# 110 above the 3 minutes before, and after 30 s held, at 360 s, it lifts,
+# breathes amber and says the line, once. If a humidity guard is decided,
+# this case's verdict changes with it.
+clock = "10:00"
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

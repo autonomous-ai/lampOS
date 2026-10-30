@@ -134,6 +134,50 @@ pub fn held_forget_told(name: &str) -> serde_json::Value {
     })
 }
 
+/// What the model is told of a carried line's `remember`
+/// (`LAMP_CONVERSATION_CARRIED_SAVES`, `ScopeLease::saves_carried`): the
+/// lamp could not see who said it, so nothing is kept yet. It is held, in
+/// memory only, for the carried person's own yes, their face seen saying it
+/// (`second_provider::HeldForget`), and dropped on anything else. The reply
+/// asks once and never says it is kept (the first builder's call on #4508).
+pub fn held_keep_told() -> serde_json::Value {
+    serde_json::json!({
+        "remembered": false,
+        "held": HELD_KEEP_ASKS,
+    })
+}
+
+/// [`held_keep_told`]'s words.
+pub const HELD_KEEP_ASKS: &str = "Not kept yet: you could not see who said it. Do not say it is kept or noted. Ask them once, in a few words, whether you should keep it for them (for example \"Want me to keep that for you?\"), and then stop. Their yes, said where you can see them, keeps it; do not call remember again for it.";
+
+/// What the model is told when a carried line's `remember` cannot be held
+/// for a yes: one waits already, or the eyes don't read who speaks.
+/// Nothing is kept.
+pub const HELD_KEEP_REFUSED: &str = "Not kept: you could not see who said it. Say so in a few words, and that you can keep it when they say it where you can see them. Do not say it is kept.";
+
+/// Whether the lamp's `answer` asks them about a held keep: one of its
+/// sentences is an offer to keep ([`offers_a_keep`]: a question in which
+/// the lamp would keep it, "Want me to keep that for you?"). What keeps a
+/// carried line's held `remember` for their yes
+/// (`second_provider::HeldForget`).
+pub fn asks_about_keeping(answer: &str) -> bool {
+    let mut sentence = String::new();
+    for c in answer.chars() {
+        sentence.push(c);
+        match c {
+            '?' | '\u{ff1f}' => {
+                if offers_a_keep(&sentence.replace('\u{ff1f}', "?")) {
+                    return true;
+                }
+                sentence.clear();
+            }
+            '.' | '!' | '\u{2026}' | '\u{3002}' => sentence.clear(),
+            _ => {}
+        }
+    }
+    false
+}
+
 /// What the model is told when a held forget's yes did not count: the lamp
 /// did not see the person whose forget it is say it
 /// (`second_provider::HeldForget`, `LAMP_EYES_SPEAKING=on`). Nothing ran;
@@ -143,6 +187,10 @@ pub fn unseen_yes_told(name: &str) -> String {
     let (what, example) = match name {
         crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
         FORGET_EVERYTHING => ("everything about them", "Yes, forget everything."),
+        // A carried line's held keep: nothing was kept.
+        REMEMBER => {
+            return "(For you to know: that yes did not count, since you did not see them say it, so nothing was kept. If they want it kept, they can tell you again where you can see them. Do not say it is kept, and do not call remember for it now.)".to_owned();
+        }
         _ => ("that", "Yes, forget that."),
     };
     format!(

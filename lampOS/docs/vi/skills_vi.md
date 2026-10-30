@@ -4,7 +4,14 @@ Trang này chỉ dịch phần mới về kỹ năng tạo bằng giọng nói. 
 kế kỹ năng là [skills.md](../skills.md), bằng tiếng Anh; nếu hai trang khác
 nhau, bản tiếng Anh đúng.
 
-## Tạo bằng giọng nói (#1685, tắt trừ khi `LAMP_MAKE_SKILL=on`)
+## Tạo bằng giọng nói (#1685, `LAMP_MAKE_SKILL=on`, bật trong sản phẩm)
+
+Từ fourteen-P15 (first builder đồng ý, 30/10 15:5x), `LAMP_MAKE_SKILL` và
+`LAMP_APP_MAKE_SKILL` bật trong sản phẩm. Nút "Make a skill" của ứng dụng
+chỉ hiện khi Harness của đèn có một máy tính để nhận việc: `lamp-cloud`
+hỏi `{"ready": {}}` mỗi 60 giây và chỉ ghi `skills.make` vào `can` khi câu
+trả lời là `{"ready": true}`. Kỹ năng tạo ra vẫn chỉ được bật bằng một câu
+"có" nói ở đèn.
 
 "Lamp, tạo cho tôi một kỹ năng làm đèn dịu đi lúc 10 giờ tối." Khi bật,
 mô hình có hàm `make_skill(request)` (`crates/voice/src/made_skill.rs`).
@@ -101,3 +108,49 @@ Diễn ra như sau:
 - Đăng nhập Harness trên đèn ở nhà.
 
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến cùng với việc cài nó.
+
+## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, tắt)
+
+Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng
+trang kỹ năng và `LAMP_CLOUD`); chưa unit sản phẩm nào bật. Khi bật,
+`lamp-cloud` nhận ba lệnh từ ứng dụng, không bao giờ bằng giọng nói:
+
+- **`skills.share`** (`{"name", "author"?}`): chỉ một kỹ năng tạo trên đèn
+  này (`made: here`) và đang bật. Thư mục của nó được chép vào `/tmp` riêng
+  của `lamp-cloud`, bỏ các tệp chấm (`.package.json`) và bỏ dòng
+  `made: here` khỏi `SKILL.md` (trên đèn khác nó không được tạo ở đó), đóng
+  gói không ký bằng `lamp_skills::package::pack`, rồi xóa bản chép dù thế
+  nào. Gói được gửi tới `POST {host}/api/v1/skills/publish` (`file`, và
+  `author` nếu có: tên gọi, tối đa 32 ký tự, một dòng) bằng khóa của đèn.
+  `{host}` là scheme và host của `llm_base_url` của tài khoản, không có
+  đường dẫn phía sau: các route của Store nằm ở gốc host, không nằm dưới
+  base của ping (base đó kết thúc bằng `/api/v1/ai/v1`). Store trả lời
+  trong `{"status": 1, "data": ...}`; khi từ chối (lỗi HTTP, hoặc
+  `"status": 0`), lý do lấy từ `error_message`, nếu không có thì
+  `error_code`, rồi mới đến `message`. Một câu trả lời 2xx mà `data` không
+  có id, tên hay trạng thái thì báo "the Skills Store's answer couldn't be
+  read", vì ứng dụng sẽ không bao giờ rút lại được nó.
+  **`"preview": true`** không gửi gì: bản chép giống hệt được đọc lại thành
+  `{"preview": {"name", "files": [{"path", "text"}]}}` (tệp không phải văn
+  bản chỉ cho `bytes`; tối đa 65.536 ký tự), để ứng dụng cho chủ đèn xem
+  đúng những gì sẽ rời đi trước khi bấm Send.
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine?limit=100`,
+  trang lớn nhất Store cho, mới nhất trước: **chỉ 100 kỹ năng gửi gần
+  nhất** hiện ra (với 5 gói một ngày của Store, khoảng hai mươi ngày), các
+  dòng lấy từ `data.data`, trả
+  `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`.
+- **`skills.unshare`** (`{"id"}`): `DELETE {host}/api/v1/skills/ID`.
+
+Chỉ các tệp của chính kỹ năng và tên gọi chủ đèn gõ rời khỏi đèn; đường gửi
+này không đọc những gì đèn tự giữ: trí nhớ, khuôn mặt, tên đèn biết, bản
+ghi, ảnh hay cài đặt. **Nhưng nội dung
+kỹ năng là những gì agent viết ra từ lời người ta nhờ,** nên một cái tên
+hay một chi tiết trong lời đó ("nhắc Mai uống thuốc lúc 8 giờ") có thể nằm
+trong mô tả hoặc thân kỹ năng và đi theo nó. Vì vậy ứng dụng cho xem toàn
+bộ nội dung (`preview`) trước khi bấm Send. Ứng dụng của chủ đèn thay mặt
+cả đèn, nên có thể gửi một kỹ năng mà người khác ở đèn đã tạo bằng giọng
+nói; dù thế nào, phần xem trước vẫn cho thấy nội dung của nó. Người duyệt
+của Store đọc nó trước khi lên danh sách; chỉ khi được duyệt nó mới được ký
+bằng khóa của Store. Chi tiết, giới hạn và lý do từ chối ở
+[cloud.md](../cloud.md), "A made skill sent to the Store".
+

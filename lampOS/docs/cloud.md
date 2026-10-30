@@ -129,10 +129,13 @@ lamp says so.
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
+| `skills.share` (`{"name", "author"?, "preview"?}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave. Without them, "not on this lamp" |
+| `skills.shared` (`{}`) | as `skills.share`: this lamp's sent skills, the Store's newest 100, `{"shares": [...]}` |
+| `skills.unshare` (`{"id"}`) | as `skills.share`: a sent skill taken back from the Store, `{"unshared": ID}` |
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
 | `skills.camera` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` (#3504's piece C, "The owner's yes to a skill's camera" below): the owner's yes to the skill seeing the camera's picture, given (`allow` true) or taken back, past the app's warning, asked of root's manage helper as off and on are and kept in `lamp-skills`' `camera`; the reply is `skills.list`'s, read after it, with `camera: {name, allowed}`, what was kept for that name, on the lamp or not (#4099). A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
-| `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below): `skills.make` (`{"words", "request_id"}`, the words at most 180 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
+| `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker has a computer to hand the work to (its `ready`, asked every 60 s, so the button can show up to 60 s after a computer is paired or after lamp-voice starts, and stay up to 60 s after one is unpaired, when a make gets the voice's own refusal): `skills.make` (`{"words", "request_id"}`, the words at most 180 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
@@ -556,6 +559,17 @@ page (`LAMP_SKILLS_PAGE=on`), and the same switch, `LAMP_MAKE_SKILL=on` and
 the tasks part in `lamp-voice`'s (`crate::make_skill`; the voice's side is
 in [skills.md](skills.md), "Asked for in the app"). The first builder's
 contract on #2602 (22 Oct 10:3x); the app's screen is Fourteen's (#2814).
+
+On in the product since fourteen-P15 (the first builder's yes, 30 Oct
+15:5x), with the app's button only on a lamp whose Harness has a
+computer: `make_skill::watch` asks lamp-voice's socket `{"ready": {}}` at
+start and every 60 s (`READY_EVERY`) on a thread of its own, and `can`
+names `skills.make` and `skills.made` only while the newest answer is
+`{"ready": true}` (the tasks part answered `targets` with at least one).
+`system.info` never waits on it. A make asked while it isn't ready is still
+taken on the switch alone, so an app that asks anyway gets the voice's own
+reason. The journal says each change ("making a skill is ready" or "not
+ready"), never more.
 
 - **`skills.make`** (`{"words", "request_id"}`): the words, trimmed, 1 to
   180 bytes, and a request id, are sent to `lamp-voice`'s app-make socket
@@ -994,6 +1008,77 @@ key step and the single shared switch to change after it.
 - **Not built:** `skills.catalog` (the signed list the entries come from);
   the voice installing a skill.
 
+## A made skill sent to the Store (fourteen-P13, `skills.share`, `skills.shared`, `skills.unshare`)
+
+Off unless `LAMP_SKILLS_SHARE=on` in `lamp-cloud`'s unit, with the skills
+page (`LAMP_SKILLS_PAGE=on`) and `LAMP_CLOUD`; no product unit sets it.
+`system.info`'s `can` names the three kinds only then, and only with the
+backend's base and the lamp's key at start (`crate::share::Store`). The
+first builder gave it to Fourteen on Queue #3997 (30 Oct 15:5x); the
+Store's side is Backend3's (Queue comment 6516962994), live in production
+since 30 Oct.
+
+- **`skills.share`** (`{"name", "author"?}`): the owner's act from the app
+  only, never by voice. `name` must be a skill made on this lamp (`made:
+  here`, the page's `made_here` group) that is on; else "only a skill made
+  on this lamp can be shared" or "turn the skill on before sharing it".
+  `author`, when given, is a first name: trimmed, at most 32 characters, on
+  one line; empty means none. The skill's folder is copied to a fresh
+  folder in `lamp-cloud`'s own `/tmp` (`PrivateTmp=yes`), without its dot
+  files (`.package.json`) and with `made: here` taken out of `SKILL.md`'s
+  front matter, since on another lamp it was not made there; packed
+  unsigned with `lamp_skills::package::pack` (the same checks as `lamp-skills
+  pack`), and the copy removed whatever happens. The package goes to
+  `POST {host}/api/v1/skills/publish` as `multipart/form-data` (`file`, and
+  `author` when given), with `authorization: Bearer` and the lamp's key, as
+  the ping sends it. `{host}` is the scheme and host of the account's
+  `llm_base_url` and nothing after: the Store's routes sit at the host's
+  root, not under the ping's base, which ends in `/api/v1/ai/v1` (Backend3
+  on #4570). The Store answers inside `{"status": 1, "data": ...}`, and a
+  refusal (an HTTP error, or `"status": 0`) is told by its
+  `error_message`, else its `error_code`, else its generic `message`.
+  Answered `{"sent": {"id", "name", "version", "review_status":
+  "pending"}}`, from the Store's `data`; a 2xx whose `data` has no id, name
+  or state is "the Skills Store's answer couldn't be read", since the app
+  could never take it back.
+  **`"preview": true`** sends nothing: the same copy is made and read back
+  as `{"preview": {"name", "files": [{"path", "text"}]}}` (a file that
+  isn't text gives its `bytes` only; at most 65,536 characters in all), so
+  the app can show the owner exactly what would leave before Send.
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine?limit=100`,
+  the Store's largest page, newest first: **only the newest 100** a lamp
+  sent show (at the Store's 5 a day, about twenty days of them), the rows
+  from the Store's `data.data`, answered
+  `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`
+  (only those fields; `review_status` is the Store's `pending`, `approved`
+  or `rejected`, and `review_note` its reviewer's reason).
+- **`skills.unshare`** (`{"id"}`, 1 to 64 letters, digits, `-` or `_`):
+  `DELETE {host}/api/v1/skills/ID`, answered `{"unshared": ID}`.
+
+**What leaves the lamp:** only the skill's own files (`skill.toml`,
+`SKILL.md` and anything else in its folder that isn't a dot file), and the
+first name the owner typed. What the lamp itself keeps doesn't leave: no
+memory, faces, names it knows, recordings, pictures or settings are read
+on this path. **But the skill's text is what its agent
+wrote from the words it was asked in,** so a name or a detail in those
+words ("remind Mai to take her pills at 8") can be in its description or
+body, and goes with it. That is why the app shows the whole text (its
+`preview`) before Send. The owner's app acts for the whole lamp, so it can
+send a skill another person at the lamp made by voice; the preview shows
+what it says either way. A reviewer at the Store reads it before
+it is listed; only approval signs it with the Store's key
+(`8717ddcdf9ac22fb`), and an unapproved package is never listed.
+
+**Refusals and limits.** The Store's own reason is passed on in plain
+words ("the Skills Store said: …", from its `error_message`, else its
+`error_code`, else its `message`, at most 300 characters); `401` is "the Store didn't know this
+lamp"; no answer is "the Skills Store can't be reached now". The key is
+never in an answer or the journal. The Store holds each lamp to 5 sent a
+day, 3 waiting at once and 20 attempts a day, and each owner to 10 a day
+(Backend3, 30 Oct). Each exchange runs on a thread of its own with its own
+runtime and waits at most 30 s (`share::WITHIN`), as `skills.install`
+waits on the manage helper.
+
 ## Health and crash reports (#1683, step 1)
 
 If something on a lamp breaks in a home, the company should know and fix it
@@ -1200,8 +1285,8 @@ a week.
 When the lamp updates itself, the company is told at each stage, so a
 refused or rolled-back update is seen without asking the person. It is not
 a report kind: `lamp-cloud` posts to the backend's alert endpoint, the
-base of the account's `llm_base_url` with `/alert` after it (a trailing
-`/v1` stays), with the voice's key as the bearer and the body
+`/v1/alert` under the account's `llm_base_url`, whether that ends in `/v1`
+or not, with the voice's key as the bearer and the body
 `{"device_id", "type": "ops", "message", "ts", "alert_id"}`
 (`crates/cloud/src/update_alerts.rs`). Health and crash reports are
 untouched.
@@ -1217,7 +1302,7 @@ it.
 **One alert per stage of a round,** from `update/status`: `started` (the
 first phase after `idle` that goes on to fetch; a round that only checks
 says nothing), then `done` (`switched`), `failed`, `refused`, `rolled-back`
-`self-switched` (lamp-update switched itself) or `self-confirmed` (its new
+`self-switched` (lamp-update took its newer self; read below) or `self-confirmed` (its new
 self confirmed that switch; a self-switch has this confirmation alert once
 lamp-update says it, and it breaks a repeating streak like `done`), or `self-put-back` (the old
 lamp-update was put back because the new one did not take, always told,
@@ -1228,7 +1313,40 @@ confirmed lamp-update refreshes the helper. A round whose `started` was told and
 nothing switched (`not-quiet`, `unreachable`, `would`, `up-to-date`,
 `nothing-published`) ends as `not-switched`, with `code:` the outcome's
 own name (`other` for a name not known), so no start is left without an
-end. Those outcomes in a round with no `started` told are not alerts. The message is a fixed template:
+end. Those outcomes in a round with no `started` told are not alerts.
+
+**`self-switched` is usually the whole update, not half of it.** lamp-update
+names two round ends `self-switched` (`round::Outcome::kind`), and the alert
+can't tell them apart:
+- **`SelfSwitched`:** the parts switched to `to` *and* lamp-update took the
+  newer self the build carries, in one round. Nearly every build so far
+  carries a lamp-update with a new hash, so on a self-updating product lamp
+  this, not `done`, is how most updates end: `started`, `self-switched`,
+  then `self-confirmed`. `done` comes only from a round whose lamp-update is
+  unchanged (Second, on #4370's run, 30 Oct). A round whose parts were
+  already on `to` (`UpToDate`) ends the same way when lamp-update is not
+  yet on that build's own self, e.g. after an `install` or a self put back
+  (`round.rs`, `run.own`): there too the parts run `to`.
+- **`Climbs`:** the build needs a newer updater than the one running, so only
+  lamp-update was taken; the parts stay on the old build until the next
+  round, and `to` is still the build it climbed for. That round is not a
+  wait for the timer: once the new self confirms itself, `serve` goes
+  straight on to a round (lamp-9adf at 8899: `confirmed` at 15:37:59,
+  `up to date` at 15:38:01), so the parts' own end normally follows within
+  minutes, on the same quiet terms.
+  Since #4582 every product build asks for updater 9, so each lamp's first
+  update from a build before it (updater 8 or lower) is a climb: `started`,
+  `self-switched` (the climb), `self-confirmed`, then the parts' own round,
+  `started` again and **`done`**, since that round runs the lamp-update the
+  build carries, unchanged. Its updates after that end `started`,
+  `self-switched`, `self-confirmed` as above.
+
+So from the alerts alone, a `self-switched` with `to` doesn't prove the
+parts run `to`: after a climb they do only once a later round ends `done` or
+`self-switched` again (a climb's `self-confirmed` follows it the same way).
+Telling the two apart in the alert would be a new stage name, which older
+lamp-clouds would have to parse; that's the backend's and the first
+builder's call (#4370). The message is a fixed template:
 
 ```
 Software update lamp - done

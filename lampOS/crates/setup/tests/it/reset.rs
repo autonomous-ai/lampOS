@@ -740,7 +740,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 38] = [
+const PERSON_STORES: [&str; 39] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -777,6 +777,10 @@ const PERSON_STORES: [&str; 38] = [
     // Daily routine claims and durable output restrictions belong to this
     // owner even when their switches are currently off.
     "/var/lib/lampos-skills-state",
+    // The skills a paired computer pushed, and the owner's yes to any that
+    // sees the picture, kept beside them (piece B, Reviewer-three's P2 on
+    // #4514): the next owner's lamp has neither.
+    "/var/lib/lampOS/skills-dev",
     "/var/lib/lampos-output-caps",
     "/var/lib/lampos-policy",
     "/var/lib/lampOS/voice/sessions",
@@ -1113,6 +1117,40 @@ fn the_product_reset_wipes_daily_claims_and_caps_but_keeps_service_directories()
         );
     }
     assert_eq!(fs::read(root.path("kept-setting")).unwrap(), b"kept");
+}
+
+/// A pushed skill and the owner's yes to its picture are the owner's: the
+/// product reset wipes the developer folder they're kept in, and keeps the
+/// folder itself (Reviewer-three's P2 on #4514).
+#[test]
+fn the_product_reset_wipes_pushed_skills_and_their_picture_yes() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    assert!(
+        plan.wipe
+            .contains(&Path::new("/var/lib/lampOS/skills-dev").to_path_buf()),
+        "the developer folder is absent from the product plan"
+    );
+    let root = Root::new();
+    let dev = root.path("skills-dev");
+    let skill = dev.join("sees-desk");
+    fs::create_dir_all(&skill).unwrap();
+    for (file, text) in [
+        ("SKILL.md", "---\nname: sees-desk\n---\n"),
+        ("skill.toml", "format = 2\n"),
+        (".pushed.json", "{\"client\": \"c_1\"}"),
+    ] {
+        fs::write(skill.join(file), text).unwrap();
+    }
+    fs::write(
+        dev.join(".yes.json"),
+        b"{\"c_1\": {\"sees-desk\": \"sha\"}}",
+    )
+    .unwrap();
+    reset::wipe(&dev).unwrap();
+    assert!(dev.is_dir());
+    assert_eq!(fs::read_dir(&dev).unwrap().count(), 0);
 }
 
 fn event(at_us: u64, held_us: u64) -> TouchEvent {
@@ -2049,5 +2087,38 @@ fn every_product_unit_outside_the_target_that_waits_for_setup_is_the_resets() {
     assert!(
         unnamed.is_empty(),
         "outside lampos.target, waiting for setup, and neither stopped nor started by a reset in place: {unnamed:?}"
+    );
+}
+
+/// An office lamp's `lamp-peek` on port 80 (#4536): a reset in place stops
+/// it with the lamp, as a writer, and never starts it again, so setup's page
+/// has the port; the lamp's next boot starts it once setup is done.
+#[test]
+fn a_reset_in_place_stops_lamp_peek_and_leaves_it_off_for_setup() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = product_lamp();
+    fake.writers
+        .push_str("lamp-peek.service loaded active running Peek\n");
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    let argvs = fake.argvs.borrow();
+    let stop = argvs
+        .iter()
+        .find(|argv| argv[1] == "stop" && argv.iter().any(|word| word == "lampos.target"))
+        .unwrap();
+    assert!(
+        stop.iter().any(|unit| unit == "lamp-peek.service"),
+        "{stop:?}"
+    );
+    let start = argvs.iter().rfind(|argv| argv[1] == "start").unwrap();
+    assert!(
+        !start.iter().any(|unit| unit == "lamp-peek.service"),
+        "{start:?}"
+    );
+    assert!(
+        start.iter().any(|unit| unit == "lamp-setup.service"),
+        "{start:?}"
     );
 }

@@ -223,7 +223,12 @@ give-up and quiet, twice at most. A step that would end failed or not
 available meanwhile is held as `later`, offered again only 30 minutes on,
 so a long refusal leaves setup's steps `later`. The model's own answer ends
 the refusal; an onboarding line said in its own words (`OwnWordsSaid`) does
-not. Off unless set.
+not. A skill's say (the lead's call on #1711): while turns are held, one
+with fixed words (`text`) is said as they are with no chat asked and ends
+nothing; a `note` or `quoted` line, which the model must word, waits as a
+spoken line does, for the minute's try or its own expiry
+([speaking-first.md](speaking-first.md)). On in the product
+(`deploy/product/lamp-voice.service`); off unless set.
 
 ## Service down: the internet answers, the voice service doesn't (#830)
 

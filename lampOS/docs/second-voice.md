@@ -219,7 +219,7 @@ each line plays exactly as before.
 |---|---|---|---|
 | The shutdown's | `lamp_msgs::GOING_TO_SLEEP` | speech cache, warmed at start | cached `text` played in the owner's words (`Recordings::cached`) |
 | A hand's hold's sleep line | `lamp_msgs::SLEEP_LINE` | speech cache, warmed at start (`LAMP_SLEEP_LINE`) | the owner's when kept, else the English kept line, else the breath |
-| `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words | the model told the owner's words (`sleep_asked::told`) |
+| `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words; with `LAMP_SLEEP_LINE=on` and the line kept, the hold's cached line in its place | the model told the owner's words (`sleep_asked::told`); the cached line as a hold's, when kept |
 | Offline, service down, back online | `language::PROVIDER_UNAVAILABLE`, `VOICE_SERVICE_UNREACHABLE`, `BACK_ONLINE` | the notices release's English file | the cache's line when kept (`FailureNotices::owners_line`), the English file otherwise |
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 
@@ -628,6 +628,30 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     is `POST <deepseek>/v1/tools/fetch` with `{"url"}`; the page's title and
     its Markdown cut at 2,000 characters go back. $0.75 a thousand
     successful calls of each from 1 Nov 2026; 5 a second an account.
+  - **Prices** (Migrate's finding 5 on #3997: on lamp-29e7 on 30 Oct a
+    searched $399 was given as the ErgoChair Pro's price, and argued for when
+    the person said the page showed $499). `web_search`'s description says a
+    price found may be out of date, that Autonomous's own products are priced
+    only from autonomous.ai's own product page, and that someone looking at
+    the page is believed, never argued with. A search whose query or results
+    speak of a price (the word, "how much", Vietnamese's "giá" or "bao
+    nhiêu", or an amount with `$ € £ ¥ ₫ ₹`, USD or VND) carries `note` saying the same (`SEARCHED_PRICE_NOTE`), and a
+    result on autonomous.ai carries its `url`, so `fetch_page` can read it.
+    `fetch_page` of an autonomous.ai page (`autonomous.ai` or
+    `www.autonomous.ai`, no port; never the relay's `campaign-api`) also
+    reads the page itself, `GET https://www.autonomous.ai<path>`, beside the
+    fetch and within the same 3 s, at most 2 MiB, following at most two
+    redirects and only while they stay on autonomous.ai (on 30 Oct a
+    trailing slash answered 308 and an old product name,
+    `office-chairs/ergochair-pro`, 301, both to the page): the price is from the
+    page's own schema.org data, the first `Product` or `ProductGroup`'s
+    `Offer`s (`AggregateOffer`'s low and high too), never a related
+    product's and never the page's text, as `price: {product, currency,
+    price}` or `{…, from, to}` when its options differ (the ErgoChair Pro's
+    page on 30 Oct: 499 USD, 410 KB), with `note` to give that price and
+    believe the person (`OWN_PRICE_NOTE`). No price read, or offers in two
+    currencies: `note` says to give none from elsewhere
+    (`OWN_PRICE_UNREAD_NOTE`).
   - `openrouter`: OpenRouter's web plugin on Exa, `plugins: [{"id": "web",
     "engine": "exa", "mode": "instant", "max_results": 3}]` on the chat
     request, with `LAMP_SECOND_CHAT=openrouter` only. It searches before
@@ -4138,6 +4162,25 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   journal: `request N: no face was seen speaking it, in their conversation
   going on, no other face in view: told from that conversation, never
   memory's (LAMP_CONVERSATION_CARRIES)`.
+  **A carried line's keep waits for their yes**
+  (`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, approved 30 Oct; the first
+  builder's call on #4508): after either carry, `ScopeLease::save_carried`
+  marks it, unless it was admitted held only by a face's gap. Then
+  `remember` alone is declared (`withheld` gives
+  `MEMORY_CALLS_BUT_REMEMBER`), but never written from the carried line:
+  `hold_carried_keep` holds the call in `HeldForgets`, in RAM, for the
+  carried person, and the model is told `remember::held_keep_told` ("Not
+  kept yet … ask them once"). It stands only on a reply that asks
+  (`remember::asks_about_keeping`), and runs only on their plain yes on the
+  next spoken line within 60 s with their face seen saying it
+  (`take_held_forget`, `LAMP_EYES_SPEAKING`); anything else drops it.
+  `same_voice_releases` is the hook for the same-voice follow-up. Without
+  the eyes' speaking read nothing is held (`HELD_KEEP_REFUSED`).
+  `keep_scoped` keeps the carried line out of the journal
+  (`remember::held_by_gap`). Recall, note, hits, forgets, rules, faces and
+  a yes stay refused with `HELD_MEMORY_CALL`. The journal: `request N:
+  carried: a keep waits for their yes, their face seen saying it; no reads,
+  forgets or yes (LAMP_CONVERSATION_CARRIED_SAVES)`.
   The switch is installed whether or not the eyes' reader starts; with no
   reader (the bus would not open) no face is seen, so every line is the
   room's and a late look gives no keeper: `no eyes read who spoke it

@@ -14,8 +14,10 @@ endpoint must be an actual socket with mode 0600. Symlinks at those two entries
 are rejected. The parent owns these temporary resources. There is no production
 environment switch or additional application CLI option.
 
-Bootstrap read, EOF, connection and `Connected` transmission share an eight-second
-host deadline. The reader runs only inside this dedicated child. A blocked stdin
+Bootstrap read, EOF, connection and `Connected` transmission share a 30-second
+host deadline, a watchdog: a `--memory-days` child's SQLite open makes full
+flushes, which a busy Mac disk held for 8.8–13.6 s (#1569). The reader runs
+only inside this dedicated child. A blocked stdin
 reader or connection cannot be safely cancelled through `std`; bootstrap failure
 returns from this executable, ending that reader with the process. The parent
 must still observe the real child status and reap it. `Connected` proves only
@@ -37,7 +39,7 @@ keep their existing clocks and behavior.
 The parent sends `Step { nonce, round, at_us }`. Round 1 must settle at zero.
 Later rounds are consecutive and nondecreasing, and may reach but never pass the
 last acknowledged `next_due_us`. Each frame is at most 4096 bytes including its
-LF. Every read, observed-work wait and response uses one cumulative eight-second
+LF. Every read, observed-work wait and response uses one cumulative 30-second
 host deadline. The shared socket channel uses nonblocking I/O followed by bounded
 `poll`; HUP is followed by a real read so queued bytes precede EOF. It does not
 change timeout socket options on closed peers.
@@ -114,6 +116,6 @@ Assertion logs settle current time and observe the actual stderr marker before
 reading the file. Error diagnostics use a separate raw reader to avoid recursive
 control calls. A failed controller remains failed; it never falls back to host
 cadence. Original kill/wait cleanup remains authoritative. The cumulative
-eight-second control/marker waits exclude potentially blocking kernel cleanup
+30-second control/marker waits exclude potentially blocking kernel cleanup
 and filesystem operations. Local source preservation and execution evidence must
 be reported separately; this fixture change is not a lamp latency measurement.

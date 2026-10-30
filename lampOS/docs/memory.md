@@ -527,6 +527,35 @@ conversation beyond its exchanges, and for how long:
   folded into a running note or a talk note.
 - **The journal** has counts and sizes only, never a note's words.
 
+**A carried line's keep waits for their yes**
+(`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, a privacy-rule change approved
+on 30 Oct, with the first builder's call on #4508): carried, a line kept
+nothing, so "We booked the Pine Hill Hotel" said with the face slipped got "I
+can't save that just now". With the switch, a carried line's `remember`
+(`ScopeLease::save_carried`) is declared but not written: it is held in RAM,
+never journalled, for the carried person's own yes, as a held forget is
+(`hold_carried_keep`, `take_held_forget`). The model is told "Not kept yet"
+(`remember::held_keep_told`) and asks once, "Want me to keep that for you?";
+the hold stands only if the reply said whole asks it
+(`remember::asks_about_keeping`). Their plain yes on the next spoken line,
+within `HELD_FORGET_FOR` (60 s), with their own face seen saying it and no
+other (`LAMP_EYES_SPEAKING`, `speaking_faces::seen_saying`), writes it in
+their scope, and the reply says it is kept. Their face merely in view is not
+enough: it is in view while a guest speaks off camera (Reviewer-three, 14:46).
+Anything else drops it, writing nothing anywhere: no yes, a yes not seen (the
+model is told it did not count), another face seen saying it, a forget, the
+conversation ending, or a minute passing. Without the eyes reading speaking
+nothing is held, and the keep is refused ("Not kept"). The carried line's
+exchange stays out of the journal, so no statement in it becomes their
+observed fact. Its scope stays held for everything else: no recall, note or
+hits, no `forget`, `forget_everything`, rule, face or yes. A line admitted
+held only by a face's gap (`LAMP_FACE_GAP_HOLD`) holds nothing, and a
+narrowed line (another face seen speaking it) is the room's. The rolling
+summary and talk notes leave carried lines out. Risk, left: their own seen
+yes confirms a keep whose words someone else may have said; they hear it
+asked first. A same-voice check (`same_voice_releases`, a hook, never true
+yet) is the follow-up.
+
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:
@@ -2416,11 +2445,21 @@ then use that person's scope:
   it stays (`setup_name`). A room's line asks the eyes nothing. On lamp-52e6 on 26 Oct
   (build 6963) the memory was forgotten, `people.json` kept the face and its
   name, and the lamp greeted the person by it when asked (the lead on #1711).
-  The name typed at setup (`/etc/lampOS/person/name`) is the setup's, not the
-  face's, and only the 5 s reset clears it. When the app set the owner's
+  The name typed at setup (`/etc/lampOS/person/name`) goes with the same
+  marked forget said by the owner (the line's person is the typed name's
+  or the owner the onboarding kept with their face, by either name they go
+  by: a typed "Robin Example" kept as "Robin" forgets as "Robin";
+  `person::owner_ids`), once their memory is emptied, after the place below: the model hears
+  `name: "forgotten too"` in place of `setup_name`, or that it could not be
+  (`everything: false`), and the second route reads the name again for each
+  reply, so it names no one from the next (the Live route, not the
+  product's, only from the voice's next start; `person::forget_with_everything`,
+  #4461: lamp-52e6 still named its owner after "forget everything"). Another
+  person's forget or the room's leaves it, and their answer still says it
+  stays (`setup_name`); the 5 s reset clears it too. When the app set the owner's
   place (#4333, [owner-place.md](owner-place.md)), the same marked forget said by
-  the owner (the line's person is the typed name's, or the owner the
-  onboarding kept), once their memory is emptied, removes the place the app
+  the owner (the line's person is either of the owner's, as for the name
+  above), once their memory is emptied, removes the place the app
   set too, and the model hears `place: "forgotten too"`, or that it could
   not be (`everything: false`); another person's or the room's leaves it.
   This holds with `LAMP_OWNER_PLACE` off too, so a place kept while it was

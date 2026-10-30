@@ -21,6 +21,7 @@
     "/var/lib/lampos-tasks/.harness/logs",
     "/var/lib/lampos-schedule/store",
     "/var/lib/lampos-skills-state",
+    "/var/lib/lampOS/skills-dev",
     "/var/lib/lampos-output-caps",
     "/var/lib/lampos-policy",
     "/var/lib/lampos-cloud",

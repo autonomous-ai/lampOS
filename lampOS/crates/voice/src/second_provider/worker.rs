@@ -2300,17 +2300,25 @@ pub fn serve(
     }
     // The typed name, told only to the owner's line, with
     // LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of the character, and
-    // judged each turn on its own person and the faces in view.
-    let setup_name = crate::person::for_lines();
-    let setup_bus = setup_name
-        .as_ref()
-        .and(files.bus_root.as_deref())
+    // judged each turn on its own person and the faces in view. Keyed on
+    // the switch and the file's path, not on a name there at start: the
+    // name is read for each reply, so one typed again in the app after a
+    // forget holds from the next (Reviewer-three's P3 on #4476).
+    let setup_named = crate::person::owner_only() && crate::person::named_in_environment();
+    if setup_named {
+        // Said once, at start, whether a name is used.
+        let _ = crate::person::from_environment();
+    }
+    let setup_bus = files
+        .bus_root
+        .as_deref()
+        .filter(|_| setup_named)
         .and_then(|root| lamp_bus::Bus::new(root).ok());
-    match (&setup_name, &setup_bus) {
-        (Some(_), Some(_)) => eprintln!(
+    match (setup_named, &setup_bus) {
+        (true, Some(_)) => eprintln!(
             "lamp-voice second: the typed name is told only to the owner's own known face (LAMP_PERSON_NAME_OWNER_ONLY)"
         ),
-        (Some(_), None) => eprintln!(
+        (true, None) => eprintln!(
             "lamp-voice second: LAMP_PERSON_NAME_OWNER_ONLY is on but there is no bus to read the faces from, so the typed name is never told"
         ),
         _ => {}
@@ -2352,7 +2360,7 @@ pub fn serve(
             // background, never waited on by a reply; with a typed name
             // too, as a second name their face may be kept under.
             crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
-            (typed, bus)
+            bus
         });
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
@@ -2390,9 +2398,15 @@ pub fn serve(
             let mut withheld: Option<String> = None;
             let named_by_default = by_default
                 .as_ref()
-                .and_then(|(typed, bus)| {
+                .and_then(|bus| {
+                    // The typed name is read again for each reply: one the
+                    // owner's "forget everything" cleared (#4461) names no
+                    // one from the next reply, and one typed again in the
+                    // app is named from the next (Reviewer-three's P3 on
+                    // #4476). The owner who_you_are kept is the other name
+                    // they may go by, and a forget clears it at once.
                     let (name, owners) = crate::person::by_default_owner(
-                        typed.clone(),
+                        crate::person::now(),
                         crate::known_faces::owner_now(),
                     )?;
                     Some((name, owners, bus))
@@ -2450,10 +2464,12 @@ pub fn serve(
             // person the session is counted for (the reviewer's P2 on #3050:
             // the owner's sticky presence for 30 s after they go), and no
             // lease is no name.
+            // Read again for each reply, as above (#4461).
+            let setup_name_now = setup_named.then(crate::person::now).flatten();
             let told = |character: String| {
                 with_typed_name(
                     character,
-                    setup_name.as_deref(),
+                    setup_name_now.as_deref(),
                     setup_bus.as_ref(),
                     line.as_ref().map(Option::as_deref),
                 )
@@ -2767,6 +2783,17 @@ pub fn serve(
             "lamp-voice second: a known person's line no face was seen speaking, in their conversation going on with no other face in view, is told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)"
         );
         engine = engine.carrying_conversations(true);
+        // A carried line's keep is held for the carried person's yes, their
+        // face seen saying it (approved 30 Oct, the first builder's call on
+        // #4508): never a read, forget or yes of its own.
+        if std::env::var(crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a carried line's keep waits for that person's yes, their face seen saying it (LAMP_CONVERSATION_CARRIED_SAVES)"
+            );
+            engine = engine.saving_carried(true);
+        }
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
@@ -10551,6 +10578,10 @@ fn keep_scoped(
     // out before its words reach the thread or its end hands anything on
     // (the reviewer's P2 on #2616). Its exchange stays in the spoken thread,
     // so the conversation as it stood carries on when they look back.
+    // A carried line that may save (`LAMP_CONVERSATION_CARRIED_SAVES`) is
+    // kept out too: nothing said off camera is journalled as theirs; only a
+    // keep their own face is seen saying yes to is written (the first
+    // builder's call on #4508).
     if let Some(lease) = lease
         && lease
             .scope()

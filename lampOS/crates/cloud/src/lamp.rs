@@ -110,6 +110,9 @@ pub struct Real {
     /// with `LAMP_APP_MAKE_SKILL=on` and the skills page (#2813,
     /// `crate::make_skill`).
     pub make_skill: Option<PathBuf>,
+    /// The Skills Store's owner upload, for a made skill sent there
+    /// (`LAMP_SKILLS_SHARE=on` with the skills page, fourteen-P13).
+    pub share: Option<crate::share::Store>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -713,6 +716,14 @@ impl Lamp for Real {
         self.make_skill.clone()
     }
 
+    fn make_skill_ready(&self) -> bool {
+        crate::make_skill::is_ready()
+    }
+
+    fn share(&self) -> Option<crate::share::Store> {
+        self.share.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -928,6 +939,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            share: None,
             shutdown: None,
         };
         assert!(!lamp.recovery());
@@ -1006,6 +1018,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            share: None,
             shutdown: None,
         };
         let level = Volume {
@@ -1092,6 +1105,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            share: None,
             shutdown: None,
         };
         let info = crate::answer::answer(&mut lamp, "system.info", &Value::Null)
@@ -1192,6 +1206,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            share: None,
             shutdown: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();

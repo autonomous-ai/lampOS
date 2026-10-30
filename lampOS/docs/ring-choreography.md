@@ -467,6 +467,52 @@ parameter) with a waiter that says the slide closed or open and then
 looks; it fails if the slide's state isn't kept or isn't given to the face
 (the reviewer on #1288). Not shown on a lamp.
 
+### The night's sleep (#3748)
+
+A dozing creature looks the same whichever way it fell asleep (CLAUDE.md
+rule 8). A hand's sleep mutes the voice, and its wait paints the asleep face
+(above). The night's sleep, Expression's own or the `night-sleep` skill's
+([alive.md](alive.md)), mutes nothing: the ring worker keeps the ring, so
+without this it shows its resting face at Mood's Asleep pace. With
+`LAMP_NIGHT_ASLEEP_FACE=on` in the voice's unit (passed to its ring worker
+only), the ring worker reads `expression/state` every 100 ms, twice as often as
+Expression says it, on a thread of its own (`ring_night::RingNight`). While
+it says `asleep` (falling asleep or asleep), from `expression`, enabled,
+valid and said within 500 ms, the resting face eases into the asleep face:
+the same five warm pixels at the bottom, at most 12, 5, 1 of 255, breathing
+every 6 s (`lamp_ring::asleep::asleep_pixels`), starting 1.5 s into the
+sleep and over 1.5 s, as the body folds (`ring_asleep::AFTER`, `FADE_IN`).
+Awake again, or no fresh state, it eases back out as fast, from wherever it
+was, to the resting face (`ring_night::Fade`, `over`).
+- **One writer:** it shapes only the resting frame, so a turn's cue paints
+  over it as over any resting frame, and the privacy switch and the
+  resting authority blank it as before. A hand's sleep stops the ring worker
+  with the mute, so the two faces never draw at once; the 1.5 s before it
+  shows covers the last `asleep` Expression said as the voice wakes.
+- **With the person's light on, the light wins,** as at a hand's sleep: the
+  face shows only over the light off (its ember), and the light switched on
+  in the night fades it out; switched off, it fades in again after 1.5 s.
+  The lamp's first light, before anyone asked for one, is on, so a lamp
+  whose light was never switched off keeps it.
+- **Not drawn:** over the unplug picture or the shutdown's warning, which
+  come first.
+- **Said in the journal** (`lamp-voice ring: night face: …`), once per change
+  and never per frame: `shown N ms after asleep` (N counted from when the face's
+  sleep began with the light off), `held, the light is on` (once per sleep)
+  and `gone (woke)` or `gone (light on)` as it starts fading out
+  (`ring_night::Said`).
+
+Tests: `ring_night`'s
+`only_a_fresh_enabled_expression_saying_asleep_is_asleep`,
+`it_fades_in_after_a_moment_asleep_and_out_on_waking`,
+`all_of_it_is_the_asleep_face_and_none_is_the_face_as_it_was` and
+`the_worker_rests_on_the_asleep_face_only_while_expression_sleeps` (the
+actual worker loop and guarded sink: the asleep face exactly while
+Expression says asleep with the light off; never awake, unsaid or over the
+light on); Expression's
+`the_nights_sleep_says_asleep_for_the_rings_face_until_it_wakes`
+(`alive_engine.rs`). Not shown on a lamp.
+
 ### The setup light (#806)
 
 While a lamp is not set up, no voice runs, so the ring belongs to

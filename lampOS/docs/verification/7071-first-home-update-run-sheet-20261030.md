@@ -1,10 +1,20 @@
 # A 7071 lamp's first home update, on a real lamp: run sheet — NOT RUN
 
+**Not needed as written (the lead, #1711, 30 Oct 16:42):** the ten customer
+lamps did not ship on 7071. The hardware team flashed 7071, then set each one up
+through the app on Wi-Fi, so each took that day's stable over the air before it
+was reset and packed. That was 7071 → stable on real lamps. Their first home
+update is from the build each shipped on to stable. On which shipped builds
+that differs from lamp-52e6's own move to 8899, see Second on #1711 (30 Oct
+16:5x): builds 8237 to 8498 (updater 8, from before the voice's own guard
+release `1c88f2dbd`) run the switch with their own, older order. The sheet below
+still reads right for a lamp that is on 7071, if one is ever run.
+
 For [#3689](https://github.com/autonomous-ai/lampOS/issues/3689) and the first
-builder's 15:5x on #1711 (30 Oct): the ten customer lamps left on the 7071 image
-(`aa9ec9e27a`, updater level 5), and their first update at home has never run on
-a real lamp. Tests showed the climb and the round on emulated ARM64 (#3689,
-29 Oct 02:22), and that 8899's signed envelope opens on 7071's own rules
+builder's 15:5x on #1711 (30 Oct), as it was then thought: the ten customer
+lamps left on the 7071 image (`aa9ec9e27a`, updater level 5), and their first
+update at home had never run on a real lamp. Tests showed the climb and the
+round on emulated ARM64 (#3689, 29 Oct 02:22), and that 8899's signed envelope opens on 7071's own rules
 (#3689, 30 Oct 14:55). The parts starting, the voice listening afterwards and
 the health watch need a lamp. Second has no lamp. This sheet records no result.
 

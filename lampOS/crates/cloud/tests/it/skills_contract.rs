@@ -79,6 +79,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     }
 }
@@ -262,6 +263,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
                 &served.join("no-made"),
                 &state,
                 lamp_skills::package::ASKED_LOCK_WAIT,
+                None,
                 None,
                 &stream,
                 &stream,

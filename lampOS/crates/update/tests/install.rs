@@ -1455,6 +1455,28 @@ fn the_product_carries_a_conversation_through_an_unseen_line() {
     }
 }
 
+/// A carried line's keep waits for that person's seen yes
+/// (`LAMP_CONVERSATION_CARRIED_SAVES`, #4339, approved 30 Oct; #4508),
+/// beside the carry and the scope by sight it acts with: "we booked the Pine
+/// Hill Hotel" said with the face slipped was lost ("I can't save that just
+/// now").
+#[test]
+fn the_product_saves_a_carried_line_into_its_conversation() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_CARRIES=on",
+        "Environment=LAMP_CONVERSATION_CARRIED_SAVES=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A long conversation keeps its rules and score past the thread's view
 /// (`LAMP_CONVERSATION_SUMMARY`, #1693's long-conversation plan, step 3): on
 /// lamp-06c1 on 29 Oct, 11 exchanges after a quiz's rules the lamp said

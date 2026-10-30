@@ -169,6 +169,11 @@ fn main() -> ExitCode {
     let shared_for_alerts = shared.clone();
     let alerts_bus = bus.clone();
     let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
+    // A made skill sent to the Skills Store (fourteen-P13): only with
+    // LAMP_SKILLS_SHARE=on and the skills page.
+    let share = (skills::on_from_environment() && lamp_cloud::share::on_from_environment())
+        .then(|| lamp_cloud::share::Store::of(&account, &key))
+        .flatten();
     let mut lamp = Real {
         places: Places::default(),
         bus,
@@ -215,7 +220,12 @@ fn main() -> ExitCode {
         make_skill: skills::on_from_environment()
             .then(lamp_cloud::make_skill::from_environment)
             .flatten(),
+        share,
     };
+    // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
+    if let Some(socket) = &lamp.make_skill {
+        lamp_cloud::make_skill::watch(socket.clone());
+    }
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -258,6 +268,7 @@ fn main() -> ExitCode {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     runtime.block_on(async move {

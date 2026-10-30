@@ -240,6 +240,26 @@ hold's 2 s), when the owed sleep lands (ms after the cue ended, or at the
 cap) and when a letting go cuts it. With the switch off, the hold sleeps at
 3 s and cuts the breath, as before.
 
+**Asked aloud, the same line (#3748 part 3, `LAMP_SLEEP_LINE=on` with
+`LAMP_SLEEP_ASKED=on`).** When the model calls `go_to_sleep` and the line
+is kept in the speech cache (the same lookup a hold makes,
+`TtsCache::sleep_line`), the voice cuts the model's turn as the shutdown's
+last words cut it (`cut_for_last_words`: the speaker revoked first, as a
+hand's Stop revokes it, so any of the model's audio still queued is an
+expected discard, reason `last_words`, never a cancelled tail kept for the
+next turn; lamp-52e6 on 30 Oct ended its voice on that) and plays the
+recorded line as the hold's sound turn (`SpeechOrigin::SleepBreath`, basis `asked_sleep_line`),
+so it is the same line, word for word, each time. The sleep is then owed as
+a hold's is (`HandControls::owe_sleep`, `land_owed_sleep`): it lands once
+that cue is no longer sounding, or 6 s after the ask, and speech meanwhile
+does not cancel it: a person who speaks over the line cuts it as any
+interruption does, and the owed sleep lands as soon as the cue stops, as
+after a hold, cutting what they began to say. The model is still told the words; what it says of
+them is never played. With the line not kept, or no hand controls, the
+model says the line and `SleepOwed` waits for it, as above. The journal
+says "the sleep line plays in the model's place" and "a sleep asked aloud:
+its owed sleep lands N ms after its cue ended".
+
 Sleep and Wake are separate, idempotent requested transitions. They never
 toggle microphone mute. First's 18:23 decision in
 [#711](https://github.com/autonomous-ai/lampOS/issues/711) makes Voice close
