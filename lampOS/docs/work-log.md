@@ -1,3 +1,25 @@
+## 30 October 2026, 14:05 +07: a pinhole reset that never reboots the board
+
+**Why (#4500):** on lamp-cb94 a pinhole reset ran to "The system will reboot now!", and the board never came back. The A733 hangs in its boot firmware on a warm reset, one time in three that day. A customer would have had a dark lamp, with no ring and no hotspot. The first builder chose approach (1): don't reboot.
+
+**#4513 (train 404):** after the wipe, a product reset starts setup again in place.
+- **What it starts:** what the reset stopped that a boot starts and was running (the active `STARTERS` and `lamp-update.service`, read from the stop's own listings), plus `lamp-setup.service`.
+- **Why that's enough:** with the marker gone, setup brings the hotspot up live, as Wi-Fi recovery does, and `lampos-setup-done.path` starts the lamp once setup writes the marker again.
+- **What I found while building it:** a reboot also emptied `/run`. So `/run/lampos-bus` (the bus's latest messages, which can say a person's words), the photos, and the voice's and records' preserved folders are emptied first. A test pins that list against every product unit.
+- **Fallbacks:** a keeper plan, or any failure, still reboots.
+- **Reads:** Third, Fourth, Reviewer-two and Reviewer-three. The Reviewer-lead held a marker for the lamp run.
+
+**#4533 (train 406):** the readers' P3s.
+- The old Wi-Fi leaves `wpa_supplicant`'s memory (`disconnect`, `remove_network all`), and the journal is rotated and emptied, as a reboot did. These run best effort, with absolute paths.
+- The train took #4513 at its first head, so #4533 carries the left-out commit, with the same patch id.
+
+**Still owed:** Fifth's 10 resets in a row on the build train 406 publishes. The first builder reverts both before tonight's promote if they haven't passed by 19:30. `/tmp` isn't emptied; that's for the tasks owner, on #4500.
+
+**Also:**
+- Carried #3729, the long-press shutdown, as #4495 (train 401); Fifth's commits unchanged, with the `switches.md` conflict resolved.
+- #4482: `takes_own_keys` at the hotspot's start is under a test (#4471's P3).
+- READ-OKs on #4487 (PulseAudio masks, reaching 7071's tmpfiles), #4490 and #4492 (settings restarts under the update lock), #4499 (the waking face on every voice start), #4524 (a locked round is `not-quiet`), and #4536.
+
 ## 30 October 2026, 06:30 +07 — the ten lamps' first update may come during their first walk
 
 **What I found:** the customer lamps ship reset (#3530's 4p). At home the person sets up Wi-Fi on 7071, and the 7071 voice starts the walk right away. `serve`'s next round comes within 15 minutes, and it climbs, fetches about 234 MB and switches the voice, guarded only by the 45 s quiet gate. 7071's `voice/state` follows its ring, so a walk waiting silently for the person reads as resting, and a switch can come mid-walk. The voice's `walk` flag (#4367) came tonight, so 7071's voice never sends it.
