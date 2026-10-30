@@ -1749,6 +1749,15 @@ pub fn known_hold_on() -> bool {
     std::env::var(KNOWN_HOLD_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Off unless `LAMP_FACE_REFOUND=on` on lamp-eyes: a near face whose passing
+/// id is not the one a print was last read for is recognised at once, and
+/// at every look until a print is read for it ([`recognise_due_near`], #4486).
+pub const REFOUND_ENVIRONMENT: &str = "LAMP_FACE_REFOUND";
+
+pub fn refound_on() -> bool {
+    std::env::var(REFOUND_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Whether the known person is held through a short miss: with either
 /// switch on.
 pub fn hold_on(full_crop: bool, known_hold: bool) -> bool {
@@ -1847,6 +1856,22 @@ impl Held {
 /// someone is being remembered, else once `RECOGNISE_EVERY` has passed.
 pub fn recognise_due(looked_for: Option<Instant>, taking: bool, now: Instant) -> bool {
     taking || looked_for.is_none_or(|at| now.saturating_duration_since(at) >= RECOGNISE_EVERY)
+}
+
+/// [`recognise_due`], and with `refound` on also whenever the near face has
+/// a passing id other than `printed_id`, the near id at the last check that
+/// read a print: a re-found face is asked at once, then at every look until
+/// its print is read (turned or too small), then every `RECOGNISE_EVERY`.
+pub fn recognise_due_near(
+    looked_for: Option<Instant>,
+    taking: bool,
+    now: Instant,
+    refound: bool,
+    near_id: Option<&str>,
+    printed_id: Option<&str>,
+) -> bool {
+    recognise_due(looked_for, taking, now)
+        || (refound && near_id.is_some() && near_id != printed_id)
 }
 
 /// After a remembering at the lamp: kept, the next look asks at once, so the
@@ -2429,6 +2454,111 @@ mod tests {
             next + Duration::from_millis(350)
         ));
         assert!(recognise_due(looked_for, false, next + RECOGNISE_EVERY));
+    }
+
+    /// #4486: with `LAMP_FACE_REFOUND` on, a new near id is asked at once,
+    /// inside the two seconds.
+    #[test]
+    fn a_refound_near_id_is_recognised_at_once() {
+        let start = Instant::now();
+        let soon = start + Duration::from_millis(350);
+        assert!(recognise_due_near(
+            Some(start),
+            false,
+            soon,
+            true,
+            Some("f8"),
+            Some("f3")
+        ));
+        // Nobody near, or the same id: the two seconds stand.
+        assert!(!recognise_due_near(
+            Some(start),
+            false,
+            soon,
+            true,
+            None,
+            Some("f3")
+        ));
+        assert!(!recognise_due_near(
+            Some(start),
+            false,
+            soon,
+            true,
+            Some("f3"),
+            Some("f3")
+        ));
+    }
+
+    /// #4486: until a print is read for the id (the face turned or too
+    /// small), every look asks; once read, the two seconds stand again.
+    #[test]
+    fn a_refound_id_is_asked_every_look_until_its_print_is_read() {
+        let start = Instant::now();
+        let mut looked_for = Some(start);
+        let printed = Some("f3");
+        for look in 1..=4 {
+            let at = start + Duration::from_millis(350 * look);
+            assert!(recognise_due_near(
+                looked_for,
+                false,
+                at,
+                true,
+                Some("f8"),
+                printed
+            ));
+            looked_for = Some(at);
+        }
+        // The print is read at the last of those looks.
+        let printed = Some("f8");
+        let read = looked_for.unwrap();
+        assert!(!recognise_due_near(
+            looked_for,
+            false,
+            read + Duration::from_millis(350),
+            true,
+            Some("f8"),
+            printed
+        ));
+        assert!(recognise_due_near(
+            looked_for,
+            false,
+            read + RECOGNISE_EVERY,
+            true,
+            Some("f8"),
+            printed
+        ));
+    }
+
+    /// #4486: with `LAMP_FACE_REFOUND` off, a new near id waits the two
+    /// seconds as before.
+    #[test]
+    fn with_refound_off_a_new_near_id_waits_the_two_seconds() {
+        let start = Instant::now();
+        let soon = start + Duration::from_millis(350);
+        assert!(!recognise_due_near(
+            Some(start),
+            false,
+            soon,
+            false,
+            Some("f8"),
+            Some("f3")
+        ));
+        assert!(recognise_due_near(
+            Some(start),
+            false,
+            start + RECOGNISE_EVERY,
+            false,
+            Some("f8"),
+            Some("f3")
+        ));
+        assert!(recognise_due_near(
+            Some(start),
+            true,
+            soon,
+            false,
+            Some("f8"),
+            Some("f3")
+        ));
     }
 
     #[test]
