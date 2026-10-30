@@ -60,8 +60,9 @@
 //!   `_TTS_CACHE_DIR`), a WAV per line under `/var/lib/lampOS/voice/tts-cache`
 //!   named by the SHA-256 of the voice, model, language and words, rendered
 //!   once through the speech service the voice speaks with and kept, so a
-//!   lamp offline still says it. [`tts_cache::WARM`] (the shutdown's line) is
-//!   rendered at start. It is played as a recording is (the shutdown's skill
+//!   lamp offline still says it. [`tts_cache::WARM`] (the shutdown's line,
+//!   then a hand's hold's sleep line, #3748) is rendered at start; the
+//!   coordinator reads the sleep line from the same cache, never rendering. It is played as a recording is (the shutdown's skill
 //!   past the gates, as its last words); not kept and not renderable, it is refused at once with why.
 //! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
 //!   fixed -20 dBFS default on the client's thread, without a file or model
@@ -2300,7 +2301,7 @@ mod tests {
             }),
         );
         cache.warm(tts_cache::WARM).unwrap();
-        assert_eq!(renders.load(Ordering::SeqCst), 1);
+        assert_eq!(renders.load(Ordering::SeqCst), tts_cache::WARM.len());
         let held = Recordings::none()
             .helper_uid(us)
             .with_cache(Some(Arc::new(cache)));
@@ -2326,7 +2327,11 @@ mod tests {
         }
         let (samples, ticket) = taken.expect("the cached line reached the voice");
         assert_eq!(samples, vec![1_500_i16; 24_000]);
-        assert_eq!(renders.load(Ordering::SeqCst), 1, "played from the cache");
+        assert_eq!(
+            renders.load(Ordering::SeqCst),
+            tts_cache::WARM.len(),
+            "played from the cache"
+        );
         ticket.answer(Outcome::Spoken);
         assert_eq!(
             client.join().unwrap(),

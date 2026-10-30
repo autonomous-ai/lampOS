@@ -5106,6 +5106,10 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
     /// A loop test's `LAMP_TASK_NEWS_AT_PAUSE=on` (#560), as `TEST_FULL_LOOK`.
     static TEST_NEWS_AT_PAUSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's speech cache for the hold's sleep line (#3748), as
+    /// `TEST_TASK_NEWS`.
+    static TEST_SPEECH_CACHE: std::cell::RefCell<Option<std::sync::Arc<crate::say::tts_cache::TtsCache>>> =
+        const { std::cell::RefCell::new(None) };
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
@@ -5845,15 +5849,28 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
-    // With `LAMP_SLEEP_LINE=on` (#3748): the recorded "Going to sleep. Tap
-    // my head to wake me." in the breath's place, when it loaded; the
-    // breath stays when it did not. Either way the hold's sleep waits for
-    // its cue (`HandControls::sleep_cue_sounding`).
+    // With `LAMP_SLEEP_LINE=on` (#3748): "Going to sleep. Tap my head to
+    // wake me." in the breath's place, from the speech cache, rendered at
+    // start in the product voice (`tts_cache::WARM`); read once here, never
+    // rendered on this path. The breath stays when it is not kept yet.
+    // Either way the hold's sleep waits for its cue
+    // (`HandControls::sleep_cue_sounding`).
     let sleep_line_on = controls.as_ref().is_some_and(HandControls::sleep_line);
-    let sleep_line = sleep_breath
-        .as_ref()
-        .filter(|_| sleep_line_on)
-        .and_then(|_| notices.going_to_sleep());
+    let sleep_line = if sleep_breath.is_some() && sleep_line_on {
+        #[cfg(test)]
+        let cache = TEST_SPEECH_CACHE.with(|cache| cache.borrow_mut().take());
+        #[cfg(not(test))]
+        let cache = crate::say::tts_cache::from_environment();
+        let line = cache.and_then(|cache| cache.kept(lamp_msgs::SLEEP_LINE));
+        if line.is_none() {
+            eprintln!(
+                "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"
+            );
+        }
+        line
+    } else {
+        None
+    };
     let mut sighed_for: Option<u64> = None;
     *waking = controls
         .as_mut()

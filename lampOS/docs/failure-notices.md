@@ -56,7 +56,7 @@ No wording or voice has been approved.
 
 | Field | Rule |
 |---|---|
-| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) `wifi_recovering` (#3743: the recovery hotspot's line, asked the same way by `lamp-setup recover`, `setup.md`, "When the saved network is gone") or `going_to_sleep` (#3748: said by a hand's hold on the head in place of the breath, with `LAMP_SLEEP_LINE=on`, `controls.md`) |
+| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) or `wifi_recovering` (#3743: the recovery hotspot's line, asked the same way by `lamp-setup recover`, `setup.md`, "When the saved network is gone") |
 | `language` | A BCP 47 tag, matched exactly. `en` does not satisfy `en-US` |
 | `transcript` | The words in the recording, 1 to 240 bytes, no control characters. Kept for records and review; never sent anywhere to be spoken |
 | `voice`, `voice_revision` | What produced the recording, 1 to 64 bytes each |
@@ -74,7 +74,7 @@ a lamp only with, or after, the build that knows it (#1959), as for #830's
 kinds. The same holds for `wifi_recovering` (#3743): a voice before it
 refuses a manifest that lists it, and with it every notice, so the notices
 release that adds it goes onto a lamp only with, or after, a build that
-knows it. So does `going_to_sleep` (#3748).
+knows it.
 
 The longest notice was 10 s before #3743; the no-Wi-Fi line with the reset
 pinhole runs about 13.4 s in the lamp's voice. An older loader refuses an
@@ -281,7 +281,6 @@ the install change merges.
 | `voice_service_unreachable` | "Sorry, I'm having trouble thinking right now. Give me a moment." | `voice-service-unreachable.en-US.wav` |
 | `wifi_lost` | "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again." | `wifi-lost.en-US.wav` |
 | `wifi_recovering` | "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app." | `wifi-recovering.en-US.wav` |
-| `going_to_sleep` | "Going to sleep. Tap my head to wake me." | `going-to-sleep.en-US.wav` |
 
 The `wifi_lost` words above are the new ones (#3743), naming the RESET
 pinhole on the back of the base. The clip `wifi-lost.en-US.wav` pinned in
@@ -296,13 +295,6 @@ clip is rendered or pinned yet. It is under 10 s, but its kind is new, so its
 release waits for a build that knows it (above). Until then
 `lamp-setup recover` asks for it, the voice answers `not_provisioned`, the
 journal says so and nothing is heard.
-
-`going_to_sleep` (#3748) is new too, and not yet in a published notices
-release: no clip is rendered or pinned. Its kind is new, so its release
-waits for a build that knows it (above). Until then a hold with
-`LAMP_SLEEP_LINE=on` plays the breath in its place, and the sleep still
-waits for the breath (`controls.md`). `failure_notice_capability` says
-whether it loaded, as `going_to_sleep`.
 
 They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
 size and SHA-256 in `deploy/product/models.json`. `lamp-update install`

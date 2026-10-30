@@ -1159,8 +1159,6 @@ thread_local! {
     /// last frame has played in real time (#3748). Unset, it only keeps
     /// them, as before.
     static RIG_SPEAKER_PLAYS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    /// The next loop's recorded notices (#3748). Unset, none, as before.
-    static RIG_NOTICES: RefCell<Option<FailureNotices>> = const { RefCell::new(None) };
     /// Opt in to a capture peer that waits for Allowed and StartCapture, then
     /// returns fresh silent frames from this time. Other fixtures stay silent.
     static WAKE_CAPTURE_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
@@ -1828,9 +1826,6 @@ fn run_loop_ringed(
             ))
             .unwrap();
     }
-    let notices = RIG_NOTICES
-        .with(|notices| notices.borrow_mut().take())
-        .unwrap_or_else(FailureNotices::none);
     let error = conversation_with_controls(
         &mut rig,
         &mut owner,
@@ -1840,7 +1835,7 @@ fn run_loop_ringed(
         &mut reply,
         &mut None,
         &Termination::inactive(),
-        &notices,
+        &FailureNotices::none(),
         &mut controls,
         &mut None,
     )
@@ -2970,7 +2965,7 @@ fn held_run(held_us: u64, lifted_us: u64, fresh_us: u64) -> (Ran, u64) {
 }
 
 /// As [`held_run`], with `LAMP_SLEEP_LINE=on` when `sleep_line` is given
-/// (#3748): its recording, or none loaded.
+/// (#3748): the line kept in the speech cache, or none kept.
 fn held_run_with(
     held_us: u64,
     lifted_us: u64,
@@ -2979,11 +2974,6 @@ fn held_run_with(
 ) -> (Ran, u64) {
     use std::os::unix::fs::PermissionsExt;
     RIG_SPEAKER_PLAYS.with(|plays| plays.set(sleep_line.is_some()));
-    if let Some(Some(line)) = &sleep_line {
-        RIG_NOTICES.with(|notices| {
-            *notices.borrow_mut() = Some(FailureNotices::with_sleep_line(line.clone()));
-        });
-    }
     // One folder each: the stepped tests share their scenario clock's start.
     static RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -2991,6 +2981,19 @@ fn held_run_with(
         std::env::temp_dir().join(format!("lv-sleep-breath-{}-{run}", std::process::id()));
     fs::create_dir(&directory).unwrap();
     fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    if let Some(Some(line)) = &sleep_line {
+        // Kept in the speech cache as its start would have rendered it.
+        let rendered = line.clone();
+        let cache = crate::say::tts_cache::TtsCache::new(
+            directory.join("tts-cache"),
+            "Rachel",
+            "eleven_v4_turbo",
+            "en",
+            Box::new(move |_: &str| Ok(rendered.clone())),
+        );
+        cache.warm(&[lamp_msgs::SLEEP_LINE]).unwrap();
+        TEST_SPEECH_CACHE.with(|given| *given.borrow_mut() = Some(std::sync::Arc::new(cache)));
+    }
     let record = directory.join("mute.json");
     let sleeps_at = std::cell::Cell::new(0);
     let ran = run_loop_with(
@@ -3016,6 +3019,7 @@ fn held_run_with(
     PRIVACY_FRESH_UNTIL.with(|until| until.set(None));
     RIG_SPEAKER_PLAYS.with(|plays| plays.set(false));
     WAKE_CAPTURE_FROM.with(|from| from.set(None));
+    TEST_SPEECH_CACHE.with(|given| given.borrow_mut().take());
     let _ = fs::remove_dir_all(&directory);
     (ran, sleeps_at.get())
 }

@@ -60,11 +60,6 @@ pub enum NoticeKind {
     /// loss, by `lamp-setup recover`. An older voice refuses a manifest
     /// that lists it, so it ships only after a build that knows it.
     WifiRecovering,
-    /// "Going to sleep. Tap my head to wake me.": said by a hand's hold on
-    /// the head in place of the falling breath, before the microphones
-    /// close (#3748, `LAMP_SLEEP_LINE`). An older voice refuses a manifest
-    /// that lists it, so it ships only after a build that knows it.
-    GoingToSleep,
 }
 
 /// Who may hear it.
