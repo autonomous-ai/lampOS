@@ -63,13 +63,22 @@ pub fn where_heard(config: &SecondConfig) -> String {
     }
 }
 
-/// What the voice's environment asks for. Nothing with a language other
-/// than English (#4473): the stop words and backchannels are English's.
+/// What the voice's environment asks for. Nothing in the owner's language
+/// (#4473) when the stream has no words for it ([`Language::has_stop_words`]).
+///
+/// [`Language::has_stop_words`]: crate::language::Language::has_stop_words
 pub fn listen() -> Listen {
-    if crate::language::from_environment().is_some() {
+    listen_in(
+        crate::language::from_environment(),
+        std::env::var(ENVIRONMENT).ok().as_deref(),
+    )
+}
+
+fn listen_in(language: Option<crate::language::Language>, value: Option<&str>) -> Listen {
+    if language.is_some_and(|language| !language.has_stop_words()) {
         return Listen::Off;
     }
-    listen_for(std::env::var(ENVIRONMENT).ok().as_deref())
+    listen_for(value)
 }
 
 /// Where the coordinator reads what the stop words hear ([`Source`]):
@@ -2145,6 +2154,28 @@ async fn serve<C, F>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The owner's language (#4473): Vietnamese keeps the stop words, which
+    /// have its backchannels (#2939); Japanese, Chinese and Korean, which
+    /// they have no words for, are not listened to; English is as set.
+    #[test]
+    fn the_stop_words_listen_only_in_a_language_they_have_words_for() {
+        use crate::language::Language;
+        let heard = Some("heard-always");
+        assert_eq!(listen_in(None, heard), Listen::Always);
+        assert_eq!(listen_in(Some(Language::Vietnamese), heard), Listen::Always);
+        for language in [Language::Japanese, Language::Chinese, Language::Korean] {
+            assert_eq!(
+                listen_in(Some(language), heard),
+                Listen::Off,
+                "{language:?}"
+            );
+        }
+        assert_eq!(
+            listen_in(Some(Language::Vietnamese), None),
+            listen_for(None)
+        );
+    }
 
     /// #2939, `LAMP_BACKCHANNEL_DEBUG`: off by default nothing is
     /// journaled; on, at most two words, lower case without punctuation,
