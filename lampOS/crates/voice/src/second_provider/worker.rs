@@ -3499,6 +3499,14 @@ pub fn serve(
                 heeding.lock().ok()?.conversation_note_for(request)
             }));
         }
+        // `LAMP_UNTIED_GOING_ON`: such a line with no tie to the lamp is not
+        // told it cut in (#3882).
+        if declines && crate::untied_going_on::on() {
+            let heeding = heeding.clone();
+            engine = engine.telling_the_untied(Arc::new(move |request| {
+                heeding.lock().is_ok_and(|heeding| heeding.untied(request))
+            }));
+        }
         // A line that may follow on from the lamp is not told so in a busy
         // room, as the rule judged it (#1712).
         {
@@ -3585,6 +3593,17 @@ pub fn serve(
                 // Another face than the caller's seen speaking a line tells
                 // it is another person's; the same reader as above.
                 heeding.opening_the_eyes(files.bus_root.as_deref());
+            }
+        }
+        // The lamp's answers to lines let out only as the conversation
+        // going on, with no tie to it, keep no conversation going
+        // (`LAMP_UNTIED_GOING_ON=on`, #3882).
+        if crate::untied_going_on::on() {
+            eprintln!(
+                "lamp-voice second: the lamp's answers to lines let out only as the conversation going on, with no tie to it, keep no conversation going, and such a line is told it may be people's talk (LAMP_UNTIED_GOING_ON)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.not_renewing_untied();
             }
         }
         // A line the model declines carries no conversation
@@ -5386,6 +5405,16 @@ pub(crate) struct Heeding {
     chain: Vec<u64>,
     /// [`Self::said_until_us`] but for the words of answers to `chain`.
     said_until_free_us: Option<u64>,
+    /// `LAMP_UNTIED_GOING_ON=on` ([`Self::not_renewing_untied`]).
+    untied: bool,
+    /// With it: the request judged last, if it was let out only as the
+    /// conversation going on with no tie to the lamp
+    /// ([`crate::untied_going_on`]): told it may be people's talk, and its
+    /// answer is in `chain`.
+    untied_line: Option<u64>,
+    /// The requests in `chain` put there only for having no tie to the
+    /// lamp, for the journal ([`Self::chain_by`]).
+    chain_untied: Vec<u64>,
     /// `LAMP_BUSY_CALLED_STRICT=on` ([`crate::attention::Attention::narrow_the_call`]).
     busy_called_strict: bool,
     /// `LAMP_REMARK_ABOUT_IT=on` ([`crate::remark_about_it`]).
@@ -6259,6 +6288,9 @@ impl Heeding {
             not_own: false,
             chain: Vec::new(),
             said_until_free_us: None,
+            untied: false,
+            untied_line: None,
+            chain_untied: Vec::new(),
             busy_called_strict: false,
             remark_about_it: false,
             remarked: None,
@@ -6466,6 +6498,66 @@ impl Heeding {
     /// person's, and its answer renews the window as without the switch.
     pub(crate) fn not_counting_own_answers(&mut self) {
         self.not_own = true;
+    }
+
+    /// `LAMP_UNTIED_GOING_ON=on` (#3882): the lamp's answer to a line let
+    /// out only as the conversation going on, with no tie to the lamp
+    /// ([`Self::tied_to_the_lamp`]), renews no window, and the line is told
+    /// it may be people's talk even when it began over the lamp's answer.
+    /// On lamp-06c1 on 28 October, with made voices and no faces, desk
+    /// talk after one answered question chained: each answer to a desk
+    /// line kept the next one inside the window.
+    pub(crate) fn not_renewing_untied(&mut self) {
+        self.untied = true;
+    }
+
+    /// `request` joins `chain` only for having no tie to the lamp
+    /// (`LAMP_UNTIED_GOING_ON`), and is kept as such for the journal.
+    /// Fields only, so it is called with the rule's attention borrowed.
+    fn chaining_the_untied(chain: &mut Vec<u64>, chain_untied: &mut Vec<u64>, request: u64) {
+        chain_untied.retain(|kept| chain.contains(kept));
+        chain.push(request);
+        chain_untied.push(request);
+    }
+
+    /// What put the requests in `chain` there, for the journal: the
+    /// switch the untied ones are for ([`Self::chaining_the_untied`]), and
+    /// `LAMP_GOING_ON_NOT_OWN` for any other, as before the untied ones.
+    fn chain_by(&self) -> &'static str {
+        let untied = self
+            .chain
+            .iter()
+            .filter(|request| self.chain_untied.contains(request))
+            .count();
+        if untied == 0 {
+            "LAMP_GOING_ON_NOT_OWN"
+        } else if untied == self.chain.len() {
+            "LAMP_UNTIED_GOING_ON"
+        } else {
+            "LAMP_GOING_ON_NOT_OWN, LAMP_UNTIED_GOING_ON"
+        }
+    }
+
+    /// Whether `request`, heard as `heard`, is tied to the lamp by its
+    /// words (`LAMP_UNTIED_GOING_ON`): it asks for the lamp's own work
+    /// ([`Self::asks_its_work`]), or [`crate::untied_going_on::tied`] to
+    /// the newest exchange whose answer is not in `chain`. The lamp's
+    /// question, its name, a face and a near voice are read by the rule:
+    /// a line showing any is never let out only as the conversation going
+    /// on.
+    fn tied_to_the_lamp(&self, request: u64, heard: &str) -> bool {
+        if self.asks_its_work(request) {
+            return true;
+        }
+        let said = crate::thread::current(self.thread.as_deref(), |thread| {
+            thread.said_last_but(request, &self.chain)
+        })
+        .flatten();
+        let said: Vec<&str> = said
+            .as_ref()
+            .map(|(person, lamp)| vec![person.as_str(), lamp.as_str()])
+            .unwrap_or_default();
+        crate::untied_going_on::tied(heard, &said)
     }
 
     /// In a busy room with nobody turned to the lamp, the text shows a call
@@ -8148,9 +8240,10 @@ impl Heeding {
             at_start(said_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
         let said_until_us = if but {
             eprintln!(
-                "lamp-voice second: request {request}: the lamp's answers to {} requests (the newest {:?}), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)",
+                "lamp-voice second: request {request}: the lamp's answers to {} requests (the newest {:?}), let out only as the conversation going on, keep no conversation going ({})",
                 self.chain.len(),
-                self.chain.last()
+                self.chain.last(),
+                self.chain_by()
             );
             self.said_until_free_us
         } else {
@@ -8961,6 +9054,9 @@ impl Heeding {
         self.marking_the_line(request, seen);
         let someone_else = self.someone_else(seen);
         let after_remark = std::mem::take(&mut self.after_remark);
+        // `LAMP_UNTIED_GOING_ON`: whether its words tie it to the lamp, read
+        // before the rule's verdict; only with the switch.
+        let tied = !self.untied || seen.lamp_asked || self.tied_to_the_lamp(request, &seen.heard);
         // #3945: whether only one person is at the lamp (no other voice, no
         // face speaking it but the caller's, at most one face in view), read
         // only for a line opening with a set-off name that is also a word
@@ -9153,6 +9249,10 @@ impl Heeding {
             ));
         }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
+        // `LAMP_UNTIED_GOING_ON` (#3882): let out only as the conversation
+        // going on, with no tie to the lamp.
+        let untied = alone && played && !tied;
+        self.untied_line = untied.then_some(request);
         // `LAMP_DECLINE_SILENT`: as things stand before this line is let
         // out, for its decline.
         if self.decline_silent && played {
@@ -9242,13 +9342,19 @@ impl Heeding {
         // follow-up, and its answer renews the window as without the switch
         // (the first builder at 01:02 on Queue #1722). An answer to a line
         // said to the lamp ends the chain.
+        // `LAMP_UNTIED_GOING_ON`: nor when it has no tie to the lamp, with
+        // or without a sign of someone else (#3882).
         if played && opens_nothing {
             // Its words renew no conversation going on (#4175).
             self.chain.push(request);
         } else if self.not_own && self.alone.is_some() {
             if someone_else {
                 self.chain.push(request);
+            } else if untied {
+                Self::chaining_the_untied(&mut self.chain, &mut self.chain_untied, request);
             }
+        } else if untied {
+            Self::chaining_the_untied(&mut self.chain, &mut self.chain_untied, request);
         } else if played {
             self.chain.clear();
             self.said_until_free_us = self.said_until_us;
@@ -9303,7 +9409,9 @@ impl Heeding {
             Some(crate::attention::Verdict::Hold(why)) => Some(why),
             // Said, as each hold is by the route (#829, 17:21).
             Some(crate::attention::Verdict::Play(why)) => {
-                let alone = if self.began_over == Some(request) && self.alone.is_some() {
+                let alone = if self.untied_line == Some(request) {
+                    ", only as the conversation going on, with no tie to the lamp: the model is told it may be people's talk, and its answer keeps no conversation going (LAMP_UNTIED_GOING_ON)"
+                } else if self.began_over == Some(request) && self.alone.is_some() {
                     ", only as the conversation going on, begun over the lamp's answer: the model is not told it may be people's talk"
                 } else if self.alone.is_some() {
                     ", only as the conversation going on: the model is told so"
@@ -9398,11 +9506,24 @@ impl Heeding {
     /// without its name is ([`DECLINE_NOTE`]). On lamp-52e6 on 24 Oct, told
     /// the note, "Sorry, can you say that last part again?", said over the
     /// lamp's story, got `not_for_me` and silence.
+    ///
+    /// With `LAMP_UNTIED_GOING_ON=on`, a line with no tie to the lamp
+    /// ([`Self::untied_line`]) is told it even so: desk talk begun over the
+    /// lamp's answer is no cut-in (#3882). A cut-in like that one refers
+    /// back ("say that"), so it keeps the exemption.
     pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
         (self.alone == Some(request)
-            && self.began_over != Some(request)
+            && (self.began_over != Some(request) || self.untied_line == Some(request))
             && !self.asks_its_work(request))
         .then_some(CONVERSATION_ALONE)
+    }
+
+    /// Whether `request` was let out only as the conversation going on,
+    /// with no tie to the lamp (`LAMP_UNTIED_GOING_ON=on`): the spoken
+    /// cut-in note is not told beside its conversation note
+    /// (`second_provider`'s notes).
+    pub(crate) fn untied(&self, request: u64) -> bool {
+        self.untied_line == Some(request)
     }
 
     /// Whether `request` was judged in a busy room: a line that may follow
@@ -16237,6 +16358,243 @@ mod tests {
             ),
             [true, true, false, false, false]
         );
+    }
+
+    /// #3882, lamp-06c1's desk-kit-2 rounds of 28 October (made voices, no
+    /// faces, the product unit's environment): after one question to the
+    /// lamp, desk1's four lines were let out only as the conversation going
+    /// on, each begun over or soon after the lamp's answer to the one
+    /// before, and each answer kept the next inside the window. With
+    /// `LAMP_UNTIED_GOING_ON=on` a line with no tie to the lamp is told it
+    /// may be people's talk even begun over the answer, and its answer
+    /// renews nothing: the 2nd to 4th lines are held. Real follow-ups
+    /// (referring back, sharing a word, the name, a reply to the lamp's
+    /// question) still play and still renew the window; the lamp asks that
+    /// #3895's review kept as negatives still play.
+    #[test]
+    fn untied_talk_after_an_answer_keeps_no_conversation_going() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
+        let s = Duration::from_secs;
+        // Lines at a virtual second, each answered a second later if let
+        // out, its words played to their end a second after that; `over`:
+        // begun over the lamp's answer. Each line's verdict, and whether it
+        // got the people's-talk note.
+        let run = |untied: bool, lines: &[(u64, &str, &str, bool)]| -> Vec<(bool, bool)> {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            crate::room_told::room()
+                .lock()
+                .unwrap()
+                .count_only_talk(true);
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if untied {
+                heeding.not_renewing_untied();
+            }
+            let words_end = |heeding: &mut Heeding, request: u64, end: u64, now: u64| {
+                let end_us = (monotonic_us() + end * 1_000_000).saturating_sub(now * 1_000_000);
+                heeding.lamp_did(crate::second_provider::Did::Said(request, end_us));
+            };
+            let mut answered: Vec<(u64, &str, &str, u64)> = Vec::new();
+            let mut was = 0;
+            let mut out = Vec::new();
+            for (request, (at, heard, answer, over)) in (1..).zip(lines) {
+                let passed = s(at - was);
+                was = *at;
+                let older = |until: Option<u64>| {
+                    until.map(|until| until.saturating_sub(passed.as_micros() as u64))
+                };
+                heeding.said_until_us = older(heeding.said_until_us);
+                heeding.said_until_free_us = older(heeding.said_until_free_us);
+                let said = (10_000_000 + at * 1_000_000, 11_000_000 + at * 1_000_000);
+                let now = Instant::now();
+                let mut thread = crate::thread::Thread::new();
+                for (asked, person, lamp, at_s) in &answered {
+                    let then = now - s(at - at_s);
+                    thread.person(person, true, then);
+                    thread.lamp(*asked, lamp, then);
+                }
+                *crate::thread::THREAD.lock().unwrap() = thread;
+                heeding.called_at = heeding.called_at.map(|at| at - passed);
+                heeding.hear(
+                    request,
+                    crate::second_provider::Heard::Began {
+                        over_the_lamps_voice: *over,
+                    },
+                );
+                let held = heeding.heed(request, said, heard, None);
+                let noted = heeding.conversation_note_for(request) == Some(CONVERSATION_ALONE);
+                // Untied only with the switch, let out and told.
+                assert!(
+                    !heeding.untied(request) || (untied && held.is_none() && noted),
+                    "{heard}"
+                );
+                if held.is_none() {
+                    answered.push((request, heard, answer, at + 1));
+                    words_end(&mut heeding, request, at + 2, was);
+                    room_told::room()
+                        .lock()
+                        .unwrap()
+                        .spoke(request, monotonic_us());
+                }
+                out.push((held.is_none(), noted));
+            }
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            out
+        };
+        use crate::room_told;
+        let question = (
+            0,
+            "Lamp, what's the weather in Saigon?",
+            "It's sunny in Saigon, about thirty-three degrees.",
+            false,
+        );
+        // desk1: the first line 40 s after the answer began, inside the
+        // quiet room's 45 s; each next one begun over, or soon after, the
+        // lamp's answer to the one before.
+        let desk1 = [
+            question,
+            (
+                40,
+                "Did you send the slides to Sam yet?",
+                "I hope the slides went well.",
+                true,
+            ),
+            (
+                47,
+                "Not yet, I'll do it after lunch.",
+                "Enjoy your lunch.",
+                true,
+            ),
+            (
+                54,
+                "Are you coming to the meeting at four?",
+                "I don't have a meeting at four.",
+                false,
+            ),
+            (
+                61,
+                "I think so, but I might be a bit late.",
+                "No rush.",
+                true,
+            ),
+        ];
+        assert_eq!(
+            run(false, &desk1),
+            [
+                (true, false),
+                (true, false),
+                (true, false),
+                (true, true),
+                (true, false)
+            ],
+            "off: all four answered, those begun over the answer told nothing"
+        );
+        assert_eq!(
+            run(true, &desk1),
+            [
+                (true, false),
+                (true, true),
+                (false, false),
+                (false, false),
+                (false, false)
+            ],
+            "on: the first told it may be people's talk, its answer renews nothing"
+        );
+        // Real follow-ups 30 s after the answer: each still plays, and its
+        // answer still renews the window for a line 30 s later, which is
+        // outside the question's 45 s. An untied line renews nothing.
+        let after = |follow_up: &'static str, lamp: &'static str| {
+            [
+                (0, "Lamp, what's the weather in Saigon?", lamp, false),
+                (30, follow_up, "Tomorrow is sunny too.", true),
+                (
+                    60,
+                    "Did you send the slides to Sam yet?",
+                    "I hope so.",
+                    false,
+                ),
+            ]
+        };
+        let sunny = "It's sunny in Saigon, about thirty-three degrees.";
+        for (follow_up, lamp) in [
+            ("What about tomorrow?", sunny),
+            ("Say that again.", sunny),
+            ("Is Saigon this hot every day?", sunny),
+            ("Lamp, and in Hanoi?", sunny),
+            // Sixth's P2s on #4562: no name, a new thing; a wh-word alone;
+            // "that's" as "that".
+            ("And in Hanoi?", sunny),
+            ("Còn Hà Nội?", sunny),
+            ("Why?", sunny),
+            ("Tại sao?", sunny),
+            ("That's weird, why?", sunny),
+            ("Will the rain come later?", "It's rainy in Saigon today."),
+            (
+                "Yes please.",
+                "It's sunny in Saigon. Do you want tomorrow's too?",
+            ),
+        ] {
+            let played: Vec<bool> = run(true, &after(follow_up, lamp))
+                .into_iter()
+                .map(|(played, _)| played)
+                .collect();
+            assert_eq!(played, [true; 3], "{follow_up}");
+            let (_, noted) = run(true, &after(follow_up, lamp))[1];
+            assert!(
+                !noted,
+                "{follow_up}: a cut-in tied to the lamp keeps its exemption"
+            );
+        }
+        // The cost: an untied line renews nothing, so the next line without
+        // the name or a face, 30 s on, is held; without the switch it plays.
+        let talk = after("I saved a hundred dollars on the flight.", sunny);
+        assert_eq!(
+            run(true, &talk),
+            [(true, false), (true, true), (false, false)]
+        );
+        assert_eq!(
+            run(false, &talk),
+            [(true, false), (true, false), (true, true)]
+        );
+        // The lamp asks #3895's review kept as negatives (Fourteen's P2),
+        // said 20 s after the answer: all still play with the switch.
+        for ask in [
+            "Can you grab the weather for tomorrow?",
+            "Fetch the forecast for the weekend.",
+            "Fetch me the news.",
+            "Pass the message on to my wife.",
+            "Hand over the details of the order.",
+            "I'm going downstairs, turn the light off.",
+            "Good night, I'll be right back.",
+            "Mom is calling, what time is it?",
+        ] {
+            let lines = [question, (20, ask, "Here you go.", false)];
+            for untied in [false, true] {
+                assert!(run(untied, &lines)[1].0, "{ask} {untied}");
+            }
+        }
+    }
+
+    /// Sixth's P3 on #4562: the journal names what put the requests in the
+    /// chain, not the switches that are on. A chain with no untied line is
+    /// `LAMP_GOING_ON_NOT_OWN`'s, as before the switch.
+    #[test]
+    fn the_chain_is_journaled_by_what_filled_it() {
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.not_renewing_untied();
+        heeding.chain.push(1);
+        assert_eq!(heeding.chain_by(), "LAMP_GOING_ON_NOT_OWN");
+        Heeding::chaining_the_untied(&mut heeding.chain, &mut heeding.chain_untied, 2);
+        assert_eq!(
+            heeding.chain_by(),
+            "LAMP_GOING_ON_NOT_OWN, LAMP_UNTIED_GOING_ON"
+        );
+        heeding.chain.clear();
+        Heeding::chaining_the_untied(&mut heeding.chain, &mut heeding.chain_untied, 3);
+        assert_eq!(heeding.chain_by(), "LAMP_UNTIED_GOING_ON");
+        assert_eq!(heeding.chain_untied, [3], "the old ones are let go");
     }
 
     /// The first builder at 02:33 on Queue #1722: a print is someone else's
