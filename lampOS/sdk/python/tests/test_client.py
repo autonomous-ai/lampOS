@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import re
 import stat
 from pathlib import Path
 
@@ -219,6 +220,22 @@ def test_hello_with_another_computers_key_is_unpaired(tmp_path):
                 await Lamp.connect(keyring=stranger)
 
     run(go())
+
+
+def test_every_error_code_says_what_to_do_and_both_sdks_say_the_same():
+    """Each code the schema has comes with what to do, on the error and in the
+    README, in the same words as the JS SDK's (errors.js)."""
+    assert set(errors.WHAT_TO_DO) == set(schema.error_codes())
+    refused = errors.from_reply({"code": "no_grant", "why": "not granted: look"})
+    assert refused.what_to_do == errors.WHAT_TO_DO["no_grant"] and str(refused) == "no_grant: not granted: look"
+    assert errors.LampError("x", code="closed").what_to_do == ""
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
+    for code, line in errors.WHAT_TO_DO.items():
+        assert f"| `{code}` | {line} |" in readme, code
+    js = Path(__file__).resolve().parents[2] / "js" / "src" / "errors.js"
+    if js.exists():
+        said = dict(re.findall(r'^  ([a-z_]+): (".*"),$', js.read_text(), re.M))
+        assert {code: json.loads(line) for code, line in said.items()} == errors.WHAT_TO_DO
 
 
 def test_greet_a_person_who_arrives(tmp_path):
