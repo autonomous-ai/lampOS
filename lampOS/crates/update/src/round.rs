@@ -157,7 +157,8 @@ pub enum Outcome {
     /// Without `apply`: what would be done.
     Would(Vec<String>),
     /// Installed beside the old build, or not even that, and not switched:
-    /// no quiet moment came. The next round tries again.
+    /// no quiet moment came, or another holder had lamp-update's lock and
+    /// nothing was tried (#4524). The next round tries again.
     NotQuiet(String),
     /// Switched, and every part well.
     Switched(u64),
