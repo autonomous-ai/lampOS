@@ -1,13 +1,14 @@
 //! What lets a lamp the strain guard seated stand again (#4501,
 //! `docs/body.md`, "The strain guard"): a person's deliberate hold of a head
-//! pad or a button for a second, read as the first stand's yes is
-//! (`first_stand::Touches`, from `controls/state`), or a health check
-//! (`lamp/selftest`) started since it was seated. Looked at ten times a
-//! second, and only while it is seated.
+//! pad or the primary button for a second (`first_stand::Touches`, from
+//! `controls/touch_state`: the product's head pads are only there, never in
+//! `controls/state`'s `head_active`, which needs the pins' `legacy_head`),
+//! or a health check (`lamp/selftest`) started since it was seated. Looked
+//! at ten times a second, and only while it is seated.
 
-use crate::first_stand::{HOLD_US, Touches, touched};
+use crate::first_stand::{HOLD_US, Touches};
 use lamp_bus::Bus;
-use lamp_msgs::{ControlsState, SelfTest};
+use lamp_msgs::{SelfTest, TouchSource, TouchState};
 
 const LOOK_EVERY_US: u64 = 100_000;
 
@@ -83,11 +84,11 @@ impl UnseatIn {
         self.looked_us = Some(now_us);
         let touch = self
             .bus
-            .latest(ControlsState::TOPIC)
+            .latest(TouchState::TOPIC)
             .ok()
             .flatten()
             .filter(|message| !message.expired)
-            .and_then(|message| message.parse::<ControlsState>().ok())
+            .and_then(|message| message.parse::<TouchState>().ok())
             .and_then(|state| touched(&state));
         let checked = self
             .bus
@@ -100,9 +101,77 @@ impl UnseatIn {
     }
 }
 
+/// Whether the head pads or the primary button are touched, from a valid,
+/// enabled `controls/touch_state`: one of them touched, or a head hand held
+/// through a pulse's short released gap (`held_us`, #711), is a touch; else
+/// one known untouched is none; None when neither is known (the reset button
+/// and the base strip are not asked).
+pub fn touched(state: &TouchState) -> Option<bool> {
+    if state.check().is_err() || !state.enabled {
+        return None;
+    }
+    let mut known = None;
+    for source in &state.sources {
+        if matches!(source.source, TouchSource::Head | TouchSource::Primary) {
+            match source.active {
+                Some(true) => return Some(true),
+                Some(false) if source.held_us.is_some() => return Some(true),
+                Some(false) => known = Some(false),
+                None => {}
+            }
+        }
+    }
+    known
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `controls/touch_state` as lamp-controls says it with the product's
+    /// pins: the primary button and the head, each known or not.
+    fn state(button: Option<bool>, head: Option<bool>) -> TouchState {
+        let source = |kind: &str, active: Option<bool>| {
+            let names: Vec<&str> = if active == Some(true) && kind == "head" {
+                vec!["head"]
+            } else {
+                vec![]
+            };
+            serde_json::json!({
+                "source": kind, "name": kind, "reader_session_id": "reader",
+                "ready": active.is_some(), "fault": active.is_none().then_some("missing"),
+                "observed_us": active.map(|_| 1000), "armed": active.is_some(),
+                "active": active, "contact_id": null, "began_us": null, "held_us": null,
+                "active_mask": active.map(u16::from), "active_names": names,
+                "position": null, "toward_pad": null, "distance": 0.0, "speed": 0.0
+            })
+        };
+        let state: TouchState = serde_json::from_value(serde_json::json!({
+            "stamp": {"clock_id": "controls", "at_us": 1000, "sequence": 1},
+            "session_id": "s1", "enabled": true,
+            "sources": [source("primary", button), source("head", head)],
+            "latest": [], "event_sequence": 0, "rejected_inputs": 0
+        }))
+        .unwrap();
+        assert_eq!(state.check(), Ok(()), "a state lamp-controls could send");
+        state
+    }
+
+    /// #4519 on lamp-52e6: the product's head pads are on
+    /// `controls/touch_state` only, so a head hand must be read there.
+    #[test]
+    fn a_head_or_the_button_from_the_touch_state_is_a_touch() {
+        assert_eq!(touched(&state(Some(false), Some(true))), Some(true));
+        assert_eq!(touched(&state(Some(true), Some(false))), Some(true));
+        assert_eq!(touched(&state(Some(false), Some(false))), Some(false));
+        // A lost button does not hide the head, either way.
+        assert_eq!(touched(&state(None, Some(true))), Some(true));
+        assert_eq!(touched(&state(None, Some(false))), Some(false));
+        assert_eq!(touched(&state(None, None)), None);
+        let mut off = state(Some(false), Some(true));
+        off.enabled = false;
+        assert_eq!(touched(&off), None);
+    }
 
     #[test]
     fn a_deliberate_hold_or_a_later_health_check_lets_it_stand_once() {
