@@ -3,7 +3,7 @@
 //! ```text
 //! lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
 //!                    [--mood-socket PATH] [--say-socket PATH] [--bus-root DIR] [--boot-id ID]
-//!                    [--sight-file PATH|off]
+//!                    [--sight-file PATH|off] [--remote on|off]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
@@ -19,7 +19,11 @@
 //! is refused with a why. The `camera` grant's pictures are the eyes' newest
 //! frame in `--sight-file` (`/run/lampos-eyes/sight.jpg`, the eyes' own; `off`
 //! for none), read only with `--bus-root`, which says when the lamp is
-//! private (docs/control.md, "The camera").
+//! private (docs/control.md, "The camera"). Connections come only from the
+//! lamp's own network unless `--remote on` (or `LAMP_CONTROL_REMOTE=on`)
+//! lets any address in, a VPN's 100.64/10 included; never to the camera or
+//! the microphone, which stay on the lamp's own network (docs/control.md,
+//! "The wire").
 
 use std::path::PathBuf;
 
@@ -33,6 +37,8 @@ const LISTEN: &str = "0.0.0.0:7731";
 const ADMIN: &str = "/run/lampos-control/admin.sock";
 /// Where the eyes keep their newest frame (`lamp-eyes --sight-file`).
 const SIGHT: &str = "/run/lampos-eyes/sight.jpg";
+/// `--remote on` from the environment, when the flag isn't given.
+const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -222,6 +228,23 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
     }
+    let remote = match option(arguments, "--remote")
+        .or_else(|| std::env::var(REMOTE_ENVIRONMENT).ok())
+        .as_deref()
+    {
+        None | Some("off") => false,
+        Some("on") => true,
+        Some(_) => return Err("--remote is on or off".to_owned()),
+    };
+    shared.set_remote(remote);
+    eprintln!(
+        "lamp-control: {}",
+        if remote {
+            "computers beyond the lamp's own network may connect (--remote on); never to the camera or the microphone"
+        } else {
+            "only computers on the lamp's own network may connect"
+        }
+    );
     let tls = server::acceptor(&identity).map_err(|e| format!("tls: {e}"))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
