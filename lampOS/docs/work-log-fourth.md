@@ -1,3 +1,21 @@
+## 2026-10-30 08:2x ICT — #4439 landed; reads for the 7071 lamps; #3754 setup views
+
+**#4439** (Part of #1569) landed in train 388: the motor tests' `wait` watchdog went from 2 s to 10 s, measured first (longest real wait 869 ms at load 7.4).
+
+**Reads, mostly the 7071 lamps' first home update (#3689):**
+- **#4431** (round order), as a note: an update that doesn't change the voice still restarts Controls under it. My run hung beside another session's, so it isn't a marker.
+- **#4442**: the 7071 onboarding file. All eight `Progress` fields were checked against `aa9ec9e27a`.
+- **#4447**: 7071's envelope rules, every constant, struct and fn compared.
+- **#4451**: 7071's unit line; only `LAMP_UPDATE_APPLY` differs.
+- **#4453** and **#4456**: `news_told`'s tracked waits.
+- **#4446** (El, #3754 finding 1): a P2. An invitation that crashes the voice would loop until systemd's start limit, so I asked for a give-back at most once per part. Fixed; READ-OK on `c2fc431c5a`.
+
+**#3754 finding 2** (a guard mute during setup): I proposed a spoken line, then corrected myself, since a guard-muted voice can't say any line (Third checked). Agreed on the ring and the app, with El's `muted_by`.
+
+**#4455** (the setup-walk hold): my "no file yet" window was for today's voice. Tests showed that 7071's voice writes the file only at step 1's end, so I backed Tests' fix.
+
+No device action. lamp-0c89 (#2836) still waits for access.
+
 ## 2026-10-30 03:1x ICT — #4413 and #4425 landed; the notes' default-on case
 
 **#4413** landed in train 379: the stable notes list "Built but not on yet" in plain words. After-merge on `26ae8ce57`: `lampos-promote` 4/7/25/3, `onboarding` 217/0, `second_provider` 870/0.
