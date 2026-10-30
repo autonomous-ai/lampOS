@@ -80,6 +80,11 @@ o=$(export FAIL=sudo; r preflight "$T/su"); want sudo-noted 'hello/progress NOT 
 o=$(export FAIL=; POLICY_EXTRA='--hello --act hello' r preflight "$T/pa"); want extra-act '^ABORT POLICY_EXTRA has --act' "$o"
 o2=$(export FAIL=; PASSES=1 r run "$T/r2"); cmp -s <(cut -f2 "$T/r/plays.tsv") <(cut -f2 "$T/r2/plays.tsv") || { echo "FAIL order not repeatable"; fails=$((fails+1)); }
 o3=$(export FAIL=; PASSES=2 ONLY='^q0[1-4]$' r run "$T/r3")
+# Early stop: the stub decides nothing, so every "not" line counts as not quiet and pass 2 never plays;
+# with only lamp lines (r3) both passes play.
+o=$(export FAIL=; PASSES=2 r run "$T/es"); want early-stop 'stopped after pass 1: Jev not quiet on [0-9]+ lines' "$o"
+[ "$(awk -F'\t' '$1==2' "$T/es/plays.tsv" | wc -l | tr -d ' ')" = 0 ] || { echo "FAIL pass 2 played after the verdict was in"; fails=$((fails+1)); }
+[ "$(awk -F'\t' '$1==2' "$T/r3/plays.tsv" | wc -l | tr -d ' ')" -gt 0 ] || { echo "FAIL early stop with no not-line"; fails=$((fails+1)); }
 [ "$(awk -F'\t' '$1==1{printf "%s ",$2}' "$T/r3/plays.tsv")" != "$(awk -F'\t' '$1==2{printf "%s ",$2}' "$T/r3/plays.tsv")" ] || { echo "FAIL passes share an order"; fails=$((fails+1)); }
 
 # A room that never reads busy: the busy block still plays (background talk), every line as in a busy room.

@@ -314,5 +314,11 @@ for pass in $(seq 1 "$PASSES"); do
       rest "$VD" "$blk"
     done
   done
+  # The gate (#4306): quiet on >=70/72 lines not said to the lamp. Once Jev was not quiet on more than
+  # GATE_MISS of them, no later pass can change the verdict: stop, and give the lamp back.
+  if [ "$pass" -lt "$PASSES" ]; then pull >/dev/null
+    k=$(bash score.sh "$OUT" | awk -F'|' '$5 ~ /^ *not *$/ && $4 ~ /[0-9]/ { k += $4 - $8 } END { print k + 0 }')
+    [ "$k" -gt "${GATE_MISS:-2}" ] && { note "stopped after pass $pass: Jev not quiet on $k lines not said to the lamp (gate allows ${GATE_MISS:-2}); the verdict is in"; break; }
+  fi
 done
 pull

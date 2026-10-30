@@ -25,6 +25,8 @@ judgement and against a label, line by line. The jev-verifier keeps it.
   quiet block, plays two colleagues' exchanges, then the busy block with talk between its lines (it
   plays in whatever room the lamp reads: under LAMP_SPOKEN_TO=on held-back talk never makes room/state
   busy, crates/voice/src/room_told.rs), then pulls that window's decisions and the voice's verdicts into `OUT`.
+  After each pass but the last it pulls and scores: once Jev was not quiet on more than GATE_MISS (2)
+  lines not said to the lamp, the #4306 gate (>=70/72) can't be met, so it stops and gives the lamp back.
   A follow-up plays right after the lamp's answer to its parent, only when it answered. Every play
   records `room/state` just before it. The units, their MainPIDs, lamp-policy's cmdline, the build and
   the mute are taken after the preflight and checked at each pass start: any change aborts. With
