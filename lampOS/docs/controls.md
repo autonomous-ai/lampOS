@@ -212,7 +212,9 @@ turn of its own. The line comes from the voice's speech cache
 voice through the voice's speech service (`tts_cache::WARM`) and kept on the
 lamp, so it plays offline. The coordinator reads it at each hold, from the
 file only, never waiting on a render, so a line rendered after the
-conversation started plays at the next hold. If it isn't kept yet (no
+conversation started plays at the next hold; with an owner's language
+other than English, the line in that language when kept, the English
+otherwise (#4473 (c), second-voice.md, "The fixed lines"). If it isn't kept yet (no
 speech cache, not rendered yet, or its render failed), the breath plays as
 without the switch, and the journal says so. Either way the sleep now waits for that cue: the 3 s Hold no longer
 mutes at once, it makes the sleep owed (`HandControls::land_owed_sleep`),

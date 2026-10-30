@@ -290,6 +290,17 @@ the new words arrive from the next notices release. The new line renders at
 13.37 s in the lamp's voice, over an older loader's 10 s, so that release goes
 out with or after the build that allows 15 s (above).
 
+**In the owner's language (#4473 (c)).** On a lamp whose owner's language
+is not English (second-voice.md, "The fixed lines"), `provider_unavailable`,
+`voice_service_unreachable`, `back_online`, `wifi_lost` and
+`wifi_recovering` are said from the voice's speech cache in that language
+when it keeps them (rendered at start in the lamp's voice, read again each
+time the line is chosen), and from the files above otherwise. The release
+and its manifest are untouched and no kind is added: the cached line is
+recorded under the release's kind, its `wav_sha256` `speech-cache:<key>`.
+`turn_lost` has no words of its own and is unchanged. An English lamp plays
+the files exactly as before.
+
 `wifi_recovering` (#3743, the words agreed with Sixth on #3020) is new: no
 clip is rendered or pinned yet. It is under 10 s, but its kind is new, so its
 release waits for a build that knows it (above). Until then

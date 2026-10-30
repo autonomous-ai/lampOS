@@ -204,8 +204,51 @@ For `vi`, `ja`, `zh` or `ko`:
 | The first route (Live) | stays English: only the `second` worker is given `LAMP_LANGUAGE_FILE` | `process::second_route_worker_environment` |
 | The change said | at start, a language other than the one recorded in `/var/lib/lampOS/voice/language-said` (absent is English) is said once in its own words through the say service (skill `language`, priority 8, 10 minutes to begin), and recorded only once spoken; an English lamp never changed owes nothing | `language::announce` |
 
-The speech cache (`say/tts_cache.rs`) needs no change: its key holds the
-voice, model and language, so a new language renders its lines again.
+The speech cache's key (`say/tts_cache.rs`) holds the voice, model and
+language, so a new language renders its lines again.
+
+### The fixed lines (#4473 (c))
+
+The lamp's fixed lines are said in the owner's language from the speech
+cache (speaking-first.md, "A cached line"), with English as the fallback.
+English is untouched: no line of the owner's is warmed or looked up, and
+each line plays exactly as before.
+
+| Line | English words | Today | In the owner's language |
+|---|---|---|---|
+| The shutdown's | `lamp_msgs::GOING_TO_SLEEP` | speech cache, warmed at start | cached `text` played in the owner's words (`Recordings::cached`) |
+| A hand's hold's sleep line | `lamp_msgs::SLEEP_LINE` | speech cache, warmed at start (`LAMP_SLEEP_LINE`) | the owner's when kept, else the English kept line, else the breath |
+| `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words | the model told the owner's words (`sleep_asked::told`) |
+| Offline, service down, back online | `language::PROVIDER_UNAVAILABLE`, `VOICE_SERVICE_UNREACHABLE`, `BACK_ONLINE` | the notices release's English file | the cache's line when kept (`FailureNotices::owners_line`), the English file otherwise |
+| No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
+
+The words are `language::FIXED_LINES`, one row per English line with its
+Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
+"reset" stay as they are printed. At start the cache warms the owner's
+seven lines first, then the English two (`TtsCache::warm_lines`), on its
+own thread, every line tried again until all are kept, first after a
+minute, then twice as long each time, at most hourly; a line that renders
+empty or past 20 s is not kept and never asked for again in that run
+(it stays English); so the first
+start must be online for them, and until then each line is said in
+English, read again from the file each time it is chosen
+(`TtsCache::owners_kept`, never a render on the voice's loop). The cache
+keeps up to 48 lines. A failure notice said from the cache keeps the
+release's kind in its record, with `wav_sha256` `speech-cache:<key>`: no
+notices kind is added, and the release is untouched, since an older voice
+refuses a whole manifest with a kind it doesn't know
+(failure-notices.md). The failed turn's `turn_lost` has no words of its
+own and stays the release's file or the sigh. Onboarding's fixed lines
+(the skill's words, said as they are when the chat fails, #4263) and the
+language change line (already in its own words) are not in this table.
+Tests: `language::tests::each_fixed_line_has_its_words_in_each_language`,
+`tts_cache::tests::the_owners_language_warms_its_own_lines_first_and_english_is_as_today`,
+`say::tests::the_owners_language_is_played_when_kept_and_english_otherwise`,
+`failure_notice::offline_lines_are_said_in_the_owners_language_when_kept_and_english_otherwise`,
+`notices::loading_tests::the_owners_language_adds_no_notice_kind_and_keys_the_product_words`,
+`sleep_asked::tests::the_model_is_told_the_line_in_the_owners_language`.
+Not heard yet: no line has been rendered or listened to on a lamp, and the
+words want a native speaker's check.
 
 **Cost.** The repo's only ElevenLabs price is $0.00004 a character
 (`fixtures/voice-eval-cost-prices.example.json`, list prices read on 19
@@ -215,9 +258,9 @@ same in every language; v4 Turbo's real price is not in the repo.
 
 **Not measured yet:** whether Nova-3 takes `ja`, `zh` and `ko` through the
 relay (`vi` is shown above), whether the key term "Lamp" helps or hurts a
-line in them, and the first audio of each language on a lamp. Fixed lines
-(failure notices, the no-Wi-Fi line, onboarding's lines and words) are still
-English: #4473 (b) and (c). Tests: `language::tests`,
+line in them, and the first audio of each language on a lamp. Onboarding's
+lines and words are still English (#4473 (b)); the other fixed lines are
+above. Tests: `language::tests`,
 `second_config::tests::the_owners_language_sets_the_speech_and_english_changes_nothing`,
 `stt::tests::the_owners_language_is_the_streams`,
 `not_speech::tests::the_owners_language_is_its_own_not_another`,
