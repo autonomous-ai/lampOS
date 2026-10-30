@@ -572,6 +572,91 @@ over: `answers` (lines with words), `nudged`, `reported` (the model called
 `setup_step`), `name_asked_back` and `name_confirmed`; counts and booleans,
 no words.
 
+## The owner's language (#4473 (b))
+
+The walk follows the language setting the voice reads at start
+(`LAMP_LANGUAGE_FILE`, [second-voice.md](second-voice.md), "The owner's
+language"): `en`, `vi`, `ja`, `zh` or `ko`. A missing file, `en` or an
+unknown value is English, and English is exactly as above: the same words,
+rules and lines, byte for byte. The new paths run only for `vi`, `ja`, `zh`
+and `ko` (`crates/voice/src/onboarding/in_language.rs`).
+
+**Its fixed lines.** Every note keeps its English instruction to the model
+("Say only this, …", "Ask exactly this: …"), and each quoted line in it is
+said in the language, from the voice's own table (`LINES`): the skill's
+lines in `skills/onboarding/skill.toml` and the code's own
+(`PREFERENCES_HELLO`, `PREFERENCES_DONE`, `FACE_EXPRESSIONS_YES`/`_NO`,
+`LATER`, `LAST_LATER`). A line is translated as the walk hands it out (its
+`tick` and its invitations), so the walk itself still keeps and compares
+the English notes. A `{location}` or `{name}` filled in stays as it was
+given (the privacy switch's location is the hardware profile's words). The
+call name stays "Lamp", written in Latin letters in every language, since
+lamp-name hears that word ("Hey Lamp" stays "Hey Lamp"). The table is in
+the voice, not the skill: the skill's data is `deny_unknown_fields` in both
+lamp-voice and lamp-skills, so a new key would be refused by every older
+build reading it, and the code's own lines are not in the skill at all. A
+quoted line not in the table (an edited skill file) is said in English.
+
+**What it hears.** The answers are read by the same rules as in English
+(`reading`): a strict `yes_or_no` for the consents (a short line: four words
+in Korean, six syllables in Vietnamese, twelve letters in Japanese and
+Chinese), the hello's answer, a question that is no answer ("?" or "？"), a
+request to hear it again, a greeting, and a quiet-hours answer naming a time
+or none. Vietnamese is matched by whole words, Korean by the start of a word
+(its endings join the word: "밤에", "괜찮아요"), and Japanese and Chinese
+anywhere in the line, since they have no spaces. Greetings are taken out
+before a yes or a time is read ("晚上好" names no evening), and a request to
+hear it again before a no ("没听清" is no no). A yes phrase holds a no word
+but is a yes ("không sao", "問題ない", "没问题", "상관없어요"). "大丈夫です",
+"いいです" and "괜찮아요" are as often a polite no, so none is a yes.
+
+A consent and the hello's answer take only a **bare yes** (Reviewer-three's
+P1s and Fourth's P2 on #4506). The line must be nothing but strict yes words
+(or a yes phrase) and the language's few politeness words ("please",
+"thanks", a polite ending; the `polite` row below). Anything more is no
+answer, so "Có khi", "はい、後で", "好，或许吧" and "네, 그런데요" are no
+yes, and the model's "Sorry, was that a yes or a no?" asks again. A strict
+no still comes first, as in English. A line with a put-off word (a maybe, a
+filler, a "wait", a "let me think" or a "but") or a question without its
+mark is never an answer either: 吗 or 呢 in Chinese, a phrase ending in
+ですか, ますか, でしょうか or かな in Japanese, a word ending in 까요 or 나요
+in Korean. Once the hello is asked, it takes only that bare yes or a short
+strict no (`yes_or_no`, as the face consent does). It's #4480's English
+rule (`PUTS_OFF`, `PUTS_OFF_TOGETHER`, short or firm) made strict. English
+keeps its own rules (#4469, #4480). An hour
+counts with its own "o'clock" (十時, 十点, 열 시, mười giờ), since that is
+already the time cue English needs a "from" or an "at" for. With the nudge
+on, no name is taken from a line in another language, so none is asked back
+and the model keeps "who you are".
+
+| Words | vi | ja | zh | ko |
+|---|---|---|---|---|
+| yes | có, vâng, dạ, ừ, ờ, được, ok, okay, oke, đồng ý, đúng, chắc chắn, tất nhiên, ổn | はい, うん, ええ, いいよ, いいですよ, どうぞ, オッケー, ok, もちろん, お願い, そうです, 了解, わかりました | 是的, 是啊, 好, 可以, 行啊, 行吧, 对, 当然, 同意, ok | 네, 예, 응, 그래, 좋아, 좋습니다, 물론, 맞아, 맞습니다, 오케이, ok, okay, 알겠, 돼요, 됩니다, 그럼요 |
+| no | không, ko, đừng, chưa, khỏi | いいえ, いや, だめ, ダメ, ない, 結構です, やめて, しないで, 嫌, やだ | 不, 没有, 别, 没 | 아니, 아뇨, 싫, 안 돼, 안돼, 안 해, 하지 마, 않, 없, 말아 |
+| yes phrases | không sao, không vấn đề gì, không phiền, cứ tự nhiên, sao cũng được | 問題ない, 問題ありません, 構わない, かまわない, 構いません, かまいません, 気にしない | 没问题, 没关系, 没事, 不介意, 无所谓, 不错, 没错 | 상관없, 문제없, 문제 없 |
+| strict yes (`yes_or_no`) | có, vâng, dạ, ừ, được, đồng ý, đúng, chắc chắn | はい, うん, ええ, いいよ, いいですよ, もちろん, そうです | 是的, 是啊, 好, 可以, 对, 当然 | 네, 예, 응, 좋아, 좋아요, 맞아, 맞아요, 맞습니다, 물론, 물론이죠, 물론이에요 |
+| put off (no answer) | có lẽ, có thể, để mình nghĩ, để tôi nghĩ, để em nghĩ, để xem, chờ, đợi, chưa biết, không biết, nhưng, ừm, ờm, ơ, lát nữa, để sau, từ từ, nói chậm, kiểm tra, giải thích | ちょっと, 待って, 考え, わから, かな, ええと, えーと, えっと, そうですね, でも, うーん, ふうん, たぶん, 多分, あとで, 後で, ゆっくり, 確認, 説明 | 想想, 想一下, 好像, 等, 不知道, 对了, 但是, 可是, 也许, 可能, 嗯, 呃, 以后再, 稍后, 晚点, 慢点, 解释, 一会儿 | 나중에, 천천히, 설명, 확인, 잠시, 그래서, 글쎄, 잠깐, 생각, 예를, 근데, 하지만, 아마, 음 |
+| a question without its mark | | ですか, ますか, でしょうか, かな (ending a phrase) | 吗, 呢 | 까요, 나요 (ending a word) |
+| strict no | không, ko, đừng, sai | いいえ, いや, だめ, ダメ, 嫌, やだ, 違, 結構です | 不, 没有, 别, 错 | 아니, 아뇨, 싫, 안 돼, 안돼, 틀려 |
+| polite (may go with a bare yes) | ạ, nhé, nha, rồi, làm ơn, cảm ơn | お願いします, お願い, どうぞ, です, よ, ね | 请, 谢谢, 的, 啊, 呀, 哦 | 부탁해요, 부탁합니다, 부탁드려요, 주세요, 감사합니다, 고마워요, 요 |
+| about the hello | chào, lời chào | あいさつ, 挨拶, こんにちは | 打招呼, 招呼, 问好, 你好 | 인사, 안녕 |
+| greetings | chào buổi sáng, chào buổi chiều, chào buổi tối, xin chào, chào, alo, hello, hi | こんにちは, こんばんは, おはよう, やあ, もしもし, ハロー, hello | 早上好, 下午好, 晚上好, 你好, 您好, 早安, 晚安, 嗨, 哈喽, hello | 좋은 아침, 좋은 저녁, 안녕, 여보세요, 하이, 헬로, hello, hi |
+| again | lặp lại, nói lại, gì cơ, cái gì, nói gì, sao cơ, chưa nghe, không nghe, nghe không rõ | もう一度, もう一回, もういちど, なんて, 何て, 聞こえない, 聞こえなかった, 聞き取れない, 聞き取れなかった, 繰り返 | 再说, 重复, 什么, 没听清, 没听到, 听不清, 再一遍, 啥 | 다시, 뭐, 못 들었, 잘 안 들 |
+| no no in them | xin lỗi | | 不好意思, 不客气 | |
+| a time (with any digit) | sáng, trưa, chiều, tối, đêm, khuya, nửa đêm, sau, trước, hai giờ … mười hai giờ | 夜, 朝, 午前, 午後, 夕方, 昼, 深夜, 真夜中, 以降, 以前, 過ぎ, 二時 … 十二時 | 晚上, 早上, 上午, 下午, 中午, 凌晨, 半夜, 午夜, 夜里, 以后, 之后, 以前, 之前, 两点, 二点 … 十二点, 点钟 | 밤, 아침, 저녁, 오후, 오전, 새벽, 낮, 자정, 정오, 이후, 이전, 전에, 후에, 두 시 … 열두 시, 두시 … 열두시 |
+| quiet, hours | yên lặng, im lặng, yên tĩnh, giờ, tiếng | 静か, 時間, 音 | 安静, 时间, 小时, 时段 | 조용, 시간 |
+| a name told | tên, gọi tôi, gọi mình, gọi em, gọi anh, gọi chị, tôi là, mình là, em là; or 1 to 3 words alone | と呼んで, って呼んで, 名前は, 私は, わたしは, 僕は, 俺は; or 1 to 6 letters alone | 我叫, 叫我, 我是, 名字; or 1 to 6 letters alone | 이름, 불러, 저는, 나는; or 1 to 2 words alone |
+| not a name | khỏe, đây, sẵn sàng, bận, mệt, lamp, ừm, à, hả | 元気, 大丈夫, ここ, すみません, ごめん, 忙し, 疲れ, lamp, えっと, うーん, あの | 很好, 这里, 对不起, 抱歉, 忙, 累, lamp, 嗯, 呃, 那个 | 괜찮, 여기, 미안, 죄송, 바빠, 바쁘, 피곤, lamp, 음, 어, 저기 |
+
+Like English, "one" is no hour (一点 is "a little" in Chinese), and a name
+is never a question, a yes, a no, a greeting or a request to hear it again.
+Tested in `onboarding::in_language::tests` (each language's yes, no,
+question, hello, quiet hours and name; every fixed line in each language,
+each note still one written turn; an unknown language as English) and
+`the_walk_hears_and_says_its_lines_in_the_owners_language` (the walk in
+each language, from "where you sit" to "preferences" done and the face
+question's yes and no). The translations want a native speaker's check.
+
 ## Tests
 
 `onboarding::tests`, with a scripted room and face: the steps walked in
