@@ -1013,4 +1013,88 @@ mod own_unit_line_tests {
             assert!(config.apply, "{line}");
         }
     }
+
+    /// The sandbox lines of `aa9ec9e27a`'s `deploy/product/lamp-update.service`,
+    /// the unit every 7071 lamp runs each round under.
+    const SANDBOX_7071: [&str; 7] = [
+        "User=root",
+        "NoNewPrivileges=yes",
+        "ProtectSystem=strict",
+        "ReadWritePaths=/opt/lampOS /etc/systemd/system -/var/lib/lampOS/skills -/var/lib/lampos-skills-state -/run/lampos-bus",
+        "ProtectHome=yes",
+        "PrivateTmp=yes",
+        "StateDirectory=lampos-update",
+    ];
+
+    /// Whether a round, run under `sandbox`'s lines, may write `path`.
+    fn writable(sandbox: &[&str], path: &str) -> bool {
+        let mut writes: Vec<String> = sandbox
+            .iter()
+            .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+            .flat_map(str::split_whitespace)
+            .map(|at| at.trim_start_matches('-').to_owned())
+            .collect();
+        writes.extend(
+            sandbox
+                .iter()
+                .filter_map(|line| line.strip_prefix("StateDirectory="))
+                .map(|name| format!("/var/lib/{name}")),
+        );
+        let path = path.trim_end_matches('/');
+        writes
+            .iter()
+            .any(|at| path == at || path.starts_with(&format!("{at}/")))
+    }
+
+    /// No round switches lamp-update's own unit, so the sandbox a round
+    /// runs in on a lamp is the one its image installed, whatever this file
+    /// says. A path a round needs to write that isn't in 7071's
+    /// `ReadWritePaths` needs a one-shot unit of its own, as the settings
+    /// writer's (`writer_unit`) and the apply's: widening this file's line
+    /// never reaches a shipped lamp (Second's P2 on #4503).
+    #[test]
+    fn the_updaters_own_sandbox_is_still_the_7071_images() {
+        assert_eq!(round::OWN_UNIT, "lamp-update.service");
+        let sandbox: Vec<&str> = PRODUCT_UNIT
+            .lines()
+            .filter(|line| {
+                SANDBOX_7071
+                    .iter()
+                    .any(|kept| line.split('=').next() == kept.split('=').next())
+            })
+            .collect();
+        assert_eq!(sandbox, SANDBOX_7071);
+    }
+
+    /// What a round writes itself fits 7071's sandbox; what it writes
+    /// through a one-shot unit of its own, and Harness's place, don't.
+    #[test]
+    fn a_round_writes_itself_only_where_the_7071_sandbox_lets_it() {
+        use lamp_update::{added, install, manifest, own, product_skills, unit, writer_swap};
+        for path in [
+            install::RECORDS,
+            install::UNITS,
+            added::UNITS,
+            own::FOLDER,
+            own::CURRENT,
+            manifest::MODELS_ROOT,
+            manifest::STORE,
+            unit::INSTALLED,
+            product_skills::FOLDER,
+            product_skills::ON,
+            "/run/lampos-bus",
+        ] {
+            assert!(writable(&SANDBOX_7071, path), "{path}");
+        }
+        for path in [
+            own::BACK,
+            writer_swap::PREV,
+            manifest::RESET_PLAN,
+            install::ZONE_PATH,
+            install::HARNESS,
+            install::HARNESS_HOME,
+        ] {
+            assert!(!writable(&SANDBOX_7071, path), "{path}");
+        }
+    }
 }
