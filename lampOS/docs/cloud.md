@@ -130,7 +130,7 @@ lamp says so.
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `skills.share` (`{"name", "author"?, "preview"?}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave. Without them, "not on this lamp" |
-| `skills.shared` (`{}`) | as `skills.share`: this lamp's sent skills, the Store's newest 20, `{"shares": [...]}` |
+| `skills.shared` (`{}`) | as `skills.share`: this lamp's sent skills, the Store's newest 100, `{"shares": [...]}` |
 | `skills.unshare` (`{"id"}`) | as `skills.share`: a sent skill taken back from the Store, `{"unshared": ID}` |
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
 | `skills.camera` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` (#3504's piece C, "The owner's yes to a skill's camera" below): the owner's yes to the skill seeing the camera's picture, given (`allow` true) or taken back, past the app's warning, asked of root's manage helper as off and on are and kept in `lamp-skills`' `camera`; the reply is `skills.list`'s, read after it, with `camera: {name, allowed}`, what was kept for that name, on the lamp or not (#4099). A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without the switch, V1's "not on this lamp" |
@@ -1045,10 +1045,10 @@ since 30 Oct.
   as `{"preview": {"name", "files": [{"path", "text"}]}}` (a file that
   isn't text gives its `bytes` only; at most 65,536 characters in all), so
   the app can show the owner exactly what would leave before Send.
-- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine`, its first
-  page: **only the newest 20** a lamp sent show (at 5 a day, older ones
-  drop off after four days), the rows from the Store's `data.data`,
-  answered
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine?limit=100`,
+  the Store's largest page, newest first: **only the newest 100** a lamp
+  sent show (at the Store's 5 a day, about twenty days of them), the rows
+  from the Store's `data.data`, answered
   `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`
   (only those fields; `review_status` is the Store's `pending`, `approved`
   or `rejected`, and `review_note` its reviewer's reason).

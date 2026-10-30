@@ -272,7 +272,7 @@ fn shared_reads_mine_and_keeps_only_the_apps_fields() {
     );
     let (head, _) = seen.recv().unwrap();
     assert!(
-        head.starts_with("GET /api/v1/skills/mine HTTP/1.1"),
+        head.starts_with("GET /api/v1/skills/mine?limit=100 HTTP/1.1"),
         "{head}"
     );
     assert_eq!(

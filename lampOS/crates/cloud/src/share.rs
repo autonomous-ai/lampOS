@@ -492,7 +492,11 @@ pub fn share(
 
 /// `skills.shared {}`: `{"shares": [...]}`, this lamp's sent skills.
 pub fn shared(store: &Store) -> Result<Value, String> {
-    let (status, reply) = exchange(store, (reqwest::Method::GET, store.url("mine"), None))?;
+    // The Store's largest page, newest first (Backend3 on #4570).
+    let (status, reply) = exchange(
+        store,
+        (reqwest::Method::GET, store.url("mine?limit=100"), None),
+    )?;
     Ok(json!({ "shares": rows(&answered(status, &reply)?) }))
 }
 
