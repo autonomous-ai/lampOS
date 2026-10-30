@@ -860,11 +860,13 @@ struct Written {
     stand_ins: &'static [&'static str],
     /// Spaced words (Vietnamese): a greeting or a stand-in is a whole word.
     /// Otherwise a greeting or a stand-in is a clause's opening characters.
-    /// The name itself is never a longer word's start (「ランプシェード」).
     whole_words: bool,
-    /// What may follow the name in its word and still call it ("렘프야");
-    /// a subject or object particle ("램프가 고장났어.") is talk about it.
-    calling: &'static [char],
+    /// A character that, right after the name itself, makes it no call:
+    /// more katakana, a longer word (「ランプシェード」), where a particle or
+    /// a verb still calls (「ランプを消して」); a Korean subject or object
+    /// particle, talk about the lamp ("램프가 고장났어."), where "렘프야"
+    /// calls. Chinese, often written unpunctuated ("兰普现在几点"), has none.
+    not_the_name: fn(char) -> bool,
     /// The stand-ins are everyday one-word replies ("Làm!" is "do it!",
     /// "Lắm." is "a lot."): they count only in the line's first clause,
     /// greeted ("Hây lăm.") or with more clauses after ("Làm, mấy giờ rồi?").
@@ -878,7 +880,7 @@ fn written(language: Language) -> Written {
             real: &["ランプ", "らんぷ"],
             stand_ins: &["ランク"],
             whole_words: false,
-            calling: &[],
+            not_the_name: |c| matches!(c, '\u{30A0}'..='\u{30FF}'),
             everyday: false,
         },
         Language::Chinese => Written {
@@ -886,7 +888,7 @@ fn written(language: Language) -> Written {
             real: &["兰普", "蓝普", "lamp"],
             stand_ins: &[],
             whole_words: false,
-            calling: &[],
+            not_the_name: |_| false,
             everyday: false,
         },
         Language::Korean => Written {
@@ -894,7 +896,7 @@ fn written(language: Language) -> Written {
             real: &["램프", "렘프"],
             stand_ins: &[],
             whole_words: false,
-            calling: &['야'],
+            not_the_name: |c| "가를이은는의도".contains(c),
             everyday: false,
         },
         // "Lamp" stays Latin and is read as English reads it; "làm" and
@@ -904,7 +906,7 @@ fn written(language: Language) -> Written {
             real: &[],
             stand_ins: &["lam", "lăm", "làm", "lắm", "lem"],
             whole_words: true,
-            calling: &[],
+            not_the_name: |_| false,
             everyday: true,
         },
     }
@@ -983,10 +985,7 @@ fn opens_as_written(clause: &str, written: &Written) -> Option<WrittenCall> {
     let rest = rest.as_str();
     let names = written.real.iter().filter_map(|name| {
         let after = rest.strip_prefix(name)?;
-        let after = after
-            .strip_prefix(|c| written.calling.contains(&c))
-            .unwrap_or(after);
-        Some((past(after, "", true)?, true))
+        (!after.starts_with(written.not_the_name)).then_some((after, true))
     });
     let stand_ins = (written.stand_ins.iter())
         .filter_map(|name| Some((past(rest, name, written.whole_words)?, false)));
@@ -2780,6 +2779,8 @@ mod tests {
         for (language, heard) in [
             (Japanese, "ランプ"),
             (Japanese, "ランプ 消して"),
+            (Japanese, "ランプを消して"),
+            (Chinese, "兰普现在几点"),
             (Korean, "램프야"),
             (Korean, "헤이 램프"),
         ] {
