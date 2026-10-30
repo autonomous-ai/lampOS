@@ -268,7 +268,7 @@ pub fn verdict(counts: &Counts) -> Vec<String> {
 /// `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`, applied by
 /// [`SecondConfig::with_environment`]) is set, else DeepSeek's own API with
 /// the unit's `deepseek.key`.
-fn deepseek_route(
+pub(super) fn deepseek_route(
     config: &SecondConfig,
     credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<(String, Key)> {

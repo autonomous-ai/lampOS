@@ -470,10 +470,47 @@ ones are `ASK_AGAIN_NOTE`'s case (above).
 With `LAMP_CUT_IN_TOLD=on` (the provider worker's `--cut-in-told`, right
 after `--going-on-asks`), the request that commits a spoken cut-in over the
 lamp's own audible answer (its Start's `over_the_lamps_voice`) is told
-beside what is heard, in the form of the lamp's other notes:
-"(For you to know, not to answer: they spoke while you were speaking, and
-you stopped there. Answer what they said; go back to what you were saying
-only if they ask you to.)" (`crate::cut_in_told::NOTE`).
+beside what is heard, in the form of the lamp's other notes
+(`crate::cut_in_told::NOTE`). Since #3997's cut-in proposal (30 Oct; the
+playout stop and the non-speech case are Sixth's) it makes the cut-in plain,
+as a person would:
+
+- **A stop or a wait alone** ("stop", "pause", "wait", "hold on", nothing
+  else asked): only a short "Okay, I'll stop." in the conversation's
+  language, and nothing more. On the second route a stop or "enough" over
+  its answer is already answered with `spoken_stop::LINE`
+  (`LAMP_SPOKEN_STOP_ENDS`) and never reaches the model, so there this part
+  is told only for "wait", "pause" and "hold on".
+- **Any other cut-in:** the reply's first words are a few that show it was
+  heard ("Oh, sure —"), then the answer, with one example ("Oh, sure — it's
+  four."), and the note says the character's rule against repetitive
+  acknowledgments does not hold for this reply. Never a long apology. On
+  lamp-06c1 (30 Oct) the acknowledgement came in one demo of two while it
+  was the note's third sentence; it now opens the note, and the second
+  route tells the note last, right before the person's words.
+- **Going back:** only when asked, and then first a few words of where it
+  was ("Where was I… the keeper had just…"), and on from where it stopped,
+  not from the start.
+
+The note was "(For you to know, not to answer: … Answer what they said; go
+back to what you were saying only if they ask you to.)" before it. The line
+that later asks to go on is no cut-in and is told no note, so it needs to
+know where the answer stopped:
+
+- **The Live route:** Gemini's server keeps the note in its own history,
+  with the whole answer it made; nothing marks the part that was played.
+- **The second route:** its history keeps the note of no earlier request.
+  With `LAMP_SAID_AS_HEARD=on` the thread keeps only the played words of a
+  cut answer (with "—" after a piece cut while it played), and the
+  exchange is marked cut (`thread::Recent::cut`, read back from the file by
+  its dash); with this switch too, such an answer is followed in the
+  history by `cut_in_told::CUT_HERE`: "(Your answer just above was cut off
+  where it ends: they never heard the rest. If they ask you to go on
+  with it, first say in a few words where you were, …, then go on from
+  there, not from the start.)" With `LAMP_SAID_AS_HEARD` off (the product,
+  30 Oct) the thread keeps the whole answer and nothing marks where it
+  stopped.
+- **Measured** with `lamp-voice probe-cut-in` (`docs/second-voice.md`).
 
 - **Not after a stop:** the first request after a hand or head stop is told
   the stop instead.
@@ -489,7 +526,12 @@ only if they ask you to.)" (`crate::cut_in_told::NOTE`).
   (told with the switch, not without it, not over a silent reply, the stop's
   note instead after a stop),
   `provider_worker::tests::review_2026_10_14::review_sound_a_cut_in_that_names_the_lamp_is_told_both_notes_together`
-  (the name heard too: both notes go out as one), `cut_in_told::tests` and
+  (the name heard too: both notes go out as one), `cut_in_told::tests` (the
+  note's short stop, few words first and clear resume; the mark only for a
+  cut answer and only with the switch),
+  `second_provider::worker::tests::a_cut_answer_is_told_where_it_stopped_and_a_whole_one_is_not`,
+  `thread::tests::an_answer_cut_is_kept_as_what_was_heard_of_it` (marked cut,
+  and read back so) and
   `provider_worker::tests::going_on_asks::cut_in_told_is_read_after_going_on_asks`.
 
 ## A misheard cut-in's "hm?" (#828)

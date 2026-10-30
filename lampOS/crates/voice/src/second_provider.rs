@@ -6449,7 +6449,6 @@ async fn spoken(
     let notes = stopped
         .into_iter()
         .chain(pushed)
-        .chain(cut_in)
         .chain(misheard)
         .chain(staff)
         .chain(place)
@@ -6463,6 +6462,10 @@ async fn spoken(
         .chain(called)
         .chain(air)
         .chain(seems)
+        // Last, right before the person's words: an acknowledgement asked
+        // among the other notes was said only once in two on lamp-06c1
+        // (30 Oct, #3997's cut-in proposal).
+        .chain(cut_in)
         .collect();
     if let Some(carried) = carried {
         eprintln!(
@@ -7108,7 +7111,8 @@ impl Prepared {
         notes: &[String],
         remembered: Option<String>,
     ) -> Self {
-        let notes: Vec<String> = notes.iter().cloned().chain(remembered.clone()).collect();
+        // The memory's note before the cut-in's, as round 1 tells them.
+        let notes: Vec<String> = remembered.iter().chain(notes).cloned().collect();
         let mut messages = told(shared, scope).messages();
         messages.extend(notes.iter().cloned().map(Message::system));
         messages.push(Message::user(words.clone()));
