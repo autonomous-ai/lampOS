@@ -43,7 +43,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 ```
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
-example runs this way: `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `phrase.js`, `pomodoro.js`,
+example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `phrase.js`, `pomodoro.js`,
 `ci-light.js`.
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
