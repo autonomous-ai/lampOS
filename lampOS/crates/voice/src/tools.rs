@@ -1680,6 +1680,14 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the name typed at setup, on the same mark and rule (#4461),
+            // after the place, which finds the owner by that name.
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::person::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
