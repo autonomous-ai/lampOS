@@ -234,7 +234,7 @@ against the schema before sending, and the lamp checks the rest. A test keeps
 every public method named here.
 
 **Today a lamp refuses** `look` (but at `'hand'`, on a lamp with the body's lease
-socket), `joints`, `play` and `sound` with `refused`, "not routed yet: waits for
+socket), `joints` and `play` with `refused`, "not routed yet: waits for
 …" (`LAMP_CONTROL_REFUSES` in `lampos/testing`), and `say` and `sound` in its quiet
 hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 `lamp.limits.quiet_hours`), or while its time isn't known, with `quiet_hours`.
