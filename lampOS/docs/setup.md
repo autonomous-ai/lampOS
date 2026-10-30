@@ -215,9 +215,33 @@ lamp-setup reset-now`). That unit, in this order:
    wipe them too, and `wifi-restore` puts no old network back while a reset
    is journalled (Third on #3579). Every wiped path's staging copy from
    setup (`.lamp-setup-tmp`, left by a write cut mid-way) goes with it;
-5. it removes the journal, syncs, and reboots. If the wipe fails it still
-   reboots, and if the reboot command fails it forces one: a lamp left dark
-   with no marker would wait for a hand.
+5. it removes the journal, syncs, and **starts setup again in place, with no
+   reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
+   lampos.target` and which has `lamp-setup.service`. It runs `systemctl
+   start` on what it stopped that a boot starts outside the target and was
+   running (`reset::STARTERS`, but not the updater's way back, whose timer
+   starts it, and `lamp-update.service`), and `lamp-setup.service`
+   (`reset::stop_and_wait_keeping`). First it empties what a reboot
+   emptied by being memory, `reset::VOLATILE`: every folder a part keeps in
+   `/run` past its stop, the tmpfiles' `/run/lampos-bus` (the bus's latest
+   messages, which can say a person's name or words) and
+   `/run/lampos-photos`, and the voice's and the records' own folders
+   (`RuntimeDirectoryPreserve=yes`: the thread's set-aside words, the room).
+   Every other part's `RuntimeDirectory=` goes as its unit stops. If they
+   can't be emptied it reboots instead. With the marker gone, setup serves:
+   its start brings up the hotspot from the station live, as Wi-Fi's
+   recovery does. Every part of `lampos.target` still waits for the marker,
+   and `lampos-setup-done.path` starts the target once setup writes it
+   again, so the lamp comes up as on a first boot. **Why:** the Orange Pi 4
+   Pro's A733 hung in its boot firmware on a warm reset one time in three
+   (lamp-cb94, 30 Oct, stable 8670), and a pinhole reset that rebooted left
+   a lamp dark, with no ring and no hotspot, that looked dead. A keeper's
+   plan, or a lamp without setup's unit, reboots as before. If the wipe
+   fails, or the start in place fails, it reboots, and if the reboot
+   command fails it forces one: a lamp left dark with no marker would wait
+   for a hand. What a person is told after a reset, for the user guide:
+   "After a factory reset, if the lamp's Wi-Fi doesn't appear within a
+   minute, unplug it and plug it back in."
 
 Read-only reset queries retain at most 64 KiB of stdout and have five seconds
 per query, matching the updater's setup-unit query allowance. A timeout,
