@@ -288,3 +288,13 @@ Ready for lamp-voice: yes (#4444, behind `LAMP_DECLINE_SILENT`, off; Part of #39
 - The decline's saved carry window and the live one are matched by the request each was begun for, which an answer leaves, so an answer to an earlier chained line no longer splits them within one conversation (the Reviewer-lead's P3).
 - One new test, which fails under the old comparison.
 - Gate on f56d04bae0: voice lib 4155/2 and it 274/1, all three known timed process tests (#1569); the motor ones fail on lamp-voice itself here too. Others 1, 4, 6; clippy, fmt, workspace build clean.
+
+### #3945, the decline's hold narrowed (#4458)
+
+Ready for lamp-voice: yes (#4458, behind `LAMP_DECLINE_SILENT`, off; Part of #3945)
+
+- #4444 merged in train 390.
+- The first builder's call: the switch stays off, and round 1's words wait only in a busy room or with a second voice or face. In a quiet room with one person they stream as with it off.
+- Two tests, each failing under its mutation.
+- Gate on 86a2520d88: voice lib 4159/1, the one being a known timed motor test (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean.
+- Next: "May, what would you do?" held as calling someone else, mid-conversation with one person (the first builder's 07:3x ask).
