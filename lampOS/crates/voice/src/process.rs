@@ -1683,6 +1683,7 @@ fn second_route_worker_environment(
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
+        crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
         crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -1842,6 +1843,7 @@ mod tests {
             crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
+            crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
@@ -2492,6 +2494,7 @@ mod tests {
                     || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
+                    || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
@@ -2687,6 +2690,7 @@ mod tests {
                     "LAMP_SECOND_QUIET_HELD=on",
                     "LAMP_SECOND_REMEMBER_ASKED=on",
                     "LAMP_SECOND_SAID_ONCE=on",
+                    "LAMP_SECOND_SAY_WITH_CALL=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SKILL_LOOK=on",
                     "LAMP_SECOND_SPEAKING_FACE=on",
