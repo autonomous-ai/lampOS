@@ -114,7 +114,7 @@ lamp says so.
 | `cmd` / `kind` | Answer |
 |---|---|
 | `info` | the identity fields above |
-| `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime and zone |
+| `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
 | `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
@@ -144,7 +144,7 @@ lamp says so.
 | `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
 | `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. `data` is not read. Without the switch, V1's "not on this lamp" |
 | `system.shutdown` | with `LAMP_SHUTDOWN=on` (#3697, "The lamp turned off from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"shutting_down": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). `data` is not read. Once taken, asked again within 60 s (`lamp::YES_KEPT`) it is answered the same `success` and the helper is not asked again; after that the helper is asked again. Without the switch, V1's "not on this lamp" |
-| `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
+| `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters), `language.set` (`{"language": "en" \| "vi" \| "ja" \| "zh" \| "ko"}`, #4473) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}`, `{"name"}` or `{"language"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
@@ -1469,9 +1469,23 @@ the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
 
 - **The kinds:** `timezone.set {"timezone"}` (V1's own kind and shapes),
   `person.name.set {"name"}` (the person's name setup asks for; `""` removes
-  it) and `device.rename {"name"}` (the lamp's name in the app).
+  it), `device.rename {"name"}` (the lamp's name in the app) and
+  `language.set {"language"}` (the owner's language, #4473: `en`, `vi`,
+  `ja`, `zh` or `ko`, exactly).
   - **The lamp's name in the app never changes what the lamp answers to.**
     The wake word stays "Lamp"; only `host.device_name` reads it.
+  - **A new language restarts the voice, after `success`.** The helper
+    writes `/etc/lampOS/setup/language` and answers, so `host.language`
+    reads the new value at once; then it waits for the voice to rest
+    between turns (5 s, at most 45 s, as the app's restart waits) and runs
+    `systemctl try-restart lamp-voice.service`, which reads the file at
+    start. The same language again restarts nothing. `system.info`,
+    `mic.get` and the link stay answered through the restart: `lamp-cloud`
+    keeps running and none of them asks the voice. An old lamp lists no
+    `language.set` in `can` and answers "not on this lamp: language.set".
+    A language set while an update installs is refused ("an update is being
+    installed: try again once it is done") and nothing is written: the
+    helper holds lamp-update's lock through the write and the restart.
 - **The ack at once, the result after:** the reply is `starting` as soon as
   the request is read, before anything is written. The result goes out as a
   second reply of the same kind, looked for every 50 ms on the loop texts use,
@@ -1479,7 +1493,8 @@ the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
   settings did not answer in time").
 - **Who writes: root's helper, never `lamp-cloud`.** `lamp-cloud` stays
   `lampos` and `ProtectSystem=strict`, with no new writable path. It sends one
-  line (`{"timezone": …}`, `{"person_name": …}` or `{"display_name": …}`) to
+  line (`{"timezone": …}`, `{"person_name": …}`, `{"display_name": …}` or
+  `{"language": …}`) to
   `/run/lampos-setup-change/change.sock` and reads one back, on a thread of its
   own so the broker's loop never waits. The socket is systemd's
   (`lamp-setup-change.socket`: root's, group `lampos`, 0660, `Accept=yes`, 4
@@ -1491,7 +1506,8 @@ the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
 - **Refusals** are the helper's words, never the value asked: `name must be at
   most 64 characters on one line`, `name must be 1 to 64 characters` (a rename
   to nothing), `timezone must be a zone the lamp knows, such as
-  Asia/Ho_Chi_Minh`, and `the lamp's settings are not running` when the
+  Asia/Ho_Chi_Minh`, `language must be one of en, vi, ja, zh, ko`, and
+  `the lamp's settings are not running` when the
   socket is not there.
 - **Installed:** the helper's two units are in `lamp-update`'s install list
   (`install::PRODUCT`, #2853): the socket enabled, the template never.

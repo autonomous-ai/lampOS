@@ -1,7 +1,9 @@
 # lampOS changes after setup (#1959, lampOS/docs/setup.md, "Changed after setup"): one request from
 # lamp-cloud on lamp-setup-change.socket, as standard input and output. It writes with setup's own
 # writers, answers, and after a zone change restarts lamp-schedule once the lamp is quiet (45 s,
-# an update's rule) and no update is at work (holding lamp-update's lock), waiting at most 30 minutes. The app's restart and shutdown too (#2193, #3697):
+# an update's rule) and no update is at work (holding lamp-update's lock), waiting at most 30 minutes;
+# after a new language (#4473) restarts lamp-voice once it rests between turns (5 s, at most 45 s),
+# holding the same lock. The app's restart and shutdown too (#2193, #3697):
 # answered first, then lampos.target restarted (this instance is not part of it) or lamp-setup
 # shutdown started.
 [Unit]
@@ -10,8 +12,8 @@ CollectMode=inactive-or-failed
 
 [Service]
 Type=simple
-# Root: the person's name, /etc/localtime, /etc/timezone and zone.env are root's, as setup
-# writes them, and lamp-schedule's restart.
+# Root: the person's name, /etc/localtime, /etc/timezone, zone.env and the language are root's,
+# as setup writes them, and lamp-schedule's and lamp-voice's restarts.
 User=root
 ExecStart=/opt/lampOS/setup/current/lamp-setup change --config /etc/lampOS/setup/serve.json --bus-root /run/lampos-bus --enable
 StandardInput=socket

@@ -66,6 +66,7 @@ impl Root {
             backend: self.0.join("etc/backend.json"),
             reports: self.0.join("etc/reports.json"),
             display_name: self.0.join("etc/display-name"),
+            language: self.0.join("etc/setup/language"),
             own_keys: self.0.join("etc/own"),
             web_start: vec![],
             web_stop: vec![],
@@ -103,6 +104,8 @@ fn a_request_is_checked_before_anything_is_touched() {
             credential: Some("AIza-key_1".into()),
             name: Some("Lan".into()),
             timezone: Some("Asia/Ho_Chi_Minh".into()),
+            // None asked: nothing is written, which is English.
+            language: None,
             // A port alone is no link.
             backend: None,
             share_reports: false,
@@ -266,6 +269,9 @@ impl Save for Saved {
     fn timezone(&mut self, zone: &str) -> io::Result<()> {
         self.record("timezone", zone)
     }
+    fn language(&mut self, code: &str) -> io::Result<()> {
+        self.record("language", code)
+    }
     fn backend(&mut self, link: &Backend) -> io::Result<()> {
         self.record(
             "backend",
@@ -324,6 +330,64 @@ fn a_joined_lamp_saves_the_settings_then_the_marker_and_says_it_is_set_up() {
             "marker="
         ]
     );
+}
+
+/// #4473: setup's optional `language`, checked as `language.set` checks
+/// it, is saved after the zone. One the lamp doesn't speak is left out,
+/// never a failed setup, as an unknown zone is; through the light's
+/// wrapper too, and a recovery run saves none.
+#[test]
+fn setup_saves_a_language_the_lamp_speaks_after_the_zone() {
+    let root = Root::new();
+    let config = root.config(false);
+    let with = |language: Value| {
+        let mut body = good();
+        body["language"] = language;
+        check(&request(body), &config).unwrap().language
+    };
+    for code in ["en", "vi", "ja", "zh", "ko"] {
+        assert_eq!(with(json!(code)), Some(code));
+    }
+    assert_eq!(with(json!(" ko\n")), Some("ko"), "trimmed");
+    for other in [json!("fr"), json!("JA"), json!(""), json!(null), json!(7)] {
+        assert_eq!(with(other.clone()), None, "{other}");
+    }
+    let mut body = good();
+    body["language"] = json!("ja");
+    let accepted = check(&request(body), &config).unwrap();
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut releasing = lamp_setup::light::ReleasingSave {
+        save: Saved::default(),
+        light: None,
+    };
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut releasing,
+        || Some("192.168.1.23".into()),
+    );
+    assert_eq!(
+        releasing.save.calls,
+        [
+            "name=Lan",
+            "timezone=Asia/Ho_Chi_Minh",
+            "language=ja",
+            "credential=AIza-key_1",
+            "marker="
+        ]
+    );
+    let mut saved = Saved::default();
+    run(
+        &Arc::new(Mutex::new(Status::new("lamp-4ace".into()))),
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut lamp_setup::serve::NetworkOnly(&mut saved),
+        || Some("192.168.1.23".into()),
+    );
+    assert!(saved.calls.is_empty(), "{:?}", saved.calls);
 }
 
 /// #3020, El's P1 on #3024: a recovery run takes the app's one full setup
