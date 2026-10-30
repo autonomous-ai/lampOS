@@ -61,6 +61,9 @@ Environment=LAMP_APP_UPDATE=on
 # which refuses while an update installs. Set in lamp-cloud, Controls, Voice and lamp-setup-reset together,
 # every part that reads it (switches.md). On since Mobile's three clean offs on lamp-0c89 (30 Oct, #3698).
 Environment=LAMP_SHUTDOWN=on
+# The app's Restart (#2193): `system.reboot`, asked of the same helper, which refuses while an update installs, else
+# answers first and restarts lampos.target once the voice has rested (at most 45 s); never the machine.
+Environment=LAMP_APP_RESTART=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

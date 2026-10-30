@@ -136,6 +136,9 @@ fn the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts() {
         // #2636: the lamp's will, so its record shows it offline about 30 s
         // after its connection is lost.
         "Environment=LAMP_CLOUD_OFFLINE_WILL=on",
+        // The app's Restart, so a product lamp's `can` names it and the
+        // app shows its button (#2193).
+        "Environment=LAMP_APP_RESTART=on",
         "PartOf=lampos.target",
         "WantedBy=lampos.target",
         "ConditionPathExists=/var/lib/lampos-setup/done",
