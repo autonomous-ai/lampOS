@@ -451,7 +451,8 @@ impl Worker {
         directory: &Path,
         mut on_wait: impl FnMut() -> io::Result<()>,
     ) -> io::Result<()> {
-        let deadline = startup_now() + WORKER_STARTUP_TIMEOUT;
+        let mut deadline = startup_now() + WORKER_STARTUP_TIMEOUT;
+        let mut busy_at_start = false;
         let role = self.role.clone();
         let peer_c = directory.join(format!("{role}.c.w"));
         let peer_d = directory.join(format!("{role}.d.w"));
@@ -486,6 +487,18 @@ impl Worker {
             };
             match received {
                 Some(WorkerEvent::Ready) => return Ok(()),
+                // The speaker's device is busy at start and tried again for
+                // up to its bound (#4332): ready is waited for that much
+                // longer, once, with the usual time for the rest of its start
+                // after. No authority is sent to it before ready, so none of
+                // its leases can lapse; `on_wait` keeps the other workers'
+                // renewed and ends the wait on a stop, the child killed.
+                Some(WorkerEvent::BusyAtStart) if role == "speaker" && !busy_at_start => {
+                    busy_at_start = true;
+                    deadline = startup_now()
+                        + crate::open_at_start::SPEAKER_BUSY_AT_START
+                        + WORKER_STARTUP_TIMEOUT;
+                }
                 Some(WorkerEvent::DiagnosticsStarted { started })
                     if self.diagnostic_start.is_none()
                         && matches!(role.as_str(), "capture" | "speaker") =>
@@ -714,6 +727,71 @@ fn failed_fixture(child: &mut Child, error: io::Error) -> io::Error {
 #[cfg(test)]
 mod fixture_tests {
     use super::*;
+
+    /// A speaker busy at start says so before it is ready (#4332): its
+    /// readiness is waited for up to 20 s past then plus the usual 3 s, once;
+    /// without the word, or from another role, the usual 3 s hold.
+    #[test]
+    fn a_speaker_busy_at_start_is_waited_for_past_the_usual_three_seconds() {
+        // Each wait moves the startup clock on by 500 ms, so the host's own
+        // time in the wait counts little; Ready is sent once it has moved
+        // `ready_after`, if at all.
+        let start = |role: &str, busy: bool, ready_after: Option<Duration>| {
+            let directory = SessionDirectory::create().unwrap();
+            let dir = &directory.path;
+            let (parent, boot) = (new_boot().unwrap(), new_boot().unwrap());
+            // The parent's side is left for `wait_until_ready` to connect.
+            let channels = WorkerChannels::bind(dir, role, parent, boot, false).unwrap();
+            let mut peer = WorkerChannels::bind(dir, role, parent, boot, true).unwrap();
+            peer.connect(dir, role, true).unwrap();
+            let child = Command::new("sleep")
+                .arg("60")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap();
+            let mut worker = Worker {
+                channels,
+                child,
+                boot,
+                role: role.into(),
+                diagnostic_start: None,
+                ring_resources: None,
+                on_stop: None,
+                after_terminate: None,
+            };
+            if busy {
+                peer.control.send(WorkerEvent::BusyAtStart).unwrap();
+            }
+            let mut moved = Duration::ZERO;
+            let result = worker.wait_until_ready(&directory.path, || {
+                startup_clock::move_on(Duration::from_millis(500));
+                moved += Duration::from_millis(500);
+                if ready_after == Some(moved) {
+                    peer.control.send(WorkerEvent::Ready)?;
+                }
+                Ok(())
+            });
+            (result, moved)
+        };
+        let (ready, _) = start("speaker", true, Some(Duration::from_secs(20)));
+        ready.unwrap();
+        let (late, moved) = start("speaker", true, None);
+        assert_eq!(late.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert!(moved > Duration::from_secs(20), "{moved:?}");
+        let (unsaid, moved) = start("speaker", false, Some(Duration::from_secs(5)));
+        assert_eq!(unsaid.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert!(moved < Duration::from_secs(4), "{moved:?}");
+        let (capture, moved) = start("capture", true, Some(Duration::from_secs(5)));
+        let error = capture.unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("unexpected worker startup message")
+        );
+        assert!(moved < Duration::from_secs(1), "{moved:?}");
+    }
 
     #[test]
     fn cooperative_ready_child_exit_observation_does_not_reap_or_hide_a_timeout() {
