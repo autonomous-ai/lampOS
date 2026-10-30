@@ -196,9 +196,27 @@ after the gate as before (#4332). A refused renewal says which it was at the
 end of its line: `(renewal after Ready)`, `(renewal before the gate)`,
 `(renewal in the gate after <check>)` or `(renewal after the gate)`.
 That authority is always the wait's microphone and camera **Denied**, so a
-renewal grants nothing; the lease, its expiry and the fail-closed exit are
-unchanged, so one check held past 250 ms still lapses it and ends the wait
-closed.
+renewal grants nothing.
+
+The privacy worker rides a lapse of a lease that grants nothing
+(`DeniedLapse` in `privacy_bus.rs`, #4332): when the authority it holds has
+expired, or one comes already expired from its queue, and that snapshot has
+the microphones and the camera both Denied and no turn, the worker skips it
+and publishes nothing until a fresh authority comes. The journal then says
+`lamp-voice: privacy worker re-armed its denied lease after <N> ms lapsed
+(microphones and camera stayed closed)`, once per lapse. Each pass looks at
+its authority twice: before its Bus I/O, and again after it at the stamp the
+lease would take, and it publishes only on that second look, so a lease that
+lapsed while the board stalled in the I/O is ridden too, not published with
+its lapsed expiry (which its own check refuses). A lapse ridden
+1.5 s from its expiry (`DENIED_LAPSE_MOST_US`) still ends the worker with
+`privacy controller lease expired`, and so does a lapse of any lease that
+grants the microphones or the camera, or leaves either Unknown, and no
+authority within 250 ms of the worker's start. The switch's own checks run
+on every look, ride or not: a stale or missing reading, or the publisher
+gone or late, ends the worker as before. A worker that ended abnormally
+still ends the wait with an error that is not an unreadable switch, so the
+voice exits and the restart guard counts it.
 
 Ears also holds Voice to its latch: once a `voice/privacy` session has reported
 the switch closed, Ears refuses any later permit from that session, and only a

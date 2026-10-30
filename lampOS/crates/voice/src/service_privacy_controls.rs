@@ -1269,9 +1269,12 @@ pub(crate) mod tests {
         authorities: usize,
     }
 
-    /// A privacy worker that ends itself as the real one does when its
+    /// A privacy worker that ends itself as the real one did when its
     /// controller's lease lapses (`privacy controller lease expired`): no
     /// authority within 250 ms of its start, or the one it holds expired.
+    /// The real one now rides a lapse of a Denied-only lease
+    /// (`privacy_bus::DeniedLapse`, #4332); this strict stand-in measures
+    /// the wait's renewals, which still keep the lease from lapsing at all.
     /// Every authority must be the wait's Denied one. It sends nothing.
     fn lease_watching(directory: &Path) -> (Worker, std::thread::JoinHandle<Leased>) {
         let (worker, mut peer, input) = Worker::cooperative_fixture(directory, "privacy");
@@ -1425,6 +1428,32 @@ pub(crate) mod tests {
             "{} us with no authority",
             seen.longest_us
         );
+    }
+
+    /// The privacy worker now rides a lapse of the wait's Denied lease
+    /// (`privacy_bus::DeniedLapse`, #4332), but a worker that ended
+    /// abnormally during the wait is still a real loss: the wait ends with
+    /// an error that is not an unreadable switch, so the voice exits and its
+    /// restart guard counts it, as on 06c1 before the ride.
+    #[test]
+    fn a_privacy_worker_that_died_in_the_wait_still_ends_it_for_the_guard() {
+        let fixtures = SessionDirectory::create().unwrap();
+        let directory = SessionDirectory::create().unwrap();
+        let (worker, _peer) = Worker::command_fixture(&fixtures.path, "privacy", "exit 1");
+        let outcome = run(
+            worker,
+            directory,
+            Waiting::new(new_boot().unwrap()).unwrap(),
+            &Termination::inactive(),
+            |_, _, _| Ok(()),
+            |_| Ok(false),
+            false,
+            |_| unreachable!("no indicator on this route"),
+        );
+        let error = outcome.expect_err("the wait went on past a dead worker");
+        assert!(!is_unavailable(&*error), "{error}");
+        assert!(error.to_string().contains("exited abnormally"), "{error}");
+        let _ = fs::remove_dir(&fixtures.path);
     }
 
     /// Whichever renewal finds the worker gone ends the wait closed, as
