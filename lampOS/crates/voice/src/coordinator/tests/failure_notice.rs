@@ -1366,12 +1366,15 @@ fn a_missing_signed_out_line_is_sighed_for_a_person_and_let_go_unasked() {
         NoticeDelivery::Skipped(_)
     ));
     let mut state = super::super::signed_out::SignedOut::default();
-    state.take(Some(lamp_msgs::AccountState {
-        signed_out: true,
-        for_s: 0,
-    }));
+    state.take(
+        Some(lamp_msgs::AccountState {
+            signed_out: true,
+            for_s: 0,
+        }),
+        0,
+    );
     assert!(state.owed());
-    state.note_delivery(&own);
+    state.note_delivery(&own, 1);
     assert!(!state.owed());
 }
 
@@ -1383,17 +1386,20 @@ fn the_signed_out_line_counts_as_said_only_once_it_played() {
     let mut trace = SessionState::default();
     let mut outage = Outage::default();
     let mut state = super::super::signed_out::SignedOut::default();
-    state.take(Some(lamp_msgs::AccountState {
-        signed_out: true,
-        for_s: 0,
-    }));
+    state.take(
+        Some(lamp_msgs::AccountState {
+            signed_out: true,
+            for_s: 0,
+        }),
+        0,
+    );
     let (_owner, mut own) = signed_out_turn(true, true);
     select_failure_notice_in(&catalog, &mut own, &None, &mut outage, &mut trace).unwrap();
-    state.note_delivery(&own);
+    state.note_delivery(&own, 1);
     assert!(state.owed());
     if let NoticeDelivery::Selected { retired_at_us, .. } = &mut own.as_mut().unwrap().notice {
         *retired_at_us = Some(1);
     }
-    state.note_delivery(&own);
+    state.note_delivery(&own, 1);
     assert!(!state.owed());
 }

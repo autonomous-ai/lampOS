@@ -268,24 +268,30 @@ once a second (`coordinator/signed_out.rs`). A spoken reply needs that same
 login, so the words can only come from a kept recording: "I've been signed out.
 Please set me up again in the app."
 
-- **Once a spell, with nothing asked.** A turn the lamp takes for itself
-  (`commit_own_line`, as "back online" is), when nothing holds the lamp, the
-  microphones are allowed and the room is quiet as for a reminder. It counts as
-  said once the speaker has taken some of it or it retired: a Stop before that
-  leaves it owed. A spell already 5 minutes old when the voice first reads it
+- **Once a spell, with nothing asked, to someone at the lamp.** A turn the lamp
+  takes for itself (`commit_own_line`, as "back online" is), when someone is
+  there or spoke just now (`reminders::someone_here`), nothing holds the lamp,
+  the microphones are allowed and the room is quiet as for a reminder. So it
+  isn't said at night or to an empty room: if nobody comes within a minute
+  (`UNASKED_OWED_US`) it is let go, and the line said when someone talks covers
+  the rest. It counts as said once the speaker has taken some of it or it
+  retired: a Stop before that leaves it owed. A state that goes missing and comes
+  back in the same spell owes nothing more. A spell already 5 minutes old when the voice first reads it
   (`SAID_UNASKED_WITHIN_S`) is a voice restarted in it, and is not said again
   unasked; `lamp-cloud` keeps the spell's start across its own restarts.
-- **Again when someone talks.** Each line of speech heard is a local-only turn
-  that says it, however often. A sound let through or a scrap too short to be a
-  request gets the offline breath alone.
+- **Again when someone talks, at most once in 5 minutes** (`HEARD_LINE_EVERY_US`).
+  Each line of speech heard is a local-only turn; the first in that time says
+  it, so a TV beside a lamp that can't sign back in doesn't get it after every
+  sentence. Other lines, a sound let through and a scrap too short to be a
+  request get the offline breath alone.
 - **Nothing is sent.** No turn goes to the service, and nothing the lamp starts
   itself (a reminder, a setup step, a skill's ask) begins: they wait as while
   paused. Unlike a refusal (above) there is no minute's try: only `lamp-cloud`
   ending the spell lets turns go again.
 - **Ends** when `account/state` says signed in, or stops being said: a stopped
   or older `lamp-cloud` never holds a turn. No "back online" follows.
-- With no recording, a person who spoke gets the sigh below, and the lamp's own
-  turn is silent and let go. `failure_notice_capability` says `signed_out`. The
+- With no recording, a person who spoke gets the sigh below, under the same
+  bound, and the lamp's own turn is silent and let go. `failure_notice_capability` says `signed_out`. The
   voice's health warns while it lasts (`bus_out::signed_out`).
 
 **Not yet on a lamp.** No clip is rendered or pinned: a notices release with
