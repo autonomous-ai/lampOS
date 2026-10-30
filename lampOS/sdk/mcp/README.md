@@ -51,7 +51,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
 | `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
-| `lamp_sound` | `name` | string, required | a sound's name: lowercase letters, digits, `-` and `_`, 40 at most; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
+| `lamp_sound` | `name` | string, required | a sound's name: lowercase letters, digits, `-` and `_`, 40 at most; `hum`, the lamp's own short hum, is the only one in this release; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
 | `lamp_events` | `since` | integer | a `seq` from an earlier answer; 0 for every event kept (the last 200) | 0 | the event's (`person.*` and `hand` look, `name.heard` hear, `sound.heard` sound; `touch`, `button`, `lamp.changed` none) | no |
 | | `wait_s` | number | 0 to 120: with nothing after `since`, how long to wait for the next | 0 | | |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |
@@ -65,7 +65,7 @@ needs is refused the same way, `bad_request: lamp_light needs colour`, never
 in the validator's words. `serverInfo.version` is lamp-mcp's own.
 
 `joints` is left out: a 20 Hz stream isn't something an agent drives turn by
-turn. `play` and `sound` need a skill package.
+turn. `play` needs a skill package; `sound` takes only `hum` in this release.
 
 **Leases** are taken for you: a body tool (`lamp_look`, `lamp_move`,
 `lamp_play`, `lamp_joints`) takes a 10 s body lease, or renews the one this
