@@ -1778,7 +1778,9 @@ cases are now that person's, with the switch:
   is no call to someone else inside a conversation going on, in a room not
   known to be busy, with only one person at the lamp
   (`Attention::one_person_present`: on the second route, no line in another
-  voice, no face speaking it but the caller's, at most one face in view);
+  voice, no face speaking it but the caller's, at most one face in a
+  fresh look; with no fresh look, the camera closed for privacy, the eyes
+  stopped or the look expired, one person is not known);
   nor is the line after it a reply to that someone (#3945, the first
   builder's call: on lamp 8740's talk_day, "Maybe. What would you do?"
   came back as "May, what would you do?" with one voice and one face, and
