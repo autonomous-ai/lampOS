@@ -47,7 +47,12 @@ pub(crate) const SPOKEN_STOP: &str = "spoken_stop";
 /// A push on the body while a skill's search goes on (`body/hand`, #2904):
 /// the search's turn in hand is cut as a spoken stop cuts it.
 pub(crate) const BODY_PUSHED: &str = "body_pushed";
-pub(crate) const LOCAL_CANCELS: [&str; 7] = [
+/// The shutdown's last words or a sleep asked aloud cut the lamp's reply for
+/// a sound of its own (`cut_for_last_words`, #3697, #3748), revoking the
+/// speaker first as a hand's Stop does.
+pub(crate) const LAST_WORDS: &str = "last_words";
+pub(crate) const LOCAL_CANCELS: [&str; 8] = [
+    LAST_WORDS,
     HEAD_SLEEP,
     SOFTWARE_MUTED,
     HAND_STOP,
