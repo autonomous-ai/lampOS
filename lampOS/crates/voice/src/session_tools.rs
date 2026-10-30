@@ -389,8 +389,10 @@ pub fn not_ready(tools: &[Tool], settings: &Settings) -> Option<String> {
 }
 
 /// What a session is told after its instruction: what it can't do right
-/// now ([`not_ready`]), and with `use_skill` its skills' lines
-/// ([`crate::use_skill::section`], #1668). None when there is neither.
+/// now ([`not_ready`]), with `use_skill` its skills' lines
+/// ([`crate::use_skill::section`], #1668), and how to put it to sleep or
+/// be unplugged when it has no function for it ([`crate::without_a_tool`],
+/// #4595). None when there is none of them.
 pub fn told_after(tools: &[Tool], settings: &Settings) -> Option<String> {
     let mut told = not_ready(tools, settings).unwrap_or_default();
     if tools.iter().any(|tool| tool.name == crate::use_skill::NAME) {
@@ -398,6 +400,10 @@ pub fn told_after(tools: &[Tool], settings: &Settings) -> Option<String> {
             &crate::tools::skill_tools(settings),
         )));
     }
+    told.push_str(&crate::without_a_tool::for_declared(
+        tools,
+        settings.shutdown_from_app,
+    ));
     (!told.is_empty()).then_some(told)
 }
 
