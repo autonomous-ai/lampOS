@@ -307,3 +307,12 @@ Ready for lamp-voice: yes (#4460, `LAMP_SPOKEN_TO`, on in product; Part of #3945
 - One test with the line as heard; four mutations each fail it in a different place.
 - Gate on e05bd780f0: voice lib 4158/1, the one being a known timed motor test (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean.
 - c0a4 run of the line as heard to follow.
+
+### #4458's P3s, the hold kept with each request (#4470)
+
+Ready for lamp-voice: yes (#4470, behind `LAMP_DECLINE_SILENT`, off; Part of #3945)
+
+- #4458 merged in train 394.
+- Reviewer-three's P3s: the round-one hold is kept with each request (the last eight), and the doc says a quiet room's decline after words still undoes the call and carry.
+- One test, failing under the old last-only record.
+- Gate on 580112a2e1: voice lib 4158/3, the three being known timed motor tests (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean.
