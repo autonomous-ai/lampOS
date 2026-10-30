@@ -1126,6 +1126,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      service running) and started `lamp-tasks` again. Installing on a lamp
      without Harness still needs a person's `sudo` on one.
 
+   **Or in an update's round** (#3693): a signed build may set `harness:
+   true` (updater 9) to do in the round what `harness-on` does: Harness's
+   installer while the build is fetched, its link and Harness at boot at
+   the switch, `lamp-tasks` restarted and watched with the parts, and all
+   of it undone on a put-back, its home kept (docs/updates.md, "Harness
+   turned on in the round").
+
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
    same `HOME` and `XDG_RUNTIME_DIR`, the Harness CLI's own `harness service

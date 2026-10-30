@@ -170,6 +170,11 @@ pub struct Journal {
     /// before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillBack>,
+    /// Harness was linked by the switch (#3693): on the way back its link
+    /// and Harness at boot are undone, its home kept. Absent from a journal
+    /// written before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub harness: bool,
 }
 
 impl Journal {
@@ -648,6 +653,7 @@ mod tests {
             }],
             models: Vec::new(),
             settings: false,
+            harness: false,
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));
@@ -800,6 +806,7 @@ mod tests {
                 wrote: "9".repeat(64),
                 made: Vec::new(),
             }],
+            harness: false,
         };
         (state, journal)
     }

@@ -837,12 +837,19 @@ fn shown_version(version: Option<(u32, u32, u32)>) -> String {
 }
 
 /// The part that hands work to Harness, started again once Harness is on.
-const TASKS_UNIT: &str = "lamp-tasks.service";
+pub const TASKS_UNIT: &str = "lamp-tasks.service";
 /// What says Harness was set to start at boot: written in lamp-update's
 /// records only after `harness service install` succeeded. Not the files
 /// the CLI leaves: it writes its unit before registering it, and keeps it
 /// when a later step fails (the reviewer on #934), so they prove nothing.
-const HARNESS_DONE: &str = "harness-at-boot";
+/// A round that turns Harness on writes it too (#3693), with
+/// [`harness_done_text`].
+pub const HARNESS_DONE: &str = "harness-at-boot";
+
+/// What [`HARNESS_DONE`] holds: the user Harness runs as and its home.
+pub fn harness_done_text() -> String {
+    format!("{USER} {HARNESS_HOME}\n")
+}
 
 /// Binaries a build carries that live in another part's folder: the voice
 /// starts its turn-end worker from its own (docs/endpoint-detection.md). A
@@ -980,6 +987,48 @@ pub trait Host {
 /// Set on the lamp-update an install hands over to ([`Host::hand_over`]):
 /// it hands over no further, whatever it finds.
 pub const HANDED_OVER: &str = "LAMP_UPDATE_HANDED_OVER";
+
+/// Harness on the lamp itself, for a round whose build turns it on
+/// (#3693): [`harness_on_with`]'s halves and [`harness_off_with`], through
+/// the same runner as [`System`], with no records lock of their own: the
+/// round holds it. `root` is the round's (`/` on a lamp).
+pub struct LampHarness {
+    pub root: PathBuf,
+}
+
+impl crate::world::Harness for LampHarness {
+    fn present(&self) -> bool {
+        fs::symlink_metadata(self.root.join(HARNESS.trim_start_matches('/'))).is_ok()
+    }
+
+    fn fetch(&mut self) -> Result<(), String> {
+        harness_fetch_with(&mut output_of, USER, HARNESS_HOME)
+    }
+
+    fn link(&mut self) -> Result<(), String> {
+        harness_link_with(&mut output_of, HARNESS_HOME)?;
+        harness_at_boot_with(&mut output_of, &self.root, USER, HARNESS_HOME)
+    }
+
+    fn off(&mut self) -> Result<(), String> {
+        let link = self.root.join(HARNESS.trim_start_matches('/'));
+        if fs::symlink_metadata(&link).is_err() {
+            // Never linked: Harness at boot, which needs it, was not set.
+            return Ok(());
+        }
+        // What Harness still has is `harness-off`'s to say; the put-back
+        // only needs its steps done. The link goes even when one fails, so
+        // the tasks part cannot start on it.
+        let off = harness_off_with(&mut output_of, USER, HARNESS_HOME).map(|_| ());
+        let removed = match fs::remove_file(&link) {
+            Err(error) if error.kind() != io::ErrorKind::NotFound => {
+                Err(format!("{}: {error}", link.display()))
+            }
+            _ => Ok(()),
+        };
+        off.and(removed)
+    }
+}
 
 /// The machine itself: only with the root `/`.
 pub struct System;
@@ -1249,14 +1298,23 @@ pub fn harness_off_with(run: &mut Runner, user: &str, home: &str) -> Result<Vec<
     Ok(left)
 }
 
-/// [`Host::harness_on`]'s steps, each through `run`, in this order: `id -u`;
-/// `home` made `user`'s own, 0700; as `user`, with `home` as its `HOME`, its
-/// runtime folder, a plain `PATH` and `SHELL=/bin/sh` (so the installer's one
-/// PATH line goes in `home`'s `.profile`), Harness's installer fetched and
-/// run (`curl … | sh`, as Harness says to install it); its launcher checked;
-/// then [`HARNESS`] linked to it. A failing step stops it there, before the
+/// [`Host::harness_on`]'s steps, each through `run`: [`harness_fetch_with`],
+/// then [`harness_link_with`]. A failing step stops it there, before the
 /// link, so a lamp is never left with a link to nothing.
 pub fn harness_on_with(run: &mut Runner, user: &str, home: &str) -> Result<(), String> {
+    harness_fetch_with(run, user, home)?;
+    harness_link_with(run, home)
+}
+
+/// The first half of [`harness_on_with`], which a round runs while it
+/// fetches a build that turns Harness on (#3693): nothing is linked, so the
+/// lamp is unchanged for the person. In this order: `id -u`; `home` made
+/// `user`'s own, 0700; as `user`, with `home` as its `HOME`, its runtime
+/// folder, a plain `PATH` and `SHELL=/bin/sh` (so the installer's one PATH
+/// line goes in `home`'s `.profile`), Harness's installer fetched and run
+/// (`curl … | sh`, as Harness says to install it); then its launcher
+/// checked. A failing step stops it there.
+pub fn harness_fetch_with(run: &mut Runner, user: &str, home: &str) -> Result<(), String> {
     let uid = uid_of(run, user)?;
     run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
     let mut installer: Vec<String> = ["runuser", "-u", user, "--", "env"]
@@ -1272,15 +1330,26 @@ pub fn harness_on_with(run: &mut Runner, user: &str, home: &str) -> Result<(), S
         format!("curl -fsSL --proto =https --tlsv1.2 {HARNESS_INSTALLER} | sh"),
     ]);
     run(&installer)?;
-    let launcher = format!("{home}/.local/bin/harness");
-    run(&["test".to_owned(), "-x".to_owned(), launcher.clone()])?;
+    run(&["test".to_owned(), "-x".to_owned(), harness_launcher(home)])?;
+    Ok(())
+}
+
+/// The second half of [`harness_on_with`]: [`HARNESS`] linked to the
+/// launcher Harness's installer wrote in `home`, which a round does at its
+/// switch (#3693).
+pub fn harness_link_with(run: &mut Runner, home: &str) -> Result<(), String> {
     run(&[
         "ln".to_owned(),
         "-sfn".to_owned(),
-        launcher,
+        harness_launcher(home),
         HARNESS.to_owned(),
     ])?;
     Ok(())
+}
+
+/// Where Harness's installer puts its launcher in `home`.
+fn harness_launcher(home: &str) -> String {
+    format!("{home}/.local/bin/harness")
 }
 
 /// What `harness service status --json` still says of Harness's service:
@@ -1665,7 +1734,7 @@ pub fn install(
         if !done.exists() {
             // A failure leaves nothing recorded: the next install asks again.
             host.harness_at_boot(USER, HARNESS_HOME)?;
-            write_whole(&done, format!("{USER} {HARNESS_HOME}\n").as_bytes(), 0o644)
+            write_whole(&done, harness_done_text().as_bytes(), 0o644)
                 .map_err(|error| format!("{}: {error}", done.display()))?;
             changed.push(format!("Harness starts at boot as {USER}"));
         }
@@ -2613,7 +2682,7 @@ pub fn harness_on(
     if !done.exists() {
         // A failure leaves nothing recorded: the next run asks again.
         host.harness_at_boot(USER, HARNESS_HOME)?;
-        write_whole(&done, format!("{USER} {HARNESS_HOME}\n").as_bytes(), 0o644)
+        write_whole(&done, harness_done_text().as_bytes(), 0o644)
             .map_err(|error| format!("{}: {error}", done.display()))?;
         changed.push(format!("Harness starts at boot as {USER}"));
     }

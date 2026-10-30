@@ -537,9 +537,9 @@ that build could never be promoted. Now:
   A newer head refuses as stale, as before.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 8 (2 reads models, 3 settings, 4 image, 5 reset plans,
+`manifest::UPDATER` is 9 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
-product unit the lamp lacks added). With its product deploy tree, this workflow now
+product unit the lamp lacks added, 9 Harness turned on in the round). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -1531,7 +1531,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7). A manifest
+before the field climbs first. The current `UPDATER` is 9; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7), and one that turns Harness on to 9 (`manifest::HARNESS_UPDATER`). A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
@@ -1746,6 +1746,41 @@ recovery among them), and gets them enabled for its next start. A stop of
 an added unit systemd never loaded (the switch cut before its reload) is
 taken as done. The tests use the round's fake systemd.
 
+### Harness turned on in the round (#3693)
+
+A signed build may set `harness: true` in its manifest, with `min_updater`
+9 at least (`manifest::HARNESS_UPDATER`; a lower one is refused before
+anything is fetched, and an updater of level 8 climbs first). Left out
+when false, the field is not written. The round then does what
+`lamp-update harness-on` does (docs/install.md), in steps that take no
+records lock of their own, since the round holds it (`world::Harness`):
+
+- **While fetching,** when nothing is at `/usr/local/bin/harness`:
+  Harness's own installer as `lampos` (`install::harness_fetch_with`), up
+  to its `test -x` of the launcher. Nothing is linked, so the lamp is as
+  it was for the person. One already there is kept as it is, and nothing
+  is done for Harness. An installer that fails is said ("Harness could
+  not be fetched for this build: …; the build goes on without it"), and
+  the build switches without Harness. Harness alone never makes a switch:
+  a build with nothing else of this lamp's to change, or only product
+  skills, leaves it to a later build.
+- **At the switch,** once the units are written and it is still quiet,
+  before any part restarts: the link (`install::harness_link_with`),
+  Harness at boot as `install` sets it, and its record `harness-at-boot`
+  in the records, so `harness-off` undoes it as it undoes install's.
+  A link or at-boot step that fails puts the build back.
+  `lamp-tasks.service`, which could not start without Harness, is then
+  restarted and watched with the rest, whether or not it was running.
+- **On a put-back** (a part not well, or a switch cut short: the journal's
+  `harness`): `lamp-tasks.service` is stopped, Harness at boot undone
+  (`harness-off`'s steps), the link removed and the record with it.
+  Harness's home, `/var/lib/lampos-tasks`, is kept. A step that fails is
+  said, and the rest of the put-back goes on.
+
+Not shown: any of it on a lamp. The tests use stand-ins for Harness and
+systemd (`tests/round/harness.rs`). A lamp-update older than the field that
+recovers a journal with `harness` passes over it, and leaves Harness on.
+
 ### Settings and tmpfiles (`LAMP_UPDATE_APPLY`)
 
 
@@ -1783,7 +1818,7 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7).
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 9; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7), and one that turns Harness on to 9 (`manifest::HARNESS_UPDATER`).
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
@@ -1942,7 +1977,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 8. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 9. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,

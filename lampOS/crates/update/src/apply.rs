@@ -1040,6 +1040,7 @@ mod tests {
                 settings,
                 image,
                 reset_plan: None,
+                harness: false,
             };
             // Signed unchecked: what a lamp refuses is a publisher's to sign.
             manifest::seal_unchecked(&serde_json::to_vec(&manifest).unwrap(), &self.key).unwrap()

@@ -498,6 +498,7 @@ fn a_same_binary_product_unit_records_good_only_after_climb_and_confirmation() {
             ears: &mut ears,
             disk: &disk,
             clock: &clock,
+            harness: &mut lamp.harness,
             say: &mut say,
             phase: &mut phase,
         };

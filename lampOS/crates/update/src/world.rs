@@ -79,6 +79,22 @@ pub trait Clock {
     fn now_ms(&self) -> u64;
 }
 
+/// Harness on the lamp, for a build that turns it on (#3693): its steps,
+/// none of which takes the records lock the round holds.
+pub trait Harness {
+    /// Whether anything is at `install::HARNESS` (a link or a file).
+    fn present(&self) -> bool;
+    /// Harness's own installer, run for the lamp's user: nothing is
+    /// linked yet, so the lamp is unchanged for the person.
+    fn fetch(&mut self) -> Result<(), String>;
+    /// Its link at `install::HARNESS`, and Harness at boot (as
+    /// `install::Host::harness_at_boot` sets it).
+    fn link(&mut self) -> Result<(), String>;
+    /// Its undo on a put-back: Harness at boot undone (as `harness-off`
+    /// does) and the link removed; Harness's home is kept.
+    fn off(&mut self) -> Result<(), String>;
+}
+
 /// The real systemd.
 pub struct Systemctl {
     /// The longest a restart may take: the body folds down before it stops,

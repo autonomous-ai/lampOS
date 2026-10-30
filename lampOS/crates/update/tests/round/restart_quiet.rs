@@ -123,6 +123,7 @@ fn a_sentence_during_the_prerequisite(never_quiet: bool) {
                 ears: &mut ears,
                 disk: &disk,
                 clock: &clock,
+                harness: &mut lamp.harness,
                 say: &mut |line| lamp.said.push(line.to_owned()),
                 phase: &mut |phase| lamp.phases.push(phase),
             },

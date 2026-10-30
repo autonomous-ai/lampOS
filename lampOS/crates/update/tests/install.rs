@@ -305,6 +305,7 @@ impl Lamp {
             settings: Vec::new(),
             image: Vec::new(),
             reset_plan: None,
+            harness: false,
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
         channel.files.insert(
@@ -664,6 +665,7 @@ fn a_build_without_a_lamp_update_has_nothing_to_check_against() {
         settings: Vec::new(),
         image: Vec::new(),
         reset_plan: None,
+        harness: false,
     };
     let running = Err("/proc/self/exe: Permission denied".to_owned());
     assert_eq!(install::not_the_builds_updater(&manifest, running), None);

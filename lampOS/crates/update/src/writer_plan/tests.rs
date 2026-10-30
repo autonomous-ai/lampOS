@@ -162,6 +162,7 @@ impl Fixture {
             settings,
             image: Vec::new(),
             reset_plan: None,
+            harness: false,
         };
         let product = Artifact::of(b"independent protected product-before snapshot");
         let mut fixture = Self {

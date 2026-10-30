@@ -764,6 +764,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     };
     let mut systemd = Systemctl::default();
     let clock = Monotonic::default();
+    // Harness, for a build that turns it on (#3693).
+    let mut harness = install::LampHarness {
+        root: config.root.clone(),
+    };
     eprintln!(
         "lamp-update: {command} channel={} url={} lamp={} apply={} self={} key={}",
         config.channel,
@@ -789,6 +793,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     ears: ears.as_mut(),
                     disk: &Statvfs,
                     clock: &clock,
+                    harness: &mut harness,
                     say: &mut say,
                     phase: &mut |_| {},
                 };
@@ -850,6 +855,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 ears: ears.as_mut(),
                 disk: &Statvfs,
                 clock: &clock,
+                harness: &mut harness,
                 say: &mut say,
                 phase: &mut phase,
             };
