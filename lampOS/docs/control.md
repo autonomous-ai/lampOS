@@ -344,7 +344,33 @@ SDK can keep under them. With the rates off, the default, it says `"rates": "off
 
 `phrase.heard` needs `phrases`, the ones to listen for, and `phrases` go
 only with it. A `get` reply carries each state asked for: `presence`,
-`light`, `mood`, and `lamp_state` for `lamp`.
+`light`, `mood`, `lamp_state` for `lamp`, and `body`.
+
+#### The body's limits: `get` `body`
+
+`body` says what the lamp's body may do, joint by joint, and where each joint
+is now (`crates/control/src/body_info.rs`). It comes from the body's own
+`body/limits`, said once it has found where it is and every 10 s, and its
+`body/joint_states`. It needs no grant: these are the body's bounds, not the
+room's. Until the body has said its limits, it is `{"known": false, "why": ...}`.
+
+- `joints`: `yaw`, `pitch`, `roll`, `shoulder` and `elbow`, the names
+  `joints` takes. Each has `counts` (where it is, of 4,096 a turn), `deg`
+  (degrees from its home), `min_deg` and `max_deg`, and `min_counts`,
+  `max_counts`, `home_counts`, `folded_counts` and `stand_counts`.
+- **Home** is where the head and base were found when the body started, and
+  the arm's folded pose. The base turns right and the arm rises with more
+  counts, so `yaw`, `shoulder` and `elbow` are positive that way. The head
+  looks up with fewer counts, and `pitch` is positive up. `roll` is positive
+  with more counts.
+- **The bounds** are the body's: the head's reach from home (`--reach`, and
+  the gaze's yaw if wider), inside the pitch window and never under its floor,
+  and the arm's window from folded to stood up. On a lamp that may not stand
+  (`stands: false`), the arm has no poses and its whole turn.
+- `speed_deg_s` and `acceleration_deg_s2` are the head's and base's caps.
+  `load_limit` is the force cap as a share, `null` where each servo keeps its
+  own. `heat_stop_c` is where a joint stops.
+- **Nothing here can be raised from outside the body.**
 
 ### Leases
 

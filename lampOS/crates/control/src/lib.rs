@@ -13,6 +13,7 @@
 //! ([`rate`]). Nothing listens yet: the server, pairing and the routing to
 //! the parts come in the pieces after it, off unless `LAMP_CONTROL=on`.
 
+pub mod body_info;
 pub mod body_lease;
 pub mod cert;
 pub mod feelings;

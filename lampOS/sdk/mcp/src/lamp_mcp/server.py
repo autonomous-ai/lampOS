@@ -55,7 +55,7 @@ STATE_OF_EVENT = {
     "person.facing": "presence",
     "lamp.changed": "lamp",
 }
-STATES = ("presence", "light", "mood", "lamp")
+STATES = ("presence", "light", "mood", "lamp", "body")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
 # here needs none.
@@ -337,6 +337,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "light": "its light",
         "mood": "its mood",
         "lamp": "whether it is talking, paused, private or asleep",
+        "body": "what its body may do, joint by joint (degrees from home, bounds, poses, speed, load and heat limits), and where each joint is",
     }
 
     @server.tool(
@@ -344,7 +345,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         + ", ".join(state_words[state] for state in states)
         + f". `which` is some of {', '.join(states)}; by default all of them."
     )
-    async def lamp_state(which: list[Literal["presence", "light", "mood", "lamp"]] | None = None) -> dict:
+    async def lamp_state(which: list[Literal["presence", "light", "mood", "lamp", "body"]] | None = None) -> dict:
         ungranted = [state for state in which or [] if state not in states]
         if ungranted:
             raise ToolError(f"no_grant: this computer may read {', '.join(states)}")
