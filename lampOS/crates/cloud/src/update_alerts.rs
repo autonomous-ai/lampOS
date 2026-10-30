@@ -367,30 +367,9 @@ impl Watcher {
         };
         let mut told = told;
         let mut alerts = Vec::new();
-        if status.now != "idle" {
-            // `checking` opens every round, most of which find nothing to
-            // do: a round is started when it goes on to fetch.
-            if status.now != "checking" && !(told.started && told.started_after == current) {
-                told.started = true;
-                told.started_after = current;
-                told.from = status
-                    .running
-                    .as_ref()
-                    .map(|build| Version::running(build).0);
-                // The start is still kept, but not told, while the same end
-                // repeats: its end would not be told either.
-                if told.repeating.is_none() {
-                    alerts.push(Alert {
-                        stage: Stage::Started,
-                        from: told.from.as_deref().and_then(Version::kept),
-                        to: None,
-                        code: None,
-                        took_s: None,
-                        at_s: now_ms / 1000,
-                    });
-                }
-            }
-        } else if told.ended != current {
+        // An end is told when it is first seen, idle or not: a confirmed new
+        // lamp-update can begin its next round before it is ever idle.
+        if told.ended != current {
             // The end before this one names the round, if its start was told.
             let began = told.started && told.started_after == told.ended;
             told.ended = current.clone();
@@ -427,6 +406,30 @@ impl Watcher {
                             .and_then(|began| result.at_unix_ms.checked_sub(began))
                             .map(|ms| ms / 1000)
                             .filter(|seconds| *seconds <= LONGEST_TOOK_S),
+                        at_s: now_ms / 1000,
+                    });
+                }
+            }
+        }
+        if status.now != "idle" {
+            // `checking` opens every round, most of which find nothing to
+            // do: a round is started when it goes on to fetch.
+            if status.now != "checking" && !(told.started && told.started_after == current) {
+                told.started = true;
+                told.started_after = current;
+                told.from = status
+                    .running
+                    .as_ref()
+                    .map(|build| Version::running(build).0);
+                // The start is still kept, but not told, while the same end
+                // repeats: its end would not be told either.
+                if told.repeating.is_none() {
+                    alerts.push(Alert {
+                        stage: Stage::Started,
+                        from: told.from.as_deref().and_then(Version::kept),
+                        to: None,
+                        code: None,
+                        took_s: None,
                         at_s: now_ms / 1000,
                     });
                 }
@@ -668,6 +671,32 @@ mod tests {
             Some("https://api.test/v1/alert")
         );
         assert_eq!(url(&account(" ")), None);
+    }
+
+    #[test]
+    fn a_climbs_confirmation_is_told_when_the_next_round_is_already_going() {
+        let mut watcher = Watcher::new(None);
+        let mut stages = |now: &str, last: Last| {
+            watcher
+                .observe(&status(now, 8899, last), &none(), T0)
+                .iter()
+                .map(|alert| alert.stage)
+                .collect::<Vec<_>>()
+        };
+        let climbed = Some(("self-switched", Some(8999), T0 + 1_000));
+        let confirmed = Some(("self-confirmed", Some(8999), T0 + 2_000));
+        assert!(stages("idle", None).is_empty());
+        assert!(stages("checking", None).is_empty());
+        assert_eq!(stages("idle", climbed), [Stage::SelfSwitched]);
+        assert_eq!(
+            stages("fetching", confirmed),
+            [Stage::SelfConfirmed, Stage::Started]
+        );
+        assert!(stages("switching", confirmed).is_empty());
+        assert_eq!(
+            stages("idle", Some(("switched", Some(8999), T0 + 3_000))),
+            [Stage::Done]
+        );
     }
 
     #[test]
