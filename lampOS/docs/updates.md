@@ -1120,7 +1120,11 @@ says where it stopped by a fixed name (`reason`: the last phase it said, or
 `models` for `WaitsForModels`). An end says when its round began
 (`started_at_unix_ms`, its `checking`), for #1683's update alerts. A round
 that ends before its first phase, such as one whose lock is taken
-(`round.rs`, the lock before `checking`), says neither. A new updater's confirmation of its own switch is a round's
+(`round.rs`, the lock before `checking`), says neither. One whose lock is
+taken by another holder (another lamp-update, or setup's helper restarting
+a part under it, #4490) ends `not-quiet`, not `failed`: nothing was tried,
+so no update alert says a failure, and the next round tries again. A lock
+that can't be taken for any other reason is still `failed`. A new updater's confirmation of its own switch is a round's
 end too, `self-confirmed` with the build its dry round found, so it is the
 last result the new updater says when it starts telling. A round's end is logged
 in `log.jsonl` with `"round": true` and its build, synced with its folder

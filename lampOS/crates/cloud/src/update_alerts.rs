@@ -1019,6 +1019,28 @@ mod tests {
         assert_eq!(told[0].code, Some("other"));
     }
 
+    /// #4490's P3: a round that found lamp-update's lock taken (a settings
+    /// change restarting a part under it) ends `not-quiet` before any phase,
+    /// so no start was told and nothing is alerted. Ended `failed`, as it
+    /// was before, it was told as a failed update.
+    #[test]
+    fn a_round_refused_by_the_lock_alerts_nothing() {
+        let dir = folder("locked");
+        let mut watcher = Watcher::new(Some(dir.join(FILE)));
+        let old = Some(("up-to-date", Some(8599), T0 - 1));
+        watcher.observe(&status("idle", 8599, old), &none(), T0);
+        let locked = Some(("not-quiet", None, T0 + 10_000));
+        let told = watcher.observe(&status("idle", 8599, locked), &none(), T0 + 11_000);
+        assert!(told.is_empty(), "{told:?}");
+        let failed = Some(("failed", None, T0 + 20_000));
+        let told = watcher.observe(&status("idle", 8599, failed), &none(), T0 + 21_000);
+        assert_eq!(
+            told.into_iter().map(|a| a.stage).collect::<Vec<_>>(),
+            [Stage::Failed]
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
     /// A lamp that keeps refusing, or is talked to through every update
     /// window, tells it once, not every round; and a restart mid-streak
     /// does not tell it again.
