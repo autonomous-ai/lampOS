@@ -420,6 +420,30 @@ pub fn remaining_ms(deadline: &Deadline, now: &ClockSample) -> Result<Option<i64
         .ok_or(TimeError::OutOfRange)
 }
 
+/// When an item was set, from its stored `created_unix_ms`, said in the
+/// lamp's zone `zone` as it is now: its RFC 9557 local time, and its day
+/// against `now`'s: `today`, `yesterday`, or its own `YYYY-MM-DD` (also
+/// when `now`'s wall clock is untrusted, so no day is told as today on a
+/// guess). Every Set needs a trusted wall clock ([`resolve`]), so each
+/// stored item's set time is one; a zone this build can't name is an
+/// error, told as unknown.
+pub fn set_at(unix_ms: i64, now: &ClockSample, zone: &str) -> Result<(String, String), TimeError> {
+    let zone = named_zone(zone)?;
+    let set = timestamp(unix_ms)?.to_zoned(zone.clone());
+    let date = set.date();
+    let today = if now.wall_trusted {
+        Some(timestamp(now.unix_ms)?.to_zoned(zone).date())
+    } else {
+        None
+    };
+    let day = match today {
+        Some(today) if today == date => "today".to_owned(),
+        Some(today) if today.yesterday().ok() == Some(date) => "yesterday".to_owned(),
+        _ => date.to_string(),
+    };
+    Ok((set.to_string(), day))
+}
+
 fn first_repeat(
     raw_time: &str,
     zone_name: &str,

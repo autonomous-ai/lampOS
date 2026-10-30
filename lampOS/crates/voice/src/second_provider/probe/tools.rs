@@ -179,7 +179,7 @@ pub fn functions(actions: Option<std::path::PathBuf>) -> Vec<lamp_gemini::Tool> 
 }
 
 /// The first function a request called, or [`NONE`].
-async fn asked(chat: &Chat, messages: &[Message]) -> net::Result<String> {
+pub(super) async fn asked(chat: &Chat, messages: &[Message]) -> net::Result<String> {
     let mut stream = chat.send(messages).await?;
     let mut called = None;
     while let Some(event) = stream.next().await? {
@@ -268,7 +268,7 @@ pub fn verdict(counts: &Counts) -> Vec<String> {
 /// `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`, applied by
 /// [`SecondConfig::with_environment`]) is set, else DeepSeek's own API with
 /// the unit's `deepseek.key`.
-fn deepseek_route(
+pub(super) fn deepseek_route(
     config: &SecondConfig,
     credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<(String, Key)> {

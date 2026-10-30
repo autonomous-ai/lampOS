@@ -21,6 +21,27 @@ pub const DEADLINE: Duration = Duration::from_millis(1250);
 /// yet due (#1595).
 pub const NOT_YET_DUE: &str = "Timers or reminders are set that are not due yet, so they are not in this list. List again without pending_only before saying none are set, or to find one to cancel.";
 
+macro_rules! list_before {
+    () => {
+        "Read one bounded page of active timers and reminders, oldest first. Each item's kind is timer (set with set_timer) or reminder. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due, how many are set and not yet due in all, is more than 0, timers or reminders are set: list again without pending_only before saying none are."
+    };
+}
+macro_rules! list_asked {
+    () => {
+        "Call this, not recall, for any question about their reminders or timers: what is set, when one is due, or when they set it; never say you do not remember a reminder before calling this. set_day and set_clock say when each was set, as 'yesterday at 09:00'; if they are null, say you don't know when. Never list reminders unasked."
+    };
+}
+/// `list_reminders`' description before questions about reminders were
+/// named in it: kept for the probe's old arm (`lamp-voice probe-tools`).
+pub const LIST_BEFORE: &str = list_before!();
+/// What `list_reminders`' description adds (the person's call, 30 Oct): a
+/// question about a reminder, what is set, when it is due or when it was
+/// set, is answered from this list, not from memory, and the list is never
+/// read out unasked (rule 8). On both routes: they declare the same catalog.
+pub const LIST_ASKED: &str = list_asked!();
+/// `list_reminders`' description.
+pub const LIST_DESCRIBED: &str = concat!(list_before!(), " ", list_asked!());
+
 /// Voice reserves 16 bytes in its provider's 4096-byte tool-result allowance.
 pub const MAX_RESULT_BYTES: usize = 4096 - 16;
 pub const NAMES: [&str; 6] = [
@@ -71,7 +92,7 @@ pub fn catalog() -> Vec<Function> {
         ),
         function(
             NAMES[3],
-            "Read one bounded page of active timers and reminders, oldest first. Each item's kind is timer (set with set_timer) or reminder. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due, how many are set and not yet due in all, is more than 0, timers or reminders are set: list again without pending_only before saying none are.",
+            LIST_DESCRIBED,
             json!({"pending_only":{"type":"boolean","description":"true lists only items that are due now and not yet said; leave it out to list everything that is set."},"after_id":{"type":"integer","minimum":0}}),
             json!([]),
         ),
@@ -145,8 +166,19 @@ impl Adapter {
     /// Voice's separate model-result budget. Failure sentences are fixed and
     /// never contain the caller's reminder text or an owner's arbitrary error.
     pub fn call(&self, name: &str, args: &Value) -> Value {
+        self.call_with(name, args, true)
+    }
+
+    /// [`Self::call`] with `list_reminders` asked as a plain `list`, its
+    /// items without when they were set: the app's `schedule.list`, whose
+    /// contract is unchanged. Only Voice's tool asks `list_set`.
+    pub fn call_plain(&self, name: &str, args: &Value) -> Value {
+        self.call_with(name, args, false)
+    }
+
+    fn call_with(&self, name: &str, args: &Value, set_times: bool) -> Value {
         let deadline = Instant::now() + self.deadline;
-        match parse(name, args).and_then(|call| self.perform(call, deadline)) {
+        match parse(name, args).and_then(|call| self.perform(call, set_times, deadline)) {
             Ok(result) if result.to_string().len() <= MAX_RESULT_BYTES => {
                 json!({"ok":true,"result":result})
             }
@@ -156,6 +188,17 @@ impl Adapter {
     }
 
     fn ask(&self, request: &Request, deadline: Instant) -> Result<Value, Failure> {
+        let mutation = request.guard().is_some();
+        self.ask_raw(request, deadline)?
+            .map_err(|refusal| refused(&refusal, mutation))
+    }
+
+    /// [`Self::ask`] with a refusal given back as it came.
+    fn ask_raw(
+        &self,
+        request: &Request,
+        deadline: Instant,
+    ) -> Result<Result<Value, Value>, Failure> {
         let mutation = request.guard().is_some();
         let value = serde_json::to_value(request).map_err(|_| Failure::Unavailable)?;
         let reply = client::exchange(&self.socket, &value, deadline).map_err(|e| {
@@ -168,28 +211,47 @@ impl Adapter {
         match reply["ok"].as_bool() {
             Some(true) => {
                 identity(&reply).map_err(|_| invalid_reply(mutation))?;
-                Ok(reply)
+                Ok(Ok(reply))
             }
-            Some(false) => Err(refused(&reply, mutation)),
+            Some(false) => Ok(Err(reply)),
             None => Err(invalid_reply(mutation)),
         }
     }
 
-    fn perform(&self, call: Call, deadline: Instant) -> Result<Value, Failure> {
+    fn perform(&self, call: Call, set_times: bool, deadline: Instant) -> Result<Value, Failure> {
         if let Call::List {
             after_id,
             pending_only,
         } = call
         {
-            let reply = self.ask(
-                &Request::List {
-                    after_id,
-                    limit: 8,
-                    pending_only,
-                },
-                deadline,
-            )?;
-            let mut listed = page(&reply, after_id, pending_only)?;
+            // With each item's set time; an older Schedule refuses
+            // `list_set` as a bad request, and the same list without it is
+            // asked once (a read: nothing to repeat), told as set at an
+            // unknown time.
+            let plain = Request::List {
+                after_id,
+                limit: 8,
+                pending_only,
+            };
+            let reply = if !set_times {
+                self.ask(&plain, deadline)?
+            } else {
+                match self.ask_raw(
+                    &Request::ListSet {
+                        after_id,
+                        limit: 8,
+                        pending_only,
+                    },
+                    deadline,
+                )? {
+                    Ok(reply) => reply,
+                    Err(refusal) if refusal["error"] == "bad_request" => {
+                        self.ask(&plain, deadline)?
+                    }
+                    Err(refusal) => return Err(refused(&refusal, false)),
+                }
+            };
+            let mut listed = page(&reply, after_id, pending_only, set_times)?;
             if pending_only {
                 // #1595: a list of what is due leaves out what is set and not
                 // yet due, and "nothing due" read as "nothing set" let a timer
@@ -610,6 +672,26 @@ struct Item {
     repeat: Option<Repeat>,
     snoozed: bool,
     late: bool,
+    /// When it was set, in the lamp's zone (`list_set`): absent from an
+    /// older Schedule service, null when it can't be said ([`set_at`]).
+    #[serde(default)]
+    set_local: Option<String>,
+    #[serde(default)]
+    set_day: Option<String>,
+}
+/// When an item was set, as the model is told it: its day (`today`,
+/// `yesterday` or `YYYY-MM-DD`) and its local `HH:MM`, both or neither. An
+/// item without them (an older Schedule, a zone it can't name) is told as
+/// set at an unknown time, never guessed.
+fn set_at(item: &Item) -> (Option<String>, Option<String>) {
+    let day = item
+        .set_day
+        .as_deref()
+        .filter(|d| matches!(*d, "today" | "yesterday") || (d.len() == 10 && day(d)));
+    match (day, item.set_local.as_deref().and_then(clock_of)) {
+        (Some(day), Some(clock)) => (Some(day.to_owned()), Some(clock)),
+        _ => (None, None),
+    }
 }
 fn item(value: &Value) -> Result<Item, Failure> {
     if value.get("repeat").is_none() {
@@ -641,7 +723,12 @@ fn item(value: &Value) -> Result<Item, Failure> {
     }
     Ok(item)
 }
-fn page(reply: &Value, after_id: u64, pending_only: bool) -> Result<Value, Failure> {
+fn page(
+    reply: &Value,
+    after_id: u64,
+    pending_only: bool,
+    set_times: bool,
+) -> Result<Value, Failure> {
     let values = reply["items"]
         .as_array()
         .filter(|v| v.len() <= 8)
@@ -659,7 +746,13 @@ fn page(reply: &Value, after_id: u64, pending_only: bool) -> Result<Value, Failu
             return Err(Failure::Unavailable);
         }
         previous = i.id;
-        checked.push(json!({"id":i.id,"kind":i.kind,"text":i.text,"state":i.state,"local":i.local,"clock":clock_of(&i.local),"due_unix_ms":i.due_unix_ms,"repeat":i.repeat,"snoozed":i.snoozed,"late":i.late}));
+        let mut one = json!({"id":i.id,"kind":i.kind,"text":i.text,"state":i.state,"local":i.local,"clock":clock_of(&i.local),"due_unix_ms":i.due_unix_ms,"repeat":i.repeat,"snoozed":i.snoozed,"late":i.late});
+        if set_times {
+            let (set_day, set_clock) = set_at(&i);
+            one["set_day"] = json!(set_day);
+            one["set_clock"] = json!(set_clock);
+        }
+        checked.push(one);
     }
     if server_next.is_some_and(|n| values.is_empty() || n != previous) {
         return Err(Failure::Unavailable);

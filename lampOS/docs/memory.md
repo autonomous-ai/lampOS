@@ -2905,7 +2905,7 @@ record and not what the crate does.**
 | Age out what goes unused (Copilot 28 days, Codex 30) | Derived facts lapse when unused; the journal goes at 30 days; what a person asked to be kept has no age | Opt-in observations lapse after 30 unused days or when their evidence expires; explicit kept facts do not age |
 | Scope by person, and never tell one person what another said (rated the most damaging failure for a shared room) | Until someone asks to be recognised, everything is "said in this room": used when its subject comes up, never attributed, never volunteered | All records, jobs, links and snapshots scoped by person; default is everyone; identity remains caller-supplied. The voice uses a known person's scope since #764 |
 | Treat what is heard as untrusted, and check a fact before leaning on it (the recorded errors of a deployed voice agent's memory came from mishearing) | The lamp says back what it kept; names, times and promises need confirmation | Structured untrusted snapshot and strict output/provenance validation; no semantic truth check or new voice confirmation flow |
-| Reminders are not memories: their own store, and a clock outside the model | Not part of this crate: a part of its own | No |
+| Reminders are not memories: their own store, and a clock outside the model | Not part of this crate: a part of its own. A question about a reminder (what, when, when it was set) is answered from `list_reminders`, which says when each was set, never from `recall` ([schedule.md](schedule.md)) | No |
 | A page where people see what is kept and can delete it | With the operator pages | No |
 
 Not taken: a knowledge graph (it added 1.6 points for mem0 and costs a
