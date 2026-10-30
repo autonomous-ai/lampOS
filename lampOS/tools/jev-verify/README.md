@@ -40,6 +40,10 @@ judgement and against a label, line by line. The jev-verifier keeps it.
   `replay.sh preflight OUT` runs every check, the wake (which must produce a policy decision that did
   not fail) and a busy probe (two exchanges, no labelled line: what `room/state` reads), then
   stops. `OUT` holds what the lamp heard: it stays on the Mac, and is refused inside a git work tree.
+- `rescore.py OUT NEW [WEIGHTS.json]`: re-judges a run offline with other attention weights or bands
+  (lamp-policy's combine, crates/policy/src/attention.rs), from the seven answers each decision kept;
+  then `score.sh NEW`. No WEIGHTS.json gives the shipped values and must score like the run. A changed
+  question can't be scored this way. `rescore-test.sh` tests it.
 - `score.sh OUT`: the scored table (per class and room, Jev vs the voice vs the label), the totals on
   the held lines, the false answers to desk talk, and the decision latency. Each (pass, id) is one
   trial; it says which ids flipped across passes. A missing or failed Jev decision is wrong, on "not"
