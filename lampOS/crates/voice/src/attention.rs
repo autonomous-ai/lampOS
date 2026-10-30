@@ -852,15 +852,23 @@ pub fn begins_with_the_name(heard: &str) -> bool {
 /// none: its name is read as above, and nothing here changes it. `real`
 /// are the name itself, read where the name is; `stand_ins` are words
 /// speech to text writes for it that are also other words ("ランク" is
-/// "rank", "làm" is "do"), read only after a greeting or set off alone.
+/// "rank", "làm" is "do"), read only set off, alone in their clause past
+/// any greetings (a greeting alone is not enough: "Ê làm bài tập chưa?").
 struct Written {
     greetings: &'static [&'static str],
     real: &'static [&'static str],
     stand_ins: &'static [&'static str],
-    /// Spaced words (Vietnamese): a greeting or a name is a whole word.
-    /// Otherwise a match is a clause's opening characters (Japanese,
-    /// Chinese), or a word's (Korean, its particles attached: "램프야").
+    /// Spaced words (Vietnamese): a greeting or a stand-in is a whole word.
+    /// Otherwise a greeting or a stand-in is a clause's opening characters.
+    /// The name itself is never a longer word's start (「ランプシェード」).
     whole_words: bool,
+    /// What may follow the name in its word and still call it ("렘프야");
+    /// a subject or object particle ("램프가 고장났어.") is talk about it.
+    calling: &'static [char],
+    /// The stand-ins are everyday one-word replies ("Làm!" is "do it!",
+    /// "Lắm." is "a lot."): they count only in the line's first clause,
+    /// greeted ("Hây lăm.") or with more clauses after ("Làm, mấy giờ rồi?").
+    everyday: bool,
 }
 
 fn written(language: Language) -> Written {
@@ -870,18 +878,24 @@ fn written(language: Language) -> Written {
             real: &["ランプ", "らんぷ"],
             stand_ins: &["ランク"],
             whole_words: false,
+            calling: &[],
+            everyday: false,
         },
         Language::Chinese => Written {
             greetings: &["hey", "嘿", "嗨"],
             real: &["兰普", "蓝普", "lamp"],
             stand_ins: &[],
             whole_words: false,
+            calling: &[],
+            everyday: false,
         },
         Language::Korean => Written {
             greetings: &["hey", "헤이"],
             real: &["램프", "렘프"],
             stand_ins: &[],
             whole_words: false,
+            calling: &['야'],
+            everyday: false,
         },
         // "Lamp" stays Latin and is read as English reads it; "làm" and
         // "lắm" are everyday words, so never one mid-sentence.
@@ -890,6 +904,8 @@ fn written(language: Language) -> Written {
             real: &[],
             stand_ins: &["lam", "lăm", "làm", "lắm", "lem"],
             whole_words: true,
+            calling: &[],
+            everyday: true,
         },
     }
 }
@@ -919,12 +935,30 @@ fn past<'a>(text: &'a str, word: &str, whole: bool) -> Option<&'a str> {
     (!whole || !rest.starts_with(char::is_alphanumeric)).then_some(rest)
 }
 
-/// Each clause's call with the name as `language` writes it: at its start,
-/// past greetings, as the English name is read at a sentence's start. None
-/// for English.
+/// Each clause's call with the name as `language` writes it, in order,
+/// `None` for a clause that is none: at its start, past greetings, as the
+/// English name is read at a sentence's start. Empty for English.
+fn calls_by_clause(heard: &str, language: Option<Language>) -> Vec<Option<WrittenCall>> {
+    let Some(written) = language.map(written) else {
+        return Vec::new();
+    };
+    let clauses: Vec<&str> = clauses(heard).collect();
+    let last = clauses.len().saturating_sub(1);
+    clauses
+        .iter()
+        .enumerate()
+        .map(|(at, clause)| {
+            opens_as_written(clause, &written).filter(|call| {
+                call.real || !written.everyday || at == 0 && (call.greeted || at < last)
+            })
+        })
+        .collect()
+}
+
+/// Each call in `heard` with the name as `language` writes it. None for
+/// English.
 fn calls_as_written(heard: &str, language: Option<Language>) -> impl Iterator<Item = WrittenCall> {
-    let written = language.map(written);
-    clauses(heard).filter_map(move |clause| opens_as_written(clause, written.as_ref()?))
+    calls_by_clause(heard, language).into_iter().flatten()
 }
 
 /// `clause`, lower case, past the greetings it opens with, and whether
@@ -947,12 +981,18 @@ fn past_greetings(clause: &str, written: &Written) -> (String, bool) {
 fn opens_as_written(clause: &str, written: &Written) -> Option<WrittenCall> {
     let (rest, greeted) = past_greetings(clause, written);
     let rest = rest.as_str();
-    let names = written.real.iter().map(|name| (name, true));
-    let stand_ins = written.stand_ins.iter().map(|name| (name, false));
-    names.chain(stand_ins).find_map(|(name, real)| {
-        let after = past(rest, name, written.whole_words)?;
+    let names = written.real.iter().filter_map(|name| {
+        let after = rest.strip_prefix(name)?;
+        let after = after
+            .strip_prefix(|c| written.calling.contains(&c))
+            .unwrap_or(after);
+        Some((past(after, "", true)?, true))
+    });
+    let stand_ins = (written.stand_ins.iter())
+        .filter_map(|name| Some((past(rest, name, written.whole_words)?, false)));
+    names.chain(stand_ins).find_map(|(after, real)| {
         let set_off = after.trim().is_empty();
-        (real || greeted || set_off).then_some(WrittenCall {
+        (real || set_off).then_some(WrittenCall {
             real,
             greeted,
             set_off,
@@ -963,25 +1003,25 @@ fn opens_as_written(clause: &str, written: &Written) -> Option<WrittenCall> {
 /// [`begins_with_the_name`] for the name as `language` writes it: the
 /// line's first clause opens with it, greeted or set off.
 fn begins_as_written(heard: &str, language: Option<Language>) -> bool {
-    let Some(written) = language.map(written) else {
-        return false;
-    };
-    clauses(heard)
-        .next()
-        .and_then(|clause| opens_as_written(clause, &written))
+    calls_by_clause(heard, language)
+        .first()
+        .copied()
+        .flatten()
         .is_some_and(|call| call.greeted || call.set_off)
 }
 
 /// [`only_the_name`] for the name as `language` writes it: every clause a
 /// greeting or the name set off, the name in one ("エイランク。", "嘿，兰普",
-/// "Hây lăm"). Onboarding's how_you_sound takes such a line as its call
+/// "Hây lăm"; not a bare Vietnamese stand-in, "Làm!", "Này, làm.").
+/// Onboarding's how_you_sound takes such a line as its call
 /// (`second_provider::name_alone`).
 pub(crate) fn only_the_name_as_written(heard: &str, language: Option<Language>) -> bool {
     let Some(written) = language.map(written) else {
         return false;
     };
     let mut named = false;
-    let all = clauses(heard).all(|clause| match opens_as_written(clause, &written) {
+    let calls = calls_by_clause(heard, language);
+    let all = clauses(heard).zip(calls).all(|(clause, call)| match call {
         Some(call) if call.set_off => {
             named = true;
             true
@@ -2715,8 +2755,35 @@ mod tests {
             (Vietnamese, "Tôi làm việc nhiều lắm."),
             (Vietnamese, "Làm việc đi."),
             (Vietnamese, "Lắm chuyện quá."),
+            // A greeting alone does not make a stand-in a call: it must be
+            // set off, alone in its clause.
+            (Vietnamese, "Ê làm bài tập chưa?"),
+            (Japanese, "エイランクのホテルに泊まった。"),
+            (Japanese, "エイランクだね。"),
+            // Vietnamese's stand-ins are everyday one-word replies: only
+            // in the first clause, greeted or with more after.
+            (Vietnamese, "Ừ, làm."),
+            (Vietnamese, "Làm!"),
+            (Vietnamese, "Lắm."),
+            (Vietnamese, "Nhiều không? Lắm."),
+            (Vietnamese, "Này, làm."),
+            (Vietnamese, "Lem."),
+            (Vietnamese, "Ừ, làm đi."),
+            // The name opening a longer word, or Korean's subject or
+            // object particle after it, is talk about a lamp.
+            (Japanese, "ランプシェード"),
+            (Korean, "램프가 고장났어."),
+            (Korean, "램프를 꺼 줘."),
         ] {
             assert!(!called(heard, Some(language)), "{heard}");
+        }
+        for (language, heard) in [
+            (Japanese, "ランプ"),
+            (Japanese, "ランプ 消して"),
+            (Korean, "램프야"),
+            (Korean, "헤이 램프"),
+        ] {
+            assert!(called(heard, Some(language)), "{heard}");
         }
         // The line opens with it, greeted or set off.
         assert!(begins_as_written(
@@ -2726,6 +2793,8 @@ mod tests {
         assert!(begins_as_written("헤이 램프, 몇 시야?", Some(Korean)));
         assert!(!begins_as_written("램프를 꺼 줘.", Some(Korean)));
         assert!(!begins_as_written("今何時ですか。ランプ。", Some(Japanese)));
+        assert!(begins_as_written("Làm, mấy giờ rồi?", Some(Vietnamese)));
+        assert!(!begins_as_written("Làm!", Some(Vietnamese)));
         // Onboarding's how_you_sound: the name alone, greetings at most.
         for (language, alone) in [
             (Japanese, "エイランク。"),
@@ -2743,6 +2812,10 @@ mod tests {
             (Japanese, "クランク。"),
             (Korean, "캠프."),
             (Vietnamese, "Làm việc."),
+            (Vietnamese, "Làm!"),
+            (Vietnamese, "Lắm."),
+            (Vietnamese, "Lem."),
+            (Vietnamese, "Này, làm."),
         ] {
             assert!(!only_the_name_as_written(not, Some(language)), "{not}");
         }
