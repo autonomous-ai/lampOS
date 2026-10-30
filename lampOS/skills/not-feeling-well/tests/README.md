@@ -31,6 +31,12 @@ test -p lamp-skills`, which runs every skill's cases).
 | `quiet-on-a-part-never-heard-from` | From 10:00, the eyes expected and never heard from (missing, the lamp `stale` for 10 min) | Pass: nothing (no `quiet_ms`) |
 | `droops-once-for-a-part-that-errs-and-then-stops` | From 10:00, the body says `error` from 60.6 s, its last report at 119.6 s | Pass: once at 95 s (the first `error` health at 65 s); nothing at 5 min of its silence: a part that keeps its `error` is not in `quiet_ms` |
 
+The light is named as asked, `no_brighter = true` with it (#3691): its level
+against the person's light is made as the run begins, from `light/state`,
+which a replay has none of. That it is never brighter (white 1 over a person
+at level 1, as written at 2 and up, nothing over a light that is off) is
+`glow`'s unit tests in `crates/skills`.
+
 The `sleepy` look has no case: whether the droop and the pale breath read as a
 lamp a little unwell, not a status light, is for the lamp check. The 30 s and the
 10 s gap are not measured against real failures yet.

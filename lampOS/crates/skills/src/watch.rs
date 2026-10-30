@@ -1639,6 +1639,7 @@ mod tests {
                 pattern: None,
                 keep: false,
                 until_ends: false,
+                no_brighter: false,
             },
             words: guard_words(),
             built_in_words: false,

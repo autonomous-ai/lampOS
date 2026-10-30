@@ -697,6 +697,20 @@ fn relative_lights_and_resettles_are_checked_at_load() {
             "light = { relative = { warmer = 1, dimmer = 1 }, for = \"20s\", pattern = { kind = \"breathe\", period = \"10s\" } }",
         ),
     );
+    // #3691: the warmth alone at the dimmest level, and a light never
+    // brighter than the person's.
+    manifest(
+        root.path(),
+        &granted_light(
+            "light = { relative = { warmer = 1, dimmer = 1, warm_at_dimmest = true }, for = \"12s\", pattern = { kind = \"breathe\", period = \"6s\" } }",
+        ),
+    );
+    manifest(
+        root.path(),
+        &granted_light(
+            "light = { colour = \"white\", level = 2, pattern = { kind = \"breathe\", period = \"10s\", low = 1 }, for = \"20s\", no_brighter = true }",
+        ),
+    );
     manifest(
         root.path(),
         &granted_light(
@@ -709,6 +723,14 @@ fn relative_lights_and_resettles_are_checked_at_load() {
         "light = { relative = { dimmer = 1 } }",
         "light = { relative = { dimmer = 1 }, for = \"20s\", pattern = { kind = \"breathe\", low = 1 } }",
         "light = { relative = { dimmer = 1 }, for = \"20s\", pattern = { kind = \"candle\" } }",
+        "light = { relative = { dimmer = 1, warm_at_dimmest = true }, for = \"20s\" }",
+        "light = { relative = { warmer = 1, warm_at_dimmest = false }, for = \"20s\" }",
+        "light = { relative = { warmer = 1 }, for = \"20s\", no_brighter = true }",
+        "light = { colour = \"white\", for = \"20s\", no_brighter = true }",
+        "light = { colour = \"white\", level = 2, keep = true, no_brighter = true }",
+        "light = { colour = \"white\", level = 2, for = \"20s\", no_brighter = false }",
+        "light = { dim = 1, no_brighter = true }",
+        "light = { out = true, no_brighter = true }",
         "rest = { op = \"rest\", during = { from = \"23:00\", to = \"10:00\" }, resettle = { most = 4, after = \"30s\", during = { from = \"23:00\", to = \"06:00\" } } }",
         "rest = { op = \"cancel\", resettle = { most = 1, after = \"30s\", during = { from = \"23:00\", to = \"06:00\" } } }",
     ] {

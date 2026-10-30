@@ -107,18 +107,20 @@ policy = "nudge"
 # lifting the head's weight, #3691). The hold is short so the head pushes still
 # for about 1.0 s, under the body's 1.5 s stall rule, which on 06c1 latched a
 # 1.4 s hold up and lost the return. Then warmth and a slow breath at the
-# person's level for 12 s, never brighter (the first builder's 2).
+# person's level for 12 s, never brighter (the first builder's 2). At level 1,
+# where there is no level under it, the warmth alone while the colour is still
+# white; already warm, nothing (#3691).
 [[do]]
 on = "glad"
 body = { move = "glad-lift" }
-light = { relative = { warmer = 1, dimmer = 1 }, for = "12s", pattern = { kind = "breathe", period = "6s" } }
+light = { relative = { warmer = 1, dimmer = 1, warm_at_dimmest = true }, for = "12s", pattern = { kind = "breathe", period = "6s" } }
 
 # Lively: a smaller lift (90 counts), quicker (about 2.5 s), and a quicker
 # breath for 8 s.
 [[do]]
 on = "lively"
 body = { move = "perk" }
-light = { relative = { warmer = 1, dimmer = 1 }, for = "8s", pattern = { kind = "breathe", period = "4s" } }
+light = { relative = { warmer = 1, dimmer = 1, warm_at_dimmest = true }, for = "8s", pattern = { kind = "breathe", period = "4s" } }
 
 # Low: a slow, small lowering of the head (40 counts: less than Stuffy air's
 # sleepy droop, the first builder's 3), eased back slowly to 25 counts above

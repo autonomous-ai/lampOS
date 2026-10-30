@@ -132,8 +132,10 @@ the `glad-lift` move, and the light breathing every 6 s for 12 s; `lively` is
   the skill's `for`, and `stop` gives it back. It takes the place of a light
   this computer asked for, so when the feeling lapses the ring goes back to
   the person's own light, not to that one: a client re-sends its light if it
-  wants it back. With the light off, not known or at level 1, the move goes
-  alone.
+  wants it back. At level 1 `glad` and `lively` warm a white light alone,
+  steady at 1, as the skill's `warm_at_dimmest` does (#3691). With the light
+  off or not known, or at level 1 already warm (and always for `low`), the
+  move goes alone.
 - **Not carried:** the skill's triggers, waits, caps and quiet hours, which are
   the lamp's unprompted life. Nor whether the owner turned the skill off: the
   owner's say here is the `body` and `light` grants. A computer asking is held to `express`'s rate,
