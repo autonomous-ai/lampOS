@@ -2149,8 +2149,8 @@ impl Onboarding {
                 // step ended with the hello never asked.
                 let greeting = greets(&words);
                 // "Please" alone is no yes to the hello: in a line it is a
-                // request ("Please tell me more.", Reviewer-three's P2 on
-                // #4480).
+                // request ("Please tell me more."); "Please do." is one
+                // (Reviewer-three's P2 and P3 on #4480).
                 let yes = if greeting {
                     hello_yes(&words)
                 } else {
@@ -2160,7 +2160,7 @@ impl Onboarding {
                             .filter(|word| *word != "please")
                             .cloned()
                             .collect::<Vec<_>>(),
-                    )
+                    ) || said_together(&words, "please", "do")
                 };
                 // Asking to hear it again is no answer, with or without its
                 // "?" ("Sorry, can you repeat that", "What did you say", "I
@@ -2178,22 +2178,10 @@ impl Onboarding {
                 // please" took its "please" as the hello's yes and ended the
                 // step with the hello never answered (Fourth, #4469's read).
                 let asked_back = again || text.contains('?');
-                // Nor a line that puts it off ("Okay, let me think.", "Hold
-                // on, okay, one second."): the hello is the walk's to wait
-                // for (Reviewer-three's P2 on #4480).
-                let defers = words.iter().any(|word| {
-                    matches!(
-                        word.as_str(),
-                        "think"
-                            | "wait"
-                            | "hold"
-                            | "moment"
-                            | "second"
-                            | "minute"
-                            | "mean"
-                            | "slower"
-                    )
-                });
+                // Nor a line that puts it off ([`puts_off_the_hello`]): the
+                // hello is the walk's to wait for (Reviewer-three's P2s on
+                // #4480).
+                let defers = puts_off_the_hello(&words);
                 // Once asked, the hello takes its yes or no from a short
                 // answer ("That's fine.", "Okay.", "No thanks."), or from a
                 // longer one that opens with a firm yes or no ("Yes, any time
@@ -3490,6 +3478,44 @@ fn names_someone(text: &str, words: &[String]) -> bool {
 fn hello_yes(words: &[String]) -> bool {
     const HELLO_YES: [&str; 7] = ["yes", "yeah", "yep", "sure", "ok", "okay", "alright"];
     words.iter().any(|word| HELLO_YES.contains(&word.as_str())) && !refuses(words)
+}
+
+/// Whether `first` is said right before `then` in `words`.
+fn said_together(words: &[String], first: &str, then: &str) -> bool {
+    words
+        .windows(2)
+        .any(|pair| pair[0] == first && pair[1] == then)
+}
+
+/// Words that put the hello off rather than answer it, alone ("Hold on,
+/// okay, one second.", "No, tell me more first.", "Maybe later.").
+const PUTS_OFF: [&str; 14] = [
+    "wait", "hold", "moment", "second", "minute", "slower", "first", "more", "check", "later",
+    "maybe", "perhaps", "unsure", "dunno",
+];
+
+/// Words that put it off only together, so "No, I don't think so." and "Yes,
+/// I mean it." still answer: "let me think", "not sure", "I don't know",
+/// "no idea", "think about it".
+const PUTS_OFF_TOGETHER: [(&str, &str); 5] = [
+    ("let", "me"),
+    ("not", "sure"),
+    ("don't", "know"),
+    ("no", "idea"),
+    ("think", "about"),
+];
+
+/// A line that puts the walk's hello question off rather than answers it
+/// ([`Onboarding::heard`]'s `preferences`, Reviewer-three's P2s on #4480):
+/// a word of [`PUTS_OFF`], a pair of [`PUTS_OFF_TOGETHER`], or "what" with
+/// "mean" ("Okay, what does that mean.").
+fn puts_off_the_hello(words: &[String]) -> bool {
+    let has = |word: &str| words.iter().any(|said| said == word);
+    PUTS_OFF.iter().any(|word| has(word))
+        || PUTS_OFF_TOGETHER
+            .iter()
+            .any(|(first, then)| said_together(words, first, then))
+        || (has("what") && has("mean"))
 }
 
 /// The parts of the day "good" makes a greeting of.
@@ -6268,6 +6294,14 @@ mod tests {
             "Okay, what does that mean.",
             "Can you say it slower please.",
             "Please.",
+            // Reviewer-three's second P2 on #4480: a firm opening or a short
+            // line that still puts it off.
+            "No, tell me more first.",
+            "Sure, let me check first.",
+            "Okay, not sure.",
+            "Yeah, I don't know.",
+            "Maybe later.",
+            "Yes, but no idea how.",
             // Seventh's P3: a "?" after a yes, as speech to text may write
             // it, waits for a plain answer; the model or the re-ask asks.
             "Yes, say hello?",
@@ -6311,6 +6345,11 @@ mod tests {
             "Please don't greet me.",
             // Opens with a firm yes: its condition is the model's to keep.
             "Sure, but not every time.",
+            // Reviewer-three's P3 on #4480: "think" and "mean" alone, and
+            // "Please do.", answer.
+            "No, I don't think so.",
+            "Yes, I mean it.",
+            "Please do.",
             "Of course, any time you like.",
         ]
         .into_iter()
