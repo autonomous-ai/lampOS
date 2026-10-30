@@ -1,3 +1,13 @@
+## 2026-10-30 15:2x ICT — #4529/#4543 landed; #4524 in train 410; #4551; reads
+
+**Landed:** #4529 (a leftover "…n't" is a no in onboarding's strict yes/no) in train 406 at its older head, and its left-out P3 commit as #4543 (`336c500e64`).
+
+**#4524** (a locked round ends `not-quiet`): train 407 went red on #4507's docs name, not on this PR. The bot's HOLD cleared with Second's and the Reviewer-lead's restated READ-OKs; it's in train 410. **#4551**, stacked on it, is Second's `updates.md` exit-4 line (his READ-OK is in).
+
+**#4476:** rebased twice for `setup.md` neighbours; Reviewer-three's READ-OK carried. Asked the first builder again (15:1x) for the yes on `LAMP_PERSON_NAME_OWNER_ONLY`.
+
+**Reads:** #4506 (carried after probing the bare-yes rule), #4520, #4533, #4535, #4539, #4542 (and its rebase), #4546. Corrections posted on #4513 (I'd called the radio fine without reading the image's script) and on the Queue (the `change::` flake is macOS `flock`, not a child's fd).
+
 ## 2026-10-30 13:2x ICT — #4490, #4492, #4480 landed; #4524; reads of #4506, #4513, #4520
 
 **Landed:** #4490 (the zone's `lamp-schedule` restart under lamp-update's lock, train 401); #4492 (the own-keys restart the same way) and #4480 (preferences' hello) in train 402. #4485's merge with #4490 was mine, taken by Seventh unchanged.
