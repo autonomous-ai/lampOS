@@ -203,11 +203,16 @@ not declared at all, and the journal says so once. A held line's call is
 refused, as every action's is.
 
 **The hold says the line (#3748 part 1, `LAMP_SLEEP_LINE=on`, off unless
-on).** At the hold's 2 s mark the voice plays the recorded line "Going to
-sleep. Tap my head to wake me." (the failure notice `going_to_sleep`,
-`failure-notices.md`) in place of the falling breath, as the same sound turn
-of its own. If the recording isn't there, the breath plays as without the
-switch. Either way the sleep now waits for that cue: the 3 s Hold no longer
+on).** At the hold's 2 s mark the voice plays the line "Going to sleep. Tap
+my head to wake me." (`lamp_msgs::SLEEP_LINE`, the same words as the
+`go_to_sleep` function's) in place of the falling breath, as the same sound
+turn of its own. The line comes from the voice's speech cache
+(speaking-first.md, "A cached line"): rendered once at start in the product
+voice through the voice's speech service (`tts_cache::WARM`) and kept on the
+lamp, so it plays offline. The coordinator reads it once per conversation,
+from the file only, never waiting on a render. If it isn't kept yet (no
+speech cache, not rendered yet, or its render failed), the breath plays as
+without the switch, and the journal says so. Either way the sleep now waits for that cue: the 3 s Hold no longer
 mutes at once, it makes the sleep owed (`HandControls::land_owed_sleep`),
 and the mute, the microphones closing and the asleep face come once the
 cue has played whole, or 6 s after the Hold if it still sounds

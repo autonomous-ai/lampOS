@@ -16,7 +16,7 @@ pub const FLAG: &str = "--sleep-asked";
 /// The function the model calls.
 pub const NAME: &str = "go_to_sleep";
 /// What the lamp says as it goes to sleep, before the microphones close.
-pub const LINE: &str = "Going to sleep. Tap my head to wake me.";
+pub const LINE: &str = lamp_msgs::SLEEP_LINE;
 /// The latest a sleep is asked after the model was told its line, if the
 /// line's turn never ends: the line takes about 3 s to say.
 pub const LINE_PLAYED_WITHIN_US: u64 = 8_000_000;
