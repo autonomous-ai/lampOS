@@ -12,8 +12,10 @@
 //!   ([`instruction`]); the call name stays "Lamp";
 //! - ElevenLabs speaks with [`SPEECH_MODEL`], which speaks all four, in the
 //!   language's voice from V1's table ([`Language::voice`]);
-//! - the English-only gates are off: a turn heard in another script is not
-//!   asked again (#926), and no stop stream listens for English stop words;
+//! - the English-only gates follow it: a cut-in with no English word is no
+//!   fragment, a turn heard in another script is asked again (#926) only in
+//!   a Latin-script language (Vietnamese), and the stop stream listens only
+//!   in a language it has words for (Vietnamese, #2939), in that language;
 //! - at start, a language other than the last one announced is said once in
 //!   its own words ([`announce`]), and recorded in [`SAID_PATH`].
 //!
@@ -103,6 +105,18 @@ impl Language {
         }
     }
 
+    /// Whether the stop stream has words for it: #2939's Vietnamese
+    /// backchannels. Without them it is not listened to.
+    pub fn has_stop_words(self) -> bool {
+        self == Self::Vietnamese
+    }
+
+    /// Whether it is written in the Latin script, as English is: #926's
+    /// check for a turn heard in another script still holds for it.
+    pub fn latin_script(self) -> bool {
+        self == Self::Vietnamese
+    }
+
     /// Said once when the lamp starts speaking it.
     pub fn changed(self) -> &'static str {
         match self {
@@ -145,6 +159,13 @@ pub fn from_var(var: impl Fn(&str) -> Option<OsString>) -> Option<Language> {
 /// [`from_var`] from this process's environment.
 pub fn from_environment() -> Option<Language> {
     from_var(|name| std::env::var_os(name))
+}
+
+/// [`from_environment`], read once for this process: for checks made on
+/// every turn.
+pub fn at_start() -> Option<Language> {
+    static CHOSEN: std::sync::OnceLock<Option<Language>> = std::sync::OnceLock::new();
+    *CHOSEN.get_or_init(from_environment)
 }
 
 /// The character told to speak `language`; English leaves it as it is.

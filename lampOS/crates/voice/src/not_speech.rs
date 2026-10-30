@@ -582,13 +582,23 @@ pub const UNCLEAR: &str = "sorry";
 pub const UNCLEAR_FLAG: &str = "--ask-unclear";
 
 /// The provider worker's argument for asking again, from the environment.
-/// Never with a language other than English (#4473): another script is
-/// then the conversation's own.
+/// Never in a language written in another script than English's (#4473):
+/// that script is then the conversation's own.
 pub fn unclear_arguments_from_environment() -> Vec<String> {
-    if crate::language::from_environment().is_some() {
+    unclear_arguments_in(
+        crate::language::from_environment(),
+        std::env::var(UNCLEAR_ENVIRONMENT).ok().as_deref(),
+    )
+}
+
+fn unclear_arguments_in(
+    language: Option<crate::language::Language>,
+    value: Option<&str>,
+) -> Vec<String> {
+    if language.is_some_and(|language| !language.latin_script()) {
         return Vec::new();
     }
-    unclear_arguments(std::env::var(UNCLEAR_ENVIRONMENT).ok().as_deref())
+    unclear_arguments(value)
 }
 
 fn unclear_arguments(value: Option<&str>) -> Vec<String> {
@@ -894,6 +904,22 @@ pub fn unclear_in_conversation(
     lamp_asked: bool,
     cut_in: bool,
 ) -> Option<&'static str> {
+    unclear_in(
+        heard,
+        lamp_asked,
+        cut_in,
+        crate::language::at_start().is_none(),
+    )
+}
+
+/// [`unclear_in_conversation`] in a conversation held in English or not
+/// (#4473): in the owner's own language a cut-in needs no English word.
+fn unclear_in(
+    heard: &str,
+    lamp_asked: bool,
+    cut_in: bool,
+    in_english: bool,
+) -> Option<&'static str> {
     let letters = heard.chars().filter(|c| c.is_alphabetic()).count();
     let other = heard
         .chars()
@@ -911,7 +937,7 @@ pub fn unclear_in_conversation(
     if letters == 0 && numbers == 1 && !lamp_asked {
         return Some(ONLY_DIGITS);
     }
-    if cut_in && (letters > 0 || numbers > 1) {
+    if in_english && cut_in && (letters > 0 || numbers > 1) {
         let words = plain_words(heard);
         // No English word at all, however many: over the lamp's English
         // answer, a cut-in heard all in another language was misheard
@@ -927,6 +953,33 @@ pub fn unclear_in_conversation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The owner's language (#4473): a Vietnamese lamp still asks again for
+    /// a turn in another script, and takes a Vietnamese cut-in as said;
+    /// Japanese, Chinese and Korean, in their own scripts, never ask.
+    #[test]
+    fn the_owners_language_is_its_own_not_another() {
+        use crate::language::Language;
+        let asking = vec![UNCLEAR_FLAG.to_owned()];
+        assert_eq!(unclear_arguments_in(None, Some(UNCLEAR)), asking);
+        assert_eq!(
+            unclear_arguments_in(Some(Language::Vietnamese), Some(UNCLEAR)),
+            asking
+        );
+        for language in [Language::Japanese, Language::Chinese, Language::Korean] {
+            assert!(unclear_arguments_in(Some(language), Some(UNCLEAR)).is_empty());
+        }
+        assert_eq!(
+            unclear_in("dừng lại đi", false, true, true),
+            Some(CUT_IN_FRAGMENT)
+        );
+        assert_eq!(unclear_in("dừng lại đi", false, true, false), None);
+        assert_eq!(unclear_in("Bạn khỏe không?", false, false, false), None);
+        assert_eq!(
+            unclear_in("हिंदू के स्थान", false, false, false),
+            Some(OTHER_SCRIPT)
+        );
+    }
 
     /// `LAMP_NOT_FOR_ME_WORDS`: "not for me", however written, as the whole
     /// reply or followed by the refusal's own clause, is a refusal; followed
