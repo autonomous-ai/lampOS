@@ -779,6 +779,18 @@ impl SecondConfig {
             self.gemini.speech_model = model.clone();
             self.tts_model = Some(model);
         }
+        // The owner's language (#4473), over the file's and the unit's: its
+        // speech to text, and an ElevenLabs model and voice that speak it.
+        // English, unset or unknown changes nothing.
+        if let Some(language) = crate::language::from_var(&var) {
+            self.stt_language = Some(language.stt().to_owned());
+            if self.tts_provider == TtsProvider::ElevenLabs {
+                self.tts_model = Some(crate::language::SPEECH_MODEL.to_owned());
+                if let Some(voice) = language.voice() {
+                    self.tts_voice = Some(voice.to_owned());
+                }
+            }
+        }
         self = self.with_key_terms_from(&var)?;
         self.stt_flux = var(FLUX_ENV).is_some_and(|value| value == "on");
         Ok(self)
@@ -1601,5 +1613,56 @@ mod tests {
             let (_, config) = written("gemini-refused", extra);
             assert!(load_from_path(&config).is_err(), "{extra}");
         }
+    }
+
+    /// The owner's language (#4473): English, no file, an empty one or an
+    /// unknown value leave the product's route exactly as it was; vi, ja, zh
+    /// and ko each tell speech to text their language and speak with a model
+    /// and a voice that speak it.
+    #[test]
+    fn the_owners_language_sets_the_speech_and_english_changes_nothing() {
+        let (directory, config) = written("language", r#","tts_provider":"elevenlabs""#);
+        let file = directory.join("language");
+        let product = |name: &str| match name {
+            SPEECH_MODEL_ENV => Some("eleven_v4_turbo".into()),
+            crate::language::FILE_ENVIRONMENT => Some(file.clone().into()),
+            _ => None,
+        };
+        let route = || load_from_path(&config).unwrap();
+        let _ = fs::remove_file(&file);
+        let today = route().with_environment(product).unwrap();
+        assert_eq!(today.stt_language, None);
+        assert_eq!(today.tts_model.as_deref(), Some("eleven_v4_turbo"));
+        assert_eq!(today.tts_voice, None);
+        for english in ["", "en", "en\n", "fr"] {
+            fs::write(&file, english).unwrap();
+            assert_eq!(
+                route().with_environment(product).unwrap(),
+                today,
+                "{english:?}"
+            );
+        }
+        for (code, voice) in [
+            ("vi", Some("Ngan")),
+            ("ja", Some("Shizuka")),
+            ("zh", Some("Amy")),
+            ("ko", None),
+        ] {
+            fs::write(&file, format!("{code}\n")).unwrap();
+            let spoken = route().with_environment(product).unwrap();
+            assert_eq!(spoken.stt_language.as_deref(), Some(code));
+            assert_eq!(spoken.tts_model.as_deref(), Some("eleven_flash_v2_5"));
+            assert_eq!(spoken.tts_voice.as_deref(), voice, "{code}");
+        }
+        // OpenAI's voice keeps its own model and voice; only the hearing changes.
+        let (_, openai) = written("language-openai", "");
+        fs::write(&file, "ja").unwrap();
+        let spoken = load_from_path(&openai)
+            .unwrap()
+            .with_environment(product)
+            .unwrap();
+        assert_eq!(spoken.stt_language.as_deref(), Some("ja"));
+        assert_eq!(spoken.tts_model.as_deref(), Some("eleven_v4_turbo"));
+        assert_eq!(spoken.tts_voice, None);
     }
 }

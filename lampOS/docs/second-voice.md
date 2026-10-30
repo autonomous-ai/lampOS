@@ -178,6 +178,48 @@ An example, with the company's endpoints:
 The first builder writes lamp-4ace's file from the company's endpoints.
 Who writes it at onboarding is not built (below).
 
+## The owner's language (#4473 (a), the voice side)
+
+The lamp speaks English, Vietnamese, Japanese, Chinese or Korean, as the
+owner chooses (`crates/voice/src/language.rs`). The setting is one line,
+`en`, `vi`, `ja`, `zh` or `ko`, in the file `LAMP_LANGUAGE_FILE` names; the
+product's unit names `/etc/lampOS/setup/language`. Each process reads it as
+it starts, so a change takes effect at the voice's next start. Writing it
+from the app (`lamp-cloud`, root's change helper) is not built yet: its
+contract is agreed on #4473 and #4474 first.
+
+**English is unchanged.** No variable, no file, an empty file, `en` or a
+value this build doesn't know (said in the journal) is English: the
+speech-to-text query, the character, the voice and its model are
+exactly what they were.
+
+For `vi`, `ja`, `zh` or `ko`:
+
+| Part | What changes | Where |
+|---|---|---|
+| Speech to text | `language` is the code, over `stt_language`; Flux hears English only, so Nova-3 hears it (`nova-3-general`, as for `vi` above) | `SecondConfig::with_environment` |
+| The character | "Always speak English" becomes "Always speak Vietnamese", "Japanese", "Mandarin Chinese, in simplified characters" or "Korean"; a character without the rule gets it at its end. The call name stays "Lamp" | `ProviderConfig::instruction` |
+| The voice (ElevenLabs only) | `eleven_flash_v2_5`, over `LAMP_SECOND_SPEECH_MODEL` (`eleven_v4_turbo`), with V1's first voice for the language (`system/domain/device.go`): Ngan (vi), Shizuka (ja), Amy (zh). V1 had no Korean voice: Korean keeps the lamp's own. Speech tags are then off, as for any model that does not read them | `SecondConfig::with_environment` |
+| English-only gates | no `--ask-unclear` (#926: another script is the conversation's own), and no stop-word stream (its words and backchannels are English's) | `not_speech::unclear_arguments_from_environment`, `stop_words::listen` |
+| The change said | at start, a language other than the one recorded in `/var/lib/lampOS/voice/language-said` (absent is English) is said once in its own words through the say service (skill `language`, priority 8, 10 minutes to begin), and recorded only once spoken; an English lamp never changed owes nothing | `language::announce` |
+
+The speech cache (`say/tts_cache.rs`) needs no change: its key holds the
+voice, model and language, so a new language renders its lines again.
+
+**Cost.** The repo's only ElevenLabs price is $0.00004 a character
+(`fixtures/voice-eval-cost-prices.example.json`, list prices read on 19
+Oct), and its note says `eleven_v4_turbo`'s own price was not read and
+Flash's was used in its place. By the repo's numbers, a character costs the
+same in every language; v4 Turbo's real price is not in the repo.
+
+**Not measured yet:** whether Nova-3 takes `ja`, `zh` and `ko` through the
+relay (`vi` is shown above), whether the key term "Lamp" helps or hurts a
+line in them, and the first audio of each language on a lamp. Fixed lines
+(failure notices, the no-Wi-Fi line, onboarding's lines and words) are still
+English: #4473 (b) and (c). Tests: `language::tests`,
+`second_config::tests::the_owners_language_sets_the_speech_and_english_changes_nothing`,
+`stt::tests::the_owners_language_is_the_streams`.
+
 ## What each client speaks
 
 As V1's HAL speaks them (`hal/drivers/voice/stt/*`, `hal/drivers/voice/tts/*`).

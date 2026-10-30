@@ -410,7 +410,11 @@ impl ProviderConfig {
     /// `LAMP_PERSON_NAME_OWNER_ONLY=on` it is not: it is told only to the
     /// owner's line ([`crate::person::may_tell`], #2602).
     pub fn instruction(&self, camera: bool) -> io::Result<String> {
-        let character = self.character(camera)?;
+        // The owner's language (#4473): English leaves it as it is.
+        let character = crate::language::instruction(
+            self.character(camera)?,
+            crate::language::from_environment(),
+        );
         Ok(match crate::person::for_instruction() {
             Some(name) => format!("{character}\n\n{}", crate::person::told(&name)),
             None => character,
