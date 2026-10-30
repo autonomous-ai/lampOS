@@ -292,7 +292,10 @@ class FakeLamp:
             "light": None,
             "mood": None,
             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
+            "volume": {"level": 50, "muted": False},
         }
+        # Where an unmute brings it back to (lamp-actions' `before_mute`).
+        self._before_mute = 50
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
         # Each connection whose head follows the hand (`look` at `hand`) and
         # its lease, until its stop, another look, or the lease ends; and the
@@ -348,6 +351,17 @@ class FakeLamp:
         for ws in list(self._connections):
             if event in self.subscribed[id(ws)]:
                 await ws.send(frame)
+
+    async def set_volume(self, level: int) -> None:
+        """The person changes the volume (by voice or in the app), or a
+        `volume` op does: `get("volume")` follows, and subscribers hear
+        `volume.changed` when it changed, as lamp-control tells it from
+        `speaker/volume`."""
+        level = max(0, min(100, round(level)))
+        now = {"level": level, "muted": level == 0}
+        before, self.state["volume"] = self.state["volume"], now
+        if before != now:
+            await self.emit("volume.changed", **now)
 
     def _show(self, request: dict) -> None:
         """The ring shows a computer's light while it lasts."""
@@ -518,13 +532,15 @@ class FakeLamp:
         "person.arrived": "look", "person.left": "look", "person.stood_up": "look", "person.facing": "look",
         "hand": "look",
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
+        "volume.changed": "speak",
     }
 
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
-            return ["look"] if "presence" in request.get("state", []) else []
+            asked = request.get("state", [])
+            return (["look"] if "presence" in asked else []) + (["speak"] if "volume" in asked else [])
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") in ("face", "hand") else ["body"]
@@ -533,6 +549,7 @@ class FakeLamp:
             "light": ["light"],
             "say": ["speak"],
             "sound": ["speak"],
+            "volume": ["speak"],
             "lease.take": [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])],
         }.get(op, [])
 
@@ -645,6 +662,26 @@ class FakeLamp:
             if self.auto_done:
                 at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
                 await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
+        elif op == "volume":
+            # As lamp-control through lamp-actions' app calls: a level, the
+            # voice's 20-point step within its floor of 10 and ceiling of 100,
+            # or a mute that an unmute takes back. The answer is the level it
+            # left, and `volume.changed` follows when it changed.
+            level = self.state["volume"]["level"]
+            if request.get("to") is not None:
+                level_next = request["to"]
+            elif request.get("step") == "up":
+                level_next = min(100, level + 20)
+            elif request.get("step") == "down":
+                level_next = 0 if level == 0 else max(10, level - 20)
+            elif request.get("mute") is True:
+                if level > 0:
+                    self._before_mute = level
+                level_next = 0
+            else:
+                level_next = level if level > 0 else self._before_mute
+            await self.set_volume(level_next)
+            await self._ok(ws, id_, **self.state["volume"])
         elif op == "say":
             # As lamp-control: the voice takes it, and its `done` follows.
             await self._ok(ws, id_, to="voice")

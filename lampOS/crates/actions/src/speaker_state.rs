@@ -29,6 +29,18 @@ pub(crate) fn intent(name: &str, args: &Value) -> Option<Intent> {
         "volume_up" | "volume_unmute" if nothing => Some(Intent::Audible),
         "volume_down" if nothing => Some(Intent::Observe),
         "volume_level" => Some(Intent::Observe),
+        // lamp-control's step and mute (the app calls beside `volume_to`):
+        // the voice's own changes, with the same intents.
+        "volume_step" => match args.get("step").and_then(Value::as_str) {
+            Some("up") => Some(Intent::Audible),
+            Some("down") => Some(Intent::Observe),
+            _ => None,
+        },
+        "volume_muted" => match args.get("muted").and_then(Value::as_bool) {
+            Some(true) => Some(Intent::Mute),
+            Some(false) => Some(Intent::Audible),
+            None => None,
+        },
         "volume_to" => args
             .get("volume")
             .and_then(Value::as_u64)

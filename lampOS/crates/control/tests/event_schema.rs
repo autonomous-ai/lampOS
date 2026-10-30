@@ -188,6 +188,16 @@ fn every_event_from_the_bus_validates_against_the_schema() {
             json!({"x": 0.42, "y": 0.61, "size": 0.18, "open": true, "confidence": 0.93, "t": 1}),
             27 * S,
         ),
+        (
+            "speaker/volume",
+            json!({"volume": 40, "muted": false}),
+            28 * S,
+        ),
+        (
+            "speaker/volume",
+            json!({"volume": 0, "muted": true}),
+            29 * S,
+        ),
     ];
     let mut kinds = std::collections::BTreeSet::new();
     let mut outs: Vec<(String, Value, Out)> = Vec::new();
@@ -231,6 +241,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         "button",
         "lamp.changed",
         "hand",
+        "volume.changed",
     ] {
         assert!(kinds.contains(kind), "{kind} not seen: {kinds:?}");
     }

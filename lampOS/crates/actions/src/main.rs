@@ -155,6 +155,15 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         };
+    // The speaker's volume said on the bus after each change, for every
+    // reader (lamp-control's `volume.changed`): with a bus and a mixer.
+    let volume_out = match (arguments.bus.as_ref(), sound.as_ref()) {
+        (Some(root), Some(_)) => lamp_bus::Bus::new(root)
+            .and_then(|bus| lamp_actions::volume_out::VolumeOut::on(&bus))
+            .inspect_err(|error| eprintln!("lamp-actions: the volume is not said: {error}"))
+            .ok(),
+        _ => None,
+    };
     // The lamp's health hears from this part on the same bus.
     let health = arguments.bus.as_ref().and_then(|root| {
         lamp_bus::Bus::new(root)
@@ -194,7 +203,7 @@ fn main() -> ExitCode {
         light,
         short,
     };
-    match lamp_actions::server::serve_reporting_with_outputs(
+    match lamp_actions::server::serve_reporting_with_volume(
         &arguments.dir,
         &mut executive,
         &AtomicBool::new(false),
@@ -202,6 +211,7 @@ fn main() -> ExitCode {
         schedule.as_ref(),
         caps.as_ref(),
         speaker,
+        volume_out,
     ) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {

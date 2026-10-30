@@ -311,6 +311,24 @@ pub fn serve_reporting_with_outputs<S: Mixer, L: Light>(
     config: Option<&crate::caps_service::Config>,
     speaker: Option<crate::speaker_state::Service>,
 ) -> io::Result<()> {
+    serve_reporting_with_volume(
+        directory, executive, stop, health, schedule, config, speaker, None,
+    )
+}
+
+/// [`serve_reporting_with_outputs`] that also says the speaker's volume on
+/// the bus after each change (`speaker/volume`, [`crate::volume_out`]).
+#[allow(clippy::too_many_arguments)]
+pub fn serve_reporting_with_volume<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    config: Option<&crate::caps_service::Config>,
+    speaker: Option<crate::speaker_state::Service>,
+    volume_out: Option<crate::volume_out::VolumeOut>,
+) -> io::Result<()> {
     serve_configured(
         directory,
         executive,
@@ -320,6 +338,7 @@ pub fn serve_reporting_with_outputs<S: Mixer, L: Light>(
         &Instant::now,
         || config.map(crate::caps_service::Service::open).transpose(),
         speaker,
+        volume_out,
     )
 }
 
@@ -402,6 +421,7 @@ pub fn serve_with_clock_and_outputs<S: Mixer, L: Light>(
         now,
         || Ok(caps),
         speaker,
+        None,
     )
 }
 
@@ -447,6 +467,7 @@ fn serve_configured<S: Mixer, L: Light>(
     now: &dyn Fn() -> Instant,
     start_caps: impl FnOnce() -> io::Result<Option<crate::caps_service::Service>>,
     mut speaker: Option<crate::speaker_state::Service>,
+    mut volume_out: Option<crate::volume_out::VolumeOut>,
 ) -> io::Result<()> {
     std::fs::create_dir_all(directory)?;
     let listener = listen(directory)?;
@@ -472,6 +493,11 @@ fn serve_configured<S: Mixer, L: Light>(
             })?;
         }
         refresh_speaker(executive, caps.as_mut(), speaker.as_mut(), now, false);
+        // The volume is said once at the start, from one read.
+        if let (Some(out), Some(sound)) = (volume_out.as_mut(), executive.sound.as_mut()) {
+            let _ = sound.level();
+            out.after(sound.heard());
+        }
         let offered_now = |executive: &mut Executive<S, L>| {
             let mut offered = executive.offered();
             if schedule.is_some() {
@@ -502,6 +528,16 @@ fn serve_configured<S: Mixer, L: Light>(
                 })?;
             }
             refresh_speaker(executive, caps.as_mut(), speaker.as_mut(), now, true);
+            // Whatever read or changed the mixer last (a call, the caps'
+            // reconciler, the speaker's poll), said if it is news: no read.
+            if let Some(out) = volume_out.as_mut() {
+                out.after(
+                    executive
+                        .sound
+                        .as_ref()
+                        .and_then(crate::sound::Volume::heard),
+                );
+            }
             set_ready(
                 directory,
                 caps.as_ref().is_none_or(|caps| caps.ready()),
@@ -542,6 +578,14 @@ fn serve_configured<S: Mixer, L: Light>(
                         speaker.as_mut(),
                         now,
                     );
+                    if let Some(out) = volume_out.as_mut() {
+                        out.after(
+                            executive
+                                .sound
+                                .as_ref()
+                                .and_then(crate::sound::Volume::heard),
+                        );
+                    }
                     set_ready(
                         directory,
                         caps.as_ref().is_none_or(|caps| caps.ready()),

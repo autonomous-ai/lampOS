@@ -30,6 +30,8 @@ SUMMARISED = frozenset({"text", "data"})
 SHOWN = frozenset({
     # A dev lamp's `--rates off`, said in hello's limits.
     "rates",
+    # The `volume` op and `volume.changed`.
+    "mute", "muted", "step",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",

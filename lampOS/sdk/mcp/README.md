@@ -44,6 +44,9 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
 | `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
+| `lamp_volume` | `to` | integer | 0 to 100 of what the lamp allows; 0 is muted. Exactly one of `to`, `step` or `mute`. The person's own volume, the same they set by voice or in the app; it returns the level it left, `{level, muted}` | none | speak | no |
+| | `step` | string | `up` or `down`: the lamp's own step, within its floor and ceiling | none | | |
+| | `mute` | boolean | `true` mutes; `false` brings it back to where it was | none | | |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |
 
 **An argument a tool doesn't take is refused**, never read past. Each
@@ -79,6 +82,7 @@ All JSON, read when asked; none takes a parameter.
 | `lamp://state/light` | its light | none |
 | `lamp://state/mood` | its mood | none |
 | `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
+| `lamp://state/volume` | its speaker's volume: `level` 0 to 100 and `muted` | speak (listed only with it) |
 | `lamp://lease` | the leases this server holds now | none |
 | `lamp://events/recent` | the last 50 events `lamp_wait_for` heard, newest last; never a transcript: `phrase.heard` says only which registered phrase it was | none |
 

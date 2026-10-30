@@ -256,7 +256,7 @@ about 3 ms at the median on the Intel Mac, against about 55 ms before 19 Oct,
 when the ring looked every 50 ms and the executive every 15 ms (#1806;
 `lamp-voice`'s `light_call` test).
 
-## The app's two calls (#1396)
+## The app's calls (#1396), and lamp-control's
 
 The Autonomous app's volume slider is answered through the executive too, so
 it stays the speaker's only writer: `lamp-cloud` asks on the same socket for
@@ -270,6 +270,21 @@ one it names anyway the voice runs by nobody (`route` in
 reaches the executive (the reviewer on #1418). The executive itself answers
 them for any caller on its socket, which only `lampos` may open. The journal
 says their names and whether they were done, as for every call.
+
+A paired computer's `volume` op (lamp-control, [control.md](control.md))
+uses two more on the same socket, also in `APP_CALLS` on both sides:
+`volume_step` with `{"step": "up" | "down"}` and `volume_muted` with
+`{"muted": true | false}`. Each is the voice's own change (`volume_up`,
+`volume_down`, `volume_mute`, `volume_unmute`: the same step, floor and
+ceiling, and an unmute back to where it was), answered with the level it
+left in the same numbers. Their speaker intents are the voice's too.
+
+**`speaker/volume`.** With `--bus-root` and a mixer, the executive says the
+volume on the bus (`lamp_msgs::SpeakerVolume`, `{volume, muted}`, latest)
+once it starts, from one read, and after any call or check that read a
+different level: the voice's, the app's or a computer's (`volume_out.rs`).
+Nothing is read for it; it says what the last call read. lamp-control makes
+`volume.changed` from it, so a computer hears the person's own changes.
 
 ## What was taken from V1, and what was not
 

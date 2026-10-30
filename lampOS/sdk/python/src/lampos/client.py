@@ -649,6 +649,17 @@ class Lamp:
     async def say(self, text: str) -> dict:
         return await self._act("say", False, text=text)
 
+    async def volume(self, *, to: int | None = None, step: str | None = None, mute: bool | None = None) -> dict:
+        """The speaker's volume, the person's own: one of `to` (0-100), `step`
+        ("up" or "down"), or `mute` (True or False). Returns the level it
+        left, `{"level": ..., "muted": ...}`."""
+        given = {k: v for k, v in {"to": to, "step": step, "mute": mute}.items() if v is not None}
+        # Exactly one, as the lamp holds it (control.schema.json's `volume`).
+        if len(given) != 1:
+            raise LampError("volume: one of to, step or mute", code="bad_request")
+        reply = await self._act("volume", False, **given)
+        return {"level": reply["level"], "muted": reply["muted"]}
+
     async def sound(self, name: str) -> dict:
         return await self._act("sound", False, name=name)
 

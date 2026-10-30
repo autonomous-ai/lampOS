@@ -44,11 +44,11 @@ STOP_ASKED = "stop asked"
 MOST_WAIT_S = 120
 # What `lamp://events/recent` keeps.
 RECENT_EVENTS = 50
-STATES = ("presence", "light", "mood", "lamp")
+STATES = ("presence", "light", "mood", "lamp", "volume")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
 # here needs none.
-STATE_NEEDS = {"presence": "look"}
+STATE_NEEDS = {"presence": "look", "volume": "speak"}
 EVENT_NEEDS = {
     "person.arrived": "look",
     "person.left": "look",
@@ -294,6 +294,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "light": "its light",
         "mood": "its mood",
         "lamp": "whether it is talking, paused, private or asleep",
+        "volume": "its speaker's volume (0 to 100, and whether muted)",
     }
 
     @server.tool(
@@ -301,7 +302,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         + ", ".join(state_words[state] for state in states)
         + f". `which` is some of {', '.join(states)}; by default all of them."
     )
-    async def lamp_state(which: list[Literal["presence", "light", "mood", "lamp"]] | None = None) -> dict:
+    async def lamp_state(which: list[Literal["presence", "light", "mood", "lamp", "volume"]] | None = None) -> dict:
         ungranted = [state for state in which or [] if state not in states]
         if ungranted:
             raise ToolError(f"no_grant: this computer may read {', '.join(states)}")
@@ -432,6 +433,18 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 raise ToolError("bad_request: at most 300 characters")
             await act("say", text=text)
             return "said"
+
+        @server.tool()
+        async def lamp_volume(
+            to: int | None = None, step: Literal["up", "down"] | None = None, mute: bool | None = None
+        ) -> dict:
+            """Set the lamp's speaker volume, the person's own (the same they set by voice or in the app):
+            exactly one of `to` (0 to 100 of what the lamp allows), `step` ("up" or "down", the lamp's own
+            step), or `mute` (true, or false to bring it back). Returns the level it left."""
+            try:
+                return await lamp.volume(to=to, step=step, mute=mute)
+            except LampError as error:
+                raise refused(error) from error
 
     if allowed("body", "look"):
 

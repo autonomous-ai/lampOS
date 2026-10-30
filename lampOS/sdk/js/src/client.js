@@ -478,6 +478,16 @@ export class Lamp {
   joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
   say(text) { return this.act('say', { text }); }
+  // The speaker's volume, the person's own: one of `to` (0-100), `step` ('up' or 'down'), or `mute` (true or
+  // false). Resolves to the level it left, `{ level, muted }`.
+  async volume({ to, step, mute } = {}) {
+    // Exactly one, as the lamp holds it (control.schema.json's `volume`).
+    if ([to, step, mute].filter((v) => v !== undefined).length !== 1) {
+      throw new LampError('volume: one of to, step or mute', { code: 'bad_request' });
+    }
+    const { level, muted } = await this.act('volume', { to, step, mute });
+    return { level, muted };
+  }
   sound(name) { return this.act('sound', { name }); }
   async stop() {
     const reply = await this.act('stop', {});

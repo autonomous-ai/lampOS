@@ -910,3 +910,29 @@ test('a look at the hand needs the body\'s lease socket, as other looks do', asy
     assert.equal(fake.leases.size, 0);
   });
 });
+
+test('the volume is set, stepped, muted and told when the person changes it', async () => {
+  await withLamp({ grants: ['speak'] }, async (lamp, fake) => {
+    assert.deepEqual(await lamp.get('volume'), { volume: { level: 50, muted: false } });
+    assert.deepEqual(await lamp.volume({ to: 35 }), { level: 35, muted: false });
+    assert.deepEqual(await lamp.volume({ step: 'up' }), { level: 55, muted: false });
+    assert.deepEqual(await lamp.volume({ mute: true }), { level: 0, muted: true });
+    assert.deepEqual(await lamp.volume({ mute: false }), { level: 55, muted: false });
+    for (const wrong of [{}, { to: 10, mute: true }]) {
+      await assert.rejects(lamp.volume(wrong), (error) => error.code === 'bad_request');
+    }
+    const heard = [];
+    await lamp.on('volume.changed', (event) => heard.push(event));
+    // The person says "quieter" to the lamp.
+    fake.setVolume(30);
+    await until(() => heard.length > 0);
+    assert.deepEqual([heard[0].level, heard[0].muted], [30, false]);
+  });
+});
+
+test('the volume needs the speak grant', async () => {
+  await withLamp({ grants: ['body'] }, async (lamp) => {
+    await assert.rejects(lamp.volume({ to: 10 }), (error) => error.code === 'no_grant');
+    await assert.rejects(lamp.get('volume'), (error) => error.code === 'no_grant');
+  });
+});
