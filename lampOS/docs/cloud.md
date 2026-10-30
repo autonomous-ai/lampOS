@@ -129,6 +129,9 @@ lamp says so.
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
+| `skills.share` (`{"name", "author"?, "preview"?}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave. Without them, "not on this lamp" |
+| `skills.shared` (`{}`) | as `skills.share`: this lamp's sent skills, the Store's newest 20, `{"shares": [...]}` |
+| `skills.unshare` (`{"id"}`) | as `skills.share`: a sent skill taken back from the Store, `{"unshared": ID}` |
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
 | `skills.camera` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` (#3504's piece C, "The owner's yes to a skill's camera" below): the owner's yes to the skill seeing the camera's picture, given (`allow` true) or taken back, past the app's warning, asked of root's manage helper as off and on are and kept in `lamp-skills`' `camera`; the reply is `skills.list`'s, read after it, with `camera: {name, allowed}`, what was kept for that name, on the lamp or not (#4099). A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
@@ -1035,10 +1038,17 @@ since 30 Oct.
   refusal (an HTTP error, or `"status": 0`) is told by its
   `error_message`, else its `error_code`, else its generic `message`.
   Answered `{"sent": {"id", "name", "version", "review_status":
-  "pending"}}`, from the Store's `data`.
-- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine` (its first
-  page, 20 rows, more than a lamp can have waiting or sent in days), the
-  rows from the Store's `data.data`, answered
+  "pending"}}`, from the Store's `data`; a 2xx whose `data` has no id, name
+  or state is "the Skills Store's answer couldn't be read", since the app
+  could never take it back.
+  **`"preview": true`** sends nothing: the same copy is made and read back
+  as `{"preview": {"name", "files": [{"path", "text"}]}}` (a file that
+  isn't text gives its `bytes` only; at most 65,536 characters in all), so
+  the app can show the owner exactly what would leave before Send.
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine`, its first
+  page: **only the newest 20** a lamp sent show (at 5 a day, older ones
+  drop off after four days), the rows from the Store's `data.data`,
+  answered
   `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`
   (only those fields; `review_status` is the Store's `pending`, `approved`
   or `rejected`, and `review_note` its reviewer's reason).
@@ -1047,14 +1057,21 @@ since 30 Oct.
 
 **What leaves the lamp:** only the skill's own files (`skill.toml`,
 `SKILL.md` and anything else in its folder that isn't a dot file), and the
-first name the owner typed. No memory, faces, names the lamp knows,
-recordings, pictures or settings. A reviewer at the Store reads it before
+first name the owner typed. What the lamp itself keeps doesn't leave: no
+memory, faces, names it knows, recordings, pictures or settings are read
+on this path. **But the skill's text is what its agent
+wrote from the words it was asked in,** so a name or a detail in those
+words ("remind Mai to take her pills at 8") can be in its description or
+body, and goes with it. That is why the app shows the whole text (its
+`preview`) before Send. The owner's app acts for the whole lamp, so it can
+send a skill another person at the lamp made by voice; the preview shows
+what it says either way. A reviewer at the Store reads it before
 it is listed; only approval signs it with the Store's key
 (`8717ddcdf9ac22fb`), and an unapproved package is never listed.
 
 **Refusals and limits.** The Store's own reason is passed on in plain
-words ("the Skills Store said: …", from its `error`, `message` or
-`error_code`, at most 300 characters); `401` is "the Store didn't know this
+words ("the Skills Store said: …", from its `error_message`, else its
+`error_code`, else its `message`, at most 300 characters); `401` is "the Store didn't know this
 lamp"; no answer is "the Skills Store can't be reached now". The key is
 never in an answer or the journal. The Store holds each lamp to 5 sent a
 day, 3 waiting at once and 20 attempts a day, and each owner to 10 a day

@@ -302,3 +302,50 @@ fn unshare_deletes_that_id_and_refuses_one_that_isnt() {
         assert_eq!(unshare(&store, &bad), Err(BAD_ID.into()));
     }
 }
+
+#[test]
+fn a_preview_shows_the_text_that_would_leave_and_sends_nothing() {
+    let places = places("share-preview");
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    // No Store at all: a preview never reaches one.
+    let store = Store {
+        base: "http://127.0.0.1:9".into(),
+        key: "k-secret".into(),
+    };
+    let answer = share(
+        &store,
+        &places,
+        &json!({"name": "water", "preview": true}),
+        &scratch("preview"),
+    )
+    .unwrap();
+    let files = answer["preview"]["files"].as_array().unwrap();
+    assert_eq!(answer["preview"]["name"], "water");
+    let card = files
+        .iter()
+        .find(|file| file["path"] == "SKILL.md")
+        .unwrap();
+    assert!(!card["text"].as_str().unwrap().contains("made: here"));
+    assert!(files.iter().any(|file| file["path"] == "skill.toml"));
+    assert!(
+        files
+            .iter()
+            .all(|file| !file["path"].as_str().unwrap().starts_with('.'))
+    );
+}
+
+#[test]
+fn a_sent_answer_with_no_id_is_unread_not_sent() {
+    let places = places("share-unread");
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    let (store, _) = store(201, r#"{"status":1,"data":{"name":"water"}}"#);
+    assert_eq!(
+        share(
+            &store,
+            &places,
+            &json!({"name": "water"}),
+            &scratch("unread")
+        ),
+        Err(UNREAD.into())
+    );
+}

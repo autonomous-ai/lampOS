@@ -697,7 +697,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MOOD_TONE` | How your words sound nudges the lamp's mood, seen only in its breathing and liveliness; nothing is kept. |
 | `LAMP_MESSAGES` | You can text the lamp from the app and it texts back, and it can send you news of tasks unasked. |
 | `LAMP_SKILLS_STORE` | You can install skills from the Skills Store with the app's Add button, each checked before it goes on. |
-| `LAMP_SKILLS_SHARE` | You can send a skill you made on your lamp to the Skills Store; a reviewer reads it before other owners can add it. |
+| `LAMP_SKILLS_SHARE` | You can send a skill you made to the Skills Store; a reviewer reads it before others can add it. |
 | `LAMP_APP_RESTART` | You can restart the lamp from the app; it waits for a pause in talk and never restarts during an update. |
 | `LAMP_GUARD_FROM_APP` | You can turn guard mode on and off from the app, not only by voice. |
 | `LAMP_GUARD_SOUNDS` | In guard mode, a door or footsteps followed by a face or speech counts as someone arriving. |
