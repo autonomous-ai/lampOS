@@ -36,3 +36,16 @@ mod voice_note_ahead;
 mod voice_people;
 mod voice_submit;
 mod voice_timing;
+
+/// Real-store voice fixtures (`voice`, `voice_people`, `voice_name`,
+/// `voice_note_ahead`) one at a time: each write is several full flushes
+/// (F_FULLFSYNC) on a Mac, and beside one another a follow-up forget ran out
+/// the voice's own 1.5 s cap (#1569).
+static VOICE_STORE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// This fixture's turn; a test that panicked while holding it passes it on.
+pub fn voice_store_turn() -> std::sync::MutexGuard<'static, ()> {
+    VOICE_STORE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
