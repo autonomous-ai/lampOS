@@ -247,11 +247,11 @@ MACVOL_WAS=$(osascript -e 'output volume of (get volume settings)')
 vol "$MACVOL"; ok "Mac volume $MACVOL (was $MACVOL_WAS, put back on exit)"
 
 # lamp clock minus Mac clock, ms: the midpoint of the fastest of 5 round trips (over the shared connection)
-rtt=999999 off=
+rtt=999999 off= lb=
 for _ in 1 2 3 4 5; do m0=$(now_ms); l0=$(lamp_ms); m1=$(now_ms)
-  [ -n "$l0" ] && [ $(( m1 - m0 )) -lt "$rtt" ] && rtt=$(( m1 - m0 )) off=$(( l0 - (m0 + m1) / 2 )); done
+  [ -n "$l0" ] && [ $(( m1 - m0 )) -lt "$rtt" ] && rtt=$(( m1 - m0 )) off=$(( l0 - (m0 + m1) / 2 )) lb=$l0; done
 [ -n "$off" ] && [ "$rtt" -le 1000 ] || abort "cannot read the lamp's clock in under 1 s (best round trip ${rtt} ms)"
-start_s=$(( l0 / 1000 - 5 ))
+start_s=$(( lb / 1000 - 5 ))
 note "offset_ms=$off rtt_ms=$rtt start_s=$start_s"
 
 # ---- wake: answered within 12 s, raising the Mac 45 -> 60 -> 75 if not (RULES: small MacBook speaker); then standing
