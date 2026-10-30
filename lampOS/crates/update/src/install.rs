@@ -134,6 +134,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-mood.service",
         include_str!("../../../deploy/product/lamp-mood.service"),
     ),
+    // The developers' door (#3504, docs/control.md); off unless the owner's
+    // setting writes LAMP_CONTROL=on.
+    (
+        "lamp-control.service",
+        include_str!("../../../deploy/product/lamp-control.service"),
+    ),
     (
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
@@ -261,6 +267,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-air.service",
     "lamp-body.service",
     "lamp-cloud.service",
+    "lamp-control.service",
     "lamp-controls.service",
     "lamp-ears.service",
     "lamp-expression.service",
@@ -630,6 +637,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "af538415909f6e577ac58d9a1cac26fed42949bc44c375581139b587d67a2445", // lamp-control's state (paired computers) forgotten on reset
     "812762927c5c43b518d7ce8018487a28bdf8e1b776d61ffd21ec31628ca465f6", // #5358: the last two boots' kept journal too
     "fb16d6a194804098c318b1b1b9e2d8e75445c35a598502971d224dd5ab9a7132", // #5144: a first-time setup's kept journal
     "b6d434ab7281c4a4202bcd4a379f9ebe1c8ff253d315e580a9359d235b65c2a1", // the owner's voice print beside the faces
