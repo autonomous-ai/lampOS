@@ -3632,6 +3632,35 @@ pub fn serve(
                 }),
             );
         }
+        // A known person's keep on a line no face was seen speaking is theirs
+        // (its reads the room's) when their known face was the one face in
+        // view and the rule heard no other voice in the conversation
+        // (`LAMP_PERSON_SCOPE_ONE_FACE=on`, the launch testers' item 1 on
+        // #3997). Only beside the scoping by sight and with the rule keeping
+        // each line's room. It does not wait on the same-voice check: only
+        // the keep goes to the person, its reads stay the room's, so a voice
+        // off camera can at most add words to their memory (the first
+        // builder's option 1 on #3997, 22:12).
+        if std::env::var(crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            let records = heeding
+                .lock()
+                .is_ok_and(|heeding| heeding.records_another_person());
+            let seen = std::env::var(crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT)
+                .is_ok_and(|value| value == "on");
+            match one_face_not_acted(seen, records) {
+                None => {
+                    eprintln!(
+                        "lamp-voice second: a known person's keep on a line no face was seen speaking is theirs, its reads the room's, when their known face was the one face in view and no other voice was heard in the conversation (LAMP_PERSON_SCOPE_ONE_FACE)"
+                    );
+                    engine = engine.scoping_by_one_face(another_voice.clone());
+                }
+                Some(why) => eprintln!(
+                    "lamp-voice second: LAMP_PERSON_SCOPE_ONE_FACE is on, but not acted on: {why}"
+                ),
+            }
+        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -5487,6 +5516,25 @@ pub(crate) const SAME_VOICE_JOINS: &str = "the same voice said both";
 /// Why, by the eyes: one face, the same, seen speaking each, and no other.
 pub(crate) const SAME_FACE_JOINS: &str = "one face was seen speaking both";
 
+/// Why `LAMP_PERSON_SCOPE_ONE_FACE`, switched on, is not acted on, said once
+/// at start; `None`, it is. It needs `LAMP_PERSON_SCOPE_SEEN` (`seen`) and
+/// the rule's record of another person (`records`,
+/// [`Heeding::records_another_person`]). The same-voice check is not needed:
+/// without it a voice off camera is never heard as another, so its words can
+/// be kept as the one face's, but nothing of theirs is read on the line (the
+/// first builder's option 1 on #3997).
+fn one_face_not_acted(seen: bool, records: bool) -> Option<&'static str> {
+    if !seen {
+        Some("LAMP_PERSON_SCOPE_SEEN is off")
+    } else if !records {
+        Some(
+            "the rule keeps no record of another voice (LAMP_JOIN_CUT_WORDS or LAMP_SECOND_NAME_CARRIES off)",
+        )
+    } else {
+        None
+    }
+}
+
 /// The same-voice check (#829) on `heeding`, its child made by `start` with
 /// `model`, when a rule reads its prints (`read`): `LAMP_SPOKEN_TO`'s
 /// conversation check, or `LAMP_QUIET_GOING_ON_SAME_ONE`'s and
@@ -6244,6 +6292,15 @@ impl Heeding {
     /// [`Self::another_person`] is kept for each line judged.
     pub(crate) fn keeps_line_rooms_now(&self) -> bool {
         self.rooms.is_some()
+    }
+
+    /// Whether another person heard or seen speaking in the conversation is
+    /// recorded ([`Self::keeping_line_rooms`]) and told to the flag of
+    /// [`Self::telling_another_voice`]: without both, that flag never
+    /// shows another voice, so it shows no one voice either
+    /// (`LAMP_PERSON_SCOPE_ONE_FACE`).
+    pub(crate) fn records_another_person(&self) -> bool {
+        self.rooms.is_some() && self.another_voice.is_some()
     }
 
     /// `LAMP_FIRST_SECONDS_QUIET` (#3711): a line kept for a join
@@ -15321,6 +15378,25 @@ mod tests {
             judge(true, office, signs(Room::Quiet, true, false, false)),
             None
         );
+    }
+
+    /// `LAMP_PERSON_SCOPE_ONE_FACE` acts with the scoping by sight and the
+    /// rule's record of another voice, whether or not the same-voice check
+    /// runs for the route (the first builder's option 1 on #3997): a printer
+    /// that did not start, or a standby beside Live, and it still acts.
+    #[test]
+    fn the_one_face_rule_acts_without_the_same_voice_check() {
+        let heeding = Mutex::new(Heeding::new(true, true, None, None));
+        let hears = super::checking_the_voice_for(
+            &heeding,
+            Some(PathBuf::from("/models/campplus.onnx")),
+            true,
+            |_| Err(std::io::Error::other("no model")),
+        );
+        assert!(!hears, "the printer did not start");
+        assert_eq!(super::one_face_not_acted(true, true), None);
+        assert!(super::one_face_not_acted(false, true).is_some());
+        assert!(super::one_face_not_acted(true, false).is_some());
     }
 
     /// lamp-52e6 at 08:33 on #2341: `LAMP_QUIET_GOING_ON_SAME_ONE=on` and

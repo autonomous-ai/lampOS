@@ -475,6 +475,12 @@ struct RequestContext {
     /// Carried, its keep waits for that conversation's person's yes
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`ScopeLease::save_carried`]).
     carried_saves: AtomicBool,
+    /// The known person (a memory id) whose face was the one face in view
+    /// through this line, none seen speaking it, and no other voice heard
+    /// (`LAMP_PERSON_SCOPE_ONE_FACE`, [`ScopeLease::take_by_one_face`]): its
+    /// `remember` goes to their scope, and nothing else does. Its reads stay
+    /// the room's. Cleared by any narrow after it ([`ScopeLease::narrow_to_room`]).
+    one_face: Mutex<Option<Arc<str>>>,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -532,6 +538,7 @@ impl RequestScope {
                 scope,
                 carried: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
+                one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -578,6 +585,7 @@ impl RequestScope {
                 scope,
                 carried: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
+                one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -633,7 +641,13 @@ impl ScopeLease {
     /// every later boundary reads the room. One way only; nothing widens a
     /// scope again.
     pub fn narrow_to_room(&self) {
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         self.context.narrowed.store(true, Ordering::Release);
+        *one_face = None;
     }
 
     /// A line no face was seen speaking, with nothing to say it was anyone
@@ -706,6 +720,74 @@ impl ScopeLease {
     /// (reviewer-three's P2 on #4090).
     pub fn name_for_reply(&self) {
         self.context.named.store(true, Ordering::Release);
+    }
+
+    /// A line admitted as a known person's, theirs only by the one-face rule
+    /// (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers' item 1 on #3997):
+    /// their known face the one face in view, none seen speaking it, and no
+    /// other voice heard in the conversation. Narrowed to the room, so every
+    /// read (recall, hits, the memory note, the person's context, their
+    /// thread) is the room's; only its `remember` goes to their scope
+    /// ([`Self::kept_by_one_face`]). A guest off camera who begins a
+    /// conversation while they sit silent reads the same, so their memory
+    /// is never read on it (reviewer-three's P1 on #4584, option 2). `false`,
+    /// and nothing changed, for a revoked line or one admitted as nobody's.
+    pub fn take_by_one_face(&self) -> bool {
+        let Some(person) = self.context.scope.person().filter(|_| self.is_current()) else {
+            return false;
+        };
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        self.context.narrowed.store(true, Ordering::Release);
+        *one_face = Some(Arc::from(person));
+        true
+    }
+
+    /// [`Self::take_by_one_face`] for a line admitted as the room's whose
+    /// known face the eyes named late (#2807): its `remember` goes to
+    /// `person`'s scope, its reads and every other call stay the room's.
+    /// `false`, and nothing changed, for a revoked, narrowed or carried line,
+    /// or one admitted as someone's.
+    pub fn keep_for_one_face(&self, person: &str) -> bool {
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.carried.get().is_some()
+            || self.context.scope.person().is_some()
+        {
+            return false;
+        }
+        *one_face = Some(Arc::from(person));
+        true
+    }
+
+    /// Whose scope this line's `remember` goes to by the one-face rule
+    /// ([`Self::take_by_one_face`], [`Self::keep_for_one_face`]), while the
+    /// lease is current and no narrow came after. Never a read, a forget or
+    /// a yes: only a keep reads it.
+    pub fn kept_by_one_face(&self) -> Option<String> {
+        if !self.is_current() {
+            return None;
+        }
+        self.context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_deref()
+            .map(str::to_owned)
+    }
+
+    /// Whether this line's keep is someone's by the one-face rule
+    /// ([`Self::kept_by_one_face`]): a held forget's yes on it is never one.
+    pub fn by_one_face(&self) -> bool {
+        self.kept_by_one_face().is_some()
     }
 
     /// The admitted person whose name a narrowed line's reply is told
@@ -941,6 +1023,53 @@ mod tests {
         revoked.revoke();
         assert!(!lease.carry_conversation(&a_id), "revoked");
         assert_eq!(lease.carried_for(), None, "revoked");
+    }
+    /// `LAMP_PERSON_SCOPE_ONE_FACE` (reviewer-three's P1 on #4584, option
+    /// 2): a line A's only by the one-face rule reads the room's, and only
+    /// its keep is A's. A narrow after it ends the keep; a revoked line, or
+    /// one admitted as nobody's, takes none. A room's line named late keeps
+    /// for that face, unless narrowed, carried or admitted as someone's.
+    #[test]
+    fn a_one_face_line_reads_the_room_and_keeps_only_for_its_person() {
+        let a = ScopeSnapshot::of("A");
+        let a_id = a.person().unwrap().to_owned();
+        let own = RequestScope::new(key(21), a.clone());
+        let lease = own.lease();
+        assert_eq!(lease.kept_by_one_face(), None);
+        assert!(lease.take_by_one_face());
+        assert_eq!(
+            lease.scope(),
+            Some(&ScopeSnapshot::room()),
+            "reads: the room's"
+        );
+        assert_eq!(lease.kept_by_one_face(), Some(a_id.clone()), "keeps: A's");
+        assert!(lease.by_one_face());
+        assert_eq!(lease.carried_for(), None);
+        assert!(!lease.carry_conversation(&a_id), "never widened after");
+        lease.narrow_to_room();
+        assert_eq!(lease.kept_by_one_face(), None, "a narrow ends the keep");
+        let room = RequestScope::new(key(22), ScopeSnapshot::room());
+        assert!(!room.lease().take_by_one_face(), "nobody's");
+        assert_eq!(room.lease().kept_by_one_face(), None);
+        assert!(room.lease().keep_for_one_face(&a_id), "named late");
+        assert_eq!(room.lease().scope(), Some(&ScopeSnapshot::room()));
+        assert_eq!(room.lease().kept_by_one_face(), Some(a_id.clone()));
+        let carried = RequestScope::new(key(23), ScopeSnapshot::room());
+        assert!(carried.lease().carry_conversation(&a_id));
+        assert!(!carried.lease().keep_for_one_face(&a_id), "carried wins");
+        let narrowed = RequestScope::new(key(24), ScopeSnapshot::room());
+        narrowed.lease().narrow_to_room();
+        assert!(!narrowed.lease().keep_for_one_face(&a_id), "narrowed");
+        assert!(
+            !own.lease().keep_for_one_face(&a_id),
+            "admitted as someone's"
+        );
+        let revoked = RequestScope::new(key(25), a);
+        let lease = revoked.lease();
+        assert!(lease.take_by_one_face());
+        revoked.revoke();
+        assert_eq!(lease.kept_by_one_face(), None, "revoked");
+        assert!(!lease.take_by_one_face(), "revoked");
     }
     /// `LAMP_CONVERSATION_CARRIED_SAVES` (#4339): only a carried line may
     /// save, and only into the carried person's scope; not one narrowed,

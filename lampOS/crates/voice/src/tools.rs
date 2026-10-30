@@ -1638,7 +1638,18 @@ fn run_call_with_scope(
                         ) =>
                     {
                         let started = std::time::Instant::now();
-                        match lease.keeper_within(crate::memory_scope::KEEPER_WAIT) {
+                        // A line A's only by the one-face rule, its reads
+                        // the room's: its `remember`, never a forget, is
+                        // A's (`LAMP_PERSON_SCOPE_ONE_FACE`, option 2 of
+                        // reviewer-three's P1 on #4584).
+                        let keeper = lease
+                            .keeper_within(crate::memory_scope::KEEPER_WAIT)
+                            .or_else(|| {
+                                (model.name == crate::remember::REMEMBER)
+                                    .then(|| lease.kept_by_one_face())
+                                    .flatten()
+                            });
+                        match keeper {
                             Some(person) => {
                                 eprintln!(
                                     "lamp-voice: request {request}: a memory write in a line admitted as the room's goes to the known face the eyes named by its end ({} ms)",
@@ -5083,6 +5094,80 @@ mod tests {
             });
         });
         assert_eq!(asked["person"], json!(ann), "{asked}");
+    }
+
+    /// `LAMP_PERSON_SCOPE_ONE_FACE` (option 2 of reviewer-three's P1 on
+    /// #4584): on a line Ann's only by her face the one face in view, her
+    /// `remember` is asked in her scope; a recall and a single-item forget
+    /// are asked in the room's, never hers.
+    #[test]
+    fn a_one_face_lines_keep_is_theirs_and_its_recall_and_forget_the_rooms() {
+        let ann = crate::remember::person_id("Ann");
+        for (at, (name, args, reply, person)) in [
+            (
+                crate::remember::REMEMBER,
+                json!({"text":"Flying to Tokyo next week."}),
+                "{\"ok\":true,\"id\":1}\n",
+                Some(ann.clone()),
+            ),
+            (
+                crate::remember::RECALL,
+                json!({"query":"doctor"}),
+                "{\"ok\":true,\"items\":[]}\n",
+                None,
+            ),
+            (
+                crate::remember::FORGET,
+                json!({}),
+                "{\"ok\":true,\"removed\":1}\n",
+                None,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let socket =
+                std::env::temp_dir().join(format!("one-face-{at}-{}.sock", std::process::id()));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                stream.write_all(reply.as_bytes()).unwrap();
+                serde_json::from_str::<Value>(&line).unwrap()
+            });
+            let request = 4_584 + at as u64;
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x45; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Ann"),
+            );
+            let lease = owner.lease();
+            assert!(lease.take_by_one_face());
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "o1".into(),
+                name: name.into(),
+                args,
+            };
+            answer_scoped(&settings, &call, request, false, &lease);
+            let asked = served.join().unwrap();
+            std::fs::remove_file(socket).unwrap();
+            assert_eq!(
+                asked.get("person").and_then(Value::as_str),
+                person.as_deref(),
+                "{name}: {asked}"
+            );
+        }
     }
 
     /// A genuinely unknown speaker's keep (nobody known by the end of the
