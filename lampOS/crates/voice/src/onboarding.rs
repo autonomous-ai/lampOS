@@ -3381,10 +3381,13 @@ const NO: [&str; 6] = ["no", "nope", "not", "don't", "never", "none"];
 /// problem", "I don't mind", "Of course", "Go ahead". On lamp-29e7 on 27 Oct
 /// "who you are" took 5 minutes (#3883); a "no problem" there also cleared
 /// the name heard.
-const YES_PHRASES: [&[&str]; 5] = [
+const YES_PHRASES: [&[&str]; 7] = [
     &["no", "problem"],
     &["don't", "mind"],
     &["do", "not", "mind"],
+    // "Yes, I wouldn't mind" (Third's P3 on #4529).
+    &["wouldn't", "mind"],
+    &["would", "not", "mind"],
     &["of", "course"],
     &["go", "ahead"],
 ];
@@ -3679,8 +3682,11 @@ fn head_still(joints: &lamp_msgs::JointState, asked: &mut Option<Asked>, now_us:
 fn words_of(text: &str) -> Vec<String> {
     text.split_whitespace()
         .map(|word| {
+            // A curly apostrophe reads as a straight one, so "don’t mind"
+            // is the phrase "don't mind" (Third's P3 on #4529).
             word.trim_matches(|c: char| !c.is_alphanumeric())
                 .to_lowercase()
+                .replace('\u{2019}', "'")
         })
         .filter(|word| !word.is_empty())
         .collect()
@@ -3697,10 +3703,7 @@ fn yes_or_no(text: &str) -> Option<bool> {
     // A "…n't" left once the yes phrases are out ("don't mind" is one) is a
     // no: "Right, I don't." and "Yeah, I won't." were a yes, and a consent
     // with them (Fourth's P3 on #4469).
-    if has(&["no", "nope", "nah", "not", "wrong"])
-        || rest
-            .iter()
-            .any(|word| word.ends_with("n't") || word.ends_with("n’t"))
+    if has(&["no", "nope", "nah", "not", "wrong"]) || rest.iter().any(|word| word.ends_with("n't"))
     {
         Some(false)
     } else if phrase
@@ -5675,6 +5678,19 @@ mod tests {
             assert_eq!(yes_or_no(no), Some(false), "{no}");
         }
         assert_eq!(yes_or_no("Yes, I don't mind"), Some(true));
+        // Third's P3 on #4529: "wouldn't mind" is a yes phrase, and a curly
+        // apostrophe reads as a straight one.
+        for yes in [
+            "Yes, I wouldn't mind",
+            "I would not mind",
+            "Yes, I don\u{2019}t mind",
+        ] {
+            assert_eq!(yes_or_no(yes), Some(true), "{yes}");
+        }
+        assert_eq!(yes_or_no("Right, I don\u{2019}t."), Some(false));
+        // Seventh's P3 on #4529, pinned as the safe way: an eager yes with a
+        // "…n't" is a no, and no consent is kept on it.
+        assert_eq!(yes_or_no("Yes, I can't wait."), Some(false));
     }
 
     /// With a face to keep (the eyes' who socket), a name and a yes leave
