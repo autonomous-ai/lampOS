@@ -6339,10 +6339,10 @@ fn a_real_coordinator_transcript_is_projected_before_shared_storage() {
 }
 
 /// `LAMP_SIGNED_OUT=on`, signed out after the first line was answered: the lamp
-/// says the line once with nothing asked, each line heard after it gets the
-/// line again, and no turn is sent after the first.
+/// says the line once with nothing asked, lines heard within its bound get the
+/// breath alone, and no turn is sent after the first.
 #[test]
-fn a_signed_out_lamp_says_so_once_and_again_when_talked_to_and_sends_nothing() {
+fn a_signed_out_lamp_says_so_once_and_bounds_it_when_talked_to_and_sends_nothing() {
     let _one = super::pilot_faults::one_session();
     super::super::signed_out::set_for_test(Some(|since_us| lamp_msgs::AccountState {
         signed_out: since_us >= 15_000_000,
@@ -6377,8 +6377,8 @@ fn a_signed_out_lamp_says_so_once_and_again_when_talked_to_and_sends_nothing() {
         .collect::<BTreeSet<_>>();
     assert_eq!(
         turns.len(),
-        3,
-        "once unasked, twice heard: {}",
+        1,
+        "once unasked, the lines heard after it within the bound: {}",
         run.summary()
     );
     let own = run
@@ -6387,6 +6387,33 @@ fn a_signed_out_lamp_says_so_once_and_again_when_talked_to_and_sends_nothing() {
         .filter(|event| event["admission_basis"] == "signed_out")
         .count();
     assert_eq!(own, 1, "{}", run.summary());
+}
+
+/// `LAMP_SIGNED_OUT=on` with nobody at the lamp and nobody talking: the line
+/// isn't said to an empty room.
+#[test]
+fn a_signed_out_lamp_says_nothing_to_an_empty_room() {
+    let _one = super::pilot_faults::one_session();
+    super::super::signed_out::set_for_test(Some(|_| lamp_msgs::AccountState {
+        signed_out: true,
+        for_s: 0,
+    }));
+    let run = run(Script {
+        second: false,
+        only: true,
+        notices: true,
+        silent: true,
+        mute_at_frame: Some(6_000),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::signed_out::set_for_test(None);
+    let own = run
+        .events("input_admitted")
+        .into_iter()
+        .filter(|event| event["admission_basis"] == "signed_out")
+        .count();
+    assert_eq!(own, 0, "{}", run.summary());
 }
 
 /// The state cleared: the lines before it are held, the one after it is sent.

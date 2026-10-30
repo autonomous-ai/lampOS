@@ -10046,10 +10046,9 @@ fn conversation_with_gate_inner(
                         });
                         let resumed_at = monotonic_us();
                         let opening_blocks = opening.len();
-                        match cloud
-                            .ready_session()
-                            .filter(|_| provider_control_empty && !submission_draining)
-                        {
+                        match cloud.ready_session().filter(|_| {
+                            provider_control_empty && !submission_draining && !signed_out.holds()
+                        }) {
                             Some(provider_session) => {
                                 let not_now = sleep_not_now(
                                     crate::sleep_asked::switched_on(),
@@ -10324,6 +10323,10 @@ fn conversation_with_gate_inner(
                     // through, nor a scrap too short to be a request.
                     if let Some(local) = current.local_only.as_mut() {
                         local.speech = !as_sound && said_turn == Some(current.owner.turn());
+                        // Signed out, the line is bounded: the breath between.
+                        if local.signed_out && !signed_out.may_say_heard(monotonic_us()) {
+                            local.speech = false;
+                        }
                     }
                     if sent.is_none() {
                         // Only the lamp's name, and nothing more in its
@@ -10603,7 +10606,7 @@ fn conversation_with_gate_inner(
             )?;
         }
         outage.note_delivery(reply);
-        signed_out.note_delivery(reply);
+        signed_out.note_delivery(reply, monotonic_us());
         select_failure_notice_in(notices, reply, &speaker_pending, &mut outage, trace)?;
         if let Some((request, why)) = reply.as_ref().and_then(|current| {
             current
@@ -11563,8 +11566,15 @@ fn conversation_with_gate_inner(
             }
         }
         // "I've been signed out." (`LAMP_SIGNED_OUT`): once a spell, unasked,
-        // when nothing holds the lamp and the room is quiet.
+        // to someone at the lamp, when nothing holds it and the room is quiet.
         if signed_out.owed()
+            && crate::reminders::someone_here(
+                presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock)),
+                said_at_us,
+                clock,
+            )
             && reply.is_none()
             && provider_queue.is_empty()
             && speaker_pending.is_none()
