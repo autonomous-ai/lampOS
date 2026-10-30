@@ -220,6 +220,10 @@ struct Script {
     /// With `second_fails`, only this many of the route's requests fail;
     /// the ones after are answered: the service is back.
     second_fails_first: Option<usize>,
+    /// With `second_fails`, this many of the lamp's written notes fail too,
+    /// their chat refused; a line the lamp says itself asks no chat, so it
+    /// never fails and is told `OwnWordsSaid`, as the engine tells it.
+    second_refuses_notes: usize,
     /// More lines, of 60 capture frames each, beginning at these frames.
     speak_at: &'static [u64],
     /// The second route's requests, by the count ended, in which speech to
@@ -325,6 +329,7 @@ impl Script {
             call_takes_next: false,
             second_fails: None,
             second_fails_first: None,
+            second_refuses_notes: 0,
             speak_at: &[],
             second_unheard: &[],
             second_slow: &[],
@@ -558,6 +563,8 @@ struct Peers {
     second_looked: bool,
     /// Look's turns the second route has answered (`Script::look_answers`).
     look_turns: usize,
+    /// Written notes refused (`Script::second_refuses_notes`).
+    notes_refused: usize,
     /// The capture frame the murmur began at (`Script::murmur`).
     murmur_at: Option<u64>,
     /// The capture frame the push began at (`Script::push`).
@@ -1114,6 +1121,21 @@ impl Peers {
                         }
                         Written::Said(packets) => {
                             queued.push_back(started);
+                            let own = crate::onboarding::own_words(&text).is_some();
+                            if !live && own {
+                                queued.push_back(ProviderOutput::OwnWordsSaid { request });
+                            } else if !live
+                                && let Some(reason) = self.script.second_fails
+                                && self.notes_refused < self.script.second_refuses_notes
+                            {
+                                self.notes_refused += 1;
+                                queued.push_back(ProviderOutput::TurnFailed {
+                                    request,
+                                    stage: FailedStage::AwaitingResponse,
+                                    reason,
+                                });
+                                continue;
+                            }
                             let before = self.peers[index].queued.len();
                             // Alone, a look's turn or the look's note is
                             // answered as the script says.
@@ -1838,6 +1860,7 @@ fn run(script: Script) -> Run {
         second_session: 0,
         second_looked: false,
         look_turns: 0,
+        notes_refused: 0,
         murmur_at: None,
         pushed_at: None,
         last_hand_publish_us: None,
@@ -6543,4 +6566,157 @@ fn a_refusals_line_past_its_minute_that_fails_only_slow_holds_nothing_and_the_ne
         .map(|chunk| chunk.turn)
         .collect::<BTreeSet<_>>();
     assert_eq!(answered.len(), 2, "{answered:?}\n{}", run.summary());
+}
+
+/// A skill's say while the model service refuses (#4265, the lead's call
+/// on #1711), on the second route alone, the refusal begun by its first
+/// turn's quota: the say and the person's lines that follow, as the run
+/// gave them.
+fn a_say_while_refused(
+    words: crate::say::Words,
+    refused_notes: usize,
+    speak_at: &'static [u64],
+    seconds: u64,
+) -> (Run, Vec<crate::say::Answer>) {
+    let (says, answered) =
+        crate::say::Says::words_for_test("stretch", words, crate::say::URGENT_FROM);
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        written: Written::Said(12),
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        second_refuses_notes: refused_notes,
+        speak_at,
+        mute_at_frame: Some(seconds * 100 - 500),
+        limit: Duration::from_secs(seconds),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    run.assert_clean();
+    let answered = answered.try_iter().collect();
+    (run, answered)
+}
+
+/// The say's turn and how long after the refused first turn it was
+/// admitted.
+fn said_after_refusal(run: &Run) -> (u64, u64) {
+    let refused_at = run.events("turn_finished")[0]["at_us"].as_u64().unwrap();
+    let say = run
+        .events("input_admitted")
+        .into_iter()
+        .find(|event| event["admission_basis"] == "skill_says")
+        .unwrap_or_else(|| panic!("no say: {}", run.summary()));
+    (
+        say["turn"].as_u64().unwrap(),
+        say["at_us"].as_u64().unwrap().saturating_sub(refused_at),
+    )
+}
+
+fn held_lines(run: &Run) -> usize {
+    run.events("input_admitted")
+        .into_iter()
+        .filter(|event| event["local_only"] == true)
+        .count()
+}
+
+/// A say with its own fixed words (a `text`) needs no model: while turns
+/// are held it is said as the lamp's own line, its words as they are and
+/// no chat asked. That is no answer of the model's: the person's line
+/// after it, within the minute, is still held.
+#[test]
+fn a_says_fixed_words_are_said_while_refused_and_end_no_refusal() {
+    use crate::say::{Answer, Outcome, Words};
+    let _one = super::pilot_faults::one_session();
+    let (run, answered) = a_say_while_refused(
+        Words::Text("Time to stretch.".into()),
+        0,
+        // Within the minute: held.
+        &[2_500],
+        40,
+    );
+    let own = crate::onboarding::said_as_is("Time to stretch.").unwrap();
+    let said: Vec<u64> = run
+        .seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written { request, text, .. } if *text == own => Some(*request),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(said.len(), 1, "{}", run.summary());
+    let (turn, after_us) = said_after_refusal(&run);
+    assert_eq!(turn, said[0]);
+    assert!(
+        after_us < super::super::model_refusing::TRY_AGAIN_EVERY_US,
+        "{after_us}"
+    );
+    assert_eq!(run.played(turn), vec![SECOND; 48]);
+    assert!(
+        matches!(
+            answered.as_slice(),
+            [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+        ),
+        "{answered:?}"
+    );
+    assert_eq!(held_lines(&run), 1, "{}", run.summary());
+}
+
+/// A note the model must word waits while turns are held, as a spoken line
+/// does, and is sent with the minute's try. Its chat refused again, the
+/// try is spent: the person's line after it is held for another minute.
+#[test]
+fn a_note_that_needs_the_model_waits_for_the_refusals_try_and_its_refusal_spends_it() {
+    use crate::say::Words;
+    let _one = super::pilot_faults::one_session();
+    let (run, _) = a_say_while_refused(
+        Words::Note("Remind the person to stretch.".into()),
+        1,
+        // Past the minute, after the note's refused try: held.
+        &[8_000],
+        100,
+    );
+    let (_, after_us) = said_after_refusal(&run);
+    assert!(
+        after_us >= super::super::model_refusing::TRY_AGAIN_EVERY_US,
+        "the note was sent {after_us} µs after the refusal: {}",
+        run.summary()
+    );
+    assert_eq!(held_lines(&run), 1, "{}", run.summary());
+}
+
+/// A note the model must word ends no refusal by being there: it waits, so
+/// the person's line within the minute is held. Sent with the minute's
+/// try and answered, it ends the refusal, and the line after it is sent
+/// and answered.
+#[test]
+fn a_note_that_needs_the_model_ends_a_refusal_only_once_answered() {
+    use crate::say::Words;
+    let _one = super::pilot_faults::one_session();
+    let (run, _) = a_say_while_refused(
+        Words::Note("Remind the person to stretch.".into()),
+        0,
+        // Within the minute: held; past it, after the note's answer: sent.
+        &[2_500, 8_500],
+        100,
+    );
+    let (note, after_us) = said_after_refusal(&run);
+    assert!(
+        after_us >= super::super::model_refusing::TRY_AGAIN_EVERY_US,
+        "{after_us}: {}",
+        run.summary()
+    );
+    assert_eq!(held_lines(&run), 1, "{}", run.summary());
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND && chunk.turn != note)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 1, "{answered:?}\n{}", run.summary());
 }
