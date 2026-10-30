@@ -43,13 +43,27 @@ pub const RATE_OVER: Duration = Duration::from_secs(2);
 /// go as they come, not on a clock of their own.
 const LOOK_EVERY: Duration = Duration::from_millis(20);
 
-/// When the last new frames came, for `fps_now`: shared by every stream.
+/// The source's rate, for `fps_now`: when each new frame of the eyes was
+/// first seen, whichever stream saw it, and the last one's time on the file,
+/// so a frame two streams see counts once, and a slow stream's skipped
+/// frames still count.
 #[derive(Default)]
-pub struct Rate(std::sync::Mutex<std::collections::VecDeque<std::time::Instant>>);
+pub struct Rate(
+    std::sync::Mutex<(
+        std::collections::VecDeque<std::time::Instant>,
+        Option<SystemTime>,
+    )>,
+);
 
 impl Rate {
-    fn came(&self, at: std::time::Instant) {
-        if let Ok(mut times) = self.0.lock() {
+    /// A frame written at `modified` seen at `at`: counted once.
+    fn saw(&self, modified: SystemTime, at: std::time::Instant) {
+        if let Ok(mut held) = self.0.lock() {
+            let (times, last) = &mut *held;
+            if *last == Some(modified) {
+                return;
+            }
+            *last = Some(modified);
             times.push_back(at);
             while times
                 .front()
@@ -63,7 +77,8 @@ impl Rate {
     /// New frames a second over the last [`RATE_OVER`], to a tenth; none
     /// before two were seen in it.
     pub fn now(&self) -> Option<f64> {
-        let times = self.0.lock().ok()?;
+        let held = self.0.lock().ok()?;
+        let times = &held.0;
         let fresh: Vec<_> = times
             .iter()
             .filter(|at| at.elapsed() <= RATE_OVER)
@@ -271,25 +286,24 @@ fn run(
             return;
         }
         match newest(sight, SystemTime::now()) {
-            Ok(frame)
-                if last != Some(frame.modified)
-                    && sent_at.is_none_or(|at| at.elapsed() >= least_gap) =>
-            {
+            Ok(frame) => {
+                let now = std::time::Instant::now();
+                // Every new frame of the eyes counts toward their rate,
+                // sent here or not.
+                rate.saw(frame.modified, now);
                 // The mark is on the ring before the picture leaves.
                 marked(&mut marked_at);
-                last = Some(frame.modified);
-                let now = std::time::Instant::now();
                 fresh_at = now;
-                sent_at = Some(now);
-                rate.came(now);
-                let mut event = frame.json();
-                event["ev"] = json!("camera.frame");
-                event["fps_now"] = json!(rate.now().unwrap_or(0.0));
-                tell(event);
-            }
-            Ok(_) => {
-                marked(&mut marked_at);
-                fresh_at = std::time::Instant::now();
+                if last != Some(frame.modified)
+                    && sent_at.is_none_or(|at| at.elapsed() >= least_gap)
+                {
+                    last = Some(frame.modified);
+                    sent_at = Some(now);
+                    let mut event = frame.json();
+                    event["ev"] = json!("camera.frame");
+                    event["fps_now"] = json!(rate.now());
+                    tell(event);
+                }
             }
             Err(_) if fresh_at.elapsed() >= GONE_AFTER => {
                 running.store(false, Ordering::SeqCst);
@@ -382,6 +396,42 @@ mod tests {
                 .why
                 .contains("not shown on the ring")
         );
+    }
+
+    #[test]
+    fn fps_now_is_the_eyes_rate_whoever_streams_and_however_slowly() {
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let mut camera =
+            Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(|_, _| {}));
+        let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let into = seen.clone();
+        let events: Events = Arc::new(move |_, event| into.lock().unwrap().push(event));
+        // Before two frames were seen, none.
+        assert_eq!(
+            camera
+                .stream("c_1", true, Some(30), events.clone())
+                .unwrap()["fps_now"],
+            Value::Null
+        );
+        // A second computer, and a slow one: neither doubles nor halves it.
+        camera.stream("c_2", true, Some(1), events.clone()).unwrap();
+        // The eyes write a new frame every 100 ms for 1.5 s: 10 a second.
+        for _ in 0..15 {
+            std::thread::sleep(Duration::from_millis(100));
+            let next = sight.with_extension("new");
+            std::fs::write(&next, JPEG).unwrap();
+            std::fs::rename(&next, &sight).unwrap();
+        }
+        let fps = camera.rate.now().expect("measured");
+        assert!((8.0..=12.0).contains(&fps), "{fps}");
+        // The first frame each sent said none yet: null, never 0.
+        let seen = seen.lock().unwrap();
+        assert!(seen.iter().any(|event| event["fps_now"].is_null()));
+        assert!(seen.iter().all(|event| event["fps_now"].is_null()
+            || event["fps_now"].as_f64().is_some_and(|fps| fps > 0.0)));
+        camera.end("c_1");
+        camera.end("c_2");
     }
 
     #[test]
