@@ -2230,6 +2230,22 @@ then use that person's scope:
   - **The journal** says counts only: `is theirs now: exchanges=N kept=N
     moved=N`, or `stays the room's: why=another_face|cant_tell|incomplete|not_adopted
     exchanges=N kept=N`.
+- **The name a face was saved under at onboarding** (always, with Days;
+  the onboarding forgets report, 30 Oct). When `remember_my_face` answers
+  `ok` while the onboarding file has "who you are" not yet done
+  (`onboarding::who_you_are_open`), the name the eyes kept it under is kept
+  as a thing of that person's own, "Their name is X.", in their scope
+  (`known_faces::memory_person`, `remember::keep_name_with_face`), as a
+  "remember my name" would keep it. Before, onboarding kept no name, so
+  once its exchange left the chat window a recognised owner had no source
+  for it but the by-default note. It runs on a thread of its own, never a
+  turn's, once per person per run; a failed keep says so in the journal
+  and is tried again at a next save in the step. A visitor's face saved during the
+  step keeps the visitor's name under the visitor's face. It is forgotten
+  as any kept thing of theirs: a forget of it, their "forget everything",
+  their face's forget with `LAMP_MEMORY_FORGET_ALL`. Only their own scope
+  reads it: a voice in the room's scope or another person's never recalls
+  it, and a face saved after the step is done keeps no name.
 - **What the caller said before their face was known**
   (`LAMP_MEMORY_FOLLOWS_FACE=on`, with Days, the second route only; off
   unless set; #2176; `crates/voice/src/follows_face.rs`). "My name is

@@ -1723,6 +1723,20 @@ fn run_call_with_scope(
             {
                 lease.face_remembered();
             }
+            // A face saved at onboarding, "who you are" not yet done: the
+            // name it was saved under is kept in that person's own memory,
+            // off this call's path (`remember::keep_name_with_face`, the
+            // onboarding forgets report). Read before the mailbox below.
+            if call.name == crate::known_faces::REMEMBER
+                && told.0["ok"] == true
+                && let Some(file) = onboarding
+                && crate::onboarding::who_you_are_open(file)
+                && let Some(name) = told.0["remembered"]
+                    .as_str()
+                    .or_else(|| call.args.get("name").and_then(Value::as_str))
+            {
+                crate::remember::keep_name_with_face(name);
+            }
             // A face saved while the walk leads "who you are" ends that step
             // (#3740), through the mailbox `setup_step` writes; one saved
             // before it is asked ends it when it comes up, unless a face is

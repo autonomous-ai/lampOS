@@ -4066,6 +4066,22 @@ pub fn owner_of(file: &Path) -> Option<String> {
     serde_json::from_slice::<Progress>(&bytes).ok()?.owner
 }
 
+/// Whether a face saved now is saved at onboarding: the onboarding file at
+/// `file` is there and has "who you are" not yet done (none, `later`,
+/// skipped or failed), so this save ends it. Read before
+/// [`face_saved`] posts: the runner commits the step some seconds later.
+/// No file, or one that can't be read, is not: nothing is kept on a guess.
+pub fn who_you_are_open(file: &Path) -> bool {
+    let Ok(bytes) = std::fs::read(file) else {
+        return false;
+    };
+    let Ok(progress) = serde_json::from_slice::<Value>(&bytes) else {
+        return false;
+    };
+    progress["steps"].is_object()
+        && progress["steps"][Step::WhoYouAre.name()]["outcome"] != json!("done")
+}
+
 /// A face `forget_my_face` forgot: a face saved before "who you are" was
 /// asked no longer ends it (#3640).
 pub fn face_forgotten(file: &Path) {
@@ -5541,6 +5557,40 @@ mod tests {
         early.wait(20 * S, Some(NEAR_MIDDLE));
         assert_eq!(early.outcome(Step::WhoYouAre), Some(Outcome::Done));
         assert_eq!(early.walk.desired.owner.as_deref(), Some("Example Name"));
+    }
+
+    /// The onboarding forgets report (30 Oct), fix C: a face saved while
+    /// "who you are" is not yet done is saved at onboarding; once it is done,
+    /// or with no file or an unreadable one, it is not.
+    #[test]
+    fn a_face_is_saved_at_onboarding_only_while_who_you_are_is_not_done() {
+        let dir = std::env::temp_dir().join(format!("lamp-who-open-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("progress.json");
+        assert!(!who_you_are_open(&file), "no file");
+        std::fs::write(&file, "not json").unwrap();
+        assert!(!who_you_are_open(&file), "unreadable");
+        for (steps, open) in [
+            (json!({}), true),
+            (json!({"sitting":{"outcome":"done","at_unix_s":1}}), true),
+            (
+                json!({"who_you_are":{"outcome":"later","at_unix_s":1}}),
+                true,
+            ),
+            (
+                json!({"who_you_are":{"outcome":"skipped","at_unix_s":1}}),
+                true,
+            ),
+            (
+                json!({"who_you_are":{"outcome":"done","at_unix_s":1}}),
+                false,
+            ),
+        ] {
+            std::fs::write(&file, json!({"steps": steps}).to_string()).unwrap();
+            assert_eq!(who_you_are_open(&file), open, "{steps}");
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// A face `remember_my_face` saved while "who you are" is led ends it
