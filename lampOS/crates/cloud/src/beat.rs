@@ -6,6 +6,7 @@
 use crate::account::Account;
 use crate::online::Say;
 use crate::ping::{self, Payload};
+use crate::signed_out::{self, Answer, Login};
 use crate::wire::Identity;
 use std::sync::Arc;
 use std::time::Duration;
@@ -43,6 +44,20 @@ pub fn client() -> Result<reqwest::Client, String> {
         .map_err(|_| "HTTPS client setup".to_owned())
 }
 
+/// Why a ping has no reply, and what that says of the login.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Failed {
+    pub why: String,
+    pub answer: Answer,
+}
+
+fn says_nothing(why: &str) -> Failed {
+    Failed {
+        why: why.to_owned(),
+        answer: Answer::Neither,
+    }
+}
+
 /// One ping: the reply's body, or why there is none. The key is only in the
 /// request's header, never in what is returned.
 pub async fn once(
@@ -50,8 +65,8 @@ pub async fn once(
     url: &str,
     key: &str,
     payload: &Payload,
-) -> Result<Vec<u8>, String> {
-    let body = serde_json::to_string(payload).map_err(|_| "the body".to_owned())?;
+) -> Result<Vec<u8>, Failed> {
+    let body = serde_json::to_string(payload).map_err(|_| says_nothing("the body"))?;
     let mut response = client
         .post(url)
         .header("authorization", format!("Bearer {key}"))
@@ -60,24 +75,28 @@ pub async fn once(
         .send()
         .await
         .map_err(|error| {
-            if error.is_timeout() {
-                "no answer in time".to_owned()
+            says_nothing(if error.is_timeout() {
+                "no answer in time"
             } else {
-                "no connection".to_owned()
-            }
+                "no connection"
+            })
         })?;
     if !response.status().is_success() {
-        return Err(format!("status {}", response.status().as_u16()));
+        let status = response.status().as_u16();
+        return Err(Failed {
+            why: format!("status {status}"),
+            answer: Answer::of_status(status),
+        });
     }
     let mut read = Vec::new();
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|_| "the reply broke off".to_owned())?
+        .map_err(|_| says_nothing("the reply broke off"))?
     {
         read.extend_from_slice(&chunk);
         if read.len() > MOST_REPLY {
-            return Err("the reply is too long".to_owned());
+            return Err(says_nothing("the reply is too long"));
         }
     }
     Ok(read)
@@ -85,7 +104,8 @@ pub async fn once(
 
 /// Pings every `every` with the newest account and identity until
 /// `accounts` closes. `key` is the bearer. `keep` is given each account a
-/// reply moved to, before it is sent on.
+/// reply moved to, before it is sent on. `login`, with `LAMP_SIGNED_OUT=on`,
+/// is told what each ping's answer says of the login.
 pub async fn pings(
     accounts: watch::Sender<Option<Account>>,
     identity: watch::Receiver<Identity>,
@@ -93,6 +113,7 @@ pub async fn pings(
     every: Duration,
     say: &mut impl Say,
     keep: &mut impl FnMut(&Account),
+    mut login: Option<&mut Login>,
 ) {
     let mut client = match client() {
         Ok(client) => client,
@@ -119,7 +140,15 @@ pub async fn pings(
         if let Some(account) = account
             && let Some(url) = ping::url(&account)
         {
-            match once(&client, &url, &key, &Payload::of(&me)).await {
+            let result = once(&client, &url, &key, &Payload::of(&me)).await;
+            if let Some(login) = login.as_deref_mut() {
+                let answer = match &result {
+                    Ok(body) => Answer::of_body(body),
+                    Err(failed) => failed.answer,
+                };
+                login.observe(answer, signed_out::now_s(), &mut |line| say.line(line));
+            }
+            match result {
                 Ok(body) => {
                     if failing.take().is_some() {
                         say.line("the backend's ping answers again");
@@ -135,7 +164,7 @@ pub async fn pings(
                         let _ = accounts.send(Some(next));
                     }
                 }
-                Err(why) => {
+                Err(Failed { why, .. }) => {
                     if failing.as_deref() != Some(why.as_str()) {
                         say.line(&format!("the backend's ping fails: {why}"));
                         failing = Some(why);
@@ -252,6 +281,7 @@ mod tests {
                 Duration::from_millis(20),
                 &mut say,
                 &mut keep,
+                None,
             )
             .await;
         });
@@ -295,5 +325,60 @@ mod tests {
                 !line.contains("voice-key") && !line.contains("p2") && !line.contains("s3cret")
             );
         }
+    }
+
+    /// The ping against a backend: twelve rejected pings in a row with
+    /// failing answers among them are signed out, and the first accepted
+    /// one after that is not. A login signed out says so once.
+    #[tokio::test]
+    async fn rejected_pings_sign_out_failing_ones_say_nothing_and_an_accepted_one_clears() {
+        use crate::signed_out::REJECTED_IN_A_ROW;
+        let mut answers = Vec::new();
+        for _ in 0..REJECTED_IN_A_ROW - 1 {
+            answers.push((401, ""));
+            answers.push((503, ""));
+            answers.push((429, ""));
+        }
+        // A success that is not the backend's says nothing either.
+        answers.push((200, "<html>"));
+        answers.push((401, ""));
+        answers.push((401, ""));
+        let (base, _requests) = backend(answers).await;
+        let (accounts, watched) = watch::channel(Some(account(&base)));
+        let (_me_tx, me) = watch::channel(Identity::default());
+        let lines = Arc::new(Mutex::new(Vec::<String>::new()));
+        let said = lines.clone();
+        let mut login = Login::open("voice-key", None, &mut |_| {});
+        let mut since = login.watch();
+        let pinging = tokio::spawn(async move {
+            let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
+            pings(
+                accounts,
+                me,
+                "voice-key".into(),
+                Duration::from_millis(2),
+                &mut say,
+                &mut |_: &Account| {},
+                Some(&mut login),
+            )
+            .await;
+        });
+        // Signed out, then signed in again by the `{}` after the script.
+        let mut seen = Vec::new();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while seen.len() < 2 {
+                since.changed().await.unwrap();
+                seen.push(since.borrow_and_update().is_some());
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(seen, [true, false]);
+        drop(watched);
+        pinging.await.unwrap();
+        let lines = lines.lock().unwrap().clone();
+        let said = |words: &str| lines.iter().filter(|line| line.contains(words)).count();
+        assert_eq!(said("this lamp is signed out: 12 pings"), 1, "{lines:?}");
+        assert_eq!(said("a ping was accepted"), 1, "{lines:?}");
     }
 }

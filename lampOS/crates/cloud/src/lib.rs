@@ -19,6 +19,7 @@ pub mod reports;
 pub mod schedule;
 pub mod settings;
 pub mod share;
+pub mod signed_out;
 pub mod skills;
 pub mod unasked;
 pub mod update;

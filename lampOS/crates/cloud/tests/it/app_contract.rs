@@ -928,3 +928,67 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
     assert_eq!(data["muted_by"], "sleep", "{data}");
     let _ = std::fs::remove_dir_all(root);
 }
+
+/// `LAMP_SIGNED_OUT`: `system.info` and `lamp.health` read the state from
+/// `account/state`. No state at all (the switch off, an older lamp-cloud) and
+/// a state of signed in say no field.
+#[test]
+fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
+    use lamp_msgs::{AccountState, Health};
+    let root = tempfile::tempdir().unwrap();
+    let places = lamp(&root.path().to_path_buf());
+    let bus_root = root.path().join("bus");
+    let bus = Bus::new(&bus_root).unwrap();
+    let mut health = bus
+        .publisher_declared(Health::TOPIC, &Health::declaration(), "health")
+        .unwrap();
+    health
+        .publish_json(
+            1,
+            &json!({"level":"ok","message":"","items":[],"missing":[]}),
+        )
+        .unwrap();
+    let mut real = Real {
+        places,
+        bus: Some(Bus::new(&bus_root).unwrap()),
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        share: None,
+        shutdown: None,
+    };
+    let said = |real: &mut Real, kind: &str| answer(real, kind, &Value::Null).unwrap().unwrap();
+    assert!(said(&mut real, "system.info").get("account").is_none());
+    assert!(said(&mut real, "lamp.health").get("account").is_none());
+    let mut state = bus
+        .publisher_declared(AccountState::TOPIC, &AccountState::declaration(), "cloud")
+        .unwrap();
+    state
+        .publish_json(lamp_ipc::monotonic_us(), &AccountState::default())
+        .unwrap();
+    assert!(said(&mut real, "system.info").get("account").is_none());
+    state
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &AccountState {
+                signed_out: true,
+                for_s: 3,
+            },
+        )
+        .unwrap();
+    assert_eq!(said(&mut real, "system.info")["account"], "signed_out");
+    assert_eq!(said(&mut real, "lamp.health")["account"], "signed_out");
+}

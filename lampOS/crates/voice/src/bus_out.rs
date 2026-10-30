@@ -683,6 +683,28 @@ pub fn chat_key_refused(report: lamp_msgs::Diagnostic, refused: bool) -> lamp_ms
     out.with("refused", "key")
 }
 
+/// The voice's report with the lamp signed out
+/// (`LAMP_SIGNED_OUT`): a warning that the lamp needs setting up again.
+pub fn signed_out(report: lamp_msgs::Diagnostic, signed_out: bool) -> lamp_msgs::Diagnostic {
+    use lamp_msgs::{Diagnostic, Level};
+    if !signed_out {
+        return report;
+    }
+    let said = "this lamp is signed out: it needs setting up again in the app";
+    let message = if report.message.is_empty() {
+        said.to_owned()
+    } else {
+        format!("{said}; {}", report.message)
+    };
+    let level = match report.level {
+        Level::Ok => Level::Warn,
+        level => level,
+    };
+    let mut out = Diagnostic::new(level, SOURCE, &message);
+    out.values = report.values;
+    out
+}
+
 /// The voice's report with the model service refusing the lamp's turns
 /// (#4265, `LAMP_SECOND_REFUSED_HOLD`): a warning naming the refusal's
 /// kinds and how long it has lasted, beside what else is said, so the team
@@ -1067,6 +1089,7 @@ pub struct BusOut {
     chat_key_refused: bool,
     /// The model service refusing turns: its kinds and for how long (#4265).
     model_refusing: Option<(String, u64)>,
+    signed_out: bool,
 }
 
 impl BusOut {
@@ -1119,6 +1142,7 @@ impl BusOut {
             ring_off: false,
             chat_key_refused: false,
             model_refusing: None,
+            signed_out: false,
         })
     }
 
@@ -1248,6 +1272,7 @@ impl BusOut {
             ),
             self.ring_off,
         );
+        let report = signed_out(report, self.signed_out);
         let _ = self.health.publish_json(now_us, &report);
         if let Some(link) = &mut self.link {
             let _ = link.publish_json(now_us, &link_state(link_up, down_for, refusal));
@@ -1270,6 +1295,12 @@ impl BusOut {
     /// while it does (#4265).
     pub fn set_model_refusing(&mut self, refusing: Option<(String, u64)>) {
         self.model_refusing = refusing;
+    }
+
+    /// Whether the lamp is signed out (`LAMP_SIGNED_OUT`), for the voice's
+    /// health.
+    pub fn set_signed_out(&mut self, signed_out: bool) {
+        self.signed_out = signed_out;
     }
 
     /// How many runs in a row failed before they heard anything, as the
