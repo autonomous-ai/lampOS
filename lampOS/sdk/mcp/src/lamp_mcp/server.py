@@ -66,7 +66,10 @@ LIMIT_KIND = {
     "look": "motion",
     "light": "light",
     "say": "say",
+    "sound": "say",
     "express": "express",
+    "play": "motion",
+    "joints": "joints",
 }
 
 
@@ -187,6 +190,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # action never ended is listed only until then (the Reviewer-lead's P3
     # on #3802).
     leases: dict[str, float] = {}
+    # The body lease the action tools hold now, if any (`with_body_lease`).
+    body_now: list[str] = []
     # The one `lamp_follow_hand` running, if any (a `Following`, True while it
     # starts, or STOP_ASKED when a stop came while it started): a second is
     # `busy`, and `lamp_follow_stop` or `lamp_stop` ends it (folded from
@@ -225,16 +230,30 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         except LampError as error:
             raise refused(error) from error
 
-    async def with_body_lease(op: str, **fields: Any) -> str:
+    async def with_body_lease(op: str, named: bool = False, **fields: Any) -> str:
         """`op` under a body lease of its own, released at `done` or left to
         lapse; a lease another holds, or one the lamp suspends, is the
-        tool's error, never retried."""
+        tool's error, never retried. `named`: the op names its lease
+        (`joints`)."""
         limits.take(op)
-        try:
-            taken = await lamp.request("lease.take", parts=["body"], for_ms=ACTION_LEASE_MS, why=why)
-        except LampError as error:
-            raise refused(error) from error
-        lease = taken["lease"]
+        # A body lease this server still holds, from an action the body took
+        # (`{"to": "body"}`, left to lapse), is renewed and used again: the
+        # lamp refuses a second take even from its own holder (`busy`), so a
+        # tool called right after another would fail.
+        lease = None
+        if body_now and leases.get(body_now[0], 0) > clock():
+            try:
+                await lamp.request("lease.renew", lease=body_now[0], for_ms=ACTION_LEASE_MS)
+                lease = body_now[0]
+            except LampError:
+                leases.pop(body_now[0], None)
+        if lease is None:
+            try:
+                taken = await lamp.request("lease.take", parts=["body"], for_ms=ACTION_LEASE_MS, why=why)
+            except LampError as error:
+                raise refused(error) from error
+            lease = taken["lease"]
+        body_now[:] = [lease]
         leases[lease] = clock() + ACTION_LEASE_MS / 1000
         ended: asyncio.Future = asyncio.get_running_loop().create_future()
 
@@ -242,14 +261,21 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             if event.get("ev") == "lease" and event.get("lease") == lease and event.get("state") in ("lost", "suspended"):
                 if not ended.done():
                     ended.set_result(("lease", event.get("state"), event.get("why")))
-            elif event.get("ev") == "done" and event.get("re") == sent.get("re") and not ended.done():
+            elif event.get("ev") == "done" and event.get("re") == asked and not ended.done():
                 ended.set_result(("done", event.get("how"), event.get("why")))
 
+        if named:
+            fields["lease"] = lease
         sent: dict = {}
+        # The request's id, known before it's sent (`request` takes the next
+        # id before it first yields): a `done` can come before its answer is
+        # read here, as the fake's `play` does.
+        asked: int | None = None
         lamp.on("lease", follow)
         lamp.on("done", follow)
         try:
             try:
+                asked = lamp._next_id
                 sent.update(await lamp.request(op, **fields))
             except LampError as error:
                 # The action was refused: its lease is let go of at once.
@@ -281,12 +307,14 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 what, how, _ = ended.result()
                 if what == "done" or how == "suspended":
                     leases.pop(lease, None)
+                    body_now[:] = [held for held in body_now if held != lease]
                     try:
                         await lamp.request("lease.release", lease=lease)
                     except LampError:
                         pass
                 elif how == "lost":
                     leases.pop(lease, None)
+                    body_now[:] = [held for held in body_now if held != lease]
 
     # Only what this computer may read is promised (blue's P3 on #3802).
     state_words = {
@@ -408,6 +436,34 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             elbow), the first and last all 0, one every `step_ms` (40 to 1000), lasting 1.5 to 10 s. The body checks it."""
             return await with_body_lease("move", step_ms=step_ms, frames=frames)
 
+        @server.tool()
+        async def lamp_play(name: str) -> str:
+            """Play a recorded move by its name (lowercase letters, digits, - and _). The body checks
+            it as any move. A lamp that doesn't route `play` yet says so, as the tool's error."""
+            return await with_body_lease("play", name=name)
+
+        @server.tool()
+        async def lamp_joints(
+            within_ms: int = 1_000,
+            pitch: float | None = None,
+            roll: float | None = None,
+            yaw: float | None = None,
+            shoulder: float | None = None,
+            elbow: float | None = None,
+        ) -> str:
+            """Aim the joints you name, in degrees (−180 to 180), reached within `within_ms`
+            (up to 5,000): head `pitch` and `roll`, base `yaw`, `shoulder` and `elbow`. At least one.
+            The body bounds each step as it does every move. A lamp that doesn't route `joints` yet
+            says so, as the tool's error."""
+            targets = {
+                name: value
+                for name, value in (("pitch", pitch), ("roll", roll), ("yaw", yaw), ("shoulder", shoulder), ("elbow", elbow))
+                if value is not None
+            }
+            if not targets:
+                raise ToolError("bad_request: lamp_joints needs at least one of pitch, roll, yaw, shoulder, elbow")
+            return await with_body_lease("joints", named=True, targets=targets, within_ms=within_ms)
+
     if allowed("light"):
 
         @server.tool()
@@ -432,6 +488,14 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 raise ToolError("bad_request: at most 300 characters")
             await act("say", text=text)
             return "said"
+
+        @server.tool()
+        async def lamp_sound(name: str) -> str:
+            """Play a short sound by its name (lowercase letters, digits, - and _). Like `lamp_say`, not
+            while the lamp is in quiet hours, private or talking. A lamp that doesn't route sound yet
+            says so, as the tool's error."""
+            await act("sound", name=name)
+            return f"{name} played"
 
     if allowed("body", "look"):
 

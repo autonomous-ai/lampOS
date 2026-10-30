@@ -279,10 +279,13 @@ claude mcp add lamp -- lamp-mcp        # or any MCP client; --lamp ID picks one 
 Install the two in one `pip` command: the SDK (`lampos`) isn't on PyPI, so
 `sdk/mcp` installed alone looks for it there and fails.
 
-The tools are `lamp_state`, `lamp_wait_for`, `lamp_gesture`, `lamp_light`,
-`lamp_say`, `lamp_look`, `lamp_move`, `lamp_express` and `lamp_stop`. Each
-is offered only with the grant it needs, takes its own short body lease,
-and keeps to the lamp's rates. A refusal comes back as the tool's error,
+The tools send every op of the protocol: `lamp_state`, `lamp_wait_for`,
+`lamp_gesture`, `lamp_light`, `lamp_say`, `lamp_sound`, `lamp_look`,
+`lamp_move`, `lamp_play`, `lamp_joints`, `lamp_express`, `lamp_follow_hand`,
+`lamp_follow_stop` and `lamp_stop` (the README's table has each one's
+parameters). Each is offered only with the grant it needs. A body tool takes
+a short body lease of its own, or renews the one it holds, and keeps to what
+hello's `limits` says. A refusal comes back as the tool's error,
 in the lamp's words. `lamp_look` works on a lamp with `--lease-socket` and on
 `lamp fake --everything`; a product lamp refuses it ("the body's lease socket
 is not on here") until its unit passes `--lease-socket`.
