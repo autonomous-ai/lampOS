@@ -472,6 +472,9 @@ struct RequestContext {
     /// it (#4339, [`ScopeLease::carry_conversation`]): that person's scope
     /// held ([`ScopeSnapshot::held`]) from then on, unless narrowed.
     carried: OnceLock<ScopeSnapshot>,
+    /// Carried, its keep waits for that conversation's person's yes
+    /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`ScopeLease::save_carried`]).
+    carried_saves: AtomicBool,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -528,6 +531,7 @@ impl RequestScope {
                 key,
                 scope,
                 carried: OnceLock::new(),
+                carried_saves: AtomicBool::new(false),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -573,6 +577,7 @@ impl RequestScope {
                 key,
                 scope,
                 carried: OnceLock::new(),
+                carried_saves: AtomicBool::new(false),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -659,6 +664,38 @@ impl ScopeLease {
         };
         let carried = self.context.carried.get_or_init(|| held);
         carried.person() == Some(person)
+    }
+
+    /// A carried line ([`Self::carry_conversation`]) may save: its
+    /// `remember` is held, in memory only, for the carried person's yes,
+    /// their own face seen saying it, and then written in their scope, the
+    /// conversation's own (`LAMP_CONVERSATION_CARRIED_SAVES`, #4339,
+    /// approved 30 Oct; the first builder's call on #4508). Nothing is
+    /// written or journalled from the carried line itself, and its scope
+    /// stays held ([`ScopeSnapshot::held`]): no recall, note or hits, no
+    /// forget and no yes. `false`, and nothing changed, for a line not
+    /// carried, narrowed, revoked, or admitted held only by a face's gap.
+    pub fn save_carried(&self) -> bool {
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.held
+            || self.context.carried.get().is_none()
+        {
+            return false;
+        }
+        self.context.carried_saves.store(true, Ordering::Release);
+        true
+    }
+
+    /// The carried person whose yes this line's keep waits for
+    /// ([`Self::save_carried`]): while current, not narrowed, and only for
+    /// a line marked to save.
+    pub fn saves_carried(&self) -> Option<&str> {
+        (self.is_current()
+            && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.carried_saves.load(Ordering::Acquire))
+        .then(|| self.context.carried.get().and_then(ScopeSnapshot::person))
+        .flatten()
     }
 
     /// A line narrowed to the room whose admitted person's face was alone in
@@ -840,6 +877,11 @@ impl ScopeLease {
     /// forget reads this; recall and other calls retain the admitted scope.
     pub fn keeper_within(&self, wait: Duration) -> Option<String> {
         self.context.late.as_ref()?;
+        // A carried line's keep is the carried conversation's, never a face
+        // named late (`LAMP_CONVERSATION_CARRIED_SAVES`).
+        if self.context.carried.get().is_some() && !self.context.narrowed.load(Ordering::Acquire) {
+            return None;
+        }
         let until = Instant::now() + wait;
         loop {
             let late = self.late_open()?;
@@ -899,6 +941,44 @@ mod tests {
         revoked.revoke();
         assert!(!lease.carry_conversation(&a_id), "revoked");
         assert_eq!(lease.carried_for(), None, "revoked");
+    }
+    /// `LAMP_CONVERSATION_CARRIED_SAVES` (#4339): only a carried line may
+    /// save, and only into the carried person's scope; not one narrowed,
+    /// revoked, never carried, or admitted held only by a face's gap. A
+    /// narrow after it ends the save. A carried line's keep never goes to a
+    /// face named late.
+    #[test]
+    fn only_a_carried_line_saves_and_only_as_the_carried_person() {
+        let a = ScopeSnapshot::of("A");
+        let a_id = a.person().unwrap().to_owned();
+        let room = RequestScope::new(key(11), ScopeSnapshot::room());
+        let lease = room.lease();
+        assert!(!lease.save_carried(), "not carried");
+        assert_eq!(lease.saves_carried(), None);
+        assert!(lease.carry_conversation(&a_id));
+        assert!(lease.save_carried());
+        assert_eq!(lease.saves_carried(), Some(a_id.as_str()));
+        assert!(lease.scope().unwrap().held(), "still held: no reads");
+        lease.narrow_to_room();
+        assert_eq!(lease.saves_carried(), None, "narrowed");
+        let gap = RequestScope::new(key(12), ScopeSnapshot::held_of("A"));
+        assert!(gap.lease().carry_conversation(&a_id));
+        assert!(!gap.lease().save_carried(), "admitted held by a gap");
+        assert_eq!(gap.lease().saves_carried(), None);
+        let revoked = RequestScope::new(key(13), a.clone());
+        let lease = revoked.lease();
+        assert!(lease.carry_conversation(&a_id));
+        revoked.revoke();
+        assert!(!lease.save_carried(), "revoked");
+        // A room's line looking later, its keeper recorded as B, carried as
+        // A's: its keep is A's, never B's.
+        let cache = Arc::new(FaceCache::default());
+        let late = RequestScope::looking_later(key(14), ScopeSnapshot::room(), cache);
+        let lease = late.lease();
+        lease.record_keeper(Some(crate::remember::person_id("B")));
+        assert!(lease.carry_conversation(&a_id));
+        assert!(lease.save_carried());
+        assert_eq!(lease.keeper_within(Duration::ZERO), None);
     }
     fn key(worker: u8) -> RequestKey {
         RequestKey {

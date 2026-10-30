@@ -4138,6 +4138,25 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   journal: `request N: no face was seen speaking it, in their conversation
   going on, no other face in view: told from that conversation, never
   memory's (LAMP_CONVERSATION_CARRIES)`.
+  **A carried line's keep waits for their yes**
+  (`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, approved 30 Oct; the first
+  builder's call on #4508): after either carry, `ScopeLease::save_carried`
+  marks it, unless it was admitted held only by a face's gap. Then
+  `remember` alone is declared (`withheld` gives
+  `MEMORY_CALLS_BUT_REMEMBER`), but never written from the carried line:
+  `hold_carried_keep` holds the call in `HeldForgets`, in RAM, for the
+  carried person, and the model is told `remember::held_keep_told` ("Not
+  kept yet … ask them once"). It stands only on a reply that asks
+  (`remember::asks_about_keeping`), and runs only on their plain yes on the
+  next spoken line within 60 s with their face seen saying it
+  (`take_held_forget`, `LAMP_EYES_SPEAKING`); anything else drops it.
+  `same_voice_releases` is the hook for the same-voice follow-up. Without
+  the eyes' speaking read nothing is held (`HELD_KEEP_REFUSED`).
+  `keep_scoped` keeps the carried line out of the journal
+  (`remember::held_by_gap`). Recall, note, hits, forgets, rules, faces and
+  a yes stay refused with `HELD_MEMORY_CALL`. The journal: `request N:
+  carried: a keep waits for their yes, their face seen saying it; no reads,
+  forgets or yes (LAMP_CONVERSATION_CARRIED_SAVES)`.
   The switch is installed whether or not the eyes' reader starts; with no
   reader (the bus would not open) no face is seen, so every line is the
   room's and a late look gives no keeper: `no eyes read who spoke it
