@@ -121,15 +121,31 @@ impl Item {
     fn timer(&self) -> bool {
         self.deadline.elapsed.is_some()
     }
+
+    /// A timer the room hears ([`visible`]): set with nobody sure, for at
+    /// most [`ROOM_TIMER_MS`] from when it was set.
+    fn rooms(&self) -> bool {
+        self.person.is_none()
+            && self.timer()
+            && self.deadline.unix_ms.saturating_sub(self.created_unix_ms) <= ROOM_TIMER_MS
+    }
 }
 
+/// The longest a timer set with nobody sure may run and still be the room's:
+/// a kitchen timer is minutes, a roast's an hour or two. `set_timer` also
+/// sets relative reminders, up to a year out ("in three weeks, renew my
+/// prescription", Reviewer-three's P1 and Third's line on #4668), and a
+/// longer one is kept as a reminder is.
+const ROOM_TIMER_MS: i64 = 2 * 3_600_000;
+
 /// Whether `asker`, if any, may see `item`: no asker sees everything, and
-/// every line sees a timer. A timer is the room's (option 1 on #4656's
-/// after-merge P2): set for minutes or hours, said aloud to whoever is there
-/// when it's due, and asked after from the stove with no face in view. It
-/// keeps its setter all the same, so a person's forget still cancels it.
+/// every line sees the room's timers. A timer set with nobody sure, for two
+/// hours at most, is the room's (option 1 on #4656's after-merge P2): asked
+/// after from the stove with no face in view, and said aloud to whoever is
+/// there when it's due. A timer a person set stays theirs, as their
+/// relative reminders do, and their forget cancels it.
 fn visible(asker: Option<&Asker>, item: &Item) -> bool {
-    item.timer() || asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
+    item.rooms() || asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
 }
 
 /// A setter's person id as memory makes them: `p-` and 16 hex digits.
