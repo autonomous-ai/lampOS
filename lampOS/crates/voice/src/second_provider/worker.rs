@@ -1348,8 +1348,13 @@ pub(crate) const RECALL_BEFORE_NOT_KNOWING: &str = " Before you say you don't kn
 /// call, so they are said at the first round's pace. The next round is told
 /// they were heard (`LAMP_SECOND_SAID_ONCE`) and adds only what the results
 /// or the rest of the request call for, so another ask in the same line
-/// ("dim the light and tell me a joke") is still answered.
-pub(crate) const SAY_WITH_CALL_NOTE: &str = " When you call a function that changes something for them (your light, how loud you are, a timer or a reminder, or keeping what they asked you to remember), say your few words in the same reply as the call, such as \"Warmer it is.\" or \"Ten minutes, starting now.\", not after it.";
+/// ("dim the light and tell me a joke") is still answered. Never a keep or
+/// a forget: either can come back held for the person's yes (a carried
+/// line's keep, `LAMP_CONVERSATION_CARRIED_SAVES`; every forget,
+/// `held_forget_told`), and words said with the call would promise what
+/// round 2 then asks (Reviewer-three's P2 on #4635: "Forgotten." said, the
+/// forget waiting for a yes never given, the data kept).
+pub(crate) const SAY_WITH_CALL_NOTE: &str = " When you call a function that changes your light or how loud you are, or sets a timer or a reminder, say your few words in the same reply as the call, such as \"Warmer it is.\" or \"Ten minutes, starting now.\", not after it. Never for remembering or forgetting, or for anything that needs their yes: say those after the result, as before.";
 
 /// The spoken character with [`SAY_WITH_CALL_NOTE`] after it when `on`:
 /// `LAMP_SECOND_SAY_WITH_CALL` together with `LAMP_SECOND_SAID_ONCE`, which
@@ -24348,6 +24353,19 @@ mod tests {
         assert_eq!(asked, format!("{spoken}{}", super::SAY_WITH_CALL_NOTE));
         assert!(super::SAY_WITH_CALL_NOTE.contains("in the same reply as the call"));
         assert!(super::SAY_WITH_CALL_NOTE.starts_with(' '));
+        // Never a keep or a forget, which may come back held for the
+        // person's yes (Reviewer-three's P2 on #4635): they are said after
+        // the result.
+        let note = super::SAY_WITH_CALL_NOTE;
+        assert!(
+            note.contains(
+                "Never for remembering or forgetting, or for anything that needs their yes"
+            )
+        );
+        let asked = &note[..note.find("Never").unwrap()];
+        for word in ["remember", "keep", "forget", "save"] {
+            assert!(!asked.contains(word), "asked with {word}: {asked}");
+        }
     }
 
     #[test]
