@@ -64,16 +64,24 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 #[test]
-fn the_store_is_the_pings_base_and_never_shows_its_key() {
+fn the_store_is_the_hosts_root_and_never_shows_its_key() {
     let account = |base: &str| Account {
         llm_base_url: base.into(),
         ..Default::default()
     };
-    let store = Store::of(&account("https://api.test/v1/"), " k ").unwrap();
+    // A lamp's base, as setup keeps it: the routes sit at its host's root.
+    let store = Store::of(&account("https://api.test/api/v1/ai/v1"), " k ").unwrap();
     assert_eq!(
         store.url("publish"),
         "https://api.test/api/v1/skills/publish"
     );
+    assert_eq!(
+        Store::of(&account("http://127.0.0.1:8080/api/v1/ai/v1/"), "k")
+            .unwrap()
+            .url("mine"),
+        "http://127.0.0.1:8080/api/v1/skills/mine"
+    );
+    assert_eq!(Store::of(&account("not a url"), "k"), None);
     assert_eq!(store.key, "k");
     assert!(!format!("{store:?}").contains('k') || !format!("{store:?}").contains("\"k\""));
     assert!(format!("{store:?}").contains("<hidden>"));
@@ -173,7 +181,7 @@ fn share_uploads_the_package_with_the_lamps_key_and_reads_back_pending() {
     skill(&places, "water", "Water", "made: here\n", MADE);
     let (store, seen) = store(
         201,
-        r#"{"id":"s1","name":"water","version":"1.0.0","review_status":"pending","owner":"x"}"#,
+        r#"{"status":1,"data":{"id":"s1","name":"water","version":"1.0.0","review_status":"pending","owner":"x"}}"#,
     );
     let sent = share(
         &store,
@@ -211,9 +219,16 @@ fn the_stores_refusals_are_passed_on_in_plain_words_never_the_key() {
     assert_eq!(
         reason(
             409,
-            br#"{"error_code":"skill_name_reserved","message":"that name is a built-in skill's"}"#
+            br#"{"status":0,"message":"Request failed","error_code":"skill_name_reserved","error_message":"that name is a built-in skill's"}"#
         ),
         "the Skills Store said: that name is a built-in skill's"
+    );
+    assert_eq!(
+        reason(
+            409,
+            br#"{"status":0,"message":"Request failed","error_code":"skill_name_taken"}"#
+        ),
+        "the Skills Store said: skill_name_taken"
     );
     assert_eq!(
         reason(429, br#"{"error":"5 a day from one lamp"}"#),
@@ -223,10 +238,22 @@ fn the_stores_refusals_are_passed_on_in_plain_words_never_the_key() {
 
     let places = places("share-no");
     skill(&places, "water", "Water", "made: here\n", MADE);
-    let (store, _) = store(409, r#"{"error_code":"skill_name_taken"}"#);
+    let (taken, _) = store(
+        409,
+        r#"{"status":0,"message":"Request failed","error_code":"skill_name_taken"}"#,
+    );
     assert_eq!(
-        share(&store, &places, &json!({"name": "water"}), &scratch("no")),
+        share(&taken, &places, &json!({"name": "water"}), &scratch("no")),
         Err("the Skills Store said: skill_name_taken".into())
+    );
+    // A refusal the Store gives with a 200 and "status": 0 is one too.
+    let (full, _) = store(
+        200,
+        r#"{"status":0,"message":"Request failed","error_message":"3 are waiting already"}"#,
+    );
+    assert_eq!(
+        share(&full, &places, &json!({"name": "water"}), &scratch("no2")),
+        Err("the Skills Store said: 3 are waiting already".into())
     );
 }
 
@@ -234,7 +261,7 @@ fn the_stores_refusals_are_passed_on_in_plain_words_never_the_key() {
 fn shared_reads_mine_and_keeps_only_the_apps_fields() {
     let (store, seen) = store(
         200,
-        r#"{"skills":[{"id":"s2","name":"a","version":"1.0.0","review_status":"rejected","review_note":"it names a person","owner_id":"o"},{"id":"s1","name":"b","review_status":"approved"},{"name":"no id"}]}"#,
+        r#"{"status":1,"data":{"data":[{"id":"s2","name":"a","version":"1.0.0","review_status":"rejected","review_note":"it names a person","owner_id":"o"},{"id":"s1","name":"b","review_status":"approved"},{"name":"no id"}],"total":3}}"#,
     );
     assert_eq!(
         shared(&store).unwrap(),
@@ -256,7 +283,7 @@ fn shared_reads_mine_and_keeps_only_the_apps_fields() {
 
 #[test]
 fn unshare_deletes_that_id_and_refuses_one_that_isnt() {
-    let (store, seen) = store(200, "{}");
+    let (store, seen) = store(200, r#"{"status":1,"data":null}"#);
     assert_eq!(
         unshare(&store, &json!({"id": "s-1_a"})),
         Ok(json!({"unshared": "s-1_a"}))
