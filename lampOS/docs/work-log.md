@@ -1,3 +1,16 @@
+## 30 October 2026, 16:10 +07: the 7071 lamps' first home update, still unrun on a lamp
+
+- **What I found:** stable went to 8899 at 15:21. The ten customer lamps are on 7071, and their first home update (the climb to 8899's updater, then 8899's round) has never run on a real lamp. The first builder asked the hardware team for it on 29 Oct (#3530), and that issue was closed without a result. The first builder has now made it the lead's top item (#1711).
+- **#4561**, a run sheet for that run: what the lamp should do, the steps, what to send back, and how to read each line. Reviewer-two and Third both caught the same P2: I had taken 7071's refusal line (`TooOld::why`) for a climb that worked, and put `self-switched` in the grep, though it's never a journal line. Fixed in `3b056c1b5a`, and the same grep corrected on the Queue. Lesson: read the `Display` of the outcome the serve loop prints, not the outcome's name.
+- **Also checked:**
+  - 8899 lacks #4517 (the PulseAudio busy retry). A lamp put back by that race refuses 8899 by its sequence and takes the next promote, so it doesn't loop.
+  - 8925 (train 409) needs updater 8 too.
+- **Reads:**
+  - READ-OK on #4180 (recovery needs the lamp's own key). The guard can't open by itself; Backend confirmed the key is per lamp.
+  - A scoped note on #4514's reset plan (its new hash, 7071's and stable's are all in `RESET_PLAN_SHIPPED`).
+  - READ-OK on #4551.
+- **Closed:** #4500, on cb94's 2 of 2 resets in place.
+
 ## 30 October 2026, 15:03 +07: train 409 carries the reset's bound and the sandbox test
 
 - **#4549** replaces #4539. The train bot couldn't take #4539's branch, because it still carried #4533's commits under their old SHAs. #4549 is the same commit cherry-picked onto lamp-voice, with the same patch id, so the READ-OKs carried. Lesson: after a train lands what my branch is built on, cherry-pick onto lamp-voice. Merging lamp-voice in isn't enough.
