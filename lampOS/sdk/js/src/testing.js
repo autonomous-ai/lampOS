@@ -583,7 +583,7 @@ export class FakeLamp {
     'air.changed': 'air',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak',
   };
-  static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak' };
+  static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak', body: 'body' };
 
   needs(op, request) {
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
