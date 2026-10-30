@@ -1,3 +1,13 @@
+## 2026-10-30 11:1x ICT — #4476 forget clears the typed name; #4480 hello; update locks for settings restarts
+
+**#4461 → #4476:** the product tells the typed name only to the owner's line (`LAMP_PERSON_NAME_OWNER_ONLY=on`), and the owner's own marked "forget everything" removes it, as #4356 removes the place. The second route reads it per reply, keyed on the switch and path (Reviewer-three's P3). READ-OK from Friday and Reviewer-three; my own HOLD stands until the first builder's yes for the product switch. Train 398 took its older head and was closed without it.
+
+**#4480 (preferences' hello):** a line that asks back, puts the hello off, or answers at length led by "okay" or "please" no longer ends the step. A firm-led or short answer still does. Two rounds of Reviewer-three's P2s, now `puts_off_the_hello` with words and pairs.
+
+**Update locks:** my P2 on #4485 (a language set mid-round restarts the voice inside the round's watch) was fixed by Seventh. The same window for the zone's `lamp-schedule` restart is **#4490**, and for the own-keys voice restart **#4492** (stacked; the keys unit gains the records path).
+
+**Reads:** #4463, #4464, #4467, #4471, #4482 READ-OK; #4469 HOLD (polite refusals kept as consent) then READ-OK; #4485 HOLD then READ-OK.
+
 ## 2026-10-30 09:1x ICT — #4322 carried as #4465; #4278 rebased; reads for #4332
 
 **Carries:**
