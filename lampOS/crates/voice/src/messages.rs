@@ -362,11 +362,17 @@ pub(crate) async fn serve_with(
     bus_root: std::path::PathBuf,
     mut unasked: Unasked,
 ) {
-    let bus = lamp_bus::Bus::new(&bus_root);
+    // Each timed on the second route's thread with `LAMP_STALLS=on` (#4332).
+    let polls = crate::stalls::Polls::current();
+    let bus = polls.time("texts.bus", || lamp_bus::Bus::new(&bus_root));
     let ends = bus.and_then(|bus| {
         Ok((
-            bus.subscribe_typed(ChatIn::TOPIC, "texts", ChatIn::TYPE)?,
-            bus.publisher_declared(ChatOut::TOPIC, &ChatOut::declaration(), "voice")?,
+            polls.time("texts.subscribe", || {
+                bus.subscribe_typed(ChatIn::TOPIC, "texts", ChatIn::TYPE)
+            })?,
+            polls.time("texts.publisher", || {
+                bus.publisher_declared(ChatOut::TOPIC, &ChatOut::declaration(), "voice")
+            })?,
             bus,
         ))
     });

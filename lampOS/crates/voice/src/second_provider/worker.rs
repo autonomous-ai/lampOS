@@ -3935,20 +3935,25 @@ pub fn serve(
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
+    // With `LAMP_STALLS=on`, the loop's gaps, and each poll of a task on
+    // its thread that holds it, by the task's name (#4332).
+    let stalls = crate::stalls::Stalls::from_environment("second");
+    let polls = stalls.polls();
+    let _polls_here = polls.enter();
     if let Some(task) = routes_task {
-        runtime.spawn(task);
+        runtime.spawn(crate::stalls::timed("routes", task));
     }
     if let Some((bus, told)) = air {
         eprintln!(
             "lamp-voice second: a stuffy room is told beside what a person says (LAMP_AIR_FACTS)"
         );
-        runtime.spawn(air_task(bus, told));
+        runtime.spawn(crate::stalls::timed("air", air_task(bus, told)));
     }
     if let Some((bus, told)) = seems {
         eprintln!(
             "lamp-voice second: how a known person seems is told beside what they say (LAMP_SECOND_SEEMS)"
         );
-        runtime.spawn(seems_task(bus, told));
+        runtime.spawn(crate::stalls::timed("seems", seems_task(bus, told)));
     }
     // Memory's forgets, with the running summary on and the bus: a forget
     // from the app drops the conversation's notes as one by voice does.
@@ -3963,13 +3968,16 @@ pub fn serve(
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
-        runtime.spawn(texts_task(chat, character, tools, root));
+        runtime.spawn(crate::stalls::timed(
+            "texts",
+            texts_task(chat, character, tools, root),
+        ));
     }
     let result = runtime.block_on(async move {
         // At most one filesystem read is outstanding; admission only reads the
         // nonblocking cache. Aborting the refresh prevents any later poll.
         let refresh = scope_file.map(|path| {
-            tokio::spawn(async move {
+            tokio::spawn(crate::stalls::timed("face_refresh", async move {
                 let mut interval = tokio::time::interval(crate::memory_scope::REFRESH_EVERY);
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 loop {
@@ -4001,12 +4009,20 @@ pub fn serve(
                     }
                     face_cache.replace_seen(token, observation, in_view);
                 }
-            })
+            }))
         });
         // The first turn after a start finds the chat's connection open
         // (#3754).
-        engine.warm_ahead();
-        let result = run(channels, boots.coordinator, engine, thread, probe_targets).await;
+        polls.time("warm_ahead", || engine.warm_ahead());
+        let result = run_recorded(
+            stalls,
+            channels,
+            boots.coordinator,
+            engine,
+            thread,
+            probe_targets,
+        )
+        .await;
         if let Some(refresh) = refresh {
             refresh.abort();
         }
@@ -11147,22 +11163,43 @@ fn next_output(engine: &mut Engine) -> Option<ProviderOutput> {
 /// answering is the link Unavailable until a check every 30 s finds one
 /// (`link.rs`); without, the link stays Ready, as a standby's always has.
 pub async fn run(
+    channels: WorkerChannels,
+    boot: BootId,
+    engine: Engine,
+    thread: Option<PathBuf>,
+    probe_targets: Option<Vec<String>>,
+) -> io::Result<()> {
+    let stalls = crate::stalls::Stalls::from_environment("second");
+    run_recorded(stalls, channels, boot, engine, thread, probe_targets).await
+}
+
+/// [`run`], its loop's passes in `stalls` (`LAMP_STALLS=on`, #4332): from
+/// `Ready` to the first tick one pass, each of its calls timed by name, then
+/// one pass a tick, so a tick held by a task on this thread is a `gap`.
+async fn run_recorded(
+    mut stalls: crate::stalls::Stalls,
     mut channels: WorkerChannels,
     boot: BootId,
     mut engine: Engine,
     thread: Option<PathBuf>,
     probe_targets: Option<Vec<String>>,
 ) -> io::Result<()> {
+    let polls = stalls.polls();
     let started_us = monotonic_us();
-    channels.control.send(WorkerEvent::Ready)?;
+    let prologue = stalls.begin();
+    polls.time("ready", || channels.control.send(WorkerEvent::Ready))?;
     // The wait sounds and down lines rendered at the start, not at the
     // first line: the first turn after a restart had none (#3755).
-    engine.render_lines();
-    let (mut link, ready) = super::link::Watch::new(probe_targets, started_us, monotonic_us());
+    polls.time("render_lines", || engine.render_lines());
+    let (mut link, ready) = polls.time("link_watch", || {
+        super::link::Watch::new(probe_targets, started_us, monotonic_us())
+    });
     ready.validate(monotonic_us())?;
-    channels
-        .control
-        .send(WorkerEvent::ProviderLink { link: ready })?;
+    polls.time("link_ready", || {
+        channels
+            .control
+            .send(WorkerEvent::ProviderLink { link: ready })
+    })?;
     let mut gate = Gate::new(boot, monotonic_us());
     let mut ticker = tokio::time::interval(Duration::from_millis(2));
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -11183,9 +11220,11 @@ pub async fn run(
             crate::remember::finished(request);
         }
     };
+    prologue.done();
     'tick: loop {
         // The turn tasks run while this waits.
         ticker.tick().await;
+        let pass = stalls.begin();
         engine.tick_room(monotonic_us());
         if let Some(request) = held.due(Instant::now()) {
             crate::remember::finished(request);
@@ -11309,6 +11348,7 @@ pub async fn run(
         {
             pending = Some(event);
         }
+        pass.done();
     }
 }
 
