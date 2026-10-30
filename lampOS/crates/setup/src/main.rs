@@ -711,8 +711,12 @@ fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::er
         None => Bus::from_environment()?,
     };
     let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: keys: {line}"));
-    match change::wait_for_quiet(&mut ears, change::QUIET_MOST) {
-        Ok(()) => match std::process::Command::new("/usr/bin/systemctl")
+    // Quiet, and no update at work: held to the end, so no round's watch
+    // sees the voice change process and puts its build back (Tests' P3 on
+    // #4490, as the zone's restart).
+    let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
+    match change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST) {
+        Ok(_held) => match std::process::Command::new("/usr/bin/systemctl")
             .args(["try-restart", keys::VOICE_UNIT])
             .status()
         {
@@ -723,7 +727,7 @@ fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::er
             Err(error) => eprintln!("lamp-setup: keys: the voice could not be restarted: {error}"),
         },
         Err(why) => eprintln!(
-            "lamp-setup: keys: the lamp was not quiet within {} min ({why}); the voice takes them at its next start",
+            "lamp-setup: keys: the lamp was not quiet with no update at work within {} min ({why}); the voice takes them at its next start",
             change::QUIET_MOST.as_secs() / 60
         ),
     }

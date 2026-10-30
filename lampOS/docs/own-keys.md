@@ -133,8 +133,11 @@ one plain path (`reset-plan-product.json`, the rule on #2060), and
 
 After a change the helper restarts the voice (`systemctl try-restart`) once
 the lamp is quiet, an update's rule (45 s with nobody heard and nothing
-said), waiting at most 30 minutes; otherwise the voice takes it at its next
-start. Each helper that waits holds one of the socket's 4 connections
+said), and no update is at work: it takes lamp-update's lock and holds it
+through the restart (`change::quiet_and_unlocked`, as a zone's restart), so
+a round's watch never sees the voice change process and puts its build back
+(Tests' P3 on #4490). It waits at most 30 minutes in all; otherwise the
+voice takes it at its next start. Each helper that waits holds one of the socket's 4 connections
 (`MaxConnections=4`) while it does: in a busy room, a fifth `keys.*` within
 that half hour, `keys.get` included, gets `unavailable`, "the lamp's keys
 are not running", until one restart is done (the reviewer's P3 4 on
