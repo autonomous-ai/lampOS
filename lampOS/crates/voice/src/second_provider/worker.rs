@@ -10393,11 +10393,16 @@ pub(crate) fn texts_ends(
 ) -> (crate::second_provider::System, ToolRunner) {
     let told = tools.clone();
     let system: crate::second_provider::System = Arc::new(move || {
-        let skills = if told.use_skill {
-            crate::use_skill::section(&crate::tools::skill_tools(&told))
+        // As a spoken turn's: the skills' lines with `use_skill`, and how to
+        // put the lamp to sleep or unplug it without the function (#4595,
+        // the Reviewer-lead's P3 on #4629).
+        let offered = crate::tools::skill_tools(&told);
+        let mut skills = if told.use_skill {
+            crate::use_skill::section(&offered)
         } else {
             String::new()
         };
+        skills.push_str(&crate::without_a_tool::for_turn(&told, &offered));
         texts_system_message(
             &character,
             crate::agent_tasks::noted(
@@ -19057,6 +19062,14 @@ mod tests {
                 assert!(!told.text.contains("spare key"), "{}", told.text);
                 assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
                 assert!(told.history.is_empty());
+                // Told as a spoken turn is how to put the lamp to sleep or
+                // unplug it, with neither function (#4595).
+                assert!(
+                    told.text
+                        .ends_with(&crate::without_a_tool::told(false, false, false)),
+                    "{}",
+                    told.text
+                );
                 // Told the time as it is asked with LAMP_CLOCK, and as
                 // before without it, where this machine has a local time.
                 if crate::local_time::offset_here().is_some() {
