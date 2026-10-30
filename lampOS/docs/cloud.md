@@ -1217,7 +1217,7 @@ it.
 **One alert per stage of a round,** from `update/status`: `started` (the
 first phase after `idle` that goes on to fetch; a round that only checks
 says nothing), then `done` (`switched`), `failed`, `refused`, `rolled-back`
-`self-switched` (lamp-update switched itself) or `self-confirmed` (its new
+`self-switched` (lamp-update took its newer self; read below) or `self-confirmed` (its new
 self confirmed that switch; a self-switch has this confirmation alert once
 lamp-update says it, and it breaks a repeating streak like `done`), or `self-put-back` (the old
 lamp-update was put back because the new one did not take, always told,
@@ -1228,7 +1228,27 @@ confirmed lamp-update refreshes the helper. A round whose `started` was told and
 nothing switched (`not-quiet`, `unreachable`, `would`, `up-to-date`,
 `nothing-published`) ends as `not-switched`, with `code:` the outcome's
 own name (`other` for a name not known), so no start is left without an
-end. Those outcomes in a round with no `started` told are not alerts. The message is a fixed template:
+end. Those outcomes in a round with no `started` told are not alerts.
+
+**`self-switched` is usually the whole update, not half of it.** lamp-update
+names two round ends `self-switched` (`round::Outcome::kind`), and the alert
+can't tell them apart:
+- **`SelfSwitched`:** the parts switched to `to` *and* lamp-update took the
+  newer self the build carries, in one round. Nearly every build so far
+  carries a lamp-update with a new hash, so on a self-updating product lamp
+  this, not `done`, is how most updates end: `started`, `self-switched`,
+  then `self-confirmed`. `done` comes only from a round whose lamp-update is
+  unchanged (Second, on #4370's run, 30 Oct).
+- **`Climbs`:** the build needs a newer updater than the one running, so only
+  lamp-update was taken; the parts stay on the old build until the next
+  round, and `to` is still the build it climbed for.
+
+So from the alerts alone, a `self-switched` with `to` doesn't prove the
+parts run `to`: after a climb they do only once a later round ends `done` or
+`self-switched` again (a climb's `self-confirmed` follows it the same way).
+Telling the two apart in the alert would be a new stage name, which older
+lamp-clouds would have to parse; that's the backend's and the first
+builder's call (#4370). The message is a fixed template:
 
 ```
 Software update lamp - done
