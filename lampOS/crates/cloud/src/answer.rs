@@ -1026,7 +1026,6 @@ pub mod tests {
         assert!(answer(&mut lamp, "", &Value::Null).is_err());
     }
 
-    /// #2864: `system.info`'s `can` holds each switch's kinds only while it
     /// Making a skill (fourteen-P15): with the switch on and no computer
     /// yet, `can` names neither kind, but a make asked anyway still reaches
     /// lamp-voice for its own answer; with a computer, both are named.
@@ -1053,6 +1052,7 @@ pub mod tests {
         assert!(can.contains(&"skills.make".to_owned()) && can.contains(&"skills.made".to_owned()));
     }
 
+    /// #2864: `system.info`'s `can` holds each switch's kinds only while it
     /// is on, as [`answer`] takes them; the always-answered kinds are in it
     /// with every switch off.
     #[test]

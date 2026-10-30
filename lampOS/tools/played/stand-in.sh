@@ -11,11 +11,12 @@
 #   PLAYED_TARGET     `auto` (the voice's LAMP_TASKS_TARGET, else office) or an alias: a targets file for the run,
 #                     that one alias on the fixture's machine with Claude Code, in place of the unit's --targets
 #   PLAYED_VOICE_ENV  more NAME=VALUE for the voice's drop-in, space-separated (calendar.sh: LAMP_TASKS_ACCOUNTS=on,
-#                     make-skill.sh: LAMP_MAKE_SKILL=on)
+#                     make-skill.sh: LAMP_MAKE_SKILL=on, which a product unit already sets since fourteen-P15)
 #   PLAYED_CLOUD_ENV  NAME=VALUE for a drop-in of lamp-cloud's own, space-separated, and lamp-cloud restarted with
-#                     the others (make-skill.sh with MAKE_FROM=app: LAMP_APP_MAKE_SKILL=on, without which lamp-cloud's
-#                     system.info never names skills.make and the app shows no "Make a skill", fourteen-P11 on
-#                     #2814); unset, lamp-cloud is not touched
+#                     the others (make-skill.sh with MAKE_FROM=app: LAMP_APP_MAKE_SKILL=on, which a product unit
+#                     already sets since fourteen-P15; on a lamp without it lamp-cloud's system.info never names
+#                     skills.make and the app shows no "Make a skill", fourteen-P11 on #2814); unset, lamp-cloud is
+#                     not touched
 #   PLAYED_TASKS     a lamp-tasks for this run only, in place of the unit's own (ask-again.sh's TASKS=)
 # It runs on a lamp with no Harness CLI too (lamp-06c1): lamp-tasks' drop-in clears the unit's
 # ConditionPathExists=/usr/local/bin/harness, which would have systemd skip it, and needs the stand-in's wrapper
