@@ -35,7 +35,14 @@ use std::time::{Duration, Instant};
 pub const ENVIRONMENT: &str = "LAMP_SETTINGS_CHANGE";
 
 /// The kinds, each answered `starting` and then its result.
-pub const KINDS: [&str; 3] = ["timezone.set", "person.name.set", "device.rename"];
+pub const KINDS: [&str; 4] = [
+    "timezone.set",
+    "person.name.set",
+    "device.rename",
+    // The owner's language (#4473): `{"language": "en"|"vi"|"ja"|"zh"|"ko"}`,
+    // checked by the helper, which restarts the voice once it rests.
+    "language.set",
+];
 
 /// `on`, beside [`ENVIRONMENT`] and `LAMP_CLOUD`, takes [`WIFI_KIND`].
 pub const WIFI_ENVIRONMENT: &str = "LAMP_SETTINGS_WIFI";
@@ -280,6 +287,7 @@ pub fn line(kind: &str, data: &Value) -> Result<String, String> {
         "timezone.set" => ("timezone", "timezone", "timezone must be text"),
         "person.name.set" => ("name", "person_name", "name must be text"),
         "device.rename" => ("name", "display_name", "name must be text"),
+        "language.set" => ("language", "language", "language must be text"),
         _ => return Err(crate::wire::not_here(kind)),
     };
     let text = data
@@ -1036,6 +1044,19 @@ impl Changes {
     }
 }
 
+/// The languages the voice speaks (#4473), as setup writes them.
+pub const LANGUAGES: [&str; 5] = ["en", "vi", "ja", "zh", "ko"];
+
+/// `system.info`'s `host.language` from `text` (setup's file): its code,
+/// else `en`, the voice's own reading of no file or one it doesn't know.
+pub fn language(text: &str) -> &'static str {
+    let code = text.lines().next().unwrap_or("").trim();
+    LANGUAGES
+        .into_iter()
+        .find(|known| *known == code)
+        .unwrap_or("en")
+}
+
 /// The lamp's name in the app from `text` (the helper's file), if it holds one.
 pub fn display_name(text: &str) -> Option<String> {
     let name = text.lines().next()?.trim();
@@ -1342,6 +1363,28 @@ mod tests {
             line("device.rename", &json!({"name": "x".repeat(513)})),
             Err("name must be text".to_owned())
         );
+        // #4473: the language goes as given; root's helper checks it.
+        assert_eq!(
+            line("language.set", &json!({"language": "ja"})),
+            Ok(r#"{"language":"ja"}"#.to_owned())
+        );
+        assert_eq!(
+            line("language.set", &json!({"language": 1})),
+            Err("language must be text".to_owned())
+        );
+    }
+
+    /// #4473: `host.language` is the file's code, else `en`, the voice's
+    /// own reading; the codes are setup's.
+    #[test]
+    fn the_language_reads_as_its_code_else_english() {
+        assert_eq!(LANGUAGES, lamp_setup::serve::LANGUAGES);
+        for code in LANGUAGES {
+            assert_eq!(language(&format!("{code}\n")), code);
+        }
+        for other in ["", "\n", "fr", "JA", "ja-JP"] {
+            assert_eq!(language(other), "en", "{other:?}");
+        }
     }
 
     /// The ack at once, before the helper has answered (rule 7: the app
