@@ -428,6 +428,48 @@ const NOT_NAMES_OPENING: &[&str] = &[
     "true",
 ];
 
+/// Names that are also common English words, or what speech to text writes
+/// for one at a line's start: on lamp 8740 in talk_day, "Maybe. What would
+/// you do?" came back as "May, what would you do?" and was held as said to
+/// someone called May, inside a conversation with one voice and one face
+/// (#3945). Set off at a line's start inside a conversation going on with
+/// one person only, such a name is not taken as calling someone else
+/// (the first builder's call: "May", "Will", "Grace", "Mark"; the rest are
+/// as common as words). Elsewhere they are names as before
+/// ([`Attention::one_person_present`]).
+const NAMES_ALSO_WORDS: &[&str] = &[
+    "may", "will", "grace", "mark", "bill", "hope", "joy", "rose", "faith", "art",
+];
+
+/// Whether `heard` opens, past any greeting, with a word on
+/// [`NAMES_ALSO_WORDS`] set off by a comma, and calls nobody else by name
+/// at its end ("May, what would you do?", not "May, are you coming, Daniel?").
+pub(crate) fn opens_with_a_name_also_a_word(heard: &str) -> bool {
+    let words: Vec<&str> = heard.split_whitespace().collect();
+    let opens = words
+        .iter()
+        .find(|word| {
+            !GREETINGS
+                .iter()
+                .any(|greeting| word.trim_end_matches(',').eq_ignore_ascii_case(greeting))
+        })
+        .and_then(|word| word.strip_suffix(','))
+        .is_some_and(|word| {
+            NAMES_ALSO_WORDS
+                .iter()
+                .any(|w| word.eq_ignore_ascii_case(w))
+        });
+    // The rest of the line, read alone, must call nobody else either.
+    let rest = words
+        .iter()
+        .skip_while(|word| !word.ends_with(','))
+        .skip(1)
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" ");
+    opens && !addresses_someone_else_on(&rest, false)
+}
+
 /// Whether what was heard calls someone other than the lamp by name: a name
 /// set off by a comma, opening it after any greeting ("Daniel, are you
 /// coming to the meeting at two?", "Hey Samantha, ...") or closing it ("Are
@@ -1185,6 +1227,13 @@ pub struct Attention {
     /// The request in hand was judged with a conversation going on, and
     /// nobody else's line before it.
     went_on: bool,
+    /// The caller knows only one person at the lamp for the request in
+    /// hand: no other voice, at most one face ([`Self::one_person_present`]).
+    one_person: bool,
+    /// The request in hand opened with a name that is also a word
+    /// ([`NAMES_ALSO_WORDS`]) and was not taken as calling someone else, so
+    /// the line after it is no reply to that someone either (#3945).
+    name_taken_as_a_word: bool,
     /// The name heard only in the room's sound counts only with a second
     /// sign (`LAMP_NAME_SECOND_SIGN=on`, [`Self::weigh_the_name`]).
     name_second_sign: bool,
@@ -1443,7 +1492,7 @@ impl Attention {
             && !self.near
             && !self.addressed
             && !self.lamp_asked
-            && self.another(room, false).is_none()
+            && self.another(room, going_on, false).is_none()
             && !self.asks_about_its_work()
             && !(self.remarks && crate::remarks::remark(&self.heard))
     }
@@ -1452,6 +1501,15 @@ impl Attention {
     /// (`LAMP_NAME_IN_PASSING=ignored`, #829).
     pub fn ignore_name_in_passing(&mut self, ignored: bool) {
         self.name_in_passing_ignored = ignored;
+    }
+
+    /// Whether only one person is known at the lamp for the request in
+    /// hand, as the caller reads it just before judging: no line in another
+    /// voice than the conversation's, no face speaking it but the caller's,
+    /// and at most one face in view. Read only for a set-off name that is
+    /// also a word ([`NAMES_ALSO_WORDS`], #3945); a new request forgets it.
+    pub fn one_person_present(&mut self, one: bool) {
+        self.one_person = one;
     }
 
     /// Play an answer only when something shows the lamp was spoken to,
@@ -1538,7 +1596,8 @@ impl Attention {
                 .ended_us
                 .or(self.began_us)
                 .is_some_and(|end| end.saturating_add(ANOTHER_REPLY_US) >= now_us)
-            && addresses_someone_else_on(&self.heard, self.stand_alone_ins);
+            && addresses_someone_else_on(&self.heard, self.stand_alone_ins)
+            && !self.name_taken_as_a_word;
         // The line before, if it was a question the lamp left unanswered
         // and ended just now (#829, 15:40).
         let after_question = self.spoken_to
@@ -1817,6 +1876,8 @@ impl Attention {
         self.addressed = false;
         self.sound = false;
         self.cut_in = false;
+        self.one_person = false;
+        self.name_taken_as_a_word = false;
     }
 
     /// Short sounds let through are checked (`--sounds-checked`, #800).
@@ -1956,7 +2017,10 @@ impl Attention {
         self.going_on_alone = false;
         self.went_on = false;
         let fresh = self.begun <= FRESH_REQUESTS;
-        let another = self.another(room, own);
+        self.name_taken_as_a_word = false;
+        let another = self.another(room, going_on, own);
+        self.name_taken_as_a_word =
+            self.spoken_to && !own && another.is_none() && self.name_as_a_word(room, going_on);
         let answering_another = another.is_some();
         let going_on = going_on && !answering_another;
         self.went_on = going_on;
@@ -2327,13 +2391,14 @@ impl Attention {
     /// counts for it (#829). A line that itself calls someone else by name
     /// is theirs too, and in a busy room so is a reply to a question the
     /// lamp left unanswered (#829, 15:40). Never the lamp's own turn.
-    fn another(&self, room: Room, own: bool) -> Option<&'static str> {
+    fn another(&self, room: Room, going_on: bool, own: bool) -> Option<&'static str> {
         if !self.spoken_to || own {
             None
         } else if self.after_another {
             Some(ANSWERING_ANOTHER)
         } else if addresses_someone_else_on(&self.heard, self.stand_alone_ins)
             && self.heard.contains('?')
+            && !self.name_as_a_word(room, going_on)
         {
             // Only a question put to that person: a request that opens
             // with a word and a comma is the lamp's (Second on #1090).
@@ -2343,6 +2408,21 @@ impl Attention {
         } else {
             None
         }
+    }
+
+    /// Whether the set-off name the request in hand opens with is taken as
+    /// the word it also is ([`NAMES_ALSO_WORDS`]), not as a call to someone
+    /// else: only inside a conversation going on (nobody else's line
+    /// before it), in a room not known to be busy, with the caller knowing
+    /// only one person at the lamp ([`Self::one_person_present`]). "May,
+    /// what would you do?" there is the person's "Maybe. What would you
+    /// do?" (#3945, the first builder's call); with no conversation, in a
+    /// busy room, or with a second voice or face, it is held as before.
+    fn name_as_a_word(&self, room: Room, going_on: bool) -> bool {
+        going_on
+            && room != Room::Busy
+            && self.one_person
+            && opens_with_a_name_also_a_word(&self.heard)
     }
 
     /// Whether the request in hand asks about the lamp's own work, done
@@ -3911,6 +3991,95 @@ mod tests {
         let mut attention = Attention::default();
         attention.began_at(1, 7, S);
         assert!(!attention.follows_an_unanswered_line(1));
+    }
+
+    /// #3945, the first builder's call on lamp 8740's talk_day: "Maybe.
+    /// What would you do?" came back as "May, what would you do?" inside a
+    /// conversation with one voice and one face, and was held as said to
+    /// someone called May. A set-off name that is also a word, at a line's
+    /// start, inside a conversation going on with one person only, in a room
+    /// not known to be busy, is no call to someone else; its next line is
+    /// no reply to that someone either. With no conversation, in a busy
+    /// room, or with a second person, it is held as before, and so is a name
+    /// that is no word ("Anna, …") with one person.
+    #[test]
+    fn a_name_that_is_also_a_word_mid_conversation_with_one_person_calls_nobody_else() {
+        const S: u64 = 1_000_000;
+        const AS_HEARD: &str = "May, what would you do?";
+        let judge = |heard: &str, room: Room, going_on: bool, one_person: bool| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.began_at(60, 7, 10 * S);
+            attention.heard(heard);
+            attention.one_person_present(one_person);
+            attention.first_output_busy(60, room, going_on, false, None)
+        };
+        // As heard, mid-conversation, one voice and one face, a quiet room
+        // (and one not yet known): let out as the conversation going on,
+        // not held as said to someone else.
+        assert_eq!(
+            judge(AS_HEARD, Room::Quiet, true, true),
+            Some(Verdict::Play(ROOM_NOT_BUSY))
+        );
+        assert!(matches!(
+            judge(AS_HEARD, Room::Unknown, true, true),
+            Some(Verdict::Play(_))
+        ));
+        for heard in [
+            "Will, what do you think?",
+            "Grace, what would you do?",
+            "Mark, is that right?",
+            "Hey May, what would you do?",
+        ] {
+            assert_eq!(
+                judge(heard, Room::Quiet, true, true),
+                Some(Verdict::Play(ROOM_NOT_BUSY)),
+                "{heard}"
+            );
+        }
+        // No conversation going on, a busy room, or a second person: held.
+        assert_eq!(
+            judge(AS_HEARD, Room::Quiet, false, true),
+            Some(Verdict::Hold(TO_ANOTHER))
+        );
+        assert!(matches!(
+            judge(AS_HEARD, Room::Busy, true, true),
+            Some(Verdict::Hold(_))
+        ));
+        assert_eq!(
+            judge(AS_HEARD, Room::Quiet, true, false),
+            Some(Verdict::Hold(TO_ANOTHER))
+        );
+        // A name that is no word, with one person: held as before.
+        assert_eq!(
+            judge("Anna, what would you do?", Room::Quiet, true, true),
+            Some(Verdict::Hold(TO_ANOTHER))
+        );
+        // A line that calls someone else at its end as well: held.
+        assert_eq!(
+            judge("May, are you coming, Daniel?", Room::Quiet, true, true),
+            Some(Verdict::Hold(TO_ANOTHER))
+        );
+        // The line after the one let out is no reply to someone called
+        // May; after "Anna, …" held, it is a reply to Anna, as before.
+        let next = |first: &str| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.began_at(61, 7, 10 * S);
+            attention.heard(first);
+            attention.one_person_present(true);
+            attention.first_output_busy(61, Room::Quiet, true, false, None);
+            attention.ended(61, 12 * S);
+            attention.began_at(62, 7, 13 * S);
+            attention.heard("I'd go for the blue one.");
+            attention.one_person_present(true);
+            attention.first_output_busy(62, Room::Quiet, true, false, None)
+        };
+        assert_eq!(next(AS_HEARD), Some(Verdict::Play(ROOM_NOT_BUSY)));
+        assert_eq!(
+            next("Anna, what would you do?"),
+            Some(Verdict::Hold(ANSWERING_ANOTHER))
+        );
     }
 
     /// #829, the first builder at 15:40, the two-person round on lamp-4ace:
