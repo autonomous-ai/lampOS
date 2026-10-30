@@ -109,6 +109,50 @@ struct Found {
 pub struct RingNight {
     found: Arc<Found>,
     fade: Fade,
+    said: Said,
+}
+
+/// What the journal is told of the night face (#3748): when it shows, when
+/// the person's light holds it back (once a sleep), and when it goes.
+#[derive(Debug, Default)]
+struct Said {
+    held: bool,
+    shown: bool,
+}
+
+impl Said {
+    /// The line for this step, if any: `said` is Expression saying asleep,
+    /// `allowed` the light off, `share` the face's share after the step and
+    /// `asleep_for_us` how long the face's sleep has lasted.
+    fn step(
+        &mut self,
+        said: bool,
+        allowed: bool,
+        share: f32,
+        asleep_for_us: u64,
+    ) -> Option<String> {
+        let mut line = None;
+        if !said {
+            self.held = false;
+        } else if !allowed && !self.held {
+            self.held = true;
+            line = Some("night face: held, the light is on".to_owned());
+        }
+        if !self.shown && share > 0.0 {
+            self.shown = true;
+            line = Some(format!(
+                "night face: shown {} ms after asleep",
+                asleep_for_us / 1_000
+            ));
+        } else if self.shown && !(said && allowed) {
+            self.shown = false;
+            line = Some(format!(
+                "night face: gone ({})",
+                if said { "light on" } else { "woke" }
+            ));
+        }
+        line
+    }
 }
 
 impl RingNight {
@@ -133,6 +177,7 @@ impl RingNight {
         Ok(Self {
             found,
             fade: Fade::default(),
+            said: Said::default(),
         })
     }
 
@@ -140,13 +185,20 @@ impl RingNight {
     /// face shows now, where it may (`allowed`: not over the person's light
     /// on). It reads no bus and never waits.
     pub fn tick(&mut self, now_us: u64, allowed: bool) -> f32 {
-        let asleep = allowed
-            && self.found.state.lock().ok().is_some_and(|found| {
-                found
-                    .as_ref()
-                    .is_some_and(|message| asleep_in(message, now_us))
-            });
-        self.fade.step(asleep, now_us)
+        let said = self.found.state.lock().ok().is_some_and(|found| {
+            found
+                .as_ref()
+                .is_some_and(|message| asleep_in(message, now_us))
+        });
+        let share = self.fade.step(allowed && said, now_us);
+        let asleep_for_us = self
+            .fade
+            .asleep_since
+            .map_or(0, |since| now_us.saturating_sub(since));
+        if let Some(line) = self.said.step(said, allowed, share, asleep_for_us) {
+            eprintln!("lamp-voice ring: {line}");
+        }
+        share
     }
 }
 
@@ -260,6 +312,38 @@ mod tests {
         ] {
             assert!(!asleep_in(&message, now), "{label}");
         }
+    }
+
+    /// The journal hears each change once: held once a sleep however long
+    /// the light stays on, shown once, gone with why.
+    #[test]
+    fn the_journal_hears_shown_held_and_gone_once_each() {
+        let mut said = Said::default();
+        let mut lines = Vec::new();
+        let mut step = |asleep, allowed, share, for_us| {
+            if let Some(line) = said.step(asleep, allowed, share, for_us) {
+                lines.push(line);
+            }
+        };
+        step(true, true, 0.0, 0);
+        step(true, true, 0.01, 1_525_000);
+        step(true, true, 0.5, 2_250_000);
+        step(false, true, 0.4, 0);
+        step(true, false, 0.0, 0);
+        step(true, false, 0.0, 0);
+        step(true, true, 0.2, 1_600_000);
+        step(true, false, 0.1, 0);
+        step(true, false, 0.0, 0);
+        assert_eq!(
+            lines,
+            [
+                "night face: shown 1525 ms after asleep",
+                "night face: gone (woke)",
+                "night face: held, the light is on",
+                "night face: shown 1600 ms after asleep",
+                "night face: gone (light on)",
+            ]
+        );
     }
 
     /// Asleep, nothing shows for the first 1.5 s, then it fades in over
