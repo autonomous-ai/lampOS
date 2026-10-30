@@ -51,7 +51,8 @@ test('proofs name what they are for', async () => {
 
 test('every op has a call and every error code a class', () => {
   const plumbing = new Set(['pair', 'hello', 'subscribe', 'unsubscribe', 'get', 'lease.take', 'lease.renew', 'lease.release']);
-  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[op] === 'function', op);
+  const call = (op) => op.replace(/\.(\w)/g, (_, c) => c.toUpperCase());
+  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[call(op)] === 'function', op);
   for (const code of schema.errorCodes) assert.equal(new byCode[code]('x').code, code);
   assert.equal(fromReply({ code: 'rate', why: 'x', retry_ms: 900 }).retryMs, 900);
   assert.ok(fromReply({ code: 'no_grant', why: 'x' }) instanceof byCode.no_grant);
@@ -367,7 +368,7 @@ test('names outside the schema never leave this computer', async () => {
     for (const call of [lamp.gesture('scanning'), lamp.gesture('idle'), lamp.light('magenta', 3, 1000)]) {
       await assert.rejects(call, (error) => error.code === 'bad_request');
     }
-    assert.throws(() => lamp.on('camera.frame', () => {}), LampError);
+    assert.throws(() => lamp.on('camera.zoomed', () => {}), LampError);
     await lamp.stop();
     assert.deepEqual(fake.received.filter((f) => ['gesture', 'light'].includes(f.op)), []);
   });
