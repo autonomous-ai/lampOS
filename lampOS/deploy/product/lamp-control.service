@@ -1,0 +1,49 @@
+# lampOS control: the developers' door, paired computers on the LAN driving the lamp's body, light
+# and voice at `skill` (lampOS/docs/control.md, #3504). The product unit (lampOS/docs/install.md):
+# installed and enabled on every lamp, and off unless the owner's developer setting in the app writes
+#   [Service]
+#   Environment=LAMP_CONTROL=on
+# as a drop-in and restarts it. Off, `serve` says so and exits 0 with nothing listening.
+# No --manage-socket: skill push stays off until lamp-skills' manage helper keeps its record of
+# revokes (docs/control.md). No --lease-socket: the product lamp-body passes none yet, so `look`
+# is refused as not on here.
+[Unit]
+Description=lampOS control (lamp-control)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target network-online.target lamp-voice.service lamp-body.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Nice=10
+# Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
+# the body's mood socket, the voice's say socket and the ring's light requests on the bus.
+ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --say-socket /run/lampos-say/say.sock --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-control
+NoNewPrivileges=yes
+# Its own state and admin socket, made by systemd for its user and writable under ProtectSystem=strict.
+StateDirectory=lampos-control
+StateDirectoryMode=0700
+RuntimeDirectory=lampos-control
+RuntimeDirectoryMode=0700
+ProtectSystem=strict
+# The bus.
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=lampos.target

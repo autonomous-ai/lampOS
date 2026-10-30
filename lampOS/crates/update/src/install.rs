@@ -129,6 +129,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-mood.service",
         include_str!("../../../deploy/product/lamp-mood.service"),
     ),
+    // The developers' door (#3504, docs/control.md); off unless the owner's
+    // setting writes LAMP_CONTROL=on.
+    (
+        "lamp-control.service",
+        include_str!("../../../deploy/product/lamp-control.service"),
+    ),
     (
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
@@ -256,6 +262,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-air.service",
     "lamp-body.service",
     "lamp-cloud.service",
+    "lamp-control.service",
     "lamp-controls.service",
     "lamp-ears.service",
     "lamp-expression.service",
@@ -615,6 +622,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "e8d1da28131f4a5da8271730b6dc85bdd32f574f0c1792287fa1cf923c42ca52", // lamp-control's state (paired computers) forgotten on reset
     "cf1adcb3075bff001ae625c90ddab1e956a25c9b3bcf633ce07c1228737d0adc", // #4333: the owner's place beside the name
     "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b", // #2948 carried onto lamp-voice 23 Oct: head touch on (#711)
     "ad3fd11185bdf206f8622fef2c6d9bafac4efb7742e65b1c7df11de383cc83e6", // combined people temporaries and face expressions, 23 Oct

@@ -19,8 +19,9 @@ SDKs generate from.
 - **piece 6**: the body's lease (`body_lease.rs`): with `--lease-socket`, a computer's `body` lease holds lamp-body's own, so the lamp's own life stands back, and the body's end of it is the computer's (`slumped` added to the whys).
 - **piece 7**: skills pushed from a computer (`push.rs`, with `--manage-socket`): the `skills` grant, `skill.push` in parts, `skill.list` and `skill.remove`, each asked of root's manage helper off the door's lock, and a revoke turning the computer's pushed skills off. The helper's side is lamp-skills' (Eighth's piece B); until it is in, the helper refuses what it doesn't know.
 
-**No unit carries it yet**, so nothing listens on a lamp; discovery is the next piece, off unless `LAMP_CONTROL=on`, and the owner turns developer
-access on in the app. This
+**The product unit `deploy/product/lamp-control.service` carries it**, as `lampos`, installed and enabled on every lamp
+and off unless `LAMP_CONTROL=on`, so nothing listens until the owner turns developer access on in the app (that setting,
+which writes the unit's drop-in, follows in a later PR); discovery is the next piece. This
 page is the contract it and the SDKs are built to. Its protocol types, lease
 rules and rates are `crates/control` (Nine, #3715), and the schema follows
 its types. A few of the crate's checks can't be written in JSON Schema, so a
@@ -166,7 +167,7 @@ so it never outlives that lease, and only the holder's connection is read.
 - **Its end:** the body answers each look once, `there` when the head and
   base are within 6 counts of goals that have stopped moving for 10 steps
   (0.2 s), or `cut_short`. The door makes that the computer's `done`.
-- **On a product lamp** no unit passes `--lease-socket` yet, so `look` is
+- **On a product lamp** neither product unit passes `--lease-socket` yet, so `look` is
   refused there as "the body's lease socket is not on here" until both units
   do (lamp-control's after #3876, lamp-body's with it).
 
@@ -222,7 +223,7 @@ lamp-control revoke c_…
 lamp-control clients
 ```
 
-- **Off by default:** `serve` runs only with `LAMP_CONTROL=on`; otherwise it says so and exits 0. No product unit passes it yet.
+- **Off by default:** `serve` runs only with `LAMP_CONTROL=on`; otherwise it says so and exits 0. The product unit (`deploy/product/lamp-control.service`, as `lampos` in `lampos-parts.slice`) doesn't set it; the owner's app setting will, by a drop-in, in a later PR.
 - **The parts it reaches:** `--mood-socket` (the body's gestures and moves), `--say-socket` (the voice), `--bus-root` (light requests out; events and state in) and `--boot-id` (the clock a light request names, `/proc/sys/kernel/random/boot_id` by default). A part not given is refused with "not reachable from lamp-control here".
 - **The body's lease:** with `--lease-socket` (lamp-body's, docs/body.md "Held by lamp-control"), while a computer holds `body` the door holds the body too, so the lamp's own life (the rest glance, Expression's offsets, a stand timing out) stands back. It holds for 30 s, renewed every 10 s, and lets go when no computer holds `body`. The body's own end of it (`lost` for a hand, privacy, a pause, a sleep, a slump or a lapse) ends the computer's `body` lease with that why, a lapse as `expired`; a why the door doesn't know, or a hold the body refuses, ends it as `released`, so a computer never thinks the lamp's own life stands back when it doesn't. A body that restarts is held again at the next 250 ms check, and a line from a connection the door has dropped is ignored. A body that can't be reached is journaled once, and the lamp's own life goes on.
 - **Following a hand:** a `look` at `hand` under the `body` lease has each hold say `"follow":"hand"` (`{"hold":{"for_ms":30000,"follow":"hand"}}`), said at once when it starts or stops, not at the next renewal; a hold without it follows nothing. lamp-body does the fast loop on the lamp from `humans/hands/tracked`, so the picture and the loop never leave it. It ends with the holder's `stop` (never rated), another look once it is taken (rated as motion, one a second; a refused look, such as one at `face`, leaves it following), or the lease ending, and a new holder never starts out following. A body that doesn't know `follow` refuses the hold, which ends the lease as `released`, as any refused hold does.
