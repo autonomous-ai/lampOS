@@ -192,6 +192,12 @@ const BLINK_LOW: f32 = 0.25;
 const COUNTDOWN_FROM_US: f32 = 1_000_000.0;
 const COUNTDOWN_TO_US: f32 = 3_000_000.0;
 const COUNTDOWN_LOW: f32 = 0.15;
+/// A stir at its name in the night's sleep (`LAMP_REST_THROUGH_SOUNDS=on`,
+/// #1672, [`crate::ring_stir`]): at its full the resting face is this much
+/// brighter than its night level, a little, as eyes half open; the first
+/// level of light goes from about 2 to 3 steps of 24 to 3 to 5. Authored,
+/// to be looked at on a lamp (CLAUDE.md rule 8).
+pub const STIR_LIFT: f32 = 0.6;
 /// After a tap's listening face at rest (#711), the face settles back to its
 /// own light this slowly: most of the way in about half a second, so that it
 /// eases and does not snap (First, #711).
@@ -270,6 +276,9 @@ pub struct Face {
     /// ([`Face::skill_light`]).
     tints_speaking: bool,
     held: Option<Lit>,
+    /// How far a stir at its name has lifted the face at rest, 0 to 1
+    /// ([`Face::stir`]).
+    stir: f32,
 }
 
 impl Default for Face {
@@ -306,7 +315,17 @@ impl Face {
             breath: None,
             tints_speaking: false,
             held: None,
+            stir: 0.0,
         }
+    }
+
+    /// How far a stir at its name has come in, 0 to 1, already eased
+    /// ([`crate::ring_stir`], #1672): the resting face is lifted by up to
+    /// [`STIR_LIFT`] of itself. Only the resting face on a light that is on:
+    /// a light the person turned off stays its ember, and listening,
+    /// thinking and speaking (the answer's full wake) are as always.
+    pub fn stir(&mut self, share: f32) {
+        self.stir = share.clamp(0.0, 1.0);
     }
 
     /// How long a hand has been kept on the head, as Controls counts it, or
@@ -544,7 +563,12 @@ impl Face {
                 });
             }
         }
-        let brighten = 1.0 + NOTICE_GAIN * notice;
+        let stirred = if mood == Mood::Resting && self.lit.on {
+            1.0 + STIR_LIFT * self.stir
+        } else {
+            1.0
+        };
+        let brighten = (1.0 + NOTICE_GAIN * notice) * stirred;
         // A hand kept on the head (#711): the countdown to sleep dims it.
         let countdown = self.held_us.map_or(0.0, |held| {
             ((held as f32 - COUNTDOWN_FROM_US) / (COUNTDOWN_TO_US - COUNTDOWN_FROM_US))
@@ -929,6 +953,66 @@ mod tests {
         assert!(low > 0.0, "never dark: the face still shows it hears");
         // Let go: back to the light.
         assert!((ratio(None, 3.0) - 1.0).abs() < 0.02);
+    }
+
+    /// #1672: a stir at its name lifts the resting face a little from its
+    /// night level (the first level of light, as at night), by up to
+    /// [`STIR_LIFT`] of itself, and lets it back down; never past the
+    /// ceiling. Two faces, one stirred, compared at the same frames.
+    #[test]
+    fn a_stir_lifts_the_resting_face_a_little_and_lets_it_back() {
+        let at = |seconds: f32| 4_000_000_000 + (seconds * 1e6) as u64;
+        let mut plain = Face::new();
+        let mut stirred = plain.clone();
+        let mut ratio = |share: f32, from: f32| {
+            stirred.stir(share);
+            let plain = play(&mut plain, Mood::Resting, 0, at(from), 50);
+            let lifted = play(&mut stirred, Mood::Resting, 0, at(from), 50);
+            brightness(lifted.last().unwrap()) as f32 / brightness(plain.last().unwrap()) as f32
+        };
+        assert!((ratio(0.0, 0.0) - 1.0).abs() < 0.02);
+        let full = ratio(1.0, 1.0);
+        assert!((1.4..1.8).contains(&full), "{full}");
+        let half = ratio(0.5, 2.0);
+        assert!((1.15..1.45).contains(&half), "{half}");
+        assert!((ratio(0.0, 3.0) - 1.0).abs() < 0.02);
+        // The brightest light is held at its ceiling, never past it.
+        let mut bright = Face::new();
+        bright.light(Lit::of(true, "warm", 5).unwrap());
+        bright.stir(1.0);
+        for frame in play(&mut bright, Mood::Resting, 0, at(4.0), 300) {
+            assert!(
+                frame
+                    .iter()
+                    .all(|pixel| pixel.red.max(pixel.green).max(pixel.blue) <= 48)
+            );
+        }
+    }
+
+    /// #1672: a light the person turned off stays its ember through a
+    /// stir, and the answer's full wake (speaking), listening and thinking
+    /// are the faces they always were, frame for frame.
+    #[test]
+    fn a_stir_leaves_an_ember_and_every_turns_face_as_they_were() {
+        let at = |seconds: f32| 4_000_000_000 + (seconds * 1e6) as u64;
+        let mut off = Face::new();
+        off.light(Lit::of(false, "warm", 1).unwrap());
+        let mut off_stirred = off.clone();
+        off_stirred.stir(1.0);
+        assert_eq!(
+            play(&mut off, Mood::Resting, 0, at(0.0), 100),
+            play(&mut off_stirred, Mood::Resting, 0, at(0.0), 100)
+        );
+        for mood in [Mood::Speaking, Mood::Listening, Mood::Thinking] {
+            let mut plain = Face::new();
+            let mut stirred = Face::new();
+            stirred.stir(1.0);
+            assert_eq!(
+                play(&mut plain, mood, 160, at(1.0), 100),
+                play(&mut stirred, mood, 160, at(1.0), 100),
+                "{mood:?}"
+            );
+        }
     }
 
     /// #711: a tap the voice answers with its hum shows the listening face

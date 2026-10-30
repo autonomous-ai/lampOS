@@ -1524,3 +1524,92 @@ fn every_eye_mode_writes_and_says_the_shutdown_black_at_a_service_stop() {
         );
     }
 }
+
+/// #1672: a stir at its name only shapes the face. With the microphone
+/// denied (the privacy switch closed) the ring stays black while Expression
+/// says `stirring` on the bus, as it is with no stir; allowed again, the
+/// resting face comes back as always. The muted lamp's asleep face is not
+/// this worker's (`ring_asleep`), and no stir reaches it.
+#[test]
+fn a_stir_at_its_name_never_lights_a_ring_the_privacy_switch_keeps_dark() {
+    use lamp_msgs::{ClockStamp, ExpressionState};
+    let root = std::path::PathBuf::from(format!("/tmp/lrws-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut said = bus
+        .publisher_declared(
+            ExpressionState::TOPIC,
+            &ExpressionState::declaration(),
+            "expression",
+        )
+        .unwrap();
+    let stir = lamp_voice::ring_stir::RingStir::switched(&root, Some("on"))
+        .unwrap()
+        .unwrap();
+    let rig = Rig::start_resting(
+        Senses {
+            stir: Some(stir),
+            ..Senses::default()
+        },
+        24,
+    );
+    rig.ready();
+    // As the eye's shutdown test lets the ring rest, but for the switch.
+    let mut controller = Controller::new(rig.boot, now());
+    let authority = |controller: &mut Controller, permission: Permission| {
+        controller
+            .set_microphone_permission(now(), permission)
+            .unwrap();
+        // Capture and admission open only where the microphone may listen.
+        if permission == Permission::Allowed {
+            let until = now().checked_add(900_000).unwrap();
+            controller
+                .set_capture(now(), CaptureState::RetainingUntil(until))
+                .unwrap();
+            controller
+                .set_admission(now(), AdmissionState::OpenUntil(until))
+                .unwrap();
+        }
+        Control::Authority {
+            snapshot: controller.snapshot(now()).unwrap(),
+        }
+    };
+    let stirring = |sequence: u64| ExpressionState {
+        stamp: ClockStamp {
+            clock_id: "boot".into(),
+            at_us: monotonic_us(),
+            sequence,
+        },
+        enabled: true,
+        turn: None,
+        request: None,
+        behaviours: vec!["asleep".into(), "stirring".into()],
+        missing: Vec::new(),
+        warnings: Vec::new(),
+        body: false,
+        light: false,
+        asleep: Some(true),
+    };
+    // Each look renewed, so the ring is dark for privacy, not a lapse.
+    for sequence in 1..=6 {
+        rig.control(authority(&mut controller, Permission::Denied));
+        said.publish_json(monotonic_us(), &stirring(sequence))
+            .unwrap();
+        thread::sleep(Duration::from_millis(100));
+    }
+    assert_eq!(
+        rig.colored(),
+        0,
+        "a stir lit a ring the privacy switch closed"
+    );
+    said.publish_json(monotonic_us(), &stirring(7)).unwrap();
+    rig.control(authority(&mut controller, Permission::Allowed));
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while rig.colored() == 0 {
+        assert!(Instant::now() < deadline, "no resting face once allowed");
+        thread::sleep(Duration::from_millis(2));
+    }
+    rig.control(Control::Stop);
+    drop(said);
+    let _ = std::fs::remove_dir_all(&root);
+}
