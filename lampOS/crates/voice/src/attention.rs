@@ -1135,6 +1135,15 @@ const REPEAT_LEAST_WORDS: usize = 2;
 /// ([`Attention::words_back`]): the line before, and a few more in case
 /// lines are judged out of the order they were said in.
 const SAID_LINES_KEPT: usize = 4;
+
+/// How long after its end a kept line's words are let go
+/// ([`Attention::let_go_of_said_lines`], Reviewer-three's P3 on #4645): only
+/// a line begun within [`REPEAT_WITHIN_US`] of that end reads them, but it
+/// can be judged once it has ended, after the next line began, and a line
+/// can run on for many seconds (#4594's 13 s follow-up). So not that bound
+/// itself: let go at it, a long line's line before would be gone before
+/// that line is judged.
+const SAID_LINE_KEPT_US: u64 = 30_000_000;
 const NAMED: &str = "its name was heard in the room's sound";
 
 /// With `LAMP_NAME_SECOND_SIGN=on`, a hearing of the name that began no
@@ -1650,6 +1659,7 @@ impl Attention {
     /// Keep `words` as `request`'s, ended at `ended_us`, in place of any kept
     /// for it before ([`Self::words_back`]).
     fn keep_said_line(&mut self, request: u64, ended_us: u64, words: &str) {
+        self.let_go_of_said_lines(ended_us);
         self.said_lines.retain(|(of, _, _)| *of != request);
         if self.said_lines.len() == SAID_LINES_KEPT {
             self.said_lines.pop_front();
@@ -1671,17 +1681,30 @@ impl Attention {
         }
     }
 
-    /// With [`Self::not_calling_on_a_repeat`]: the repeated words, and how
-    /// long after the line before ended the request in hand began, when the
-    /// text would have called the lamp but for them; for the journal.
-    pub fn call_taken_as_a_repeat(&self) -> Option<(String, u64)> {
-        let (from, end, _, gap_us) = self.repeated_opening()?;
-        (self.calls_in(&self.heard) && !self.called_in_text()).then(|| {
-            let words = self.heard[from..end]
-                .trim_start_matches(|c: char| !c.is_alphanumeric())
-                .to_owned();
-            (words, gap_us)
-        })
+    /// With [`Self::not_calling_on_a_repeat`]: how many words repeated, and
+    /// how long after the line before ended the request in hand began, when
+    /// the text would have called the lamp but for them; for the journal,
+    /// which never has the words.
+    pub fn call_taken_as_a_repeat(&self) -> Option<(usize, u64)> {
+        let (_, _, count, gap_us) = self.repeated_opening()?;
+        (self.calls_in(&self.heard) && !self.called_in_text()).then_some((count, gap_us))
+    }
+
+    /// Let go of kept lines' words that ended more than [`SAID_LINE_KEPT_US`]
+    /// before `now_us`, as a line is kept or begins (Reviewer-three's P3 on
+    /// #4645): they are past any use, and are not held on through a quiet
+    /// spell, a privacy close or a forget until newer lines push them out.
+    fn let_go_of_said_lines(&mut self, now_us: u64) {
+        self.said_lines
+            .retain(|(_, ended, _)| ended.saturating_add(SAID_LINE_KEPT_US) >= now_us);
+    }
+
+    /// Let go of every kept line's words and of a first part's kept for
+    /// its continuation ([`Self::not_calling_on_a_repeat`]): a camera close
+    /// or a mute (`Heeding::privacy_changed`, Reviewer-two's P3 on #4645).
+    pub fn forget_said_lines(&mut self) {
+        self.said_lines.clear();
+        self.line_before = None;
     }
 
     /// A hearing of the name is at the line's start ([`NAME_AT_THE_START_US`])
@@ -2056,6 +2079,7 @@ impl Attention {
             let words = self.heard.clone();
             self.keep_said_line(self.request, ended, &words);
         }
+        self.let_go_of_said_lines(now_us);
         self.began(request, session);
         self.line_before = None;
         self.after_another = after_another;
@@ -5554,7 +5578,7 @@ mod tests {
         assert_eq!(untaken, None, "off: nothing taken as a repeat");
         let (_, on, taken) = judged(true, d09_before, d09, 300_000);
         assert!(matches!(on, Some(Verdict::Hold(_))), "{on:?}");
-        assert_eq!(taken, Some(("Lamp is cute".to_owned(), 300_000)));
+        assert_eq!(taken, Some((3, 300_000)), "three words, never the words");
         // Calls that stay calls with the switch on.
         let calls = [
             // After an unrelated line.
@@ -5632,7 +5656,7 @@ mod tests {
         );
         let (on, taken) = judged(true, 300_000);
         assert!(matches!(on, Some(Verdict::Hold(_))), "{on:?}");
-        assert_eq!(taken, Some(("Lamp is cute".to_owned(), 300_000)));
+        assert_eq!(taken, Some((3, 300_000)), "three words, never the words");
         assert_eq!(
             judged(true, REPEAT_WITHIN_US + 1).0,
             Some(Verdict::Play(CALLED_IN_TEXT)),
@@ -5642,6 +5666,39 @@ mod tests {
         let mut attention = Attention::default();
         attention.words_back(70, (0, S), "That lamp is cute.");
         assert!(attention.said_lines.is_empty());
+    }
+
+    /// Kept words are let go [`SAID_LINE_KEPT_US`] after their line ended,
+    /// as a line begins (Reviewer-three's P3 on #4645): a line begun a
+    /// minute later finds none. A long line begun within the gap and judged
+    /// after it ran 20 s still reads its line before.
+    #[test]
+    fn kept_words_are_let_go_past_their_use() {
+        const S: u64 = 1_000_000;
+        let mut attention = Attention::default();
+        attention.not_calling_on_a_repeat(true);
+        attention.words_back(70, (10 * S, 12 * S), "I'll call the doctor at four.");
+        attention.began_at(71, 7, 72 * S);
+        assert!(attention.said_lines.is_empty(), "a minute later");
+
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.ignore_name_in_passing(true);
+        attention.count_stand_alone_ins(true);
+        attention.not_calling_on_a_repeat(true);
+        attention.words_back(70, (10 * S, 11 * S + 200_000), "That lamp is cute.");
+        attention.began_at(71, 7, 11 * S + 500_000);
+        attention.heard("Lamp is cute. Where did you get it, and how long did it take?");
+        attention.ended(71, 31 * S + 500_000);
+        // The next line begins before line 71 is judged.
+        attention.began_at(72, 7, 32 * S);
+        assert!(
+            attention.said_lines.iter().any(|(of, _, _)| *of == 70),
+            "still in use"
+        );
+        // A camera close or a mute lets go of them all.
+        attention.forget_said_lines();
+        assert!(attention.said_lines.is_empty(), "on privacy");
     }
 
     /// The same when the second line goes on from the first, cut short
