@@ -2159,11 +2159,19 @@ impl Onboarding {
                 // P3s on #4346).
                 let again = words.first().is_some_and(|word| word == "what")
                     || words.iter().any(|word| {
-                        matches!(word.as_str(), "repeat" | "pardon" | "again" | "catch")
+                        matches!(
+                            word.as_str(),
+                            "repeat" | "pardon" | "again" | "catch" | "explain"
+                        )
                     });
                 let answer = !greeting && !again && !text.contains('?') && !words.is_empty();
-                if about_hello
-                    || (heard.hello_asked && !names_hours(&words) && (yes || refuses(&words)))
+                // Nor does it answer the hello: "Sorry, can you repeat that
+                // please" took its "please" as the hello's yes and ended the
+                // step with the hello never answered (Fourth, #4469's read).
+                let asked_back = again || text.contains('?');
+                if !asked_back
+                    && (about_hello
+                        || (heard.hello_asked && !names_hours(&words) && (yes || refuses(&words))))
                 {
                     heard.hello = true;
                 } else if (answer || quiet_hours(&words)) && !heard.quiet_hours && !heard.hello {
@@ -6191,6 +6199,44 @@ mod tests {
         room.walk.heard("After ten at night.", room.at);
         room.walk.lamp_said();
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+    }
+
+    /// Fourth, on #4469's read: once the hello was asked, a request to hear
+    /// it again or have it explained, with or without its "?", is no answer
+    /// to it, though it says "please" or "okay"; the answer after it is.
+    #[test]
+    fn asking_again_after_the_hello_is_no_answer() {
+        for (n, line) in [
+            "Sorry, can you repeat that please",
+            "Say that again please.",
+            "Could you repeat that, okay",
+            "Sorry, what? Okay.",
+            "Please explain what you mean.",
+            "Say hello again?",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut room = Room::new(&format!("hello-again-{n}"));
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk.heard("After ten at night.", room.at);
+            room.walk.lamp_said();
+            assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+            room.walk.heard(line, room.at);
+            room.walk.lamp_said();
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::Preferences), None, "{line}");
+            room.walk.heard("Yes, that's fine.", room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::Preferences),
+                Some(Outcome::Done),
+                "{line}"
+            );
+        }
     }
 
     /// The lead's bound on #4326 (lamp-52e6, 29 Oct: the hello ~15 s after
