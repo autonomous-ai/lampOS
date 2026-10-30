@@ -195,9 +195,15 @@ pub fn make_with(
                 .max(manifest::PRODUCT_UNITS_UPDATER),
         );
     }
-    // Every build with the product's units may add one a lamp lacks.
+    // Every build with the product's units may add one a lamp lacks, and
+    // is switched in this updater's order: an older updater climbs first.
     if units.iter().any(|unit| unit.lamp == manifest::PRODUCT_LAMP) {
-        min_updater = Some(min_updater.unwrap_or(1).max(manifest::ADDS_UPDATER));
+        min_updater = Some(
+            min_updater
+                .unwrap_or(1)
+                .max(manifest::ADDS_UPDATER)
+                .max(manifest::ORDER_UPDATER),
+        );
     }
     // A template by its name on the lamp (`manifest::lamp_name`).
     if units
@@ -294,7 +300,15 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        assert_eq!(made.min_updater, Some(manifest::ADDS_UPDATER));
+        assert_eq!(made.min_updater, Some(manifest::ORDER_UPDATER));
+        // An updater of level 8, which restarts lamp-controls before the
+        // voice, reads the build as too new for it and takes only the
+        // lamp-update it carries (second-P1); this updater reads it whole.
+        let bytes = serde_json::to_vec(&made).unwrap();
+        let too_old = manifest::too_old(&bytes, manifest::ADDS_UPDATER).unwrap();
+        assert_eq!(too_old.needed, manifest::ORDER_UPDATER);
+        assert_eq!(too_old.carried.unwrap().name, "lamp-update");
+        assert!(manifest::too_old(&bytes, manifest::UPDATER).is_none());
         assert_eq!(made.units.len(), 3);
         let product_voice = made
             .units
@@ -392,7 +406,7 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        assert_eq!(made.min_updater, Some(manifest::ADDS_UPDATER));
+        assert_eq!(made.min_updater, Some(manifest::ORDER_UPDATER));
         let units: Vec<String> = made.units.iter().map(Unit::file_name).collect();
         assert_eq!(
             units,
