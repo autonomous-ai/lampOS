@@ -942,7 +942,8 @@ heard each bare "Lamp". So a line told the second route as the step's call
 "Lamp", "Lamp.", "Hey Lamp", "Hey, Lamp.", "Hey Lamp!"; with a language
 other than English, also the name alone as that language's speech to text
 writes it, as [second-voice.md](second-voice.md) lists: 「エイランク。」 in
-`ja`, #4473) is told back as
+`ja`, "Hây lăm." in `vi` but not a bare "Làm!" or "Này, làm.", #4473) is
+told back as
 `ProviderOutput::StepCallHeard`, before its idle `TurnComplete`. The
 coordinator kept when that line's speech began and ended (its candidate's
 trigger, and its End; not the oldest speech block kept, which can be a sound
