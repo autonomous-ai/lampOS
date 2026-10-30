@@ -775,7 +775,14 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         received_authority(&mut speaker_peer).owner(),
         Some(old_owner)
     );
-    let stopped = received_authority(&mut speaker_peer);
+    // The startup prologue's lease keeps (#4332) re-send that same
+    // authority before the loop's own first publish.
+    let stopped = loop {
+        let next = received_authority(&mut speaker_peer);
+        if next.owner() != Some(old_owner) {
+            break next;
+        }
+    };
     assert!(stopped.owner().is_none());
     assert!(reply.is_none());
     let at = now();
