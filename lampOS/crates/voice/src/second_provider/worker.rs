@@ -277,7 +277,11 @@ impl Gate {
     fn drain(&mut self, control: &mut Channel, engine: &mut Engine) -> io::Result<Drain> {
         let mut drained = Drain::Deferred;
         for _ in 0..CONTROL_SLICE {
-            match control.receive()? {
+            // A stale renewal with the next one behind it is passed over, as
+            // the audio workers do: at start the coordinator renews every
+            // 20 ms, and a first look 120 ms or more after Ready otherwise
+            // found the third renewal stale and ended the voice (#4332).
+            match control.receive_renewed(Control::is_renewal)? {
                 Some(Control::Stop) => {
                     // Its Days session closed, so a restart leaves none (#1722, D).
                     crate::remember::close_at_exit();
@@ -18245,6 +18249,126 @@ mod tests {
         assert_eq!(gate.last_control_us, read_us);
         assert_eq!(gate.skipped_expired, 0);
         gate.fresh(read_us).unwrap();
+    }
+
+    /// What the coordinator queued for the second worker, in turn.
+    #[derive(Clone, Copy)]
+    enum Queued {
+        Renewal,
+        Capacity,
+        Stop,
+    }
+
+    /// The second worker's control queue at its first look (#4332): it sent
+    /// Ready, then did not read for `stall_us` while the coordinator's
+    /// startup pulse (`coordinator::pulse`) queued a message every 20 ms from
+    /// Ready on. The worker then drains as `serve` does, on the host clock:
+    /// the result, the authority it holds after, and the renewals sent.
+    fn first_drain_after(
+        stall_us: u64,
+        queued: &[Queued],
+    ) -> (io::Result<Drain>, Option<Snapshot>, Vec<Snapshot>) {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let boot = BootId::new([7; 16]).unwrap();
+        let worker_boot = BootId::new([8; 16]).unwrap();
+        let mut parent =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, false).unwrap();
+        let mut worker =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, true).unwrap();
+        parent.connect(&directory.path, "second", false).unwrap();
+        worker.connect(&directory.path, "second", true).unwrap();
+        let ready_us = monotonic_us() - stall_us;
+        worker
+            .control
+            .send_with(WorkerEvent::Ready, || ready_us)
+            .unwrap();
+        let at = MonoTime::from_micros;
+        let mut owner = Controller::new(boot, at(ready_us));
+        owner
+            .set_microphone_permission(at(ready_us), Permission::Allowed)
+            .unwrap();
+        let mut sent = Vec::new();
+        for (k, queued) in queued.iter().enumerate() {
+            let stamp = ready_us + k as u64 * 20_000;
+            let message = match queued {
+                Queued::Renewal => {
+                    owner
+                        .set_capture(
+                            at(stamp),
+                            CaptureState::RetainingUntil(at(stamp + 1_000_000)),
+                        )
+                        .unwrap();
+                    let snapshot = owner.snapshot(at(stamp)).unwrap();
+                    sent.push(snapshot);
+                    Control::Authority { snapshot }
+                }
+                Queued::Capacity => Control::ProviderOutputCapacity { through: 1 },
+                Queued::Stop => Control::Stop,
+            };
+            parent.control.send_with(message, || stamp).unwrap();
+        }
+        let mut engine = Engine::new(
+            Arc::new(Silent),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+        );
+        let mut gate = Gate::new(boot, ready_us);
+        let drained = gate.drain(&mut worker.control, &mut engine);
+        (drained, gate.guard.state(), sent)
+    }
+
+    /// The error a drain ended on.
+    fn ended(drained: io::Result<Drain>) -> String {
+        match drained {
+            Ok(_) => panic!("the drain went on"),
+            Err(error) => error.to_string(),
+        }
+    }
+
+    /// #4332: a worker that stalls 150 ms after Ready finds eight startup
+    /// renewals queued, 150 to 10 ms old. The first is taken on the first
+    /// message's grace and the second late, as from a held-up sender; the
+    /// third, 110 ms old, ended the worker as stale, and with the second
+    /// route the only voice, the voice. Stale renewals with the next one
+    /// behind are passed over, as the audio workers' are, and the newest is
+    /// held.
+    #[tokio::test]
+    async fn a_startup_backlog_of_stale_renewals_is_passed_over_to_the_newest() {
+        let (drained, held, sent) = first_drain_after(150_000, &[Queued::Renewal; 8]);
+        if let Err(error) = &drained {
+            panic!("{error}");
+        }
+        assert!(matches!(drained, Ok(Drain::Empty)));
+        assert_eq!(held, sent.last().copied());
+    }
+
+    /// What is not a renewal carries state a skip would lose: stale, it still
+    /// ends the worker, a renewal behind it or not, and so does a stale
+    /// renewal with anything but the next renewal behind it.
+    #[tokio::test]
+    async fn a_stale_message_that_is_not_a_renewal_still_ends_the_worker() {
+        use Queued::{Capacity, Renewal, Stop};
+        for queued in [
+            [Renewal, Renewal, Capacity, Renewal],
+            [Renewal, Renewal, Renewal, Capacity],
+            [Renewal, Renewal, Renewal, Stop],
+        ] {
+            let error = ended(first_drain_after(150_000, &queued).0);
+            assert!(error.contains("second.c.w: stale"), "{error}");
+        }
+    }
+
+    /// A coordinator that really stopped still ends the worker: its last
+    /// renewal stale with none behind it, or, the queue empty, nothing
+    /// renewed within the lease.
+    #[tokio::test]
+    async fn a_coordinator_that_stopped_still_ends_the_worker() {
+        // Four renewals, then nothing: the newest is 240 ms old.
+        let error = ended(first_drain_after(300_000, &[Queued::Renewal; 4]).0);
+        assert!(error.contains("second.c.w: stale"), "{error}");
+        // Nothing sent since Ready, a lease ago.
+        let error = ended(first_drain_after(CONTROL_LEASE_US + 10_000, &[]).0);
+        assert!(error.contains("heartbeat expired"), "{error}");
     }
 
     /// #2305's review: a camera close and a mute, as the worker installs
