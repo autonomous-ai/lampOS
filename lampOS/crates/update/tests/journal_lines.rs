@@ -8,6 +8,7 @@ use lamp_update::manifest::{File, TooOld};
 use lamp_update::records::Records;
 use lamp_update::round::Told;
 use lamp_update::{Outcome, walk};
+use std::{fs, path::Path};
 
 const OLD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const NEW: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -142,4 +143,68 @@ fn a_round_not_switched_says_the_walk_or_the_lock_as_the_table_gives_them() {
         panic!("the lock was taken twice");
     };
     assert_eq!(error.to_string(), "another lamp-update is at work");
+}
+
+/// The words of a `self.say(` call at `at` in `source`: its string literal,
+/// directly or as `format!`'s, or none for a line built before the call
+/// (`self.say(&line)`), which the table names by hand.
+fn said_words(source: &str, at: usize) -> Option<String> {
+    let rest = source[at + "self.say(".len()..].trim_start();
+    let rest = rest.strip_prefix("&format!(").unwrap_or(rest).trim_start();
+    let rest = rest.strip_prefix('"')?;
+    let mut words = String::new();
+    let mut chars = rest.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => return Some(words),
+            '\\' => match chars.next()? {
+                // A line continued: the newline and the next line's indent.
+                '\n' => {
+                    let tail = chars.as_str().trim_start();
+                    chars = tail.chars();
+                }
+                escaped => words.push(escaped),
+            },
+            c => words.push(c),
+        }
+    }
+    None
+}
+
+/// Every line a round says with words of its own (`Round::say` in
+/// `round.rs`) has a row in `docs/updates.md`'s "Every line a round says":
+/// the row holds its longest fixed piece, the words between its
+/// placeholders. Run sheets grep these lines on lamps (#4672, #4680), and on
+/// 31 Oct 34 of the round's 41 had no row.
+#[test]
+fn every_line_a_round_says_has_a_row_in_updates_md() {
+    let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source = fs::read_to_string(crate_dir.join("src/round.rs")).unwrap();
+    let docs = fs::read_to_string(crate_dir.join("../../docs/updates.md")).unwrap();
+    let table = docs
+        .split_once("### Every line a round says")
+        .map(|(_, after)| after.split("\n### ").next().unwrap_or(after))
+        .expect("updates.md has \"Every line a round says\"");
+    let mut lines = 0;
+    let mut unnamed = Vec::new();
+    for (at, _) in source.match_indices("self.say(") {
+        let Some(words) = said_words(&source, at) else {
+            continue;
+        };
+        lines += 1;
+        let piece = words
+            .split(['{', '}'])
+            .step_by(2)
+            .map(|piece| piece.trim_matches(|c: char| c.is_whitespace() || ",;:".contains(c)))
+            .max_by_key(|piece| piece.len())
+            .unwrap_or_default();
+        if !table.contains(piece) {
+            unnamed.push(words);
+        }
+    }
+    assert!(lines >= 40, "only {lines} said lines found in round.rs");
+    assert!(
+        unnamed.is_empty(),
+        "updates.md's \"Every line a round says\" has no row for {unnamed:#?}"
+    );
 }
