@@ -115,3 +115,28 @@ fn no_walk_is_read_without_setup_done_or_a_readable_file() {
     put(&unread, "/var/lib/lampos-update/walk-held", "many");
     assert_eq!(unread.round(), Outcome::Switched(2));
 }
+
+/// Tests' P2 on #4455: a round that began before the walk's file (its first
+/// step, or before setup's `done`) is held at the switch's wait, with the
+/// build installed beside and nothing switched; the next round after the
+/// walk switches to it.
+#[test]
+fn a_walk_begun_while_the_round_fetched_holds_it_at_the_switch() {
+    let mut lamp = Lamp::new();
+    build_two(&mut lamp);
+    set_up(&lamp);
+    let progress = lamp.root.join(walk::PROGRESS.trim_start_matches('/'));
+    lamp.channel.on_fetch = Some((progress, TWO_STEPS_IN.to_owned()));
+    assert_eq!(lamp.round(), held(1));
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    assert!(lamp.exists(&format!(
+        "/opt/lampOS/releases/{}/lamp-voice",
+        sha("voice 2")
+    )));
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-voice.service"),
+        voice_unit(&sha("voice 1"))
+    );
+    put(&lamp, walk::PROGRESS, &walked());
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+}

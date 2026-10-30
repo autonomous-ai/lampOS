@@ -698,10 +698,16 @@ each under the quiet rule. A round
    the walk's, is no walk: the 7071 voice writes it at the first step's
    end, and a lamp with onboarding off never does. The round then ends
    `not switched: the setup walk is under way: held, round N of 8` (status
-   4), and the next round looks again. At most 8 rounds on a lamp, 2 hours
+   4), and the next round looks again. The walk is looked at again at each
+   second of the switch's quiet wait (step 7), so a round begun before the
+   walk's file (its first step, or before setup's `done`) is held there
+   the same way, with its new folders installed beside and nothing
+   switched (Tests' P2 on #4455). At most 8 rounds on a lamp, 2 hours
    at `serve`'s 900 s: the count is kept in `walk-held` in the records and
-   never reset, so a walk left half done, or a redo later, never holds
-   updates for long. Counting rounds needs no clock, which a new lamp may
+   never reset, so a walk left half done never holds updates for long, and
+   a redo weeks later is held only for what is left of the 8. The app's
+   Check for update starts a round at once (#4153), so each one during a
+   walk spends a held round too. Counting rounds needs no clock, which a new lamp may
    set only after its setup. A count that can't be read or kept holds
    nothing. **Why:** the first customer lamps ship reset, and their first
    update comes within the hour of their setup, while their first voice
