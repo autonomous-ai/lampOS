@@ -81,7 +81,7 @@ pub(crate) const OWN_PRICE_UNREAD_NOTE: &str = "No price could be read from Auto
 
 /// Told with a search's results and the price the lamp read on the
 /// Autonomous product page among them.
-pub(crate) const SEARCHED_OWN_PRICE_NOTE: &str = "The price here is the one Autonomous's own product page shows, read just now: give it for that product, never a price in the results. A price for anything else found by a search may be out of date: if you give one, say it may have changed. If they are looking at the page and see another price, believe them and never argue.";
+pub(crate) const SEARCHED_OWN_PRICE_NOTE: &str = "The price here is the one Autonomous's own product page shows, read just now: give it for that product, never a price in the results. Never give a price for any other Autonomous product from a search or another site, only from its own page: fetch that page. A price for anything else found by a search may be out of date: if you give one, say it may have changed. If they are looking at the page and see another price, believe them and never argue.";
 
 impl Search {
     /// DeepSeek's Search & Fetch API.
@@ -270,33 +270,53 @@ fn fetch_told(fetched: std::result::Result<Result<Value>, tokio::time::error::El
     }
 }
 
-/// A search speaking of a price (`results` gave it the note) with a result
-/// on our own site carries that page's price, read by `read` at once,
-/// within [`WITHIN`], so the model needn't fetch the page to give it. On
-/// lamp-4ace on 31 Oct (build 9063) "How much is the Autonomous ErgoChair
-/// Pro?" was answered "449 euro on Autonomous's own page" from a search's
-/// text, with no `fetch_page`; the page said $499.
-async fn with_own_price<F>(mut told: Value, read: impl FnOnce(String) -> F) -> Value
+/// The most of our own pages among a search's results read for a price: the
+/// first may be a category or a story with no product data (Reviewer-three's
+/// and Thirteen's P3 on #4684).
+const OWN_PAGES_READ: usize = 2;
+
+/// A search speaking of a price (`results` gave it the note) with results
+/// on our own site carries the price of the first of them that has one,
+/// read by `read`: up to [`OWN_PAGES_READ`] pages at once, each within
+/// [`WITHIN`] after the results, so the model needn't fetch the page to
+/// give it. On lamp-4ace on 31 Oct (build 9063) "How much is the Autonomous
+/// ErgoChair Pro?" was answered "449 euro on Autonomous's own page" from a
+/// search's text, with no `fetch_page`; the page said $499.
+async fn with_own_price<F>(mut told: Value, read: impl Fn(String) -> F) -> Value
 where
     F: std::future::Future<Output = Option<Value>>,
 {
     if told.get("note").is_none() {
         return told;
     }
-    let Some(own) = told["results"]
+    let mut owns: Vec<String> = Vec::new();
+    for own in told["results"]
         .as_array()
         .into_iter()
         .flatten()
-        .find_map(|result| result["url"].as_str().and_then(own_page))
-    else {
+        .filter_map(|result| result["url"].as_str().and_then(own_page))
+    {
+        if !owns.contains(&own) {
+            owns.push(own);
+        }
+        if owns.len() == OWN_PAGES_READ {
+            break;
+        }
+    }
+    if owns.is_empty() {
         return told;
-    };
-    match tokio::time::timeout(WITHIN, read(own)).await {
-        Ok(Some(price)) => {
+    }
+    let prices = futures_util::future::join_all(
+        owns.into_iter()
+            .map(|own| tokio::time::timeout(WITHIN, read(own))),
+    )
+    .await;
+    match prices.into_iter().find_map(|price| price.ok().flatten()) {
+        Some(price) => {
             told["price"] = price;
             told["note"] = SEARCHED_OWN_PRICE_NOTE.into();
         }
-        _ => told["note"] = format!("{SEARCHED_PRICE_NOTE} {OWN_PRICE_UNREAD_NOTE}").into(),
+        None => told["note"] = format!("{SEARCHED_PRICE_NOTE} {OWN_PRICE_UNREAD_NOTE}").into(),
     }
     told
 }
@@ -766,6 +786,13 @@ mod tests {
         );
         assert_eq!(told["price"], price);
         assert_eq!(told["note"], SEARCHED_OWN_PRICE_NOTE);
+        // Our other products are still never priced from a search
+        // (Reviewer-three's P2 on #4684: "the ErgoChair Pro compared with
+        // the SmartDesk Pro", the desk's page read first).
+        assert!(
+            SEARCHED_OWN_PRICE_NOTE
+                .contains("Never give a price for any other Autonomous product from a search")
+        );
         assert_eq!(told["results"].as_array().unwrap().len(), 2);
         // Not read: the note says to give none from the search.
         let told = with_own_price(results(&answer, "how much is the ErgoChair Pro"), |_| {
@@ -797,6 +824,46 @@ mod tests {
             .await,
             priced
         );
+    }
+
+    /// Up to two of our pages are read at once, and the first in the results'
+    /// order that has a price is given: a category page with no product data
+    /// first doesn't hide the product's (Reviewer-three's and Thirteen's P3
+    /// on #4684). A third is not read.
+    #[tokio::test]
+    async fn the_first_of_our_pages_with_a_price_is_given() {
+        let answer = json!({"results": [
+            {"title": "Office chairs", "summary": "Chairs from $299.", "url": "https://www.autonomous.ai/office-chairs"},
+            {"title": "ErgoChair Pro", "summary": "€449", "url": "https://www.autonomous.ai/en-GB/office-chairs/ergonomic-chair"},
+            {"title": "SmartDesk Pro", "summary": "$499", "url": "https://www.autonomous.ai/standing-desks/smartdesk-pro"},
+        ]});
+        let read = std::sync::Mutex::new(Vec::new());
+        let chair = json!({"product": "ErgoChair Pro", "currency": "USD", "price": 499});
+        let told = with_own_price(results(&answer, "ErgoChair Pro price"), |own| {
+            read.lock().unwrap().push(own.clone());
+            std::future::ready(own.ends_with("/ergonomic-chair").then(|| chair.clone()))
+        })
+        .await;
+        assert_eq!(
+            *read.lock().unwrap(),
+            [
+                "https://www.autonomous.ai/office-chairs",
+                "https://www.autonomous.ai/office-chairs/ergonomic-chair"
+            ]
+        );
+        assert_eq!(told["price"], chair);
+        assert_eq!(told["note"], SEARCHED_OWN_PRICE_NOTE);
+        // Both with a price: the earlier result's is given.
+        let first = json!({"product": "Office chairs", "currency": "USD", "from": 299, "to": 599});
+        let told = with_own_price(results(&answer, "ErgoChair Pro price"), |own| {
+            std::future::ready(Some(if own.ends_with("/office-chairs") {
+                first.clone()
+            } else {
+                chair.clone()
+            }))
+        })
+        .await;
+        assert_eq!(told["price"], first);
     }
 
     /// A read that doesn't come within `WITHIN` is no price.
