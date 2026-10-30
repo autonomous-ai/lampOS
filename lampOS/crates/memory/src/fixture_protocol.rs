@@ -11,7 +11,11 @@ use std::{
 
 pub const VERSION: u32 = 1;
 pub const MAX_FRAME_BYTES: usize = 4096;
-pub const HOST_WAIT: Duration = Duration::from_secs(8);
+/// A watchdog, not a latency bound: a `--memory-days` child opens SQLite with
+/// full flushes (F_FULLFSYNC on macOS), which wait behind other processes'
+/// file work. Beside eight processes creating, flushing, renaming and removing
+/// files, a Mac took 8.8–13.6 s to be ready (#1569).
+pub const HOST_WAIT: Duration = Duration::from_secs(30);
 pub const MAX_MARKER_BYTES: usize = 128;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
