@@ -1224,6 +1224,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         .ok()
         .as_deref()
         == Some("on");
+    // With LAMP_EYES_SPEAKING_STEADY=on (#4558), what the body says of its
+    // joints, read each look, so the mouths leave out the head's own moves.
+    let steady_bus = (std::env::var(lamp_eyes::speaking::STEADY_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on"))
+    .then(|| lamp_bus::Bus::from_environment().ok())
+    .flatten();
     let voice_bus = answered
         .as_ref()
         .and_then(|_| lamp_bus::Bus::from_environment().ok());
@@ -2467,6 +2475,23 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         if let Some(bus) = bus_out.as_mut() {
                             let now = lamp_ipc::monotonic_us();
                             bus.set_mesh_scale(mesh_scale);
+                            if let Some(joints) = steady_bus.as_ref() {
+                                // A reading older than the full look's
+                                // freshness is no word of the head: still.
+                                let moved = joints
+                                    .latest(lamp_msgs::JointState::TOPIC)
+                                    .ok()
+                                    .flatten()
+                                    .filter(|message| {
+                                        !message.expired
+                                            && lamp_eyes::full_look::unix_ms()
+                                                .saturating_sub(message.header.at_unix_ms)
+                                                <= lamp_eyes::full_look::FRESH_MS
+                                    })
+                                    .and_then(|message| message.parse::<lamp_msgs::JointState>().ok())
+                                    .is_some_and(|joints| lamp_eyes::speaking::head_moved(&joints));
+                                bus.set_head_moved(moved);
+                            }
                             bus.saw(&faces, &opens, picture.filled, now);
                             if let Some(yes) = yawns_yes {
                                 bus.activity_yawns_allowed(yes);

@@ -2407,6 +2407,31 @@ with the known face's id the eyes keep beside the known file
   `unknown` (`reason` `outliers`, after `small`: a far face reads `small`). A window with none is judged exactly as
   with it off. Offline only: a talking face with one 14 px look reads `yes`,
   a still one `no`; two such looks, or one in a window of five, `unknown`.
+- **The head's own moves, and a meshed face's eye floor
+  (`LAMP_EYES_SPEAKING_STEADY=on`, off unless set, #4558).** Off, a look
+  taken while the lamp's head turns moves the mesh's crop, and the change
+  reads as lips: on #2859's still run on lamp-52e6 two paused faces read
+  `yes` together while both boxes moved, and faces under 24 detector pixels
+  between the eyes (about 0.85 m) read `unknown` (`small`) on every look.
+  On, each look reads `body/joint_states` (`speaking::head_moved`: the
+  camera's aim, `full_look::aim_speeds`, turning faster than
+  `HEAD_MOVED_RADIANS_A_SECOND`, the full look's own still bar, 25 counts a
+  second; a reading older than 160 ms is a still head), and the mesh's score
+  leaves out every look-to-look pair with a moving look at either end. The
+  pairs kept are still, so they are judged as a still window's are, `yes` or
+  `no`; such a pair is not a gap (counting it as one read a talking face on
+  lamp-52e6 `unknown`, `reason` `mesh`, for about 2 s after every head move,
+  #4585). Only a window left with fewer than four still pairs
+  (`LEAST_LOOKS - 1`) is `unknown` (`reason` `mesh`). And a window
+  the mesh read on every look is held to 16 px between the eyes
+  (`LEAST_MESHED_EYES_PX`, in the pixels the mesh saw) instead of 24; a window
+  judged by the corners keeps 24. The 16 is to be confirmed by the 52e6 size
+  ladder on #4558. Host tests only: a still face whose mouth jumps only on
+  moving looks reads `no` on, `yes` off; the same jumps on a still head
+  `yes` either way; a meshed face at 18 px `unknown` off and judged on; a
+  corners-only one at 18 px `unknown` either way; a talking window with one
+  moving look `yes` either way, and one with a move every third look
+  `unknown` on. Off, nothing is read and nothing changes.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
@@ -2574,7 +2599,9 @@ the frame's own pixels (`Mouths::set_mesh_scale`, four a detector pixel at
 `window_mean_eyes_px` says that value; `eyes_px` stays the detector's. A
 window with a look the mesh missed is judged by the corners, on the
 detector's marks, so it is gated in the detector's pixels as before. Without
-the switch or `--full-look` nothing changes. `filled` excludes padding; the existing
+the switch or `--full-look` nothing changes. With
+`LAMP_EYES_SPEAKING_STEADY=on` a window the mesh read on every look is held
+to 16 px instead of 24, in the same pixels; the corners keep 24. `filled` excludes padding; the existing
 camera-open line gives capture dimensions. The frame is shrunk uniformly to
 fit 320 by 256, never enlarged; a 320 by 240 capture adds sixteen black rows,
 without stretching. Mesh crop upsampling does not change `eyes_px`. The box
