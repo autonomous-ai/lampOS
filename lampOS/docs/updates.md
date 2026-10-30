@@ -1077,10 +1077,21 @@ and `check` end with
 defaults: channel `lamp-voice`, key `/etc/lampOS/update/key.pub`, lamp the
 host name, bus `LAMP_BUS_ROOT` or `/run/lampos-bus`.
 
-The unit is [`deploy/units/lamp-update.service`](../deploy/units/lamp-update.service):
+The unit is [`deploy/units/lamp-update.service`](../deploy/units/lamp-update.service),
+and on a product lamp [`deploy/product/lamp-update.service`](../deploy/product/lamp-update.service):
 root (it writes `/opt/lampOS` and `/etc/systemd/system` and restarts
-units), `ProtectSystem=strict` with only those two, the bus and its
-records writable, `Nice=10` and idle I/O, not part of `lampos.target`.
+units), `ProtectSystem=strict` with only those two, the product skills'
+folder (`-/var/lib/lampOS/skills`), the bus and its records writable, and
+on the product also lamp-skills' state (`-/var/lib/lampos-skills-state`).
+It runs with `Nice=10` and idle I/O, and is not part of `lampos.target`.
+No round switches this unit (`round::OWN_UNIT`), so a lamp's round runs
+in the sandbox its image installed: on the shipped lamps, 7071's, which
+has today's lines. What a round needs written outside it goes through a
+one-shot unit of its own, as the settings writer's (below) and
+`lamp-update-apply.service` do. Widening this line never reaches a lamp
+already in a home. A test pins the product unit's sandbox to 7071's and
+each folder a round writes itself to inside it (`own_unit_line_tests` in
+`main.rs`, #4540).
 
 ### Its records
 
