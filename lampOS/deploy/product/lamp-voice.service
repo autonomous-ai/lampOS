@@ -312,6 +312,12 @@ Environment=LAMP_PERSON_SCOPE_SEEN=on
 # owner's decision on #4479). It is told from the conversation as it stood (its thread and running summary), never
 # from memory's reads, keeps, forgets or a yes, and never summarised or kept in a talk note.
 Environment=LAMP_CONVERSATION_CARRIES=on
+# And such a carried line's keep waits for that person's yes (#4339, approved by the memory's owner on 30 Oct; the
+# first builder's call on #4508): its remember is held in RAM, never journalled, the lamp asks "Want me to keep that
+# for you?", and only their plain yes with their own face seen saying it writes it in their scope; anything else drops
+# it. Still no recall, note or hits on it, no forget and no yes, never another person's scope, and a line held only by
+# a face's gap holds nothing.
+Environment=LAMP_CONVERSATION_CARRIED_SAVES=on
 # The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things
 # worth keeping, each checked by the store and linked to the words it came from (OBSERVE); a dated one keeps its
 # day (EVENTS); the next session with that person asks after one open thread, once, at most one a day (THREADS);
