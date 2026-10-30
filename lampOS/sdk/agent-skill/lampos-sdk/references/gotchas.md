@@ -46,6 +46,16 @@ Each of these cost someone a run on a real lamp.
   the ring shows it muted and the lamp doesn't hear. One tap on its head
   clears it. Expect it after a lamp update or a voice restart.
 
+## Your handlers
+
+- **Catch errors inside every event handler.** The lamp keeps talking, but
+  an error your handler throws isn't returned to you: Python logs a
+  coroutine handler's as a task exception, JS emits it as `handlerError` on
+  the socket. Wrap the
+  body in `try`/`except LampError` (JS `try`/`catch`) as the patterns do.
+- **A handler can run while the last one still does:** events don't wait for
+  your handler. Keep a flag or a time if two greetings must not overlap.
+
 ## Connection
 
 - **The lamp restarts on every update:** the connection closes

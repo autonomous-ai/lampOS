@@ -11,7 +11,7 @@ Rules that make any of them feel right:
 - Wrap every action in a refusal handler: the person, quiet hours or another
   motion can say no at any time.
 
-## React to presence (look grant)
+## React to presence (look for the events, body for the gesture)
 
 ```python
 import asyncio, time
@@ -68,6 +68,20 @@ async def main(result):
 asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "pass"))
 ```
 
+```js
+import { Lamp } from 'lampos';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const lamp = await Lamp.connect();
+if ((process.argv[2] ?? 'pass') === 'pass') {
+  await lamp.light('green', 3, 20_000, 'breathe');
+} else {
+  await lamp.light('red', 3, 20_000, 'pulse');
+  await lamp.say('The build failed.');
+}
+await sleep(20_000);      // closing gives the light back at once: stay while it shows
+await lamp.close();
+```
+
 ## A pomodoro (light, speak, body)
 
 ```python
@@ -92,6 +106,29 @@ async def main():
             await hold(lamp, "green", 5 * 60)
 
 asyncio.run(main())
+```
+
+```js
+import { Lamp, LampError } from 'lampos';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function hold(lamp, colour, seconds) {
+  for (let i = 0; i < Math.floor(seconds / 25); i++) {
+    await lamp.light(colour, 2, 30_000);
+    await sleep(25_000);
+  }
+}
+const lamp = await Lamp.connect();
+for (;;) {
+  await hold(lamp, 'warm', 25 * 60);
+  try {
+    await lamp.say('Time for a short break.');
+    await lamp.gesture('stretching');
+  } catch (e) {
+    if (!(e instanceof LampError)) throw e;
+    console.log('break, quietly:', e.code);
+  }
+  await hold(lamp, 'green', 5 * 60);
+}
 ```
 
 ## An agent's progress on the lamp (light)
@@ -138,6 +175,33 @@ async def main():
 asyncio.run(main())
 ```
 
+```js
+import { Lamp } from 'lampos';
+const LOOK = {
+  working: ['blue', 2, 'breathe'],
+  waiting: ['yellow', 3, undefined],    // undefined: steady (no pattern is sent)
+  done: ['green', 3, undefined],
+  failed: ['red', 3, undefined],
+};
+class Progress {
+  constructor(lamp) { this.lamp = lamp; this.timer = null; }
+  async show(state) {
+    clearInterval(this.timer);
+    const [colour, level, pattern] = LOOK[state];
+    const light = () => this.lamp.light(colour, level, 30_000, pattern).catch((e) => console.log('light:', e.code));
+    await light();
+    this.timer = setInterval(light, 25_000);
+  }
+  stop() { clearInterval(this.timer); }
+}
+const lamp = await Lamp.connect();
+const progress = new Progress(lamp);
+await progress.show('working');
+// ... your agent's work ...
+await progress.show('done');
+await lamp.express('glad');
+```
+
 With lamp-mcp an agent can do this itself: `lamp_light` while it works,
 `lamp_express("glad")` at the end, `lamp_say` only when the person must act.
 
@@ -166,6 +230,15 @@ async def main():
         await asyncio.sleep(20)     # the light lasts while this stays connected
 
 asyncio.run(main())
+```
+
+```js
+import { Lamp, LampError } from 'lampos';
+async function alert(lamp, text, urgent = false) {
+  await lamp.light('purple', 3, 20_000, urgent ? 'pulse' : undefined);
+  if (!urgent) return;
+  try { await lamp.say(text.slice(0, 300)); } catch (e) { if (e instanceof LampError) console.log('said nothing:', e.code); else throw e; }
+}
 ```
 
 Hook `alert` to your webhook handler (an `aiohttp` or Express route), and
