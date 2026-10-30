@@ -796,7 +796,8 @@ each under the quiet rule. A round
    before are in the journal, written with it). Each changed unit that was
    running is then restarted in the candidate graph's startup order, except
    the voice: when a running part before it restarts too, the voice is
-   stopped first and started last (see "The voice stopped first" below). A
+   stopped first and started again at its own place in that order, after
+   the parts it reads (see "The voice stopped first" below). A
    unit that was not running is switched without being started.
 
    **Completed product Setup:** `lamp-setup.service` may still be serving
@@ -829,8 +830,12 @@ each under the quiet rule. A round
    with a plain `systemctl stop`, while lamp-controls is still up. That is a
    clean stop with nothing in flight, so no build's voice arms its restart
    guard (#960), not even one from before `1c88f2dbd` (#4280). Then the
-   other parts restart in startup order, and the voice is started last, as
-   the new voice. If no quiet moment arrives within `--quiet-wait-s`, the
+   other parts restart in startup order, and the voice is started at its own
+   place in it, after its prerequisites (its `After=`), as the new voice. The
+   parts ordered after it (Body, Expression, Skills) restart after it, as at
+   boot. On lamp-9adf's 8899 → 8999 round (30 Oct): voice stopped at
+   23:39:26.81, cloud and setup-reset restarted, voice started at 27.17,
+   then Body, Expression and Skills from 27.29. If no quiet moment arrives within `--quiet-wait-s`, the
    changes are put back and nothing has been restarted. The voice is marked
    restarted at its stop, so a part that fails later puts it back, and the
    old voice is started again. A sentence begun while a prerequisite
@@ -1751,7 +1756,8 @@ round's fake systemd.
 ### Every lamp switches in its build's order (second-P1)
 
 Every product build asks for updater level 9 (`manifest::ORDER_UPDATER`):
-a round stops the voice first and starts it last (#4431, step 8). An
+a round stops the voice first and starts it again after the parts it reads
+(#4431, step 8). An
 updater of level 8 or lower reads such a build as too new for it, takes
 only the lamp-update it carries, and that one confirms itself and, in the
 same `serve`, runs the switch in its own order: on lamp-9adf a confirmed
