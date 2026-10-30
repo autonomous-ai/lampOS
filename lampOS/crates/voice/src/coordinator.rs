@@ -6383,14 +6383,10 @@ fn conversation_with_gate_inner(
         );
     }
     let mut stop_words = (duplex && listen != crate::stop_words::Listen::Off)
-        .then(|| match crate::second_config::load_from_env() {
+        .then(|| match crate::language::hearing_config_from_env() {
             Ok(Some(config)) => {
             // Its backchannels are the speech-to-text's language's (#2939),
             // the owner's when set (#4473), heard in it.
-            let mut config = config;
-            if let Some(owner) = crate::language::from_environment() {
-                config.stt_language = Some(owner.stt().to_owned());
-            }
             let language = config.stt_language.clone();
             crate::stop_words::RelayEars::start(
                 {
@@ -6466,7 +6462,8 @@ fn conversation_with_gate_inner(
     // waited for on the next pass, as a spoken stop does.
     let mut waited_stop = false;
     let mut wait_words = wait_hears_words
-        .then(|| match crate::second_config::load_from_env() {
+        // Heard in the owner's language when set (#4473), as the stop stream.
+        .then(|| match crate::language::hearing_config_from_env() {
             Ok(Some(config)) => {
                 eprintln!(
                     "lamp-voice: wait words: a sound while an answer waits is judged by its words, through the second voice's speech-to-text at {}",
