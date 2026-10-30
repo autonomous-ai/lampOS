@@ -36,7 +36,11 @@ finish() { rc=$?; [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && { kill -TERM "$
   r=$(cat "$OUT/aborted" 2>/dev/null || grep -E '^pulled:' "$OUT/run.txt" 2>/dev/null | tail -1)
   back="Speaker and lamp-policy put back"
   grep -q 'LAMP-POLICY NOT PUT BACK' "$OUT/run.txt" 2>/dev/null && back="LAMP-POLICY NOT PUT BACK: its /run drop-in needs removing by hand"
-  post "Jev-verifier, QUIET $LAMP $(hm): #4306 run ended (exit $rc). ${r:-no result}. $back; lock released."
+  # Busy-labelled lines played, and how many of them read room/state busy just before (the rest are background talk).
+  bz=$(awk -F'|' 'NR==FNR { if ($3 == "busy") b[$1] = 1; next } FNR > 1 && ($2 in b) { n++; if ($7 == "busy") k++ }
+    END { printf "busy-labelled lines played %d, room read busy before %d (the rest scored as background talk)", n, k }' \
+    "$HERE/lines.txt" FS='\t' "$OUT/plays.tsv" 2>/dev/null)
+  post "Jev-verifier, QUIET $LAMP $(hm): #4306 run ended (exit $rc). ${r:-no result}. ${bz:+$bz. }$back; lock released."
   "$LOCK" "$LAMP" release "$HOLDER" "$SESS" >/dev/null 2>&1 || echo "lock release failed" >&2; }
 trap finish EXIT
 trap 'exit 130' INT TERM
