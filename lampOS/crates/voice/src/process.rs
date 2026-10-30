@@ -1652,6 +1652,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
         // The name at a line's start dated from its usual start (#4226).
         crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
+        // The conversation's windows measured to a line's start (#4594).
+        crate::second_provider::WINDOW_FROM_START_ENVIRONMENT,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
@@ -1815,6 +1817,7 @@ mod tests {
             crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
+            crate::second_provider::WINDOW_FROM_START_ENVIRONMENT,
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
             crate::second_config::OWN_KEYS_ENV,
@@ -2455,6 +2458,7 @@ mod tests {
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_START_USUAL_ENVIRONMENT
+                    || name == crate::second_provider::WINDOW_FROM_START_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
@@ -2676,6 +2680,7 @@ mod tests {
                     "LAMP_TURNED_FACE_SPEAKS=on",
                     "LAMP_TURNED_SPEAKING=on",
                     "LAMP_TWO_FACES_HELD=on",
+                    "LAMP_WINDOW_FROM_START=on",
                 ],
             ),
             (
