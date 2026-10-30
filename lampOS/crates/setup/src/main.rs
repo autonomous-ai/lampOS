@@ -618,8 +618,10 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         None => Bus::from_environment()?,
     };
     let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: change: {line}"));
-    match change::wait_for_quiet(&mut ears, change::QUIET_MOST) {
-        Ok(()) => {
+    // Quiet, and no update at work: held to the end, so no round's watch
+    // sees lamp-schedule change process and puts its build back.
+    match change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST) {
+        Ok(_held) => {
             let status = std::process::Command::new("/usr/bin/systemctl")
                 .args(["try-restart", change::SCHEDULE_UNIT])
                 .status();
@@ -638,7 +640,7 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             }
         }
         Err(why) => eprintln!(
-            "lamp-setup: change: the lamp was not quiet within {} min ({why}); lamp-schedule keeps the old zone until it next starts",
+            "lamp-setup: change: the lamp was not quiet with no update at work within {} min ({why}); lamp-schedule keeps the old zone until it next starts",
             change::QUIET_MOST.as_secs() / 60
         ),
     }

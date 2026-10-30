@@ -393,6 +393,63 @@ fn schedule_waits_for_the_quiet_an_update_waits_for() {
     assert!(why.contains("cannot be judged"), "{why}");
 }
 
+/// A zone's `lamp-schedule` restart waits for the quiet and then for no
+/// update at work, holding lamp-update's lock through the restart: a round
+/// puts its build back when a unit it restarted changes process in its
+/// watch (`updates.md` step 9). Free, the lock comes after the quiet; held
+/// all along, given up at the bound with why; let go meanwhile, taken after
+/// the quiet again.
+#[test]
+fn a_zone_restart_waits_for_no_update_and_holds_its_lock() {
+    use std::{cell::RefCell, rc::Rc};
+    let folder = std::env::temp_dir().join(format!(
+        "lsc-unlocked-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let records = lamp_update::records::Records::new(folder.clone());
+    let resting =
+        || -> Box<dyn Fn(u64) -> Vec<Heard>> { Box::new(|_| vec![Heard::State(Voice::Resting)]) };
+    // No update: the lock after 45 s of quiet, held while the caller acts.
+    let mut ears = Script {
+        now: 0,
+        at: resting(),
+    };
+    let held = change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST).unwrap();
+    assert_eq!(ears.now, 45 * S);
+    assert!(records.lock().is_err());
+    drop(held);
+    // An update holding it all along: given up at the bound, with why.
+    let update = records.lock().unwrap();
+    let mut ears = Script {
+        now: 0,
+        at: resting(),
+    };
+    let Err(why) = change::quiet_and_unlocked(&mut ears, &records, Duration::from_secs(120)) else {
+        panic!("taken while an update held it");
+    };
+    assert!(why.contains("update"), "{why}");
+    assert!(ears.now >= 120 * S, "{}", ears.now);
+    // Let go at 70 s: quiet at 45 s, the lock held, looked at again 10 s
+    // later after another 45 s of quiet, at 100 s.
+    let update = Rc::new(RefCell::new(Some(update)));
+    let letting = Rc::clone(&update);
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(move |now| {
+            if now >= 70 * S {
+                letting.borrow_mut().take();
+            }
+            vec![Heard::State(Voice::Resting)]
+        }),
+    };
+    let held = change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST).unwrap();
+    assert_eq!(ears.now, 100 * S);
+    assert!(update.borrow().is_none());
+    drop(held);
+    let _ = fs::remove_dir_all(folder);
+}
+
 /// The app's restart and shutdown (#2193, #3697): off, refused as every
 /// change is; on, answered first, holding lamp-update's lock to act on;
 /// refused with why while an update holds it, and nothing to act on. A
