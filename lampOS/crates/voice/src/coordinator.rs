@@ -7911,7 +7911,7 @@ fn conversation_with_gate_inner(
                         })
                         .and_then(|cache| cache.sleep_line());
                     if let (Some(line), Some(controls)) = (line, controls.as_mut()) {
-                        submission_draining |= cut_for_last_words(
+                        let (draining, _) = cut_for_last_words(
                             owner,
                             reply,
                             &mut provider_queue,
@@ -7919,7 +7919,9 @@ fn conversation_with_gate_inner(
                             &mut admission,
                             &mut detector,
                             trace,
+                            |state| rig.publish(state),
                         )?;
+                        submission_draining |= draining;
                         let (now_state, _) = speaker_tone::commit_sound_turn(
                             owner,
                             reply,
@@ -11566,7 +11568,7 @@ fn conversation_with_gate_inner(
             && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
         {
             if ticket.last_words() {
-                submission_draining |= cut_for_last_words(
+                let (draining, now_state) = cut_for_last_words(
                     owner,
                     reply,
                     &mut provider_queue,
@@ -11574,7 +11576,11 @@ fn conversation_with_gate_inner(
                     &mut admission,
                     &mut detector,
                     trace,
+                    |state| rig.publish(state),
                 )?;
+                submission_draining |= draining;
+                snapshot = now_state;
+                last_publish = monotonic_us();
             }
             // An add-on's quoted line is the second route's alone: there its
             // turn is asked with no functions (#2530 part 2). The Live
@@ -12957,7 +12963,7 @@ fn play_skill_sound(
     submission_draining: &mut bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
-    publish: impl FnMut(Snapshot) -> io::Result<()>,
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
     let Some((samples, ticket)) = says.take_sound(at_us) else {
         return Ok(None);
@@ -12984,7 +12990,9 @@ fn play_skill_sound(
             admission,
             detector,
             trace,
-        )?;
+            &mut publish,
+        )?
+        .0;
     }
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
@@ -13010,7 +13018,14 @@ fn play_skill_sound(
 /// still being said, drained until its end. Without the drain that line's
 /// microphone frames went on into the last words' turn, which sends nothing,
 /// and filled the provider queue past its bound (lamp-52e6, 27 Oct: the voice
-/// ended). Whether input is now drained.
+/// ended). The cut revokes the speaker itself, as a hand's Stop does
+/// (`hand::cancel`): the ownerless authority is published before the next
+/// turn is admitted, so the speaker drops the cut reply's queued audio as an
+/// expected discard. Admitted first, that next turn's input-active authority
+/// kept the audio as a cancelled tail superseded by it, which only a person's
+/// interruption may have (lamp-52e6, 30 Oct: "Lamp, go to sleep", its line,
+/// then "cancelled tail has no unique matching supersession" and the voice
+/// ended). Whether input is now drained, and the authority published.
 #[allow(clippy::too_many_arguments)]
 fn cut_for_last_words(
     owner: &mut Controller,
@@ -13020,14 +13035,17 @@ fn cut_for_last_words(
     admission: &mut InputAdmission,
     detector: &mut TurnDetector,
     trace: &mut SessionState,
-) -> Result<bool> {
-    cancel_reply(owner, reply, trace, "last_words")?;
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<(bool, Snapshot)> {
+    cancel_reply(owner, reply, trace, crate::receipt_history::LAST_WORDS)?;
     provider_queue.clear();
     *speaker_pending = None;
+    let snapshot = owner.snapshot(now())?;
+    publish(snapshot)?;
     let at_us = monotonic_us();
     admission.abandon_until_end(at_us)?;
     detector.abandon_input(at_us);
-    Ok(admission.draining())
+    Ok((admission.draining(), snapshot))
 }
 
 /// When a turn's answer begins to be heard, for the session's records
