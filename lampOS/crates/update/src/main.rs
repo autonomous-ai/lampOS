@@ -122,7 +122,8 @@ public-key prints the public key of a private key, in base64: what a lamp is giv
 
 check and once end with 0 when up to date, switched, or only saying what they would
 do; 1 when refused, put back or failed; 3 when the channel cannot be reached (nothing
-changed); 4 when no quiet moment came (nothing switched). A wrong option ends with 2.
+changed); 4 when no quiet moment came, or another lamp-update or setup's helper held the
+lock (nothing switched). A wrong option ends with 2.
 ";
 
 fn usage() -> ExitCode {
