@@ -439,6 +439,12 @@ fn reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_termina
 
 #[test]
 fn reminder_waits_for_named_request_second_look_before_its_window_can_expire() {
+    // On the stepped scenario clock, as its sibling above: on the real clock
+    // a busy host's SQLite commits in `fixture.offer()` outlasted the turn's
+    // 500 ms input evidence, so the turn was revoked (`StaleOwner`, #1569).
+    // Taken first, so it is dropped last.
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     let mut fixture = RoundtripFixture::new();
     let mut test = Test::new();
     test.reply.as_mut().unwrap().reminder = None;
