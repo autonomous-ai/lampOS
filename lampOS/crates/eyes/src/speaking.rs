@@ -396,24 +396,28 @@ impl Mouths {
                 detail.reason = Reason::Mesh;
             }
             // With the switch, a pair across which the head moved is left
-            // out, as a gap: the head's own motion moves the crop and reads
-            // as lips moving (#4558).
+            // out: the head's own motion moves the crop and reads as lips
+            // moving (#4558). The pairs kept are still, so they score the
+            // mouth as well as a still window does; only too few of them
+            // leave nothing to judge (#4585: counting such a pair as a gap
+            // read a talking face `unknown` for 2 s after every head move).
             let held: Vec<_> = pairs
                 .iter()
                 .filter(|(a, b)| !(self.steady && (a.6 || b.6)))
                 .collect();
-            let gapped = held.len() < pairs.len();
+            // Only a window the head moved in is held to that count, so a
+            // still one, and every window with the switch off, is judged as
+            // before.
+            if held.len() < pairs.len() && held.len() < LEAST_LOOKS - 1 {
+                return UNKNOWN;
+            }
             let score = (held
                 .iter()
                 .filter_map(|(a, b)| Some((b.4? - a.4?).powi(2)))
                 .sum::<f32>()
                 / held.len().max(1) as f32)
                 .sqrt();
-            // A window with such a gap may say `no` but never `yes`, as the
-            // corners across the mesh's gap; with nothing left, nothing.
-            let state = if gapped && (held.is_empty() || score >= MESH_SPEAKING_AT) {
-                return UNKNOWN;
-            } else if score >= MESH_SPEAKING_AT {
+            let state = if score >= MESH_SPEAKING_AT {
                 SpeakingState::Yes
             } else {
                 SpeakingState::No
@@ -1399,18 +1403,32 @@ mod steady_tests {
     }
 
     #[test]
-    fn a_gapped_window_never_says_yes() {
-        // Talking on every look, the head moving once: the pairs left still
-        // score as speech, but the window has a gap.
+    fn a_talking_window_with_one_moving_look_says_yes() {
+        // Talking on every look, the head moving once: the pairs left are
+        // still and score as speech (lamp-52e6 read such windows `unknown`
+        // for 2 s after every head move, #4585).
+        let every: Vec<u64> = (0..10).filter(|look| look % 2 == 1).collect();
+        for steady in [false, true] {
+            assert_eq!(
+                last(steady, 30.0, &[6], &every, false).state,
+                SpeakingState::Yes
+            );
+        }
+    }
+
+    #[test]
+    fn a_window_the_head_moved_through_is_unknown() {
+        // Almost every pair touches a move: too few still pairs to judge.
         let every: Vec<u64> = (0..10).filter(|look| look % 2 == 1).collect();
         assert_eq!(
-            last(false, 30.0, &[6], &every, false).state,
-            SpeakingState::Yes
-        );
-        assert_eq!(
-            last(true, 30.0, &[6], &every, false).state,
+            last(true, 30.0, &[2, 5, 8], &every, false).state,
             SpeakingState::Unknown
         );
+    }
+
+    #[test]
+    fn a_gapped_window_never_says_yes() {
+        let every: Vec<u64> = (0..10).filter(|look| look % 2 == 1).collect();
         // The head moving through the whole window leaves nothing to judge.
         let all: Vec<u64> = (0..10).collect();
         assert_eq!(

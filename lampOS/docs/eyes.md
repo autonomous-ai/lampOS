@@ -2417,9 +2417,12 @@ with the known face's id the eyes keep beside the known file
   camera's aim, `full_look::aim_speeds`, turning faster than
   `HEAD_MOVED_RADIANS_A_SECOND`, the full look's own still bar, 25 counts a
   second; a reading older than 160 ms is a still head), and the mesh's score
-  leaves out every look-to-look pair with a moving look at either end. A
-  window with such a gap may say `no` but never `yes`: a score at or over
-  0.015 there, or no pair left, is `unknown` (`reason` `mesh`). And a window
+  leaves out every look-to-look pair with a moving look at either end. The
+  pairs kept are still, so they are judged as a still window's are, `yes` or
+  `no`; such a pair is not a gap (counting it as one read a talking face on
+  lamp-52e6 `unknown`, `reason` `mesh`, for about 2 s after every head move,
+  #4585). Only a window left with fewer than four still pairs
+  (`LEAST_LOOKS - 1`) is `unknown` (`reason` `mesh`). And a window
   the mesh read on every look is held to 16 px between the eyes
   (`LEAST_MESHED_EYES_PX`, in the pixels the mesh saw) instead of 24; a window
   judged by the corners keeps 24. The 16 is to be confirmed by the 52e6 size
@@ -2427,7 +2430,8 @@ with the known face's id the eyes keep beside the known file
   moving looks reads `no` on, `yes` off; the same jumps on a still head
   `yes` either way; a meshed face at 18 px `unknown` off and judged on; a
   corners-only one at 18 px `unknown` either way; a talking window with one
-  moving look `unknown` on. Off, nothing is read and nothing changes.
+  moving look `yes` either way, and one with a move every third look
+  `unknown` on. Off, nothing is read and nothing changes.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
