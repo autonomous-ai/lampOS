@@ -124,6 +124,10 @@ struct Fake {
     fail_read: bool,
     fail_stop: bool,
     fail_reboot: bool,
+    /// `systemctl start`, the start in place after a product reset (#4500), fails.
+    fail_start: bool,
+    /// Emptying [`reset::VOLATILE`] before the start in place fails.
+    fail_clear: bool,
     writes_on_stop: Option<PathBuf>,
     pending: Option<PathBuf>,
 }
@@ -134,7 +138,10 @@ impl Effects for Fake {
         }
         self.calls.borrow_mut().push(argv[1].clone());
         self.argvs.borrow_mut().push(argv.to_vec());
-        if (self.fail_stop && argv[1] == "stop") || (self.fail_reboot && argv[1] == "reboot") {
+        if (self.fail_stop && argv[1] == "stop")
+            || (self.fail_reboot && argv[1] == "reboot")
+            || (self.fail_start && argv[1] == "start")
+        {
             return Err(io::Error::other("refused"));
         }
         if argv[1] == "stop" {
@@ -209,6 +216,13 @@ impl Effects for Fake {
     }
     fn force_reboot(&mut self) {
         self.calls.borrow_mut().push("force".into());
+    }
+    fn clear_volatile(&mut self) -> io::Result<()> {
+        self.calls.borrow_mut().push("clear".into());
+        if self.fail_clear {
+            return Err(io::Error::other("busy"));
+        }
+        Ok(())
     }
 }
 
@@ -1651,4 +1665,188 @@ fn a_refused_shutdown_leaves_the_next_hold_acted_on() {
         !log.iter().any(|line| line.contains("already turning off")),
         "{log:?}"
     );
+}
+
+/// #4500 (lamp-cb94, 30 Oct): the A733 board's warm reset hung one time in
+/// three, a lamp left dark after a pinhole reset. A product reset doesn't
+/// reboot: after the wipe it starts, in place, what it stopped that a boot
+/// starts outside `lampos.target` and was running (not the updater's way
+/// back, which its timer starts), and setup, which serves with the marker
+/// gone and brings up its hotspot.
+fn product_lamp() -> Fake {
+    Fake {
+        parts: "lamp-voice.service".into(),
+        starters: "lamp-skills-manage.socket loaded active listening Skills\nlamp-setup-change.socket loaded inactive dead Change\nlamp-update-back.timer loaded active waiting Back\nlamp-update-back.service loaded active running Back\n".into(),
+        writers: "lamp-setup.service loaded inactive dead Setup\n\u{25cf} lamp-update.service loaded active running Update\nlamp-records.service loaded inactive dead Records\n".into(),
+        ..Fake::default()
+    }
+}
+
+#[test]
+fn a_product_reset_starts_setup_in_place_instead_of_rebooting() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = product_lamp();
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(
+        &steps[steps.len() - 2..],
+        [Step::JournalRemoved, Step::Started]
+    );
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs.last().unwrap(),
+        &[
+            "/bin/systemctl",
+            "start",
+            "lamp-skills-manage.socket",
+            "lamp-update-back.timer",
+            "lamp-update.service",
+            "lamp-setup.service"
+        ]
+        .map(String::from),
+        "what was running and a boot starts, and setup; never a stopped one or the way back"
+    );
+    assert!(
+        !fake
+            .calls
+            .borrow()
+            .iter()
+            .any(|call| call == "reboot" || call == "force")
+    );
+    // Started only after the wipe, the journal's removal and /run emptied
+    // of what a reboot would have cleared (the bus's latest, the photos).
+    let calls = fake.calls.borrow();
+    assert_eq!(calls[calls.len() - 4..], ["sync", "sync", "clear", "start"]);
+}
+
+/// A start in place that fails reboots, then forces one, as before: a reset
+/// never leaves the lamp dark by itself.
+#[test]
+fn a_start_in_place_that_fails_reboots_as_before() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_start: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    let calls = fake.calls.borrow();
+    assert_eq!(calls[calls.len() - 2..], ["start", "reboot"]);
+}
+
+/// Without setup's unit nothing would bring the lamp back, and a keeper's
+/// plan (a dev lamp) is the plan's as it is: either way, the reboot.
+#[test]
+fn a_lamp_without_setups_unit_or_a_keepers_plan_reboots() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        writers: "\u{25cf} lamp-update.service loaded active running Update\n".into(),
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    assert!(!fake.calls.borrow().iter().any(|call| call == "start"));
+
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    plan.stop = vec![
+        "/opt/lampOS/keeper/current/lamp-keeper".into(),
+        "stop".into(),
+        "lamp".into(),
+    ];
+    let mut fake = product_lamp();
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    assert!(!fake.calls.borrow().iter().any(|call| call == "start"));
+}
+
+/// A stop that fails still reboots at once without wiping or starting:
+/// something may be running, and setup finishes the wipe at its start.
+#[test]
+fn a_failed_stop_of_a_product_lamp_reboots_without_starting() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_stop: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    assert!(
+        root.path("setup/reset.json").exists(),
+        "the journal is kept"
+    );
+    assert!(!fake.calls.borrow().iter().any(|call| call == "start"));
+}
+
+/// What a reboot cleared in `/run` (the bus's latest messages, the app's
+/// photos) must be emptied before setup starts in place: if it can't be,
+/// the reset reboots, which clears it, and starts nothing.
+#[test]
+fn run_not_emptied_reboots_instead_of_starting_in_place() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_clear: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    let calls = fake.calls.borrow();
+    assert_eq!(calls[calls.len() - 2..], ["clear", "reboot"]);
+    assert!(!calls.iter().any(|call| call == "start"));
+}
+
+/// What starting in place empties is every folder a part keeps in `/run`
+/// past its stop, and only those: each `/run/lampos-*` folder the product's
+/// tmpfiles make (but the locks, which hold no one's words), and each
+/// product unit's `RuntimeDirectory=` with `RuntimeDirectoryPreserve=yes`.
+/// A unit that starts keeping its folder fails this until it is named.
+#[test]
+fn what_starting_in_place_empties_is_every_folder_kept_in_run_past_a_stop() {
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut kept: Vec<String> = fs::read_to_string(product.join("lampos.conf"))
+        .unwrap()
+        .lines()
+        .filter_map(|line| line.strip_prefix("d "))
+        .filter_map(|rest| rest.split_whitespace().next())
+        .filter(|folder| {
+            folder.starts_with("/run/lampos-") && !folder.starts_with("/run/lampos-locks")
+        })
+        .map(String::from)
+        .collect();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|kind| kind != "service") {
+            continue;
+        }
+        let unit = fs::read_to_string(&path).unwrap();
+        if unit
+            .lines()
+            .any(|line| line.trim() == "RuntimeDirectoryPreserve=yes")
+        {
+            for line in unit.lines() {
+                if let Some(folders) = line.trim().strip_prefix("RuntimeDirectory=") {
+                    kept.extend(
+                        folders
+                            .split_whitespace()
+                            .map(|folder| format!("/run/{folder}")),
+                    );
+                }
+            }
+        }
+    }
+    kept.sort();
+    let mut named: Vec<String> = reset::VOLATILE
+        .iter()
+        .map(|folder| (*folder).to_owned())
+        .collect();
+    named.sort();
+    assert_eq!(named, kept);
 }

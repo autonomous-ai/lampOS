@@ -348,6 +348,9 @@ mod tests {
             fn force_reboot(&mut self) {
                 panic!("successful reboot command");
             }
+            fn clear_volatile(&mut self) -> io::Result<()> {
+                panic!("no start in place after a stop that failed");
+            }
         }
         let root = Root::new();
         let marker = root.0.join("done");

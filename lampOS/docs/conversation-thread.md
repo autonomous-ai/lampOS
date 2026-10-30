@@ -334,7 +334,10 @@ does not erase that talk when it comes back, and is told it:
   word did not say why the lamp forgot. The set-aside file is never told to
   a session and `forget` does not reach it, but its words stay in `/run`
   until the next reboot, where before the next turn wrote over them; the
-  reset removes it by its reboot (`/run` is memory), not by name.
+  reset removes it with the voice's whole `/run/lampos-voice`, not by name:
+  a product reset that starts setup in place empties that folder
+  (`reset::VOLATILE`, setup.md "The reset", #4500), and a reboot empties
+  `/run`.
 
 - Each exchange keeps its `whose` in the file, so one a person made on the
   second route comes back to the Live route as that person's. Who is at the

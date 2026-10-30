@@ -37,7 +37,8 @@ usage: lamp-setup COMMAND [OPTIONS]
   watch-reset --plan FILE [--bus-root PATH] [--clock-id ID] [--seconds N] [--enable]
       Watch controls/touch for the reset button held 5 s and released. With
       --enable: stop the lamp, wipe the person's data, remove the setup
-      marker and reboot. Without it, a valid reset is only logged.
+      marker, and start setup in place (a product lamp) or reboot. Without
+      it, a valid reset is only logged.
   reset-now --plan FILE [--enable]
       Reset now: what watch-reset hands to a unit of its own when the reset
       button is held. Without --enable it does nothing.
