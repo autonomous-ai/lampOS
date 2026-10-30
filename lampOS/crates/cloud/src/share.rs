@@ -56,8 +56,9 @@ pub fn on_from_environment() -> bool {
 /// Where the Store is, and the lamp's key for it.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Store {
-    /// The backend's base with a trailing `/v1` cut off, as the ping's
-    /// (`crate::ping::url`).
+    /// The scheme and host of the account's base, nothing after: the
+    /// Store's routes sit at the host's root, not under the ping's base,
+    /// which ends in `/api/v1/ai/v1` (Backend3 on #4570).
     pub base: String,
     pub key: String,
 }
@@ -74,11 +75,14 @@ impl std::fmt::Debug for Store {
 impl Store {
     /// The account's base and the lamp's key; none without either.
     pub fn of(account: &Account, key: &str) -> Option<Self> {
-        let base = account.llm_base_url.trim().trim_end_matches('/');
-        let base = base.strip_suffix("/v1").unwrap_or(base);
+        let base = reqwest::Url::parse(account.llm_base_url.trim())
+            .ok()
+            .filter(|url| url.has_host())?
+            .origin()
+            .ascii_serialization();
         let key = key.trim();
-        (!base.is_empty() && !key.is_empty()).then(|| Self {
-            base: base.to_owned(),
+        (!key.is_empty()).then(|| Self {
+            base,
             key: key.to_owned(),
         })
     }
@@ -239,8 +243,9 @@ fn seed(bytes: &[u8]) -> u64 {
 }
 
 /// What a refusal from the Store says, never the key: `401` is the lamp
-/// unknown to it; else its own reason (`error`, `message` or `error_code`),
-/// cut short, or its status.
+/// unknown to it; else its own reason, the most telling first
+/// (`error_message`, then `error_code`, then the generic `message`), cut
+/// short, or its status.
 pub fn reason(status: u16, body: &[u8]) -> String {
     if status == 401 {
         return UNKNOWN_LAMP.to_owned();
@@ -248,7 +253,7 @@ pub fn reason(status: u16, body: &[u8]) -> String {
     let said = serde_json::from_slice::<Value>(body)
         .ok()
         .and_then(|value| {
-            ["error", "message", "reason", "error_code"]
+            ["error_message", "error_code", "message", "error", "reason"]
                 .iter()
                 .find_map(|key| value.get(key).and_then(Value::as_str).map(str::to_owned))
                 .or_else(|| {
@@ -297,8 +302,9 @@ pub fn row(entry: &Value) -> Option<Value> {
     Some(row)
 }
 
-/// The rows in `GET /skills/mine`'s answer: a list, or one under `skills`,
-/// `items` or `data`.
+/// The rows in `GET /skills/mine`'s answer, once [`answered`] has taken
+/// its `data`: the list under `data` (the Store's page, with `total`), or a
+/// list itself.
 pub fn rows(answer: &Value) -> Vec<Value> {
     let list = answer.as_array().or_else(|| {
         ["skills", "items", "data"]
@@ -370,11 +376,22 @@ fn exchange(store: &Store, (method, url, body): Exchange) -> Result<(u16, Vec<u8
     .unwrap_or_else(|_| Err(UNREACHED.to_owned()))
 }
 
+/// The Store's answer inside its envelope, `{"status": 1, "data": ...}`;
+/// a refusal, by its HTTP status or by `"status": 0`, as [`reason`] says it.
 fn answered(status: u16, body: &[u8]) -> Result<Value, String> {
     if !(200..300).contains(&status) {
         return Err(reason(status, body));
     }
-    Ok(serde_json::from_slice(body).unwrap_or(Value::Null))
+    let answer: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
+    if answer.get("status").and_then(Value::as_i64) == Some(0) {
+        return Err(reason(status, body));
+    }
+    Ok(match answer {
+        Value::Object(mut fields) if fields.contains_key("data") => {
+            fields.remove("data").unwrap_or(Value::Null)
+        }
+        other => other,
+    })
 }
 
 /// `skills.share {"name", "author"?}`: `{"sent": {"id", "name", "version",

@@ -120,11 +120,18 @@ trang kỹ năng và `LAMP_CLOUD`); chưa unit sản phẩm nào bật. Khi bậ
   của `lamp-cloud`, bỏ các tệp chấm (`.package.json`) và bỏ dòng
   `made: here` khỏi `SKILL.md` (trên đèn khác nó không được tạo ở đó), đóng
   gói không ký bằng `lamp_skills::package::pack`, rồi xóa bản chép dù thế
-  nào. Gói được gửi tới `POST {base}/api/v1/skills/publish` (`file`, và
+  nào. Gói được gửi tới `POST {host}/api/v1/skills/publish` (`file`, và
   `author` nếu có: tên gọi, tối đa 32 ký tự, một dòng) bằng khóa của đèn.
-- **`skills.shared`** (`{}`): `GET {base}/api/v1/skills/mine`, trả
+  `{host}` là scheme và host của `llm_base_url` của tài khoản, không có
+  đường dẫn phía sau: các route của Store nằm ở gốc host, không nằm dưới
+  base của ping (base đó kết thúc bằng `/api/v1/ai/v1`). Store trả lời
+  trong `{"status": 1, "data": ...}`; khi từ chối (lỗi HTTP, hoặc
+  `"status": 0`), lý do lấy từ `error_message`, nếu không có thì
+  `error_code`, rồi mới đến `message`.
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine` (trang
+  đầu, 20 dòng), các dòng lấy từ `data.data`, trả
   `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`.
-- **`skills.unshare`** (`{"id"}`): `DELETE {base}/api/v1/skills/ID`.
+- **`skills.unshare`** (`{"id"}`): `DELETE {host}/api/v1/skills/ID`.
 
 Chỉ các tệp của chính kỹ năng và tên gọi chủ đèn gõ rời khỏi đèn; không có
 trí nhớ, khuôn mặt, tên đèn biết, bản ghi, ảnh hay cài đặt. Người duyệt

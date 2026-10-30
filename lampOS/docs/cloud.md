@@ -1026,17 +1026,24 @@ since 30 Oct.
   front matter, since on another lamp it was not made there; packed
   unsigned with `lamp_skills::package::pack` (the same checks as `lamp-skills
   pack`), and the copy removed whatever happens. The package goes to
-  `POST {base}/api/v1/skills/publish` as `multipart/form-data` (`file`, and
+  `POST {host}/api/v1/skills/publish` as `multipart/form-data` (`file`, and
   `author` when given), with `authorization: Bearer` and the lamp's key, as
-  the ping sends it; `{base}` is the backend's base with a trailing `/v1`
-  cut off, as the ping's. Answered `{"sent": {"id", "name", "version",
-  "review_status": "pending"}}`.
-- **`skills.shared`** (`{}`): `GET {base}/api/v1/skills/mine`, answered
+  the ping sends it. `{host}` is the scheme and host of the account's
+  `llm_base_url` and nothing after: the Store's routes sit at the host's
+  root, not under the ping's base, which ends in `/api/v1/ai/v1` (Backend3
+  on #4570). The Store answers inside `{"status": 1, "data": ...}`, and a
+  refusal (an HTTP error, or `"status": 0`) is told by its
+  `error_message`, else its `error_code`, else its generic `message`.
+  Answered `{"sent": {"id", "name", "version", "review_status":
+  "pending"}}`, from the Store's `data`.
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine` (its first
+  page, 20 rows, more than a lamp can have waiting or sent in days), the
+  rows from the Store's `data.data`, answered
   `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`
   (only those fields; `review_status` is the Store's `pending`, `approved`
   or `rejected`, and `review_note` its reviewer's reason).
 - **`skills.unshare`** (`{"id"}`, 1 to 64 letters, digits, `-` or `_`):
-  `DELETE {base}/api/v1/skills/ID`, answered `{"unshared": ID}`.
+  `DELETE {host}/api/v1/skills/ID`, answered `{"unshared": ID}`.
 
 **What leaves the lamp:** only the skill's own files (`skill.toml`,
 `SKILL.md` and anything else in its folder that isn't a dot file), and the
