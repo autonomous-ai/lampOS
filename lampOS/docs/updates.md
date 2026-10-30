@@ -714,7 +714,12 @@ each under the quiet rule. A round
    Check for update starts a round at once (#4153), so each one during a
    walk spends a held round too. Counting rounds needs no clock, which a new lamp may
    set only after its setup. A count that can't be read or kept holds
-   nothing. **Why:** the first customer lamps ship reset, and their first
+   nothing. Only the voice's unit file itself is read, not its drop-ins
+   (`lamp-voice.service.d/`, `/run/systemd/system`), so two lamps are held
+   once, for up to the 8 rounds: one whose drop-in turns onboarding off,
+   and a set-up lamp whose voice walks but never wrote its file (an office
+   lamp that skipped its walk), on its first round with this build (Tests'
+   P3 on #4455). **Why:** the first customer lamps ship reset, and their first
    update comes within the hour of their setup, while their first voice
    leads the walk. The quiet gate (step 7) keeps a switch off a sentence,
    but a walk waiting silently for the person reads as resting. A climb
