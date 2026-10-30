@@ -1335,10 +1335,13 @@ can't tell them apart:
   `up to date` at 15:38:01), so the parts' own end normally follows within
   minutes, on the same quiet terms.
   Since #4582 every product build asks for updater 9, so each lamp's first
-  update from a build before it (updater 8 or lower) is a climb: `started`,
-  `self-switched` (the climb), `self-confirmed`, then the parts' own round,
-  `started` again and **`done`**, since that round runs the lamp-update the
-  build carries, unchanged. Its updates after that end `started`,
+  update from a build before it (updater 8 or lower) is a climb:
+  `self-switched` (the climb, which goes on from `checking` with no phase
+  that tells `started`), `self-confirmed`, then the parts' own round,
+  `started` and **`done`**, since that round runs the lamp-update the
+  build carries, unchanged (lamp-9adf, 8899 to 8999, 30 Oct; an end is told
+  when it is first seen, even with the next round already going). Its
+  updates after that end `started`,
   `self-switched`, `self-confirmed` as above.
 
 So from the alerts alone, a `self-switched` with `to` doesn't prove the
