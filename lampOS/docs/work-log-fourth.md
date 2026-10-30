@@ -1,3 +1,15 @@
+## 2026-10-31 01:1x ICT — #4635 landed; #4158 rebased and fixed; #4465 narrowed; reads
+
+**#2135 step 1 → #4635** (train 427): with `LAMP_SECOND_SAY_WITH_CALL` (off, only beside `LAMP_SECOND_SAID_ONCE`) a call that changes the light or loudness, or sets a timer or reminder, carries its few words, said at round 1's pace; round 2 still runs, so "dim the light and tell me a joke" keeps its joke (I held step 2, ending after round 1, for that). Reviewer-three's P2: my note first asked for a keep's words too, but keeps on a carried line and every forget can wait for the person's yes, so "Forgotten." could be said with the data kept; fixed to never a keep or a forget, with a test. Saved as a memory. The product-unit day lines are Saturday's.
+
+**#4158** (`LAMP_SECOND_FACE_NAME` on, draft): rebased over #4339's conversation carries; a carried line's lease scope is the carried person though no face was seen speaking it, so the switch would have named them. `known_name_told` now names nobody on a carried line (test fails without). Reviewer-three re-read; Reviewer-two owed; draft for its person row.
+
+**#4465** (draft): #4633 turned `LAMP_SHUTDOWN` on, so it's now the app's restart alone. The first builder's yes for #2193's check; Mobile runs it on lamp-0c89 on 9063 (three restarts, timed to `listening_ready`, one refused under the lock).
+
+**Reads:** #4644 (Backend2: an update's end told when first seen, so a climb's `self-confirmed` reaches the backend; landed in 428). Stable 8999 (23:35) carries #4593's prices; 9063 (01:40 check) carries #4476.
+
+**Corrections tonight:** "90 hours" past the timer bound (it's a year); the day lines' numbers were 4ace's own unit, not the product's (the first builder's 22:36).
+
 ## 2026-10-30 21:3x ICT — #4476 landed; the say flake; my own HOLD; reads
 
 **#4476 landed in train 420** (`9e09f4e122` to `7c554cc1c9`), with **#4605** (its split-names test, through `forget_with_everything`; fails with the old match) in 421. All of #4461's code is on lamp-voice and in tonight's promote build; its lamp check (#3530's 4k) needs a test persona's lamp, not 4ace.
