@@ -33,9 +33,15 @@ without it, the calls are refused, or the `camera` grant can't be given.
 - **Never while private:** a stream ends (`camera.ended`, "the lamp is
   private") and a snapshot is refused `private` while the person has set the
   lamp private.
-- **Only on the lamp's own network:** a computer admitted from beyond it (the
-  lamp's remote opt-in) never gets the camera. An ssh tunnel is local to the
-  lamp and carries it: that is the owner's choice when they give ssh, never a
-  way around it.
+- **Only on the lamp's own network:** its physical LAN (Ethernet or Wi-Fi,
+  one hop) or link-local. A VPN (WireGuard, a tailnet, ZeroTier) is not, and
+  neither is a private address by itself. A computer admitted from beyond it
+  (the lamp's remote opt-in) never gets the camera. An ssh tunnel is local to
+  the lamp and carries it: that is the owner's choice when they give ssh,
+  never a way around it.
+- **Only while the ring shows its mark:** if the ring can't draw the red dot,
+  a stream ends with `camera.ended` ("the ring is not showing the camera's
+  mark") and a snapshot is refused the same way. Handle it; don't retry in a
+  loop.
 - **The microphone** has its grant in the same schema change; its calls come
   with it.
