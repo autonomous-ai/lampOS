@@ -6,11 +6,13 @@
 //! be reached starts a refusal: the turns after it are listened to and never
 //! sent, as while only the voice service is down (#830), so the lamp says
 //! the recorded `voice_service_unreachable` line once and breathes its calm
-//! offline light; one turn is let through every [`TRY_AGAIN_EVERY_US`] to
-//! find the service back, and the first turn the model answers ends the
-//! refusal. A turn that is only slow is no refusal: it fails as before. A
-//! quota or key refusal starts one at once (a 402 or 401 doesn't clear in a
-//! minute); any other only on the second refused turn in a row, so one
+//! offline light; [`TRY_AGAIN_EVERY_US`] after the last refused turn, the
+//! lines are sent again to find the service back, until one's chat is
+//! refused again (a line heard as no words asks nothing, so it is no try:
+//! lamp-52e6's room sounds took each minute's try on 30 Oct), and the
+//! first turn the model answers ends the refusal. A turn that is only slow
+//! is no refusal: it fails as before. A quota or key refusal starts one at
+//! once (a 402 or 401 doesn't clear in a minute); any other only on the second refused turn in a row, so one
 //! passing 503 or 429 holds nothing; and a turn cut while its answer was
 //! already playing never does: the service was answering (Reviewer-three's
 //! P2 on #4273). An onboarding line's own words, said when its chat fails
@@ -24,6 +26,27 @@ use crate::provider_worker::{FailedStage, Fault};
 
 /// The switch, exactly `on`. Off unless set.
 pub(super) const ENVIRONMENT: &str = "LAMP_SECOND_REFUSED_HOLD";
+
+/// Whether the switch is on: [`ENVIRONMENT`] exactly `on`, or this
+/// thread's test setting.
+pub(super) fn switched_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = FOR_TEST.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+#[cfg(test)]
+thread_local! {
+    static FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// This thread's switch, for a test; `None` reads the environment again.
+#[cfg(test)]
+pub(super) fn set_for_test(on: Option<bool>) {
+    FOR_TEST.with(|cell| cell.set(on));
+}
 
 /// While refusing, one turn is sent to find the service back this often.
 pub(super) const TRY_AGAIN_EVERY_US: u64 = 60_000_000;
@@ -111,12 +134,15 @@ impl ModelRefusing {
     }
 
     /// Whether a turn heard now is held, not sent: refusing, and a turn
-    /// was sent less than [`TRY_AGAIN_EVERY_US`] ago.
+    /// was refused, or an onboarding line sent, less than
+    /// [`TRY_AGAIN_EVERY_US`] ago. A spoken line sent is no try until its
+    /// chat is refused: one heard as no words never asks the model.
     pub(super) fn holds(&self, now_us: u64) -> bool {
         self.refusing() && now_us.saturating_sub(self.tried_at_us) < TRY_AGAIN_EVERY_US
     }
 
-    /// A turn sent while refusing: the next waits its time again.
+    /// An onboarding line sent while refusing, whose chat is always asked:
+    /// the next turn waits its time again.
     pub(super) fn tried(&mut self, now_us: u64) {
         if self.refusing() {
             self.tried_at_us = now_us;

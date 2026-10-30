@@ -217,6 +217,17 @@ struct Script {
     /// The second route fails each turn before any audio, as its worker
     /// does when its speech to text or chat cannot be reached.
     second_fails: Option<Fault>,
+    /// With `second_fails`, only this many of the route's requests fail;
+    /// the ones after are answered: the service is back.
+    second_fails_first: Option<usize>,
+    /// More lines, of 60 capture frames each, beginning at these frames.
+    speak_at: &'static [u64],
+    /// The second route's requests, by the count ended, in which speech to
+    /// text heard no words: told idle at End, no chat asked.
+    second_unheard: &'static [usize],
+    /// The recorded failure lines, an offline and a voice service one
+    /// among them (`FailureNotices::synthetic_offline`); none without.
+    notices: bool,
     /// This peer reads Stop and keeps its process running (#1620).
     ignores_stop: Option<&'static str>,
     /// The scenario's own bound, past which capture reports a fault.
@@ -310,6 +321,10 @@ impl Script {
             open_name: false,
             call_takes_next: false,
             second_fails: None,
+            second_fails_first: None,
+            speak_at: &[],
+            second_unheard: &[],
+            notices: false,
             ignores_stop: None,
             limit: LIMIT,
             silent: false,
@@ -571,7 +586,12 @@ impl Peers {
                     .is_some_and(|offset| (offset..offset + 60).contains(&frame))
                 || self
                     .murmur_at
-                    .is_some_and(|at| (at..at + 2).contains(&frame)))
+                    .is_some_and(|at| (at..at + 2).contains(&frame))
+                || self
+                    .script
+                    .speak_at
+                    .iter()
+                    .any(|at| (*at..at + 60).contains(&frame)))
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
@@ -1190,7 +1210,22 @@ impl Peers {
                         }
                         continue;
                     }
-                    if !live && let Some(reason) = self.script.second_fails {
+                    if !live && self.script.second_unheard.contains(&self.ended.len()) {
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::TurnComplete {
+                                request,
+                                idle: true,
+                            });
+                        continue;
+                    }
+                    if !live
+                        && let Some(reason) = self.script.second_fails
+                        && self
+                            .script
+                            .second_fails_first
+                            .is_none_or(|first| self.ended.len() <= first)
+                    {
                         self.peers[index]
                             .queued
                             .push_back(ProviderOutput::TurnFailed {
@@ -1574,6 +1609,11 @@ fn hand_stop_state(at_us: u64) -> lamp_msgs::ControlsState {
 
 fn run(script: Script) -> Run {
     let limit = script.limit;
+    let notices = if script.notices {
+        FailureNotices::synthetic_offline()
+    } else {
+        FailureNotices::none()
+    };
     let directory = SessionDirectory::create().unwrap();
     let mut peers = Vec::new();
     let mut spawn = |role| {
@@ -1828,7 +1868,7 @@ fn run(script: Script) -> Run {
         &mut reply,
         &mut None,
         &Termination::inactive(),
-        &FailureNotices::none(),
+        &notices,
         &mut controls,
         &mut None,
     );
@@ -6259,4 +6299,187 @@ fn a_real_coordinator_transcript_is_projected_before_shared_storage() {
         assert_eq!(shared["turn"], original["turn"]);
         assert_eq!(shared["at_us"], original["at_us"]);
     }
+}
+
+/// #4265 (`LAMP_SECOND_REFUSED_HOLD=on`), as lamp-52e6 ran it on 30 Oct:
+/// the second route alone, its first turn refused for its quota, so the
+/// refusal starts at once and the lines heard within the minute are held,
+/// never sent. A line heard past the minute is sent, the service is back
+/// and answers it, and that answer ends the refusal: the line after it,
+/// seconds later, is sent and answered too, not held.
+#[test]
+fn a_refusal_holds_lines_for_its_minute_then_a_line_is_sent_and_its_answer_ends_the_refusal() {
+    let _one = super::pilot_faults::one_session();
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        // Held (20 s), sent past the minute (75 s), then sent again (85 s).
+        speak_at: &[2_000, 7_500, 8_500],
+        mute_at_frame: Some(9_500),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    run.assert_clean();
+    let started: Vec<u64> = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        started.len(),
+        3,
+        "the refused line, the try past the minute and the line after it: {started:?}\n{}",
+        run.summary()
+    );
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 2, "{answered:?}\n{}", run.summary());
+    let held = run
+        .events("input_admitted")
+        .into_iter()
+        .filter(|event| event["local_only"] == true)
+        .count();
+    assert_eq!(held, 1, "the line within the minute: {}", run.summary());
+}
+
+/// #4265 as lamp-52e6 ran it on 30 Oct: connections refused, so a refusal
+/// starts on the second refused turn in a row; the recorded voice service
+/// line plays for the line held after it, and the person speaks over it.
+/// A line heard past the minute is still taken and sent, the service is
+/// back and answers it, and the line after it is sent too.
+#[test]
+fn a_refusal_on_refused_connections_whose_line_is_spoken_over_still_sends_the_line_past_its_minute()
+{
+    let _one = super::pilot_faults::one_session();
+    for (turn_taking, echo_evidence) in [
+        (TurnTaking::V1Baseline, false),
+        (TurnTaking::VadOnly, false),
+        (TurnTaking::Duplex, true),
+    ] {
+        super::super::model_refusing::set_for_test(Some(true));
+        let run = run(Script {
+            turn_taking,
+            echo_evidence,
+            second: false,
+            only: true,
+            second_fails: Some(Fault::Transport),
+            second_fails_first: Some(2),
+            notices: true,
+            // Refused again (10 s); held, its line spoken over (20 s, 20.7 s);
+            // sent past the minute (80 s), then sent again (90 s).
+            speak_at: &[1_000, 2_000, 2_070, 8_000, 9_000],
+            mute_at_frame: Some(10_000),
+            limit: Duration::from_secs(110),
+            ..Script::question(Live::Answer(12))
+        });
+        super::super::model_refusing::set_for_test(None);
+        run.assert_clean();
+        let started: Vec<u64> = dedup(
+            &run.seen
+                .second
+                .iter()
+                .filter(|input| matches!(input, ProviderInput::Start { .. }))
+                .map(request_of)
+                .collect::<Vec<_>>(),
+        );
+        let finished: Vec<_> = run
+            .events("turn_finished")
+            .into_iter()
+            .map(|event| {
+                (
+                    event["turn"].clone(),
+                    event["outcome"].clone(),
+                    event["failure_notice"].clone(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            started.len(),
+            4,
+            "{turn_taking:?} {started:?}\n{finished:?}\n{}",
+            run.summary()
+        );
+        let answered = run
+            .seen
+            .chunks
+            .iter()
+            .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+            .map(|chunk| chunk.turn)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            answered.len(),
+            2,
+            "{turn_taking:?} {answered:?}\n{finished:?}\n{}",
+            run.summary()
+        );
+        assert!(
+            run.seen
+                .chunks
+                .iter()
+                .any(|chunk| chunk.accepted && chunk.value == 55),
+            "the voice service line played: {finished:?}"
+        );
+    }
+}
+
+/// #4265 as lamp-52e6 ran it on 30 Oct (turns 13 and 17 of its trace): the
+/// minute's try went to a short sound of the room, sent, its speech to
+/// text hearing no words, so no chat asked the model; the person's ask a
+/// few seconds after it was held for another minute, and so each ask was.
+/// A line in which no words were heard tells nothing of the service: the
+/// ask after it is still sent, the service answers it, and the refusal
+/// ends.
+#[test]
+fn a_refusals_try_spent_on_a_line_with_no_words_still_sends_the_ask_after_it() {
+    let _one = super::pilot_faults::one_session();
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        // Past the minute: the room's sound, sent and heard as no words
+        // (75 s), then the person's ask (80 s), then another (90 s).
+        speak_at: &[7_500, 8_000, 9_000],
+        second_unheard: &[2],
+        mute_at_frame: Some(10_000),
+        limit: Duration::from_secs(110),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    run.assert_clean();
+    let started: Vec<u64> = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        started.len(),
+        4,
+        "the refused line, the unheard one and both asks: {started:?}\n{}",
+        run.summary()
+    );
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 2, "{answered:?}\n{}", run.summary());
 }

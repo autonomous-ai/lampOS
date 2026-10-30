@@ -205,7 +205,12 @@ turn again (its generation completes; an onboarding line's own words, said on
 a failed chat, #4263, are no answer), speech is admitted as
 a local-only turn, as in a service-down outage below: the
 `voice_service_unreachable` recording once a refusal, the offline breath,
-nothing sent. One turn is sent every minute to find the service back. The
+nothing sent. A minute after the last refused turn, the lines are sent
+again to find the service back, until one's chat is refused and holds the
+turns for another minute. A line sent then that asks the model nothing (its
+speech to text heard no words, or it was no speech) is no try: on
+lamp-52e6 on 30 Oct the room's short sounds took each minute's try, and
+every ask after them was held. The
 journal says each kind once a refusal, and the voice's health warns with
 the kinds and minutes (`bus_out::model_refusing`). The fault carries no HTTP
 status, so a 400 counts with the other 4xx. Setup waits too
