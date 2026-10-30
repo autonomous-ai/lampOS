@@ -26,6 +26,7 @@ from typing import Any, Literal
 from lampos import Lamp, LampError, schema
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
+from pydantic import AnyUrl
 
 # The body's clips a client may name, less the two the lamp refuses through
 # this door: `idle` is the lamp's own life, and `scanning` sweeps a room like
@@ -44,6 +45,16 @@ STOP_ASKED = "stop asked"
 MOST_WAIT_S = 120
 # What `lamp://events/recent` keeps.
 RECENT_EVENTS = 50
+# What the events stream (`lamp://events`, `lamp_events`) keeps.
+STREAM_EVENTS = 200
+# The state an event changes, so a client subscribed to it is told.
+STATE_OF_EVENT = {
+    "person.arrived": "presence",
+    "person.left": "presence",
+    "person.stood_up": "presence",
+    "person.facing": "presence",
+    "lamp.changed": "lamp",
+}
 STATES = ("presence", "light", "mood", "lamp")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
@@ -618,6 +629,90 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     def held_leases() -> list[str]:
         """The leases this server holds now."""
         return held()
+
+    # The events stream: every event the grants let this computer hear but
+    # `phrase.heard` (which needs its own phrases, `lamp_wait_for`), each with
+    # a running `seq`. It starts at the first `lamp_events` or subscription
+    # and runs while the server does. A client subscribed to `lamp://events`,
+    # or to the state an event changes, gets `notifications/resources/updated`
+    # for it. Any event the lamp adds to the schema (a camera's or a
+    # microphone's, metrics) joins it with its grant in EVENT_NEEDS.
+    streamed = [
+        event for event in schema.events() if event != "phrase.heard" and allowed(*filter(None, [EVENT_NEEDS.get(event)]))
+    ]
+    stream: collections.deque = collections.deque(maxlen=STREAM_EVENTS)
+    seq = [0]
+    arrived = [asyncio.Event()]
+    streaming: list[bool] = []
+    subscribers: dict[str, set] = collections.defaultdict(set)
+
+    def heard_any(event: dict) -> None:
+        seq[0] += 1
+        stream.append({"seq": seq[0], **event})
+        arrived[0].set()
+        arrived[0] = asyncio.Event()
+        uris = ["lamp://events"]
+        if event.get("ev") in STATE_OF_EVENT:
+            uris.append(f"lamp://state/{STATE_OF_EVENT[event['ev']]}")
+        for uri in uris:
+            for session in list(subscribers.get(uri, ())):
+                asyncio.ensure_future(session.send_resource_updated(AnyUrl(uri)))
+
+    async def start_stream() -> None:
+        if streaming:
+            return
+        streaming.append(True)
+        for event in streamed:
+            try:
+                await lamp.on(event, heard_any)
+            except LampError:
+                # An event the lamp doesn't say yet is left out, not fatal.
+                lamp.off(event, heard_any)
+
+    @server.resource("lamp://events", mime_type="application/json")
+    async def events_stream() -> dict:
+        """The events heard since the stream started, newest last, each with its `seq`, and
+        `latest`, the newest `seq`. Subscribe to it to be told of each new one."""
+        await start_stream()
+        return {"events": list(stream), "latest": seq[0]}
+
+    @server.tool()
+    async def lamp_events(since: int = 0, wait_s: float = 0) -> dict:
+        """The events the lamp said after `since` (a `seq`; 0 for all kept), newest last, and `latest`.
+        With `wait_s` (120 at most), waits that long for one if none is there yet. Every event the
+        grants let this computer hear, but phrases (`lamp_wait_for` takes those): presence, hands,
+        touch, the button, the lamp's state, sounds."""
+        await start_stream()
+        if seq[0] <= since and wait_s > 0:
+            waiting = arrived[0]
+            try:
+                await asyncio.wait_for(waiting.wait(), min(wait_s, MOST_WAIT_S))
+            except asyncio.TimeoutError:
+                pass
+        return {"events": [event for event in stream if event["seq"] > since], "latest": seq[0]}
+
+    low = server._mcp_server
+
+    @low.subscribe_resource()
+    async def subscribe(uri) -> None:
+        subscribers[str(uri)].add(low.request_context.session)
+        await start_stream()
+
+    @low.unsubscribe_resource()
+    async def unsubscribe(uri) -> None:
+        subscribers[str(uri)].discard(low.request_context.session)
+
+    # The mcp library says `subscribe: false` even with a handler; this
+    # server takes subscriptions, so it says so.
+    capabilities = low.get_capabilities
+
+    def with_subscribe(*args: Any, **kwargs: Any):
+        said = capabilities(*args, **kwargs)
+        if said.resources is not None:
+            said.resources.subscribe = True
+        return said
+
+    low.get_capabilities = with_subscribe  # type: ignore[method-assign]
 
     return server
 

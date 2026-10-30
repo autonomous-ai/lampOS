@@ -14,12 +14,13 @@ import pytest
 from lampos import Keyring, Lamp, schema
 from lampos.testing import FakeLamp
 from mcp.shared.memory import create_connected_server_and_client_session
+from pydantic import AnyUrl
 
 from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
     "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
-    "lamp_light", "lamp_say", "lamp_sound", "lamp_stop",
+    "lamp_light", "lamp_say", "lamp_sound", "lamp_events", "lamp_stop",
 }
 # The schema's ops a tool doesn't send itself: pairing and hello are the
 # SDK's, before any tool; leases go with each body tool.
@@ -33,7 +34,9 @@ def run(coroutine):
 
 
 @asynccontextmanager
-async def connected(folder: Path, grants=("body", "light", "speak"), auto_done=True, clock=None, **fake_options):
+async def connected(
+    folder: Path, grants=("body", "light", "speak"), auto_done=True, clock=None, message_handler=None, **fake_options
+):
     """A fake lamp, this computer paired with it, and an MCP session on the
     server built for it."""
     async with FakeLamp(grants=tuple(grants), auto_done=auto_done, **fake_options) as fake:
@@ -41,7 +44,7 @@ async def connected(folder: Path, grants=("body", "light", "speak"), auto_done=T
         await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
         async with await Lamp.connect(keyring=ring) as lamp:
             server = build(lamp, client="test laptop", **({"clock": clock} if clock else {}))
-            async with create_connected_server_and_client_session(server._mcp_server) as session:
+            async with create_connected_server_and_client_session(server._mcp_server, message_handler=message_handler) as session:
                 yield fake, lamp, session
 
 
@@ -66,6 +69,7 @@ def test_tools_are_listed_by_the_lamps_grants(tmp_path):
                 "lamp_state",
                 "lamp_wait_for",
                 "lamp_light",
+                "lamp_events",
                 "lamp_stop",
             }
 
@@ -188,6 +192,76 @@ def test_a_lamp_that_doesnt_route_them_says_so_as_the_tools_error(tmp_path):
             for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 5}), ("lamp_sound", {"name": "hum"})):
                 result = await session.call_tool(tool, arguments)
                 assert result.isError and "refused: not routed yet" in text(result), (tool, text(result))
+
+    run(go())
+
+
+def test_lamp_events_gives_what_the_lamp_said_since_a_seq_and_waits_for_one(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body", "look")) as (fake, _, session):
+            first = json.loads(text(await session.call_tool("lamp_events", {})))
+            assert first == {"events": [], "latest": 0}
+            await until(lambda: "person.arrived" in {e for s in fake.subscribed.values() for e in s})
+            await fake.emit("person.arrived", count=1, near=0.3)
+            await fake.emit("touch", kind="tap")
+            await until(lambda: True)
+            said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+            while said["latest"] < 2:
+                said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+            assert [(e["seq"], e["ev"]) for e in said["events"]] == [(1, "person.arrived"), (2, "touch")]
+            # Only what came after `since`, and a wait that ends at the next one.
+            waiting = asyncio.create_task(session.call_tool("lamp_events", {"since": 2, "wait_s": 10}))
+            await asyncio.sleep(0.2)
+            assert not waiting.done()
+            await fake.emit("person.left", count=0)
+            later = json.loads(text(await waiting))
+            assert [(e["seq"], e["ev"], e["count"]) for e in later["events"]] == [(3, "person.left", 0)]
+            # Nothing new: an empty list at once without wait_s.
+            assert json.loads(text(await session.call_tool("lamp_events", {"since": 3})))["events"] == []
+
+    run(go())
+
+
+def test_lamp_events_never_hears_what_the_grants_dont_allow(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            await session.call_tool("lamp_events", {})
+            await until(lambda: any(fake.subscribed.values()))
+            heard = {e for s in fake.subscribed.values() for e in s}
+            assert "touch" in heard and "button" in heard
+            assert not heard & {"person.arrived", "hand", "name.heard", "sound.heard", "phrase.heard"}
+
+    run(go())
+
+
+def test_a_client_subscribed_to_the_events_is_told_of_each(tmp_path):
+    from mcp import types
+
+    told: list[str] = []
+
+    async def notified(message) -> None:
+        if isinstance(message, types.ServerNotification) and isinstance(message.root, types.ResourceUpdatedNotification):
+            told.append(str(message.root.params.uri))
+
+    async def go():
+        async with connected(tmp_path, grants=("body", "look"), message_handler=notified) as (fake, _, session):
+            assert session.get_server_capabilities().resources.subscribe is True
+            await session.subscribe_resource(AnyUrl("lamp://events"))
+            await session.subscribe_resource(AnyUrl("lamp://state/presence"))
+            await until(lambda: "person.arrived" in {e for s in fake.subscribed.values() for e in s})
+            await fake.emit("person.arrived", count=1, near=0.3)
+            await until(lambda: "lamp://state/presence" in told and "lamp://events" in told)
+            await fake.emit("touch", kind="tap")
+            await until(lambda: told.count("lamp://events") == 2)
+            # A touch changes no state.
+            assert told.count("lamp://state/presence") == 1
+            stream = json.loads((await session.read_resource(AnyUrl("lamp://events"))).contents[0].text)
+            assert [e["ev"] for e in stream["events"]] == ["person.arrived", "touch"] and stream["latest"] == 2
+            await session.unsubscribe_resource(AnyUrl("lamp://events"))
+            await fake.emit("touch", kind="pet")
+            await until(lambda: True)
+            await asyncio.sleep(0.2)
+            assert told.count("lamp://events") == 2
 
     run(go())
 

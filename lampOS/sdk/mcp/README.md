@@ -52,6 +52,8 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
 | `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
 | `lamp_sound` | `name` | string, required | a sound's name: lowercase letters, digits, `-` and `_`, 40 at most; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
+| `lamp_events` | `since` | integer | a `seq` from an earlier answer; 0 for every event kept (the last 200) | 0 | the event's (`person.*` and `hand` look, `name.heard` hear, `sound.heard` sound; `touch`, `button`, `lamp.changed` none) | no |
+| | `wait_s` | number | 0 to 120: with nothing after `since`, how long to wait for the next | 0 | | |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |
 
 **An argument a tool doesn't take is refused**, never read past. Each
@@ -89,6 +91,7 @@ All JSON, read when asked; none takes a parameter.
 | `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
 | `lamp://lease` | the leases this server holds now | none |
 | `lamp://events/recent` | the last 50 events `lamp_wait_for` heard, newest last; never a transcript: `phrase.heard` says only which registered phrase it was | none |
+| `lamp://events` | the events stream: every event the grants let this computer hear but `phrase.heard`, the last 200, newest last, each with its `seq`, and `latest`. Subscribable: a subscribed client gets `notifications/resources/updated` for each new event, and for `lamp://state/presence` or `lamp://state/lamp` when one changes it | none (each event needs its own grant) |
 
 ## Tests
 
