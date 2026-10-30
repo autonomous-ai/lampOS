@@ -259,6 +259,17 @@ test('hello with another computer\'s key is unpaired', async (t) => {
   await assert.rejects(Lamp.connect(undefined, { keyring: stranger }), byCode.unpaired);
 });
 
+test('every error code says what to do, on the error and in the README', async () => {
+  const { WHAT_TO_DO } = await import('../src/errors.js');
+  assert.deepEqual(Object.keys(WHAT_TO_DO).sort(), [...schema.errorCodes].sort());
+  const refused = fromReply({ code: 'no_grant', why: 'not granted: look' });
+  assert.equal(refused.whatToDo, WHAT_TO_DO.no_grant);
+  assert.equal(refused.message, 'no_grant: not granted: look');
+  assert.equal(new LampError('x', { code: 'closed' }).whatToDo, '');
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  for (const [code, line] of Object.entries(WHAT_TO_DO)) assert.ok(readme.includes(`| \`${code}\` | ${line} |`), code);
+});
+
 test('greet a person who arrives', async () => {
   await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
     let greeted;
