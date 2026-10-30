@@ -2432,9 +2432,13 @@ comma. A line joined with the one it cut short is read on the
 joined words. Words cut short are also never answered in a held line's
 place (`LAMP_JOIN_CUT_WORDS`) when they open with a word said to a person
 ("Ma'am could", bare in two words or fewer, as above) or the held line
-does ("Sir, what time is this?"): they are let go, and the journal says
+does ("Sir, what time is this?") and they don't call the lamp
+(`attention::called`: "Lamp, what time is it in London?" cut by "Sir, …"
+is still answered): they are let go, and the journal says
 `request N's words, cut short, are let go: they or request M open with
-"ma'am", said to a person (LAMP_NAME_SAID_TO_A_PERSON)`
+"ma'am", said to a person; their unplayed answers are not kept as the
+lamp's words (1 requests, LAMP_NAME_SAID_TO_A_PERSON)`, and those answers
+leave the thread (`Engine::unsaying_joined`), so they open no conversation
 (`second_provider::cut_said_to_a_person`, #3945's c0a4 run 2 on 29 Oct: a
 cut "Ma'am, could … you pass me the salt", let out as a conversation going
 on, was answered in place of a held "Sir, what time is this?"). Words cut
