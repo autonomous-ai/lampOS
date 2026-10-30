@@ -2883,8 +2883,26 @@ after a take-over, but now for every turn:
   me" on a line that may not be for the lamp: taken as not_for_me, nothing
   said (LAMP_DECLINE_SILENT)`. Nothing waits on a line said by name
   (`BY_NAME_NOTE`), a written turn, or any round after one that called
-  something. What waits: the first audio of round 1 on a line that may be
-  declined, for the rest of that round's reply; measured on the test clock
+  something. Nor does a line judged in a quiet room with one voice and at
+  most one face (the first builder's call on #3945: on lamp-c0a4 the hold
+  made 26 of 39 played lines wait, in a room where every line was for the
+  lamp): round 1's words wait only where the rule judged it in a busy room,
+  in another voice than the conversation's (`Seen::other_voice`), or with a
+  second face seen speaking it (two faces, or one not the caller's while a
+  conversation has one; `worker::others_may_talk`,
+  `Heeding::holds_round_one`, given the engine as
+  `Engine::holding_round_one_when`). Two faces only in view, none seen
+  speaking, count as the busy room `LAMP_NAME_OR_FOLLOW_UP` makes of them,
+  and not without it. Elsewhere its words stream as with the switch off
+  (journal: `a quiet room, one voice, no second face: its words are not
+  held (LAMP_DECLINE_SILENT)`); a `not_for_me` after them says its first
+  words as with the switch off, and its decline is still told the rule.
+  Without the rule's hook (a harness), every such line waits, as before.
+  Tests: `round one waits only where the rule says others may talk`
+  (first audio 80 ms off, 80 ms on in a quiet room, 360/480 ms where
+  others may talk) and `round one is held only in a busy room or with a
+  second voice or face` (worker). What waits: the first audio of round 1
+  on a line that may be declined, where others may talk, for the rest of that round's reply; measured on the test clock
   with a word every 40 ms and four first words
   (`the_hold_costs_the_first_audio_only_on_lines_that_may_be_declined`),
   a line said by name 80 ms either way; a line that may be declined

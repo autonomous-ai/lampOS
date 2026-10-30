@@ -18,6 +18,17 @@ type Answered = (Vec<String>, Vec<(u64, lamp_msgs::TurnVerdict)>, Vec<u64>);
 /// with none the writing half never waits, and the saying half never
 /// takes a piece before the turn ends.
 async fn answered(on: bool, note: &'static str, events: Vec<net::Result<ChatEvent>>) -> Answered {
+    answered_where(on, None, note, events).await
+}
+
+/// [`answered`], the rule saying whether round 1's words wait
+/// ([`Engine::holding_round_one_when`]) when `held` is some.
+async fn answered_where(
+    on: bool,
+    held: Option<bool>,
+    note: &'static str,
+    events: Vec<net::Result<ChatEvent>>,
+) -> Answered {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(TALK.to_owned())].into()),
         chats: Mutex::new([events].into()),
@@ -35,12 +46,16 @@ async fn answered(on: bool, note: &'static str, events: Vec<net::Result<ChatEven
         .noting_whether_called(Arc::new(move |_, _| Some(note)))
         .declining_in_words(true)
         .declining_silently(on)
-        .cutting_first_words(4)
-        .telling_what_it_did(Arc::new(move |did| {
-            if let Did::Declined(request) = did {
-                seen.lock().unwrap().push(request);
-            }
-        }));
+        .cutting_first_words(4);
+    let engine = match held {
+        Some(held) => engine.holding_round_one_when(Arc::new(move |_| held)),
+        None => engine,
+    };
+    let engine = engine.telling_what_it_did(Arc::new(move |did| {
+        if let Did::Declined(request) = did {
+            seen.lock().unwrap().push(request);
+        }
+    }));
     let (mut engine, told) = telling(engine);
     engine.submit(start(1));
     engine.submit(audio(1, 1));
@@ -170,6 +185,54 @@ async fn the_switch_off_and_a_line_said_by_name_keep_todays_behaviour() {
     assert_eq!(by_name, off);
 }
 
+/// A piece's gap in the timed tests: a word every 40 ms.
+const PIECE_GAP: Duration = Duration::from_millis(40);
+
+/// When a turn's first audio came, from the line's end on the test's clock,
+/// a piece (a word) every [`PIECE_GAP`], its words cut at four: the line
+/// told `note`, answered with `reply`, the switch `on`, and the rule saying
+/// whether round 1's words wait ([`Engine::holding_round_one_when`]) when
+/// `held` is some.
+async fn first_audio(on: bool, held: Option<bool>, note: &'static str, reply: &str) -> Duration {
+    let cut: Vec<&str> = reply.split_inclusive(' ').collect();
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(TALK.to_owned())].into()),
+        chats: Mutex::new(
+            [cut.iter()
+                .map(|piece| text(piece))
+                .chain([Ok(ChatEvent::Done)])
+                .collect()]
+            .into(),
+        ),
+        piece_gap: Some(PIECE_GAP),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let engine = engine
+        .noting_whether_called(Arc::new(move |_, _| Some(note)))
+        .declining_silently(on)
+        .cutting_first_words(4);
+    let mut engine = match held {
+        Some(held) => engine.holding_round_one_when(Arc::new(move |_| held)),
+        None => engine,
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let ended = tokio::time::Instant::now();
+    loop {
+        match engine.next().await {
+            ProviderOutput::Audio { samples, .. } if !samples.is_empty() => {
+                return ended.elapsed();
+            }
+            ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } => {
+                panic!("{reply}: nothing said")
+            }
+            _ => {}
+        }
+    }
+}
+
 /// What the switch costs the first sound, timed on the test's clock from
 /// the line's end, a piece (a word) every 40 ms, its words cut at four: on
 /// a line said by name nothing, and on a line that may not be for the lamp
@@ -177,51 +240,15 @@ async fn the_switch_off_and_a_line_said_by_name_keep_todays_behaviour() {
 /// `--nocapture`.
 #[tokio::test(start_paused = true)]
 async fn the_hold_costs_the_first_audio_only_on_lines_that_may_be_declined() {
-    const GAP: Duration = Duration::from_millis(40);
-    async fn first_said(on: bool, note: &'static str, reply: &str) -> Duration {
-        let cut: Vec<&str> = reply.split_inclusive(' ').collect();
-        let script = Arc::new(Script {
-            heard: Mutex::new([Ok(TALK.to_owned())].into()),
-            chats: Mutex::new(
-                [cut.iter()
-                    .map(|piece| text(piece))
-                    .chain([Ok(ChatEvent::Done)])
-                    .collect()]
-                .into(),
-            ),
-            piece_gap: Some(GAP),
-            ..Script::default()
-        });
-        let (engine, _, _) = scripted(script);
-        let mut engine = engine
-            .noting_whether_called(Arc::new(move |_, _| Some(note)))
-            .declining_silently(on)
-            .cutting_first_words(4);
-        engine.submit(start(1));
-        engine.submit(audio(1, 1));
-        engine.submit(end(1));
-        let ended = tokio::time::Instant::now();
-        loop {
-            match engine.next().await {
-                ProviderOutput::Audio { samples, .. } if !samples.is_empty() => {
-                    return ended.elapsed();
-                }
-                ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } => {
-                    panic!("{reply}: nothing said")
-                }
-                _ => {}
-            }
-        }
-    }
     for reply in [
         "Sure, it was a gift from a friend.",
         "I think it was ordered online, from a shop in town.",
     ] {
         let pieces = reply.split_inclusive(' ').count() as u32;
-        let named_off = first_said(false, worker::BY_NAME_NOTE, reply).await;
-        let named_on = first_said(true, worker::BY_NAME_NOTE, reply).await;
-        let off = first_said(false, worker::DECLINE_NOTE, reply).await;
-        let on = first_said(true, worker::DECLINE_NOTE, reply).await;
+        let named_off = first_audio(false, None, worker::BY_NAME_NOTE, reply).await;
+        let named_on = first_audio(true, None, worker::BY_NAME_NOTE, reply).await;
+        let off = first_audio(false, None, worker::DECLINE_NOTE, reply).await;
+        let on = first_audio(true, None, worker::DECLINE_NOTE, reply).await;
         eprintln!(
             "LAMP_DECLINE_SILENT first audio: by name off {} ms, on {} ms; may be declined off {} ms, on {} ms: {reply}",
             named_off.as_millis(),
@@ -231,6 +258,46 @@ async fn the_hold_costs_the_first_audio_only_on_lines_that_may_be_declined() {
         );
         assert_eq!(named_on, named_off, "{reply}");
         assert!(on > off, "{reply}");
-        assert!(on <= off + GAP * pieces, "{reply}");
+        assert!(on <= off + PIECE_GAP * pieces, "{reply}");
     }
+}
+
+/// The first builder's call on #3945: the hold only where talk not for the
+/// lamp may be, a busy room or a second voice or face
+/// (`worker::Heeding::holds_round_one`). Where the rule says none, a quiet
+/// room with one voice and at most one face, round 1's words on a line that
+/// may be declined stream as with the switch off, on both notes; where it
+/// says so, they wait as before. A decline after words not held says its
+/// first words as with the switch off, and is still told the worker
+/// ([`Did::Declined`]); held, it says nothing. Shown with `--nocapture`.
+#[tokio::test(start_paused = true)]
+async fn round_one_waits_only_where_the_rule_says_others_may_talk() {
+    for note in [worker::DECLINE_NOTE, worker::CONVERSATION_ALONE] {
+        for reply in [
+            "Sure, it was a gift from a friend.",
+            "I think it was ordered online, from a shop in town.",
+        ] {
+            let off = first_audio(false, None, note, reply).await;
+            let quiet = first_audio(true, Some(false), note, reply).await;
+            let busy = first_audio(true, Some(true), note, reply).await;
+            eprintln!(
+                "LAMP_DECLINE_SILENT first audio: off {} ms, on in a quiet room {} ms, on where others may talk {} ms: {reply}",
+                off.as_millis(),
+                quiet.as_millis(),
+                busy.as_millis()
+            );
+            assert_eq!(quiet, off, "{note}: {reply}");
+            assert!(busy > off, "{note}: {reply}");
+        }
+    }
+    let words = "Sure, I'll stay out of it.";
+    let (labels, told, declined) =
+        answered_where(true, Some(false), worker::DECLINE_NOTE, reply(words, true)).await;
+    let (off, off_told, _) = answered(false, worker::DECLINE_NOTE, reply(words, true)).await;
+    assert!(!spoken(&labels).is_empty(), "{labels:?}");
+    assert_eq!(spoken(&labels), spoken(&off));
+    assert_eq!(told, off_told);
+    assert_eq!(declined, [1]);
+    let held = answered_where(true, Some(true), worker::DECLINE_NOTE, reply(words, true)).await;
+    assert_eq!(held, silent(true));
 }

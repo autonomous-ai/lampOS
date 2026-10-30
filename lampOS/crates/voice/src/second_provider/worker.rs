@@ -2940,7 +2940,7 @@ pub fn serve(
         == Some("on");
     if declines_silent {
         eprintln!(
-            "lamp-voice second: a line the model declines says nothing and carries no conversation; a spoken line not said by name holds its first round's words to the round's end (LAMP_DECLINE_SILENT)"
+            "lamp-voice second: a line the model declines says nothing and carries no conversation; a spoken line not said by name, in a busy room or with a second voice or face, holds its first round's words to the round's end (LAMP_DECLINE_SILENT)"
         );
     }
     engine = engine.declining_silently(declines_silent);
@@ -3341,6 +3341,16 @@ pub fn serve(
         // (`LAMP_DECLINE_SILENT=on`, read above).
         if declines_silent && let Ok(mut heeding) = heeding.lock() {
             heeding.declining_silently();
+        }
+        // And its first round's words wait only where talk not for the lamp
+        // may be: a busy room, a second voice or face (#3945).
+        if declines_silent {
+            let heeding = heeding.clone();
+            engine = engine.holding_round_one_when(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.holds_round_one(request))
+            }));
         }
         // A line that cuts the one before it short is asked with that one's
         // words when one person said both (`LAMP_JOIN_CUT_WORDS`): by the
@@ -4955,6 +4965,9 @@ pub(crate) struct Heeding {
     alone: Option<u64>,
     /// The request last judged in a busy room ([`Self::judged_busy`]).
     busy: Option<u64>,
+    /// The request last judged where talk not for the lamp may be
+    /// ([`Self::holds_round_one`]).
+    others_may_talk: Option<u64>,
     /// The Policy's attention decisions, with `LAMP_GOING_ON_ASKS`
     /// ([`Self::asking_the_policy`]).
     policy: Option<crate::policy_holds::Verdicts>,
@@ -5860,6 +5873,7 @@ impl Heeding {
             fired: None,
             alone: None,
             busy: None,
+            others_may_talk: None,
             policy: None,
             waiting: None,
             by_name: None,
@@ -8430,6 +8444,9 @@ impl Heeding {
 
     /// The verdict on `request`, seen as `seen`, said and kept.
     fn verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
+        // `LAMP_DECLINE_SILENT`: where talk not for the lamp may be, read
+        // before its let-out changes the caller's faces (#3945).
+        self.others_may_talk = others_may_talk(seen, &self.caller_faces).then_some(request);
         let why = self.judged_verdict(request, seen);
         // The last line held as a remark about the lamp, for `voice/remarked`
         // (#4175): Expression's small glance.
@@ -8859,6 +8876,16 @@ impl Heeding {
     pub(crate) fn judged_busy(&self, request: u64) -> bool {
         self.busy == Some(request)
     }
+
+    /// `LAMP_DECLINE_SILENT` (#3945): whether `request`'s first round's words
+    /// wait for its end, as it may be declined. Only where talk not for the
+    /// lamp may be ([`others_may_talk`]): the first builder's call, "narrow
+    /// the hold to when the room is busy or a second voice or face is
+    /// present: that's where a decline happens, and where saying it aloud
+    /// does harm".
+    pub(crate) fn holds_round_one(&self, request: u64) -> bool {
+        self.others_may_talk == Some(request)
+    }
 }
 
 fn unix_ms(at: SystemTime) -> u64 {
@@ -8907,6 +8934,23 @@ fn hits_whose(
         );
     }
     person
+}
+
+/// Whether a line was judged where talk not for the lamp may be
+/// (`LAMP_DECLINE_SILENT`, #3945): in a busy room, in another voice than the
+/// conversation's (#829), or with a second face: two faces seen speaking it,
+/// or one that is not the caller's while a conversation has one. A face is
+/// one seen speaking (`LAMP_SECOND_SPEAKING_FACE`), as the same-speaker rules
+/// read them: two faces merely in view make the room busy already with
+/// `LAMP_NAME_OR_FOLLOW_UP`, and are not read here without it.
+fn others_may_talk(seen: &Seen, caller_faces: &crate::speaking_faces::Speakers) -> bool {
+    let another_face = seen.speakers.len() > 1
+        || !caller_faces.is_empty()
+            && seen
+                .speakers
+                .iter()
+                .any(|face| !caller_faces.contains(face));
+    seen.busy || seen.other_voice || another_face
 }
 
 /// Whether the faces seen speaking a line are the caller's one face and no
@@ -22124,6 +22168,102 @@ mod tests {
         assert!(!heeding.judged_busy(8));
         heeding.judge(10, line, "Lamp, what time is it?", signs(Room::Quiet));
         assert!(!heeding.judged_busy(10) && !heeding.judged_busy(9));
+    }
+
+    /// `LAMP_DECLINE_SILENT` (#3945), the first builder's call: round 1's
+    /// words wait only where talk not for the lamp may be. Judged by the
+    /// rule, a line in a quiet room in the conversation's voice, its
+    /// caller's face alone seen speaking it, holds nothing; in a busy room,
+    /// in another voice than the conversation's, with a face not the
+    /// caller's or two faces seen speaking it, its words wait.
+    #[test]
+    fn round_one_is_held_only_in_a_busy_room_or_with_a_second_voice_or_face() {
+        use crate::room_told::Room;
+        let _one = crate::provider_worker::tests::one_thread();
+        // A line judged with no voices and no eyes: by the room alone.
+        let signs = |room| super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.declining_silently();
+        heeding.judge(9, line, "That lamp is cute.", signs(Room::Quiet));
+        assert!(!heeding.holds_round_one(9), "a quiet room");
+        heeding.judge(10, line, "That lamp is cute.", signs(Room::Busy));
+        assert!(heeding.holds_round_one(10), "a busy room");
+        assert!(!heeding.holds_round_one(9));
+        // The owner's conversation at a desk, the room not busy, another
+        // voice not making it so (no `LAMP_NAME_OR_FOLLOW_UP`), so each sign
+        // is seen alone.
+        let mut desk = CarryDesk::new_in(false, false);
+        desk.heeding.declining_silently();
+        desk.heeding.name_or_follow_up = false;
+        let judged = |desk: &mut CarryDesk, voice: i16, face: &str, faces: &[&str]| {
+            desk.answered(2);
+            let began = desk.start.1 + ((desk.request + 1) * 3_000 + 1_000) * 1_000;
+            two_faces_speaking(desk, faces, began);
+            desk.line_at(voice, face, "And what about tomorrow?", began);
+            let request = desk.request;
+            assert!(
+                !desk.heeding.judged_busy(request),
+                "{voice} {face} {faces:?}"
+            );
+            desk.heeding.holds_round_one(request)
+        };
+        assert!(!judged(&mut desk, 1, "f1", &[]), "the caller, alone");
+        // Another face counts against the caller's while the conversation
+        // has one; another voice's line ends that conversation, so it comes
+        // last.
+        assert!(judged(&mut desk, 1, "f2", &[]), "another face");
+        assert!(judged(&mut desk, 1, "", &["f1", "f2"]), "two faces");
+        assert!(judged(&mut desk, -1, "f1", &[]), "another voice");
+        assert!(!judged(&mut desk, 1, "f1", &[]), "the caller again");
+    }
+
+    /// The faces `faces` seen speaking together over a desk line begun at
+    /// `began_us`, as [`CarryDesk::line_at`] lays one face's looks.
+    fn two_faces_speaking(desk: &mut CarryDesk, faces: &[&str], began_us: u64) {
+        use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+        if faces.is_empty() {
+            return;
+        }
+        let (now, now_us) = desk.start;
+        let from_ms = (began_us - now_us) / 1_000 + 200;
+        let look = Faces {
+            faces: faces
+                .iter()
+                .enumerate()
+                .map(|(at, id)| Face {
+                    id: (*id).to_owned(),
+                    xmin: 0.1 + 0.4 * at as f32,
+                    ymin: 0.2,
+                    xmax: 0.3 + 0.4 * at as f32,
+                    ymax: 0.5,
+                    confidence: 1.0,
+                    yaw: None,
+                    facing: Some(true),
+                    speaking: Some(Speaking {
+                        state: SpeakingState::Yes,
+                        score: 0.9,
+                        from: None,
+                    }),
+                })
+                .collect(),
+        };
+        for at in 0..4u64 {
+            desk.seq += 1;
+            desk.eyes.look(
+                now + Duration::from_millis(from_ms + at * 400),
+                Some((("b", desk.seq), &look)),
+            );
+        }
     }
 
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line

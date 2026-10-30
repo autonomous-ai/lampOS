@@ -1544,7 +1544,8 @@ the battery's counters read both routes alike.
   the battery shows such words on held turns, the fix is to hold the
   words back only once a call the Policy holds is in the round.
 - **A line the model declines, with `LAMP_DECLINE_SILENT=on`** (#3945):
-  on a spoken line not said by name, round 1's words wait for the round's
+  on a spoken line not said by name, judged in a busy room or with a
+  second voice or face (#3945), round 1's words wait for the round's
   end, so words written before `not_for_me` are never said, and the rule
   undoes what letting the line out began (its call's 15 s, the
   `LAMP_GOING_ON_NOT_OWN` chain, the same-speaker carry): a declined line
