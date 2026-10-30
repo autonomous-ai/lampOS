@@ -1722,7 +1722,14 @@ head tap. The ten customer lamps shipped on the stable of the day they
 were set up at the factory (the lead, #1711, 30 Oct), which may be one of
 those. The cost is the climb itself, about 20 s, on each lamp's next
 update; the self-switch every build already makes moves from after the
-parts to before them.
+parts to before them. A lamp that put a carried lamp-update back for good
+(`own::refused_for_good`) now takes nothing from a build carrying that same
+lamp-update, where before its own updater still switched the parts; that ends
+at the next build whose lamp-update differs (Tests' P3 on #4582). A
+development lamp on `deploy/units/lamp-update.service`, pinned with no
+`LAMP_UPDATE_SELF`, refuses every product build from here ("needs updater 9
+or newer") until it is installed again. The test:
+`an_updater_of_level_eight_climbs_before_it_switches_any_part`.
 
 ### A part added over the air (#3689)
 

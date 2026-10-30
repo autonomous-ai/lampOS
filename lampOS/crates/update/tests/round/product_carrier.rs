@@ -333,6 +333,83 @@ fn an_older_updater_climbs_before_the_product_switch_and_fallback() {
     }
 }
 
+/// second-P1: an updater of level 8, which restarts lamp-controls before
+/// the voice, is offered a build that asks for `ORDER_UPDATER`. It takes
+/// only the lamp-update the build carries and switches no part; once that
+/// one confirms itself, it switches the parts in its own order.
+#[test]
+fn an_updater_of_level_eight_climbs_before_it_switches_any_part() {
+    let mut lamp = settings_lamp(true, true);
+    lamp.config.updater = manifest::ADDS_UPDATER;
+    lamp.systemd.self_recovery = Ok(());
+    let recovery = lamp.root.join(own::BACK.trim_start_matches('/'));
+    fs::create_dir_all(recovery.parent().unwrap()).unwrap();
+    fs::write(&recovery, "the independently installed recovery executable").unwrap();
+    fs::set_permissions(&recovery, fs::Permissions::from_mode(0o755)).unwrap();
+    carried(
+        &mut lamp,
+        &new_eyes_unit(),
+        "eyes 2",
+        None,
+        vec![Setting::new(CONTROLS_JSON, "controls 2")],
+    );
+    let envelope = &lamp.channel.files[&format!("{CHANNEL}{}", manifest::ENVELOPE)];
+    let bytes = manifest::signed(envelope, &lamp.config.key).unwrap();
+    let mut build = manifest::parse(&bytes).unwrap();
+    build.min_updater = Some(manifest::ORDER_UPDATER);
+    let updater = "update 2";
+    build.files.push(File {
+        name: "lamp-update".into(),
+        sha256: sha(updater),
+        size: updater.len() as u64,
+    });
+    lamp.channel.files.insert(
+        format!("{}lamp-update", build.files_url),
+        updater.as_bytes().to_vec(),
+    );
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&serde_json::to_vec(&build).unwrap(), &lamp.key).unwrap(),
+    );
+
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: manifest::ORDER_UPDATER,
+            from: sha("update 1"),
+            to: sha(updater)
+        },
+        "{:?}",
+        lamp.said
+    );
+    // Nothing of the parts moved under the old updater.
+    assert_eq!(lamp.eyes_link(), sha("eyes 1"));
+    assert_eq!(
+        lamp.read("/etc/systemd/system/lamp-eyes.service"),
+        eyes_unit()
+    );
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+    assert!(
+        !lamp.calls().iter().any(|call| call.contains("restart")),
+        "{:?}",
+        lamp.calls()
+    );
+
+    // The climbed updater confirms itself, then switches the parts.
+    lamp.config.updater = manifest::UPDATER;
+    assert_eq!(
+        lamp.confirm(&sha(updater)),
+        own::Confirm::Confirmed,
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    assert_eq!(lamp.read(CONTROLS_JSON), "controls 2");
+    assert_eq!(lamp.own_build(), sha(updater));
+}
+
 #[test]
 fn a_comment_only_product_unit_is_an_intended_noop() {
     let mut lamp = settings_lamp(false, true);
