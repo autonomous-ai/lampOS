@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # slot.sh DAY START LAST END [OUT]: replay.sh run in a booked lamp-52e6 slot. Times are HH:MM in GMT+7 on
-# DAY (YYYY-MM-DD). Run it under caffeinate so the Mac stays awake:
-#   SESS=<session> caffeinate -dimsu tools/jev-verify/slot.sh 2026-10-30 02:30 02:40 03:50
+# DAY (YYYY-MM-DD). It re-runs itself under caffeinate so the Mac stays awake:
+#   SESS=<session> tools/jev-verify/slot.sh 2026-10-30 02:30 02:40 03:50
 # From START it tries the lamp lock every 20 s. Not taken by LAST: "aborted, nothing ran" goes to
 # loans.txt and it exits 4. Taken: PLAYING on #3336, then the run with DEADLINE = END - 4 min (the pull
 # still fits), renewing the lock every 4 min; a lost lock, no renewal confirmed for 8 min (the lease is 10),
@@ -9,6 +9,7 @@
 # the result, then the lock released.
 # OUT defaults to ~/jev-verify-runs/DAY-HHMM (outside any repo: it holds what the lamp heard).
 set -u
+[ -n "${CAFF:-}" ] || CAFF=1 exec caffeinate -dimsu "$0" "$@"   # the Mac stays awake for the whole slot
 DAY=${1:?usage: slot.sh DAY START LAST END [OUT]} START=${2:?} LAST=${3:?} END=${4:?}
 HERE=$(cd "$(dirname "$0")" && pwd) || exit 1
 LOCK=${LOCK:-$HERE/../lamp-lock.sh} REPLAY=${REPLAY:-$HERE/replay.sh} LAMP=${LAMP:-lamp-52e6} HOLDER=jev-verifier SESS=${SESS:?SESS: the session id}

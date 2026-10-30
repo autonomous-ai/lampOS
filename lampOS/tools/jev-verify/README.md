@@ -13,9 +13,10 @@ judgement and against a label, line by line. The jev-verifier keeps it.
 - `render.sh`: renders each line on the Mac (ElevenLabs, the Mac kit's voices), levelled to -20 LUFS,
   into `clips/` (not committed). The TV is a colleague's voice through a small speaker's band, 6 dB
   under the rest on purpose: the TV class tests what is said, not a voice the lamp has never heard.
-- `slot.sh DAY START LAST END`: the way to run it in a booked slot, under `caffeinate`:
+- `slot.sh DAY START LAST END`: the way to run it in a booked slot (it re-runs itself under
+  `caffeinate` so the Mac stays awake):
 
-      SESS=<session> caffeinate -dimsu tools/jev-verify/slot.sh 2026-10-30 02:30 02:40 03:50
+      SESS=<session> tools/jev-verify/slot.sh 2026-10-30 02:30 02:40 03:50
 
   It tries the lamp lock from START; not free by LAST, it writes "aborted, nothing ran" to loans.txt and
   stops. Taken, it posts PLAYING on #3336, runs `replay.sh run` with a deadline of END - 4 min, renews
@@ -29,7 +30,9 @@ judgement and against a label, line by line. The jev-verifier keeps it.
   DEADLINE set, no line or wait starts after it. It writes a loans.txt line at the start and one at the
   end ("done", or "aborted, nothing ran"). For hello and progress it restarts lamp-policy in shadow
   with `--hello --progress` through a /run drop-in, and puts it back on exit; if that can't be done it
-  says "hello/progress NOT MEASURED" and goes on with attention.
+  says "hello/progress NOT MEASURED" and goes on with attention. Put back means lamp-policy runs again
+  with the cmdline it had before the run. Every ssh shares one connection (a fresh one took ~5.8 s on
+  30/10), and the lamp's clock offset is the midpoint of the fastest of 5 round trips (over 1 s aborts).
 
   `replay.sh preflight OUT` runs every check, the wake (which must produce a policy decision that did
   not fail) and a busy probe (two exchanges, no labelled line: does `room/state` read busy?), then

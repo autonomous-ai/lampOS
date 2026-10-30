@@ -27,8 +27,10 @@ LAMP=${LAMP:-lamp-52e6} MACVOL=${MACVOL:-45} PASSES=${PASSES:-3} ONLY=${ONLY:-.}
 DEADLINE=${DEADLINE:-} POLICY_EXTRA=${POLICY_EXTRA---hello --progress}
 DROPIN=/run/systemd/system/lamp-policy.service.d/jev-verify.conf
 GAP=22   # Jev counts the lamp "in conversation" for 20 s after it last spoke
-L="ssh -n -o BatchMode=yes -o ConnectTimeout=15 orangepi@$LAMP.local"
-LI="ssh -o BatchMode=yes -o ConnectTimeout=15 orangepi@$LAMP.local"   # for scripts on stdin
+# One shared connection: a fresh ssh to 52e6 took ~5.8 s on 30/10, late for a short answer and the clock.
+SO="-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ControlMaster=auto -o ControlPath=/tmp/jev-cm-%C -o ControlPersist=120"
+L="ssh -n $SO orangepi@$LAMP.local"
+LI="ssh $SO orangepi@$LAMP.local"   # for scripts on stdin
 V='request [0-9]+: its answer is (played|held back)'   # lamp-voice second (and provider)
 if [ -n "${DRY:-}" ]; then
   ssh() { "${DRY_SSH:?DRY=1 needs DRY_SSH, a stub ssh}" "$@"; }
@@ -38,7 +40,7 @@ if [ -n "${DRY:-}" ]; then
   sleep() { :; }
 fi
 rm -f "$OUT/aborted"; : > "$OUT/run.txt"
-PLAYED=0 PULLED= SPK0= MACVOL_WAS= start_s= LOANED= DROPPED= VD=
+PLAYED=0 PULLED= PC0= SPK0= MACVOL_WAS= start_s= LOANED= DROPPED= VD=
 
 note() { echo "$*" | tee -a "$OUT/run.txt"; }
 ok() { note "ok $*"; }
@@ -132,7 +134,8 @@ pull() { local day0 day1; PULLED=1; sleep 5
   note "pulled: $(( $(wc -l < "$OUT/plays.tsv") - 1 )) lines played, $(wc -l < "$OUT/decisions.jsonl" | tr -d ' ') decisions, $(wc -l < "$OUT/voice.txt" | tr -d ' ') verdicts"; }
 # Restores first: under lamp-lock.sh run a TERM is followed by a KILL 10 s later.
 policy_back() { $L "sudo -n rm -f $DROPIN && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-policy" &&
-  sleep 3 && [ "$($L 'systemctl is-active lamp-policy')" = active ]; }
+  sleep 3 && [ "$($L 'systemctl is-active lamp-policy')" = active ] &&   # and running as before the run
+  [ "$($L "sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline")" = "$PC0" ]; }
 cleanup() { [ -n "$MACVOL_WAS" ] && vol "$MACVOL_WAS"
   [ -n "$SPK0" ] && $L "amixer -q -c device_cmedia sset Speaker $SPK0" && note "lamp Speaker back to $SPK0"
   if [ -n "$DROPPED" ]; then policy_back && note "lamp-policy back to its own unit (drop-in removed, active)" ||
@@ -182,7 +185,7 @@ $L "sudo -n cat /run/lampos-bus/voice/mute/latest 2>/dev/null" | grep -q '"muted
   abort "the voice says it is muted (voice/mute on the bus): a chosen mute is never cleared here"
 ok "voice not muted"
 
-pc=$($L "sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline")
+pc=$($L "sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline"); PC0=$pc
 [ -n "$pc" ] || abort "cannot read lamp-policy's MainPID cmdline"
 note "policy_cmdline=$pc"
 # The installed build is the baseline the scores belong to (a promote may change it overnight).
@@ -243,10 +246,13 @@ ok "lamp Speaker 50% (was $SPK0, put back on exit)"
 MACVOL_WAS=$(osascript -e 'output volume of (get volume settings)')
 vol "$MACVOL"; ok "Mac volume $MACVOL (was $MACVOL_WAS, put back on exit)"
 
-m0=$(now_ms); l0=$(lamp_ms); m1=$(now_ms)
-off=$(( l0 - (m0 + m1) / 2 ))              # lamp clock minus Mac clock, ms
+# lamp clock minus Mac clock, ms: the midpoint of the fastest of 5 round trips (over the shared connection)
+rtt=999999 off=
+for _ in 1 2 3 4 5; do m0=$(now_ms); l0=$(lamp_ms); m1=$(now_ms)
+  [ -n "$l0" ] && [ $(( m1 - m0 )) -lt "$rtt" ] && rtt=$(( m1 - m0 )) off=$(( l0 - (m0 + m1) / 2 )); done
+[ -n "$off" ] && [ "$rtt" -le 1000 ] || abort "cannot read the lamp's clock in under 1 s (best round trip ${rtt} ms)"
 start_s=$(( l0 / 1000 - 5 ))
-note "offset_ms=$off start_s=$start_s"
+note "offset_ms=$off rtt_ms=$rtt start_s=$start_s"
 
 # ---- wake: answered within 12 s, raising the Mac 45 -> 60 -> 75 if not (RULES: small MacBook speaker); then standing
 woke=; v=$MACVOL
