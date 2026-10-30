@@ -129,6 +129,25 @@ fn offer(walk: &mut Onboarding, now: u64) -> u64 {
     invitation.invitation
 }
 
+/// A prompt taken, the skill's note: a sentence prompt is the walk's own
+/// line (#3769), marked so; a call prompt is not.
+fn take(walk: &mut Onboarding, token: u64, now: u64) -> String {
+    let note = walk.take_invitation(token, now).unwrap();
+    let own = own_words(&note).is_some();
+    let note = note
+        .strip_prefix(OWN_MARK)
+        .map_or(note.clone(), str::to_owned);
+    let sentence = [
+        SENTENCE_FIRST,
+        SENTENCE_LOUDER,
+        SENTENCE_CLOSER,
+        SENTENCE_AGAIN,
+    ]
+    .contains(&note.as_str());
+    assert_eq!(own, sentence, "{note}");
+    note
+}
+
 /// The prompt is played whole; its end is read from the Unix clock then.
 fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
     play_as(walk, now, unix_ms, turn, Delivery::Whole)
@@ -137,7 +156,7 @@ fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
 /// [`play`], its playback ended as `delivery`.
 fn play_as(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64, delivery: Delivery) -> Prompt {
     let token = offer(walk, now);
-    let words = walk.take_invitation(token, now).unwrap();
+    let words = take(walk, token, now);
     assert!(
         [NEAR_FIRST, NEAR_AGAIN, NEAR_MISSED].contains(&words.as_str()),
         "{words}"
@@ -687,7 +706,7 @@ fn a_prompt_spoken_over_is_offered_again_twice_at_most() {
     let cut = |walk: &mut Onboarding, at: u64, turn: u64| {
         let token = offer(walk, at);
         let attempt = walk.pending().invitations[0].attempt;
-        walk.take_invitation(token, at).unwrap();
+        take(walk, token, at);
         assert!(walk.bind_invitation(token, boot, turn));
         walk.invitation_finished(boot, turn, Delivery::Cut, at);
         walk.drain_storage_for_test(at);
@@ -797,7 +816,7 @@ fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
     let boot = BootId::new([3; 16]).unwrap();
     // Cut before any try: the first line again.
     let token = offer(&mut walk, 10 * S);
-    assert_eq!(walk.take_invitation(token, 10 * S).unwrap(), NEAR_FIRST);
+    assert_eq!(take(&mut walk, token, 10 * S), NEAR_FIRST);
     assert!(walk.bind_invitation(token, boot, 1));
     walk.invitation_finished(boot, 1, Delivery::Cut, 10 * S);
     walk.drain_storage_for_test(10 * S);
@@ -827,7 +846,7 @@ fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
 /// The words of the prompt after this one: offered and taken, not played.
 fn next_words(walk: &mut Onboarding, at: u64) -> String {
     let token = offer(walk, at);
-    walk.take_invitation(token, at).unwrap()
+    take(walk, token, at)
 }
 
 /// The ways a real person gets the call wrong (#3702, the lead's merge
@@ -886,7 +905,7 @@ fn a_call_over_the_prompt_is_asked_again_with_the_same_line() {
     let boot = BootId::new([3; 16]).unwrap();
     let cut = |walk: &mut Onboarding, at: u64, turn: u64| {
         let token = offer(walk, at);
-        let words = walk.take_invitation(token, at).unwrap();
+        let words = take(walk, token, at);
         assert!(walk.bind_invitation(token, boot, turn));
         walk.invitation_finished(boot, turn, Delivery::Cut, at);
         walk.drain_storage_for_test(at);
@@ -941,7 +960,7 @@ fn a_heard_call_is_answered_at_once_not_after_seven_seconds() {
     let pending = walk.pending();
     assert!(pending.invitations[0].ready, "{pending:?}");
     let token = pending.invitations[0].invitation;
-    assert_eq!(walk.take_invitation(token, now).unwrap(), NEAR_AGAIN);
+    assert_eq!(take(&mut walk, token, now), NEAR_AGAIN);
     let latency_us = now - heard_us;
     eprintln!("how_you_sound: the answer is ready {latency_us} us after the call was heard");
     assert!(latency_us <= S, "{latency_us}");
@@ -1476,7 +1495,7 @@ fn ask(walk: &mut Onboarding, at: u64, turn: u64) -> String {
 fn ask_as(walk: &mut Onboarding, at: u64, turn: u64, delivery: Delivery) -> String {
     let token = offer(walk, at);
     assert!(walk.pending().invitations[0].attempt > 5);
-    let words = walk.take_invitation(token, at).unwrap();
+    let words = take(walk, token, at);
     let boot = BootId::new([3; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
     walk.invitation_finished(boot, turn, delivery, at);
@@ -1506,6 +1525,58 @@ fn a_sentence_after_a_prompt_said_with_a_gap_is_a_try() {
     assert_eq!(judged["accepted"], true, "{judged}");
     assert_eq!(settle(&mut walk, 120 * S), [SENTENCE_DONE]);
     assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+/// lamp-52e6, 30 Oct 08:22 (#3769): the sentence prompt went to the model
+/// as a note, the model said its own small talk, and the prompt still
+/// counted as played whole. Each sentence prompt is the walk's own line,
+/// its exact words said by the route, never the model's. A prompt cut is offered again
+/// with the same words and spends nothing; the try window opens only once
+/// the prompt is played whole.
+#[test]
+fn the_sentence_prompts_are_the_walks_own_lines() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    for (turn, rise) in [(1, 22.4), (2, 25.0), (3, 23.1)] {
+        assert_eq!(call(&mut walk, turn * 20 * S, rise, turn)["accepted"], true);
+    }
+    assert_eq!(settle(&mut walk, 70 * S), [NEAR_DONE]);
+    let boot = BootId::new([3; 16]).unwrap();
+    // Cut: no window, offered again with the same words, nothing spent.
+    let token = offer(&mut walk, 80 * S);
+    let note = walk.take_invitation(token, 80 * S).unwrap();
+    assert_eq!(note, own_line(SENTENCE_FIRST.into()));
+    assert_eq!(
+        own_words(&note),
+        Some("Now say any sentence to me, the way you'd talk to me.")
+    );
+    assert!(walk.bind_invitation(token, boot, 4));
+    walk.invitation_finished(boot, 4, Delivery::Cut, 80 * S);
+    walk.drain_storage_for_test(80 * S);
+    assert!(!walk.sentence_window(81 * S));
+    let cut = walk
+        .take_records()
+        .into_iter()
+        .rfind(|row| row["kind"] == "onboarding_sentence_try")
+        .unwrap();
+    assert_eq!(cut["offered_again"], true, "{cut}");
+    assert_eq!(walk.kept().sentence_prompts, 0);
+    // Whole: its window opens, and a sentence in it ends the step done.
+    let token = offer(&mut walk, 90 * S);
+    assert_eq!(
+        walk.take_invitation(token, 90 * S).unwrap(),
+        own_line(SENTENCE_FIRST.into())
+    );
+    assert!(!walk.sentence_window(90 * S));
+    assert!(walk.bind_invitation(token, boot, 5));
+    walk.invitation_finished(boot, 5, Delivery::Whole, 90 * S);
+    assert!(walk.sentence_window(91 * S));
+    assert_eq!(
+        sentence(&mut walk, 90 * S, 3_000, 20.0, Some(9))["accepted"],
+        true
+    );
+    assert_eq!(settle(&mut walk, 110 * S), [SENTENCE_DONE]);
+    assert_eq!(walk.kept().sentence_prompts, 1);
 }
 
 /// A line ended 4 s after the prompt, its words back, and the try judged.
@@ -1814,10 +1885,7 @@ fn late_lines_skip_redo_and_a_new_cycle_in_the_sentence_part() {
     let mut walk = store.cycle(100 * S);
     assert_eq!(settle(&mut walk, 100 * S), [NEAR_DONE]);
     let token = offer(&mut walk, 110 * S);
-    assert_eq!(
-        walk.take_invitation(token, 110 * S).unwrap(),
-        SENTENCE_AGAIN
-    );
+    assert_eq!(take(&mut walk, token, 110 * S), SENTENCE_AGAIN);
     // Claimed and never judged: with both prompts spent the step fails.
     drop(walk);
     let mut walk = store.cycle(120 * S);

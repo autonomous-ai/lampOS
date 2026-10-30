@@ -267,6 +267,30 @@ fn every_shipped_say_only_line_has_fixed_words_and_no_other_line_does() {
     );
 }
 
+/// lamp-52e6, 30 Oct 08:22 (#3769): a fixed line the walk owns is marked so
+/// the second route says its exact words and never asks the model; a
+/// plain fixed line keeps the model path, and a note of an older file
+/// (not the fixed form) is never marked.
+#[test]
+fn a_walk_owned_line_carries_its_exact_words_and_only_a_fixed_line_is_marked() {
+    use crate::onboarding::{fixed_words, own_line, own_words};
+    let marked = own_line(SENTENCE_FIRST.to_owned());
+    assert_eq!(
+        own_words(&marked),
+        Some("Now say any sentence to me, the way you'd talk to me.")
+    );
+    assert!(marked.ends_with(SENTENCE_FIRST), "{marked}");
+    assert_eq!(fixed_words(&marked), None);
+    assert_eq!(own_words(SENTENCE_FIRST), None);
+    let older = toml::from_str::<toml::Value>(BEFORE_3769).unwrap()["onboarding"]["words"]
+        ["sentence_first"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(own_line(older.clone()), older);
+    assert_eq!(own_words(&older), None);
+}
+
 /// The onboarding file as lamp-voice shipped it before #3769, which an
 /// older updater's `install` still writes from its own built-in copy.
 pub(crate) const BEFORE_3769: &str = include_str!("before_3769.toml");

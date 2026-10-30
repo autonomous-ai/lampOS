@@ -204,7 +204,8 @@ absent from production.
 Where you sit, how they sound (the call and the sentence), touch, privacy's
 result and giving way say lines written once in the skill, each note
 `(Say only this, nothing before or after it: "…")`, so the model never words
-them itself; the steps the model leads (who you are, room sounds, face
+them itself (how they sound's sentence prompts are said by the route,
+never the model, below); the steps the model leads (who you are, room sounds, face
 expressions, preferences) give it each line to say exactly, in the step's own
 note, so no new skill key is needed. No line says the arm or another step's
 words (`no_step_says_another_steps_words`). Each
@@ -247,6 +248,30 @@ the turn's bookkeeping are as for any reply. A line that asks the model to do
 more (`who_you_are`, preferences, a confirm: "Ask exactly this … When they
 have answered …") keeps the model path and ends unanswered (or failed) as before; so do
 a person's line, a look and an add-on's quoted line.
+
+**How you sound's sentence prompts are the walk's own, never the model's**
+(#3769, lamp-52e6, 30 Oct 08:22, stable 8670: given the sentence prompt as a
+note, the model said "The mornings are getting cooler now, wouldn't you
+say?" in place of "Now say any sentence to me, the way you'd talk to me.",
+and the voice still logged `how_you_sound prompt 1 played whole (sentence)`,
+so the person was never asked for a sentence). Each sentence prompt
+(`sentence_first`, `sentence_louder`, `sentence_closer`, `sentence_again`)
+of the fixed form is marked as the walk's own when it is handed out
+(`onboarding::own_line`, the note behind `(The lamp says this itself.) `).
+The second route says a marked line's quoted words as they are and asks no
+chat at all (`onboarding::own_words`; journal: `is the onboarding walk's own
+line; its words are said, no chat asked`), told as `OwnWordsSaid`, so its
+completion ends no refusal. Its delivery is that line's own playback: the
+prompt counts as played, and its try window opens, only on its words played
+whole or with a gap; one cut or unsaid is offered again with the same words
+and spends nothing, as before. The Live route's model still reads the fixed
+note after the mark. An older file's words not of the fixed form are not
+marked and stay the model's. Every other fixed line (the call prompts, the
+step's done, failed, skipped and later lines, and the other steps') still
+goes to the model as above. Tests:
+`onboarding::near_flow_tests::the_sentence_prompts_are_the_walks_own_lines`,
+`second_provider::tests::a_walk_owned_onboarding_line_is_said_in_its_words_and_never_asked_of_the_model`,
+`onboarding::skill::tests::a_walk_owned_line_carries_its_exact_words_and_only_a_fixed_line_is_marked`.
 
 The conversational steps keep their tool calls and consent clauses, but say
 their questions exactly: `who_you_are` asks "What should I call you?", then

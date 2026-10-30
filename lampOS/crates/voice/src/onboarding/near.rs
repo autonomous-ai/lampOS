@@ -737,7 +737,7 @@ impl Onboarding {
         offer.claimed = true;
         offer.ready = false;
         self.near.answers = false;
-        Some(
+        let note = Some(
             match (offer.sentence, offer.prompt, self.near.short) {
                 // Each call prompt answers the last try (#3702).
                 (false, _, _) => match self.near.last {
@@ -759,7 +759,14 @@ impl Onboarding {
                 (true, _, None) => self.definition.words.sentence_again.as_str(),
             }
             .to_owned(),
-        )
+        );
+        // The sentence's prompts are the walk's own lines, its exact words
+        // said by the route, never the model's (#3769, lamp-52e6 30 Oct 08:22).
+        if offer.sentence {
+            note.map(super::own_line)
+        } else {
+            note
+        }
     }
 
     pub(super) fn bind_near_invitation(
