@@ -637,10 +637,14 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     speak of a price (the word, "how much", Vietnamese's "giá" or "bao
     nhiêu", or an amount with `$ € £ ¥ ₫ ₹`, USD or VND) carries `note` saying the same (`SEARCHED_PRICE_NOTE`), and a
     result on autonomous.ai carries its `url`. Such a search also reads the
-    first of those pages itself, as below, after the results and within
-    another 3 s, and carries its `price` with `note` to give that price for
-    that product, never one in the results (`SEARCHED_OWN_PRICE_NOTE`), or,
-    with none read, `SEARCHED_PRICE_NOTE` and `OWN_PRICE_UNREAD_NOTE`. The
+    first two of those pages itself, at once, as below, each within another
+    3 s after the results, and carries the `price` of the first in the
+    results' order that has one. Its `note` says to give that price for that
+    product, never one in the results, and never a price for another of our
+    products from a search, only from its own page (`SEARCHED_OWN_PRICE_NOTE`).
+    With none read it is `SEARCHED_PRICE_NOTE` and `OWN_PRICE_UNREAD_NOTE`.
+    So a search the model asks for can wait up to 6 s in all; one begun early
+    from the words heard waits mostly behind the model's first round. The
     model needn't call `fetch_page` for it: on lamp-4ace on 31 Oct (build
     9063) "How much is the Autonomous ErgoChair Pro?" was searched, not
     fetched, and answered "449 euro on Autonomous's own page" from the
