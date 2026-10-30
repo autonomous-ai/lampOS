@@ -158,7 +158,7 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
 - What each carries, and its grant: [references/api.md](references/api.md#events-and-state).
 - Never readable, by any grant: pictures, audio, transcripts, face prints,
   names. A hand's or face's place is a share of the picture.
-- **The camera** (arriving, the `camera` grant): a snapshot, or a stream of
+- **The camera** (the `camera` grant): a snapshot, or a stream of
   frames; never while private, never off the lamp's own network:
   [references/camera.md](references/camera.md). The microphone, `body.state`
   and routed `joints` come next; this skill gains them as they land.

@@ -12,6 +12,9 @@ import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
 
+// Events that come with a request, never subscribed to: a camera stream's.
+const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
+
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` answers
 // `{"to":"voice"}` and its `done` does follow.
@@ -398,7 +401,7 @@ export class Lamp {
 
   // Call `handler(event)` for each `event` the lamp says; subscribes at once.
   on(event, handler, { phrases } = {}) {
-    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done') {
+    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)) {
       throw new LampError(`no event ${event}`, { code: 'bad_request' });
     }
     const short = shortPhrase(phrases);
@@ -478,6 +481,22 @@ export class Lamp {
   joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
   say(text) { return this.act('say', { text }); }
+
+  // The camera (the `camera` grant): the eyes' own newest picture, never
+  // while the lamp is private.
+
+  /** The camera's newest picture, a JPEG about 320 across, as a Buffer. */
+  async cameraSnapshot() {
+    const reply = await this.request('camera.snapshot');
+    return unb64(reply.jpeg);
+  }
+
+  /** Pictures as `camera.frame` events (`lamp.on('camera.frame', ...)`, each
+   * with its `jpeg` in base64), `fps` a second at most (1 to 5), until
+   * `cameraStream(false)`, `stop`, or a `camera.ended` event. */
+  cameraStream(on = true, fps = undefined) {
+    return this.request('camera.stream', fps === undefined ? { on } : { on, fps });
+  }
   sound(name) { return this.act('sound', { name }); }
   async stop() {
     const reply = await this.act('stop', {});

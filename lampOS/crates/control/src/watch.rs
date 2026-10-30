@@ -321,6 +321,12 @@ impl Watch {
     }
 
     /// The state `get` answers for `kind`.
+    /// Whether the lamp is private now: the privacy switch, or a privacy
+    /// lease that stopped coming ([`Self::lapse`]).
+    pub fn private(&self) -> bool {
+        self.private
+    }
+
     pub fn state(&self, kind: crate::protocol::StateKind) -> Value {
         use crate::protocol::StateKind;
         match kind {

@@ -16,6 +16,7 @@ request it took. It moves nothing, so it never stands in for a lamp check.
 from __future__ import annotations
 
 import asyncio
+import base64
 import datetime
 import ipaddress
 import json
@@ -38,6 +39,9 @@ from websockets.asyncio.server import ServerConnection, serve
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
 from .moves import move_refusal
+
+# The fake's camera picture: the smallest whole JPEG (start and end markers).
+FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
 
 try:
     import jsonschema
@@ -545,6 +549,8 @@ class FakeLamp:
             "light": ["light"],
             "say": ["speak"],
             "sound": ["speak"],
+            "camera.snapshot": ["camera"],
+            "camera.stream": ["camera"],
             "lease.take": [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])],
         }.get(op, [])
 
@@ -663,6 +669,17 @@ class FakeLamp:
             await self._ok(ws, id_, to="voice")
             if self.auto_done:
                 await self.done(id_)
+        elif op == "camera.snapshot":
+            # A picture with no camera behind it: the smallest whole JPEG.
+            await self._ok(ws, id_, jpeg=base64.b64encode(FAKE_JPEG).decode(), bytes=len(FAKE_JPEG), age_ms=0)
+        elif op == "camera.stream":
+            if request["on"]:
+                fps = request.get("fps", 2)
+                await self._ok(ws, id_, stream="on", fps=fps)
+                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(FAKE_JPEG).decode(), "bytes": len(FAKE_JPEG), "age_ms": 0}
+                await ws.send(json.dumps(frame))
+            else:
+                await self._ok(ws, id_, stream="off")
         else:
             await self._ok(ws, id_)
             if op == "play" and self.auto_done:

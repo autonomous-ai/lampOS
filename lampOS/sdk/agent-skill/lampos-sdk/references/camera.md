@@ -1,13 +1,14 @@
-# The camera (arriving)
+# The camera
 
-The camera comes through lamp-control with the `camera` grant (#4521). It is
-on some lamps already as a try build, and in the SDKs when #4521 lands, so
-names may still change until then. On a lamp without it, the calls are
-refused, or the `camera` grant can't be given.
+The camera comes through lamp-control with the `camera` grant. On a lamp
+without it, the calls are refused, or the `camera` grant can't be given.
 
 - **A picture:** Python `await lamp.camera_snapshot()` returns the JPEG
   bytes, about 320 across, of the eyes' newest frame. JS
   `await lamp.cameraSnapshot()` returns a Buffer.
+- **From lamp-mcp:** `lamp_camera_snapshot()` returns the picture as an
+  image. The stream has no tool: its frames are for a program, not an
+  agent's turn.
 - **A stream:** Python `await lamp.camera_stream(True, fps=2)`, or with a
   size `camera_stream(True, 24, "640x480")`; JS takes them in order,
   `lamp.cameraStream(true, 2)` or `lamp.cameraStream(true, 24, '640x480')`

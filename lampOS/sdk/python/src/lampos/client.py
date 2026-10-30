@@ -12,6 +12,7 @@ error (`lampos.errors`).
 from __future__ import annotations
 
 import asyncio
+import base64
 import inspect
 import json
 import socket
@@ -113,6 +114,9 @@ def _check(op: str, fields: dict) -> None:
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
 
+
+# Events that come with a request, never subscribed to: a camera stream's.
+CAMERA_EVENTS = ("camera.frame", "camera.ended")
 
 class Subscription:
     """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
@@ -537,7 +541,7 @@ class Lamp:
         `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
-        if event not in schema.events() and event not in ("lease", "done"):
+        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS):
             raise LampError(f"no event {event!r}", code="bad_request")
         _short_phrase(phrases)
         self._handlers[event].append(handler)
@@ -653,6 +657,23 @@ class Lamp:
 
     async def say(self, text: str) -> dict:
         return await self._act("say", False, text=text)
+
+    # The camera (the `camera` grant): the eyes' own newest picture, never
+    # while the lamp is private.
+
+    async def camera_snapshot(self) -> bytes:
+        """The camera's newest picture, a JPEG about 320 across."""
+        reply = await self.request("camera.snapshot")
+        return base64.b64decode(reply["jpeg"])
+
+    async def camera_stream(self, on: bool = True, fps: int | None = None) -> dict:
+        """Pictures as `camera.frame` events (`lamp.on("camera.frame", ...)`,
+        each with its `jpeg` in base64), `fps` a second at most (1 to 5), until
+        `camera_stream(False)`, `stop`, or a `camera.ended` event."""
+        fields: dict[str, Any] = {"on": on}
+        if fps is not None:
+            fields["fps"] = fps
+        return await self.request("camera.stream", **fields)
 
     async def sound(self, name: str) -> dict:
         return await self._act("sound", False, name=name)

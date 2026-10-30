@@ -5,6 +5,7 @@ refusals. No lamp needed, and nothing here stands in for a lamp check."""
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import json
 from contextlib import asynccontextmanager
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from lampos import Keyring, Lamp, schema
-from lampos.testing import FakeLamp
+from lampos.testing import FAKE_JPEG, FakeLamp
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import AnyUrl
 
@@ -23,8 +24,9 @@ ALL = {
     "lamp_light", "lamp_say", "lamp_sound", "lamp_events", "lamp_stop",
 }
 # The schema's ops a tool doesn't send itself: pairing and hello are the
-# SDK's, before any tool; leases go with each body tool.
-NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release"}
+# SDK's, before any tool; leases go with each body tool; the camera's stream
+# is for a program, not a tool (`lamp_camera_snapshot` gives one picture).
+NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream"}
 # Offered only with both body and look.
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
 
@@ -915,5 +917,21 @@ def test_a_follow_refused_or_not_followed_lets_go_of_its_lease(tmp_path):
             assert not fake.leases and fake.asked("lease.release")
             # A refused follow leaves nothing running: the next one starts.
             assert text(await session.call_tool("lamp_follow_stop", {})) == "not following"
+
+    run(go())
+
+
+def test_the_camera_tool_is_offered_only_with_the_camera_grant_and_gives_a_picture(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("light", "camera")) as (_, _, session):
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert "lamp_camera_snapshot" in names
+            result = await session.call_tool("lamp_camera_snapshot", {})
+            assert not result.isError
+            image = result.content[0]
+            assert image.type == "image" and image.mimeType == "image/jpeg"
+            assert base64.b64decode(image.data) == FAKE_JPEG
+        async with connected(tmp_path / "plain") as (_, _, session):
+            assert "lamp_camera_snapshot" not in {tool.name for tool in (await session.list_tools()).tools}
 
     run(go())

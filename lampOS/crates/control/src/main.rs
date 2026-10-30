@@ -3,6 +3,7 @@
 //! ```text
 //! lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
 //!                    [--mood-socket PATH] [--say-socket PATH] [--bus-root DIR] [--boot-id ID]
+//!                    [--sight-file PATH|off]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
@@ -15,7 +16,10 @@
 //! (`/run/lampos-control/admin.sock`, 0600). Actions go to the body's
 //! `--mood-socket`, the voice's `--say-socket` and the ring's light requests
 //! on the bus at `--bus-root` (docs/control.md, "Routing"); a part not given
-//! is refused with a why.
+//! is refused with a why. The `camera` grant's pictures are the eyes' newest
+//! frame in `--sight-file` (`/run/lampos-eyes/sight.jpg`, the eyes' own; `off`
+//! for none), read only with `--bus-root`, which says when the lamp is
+//! private (docs/control.md, "The camera").
 
 use std::path::PathBuf;
 
@@ -27,6 +31,8 @@ const ENVIRONMENT: &str = "LAMP_CONTROL";
 const STATE_DIR: &str = "/var/lib/lampos-control";
 const LISTEN: &str = "0.0.0.0:7731";
 const ADMIN: &str = "/run/lampos-control/admin.sock";
+/// Where the eyes keep their newest frame (`lamp-eyes --sight-file`).
+const SIGHT: &str = "/run/lampos-eyes/sight.jpg";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -188,6 +194,13 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         })
         .unwrap_or_default();
     let watching = watch.clone();
+    // The camera only where the bus can say the lamp is private.
+    let sight = match option(arguments, "--sight-file").as_deref() {
+        Some("off") => None,
+        Some(path) => Some(PathBuf::from(path)),
+        None => Some(PathBuf::from(SIGHT)),
+    }
+    .filter(|_| bus.is_some());
     // The body's own lease, with `--lease-socket` only (lamp-body
     // --lease-socket): a computer's `look` on it, and the follower set by a
     // `look` at `hand`, told to the body with each hold.
@@ -197,6 +210,10 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let on_lease = lease_socket.is_some().then(|| (looks, follow.clone()));
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
         let lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
+        let lamp = match sight {
+            Some(sight) => lamp.seeing(sight),
+            None => lamp,
+        };
         Box::new(match on_lease {
             Some((looks, follow)) => lamp.looking(looks).following(follow),
             None => lamp,

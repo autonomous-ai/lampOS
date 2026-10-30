@@ -20,7 +20,7 @@ from typing import Any
 # Fields replaced wherever they appear in a frame.
 SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp"})
 # Fields given only as a summary: a said text, a pushed skill part's bytes.
-SUMMARISED = frozenset({"text", "data"})
+SUMMARISED = frozenset({"text", "data", "jpeg"})
 # Every other field the protocol has, printed as it is. A test fails on any
 # field of control.schema.json in none of these, so a new one is decided here,
 # not found later in a log; and at run time a field in none of them prints as
@@ -30,6 +30,8 @@ SUMMARISED = frozenset({"text", "data"})
 SHOWN = frozenset({
     # A dev lamp's `--rates off`, said in hello's limits.
     "rates",
+    # A camera picture's size, age and a stream's rate (never the picture).
+    "age_ms", "bytes", "fps", "stream",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
