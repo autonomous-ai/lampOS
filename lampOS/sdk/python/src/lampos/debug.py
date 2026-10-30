@@ -36,7 +36,7 @@ SHOWN = frozenset({
     "air", "co2_ppm", "cpu_load", "device", "disk_free", "feel", "humidity", "known", "memory_used", "pm10", "pm1_0",
     "pm2_5", "pm4_0", "temperature", "temperature_c", "uptime_s",
     # A camera picture's size, age and a stream's rate (never the picture).
-    "age_ms", "bytes", "fps", "fps_now", "stream",
+    "age_ms", "bytes", "fast", "fps", "fps_now", "stream",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
