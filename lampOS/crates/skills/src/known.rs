@@ -56,6 +56,31 @@ pub fn name_in(path: &Path, fresh: Duration) -> Option<String> {
     (name.len() <= MOST_NAME_BYTES).then(|| name.to_owned())
 }
 
+/// The memory's id of the known person in the known file at `path`, if
+/// it is no older than `fresh`: the eyes' id on its second line when it is
+/// one a skill's ask may carry (`p-` and 16 hex digits), else
+/// [`lamp_msgs::known::person_id`] of the name, as memory keys them. Never
+/// the name: the Policy is told whom a hello is for, not who they are.
+pub fn person_in(path: &Path, fresh: Duration) -> Option<String> {
+    let age = std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|modified| SystemTime::now().duration_since(modified).ok())?;
+    if age > fresh {
+        return None;
+    }
+    let text = std::fs::read_to_string(path).ok()?;
+    let (name, id) = lamp_msgs::known::read_known(&text)?;
+    Some(match id {
+        Some(id) if id.len() == ASK_ID_BYTES => id.to_owned(),
+        _ => lamp_msgs::known::person_id(name),
+    })
+}
+
+/// The length of a person id a skill's ask carries (`lamp_msgs::SkillAsk`):
+/// `p-` and 16 hex digits, without the eyes' `-N` for a shared one.
+const ASK_ID_BYTES: usize = 18;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,6 +114,41 @@ mod tests {
             Some("Alpha"),
             "within 5 s"
         );
+    }
+
+    /// The first builder, 30 Oct: a hello is asked for whom it is, by the
+    /// memory's id, never the name: the eyes' id when there is one an ask
+    /// may carry, else the id of the name; nothing for nobody known.
+    #[test]
+    fn the_person_a_hello_is_for_is_the_memorys_id_never_the_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = dir.path().join("known");
+        let fresh = Duration::from_secs(5);
+        assert_eq!(person_in(&known, fresh), None, "no file: nobody known");
+        std::fs::write(&known, "Alpha\n").unwrap();
+        assert_eq!(
+            person_in(&known, fresh),
+            Some(lamp_msgs::known::person_id("Alpha"))
+        );
+        std::fs::write(&known, "Alpha\np-be9688998f085098\n").unwrap();
+        assert_eq!(
+            person_in(&known, fresh).as_deref(),
+            Some("p-be9688998f085098")
+        );
+        // A shared id's `-2` is not an ask's shape: the name's id instead.
+        std::fs::write(&known, "Alpha\np-be9688998f085098-2\n").unwrap();
+        assert_eq!(
+            person_in(&known, fresh),
+            Some(lamp_msgs::known::person_id("Alpha"))
+        );
+        let old = SystemTime::now() - Duration::from_secs(10);
+        std::fs::File::options()
+            .write(true)
+            .open(&known)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        assert_eq!(person_in(&known, fresh), None, "stale: nobody known");
     }
 
     /// #1997: the names Who was here may say are the eyes' `tellable`

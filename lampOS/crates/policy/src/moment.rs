@@ -585,7 +585,7 @@ impl Moment {
         match held {
             Some(Hold::Talking) => self.totals.held_talking += 1,
             Some(Hold::KeptRule) => self.totals.held_rule += 1,
-            Some(Hold::GreetedRecently) | None => {}
+            Some(Hold::GreetedRecently | Hold::GreetedPerson) | None => {}
         }
         if held.is_some() {
             judgement.choice = Choice::Wait;
