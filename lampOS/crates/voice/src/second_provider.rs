@@ -469,9 +469,9 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 
 /// Where the worker reads whether the model is asked to say its few words
-/// in the same reply as a call that changes something (the light, the
-/// voice's loudness, a timer or reminder, a keep), so they are heard at the
-/// first round's pace (`worker::SAY_WITH_CALL_NOTE`): `on`, and nothing
+/// in the same reply as a call that changes the light or the voice's
+/// loudness or sets a timer or reminder, never a keep or a forget, so they
+/// are heard at the first round's pace (`worker::SAY_WITH_CALL_NOTE`): `on`, and nothing
 /// else, and only with [`SAID_ONCE_ENVIRONMENT`], which tells the next round
 /// they were heard. On lamp-4ace on 30 Oct (8999) these calls said nothing
 /// until their second chat round: 2.4 to 3.3 s to the first sound, against

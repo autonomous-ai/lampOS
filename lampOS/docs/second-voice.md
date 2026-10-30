@@ -760,9 +760,14 @@ order is kept. A written turn is the same from the chat on.
   said nothing until their second chat round: round 1 took about 1.0–1.5 s
   to the call, and round 2 another 1.0–1.2 s, so 2.4–3.3 s to the first
   sound, against 1.54–1.62 s for plain answers. With the switch, the spoken
-  character ends asking for the few words of a call that changes something
-  (the light, how loud the lamp is, a timer or a reminder, a keep) in the
-  same reply as the call (`worker::SAY_WITH_CALL_NOTE`). The round's words
+  character ends asking for the few words of a call that changes the light
+  or how loud the lamp is, or sets a timer or a reminder, in the same reply
+  as the call (`worker::SAY_WITH_CALL_NOTE`). Never a keep or a forget, or
+  anything that needs the person's yes: those can come back held for it (a
+  carried line's keep, `LAMP_CONVERSATION_CARRIED_SAVES`; every forget), and
+  words said with the call would promise what the next round then asks, so
+  "Forgotten." could be said while the forget waits for a yes never given
+  (Reviewer-three's P2 on #4635). They are said after the result, as before. The round's words
   are said as they come, before the call runs, as any round's are, and
   `LAMP_SECOND_SAID_ONCE` tells the next round they were heard. The next
   round still runs, so a failure, the time a timer is set for, or another
