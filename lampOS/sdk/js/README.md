@@ -105,6 +105,7 @@ await lamp.closed();
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
   | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; the door already refuses `say` and `sound` in quiet hours, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
+  | `volume.changed` | `level` (0–100), `muted`: the speaker's volume changed, whoever changed it (the person by voice or in the app, or a computer) | `speak` |
 
 - **State:** `await lamp.get('presence', 'lamp')` resolves with the states
   asked, by those names, as lamp-control answers them: `{ presence: {...},
@@ -214,6 +215,7 @@ subscribe.
 | `touch` | `kind`: `tap` (two or more taps are one tap) or `pet`. The schema also has `hold` and `where`, not sent yet | `{"ev":"touch","kind":"pet"}` | a tap or a pet on the lamp | none |
 | `button` | `press`: `long_press`. The schema also has `press`, not sent yet | `{"ev":"button","press":"long_press"}` | the button is held | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false). `quiet_hours` is planned, not sent yet | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
+| `volume.changed` | `level`: 0–100 of what the lamp allows. `muted`: true at 0 | `{"ev":"volume.changed","level":30,"muted":false}` | the volume changes, whoever changed it: the person by voice or in the app, or a computer | `speak` |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
 | `hand` | `seen`. When seen: `x`, `y` (the palm's centre, 0–1 from the picture's left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. All to 2 places, never the tracker's clock | `{"ev":"hand","seen":true,"x":0.42,"y":0.55,"size":0.12,"open":true,"confidence":0.91}` and `{"ev":"hand","seen":false}` | a hand is first seen, moves or grows by 0.05, opens or closes, at most 4 a second (the newest kept). `seen: false` once, 1 s after the last. Under 0.5 confidence is no hand | `look` |
 | `air.changed` | the air sensor's reading: `pm1_0`, `pm2_5`, `pm4_0`, `pm10` (µg/m³), `co2_ppm`, `humidity` (%), `temperature` (°C, at the sensor inside the base, so warmer than the room), each to a tenth (carbon dioxide whole) and left out while the sensor doesn't know it; `feel`: `fresh`, `fine`, `stuffy`, `very_stuffy` or `unknown`, from the carbon dioxide | `{"ev":"air.changed","pm2_5":7.4,"co2_ppm":912,"humidity":44.2,"temperature":28.3,"feel":"fine"}` | the first reading, then a value moves by its step (particles 5, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), comes or goes, or `feel` changes; at most once every 5 s, the newest kept | `air` |
@@ -235,6 +237,7 @@ And two that come by themselves, with no subscription:
 | `air` | the newest reading, as `air.changed` gives it, and `known: true`; `{"known": false}` with no sensor, its part not running, or no reading in 15 s | `{"pm2_5":7.4,"co2_ppm":912,"feel":"fine","known":true}` | `air` |
 | `device` | the lamp's own computer: `cpu_load` (the last minute's, 1 is every processor busy), `memory_used` and `disk_free` (0–1), `uptime_s`, `temperature_c` (by sensor, °C), and `known: true`; `{"known": false}` with no reading in 15 s | `{"cpu_load":0.42,"memory_used":0.55,"disk_free":0.71,"uptime_s":3600,"temperature_c":{"cpu_thermal":61.5},"known":true}` | `device` |
 | `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
+| `volume` | `level` (0–100 of what the lamp allows), `muted`. `null` until lamp-actions has said it | `{"level":50,"muted":false}` | `speak` |
 
 ### Never readable
 
@@ -271,7 +274,7 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 
 | call | parameters | grant |
 |---|---|---|
-| `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`; their fields and grants are [control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
+| `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`, `volume.changed`; their fields and grants are [control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | an array of events | each event's |
 | `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `air` (needs `air`), `device` (needs `device`) | the states asked, by those names |
@@ -311,6 +314,7 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.uploadSound(name, wav)` | `name`: a lowercase letter, then lowercase letters, digits, `_` or `-`, up to 64, never `hum`. `wav`: a Buffer, a Uint8Array or a path, a WAV of 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS (the lamp's speaker cap). Sent in 36 KiB parts and checked whole on the lamp, over a clip of the same name. Resolves to `{name, bytes, ms}`. Each computer keeps up to 64 clips and 20 MB (`limits.sounds`); revoking it deletes them | `speak` | no |
 | `lamp.sounds()` | your clips on the lamp, each `{name, bytes, ms}` | `speak` | no |
 | `lamp.removeSound(name)` | deletes one of your clips | `speak` | no |
+| `lamp.volume({ to, step, mute })` | exactly one of `to`: 0–100 of what the lamp allows (0 is muted), `step`: `'up'` or `'down'` (the voice's own step, within the lamp's floor and ceiling), or `mute`: `true` or `false` (an unmute brings it back to where it was). Resolves to `{ level, muted }`, the level it left. The person's own volume, the same the voice and the app set | `speak` | no |
 | `lamp.stop()` | | none | no |
 | `lamp.startTurn(prompt, { wait })` | `prompt`: words said first, as `say`'s `text` (`undefined`: none). Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. Resolves `{"to": "voice"}`; with `wait`, its `done`: `finished` once the answer has sounded, else `dropped` with the voice's why (`dropped: nobody spoke`). Refused in quiet hours, as `say` | `speak` and `hear` | no |
 | `lamp.endTurn()` | Ends the turn this computer started, never another's: `{"turn": "ended", "started": <the turn.start's id>}`, and the start's `done` follows. With none, `busy` ("not this computer's turn") | `speak` | no |

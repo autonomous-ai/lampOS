@@ -1031,7 +1031,7 @@ pub enum Route {
 /// The executive's calls for the Autonomous app alone,
 /// `lamp_actions::APP_CALLS` (a test holds the two lists equal; the voice
 /// does not link `lamp-actions`).
-pub const APP_CALLS: [&str; 2] = ["volume_level", "volume_to"];
+pub const APP_CALLS: [&str; 4] = ["volume_level", "volume_to", "volume_step", "volume_muted"];
 
 /// Whether `name` is one of the light's or the volume's functions, the
 /// executive's changes the model asks for: `lamp_actions::is_short`, which

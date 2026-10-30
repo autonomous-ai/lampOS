@@ -231,6 +231,7 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SkillRemove { .. } => "skill.remove",
         Op::CameraSnapshot {} => "camera.snapshot",
         Op::CameraStream { .. } => "camera.stream",
+        Op::Volume { .. } => "volume",
     }
 }
 
@@ -242,6 +243,7 @@ pub fn went(op: &Op) -> &'static str {
         // a0ae's tour build, where it read "to the door").
         Op::Look { .. } => "the body, by lease.sock",
         Op::Light { .. } => "the ring, by light/request",
+        Op::Volume { .. } => "the speaker, by lamp-actions' call.sock",
         Op::Gesture { .. } | Op::Move { .. } => "the body, by mood.sock",
         Op::Express { .. } => "the body, by mood.sock, and the ring, by light/request",
         Op::Say { .. }

@@ -61,7 +61,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 |---|---|
 | `body` | `gesture`, `move`, `play`, `look`, `joints`; with `light`, `express` |
 | `light` | `light`; with `body`, `express` |
-| `speak` | `say`, `sound`, `turn.end`; with `hear`, `turn.start` |
+| `speak` | `say`, `sound`, `turn.end`, `volume`; with `hear`, `turn.start`; the `volume` state and `volume.changed` |
 | `look` | presence events and state: arrivals, leavings, facing, standing up, a hand in view. Positions, never who |
 | `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard`, `listen.set` (its own mute); with `speak`, `turn.start` |
 | `sound` | `sound.heard`, by class |
@@ -87,6 +87,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `time` | the client's own schedule | the lamp's clock and zone | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
 | `air.changed` | `pm1_0`, `pm2_5`, `pm4_0`, `pm10` (µg/m³), `co2_ppm`, `humidity` (%), `temperature` (°C at the sensor, inside the base), each to a tenth (carbon dioxide whole) and left out while the sensor doesn't know it; `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`) | `air/state`, every 5 s. Told on the first reading, then when a value moves by its step (particles 5, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C, `watch::AIR_STEPS`), comes or goes, or `feel` changes; at most every 5 s, the newest held back until then | `air` |
+| `volume.changed` | `level` (0–100 of what the lamp allows), `muted` | `speaker/volume`, which lamp-actions says after each change: the person's by voice or in the app, or a computer's | `speak` |
 
 lamp-control reads each topic on its own thread. A state topic's message that says nothing new for these, the same privacy, pause, sleep, talking, light or mood as the last one, is passed over on that thread and never handed to the watch that turns the bus into events; a repeat still goes on every 250 ms. `voice/privacy` alone comes a hundred times a second (its lease, renewed every 10 ms), and handing each one on was half of lamp-control's idle CPU on lamp-75c9 (2.1% of a core before, 1.1% after; the rest is that thread reading them). A privacy lease not handed on for 1 s counts as private: every lease is lost with `private` and `lamp.changed` says so, until the lease is heard again. That is later than the voice's own microphone gate, which closes once a lease is 50 ms old; lamp-control says it 0.75 to 1.25 s after the last lease heard (1 s after the last one handed on, which is up to 250 ms older, and then the next 250 ms check), so a running voice, renewing every 10 ms, never reads as private. Each message is timed when its thread receives it, and every message already come is taken before a lapse is judged, so a lamp-control held up by a slow save doesn't read a renewed lease as lapsed. Before the first lease nothing lapses, so a lamp whose voice publishes none is never private for that.
 
@@ -105,6 +106,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `say` | `text`, at most 300 characters; optional `rephrase` | `say.sock` with `exact: true`: the words as sent, rendered straight through the voice's speech service (no model, no tools) and played as the lamp's own line once nobody is talking with the lamp (`say::may_play_exact`: it waits while a conversation with the lamp is going on, its speaker is busy, or an answer or reminder is owed, never for speech in the room that nobody addresses to the lamp; the keeper's pause and the privacy switch refuse it; no quiet gap or rarity). With `rephrase: true`, a written turn for the voice's model, through its quiet after a turn, privacy and busy gates, as before | `speak` | no |
 | `sound` | `name`: `hum`, the voice's built-in short hum (no file, no model), or one of the computer's own clips by name ("Sounds" below); the recorded notices are never a computer's, and no path is ever asked | `hum`: `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates. A clip: `say.sock` `{clip: PATH}`, its path in the clips folder, read by the voice with a skill sound's format and loudness checks and up to 30 s (`say::read_clip`) and played as an exact `say` is (`say::may_play_exact`). Its `done` follows | `speak` | no |
 | `sound.upload`, `sound.list`, `sound.remove` | a clip of the computer's own, kept, listed or deleted ("Sounds" below) | the state folder's `sounds/` | `speak` | no |
+| `volume` | one of `to` (0–100), `step` (`up`, `down`) or `mute` (`true`, `false`) | lamp-actions' `call.sock` (`--actions-socket`): `volume_to`, `volume_step` or `volume_muted`, the speaker's only writer, so the person's own volume within its ceiling; the reply is the level it left, `{level, muted}` | `speak` | no |
 | `turn.start` | `prompt` (optional) | `say.sock` `{turn: "start"}`, with its prompt as `text` ("Turns and listening") | `speak`, `hear` | no |
 | `turn.end` | | `say.sock` `{turn: "end", id}`, the id of this computer's own turn | `speak` | no |
 | `listen.set` | `on` | `say.sock` `{listen}` on one connection the door holds for the computer | `hear` | no |
@@ -225,7 +227,7 @@ own consent screen.
 
 ```text
 lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
-                   [--mood-socket PATH] [--say-socket PATH] [--bus-root DIR] [--boot-id ID]
+                   [--mood-socket PATH] [--say-socket PATH] [--actions-socket PATH] [--bus-root DIR] [--boot-id ID]
                    [--lease-socket PATH] [--zone ZONE] [--manage-socket PATH]
 lamp-control code --grants body,light,speak,look  # the owner's side: a pairing code and the pin; look for presence events
 lamp-control revoke c_…
@@ -233,7 +235,7 @@ lamp-control clients
 ```
 
 - **Off by default:** `serve` runs only with `LAMP_CONTROL=on`; otherwise it says so and exits 0. No product unit passes it yet.
-- **The parts it reaches:** `--mood-socket` (the body's gestures and moves), `--say-socket` (the voice), `--bus-root` (light requests out; events and state in) and `--boot-id` (the clock a light request names, `/proc/sys/kernel/random/boot_id` by default). A part not given is refused with "not reachable from lamp-control here".
+- **The parts it reaches:** `--mood-socket` (the body's gestures and moves), `--say-socket` (the voice), `--actions-socket` (lamp-actions' `call.sock`, for `volume`), `--bus-root` (light requests out; events and state in) and `--boot-id` (the clock a light request names, `/proc/sys/kernel/random/boot_id` by default). A part not given is refused with "not reachable from lamp-control here".
 - **The body's lease:** with `--lease-socket` (lamp-body's, docs/body.md "Held by lamp-control"), while a computer holds `body` the door holds the body too, so the lamp's own life (the rest glance, Expression's offsets, a stand timing out) stands back. It holds for 30 s, renewed every 10 s, and lets go when no computer holds `body`. The body's own end of it (`lost` for a hand, privacy, a pause, a sleep, a slump or a lapse) ends the computer's `body` lease with that why, a lapse as `expired`; a why the door doesn't know, or a hold the body refuses, ends it as `released`, so a computer never thinks the lamp's own life stands back when it doesn't. A body that restarts is held again at the next 250 ms check, and a line from a connection the door has dropped is ignored. A body that can't be reached is journaled once, and the lamp's own life goes on.
 - **Following a hand:** a `look` at `hand` under the `body` lease has each hold say `"follow":"hand"` (`{"hold":{"for_ms":30000,"follow":"hand"}}`), said at once when it starts or stops, not at the next renewal; a hold without it follows nothing. lamp-body does the fast loop on the lamp from `humans/hands/tracked`, so the picture and the loop never leave it. It ends with the holder's `stop` (never rated), another look once it is taken (rated as motion, one a second; a refused look, such as one at `face`, leaves it following), or the lease ending, and a new holder never starts out following. A body that doesn't know `follow` refuses the hold, which ends the lease as `released`, as any refused hold does.
 - **Rates off, the default** (the person's decision, 30 Oct 02:1x: "remove the rate"): unless `--rates default` (or `LAMP_CONTROL_RATES=default`; the flag wins; `off` is the default) turns them back on, lamp-control lifts every rate in the table below: `express`, motion, `joints`, `light`, `say`/`sound`, `skill.push`, `skill.list`/`skill.remove`. Two stay: the refused actions' guard (20 a second, then the connection closes), and the phrase changes (6 a minute), which bound `hear` for privacy, not pace: lifted, a program could cycle a word list to learn what people near the lamp say. Hello's `limits` then says `"rates": "off"`, with only the `refused` and `phrases` windows, so a client doesn't pace itself to rates the door doesn't hold. The body still bounds every move itself (below). It's read once at start, journaled ("rates off" or "rates on"), and a bad value stops lamp-control. The product unit sets neither, so it runs with the rates off.
@@ -357,7 +359,9 @@ SDK can keep under them. With the rates off, the default, it says `"rates": "off
 
 `phrase.heard` needs `phrases`, the ones to listen for, and `phrases` go
 only with it. A `get` reply carries each state asked for: `presence`,
-`light`, `mood`, and `lamp_state` for `lamp`. `air` (the `air` grant) is
+`light`, `mood`, `lamp_state` for `lamp`, and `volume` (`{level, muted}`, from
+`speaker/volume`; `null` until lamp-actions has said it, and only with the
+`speak` grant). `air` (the `air` grant) is
 the newest `air/state` reading, as `air.changed` tells it, with `known:
 true`. `device` (the `device` grant) is `board/state`'s `cpu_load`,
 `memory_used`, `disk_free`, `uptime_s` and `temperature_c`, with `known:
@@ -507,6 +511,7 @@ which back. An SDK's wait for them returns at the answer.
 | `sound.upload` | `name` (a clip's, never `hum`), `sha256` (64 hex), `size` 1–1,444,140, `part` from 0, `parts` 1–64, `data` (base64, ≤ 49,152 chars) | `speak` | — |
 | `sound.list` | — | `speak` | — |
 | `sound.remove` | `name` | `speak` | — |
+| `volume` | exactly one of `to` 0–100, `step` `up`/`down`, `mute` `true`/`false` | `speak` | — |
 | `stop` | — | — | — |
 | `turn.start` | optional `prompt`: words said first, as `say`'s `text` (≤ 300 chars) | `speak` + `hear` | — |
 | `turn.end` | —; only a turn this computer started | `speak` | — |
