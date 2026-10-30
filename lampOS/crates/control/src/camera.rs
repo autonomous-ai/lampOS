@@ -39,6 +39,35 @@ pub const GONE_AFTER: Duration = Duration::from_secs(10);
 /// Whether the lamp is private now.
 pub type Private = Arc<dyn Fn() -> bool + Send + Sync>;
 
+/// Asks the ring for its mark (`light/mark`, `lamp_msgs::RingMark`) for a
+/// client: `blink` once for a snapshot, else held [`MARK_HOLDS`] ahead.
+pub type Mark = Arc<dyn Fn(&str, bool) + Send + Sync>;
+/// A stream's mark is asked again this often...
+pub const MARK_EVERY: Duration = Duration::from_secs(1);
+/// ...to hold this far ahead, so one lost renewal leaves no gap.
+pub const MARK_HOLDS: Duration = Duration::from_secs(2);
+
+/// The mark asked for on the bus, `lamp_msgs::RingMark` on `light/mark`, on
+/// the boot's monotonic clock `clock_id`, with `publish` sending it.
+pub fn mark_on(
+    clock_id: String,
+    publish: impl Fn(&lamp_msgs::RingMark) + Send + Sync + 'static,
+) -> Mark {
+    Arc::new(move |client: &str, blink: bool| {
+        let now_us = lamp_ipc::monotonic_us();
+        publish(&lamp_msgs::RingMark {
+            claim: lamp_msgs::Claim {
+                source: format!("control:{client}"),
+                priority: lamp_msgs::Priority::Skill,
+                clock_id: clock_id.clone(),
+                until_us: now_us + u64::try_from(MARK_HOLDS.as_micros()).unwrap_or(u64::MAX),
+            },
+            kind: lamp_msgs::MarkKind::Camera,
+            blink,
+        });
+    })
+}
+
 /// The newest frame: its JPEG and how old it is.
 #[derive(Debug)]
 pub struct Frame {
@@ -89,6 +118,8 @@ pub struct Camera {
     sight: PathBuf,
     private: Private,
     streams: HashMap<String, Arc<AtomicBool>>,
+    /// The ring's mark; none, no camera at all (it is never seen unmarked).
+    mark: Option<Mark>,
 }
 
 impl Camera {
@@ -97,17 +128,35 @@ impl Camera {
             sight,
             private,
             streams: HashMap::new(),
+            mark: None,
         }
     }
 
-    /// `camera.snapshot`.
-    pub fn snapshot(&self) -> Result<Value, Error> {
+    /// The ring's mark while it is seen through.
+    pub fn marking(mut self, mark: Mark) -> Self {
+        self.mark = Some(mark);
+        self
+    }
+
+    fn mark(&self) -> Result<&Mark, Error> {
+        self.mark.as_ref().ok_or_else(|| {
+            Error::new(
+                ErrorCode::Refused,
+                "the camera is not shown on the ring here, so it is not given",
+            )
+        })
+    }
+
+    /// `camera.snapshot`: the ring blinks its mark as it is taken.
+    pub fn snapshot(&self, client: &str) -> Result<Value, Error> {
         if (self.private)() {
             return Err(Error::new(ErrorCode::Private, "the lamp is private"));
         }
-        newest(&self.sight, SystemTime::now())
-            .map(|frame| frame.json())
-            .map_err(|why| Error::new(ErrorCode::Refused, why))
+        let mark = self.mark()?;
+        let frame = newest(&self.sight, SystemTime::now())
+            .map_err(|why| Error::new(ErrorCode::Refused, why))?;
+        mark(client, true);
+        Ok(frame.json())
     }
 
     /// `camera.stream`, on or off. On again while one runs takes the new
@@ -126,13 +175,20 @@ impl Camera {
         if (self.private)() {
             return Err(Error::new(ErrorCode::Private, "the lamp is private"));
         }
+        let mark = self.mark()?.clone();
         let fps = fps.unwrap_or(FPS_DEFAULT).clamp(1, FPS_MOST);
         let running = Arc::new(AtomicBool::new(true));
         self.streams.insert(client.to_owned(), running.clone());
         let (sight, private, client) =
             (self.sight.clone(), self.private.clone(), client.to_owned());
         std::thread::spawn(move || {
-            run(&sight, fps, &running, &private, &|event| {
+            let marked = |at: &mut Option<std::time::Instant>| {
+                if at.is_none_or(|at| at.elapsed() >= MARK_EVERY) {
+                    mark(&client, false);
+                    *at = Some(std::time::Instant::now());
+                }
+            };
+            run(&sight, fps, &running, &private, &marked, &|event| {
                 events(&client, event)
             });
         });
@@ -150,10 +206,18 @@ impl Camera {
 
 /// One stream, on its own thread, until `running` is cleared, the lamp is
 /// private or the camera has been gone [`GONE_AFTER`].
-fn run(sight: &Path, fps: u8, running: &AtomicBool, private: &Private, tell: &dyn Fn(Value)) {
+fn run(
+    sight: &Path,
+    fps: u8,
+    running: &AtomicBool,
+    private: &Private,
+    marked: &dyn Fn(&mut Option<std::time::Instant>),
+    tell: &dyn Fn(Value),
+) {
     let every = Duration::from_millis(1_000 / u64::from(fps));
     let mut last: Option<SystemTime> = None;
     let mut fresh_at = std::time::Instant::now();
+    let mut marked_at = None;
     while running.load(Ordering::SeqCst) {
         if private() {
             running.store(false, Ordering::SeqCst);
@@ -162,13 +226,18 @@ fn run(sight: &Path, fps: u8, running: &AtomicBool, private: &Private, tell: &dy
         }
         match newest(sight, SystemTime::now()) {
             Ok(frame) if last != Some(frame.modified) => {
+                // The mark is on the ring before the picture leaves.
+                marked(&mut marked_at);
                 last = Some(frame.modified);
                 fresh_at = std::time::Instant::now();
                 let mut event = frame.json();
                 event["ev"] = json!("camera.frame");
                 tell(event);
             }
-            Ok(_) => fresh_at = std::time::Instant::now(),
+            Ok(_) => {
+                marked(&mut marked_at);
+                fresh_at = std::time::Instant::now();
+            }
             Err(_) if fresh_at.elapsed() >= GONE_AFTER => {
                 running.store(false, Ordering::SeqCst);
                 tell(json!({"ev": "camera.ended", "why": "the camera is closed"}));
@@ -203,10 +272,13 @@ mod tests {
     #[test]
     fn a_snapshot_is_the_newest_whole_fresh_frame() {
         let sight = dir().join("sight.jpg");
-        let camera = Camera::new(sight.clone(), Arc::new(|| false));
-        assert_eq!(camera.snapshot().unwrap_err().why, "the camera is closed");
+        let camera = Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(|_, _| {}));
+        assert_eq!(
+            camera.snapshot("c_1").unwrap_err().why,
+            "the camera is closed"
+        );
         std::fs::write(&sight, JPEG).unwrap();
-        let reply = camera.snapshot().unwrap();
+        let reply = camera.snapshot("c_1").unwrap();
         assert_eq!(reply["bytes"], 7);
         assert_eq!(
             base64::engine::general_purpose::STANDARD
@@ -216,7 +288,13 @@ mod tests {
         );
         // Caught mid-write.
         std::fs::write(&sight, &JPEG[..4]).unwrap();
-        assert!(camera.snapshot().unwrap_err().why.contains("ask again"));
+        assert!(
+            camera
+                .snapshot("c_1")
+                .unwrap_err()
+                .why
+                .contains("ask again")
+        );
         // Old: the camera has closed.
         let later = SystemTime::now() + FRESH + Duration::from_secs(1);
         std::fs::write(&sight, JPEG).unwrap();
@@ -224,11 +302,41 @@ mod tests {
     }
 
     #[test]
+    fn the_ring_marks_every_picture_and_with_no_mark_there_is_no_camera() {
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let asked: Arc<Mutex<Vec<(String, bool)>>> = Arc::default();
+        let into = asked.clone();
+        let mut camera = Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(
+            move |client: &str, blink| into.lock().unwrap().push((client.to_owned(), blink)),
+        ));
+        camera.snapshot("c_1").unwrap();
+        assert_eq!(*asked.lock().unwrap(), [("c_1".to_owned(), true)]);
+        let events: Events = Arc::new(|_, _| {});
+        camera.stream("c_2", true, Some(5), events).unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(
+            asked.lock().unwrap().contains(&("c_2".to_owned(), false)),
+            "held while it streams"
+        );
+        camera.end("c_2");
+        // A camera nobody can see on the ring is no camera.
+        let unmarked = Camera::new(sight, Arc::new(|| false));
+        assert!(
+            unmarked
+                .snapshot("c_1")
+                .unwrap_err()
+                .why
+                .contains("not shown on the ring")
+        );
+    }
+
+    #[test]
     fn nothing_is_seen_while_private() {
         let sight = dir().join("sight.jpg");
         std::fs::write(&sight, JPEG).unwrap();
-        let mut camera = Camera::new(sight, Arc::new(|| true));
-        assert_eq!(camera.snapshot().unwrap_err().code, ErrorCode::Private);
+        let mut camera = Camera::new(sight, Arc::new(|| true)).marking(Arc::new(|_, _| {}));
+        assert_eq!(camera.snapshot("c_1").unwrap_err().code, ErrorCode::Private);
         let events: Events = Arc::new(|_, _| {});
         assert_eq!(
             camera.stream("c_1", true, None, events).unwrap_err().code,
@@ -245,7 +353,8 @@ mod tests {
         let mut camera = Camera::new(
             sight.clone(),
             Arc::new(move || watching.load(Ordering::SeqCst)),
-        );
+        )
+        .marking(Arc::new(|_, _| {}));
         let seen: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
         let into = seen.clone();
         let events: Events = Arc::new(move |client, event| {
@@ -278,7 +387,8 @@ mod tests {
     fn off_and_stop_end_a_stream_with_no_more_frames() {
         let sight = dir().join("sight.jpg");
         std::fs::write(&sight, JPEG).unwrap();
-        let mut camera = Camera::new(sight.clone(), Arc::new(|| false));
+        let mut camera =
+            Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(|_, _| {}));
         let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
         let into = seen.clone();
         let events: Events = Arc::new(move |_, event| into.lock().unwrap().push(event));

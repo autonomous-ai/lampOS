@@ -144,14 +144,14 @@ impl Lamp {
     /// never while `watch` says the lamp is private: after [`Self::watching`],
     /// whose watch it reads. Without a watch nothing tells the door the lamp
     /// is private, so the camera is refused.
-    pub fn seeing(mut self, sight: PathBuf) -> Self {
+    pub fn seeing(mut self, sight: PathBuf, mark: crate::camera::Mark) -> Self {
         let watch = self.watch.clone();
         let private: crate::camera::Private = Arc::new(move || {
             watch
                 .as_ref()
                 .is_none_or(|watch| watch.lock().map_or(true, |watch| watch.private()))
         });
-        self.camera = Some(crate::camera::Camera::new(sight, private));
+        self.camera = Some(crate::camera::Camera::new(sight, private).marking(mark));
         self
     }
 
@@ -509,7 +509,7 @@ impl Parts for Lamp {
                 .camera
                 .as_ref()
                 .ok_or_else(|| not_here("the camera"))?
-                .snapshot(),
+                .snapshot(client),
             Op::CameraStream { on, fps } => {
                 let events = self.events.clone();
                 self.camera
