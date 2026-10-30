@@ -2,7 +2,7 @@
 //! tried again for. The microphone waits out busy and off-USB answers inside
 //! the capture worker's loop (#1178, #1567); the speaker waits out busy only,
 //! before it says it is ready (#4332). Off the board, so a test runs here.
-use crate::wire::MicWaited;
+use crate::wire::OpenWaited;
 use lamp_audio::{
     capture::CaptureError,
     device::{DeviceFault, OPEN_CALL, errno},
@@ -119,7 +119,7 @@ impl OpenAtStart {
 
     /// The microphone opened: whether it was off USB at all (else only
     /// busy), how long since the first failed open, and on which try.
-    pub(crate) fn opened(&mut self, now: Instant) -> Option<MicWaited> {
+    pub(crate) fn opened(&mut self, now: Instant) -> Option<OpenWaited> {
         let gone = self.gone_since.take();
         let first = match (self.busy_since.take(), gone) {
             (Some(busy), Some(gone)) => Some(busy.min(gone)),
@@ -127,7 +127,7 @@ impl OpenAtStart {
         };
         let failed = std::mem::take(&mut self.failed);
         self.next = None;
-        Some(MicWaited {
+        Some(OpenWaited {
             gone: gone.is_some(),
             waited_ms: u64::try_from(now.duration_since(first?).as_millis()).unwrap_or(u64::MAX),
             opened_on_try: failed.saturating_add(1),
@@ -152,7 +152,7 @@ pub(crate) fn open_waiting_out_busy<S>(
     mut first_busy: impl FnMut() -> Result<()>,
     mut wait_until: impl FnMut(Instant) -> Result<()>,
     mut now: impl FnMut() -> Instant,
-) -> Result<(S, Option<MicWaited>)> {
+) -> Result<(S, Option<OpenWaited>)> {
     let mut at_start = OpenAtStart::busy_for(SPEAKER_BUSY_AT_START);
     loop {
         let error = match open() {
@@ -207,7 +207,7 @@ mod open_at_start_tests {
         let waited = back.opened(at(4_500)).unwrap();
         assert_eq!(
             waited,
-            crate::wire::MicWaited {
+            crate::wire::OpenWaited {
                 gone: true,
                 waited_ms: 4_500,
                 opened_on_try: 3
@@ -240,7 +240,7 @@ mod open_at_start_tests {
         // Off USB first, so it says so.
         assert_eq!(
             back.opened(at(7_500)),
-            Some(crate::wire::MicWaited {
+            Some(crate::wire::OpenWaited {
                 gone: true,
                 waited_ms: 7_500,
                 opened_on_try: 4
@@ -292,7 +292,7 @@ mod open_at_start_tests {
     }
 
     /// What the speaker's open came to: the speaker, or the error.
-    type Opened = Result<(&'static str, Option<MicWaited>)>;
+    type Opened = Result<(&'static str, Option<OpenWaited>)>;
 
     /// The speaker's open on a clock that moves only when it waits: the
     /// result, the opens tried, the first-busy calls and when it ended, ms.
@@ -336,7 +336,7 @@ mod open_at_start_tests {
         assert_eq!((tries, said, ended), (1, 0, 0));
 
         let (opened, tries, said, ended) = run(busy(20));
-        let waited = MicWaited {
+        let waited = OpenWaited {
             gone: false,
             waited_ms: 1_000,
             opened_on_try: 21,
@@ -346,7 +346,7 @@ mod open_at_start_tests {
 
         // lamp-06c1's 9 s: free on the try at 9.2 s, past the mic's 8 s.
         let (opened, tries, said, ended) = run(busy(184));
-        let waited = MicWaited {
+        let waited = OpenWaited {
             gone: false,
             waited_ms: 9_200,
             opened_on_try: 185,
