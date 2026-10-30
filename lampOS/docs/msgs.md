@@ -594,6 +594,7 @@ and are re-exported at the crate root; `reports_topics()` and
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
 | `ReportsRequest` | `reports/request` | event | none / none | A part asks for health and crash reports to stop: `share`, and `held` (left out when false) when the line's answer was held. `lamp-cloud` takes only `false` from the bus, which anything on the lamp can write ([cloud.md](cloud.md), "Health and crash reports") |
+| `AccountState` | `account/state` | latest | 5 s / 15 s | Whether this lamp's login is no longer accepted (`signed_out`) and how long that has lasted (`for_s`), said by `lamp-cloud` with `LAMP_SIGNED_OUT=on` and read by the voice ([cloud.md](cloud.md), "Signed out"). Past its lifespan or absent means signed in |
 | `ReportsState` | `reports/state` | latest | 5 s / 15 s | Whether reports are being sent (`share`: the switch on and the person's yes), how many wait (`queued`), and how the newest choice was made: `by` (`voice`, `app`, `setup` or null), `held`, and `at_s` (wall seconds) |
 
 Published by the voice's `reports_stop` (`reports/request`) and

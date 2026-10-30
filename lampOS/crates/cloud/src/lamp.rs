@@ -650,6 +650,14 @@ impl Lamp for Real {
         }))
     }
 
+    fn account(&mut self) -> Option<&'static str> {
+        self.latest(lamp_msgs::AccountState::TOPIC)
+            .filter(|message| !message.expired)
+            .and_then(|message| message.parse::<lamp_msgs::AccountState>().ok())
+            .filter(|state| state.signed_out)
+            .map(|_| "signed_out")
+    }
+
     fn recovery(&self) -> bool {
         self.places
             .run

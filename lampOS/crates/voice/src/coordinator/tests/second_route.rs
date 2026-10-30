@@ -6315,6 +6315,88 @@ fn a_real_coordinator_transcript_is_projected_before_shared_storage() {
     }
 }
 
+/// `LAMP_SIGNED_OUT=on`, signed out after the first line was answered: the lamp
+/// says the line once with nothing asked, each line heard after it gets the
+/// line again, and no turn is sent after the first.
+#[test]
+fn a_signed_out_lamp_says_so_once_and_again_when_talked_to_and_sends_nothing() {
+    let _one = super::pilot_faults::one_session();
+    super::super::signed_out::set_for_test(Some(|since_us| lamp_msgs::AccountState {
+        signed_out: since_us >= 15_000_000,
+        for_s: 0,
+    }));
+    let run = run(Script {
+        second: false,
+        only: true,
+        notices: true,
+        speak_at: &[3_000, 5_000],
+        mute_at_frame: Some(6_000),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::signed_out::set_for_test(None);
+    run.assert_clean();
+    let started = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(started.len(), 1, "{started:?}\n{}", run.summary());
+    let turns = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == 44)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        turns.len(),
+        3,
+        "once unasked, twice heard: {}",
+        run.summary()
+    );
+    let own = run
+        .events("input_admitted")
+        .into_iter()
+        .filter(|event| event["admission_basis"] == "signed_out")
+        .count();
+    assert_eq!(own, 1, "{}", run.summary());
+}
+
+/// The state cleared: the lines before it are held, the one after it is sent.
+#[test]
+fn a_lamp_signed_in_again_sends_its_turns() {
+    let _one = super::pilot_faults::one_session();
+    super::super::signed_out::set_for_test(Some(|since_us| lamp_msgs::AccountState {
+        signed_out: since_us < 30_000_000,
+        for_s: 0,
+    }));
+    let run = run(Script {
+        second: false,
+        only: true,
+        notices: true,
+        // The first line and this one (20 s) held, then sent (50 s).
+        speak_at: &[2_000, 5_000],
+        mute_at_frame: Some(6_000),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::signed_out::set_for_test(None);
+    run.assert_clean();
+    let started = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(started.len(), 1, "{started:?}\n{}", run.summary());
+}
+
 /// #4265 (`LAMP_SECOND_REFUSED_HOLD=on`), as lamp-52e6 ran it on 30 Oct:
 /// the second route alone, its first turn refused for its quota, so the
 /// refusal starts at once and the lines heard within the minute are held,

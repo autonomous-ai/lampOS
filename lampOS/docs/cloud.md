@@ -117,10 +117,11 @@ lamp says so.
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
 | `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
+| `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
 | `mic.get` | `{"muted", "hw_switch_muted", "available"}`: the voice's own mute (`voice/mute`), the privacy switch (`voice/privacy`, `null` while unknown) and whether the voice is running. While muted, `muted_by` too (#4332), from `voice/mute`'s own `muted_by`: `sleep` (a hand held on the head), `button` (the person's hold of the button or the base), `restart_guard` (the restart guard's mute after a fault, which a tap on the head clears) or `unreadable` (a mute record the voice couldn't trust, from a newer build or a cut write, read as muted). So a setup screen can tell the guard's mute from one the person chose. No field while listening, nor from a voice that doesn't say it, though a sleep's `reason` still reads as `sleep`. There is no `app` value: the app can't mute (`mic.set` is refused) |
-| `lamp.health` | `lamp/health`'s `level` and `message`, and `stale` |
+| `lamp.health` | `lamp/health`'s `level` and `message`, and `stale`; with `account` too while signed out ("Signed out" below) |
 | `led.resting.get` | the person's own light (`light/state`, `docs/ring-choreography.md`), in V1's snapshot: `mode` (`off`; `default` while it is the light the lamp starts with, warm at the lowest level; else `custom`), `color` (`[r, g, b]` for `custom`, else `null`), `default` and `effective` (`{"effect", "color"}`), and `light`, the light by its own names (`on`, `colour`, `level`) |
 | `led.resting.set` (`{"mode": "default" \| "off" \| "custom", "color": [r, g, b]}`) | asked on `light/command`, as the actions program asks it, and read back from `light/state` within 1 s; the snapshot of what is shown. `off` keeps the colour and the level, and black is `off`, as V1 |
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
@@ -1441,6 +1442,37 @@ hour (under 0.5 % added), bytes over 24 h (under 200 KB), no flash write
 without a crash, a `kill -SEGV` reported within 60 s, a crash loop held at
 12 an hour, delivery after 30 min offline, the stop by voice and by
 `reports.set`, and the reset.
+
+## Signed out (`LAMP_SIGNED_OUT`)
+
+A lamp removed and added again keeps running on its old login. Every call it
+makes is rejected, and the ping sends that same login as its bearer, so it can't
+get a new one by itself: a person has to set it up again. With
+`LAMP_SIGNED_OUT=on`, `lamp-cloud` works this out from the ping's answers
+(`crate::signed_out`) and tells the voice and the app. Off unless set; without
+it no count is kept, no topic is said and no field is added.
+
+- **What counts.** Only the ping's answer that refuses the login. A timeout, a
+  failed connection, a failing backend, any other refusal, a redirect or a reply
+  that isn't JSON says nothing about the login: it neither counts nor starts the
+  count again.
+- **How many.** 12 in a row (`REJECTED_IN_A_ROW`), so about 2 min 45 s from the
+  first at one ping every 15 s. A login check that fails for a minute or two must
+  not make a lamp ask a person to set it up again.
+- **What it does.** Says `account/state` (`signed_out`, `for_s`) when it changes
+  and every 5 s; `system.info` and `lamp.health` add `"account": "signed_out"`
+  while it lasts; the journal says it once. The voice says the kept line and stops
+  sending turns ([failure-notices.md](failure-notices.md), "Signed out"). The ping
+  goes on every 15 s: it is how the lamp finds it is accepted again.
+- **Nothing is wiped and setup isn't reset.** The lamp's one record of it is
+  `signed-out.json` in its state folder: a short fingerprint of the login (never
+  the login) and the spell's start, so a restart goes on with the same spell.
+- **It ends** when a ping is accepted, or at a start with a different login: a
+  new login reaches `lamp-cloud` by restarting it, as setup does, since its
+  credentials are handed in at start. The ping's next answer decides after that.
+- **The app may not hear it.** The lamp's broker login and channels may stop
+  working too once it has been removed and added again. Then the app can't ask
+  the lamp anything, this field included, and the spoken line is the only sign.
 
 ## What the backend reads
 

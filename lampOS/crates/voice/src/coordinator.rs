@@ -78,6 +78,7 @@ mod model_refusing;
 mod notices;
 mod open_name;
 mod requested_media;
+mod signed_out;
 use requested_media::RequestedMedia;
 mod second;
 mod service;
@@ -5798,6 +5799,10 @@ fn conversation_with_gate_inner(
     // turn is said once and held, not failed turn by turn (#4265).
     let refused_hold = model_refusing::switched_on();
     let mut model_refusing = model_refusing::ModelRefusing::default();
+    // With `LAMP_SIGNED_OUT=on`: the login no longer accepted is said, and
+    // turns wait for a new one.
+    let signed_out_line = signed_out::switched_on();
+    let mut signed_out = signed_out::SignedOut::from_environment();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
     let mut last_spoke_us: Option<u64> = None;
@@ -6679,6 +6684,7 @@ fn conversation_with_gate_inner(
         }
         termination.check()?;
         let clock = monotonic_us();
+        signed_out.read(clock);
         if cloud.available() {
             if link_down_since.take().is_some() {
                 // Not after the service's line: the internet never left.
@@ -6699,6 +6705,8 @@ fn conversation_with_gate_inner(
         let offline = offline_now(offline_voice, link_down_since, clock, verdict);
         let service_down = service_down_now(service_down_line, link_down_since, clock, verdict);
         let paused = (rig.paused)();
+        // Nothing the lamp starts by itself is sent while signed out.
+        let unasked_paused = paused || signed_out.holds();
         if paused != was_paused {
             was_paused = paused;
             refused_while_paused = false;
@@ -9599,7 +9607,9 @@ fn conversation_with_gate_inner(
                         &mut submission_draining,
                         trace,
                     )?;
-                    let held_refused = refused_hold && model_refusing.holds(monotonic_us());
+                    let held_signed_out = signed_out.holds();
+                    let held_refused =
+                        held_signed_out || (refused_hold && model_refusing.holds(monotonic_us()));
                     let Some(provider_session) = cloud.ready_session().filter(|_| {
                         provider_control_empty && !submission_draining && !held_refused
                     }) else {
@@ -9613,7 +9623,12 @@ fn conversation_with_gate_inner(
                                 &mut provider_queue,
                                 accepted,
                                 rig.playout_start_now(),
-                                (service_down && !offline) || held_refused,
+                                notices::LocalOnly {
+                                    speech: false,
+                                    back: false,
+                                    service: (service_down && !offline) || held_refused,
+                                    signed_out: held_signed_out,
+                                },
                                 trace,
                                 |state| rig.publish(state),
                             )?;
@@ -10457,6 +10472,7 @@ fn conversation_with_gate_inner(
             )?;
         }
         outage.note_delivery(reply);
+        signed_out.note_delivery(reply);
         select_failure_notice_in(notices, reply, &speaker_pending, &mut outage, trace)?;
         if let Some((request, why)) = reply.as_ref().and_then(|current| {
             current
@@ -10722,7 +10738,9 @@ fn conversation_with_gate_inner(
                 choreography,
                 reply.as_ref().map(|current| current.notice.origin()),
             );
-            choreography.set_offline(offline || service_down || model_refusing.refusing());
+            choreography.set_offline(
+                offline || service_down || model_refusing.refusing() || signed_out.holds(),
+            );
         }
         if let Some(current) = reply
             .as_ref()
@@ -10794,6 +10812,7 @@ fn conversation_with_gate_inner(
             bus.set_ring_off(rig.ring.off_for_good());
             bus.set_chat_key_refused(key_refusals.said(clock));
             bus.set_model_refusing(model_refusing.health(clock));
+            bus.set_signed_out(signed_out.holds());
             bus.report(
                 cloud.available(),
                 cloud.refusal(),
@@ -10958,7 +10977,7 @@ fn conversation_with_gate_inner(
                         .second
                         .as_ref()
                         .is_some_and(second::Route::second_active)
-                    || unasked_session(&cloud, paused).is_some_and(|ready| ready != session)
+                    || unasked_session(&cloud, unasked_paused).is_some_and(|ready| ready != session)
             });
             if (by_tool.is_none() || tool_look_due(reply.as_ref(), turn))
                 && !asked_again
@@ -11007,7 +11026,7 @@ fn conversation_with_gate_inner(
                         && !admission.owns_stream()
                         && !submission_draining
                         && snapshot.listening_ready(now())
-                        && let Some(provider_session) = unasked_session(&cloud, paused)
+                        && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
                     {
                         look_wanted = None;
                         let (note, with_picture) = look.turn();
@@ -11150,7 +11169,7 @@ fn conversation_with_gate_inner(
                         (submission_draining, "submission_draining"),
                         (!snapshot.listening_ready(now()), "not_listening_ready"),
                         (
-                            unasked_session(&cloud, paused).is_none(),
+                            unasked_session(&cloud, unasked_paused).is_none(),
                             "no_ready_session_or_paused",
                         ),
                     ]
@@ -11169,7 +11188,7 @@ fn conversation_with_gate_inner(
                         && !admission.owns_stream()
                         && !submission_draining
                         && snapshot.listening_ready(now())
-                        && let Some(provider_session) = unasked_session(&cloud, paused)
+                        && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
                     {
                         asking.done();
                         snapshot = commit_written_turn(
@@ -11237,7 +11256,9 @@ fn conversation_with_gate_inner(
             if let Some(started) = start_timed_fixture(
                 &mut fixture_due_us,
                 clock,
-                at_rest.then(|| unasked_session(&cloud, paused)).flatten(),
+                at_rest
+                    .then(|| unasked_session(&cloud, unasked_paused))
+                    .flatten(),
                 owner,
                 reply,
                 &mut provider_queue,
@@ -11261,7 +11282,7 @@ fn conversation_with_gate_inner(
                 cycle_started_us: reminder_cycle_started_us,
                 last_speech_us,
                 last_capture_us: last_capture,
-                session: unasked_session(&cloud, paused),
+                session: unasked_session(&cloud, unasked_paused),
                 worker: rig.provider.boot,
                 snapshot: &snapshot,
                 admission: &admission,
@@ -11291,7 +11312,7 @@ fn conversation_with_gate_inner(
                 cycle_started_us: reminder_cycle_started_us,
                 last_speech_us,
                 last_capture_us: last_capture,
-                session: unasked_session(&cloud, paused),
+                session: unasked_session(&cloud, unasked_paused),
                 worker: rig.provider.boot,
                 snapshot: &snapshot,
                 admission: &admission,
@@ -11346,7 +11367,7 @@ fn conversation_with_gate_inner(
             && !admission.owns_stream()
             && !submission_draining
             && snapshot.listening_ready(now())
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
         {
             let heard_it = second_look.is_for(provider_session);
             second_look.taken();
@@ -11398,13 +11419,43 @@ fn conversation_with_gate_inner(
                 )
                 && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
             {
-                snapshot =
-                    commit_back_online(owner, reply, rig.playout_start_now(), trace, |state| {
-                        rig.publish(state)
-                    })?;
+                snapshot = commit_own_line(
+                    owner,
+                    reply,
+                    rig.playout_start_now(),
+                    false,
+                    trace,
+                    |state| rig.publish(state),
+                )?;
                 last_publish = monotonic_us();
                 back_owed_since = None;
             }
+        }
+        // "I've been signed out." (`LAMP_SIGNED_OUT`): once a spell, unasked,
+        // when nothing holds the lamp and the room is quiet.
+        if signed_out.owed()
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && speaker_pending.is_none()
+            && !paused
+            && playback_mask.available(clock)
+            && reminder_quiet(
+                clock,
+                reminder_cycle_started_us,
+                last_speech_us,
+                last_capture,
+            )
+            && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
+        {
+            snapshot = commit_own_line(
+                owner,
+                reply,
+                rig.playout_start_now(),
+                true,
+                trace,
+                |state| rig.publish(state),
+            )?;
+            last_publish = monotonic_us();
         }
         // Finish the camera/name follow-ups owed above before a reminder can
         // take the next turn. A reminder is not someone speaking first.
@@ -11444,7 +11495,7 @@ fn conversation_with_gate_inner(
                 last_capture,
             )
             && playback_mask.available(reminder_now_us)
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             && let Some(offer) = idle_reminder_offer(
                 reminders,
                 reply,
@@ -11520,7 +11571,7 @@ fn conversation_with_gate_inner(
                         last_capture,
                     )
                     && playback_mask.available(say_now_us)))
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
         {
             if ticket.last_words() {
@@ -11679,13 +11730,16 @@ fn conversation_with_gate_inner(
                 && playback_mask.available(monotonic_us())
                 && !submission_draining
                 && snapshot.listening_ready(now())
-                && unasked_session(&cloud, paused).is_some();
+                && unasked_session(&cloud, unasked_paused).is_some();
             let face = walk.face_now(clock);
             let still = walk.still_now(clock);
             // The model service refusing (#4265): the walk begins nothing
             // while turns are held, so its re-offer is the minute's try.
-            if refused_hold {
-                walk.set_model_refusing(model_refusing.refusing(), model_refusing.holds(clock));
+            if refused_hold || signed_out_line {
+                walk.set_model_refusing(
+                    model_refusing.refusing() || signed_out.holds(),
+                    model_refusing.holds(clock) || signed_out.holds(),
+                );
             }
             let note = walk.tick(
                 clock,
@@ -11706,7 +11760,7 @@ fn conversation_with_gate_inner(
             {
                 if let (Some(words), Some(provider_session)) = (
                     walk.take_invitation(offer.invitation, monotonic_us()),
-                    unasked_session(&cloud, paused),
+                    unasked_session(&cloud, unasked_paused),
                 ) {
                     snapshot = commit_written_turn(
                         owner,
@@ -11766,7 +11820,7 @@ fn conversation_with_gate_inner(
                 )?;
             }
             if let Some(note) = note
-                && let Some(provider_session) = unasked_session(&cloud, paused)
+                && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             {
                 snapshot = commit_written_turn(
                     owner,
@@ -12150,7 +12204,7 @@ fn conversation_with_gate_inner(
             && !submission_draining
             && snapshot.listening_ready(now())
             && clock.saturating_sub(last_turn_us) >= 3_000_000
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
         {
             // The eyes took it as asked: say it now. Else ask them to.
             if let Some(name) = watch.asked() {
@@ -12213,7 +12267,7 @@ fn conversation_with_gate_inner(
             && !admission.owns_stream()
             && !submission_draining
             && snapshot.listening_ready(now())
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             && let Some(ticket) = news_for_skill(news, says.as_mut(), news_by_skill, &mut news_held)
             // With the switch, tasks that finished together are told in
             // one turn (the reviewer on #1161). Not while news waits for a
@@ -14080,7 +14134,7 @@ fn commit_offline_input(
     provider_queue: &mut VecDeque<ProviderInput>,
     accepted: Accepted,
     playout_start: PlayoutStart,
-    service: bool,
+    local: notices::LocalOnly,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Snapshot> {
@@ -14108,7 +14162,8 @@ fn commit_offline_input(
             "prefix_first_host_read_us":accepted.audio.first().map(|p|p.captured_at_us),
             "candidate":accepted.candidate.id,"admission_basis":accepted.basis,
             "provider_session":null,"local_only":true,
-            "boundary":if service {"the voice service cannot be reached: listened to, never sent"}
+            "boundary":if local.signed_out {"this lamp is signed out: listened to, never sent"}
+                else if local.service {"the voice service cannot be reached: listened to, never sent"}
                 else {"the internet cannot be reached: listened to, never sent"}}),
     )?;
     let mut current = Reply {
@@ -14128,11 +14183,7 @@ fn commit_offline_input(
         playback_gaps: 0,
         notice: NoticeDelivery::default(),
         media: Default::default(),
-        local_only: Some(notices::LocalOnly {
-            speech: false,
-            back: false,
-            service,
-        }),
+        local_only: Some(local),
         reminder: None,
         say: None,
         news: Vec::new(),
@@ -14259,11 +14310,13 @@ fn reach_verdict(on: bool, bus: io::Result<lamp_bus::Bus>) -> ReachVerdict {
 /// The link is back after an outage in which the lamp said it could not
 /// reach the internet (#830): a turn the lamp takes for itself, with no
 /// input, to say "I'm back online." through the same speaker path and
-/// permits. Its request, as the offline turn's, is never sent.
-fn commit_back_online(
+/// permits. Its request, as the offline turn's, is never sent. With
+/// `signed_out`, the same turn says the lamp is signed out instead.
+fn commit_own_line(
     owner: &mut Controller,
     reply: &mut Option<Reply>,
     playout_start: PlayoutStart,
+    signed_out: bool,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Snapshot> {
@@ -14278,8 +14331,10 @@ fn commit_back_online(
         trace,
         json!({"kind":"input_admitted","owner":turn,"turn":turn.turn(),"at_us":monotonic_us(),
             "authority_issued_at_us":snapshot.issued_at().as_micros(),
-            "admission_basis":"back_online","provider_session":null,"local_only":true,
-            "boundary":"no sound was heard: the lamp says the internet is back"}),
+            "admission_basis":if signed_out {"signed_out"} else {"back_online"},
+            "provider_session":null,"local_only":true,
+            "boundary":if signed_out {"no sound was heard: the lamp says it is signed out"}
+                else {"no sound was heard: the lamp says the internet is back"}}),
     )?;
     let current = Reply {
         owner: turn,
@@ -14302,6 +14357,7 @@ fn commit_back_online(
             speech: true,
             back: true,
             service: false,
+            signed_out,
         }),
         reminder: None,
         say: None,

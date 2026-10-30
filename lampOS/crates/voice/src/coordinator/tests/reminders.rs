@@ -1882,7 +1882,12 @@ fn offline_user_interruption_retries_only_after_successful_authority_publication
             &mut queue,
             accepted,
             PlayoutStart::default(),
-            false,
+            notices::LocalOnly {
+                speech: false,
+                back: false,
+                service: false,
+                signed_out: false,
+            },
             &mut test.trace,
             |snapshot| {
                 assert_ne!(snapshot.owner(), Some(chunk.permit.owner()));
@@ -1950,7 +1955,12 @@ fn user_interruption_cannot_retry_a_failed_provider_with_unretired_audio() {
         &mut queue,
         accepted,
         PlayoutStart::default(),
-        false,
+        notices::LocalOnly {
+            speech: false,
+            back: false,
+            service: false,
+            signed_out: false,
+        },
         &mut test.trace,
         |snapshot| {
             assert_ne!(snapshot.owner(), Some(chunk.permit.owner()));

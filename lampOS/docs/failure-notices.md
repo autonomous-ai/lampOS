@@ -56,7 +56,7 @@ No wording or voice has been approved.
 
 | Field | Rule |
 |---|---|
-| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) or `wifi_recovering` (#3743: the recovery hotspot's line, asked the same way by `lamp-setup recover`, `setup.md`, "When the saved network is gone") |
+| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`), `signed_out` (`LAMP_SIGNED_OUT`), `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) or `wifi_recovering` (#3743: the recovery hotspot's line, asked the same way by `lamp-setup recover`, `setup.md`, "When the saved network is gone") |
 | `language` | A BCP 47 tag, matched exactly. `en` does not satisfy `en-US` |
 | `transcript` | The words in the recording, 1 to 240 bytes, no control characters. Kept for records and review; never sent anywhere to be spoken |
 | `voice`, `voice_revision` | What produced the recording, 1 to 64 bytes each |
@@ -253,6 +253,46 @@ the new kind goes onto a lamp only with, or after, the build that knows it.
 answering, speech over the service line's playback can reach the second
 voice's speech-to-text, as speech over any of the lamp's speech can; that is
 inside heard-always's own scope.
+
+## Signed out: the lamp's login is no longer accepted
+
+With `LAMP_SIGNED_OUT=on`, in `lamp-voice`'s and `lamp-cloud`'s environments,
+a lamp removed and added again says why it has gone quiet. `lamp-cloud` decides
+(`cloud.md`, "Signed out") and says so on `account/state`; the voice reads it
+once a second (`coordinator/signed_out.rs`). A spoken reply needs that same
+login, so the words can only come from a kept recording: "I've been signed out.
+Please set me up again in the app."
+
+- **Once a spell, with nothing asked.** A turn the lamp takes for itself
+  (`commit_own_line`, as "back online" is), when nothing holds the lamp, the
+  microphones are allowed and the room is quiet as for a reminder. It counts as
+  said once the speaker has taken some of it or it retired: a Stop before that
+  leaves it owed. A spell already 5 minutes old when the voice first reads it
+  (`SAID_UNASKED_WITHIN_S`) is a voice restarted in it, and is not said again
+  unasked; `lamp-cloud` keeps the spell's start across its own restarts.
+- **Again when someone talks.** Each line of speech heard is a local-only turn
+  that says it, however often. A sound let through or a scrap too short to be a
+  request gets the offline breath alone.
+- **Nothing is sent.** No turn goes to the service, and nothing the lamp starts
+  itself (a reminder, a setup step, a skill's ask) begins: they wait as while
+  paused. Unlike a refusal (above) there is no minute's try: only `lamp-cloud`
+  ending the spell lets turns go again.
+- **Ends** when `account/state` says signed in, or stops being said: a stopped
+  or older `lamp-cloud` never holds a turn. No "back online" follows.
+- With no recording, a person who spoke gets the sigh below, and the lamp's own
+  turn is silent and let go. `failure_notice_capability` says `signed_out`. The
+  voice's health warns while it lasts (`bus_out::signed_out`).
+
+**Not yet on a lamp.** No clip is rendered or pinned: a notices release with
+`signed_out` goes onto a lamp only with, or after, a build that knows the kind,
+as for the kinds above. In the owner's language the line comes from the speech
+cache when it was kept before the login was refused, and from the file
+otherwise. Off unless set.
+
+**What is not stopped:** with the Live route, the provider link's own
+reconnecting; and the speech cache's retries of lines it has not rendered, which
+stay bounded as they are. The product's second route opens its connections only
+as a line begins, so a held line opens none.
 
 ## Verified, and not
 
