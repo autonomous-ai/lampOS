@@ -48,6 +48,84 @@ pub const HAND_MOVED: f64 = 0.05;
 pub const HAND_BAR: f64 = 0.5;
 /// The sound classes told, never `speech`.
 pub const SOUND_CLASSES: [&str; 4] = ["music", "laughter", "door", "footsteps"];
+/// `air.changed` is told at most this often, as often as `air/state` comes.
+pub const AIR_EVERY_US: u64 = 5_000_000;
+/// A reading of the air or the board not heard again this long is no longer
+/// known: both come every 5 s, and `board/state` means nothing after 15.
+pub const READING_STALE_US: u64 = 15_000_000;
+/// How far each air value moves to be news, in its own unit: particles in
+/// µg/m³, carbon dioxide in ppm, humidity in percent, temperature in °C. A
+/// value that comes or goes (known, then not) is news too, and so is `feel`.
+pub const AIR_STEPS: [(&str, f64); 7] = [
+    ("pm1_0", 5.0),
+    ("pm2_5", 5.0),
+    ("pm4_0", 5.0),
+    ("pm10", 5.0),
+    ("co2_ppm", 50.0),
+    ("humidity", 3.0),
+    ("temperature", 0.5),
+];
+
+/// An air reading as told: each value `air/state` knows (a value the sensor
+/// doesn't know yet is left out), and `feel`.
+fn air_reading(payload: &Value) -> Value {
+    let mut reading = serde_json::Map::new();
+    for (name, _) in AIR_STEPS {
+        // The sensor's f32 widened is 12.300000190734863: told to a tenth,
+        // and carbon dioxide whole, as the sensor measures them.
+        if let Some(value) = payload[name].as_f64() {
+            let told = if name == "co2_ppm" {
+                json!(value.round() as i64)
+            } else {
+                json!((value * 10.0).round() / 10.0)
+            };
+            reading.insert(name.to_owned(), told);
+        }
+    }
+    if let Some(feel) = payload["feel"].as_str() {
+        reading.insert("feel".to_owned(), json!(feel));
+    }
+    Value::Object(reading)
+}
+
+/// Whether `now` is news over `told`: a value moved by its step, or came
+/// or went, or `feel` changed.
+fn air_moved(told: &Value, now: &Value) -> bool {
+    told["feel"] != now["feel"]
+        || AIR_STEPS.iter().any(
+            |(name, step)| match (told[name].as_f64(), now[name].as_f64()) {
+                (Some(a), Some(b)) => (a - b).abs() >= *step,
+                (None, None) => false,
+                _ => true,
+            },
+        )
+}
+
+/// The lamp's own computer as `get` `device` tells it, from `board/state`.
+fn device_reading(payload: &Value) -> Value {
+    let mut reading = serde_json::Map::new();
+    for name in ["cpu_load", "memory_used", "disk_free", "uptime_s"] {
+        if payload[name].is_number() {
+            reading.insert(name.to_owned(), payload[name].clone());
+        }
+    }
+    if payload["temperature_c"].is_object() {
+        reading.insert("temperature_c".to_owned(), payload["temperature_c"].clone());
+    }
+    Value::Object(reading)
+}
+
+/// A reading with `known: true`, or `{"known": false}` without one.
+fn known(reading: Option<&(Value, u64)>) -> Value {
+    match reading {
+        Some((Value::Object(values), _)) => {
+            let mut state = values.clone();
+            state.insert("known".to_owned(), json!(true));
+            Value::Object(state)
+        }
+        _ => json!({"known": false}),
+    }
+}
 
 /// What a bus message means for the door.
 #[derive(Clone, Debug, PartialEq)]
@@ -134,6 +212,15 @@ pub struct Watch {
     /// The last hand told, none once its going is told, and when.
     hand_told: Option<Hand>,
     hand_told_us: Option<u64>,
+    /// The newest air reading (`air/state`, its known values and `feel`),
+    /// and when it was heard.
+    air: Option<(Value, u64)>,
+    /// The last air reading told as `air.changed`, and when.
+    air_told: Option<Value>,
+    air_told_us: Option<u64>,
+    /// The newest reading of the lamp's own computer (`board/state`), and
+    /// when it was heard.
+    device: Option<(Value, u64)>,
 }
 
 impl Watch {
@@ -263,6 +350,14 @@ impl Watch {
                 self.mood = Self::kept_of(topic, payload).unwrap_or_default();
                 Vec::new()
             }
+            "air/state" => {
+                self.air = Some((air_reading(payload), now_us));
+                self.air_news(now_us)
+            }
+            "board/state" => {
+                self.device = Some((device_reading(payload), now_us));
+                Vec::new()
+            }
             _ => Vec::new(),
         }
     }
@@ -283,7 +378,19 @@ impl Watch {
     /// A hand not heard of for [`HAND_GONE_US`] is gone, and one held back
     /// by [`HAND_EVERY_US`] is told now.
     pub fn lapse(&mut self, now_us: u64) -> Vec<Out> {
+        let stale = |reading: &Option<(Value, u64)>| {
+            reading
+                .as_ref()
+                .is_some_and(|(_, heard)| now_us.saturating_sub(*heard) >= READING_STALE_US)
+        };
+        if stale(&self.air) {
+            self.air = None;
+        }
+        if stale(&self.device) {
+            self.device = None;
+        }
         let mut out = self.hand_news(now_us);
+        out.extend(self.air_news(now_us));
         let lapsed = self
             .privacy_us
             .is_some_and(|heard| now_us.saturating_sub(heard) >= PRIVACY_LAPSE_US);
@@ -320,6 +427,29 @@ impl Watch {
         vec![Out::Event(EventKind::Hand, hand.told())]
     }
 
+    /// The air, by edge: the first reading, then one where a value moved by
+    /// its [`AIR_STEPS`], came or went, or `feel` changed, at most every
+    /// [`AIR_EVERY_US`] with the newest held back until then.
+    fn air_news(&mut self, now_us: u64) -> Vec<Out> {
+        let Some((air, _)) = &self.air else {
+            return Vec::new();
+        };
+        let news = self
+            .air_told
+            .as_ref()
+            .is_none_or(|told| air_moved(told, air));
+        let due = self
+            .air_told_us
+            .is_none_or(|told| now_us.saturating_sub(told) >= AIR_EVERY_US);
+        if !news || !due {
+            return Vec::new();
+        }
+        let air = air.clone();
+        self.air_told = Some(air.clone());
+        self.air_told_us = Some(now_us);
+        vec![Out::Event(EventKind::AirChanged, air)]
+    }
+
     /// The state `get` answers for `kind`.
     pub fn state(&self, kind: crate::protocol::StateKind) -> Value {
         use crate::protocol::StateKind;
@@ -337,6 +467,10 @@ impl Watch {
                 }
             },
             StateKind::Mood => self.mood.clone(),
+            // The newest reading, with `known`; `known: false` with no sensor,
+            // its part not running, or nothing in [`READING_STALE_US`].
+            StateKind::Air => known(self.air.as_ref()),
+            StateKind::Device => known(self.device.as_ref()),
             StateKind::Lamp => {
                 json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
             }
@@ -860,5 +994,105 @@ mod tests {
             watch.state(StateKind::Light)["shows"],
             json!({"on": true, "colour": "warm", "level": 1})
         );
+    }
+
+    fn air(pm2_5: f32, co2: u16, feel: &str) -> Value {
+        json!({"pm1_0": 3.0f32, "pm2_5": pm2_5, "pm4_0": null, "pm10": 9.5f32, "humidity": 41.3f32,
+               "temperature": 27.1f32, "co2_ppm": co2, "feel": feel})
+    }
+
+    /// `air.changed`: the first reading, then only one that moved by a
+    /// step, at most every 5 s, the newest held back until then; values the
+    /// sensor doesn't know are left out, and `get` `air` says `known`.
+    #[test]
+    fn the_air_is_told_when_it_moves_at_most_every_five_seconds() {
+        let mut watch = Watch::new();
+        assert_eq!(watch.state(StateKind::Air), json!({"known": false}));
+        let first = watch.take("air/state", &air(12.3, 640, "fresh"), 0);
+        assert_eq!(
+            first,
+            [Out::Event(
+                EventKind::AirChanged,
+                json!({"pm1_0": 3.0, "pm2_5": 12.3, "pm10": 9.5, "humidity": 41.3,
+                       "temperature": 27.1, "co2_ppm": 640, "feel": "fresh"})
+            )]
+        );
+        // Under every step: nothing, however late.
+        assert!(
+            watch
+                .take("air/state", &air(14.0, 680, "fresh"), 6_000_000)
+                .is_empty()
+        );
+        // Past a step but within 5 s of the last told: held back, then told
+        // by the check, with the newest reading.
+        let mut watch = Watch::new();
+        watch.take("air/state", &air(12.3, 640, "fresh"), 0);
+        assert!(
+            watch
+                .take("air/state", &air(12.3, 900, "fine"), 2_000_000)
+                .is_empty()
+        );
+        assert!(watch.lapse(4_000_000).is_empty());
+        let later = watch.lapse(5_000_000);
+        assert_eq!(kinds(&later), [EventKind::AirChanged]);
+        let Out::Event(_, told) = &later[0] else {
+            unreachable!()
+        };
+        assert_eq!(
+            (told["co2_ppm"].clone(), told["feel"].clone()),
+            (json!(900), json!("fine"))
+        );
+        assert_eq!(watch.state(StateKind::Air)["known"], json!(true));
+        assert_eq!(watch.state(StateKind::Air)["co2_ppm"], json!(900));
+        // Not heard for 15 s: no longer known.
+        watch.lapse(16_999_999);
+        assert_eq!(watch.state(StateKind::Air)["known"], json!(true));
+        watch.lapse(17_000_000);
+        assert_eq!(watch.state(StateKind::Air), json!({"known": false}));
+    }
+
+    /// A value that comes or goes is news, and so is `feel`.
+    #[test]
+    fn an_air_value_that_comes_or_goes_or_a_new_feel_is_news() {
+        let mut watch = Watch::new();
+        watch.take(
+            "air/state",
+            &json!({"pm2_5": null, "co2_ppm": null, "feel": "unknown"}),
+            0,
+        );
+        assert_eq!(
+            kinds(&watch.take(
+                "air/state",
+                &json!({"pm2_5": 4.0f32, "co2_ppm": null, "feel": "unknown"}),
+                5_000_000
+            )),
+            [EventKind::AirChanged]
+        );
+        assert_eq!(
+            kinds(&watch.take(
+                "air/state",
+                &json!({"pm2_5": 4.0f32, "co2_ppm": 790, "feel": "fresh"}),
+                10_000_000
+            )),
+            [EventKind::AirChanged]
+        );
+    }
+
+    /// `get` `device`: `board/state`'s numbers with `known`, never told as
+    /// an event; `known: false` once not heard for 15 s.
+    #[test]
+    fn the_device_is_the_boards_newest_numbers() {
+        let mut watch = Watch::new();
+        assert_eq!(watch.state(StateKind::Device), json!({"known": false}));
+        let board = json!({"temperature_c": {"cpu_thermal": 61.5}, "cpu_load": 0.42, "memory_used": 0.55,
+                           "disk_free": 0.71, "uptime_s": 3600, "wifi_dbm": -52, "clock_synced": true});
+        assert!(watch.take("board/state", &board, 1_000_000).is_empty());
+        assert_eq!(
+            watch.state(StateKind::Device),
+            json!({"temperature_c": {"cpu_thermal": 61.5}, "cpu_load": 0.42, "memory_used": 0.55,
+                   "disk_free": 0.71, "uptime_s": 3600, "known": true})
+        );
+        watch.lapse(16_000_000);
+        assert_eq!(watch.state(StateKind::Device), json!({"known": false}));
     }
 }

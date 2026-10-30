@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { Keyring, Lamp, LampError, NotPaired, WrongLamp, byCode, fromReply, schema } from '../src/index.js';
-import { FakeLamp, HAND_PATHS, handEvents, handTrack } from '../src/testing.js';
+import { AIR, DEVICE, FakeLamp, HAND_PATHS, handEvents, handTrack } from '../src/testing.js';
 
 // A move the body plays (and lamp-control takes): 4 frames of 500 ms, 1.5 s in
 // all, from rest and back, well inside each joint's reach and speed.
@@ -404,6 +404,27 @@ test('get answers the states asked', async () => {
     const state = await lamp.get('presence', 'lamp');
     // As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
     assert.deepEqual(state, { presence: { count: 2, near: 0.4, facing: true }, lamp: { talking: false, paused: false, private: false, asleep: false } });
+  });
+});
+
+test('air and device need their grants, and air.changed comes on a new reading', async () => {
+  await withLamp({ grants: ['air', 'device'] }, async (lamp, fake) => {
+    assert.deepEqual(await lamp.air(), AIR);
+    assert.deepEqual(await lamp.device(), DEVICE);
+    let told;
+    const heard = new Promise((resolve) => { told = resolve; });
+    await lamp.on('air.changed', (event) => told(event));
+    fake.setAir({ pm2_5: 41, co2_ppm: 1350, feel: 'stuffy' });
+    const event = await heard;
+    assert.deepEqual([event.pm2_5, event.co2_ppm, event.feel], [41, 1350, 'stuffy']);
+    assert.deepEqual(await lamp.air(), { pm2_5: 41, co2_ppm: 1350, feel: 'stuffy', known: true });
+    // No sensor: known false, nothing else.
+    fake.setAir();
+    assert.deepEqual(await lamp.air(), { known: false });
+  });
+  await withLamp({ grants: ['light'] }, async (lamp) => {
+    await assert.rejects(lamp.air(), /no_grant/);
+    await assert.rejects(lamp.device(), /no_grant/);
   });
 });
 

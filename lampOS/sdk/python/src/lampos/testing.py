@@ -236,6 +236,13 @@ def _now() -> str:
     return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+# A made-up air reading and computer, as lamp-control's `get` answers them
+# (watch.rs `air_reading` and `device_reading`): the fake lamp's own.
+AIR = {"pm1_0": 2.1, "pm2_5": 5.3, "pm4_0": 6.8, "pm10": 7.9, "co2_ppm": 620, "humidity": 45.0, "temperature": 27.4,
+       "feel": "fresh", "known": True}
+DEVICE = {"cpu_load": 0.25, "memory_used": 0.4, "disk_free": 0.6, "uptime_s": 3600,
+          "temperature_c": {"cpu_thermal": 55.0}, "known": True}
+
 class FakeLamp:
     """A lamp that speaks the protocol on 127.0.0.1 and records what it's asked."""
 
@@ -292,6 +299,10 @@ class FakeLamp:
             "light": None,
             "mood": None,
             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
+            # Made-up readings, as lamp-control answers them; `set_air` changes
+            # the air and tells `air.changed`, `{"known": False}` for none.
+            "air": dict(AIR),
+            "device": dict(DEVICE),
         }
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
         # Each connection whose head follows the hand (`look` at `hand`) and
@@ -348,6 +359,14 @@ class FakeLamp:
         for ws in list(self._connections):
             if event in self.subscribed[id(ws)]:
                 await ws.send(frame)
+
+    async def set_air(self, **reading: Any) -> None:
+        """The air sensor reads `reading` (`pm2_5=40.0, co2_ppm=1300, feel="stuffy"`, ...): `get` `air` answers it,
+        and `air.changed` is told, as lamp-control tells a change past a step. With nothing, no sensor:
+        `{"known": False}`."""
+        self.state["air"] = {**reading, "known": True} if reading else {"known": False}
+        if reading:
+            await self.emit("air.changed", **reading)
 
     def _show(self, request: dict) -> None:
         """The ring shows a computer's light while it lasts."""
@@ -518,13 +537,15 @@ class FakeLamp:
         "person.arrived": "look", "person.left": "look", "person.stood_up": "look", "person.facing": "look",
         "hand": "look",
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
+        "air.changed": "air",
     }
+    STATE_GRANT = {"presence": "look", "air": "air", "device": "device"}
 
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
-            return ["look"] if "presence" in request.get("state", []) else []
+            return sorted({self.STATE_GRANT[s] for s in request.get("state", []) if s in self.STATE_GRANT})
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") in ("face", "hand") else ["body"]

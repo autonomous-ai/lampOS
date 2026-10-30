@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device).",
       "enum": [
         "body",
         "light",
@@ -35,7 +35,9 @@
         "look",
         "hear",
         "sound",
-        "skills"
+        "skills",
+        "air",
+        "device"
       ]
     },
     "part": {
@@ -59,7 +61,8 @@
         "touch",
         "button",
         "time",
-        "lamp.changed"
+        "lamp.changed",
+        "air.changed"
       ]
     },
     "state_name": {
@@ -67,7 +70,9 @@
         "presence",
         "light",
         "mood",
-        "lamp"
+        "lamp",
+        "air",
+        "device"
       ]
     },
     "colour": {
@@ -899,6 +904,114 @@
                 },
                 "lamp": {
                   "$ref": "#/$defs/lamp_state"
+                },
+                "air": {
+                  "description": "get's air (the air grant): the newest reading with known: true, or only known: false.",
+                  "type": "object",
+                  "properties": {
+                    "pm1_0": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 1 µm, µg/m³, to a tenth."
+                    },
+                    "pm2_5": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                    },
+                    "pm4_0": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 4 µm, µg/m³, to a tenth."
+                    },
+                    "pm10": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 10 µm, µg/m³, to a tenth."
+                    },
+                    "co2_ppm": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Carbon dioxide, parts per million."
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "Relative humidity at the sensor, percent, to a tenth."
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "minimum": -40,
+                      "maximum": 125,
+                      "description": "Degrees Celsius at the sensor, to a tenth: inside the lamp's base, warmed by the lamp, so not the room's."
+                    },
+                    "feel": {
+                      "enum": [
+                        "fresh",
+                        "fine",
+                        "stuffy",
+                        "very_stuffy",
+                        "unknown"
+                      ],
+                      "description": "How the air would feel, from the carbon dioxide: fresh under 800 ppm, fine to 1,200, stuffy to 2,000, very_stuffy past it, unknown without a reading."
+                    },
+                    "known": {
+                      "type": "boolean",
+                      "description": "Whether there is a reading: false with no sensor, its part not running, or none in 15 s, and then nothing else."
+                    }
+                  },
+                  "required": [
+                    "known"
+                  ],
+                  "additionalProperties": false
+                },
+                "device": {
+                  "description": "get's device (the device grant): the newest numbers with known: true, or only known: false.",
+                  "type": "object",
+                  "properties": {
+                    "cpu_load": {
+                      "type": "number",
+                      "minimum": 0,
+                      "description": "The last minute's load over the processors: 1 is every processor busy."
+                    },
+                    "memory_used": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "The share of memory in use."
+                    },
+                    "disk_free": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "The share of the system disk free."
+                    },
+                    "uptime_s": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Seconds since the board started."
+                    },
+                    "temperature_c": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      },
+                      "description": "Each temperature the board reports, by its sensor's name, in degrees Celsius."
+                    },
+                    "known": {
+                      "type": "boolean",
+                      "description": "Whether there is a reading: false with no sensor, its part not running, or none in 15 s, and then nothing else."
+                    }
+                  },
+                  "required": [
+                    "known"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
@@ -1656,8 +1769,167 @@
               "how"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "air.changed"
+              }
+            }
+          },
+          "then": {
+            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 µg/m³, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
+            "properties": {
+              "pm1_0": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 1 µm, µg/m³, to a tenth."
+              },
+              "pm2_5": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+              },
+              "pm4_0": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 4 µm, µg/m³, to a tenth."
+              },
+              "pm10": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 10 µm, µg/m³, to a tenth."
+              },
+              "co2_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Carbon dioxide, parts per million."
+              },
+              "humidity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Relative humidity at the sensor, percent, to a tenth."
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": -40,
+                "maximum": 125,
+                "description": "Degrees Celsius at the sensor, to a tenth: inside the lamp's base, warmed by the lamp, so not the room's."
+              },
+              "feel": {
+                "enum": [
+                  "fresh",
+                  "fine",
+                  "stuffy",
+                  "very_stuffy",
+                  "unknown"
+                ],
+                "description": "How the air would feel, from the carbon dioxide: fresh under 800 ppm, fine to 1,200, stuffy to 2,000, very_stuffy past it, unknown without a reading."
+              }
+            }
+          }
         }
       ]
+    },
+    "air": {
+      "description": "The air sensor's newest reading (air/state, every 5 s). A value the sensor doesn't know yet is left out.",
+      "type": "object",
+      "properties": {
+        "pm1_0": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 1 µm, µg/m³, to a tenth."
+        },
+        "pm2_5": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+        },
+        "pm4_0": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 4 µm, µg/m³, to a tenth."
+        },
+        "pm10": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 10 µm, µg/m³, to a tenth."
+        },
+        "co2_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Carbon dioxide, parts per million."
+        },
+        "humidity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Relative humidity at the sensor, percent, to a tenth."
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": -40,
+          "maximum": 125,
+          "description": "Degrees Celsius at the sensor, to a tenth: inside the lamp's base, warmed by the lamp, so not the room's."
+        },
+        "feel": {
+          "enum": [
+            "fresh",
+            "fine",
+            "stuffy",
+            "very_stuffy",
+            "unknown"
+          ],
+          "description": "How the air would feel, from the carbon dioxide: fresh under 800 ppm, fine to 1,200, stuffy to 2,000, very_stuffy past it, unknown without a reading."
+        }
+      },
+      "additionalProperties": false
+    },
+    "device": {
+      "description": "The lamp's own computer (board/state, every 5 s).",
+      "type": "object",
+      "properties": {
+        "cpu_load": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The last minute's load over the processors: 1 is every processor busy."
+        },
+        "memory_used": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The share of memory in use."
+        },
+        "disk_free": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The share of the system disk free."
+        },
+        "uptime_s": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Seconds since the board started."
+        },
+        "temperature_c": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Each temperature the board reports, by its sensor's name, in degrees Celsius."
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
