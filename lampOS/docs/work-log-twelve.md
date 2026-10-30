@@ -574,3 +574,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   All were fixed in `e748dbf26e` with a test each, and both gave READ-OK.
 - The train bot asked for a rebase. I rebased onto `c8ff2b8424` and pushed with `--force-with-lease` on my own branch; the patch is the same and the gate is green.
 - Left for #4175: busy_day on lamp-4ace with the switches on and off (asked of the first builder on #3997), then the 3+3 night runs; the Reviewer-lead's two P3s on the asking-clause trade-off.
+
+## 30 Oct, 16:49: Welcome back taken (the first builder's 17:1x, item 3)
+
+- Taken on #3997 (c6519832643); no issue carries it yet. Branch `twelve/welcome-back-once-an-hour`. Wanted: at most once an hour per person; a hello and the name only; the part of the day from the lamp's local time in the note; the Policy's hello gate asked even with `LAMP_SKILLS_ASK=skip`.
