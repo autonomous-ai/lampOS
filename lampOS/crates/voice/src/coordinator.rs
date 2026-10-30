@@ -7000,6 +7000,18 @@ fn conversation_with_gate_inner(
             }
         );
     }
+    // A yield made late in a person's speech over the lamp commits on
+    // stillness instead of resuming (`LAMP_CUT_IN_LATE_YIELD=on`): a
+    // question mostly heard as under the lamp yields only as it ends
+    // (lamp-c0a4, 31 Oct). Off unless set.
+    let late_yield = duplex && crate::turn_taking::cut_in_late_yield();
+    if late_yield {
+        eprintln!(
+            "lamp-voice: late yields commit: a yield with {} blocks over the lamp in the {} before it commits on stillness instead of resuming the answer",
+            lamp_audio::duplex::LATE_YIELD_OVER_BLOCKS,
+            lamp_audio::duplex::LATE_YIELD_WINDOW_BLOCKS,
+        );
+    }
     detector.keep_first_words(first_words);
     // A line that begins softly keeps its first word (`LAMP_SOFT_START=on`):
     // an ordinary start, the lamp silent, may begin at it. Off unless set;
@@ -7238,6 +7250,9 @@ fn conversation_with_gate_inner(
         }
         if near_asker {
             mask.cut_in_near_asker();
+        }
+        if late_yield {
+            mask.cut_in_late_yield();
         }
         if backchannel_holds {
             mask.hold_backchannels();
@@ -13726,6 +13741,11 @@ fn hear_capture_block(
         }
         event["held_ms"] = json!(held_ms);
         event["backchannel"] = json!(backchannel);
+    }
+    // Whether the yield was made late in a person's speech over the lamp
+    // (`LAMP_CUT_IN_LATE_YIELD`), with the switch or without it.
+    if listened.step == DuplexStep::Commit {
+        event["late_yield"] = json!(mask.yield_was_late());
     }
     record(trace, event)?;
     match listened.step {
